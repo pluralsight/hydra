@@ -1,0 +1,97 @@
+{
+  "deviceDna": {
+    "OS": "windows",
+    "AppType": "sgmarghade",
+    "installID": "GHRT345GHYT",
+    "signals": {
+      "DeviceId": "Gm9mCkLOtpIsPRbvs2CDZedt4Bw=3D",
+      "OriginalMobileOperatorName": "000-IN",
+      "appVersion": "9.1.0",
+      "DeviceStatus": {
+        "DeviceManufacturer": "Microsoft",
+        "DeviceName": "RM-1067_1005",
+        "DeviceFirmwareVersion": "02177.00000.15184.36002",
+        "DeviceHardwareVersion": "2.4.0.0",
+        "DeviceTotalMemory": "966664192",
+        "PowerSource": "External"
+      },
+      "OSversion": "8.1",
+      "ANID2": "A=3DE32ACBXXXXXXXXX3B337B68CFFFFFFFF&E=3Dd59&W=3D1",
+      "HostNameDetails": [
+        {
+          "CanonicalName": "192.168.2.4",
+          "DisplayName": "192.168.2.4",
+          "IanaInterfaceType": "71",
+          "NetworkAdapterId": "00f61850-1850-00f6-5018-f6007854f600",
+          "NetworkId": "",
+          "RawName": "192.168.2.4",
+          "Type": "Ipv4"
+        },
+        {
+          "CanonicalName": "192.168.2.4",
+          "DisplayName": "192.168.2.4",
+          "IanaInterfaceType": "71",
+          "NetworkAdapterId": "00f61850-1850-00f6-5018-f6007854f600",
+          "NetworkId": "",
+          "RawName": "192.168.2.4",
+          "Type": "Ipv4"
+        }
+      ],
+      "InternetConnectionProfile": {
+        "ProfileName": "belkin.36fe",
+        "IanaInterfaceType": "71",
+        "NetworkAdapterId": "89c8990e-085a-40be-bfd6-9b5e4277f261",
+        "NetworkId": "6aa40415-0002-0000-0000-000000000000",
+        "NetworkAuthenticationType": "RsnaPsk",
+        "NetworkEncryptionType": "Ccmp"
+      },
+      "ConnectonProfiles": [
+        {
+          "ProfileName": "belkin.36fe",
+          "IanaInterfaceType": "71",
+          "NetworkAdapterId": "89c8990e-085a-40be-bfd6-9b5e4277f261",
+          "NetworkId": "6aa40415-0002-0000-0000-000000000000",
+          "NetworkAuthenticationType": "RsnaPsk",
+          "NetworkEncryptionType": "Ccmp"
+        },
+        {
+          "ProfileName": "belkin.36fe",
+          "IanaInterfaceType": "71",
+          "NetworkAdapterId": "89c8990e-085a-40be-bfd6-9b5e4277f261",
+          "NetworkId": "6aa40415-0002-0000-0000-000000000000",
+          "NetworkAuthenticationType": "RsnaPsk",
+          "NetworkEncryptionType": "Ccmp"
+        }
+      ],
+      "LanIdentifiers": [
+        {
+          "InfrastructureId": "Windows.Networking.Connectivity.LanIdentifierData",
+          "NetworkAdapterId": "89c8990e-085a-40be-bfd6-9b5e4277f261",
+          "PortId": ""
+        }
+      ],
+      "SSID": "belkin.36fe",
+      "CellularMobileOperator": "cellmobileoperator",
+      "NetworkInferfaceList": [
+        {
+          "InterfaceName": "belkin.36fe",
+          "InterfaceState": "Connected",
+          "InterfaceType": "Wireless80211",
+          "InterfaceSubtype": "WiFi",
+          "Description": "belkin.36fe",
+          "Characteristics": "None",
+          "Bandwidth": "300000"
+        },
+        {
+          "InterfaceName": "belkin.36fe",
+          "InterfaceState": "Connected",
+          "InterfaceType": "Wireless80211",
+          "InterfaceSubtype": "WiFi",
+          "Description": "belkin.36fe",
+          "Characteristics": "None",
+          "Bandwidth": "300000"
+        }
+      ]
+    }
+  }
+}
