@@ -115,6 +115,7 @@ public class JsonConverter<T extends GenericRecord> {
         return schema;
     }
 
+    @SuppressWarnings("unchecked")
     public T convert(String json) throws IOException {
         try {
             //let's be proactive and fail fast with strict validation

@@ -1,5 +1,6 @@
 package hydra.common.akka
 
+import akka.actor.Actor
 import hydra.common.util.StringUtils
 
 import scala.reflect.ClassTag
@@ -23,7 +24,7 @@ object ActorUtils {
     * @return The "standard" default name for actors used in Hydra, which is created by converting the
     *         class name of the actor from camel case to underscores.
     */
-  def actorName(clazz: Class[_]): String = {
+  def actorName(clazz: Class[_ <: Actor]): String = {
     StringUtils.camel2underscores(clazz.getSimpleName)
   }
 

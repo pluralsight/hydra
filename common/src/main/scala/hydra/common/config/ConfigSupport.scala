@@ -32,25 +32,17 @@ import scala.language.implicitConversions
   * These configuration properties are exposed under a single object named ``config``
   * Created by alexsilva on 10/28/15.
   */
-trait ConfigSupport {
+trait ConfigSupport extends ConfigComponent {
 
   private val defaultConfig = ConfigFactory.load()
 
+  val externalConfig = loadExternalConfig(defaultConfig)
+
   val applicationName: String = defaultConfig.getString("application.name")
 
-  private val fileConfig = defaultConfig.get[String]("application.config.location")
-    .map(f => ConfigFactory.parseFile(new java.io.File(f))).valueOrElse(ConfigFactory.empty())
-
-  val rootConfig: Config = fileConfig.withFallback(defaultConfig)
+  val rootConfig: Config = externalConfig.withFallback(defaultConfig)
 
   val applicationConfig: Config = rootConfig.getConfig(applicationName)
-
-  def mergeConfig(addtlConfig: Option[Config]): Config = {
-    addtlConfig match {
-      case Some(conf) if !conf.isEmpty => conf.withFallback(rootConfig)
-      case _ => rootConfig
-    }
-  }
 
   import scala.collection.JavaConverters._
 
@@ -64,5 +56,10 @@ trait ConfigSupport {
     cfg.entrySet().asScala.map({ entry =>
       entry.getKey -> entry.getValue.unwrapped()
     })(collection.breakOut)
+  }
+
+  def loadExternalConfig(c: Config): Config = {
+    c.get[String]("application.config.location")
+      .map(f => ConfigFactory.parseFile(new java.io.File(f))).valueOrElse(ConfigFactory.empty())
   }
 }

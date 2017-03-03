@@ -27,8 +27,6 @@ import scala.util.{Failure, Success, Try}
   * Sends JSON messages to a topic in Kafka.  In order for this handler to be activated.
   * a request param "Hydra-Transport" must be set to "Kafka".
   *
-  * In addition, another header named "Hydra-Kafka-Topic" needs to be specify the Kafka topic to send messages to.
-  * Otherwise, the default "hydra" topic is used.
   */
 class KafkaIngestor extends Ingestor with KafkaProducerSupport {
 

@@ -21,6 +21,7 @@ lazy val defaultSettings = Seq(
 
   resolvers += Resolver.mavenLocal,
   resolvers += "Scalaz Bintray Repo" at "https://dl.bintray.com/scalaz/releases",
+  resolvers += "Confluent Maven Repo" at "http://packages.confluent.io/maven/",
   resolvers += "jitpack" at "https://jitpack.io",
 
   ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet,
