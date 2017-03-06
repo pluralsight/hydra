@@ -21,10 +21,10 @@ import java.util.Properties
 import scala.language.implicitConversions
 
 /**
- * Created by alexsilva on 11/4/15.
- */
+  * Created by alexsilva on 11/4/15.
+  */
 object CollectionExtensions {
-  implicit def mapToProps(m: Map[String, AnyRef]): Properties = {
+  implicit def mapToProps(m: Map[String, Any]): Properties = {
     (new java.util.Properties /: m) { case (props, (k, v)) => props.put(k, v.toString); props }
   }
 }

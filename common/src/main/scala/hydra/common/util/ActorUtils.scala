@@ -1,11 +1,12 @@
-package hydra.common.akka
+package hydra.common.util
 
 import akka.actor.Actor
-import hydra.common.util.StringUtils
 
 import scala.reflect.ClassTag
 
 /**
+  * Standardizes on actor names used across Hydra.
+  *
   * Created by alexsilva on 2/17/17.
   */
 object ActorUtils {

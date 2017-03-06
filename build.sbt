@@ -6,6 +6,7 @@ enablePlugins(JavaAppPackaging)
 val JDK = "1.8"
 val buildNumber = sys.env.get("BUILD_NUMBER").getOrElse("000")
 
+
 lazy val defaultSettings = Seq(
   organization := "pluralsight",
   version := "0.6.5",

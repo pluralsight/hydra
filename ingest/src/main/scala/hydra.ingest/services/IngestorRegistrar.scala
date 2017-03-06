@@ -2,9 +2,9 @@ package hydra.ingest.services
 
 import akka.actor.Actor
 import configs.syntax._
-import hydra.common.akka.ActorUtils
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
+import hydra.common.util.ActorUtils
 import hydra.core.ingest.{ClasspathIngestorDiscovery, IngestorInfo}
 import hydra.ingest.services.IngestorRegistry.{RegisterIngestor, UnregisterIngestor}
 

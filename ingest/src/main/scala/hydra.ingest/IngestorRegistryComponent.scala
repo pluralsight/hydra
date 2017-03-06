@@ -3,8 +3,8 @@ package hydra.ingest
 import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.ask
 import akka.util.Timeout
-import hydra.common.akka.ActorUtils
 import hydra.common.config.ConfigSupport
+import hydra.common.util.ActorUtils
 import hydra.ingest.services.IngestorRegistry
 import hydra.ingest.services.IngestorRegistry.{IngestorLookupResult, Lookup}
 

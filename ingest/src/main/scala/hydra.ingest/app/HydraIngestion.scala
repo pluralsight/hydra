@@ -22,7 +22,7 @@ import akka.actor.Props
 import com.github.vonnagy.service.container.ContainerBuilder
 import com.pluralsight.hydra.network.util.NetworkUtils
 import com.typesafe.config.ConfigFactory
-import hydra.common.akka.ActorUtils
+import hydra.common.util.ActorUtils
 import hydra.core.app.HydraEntryPoint
 import hydra.ingest.services._
 import hydra.kafka.config.KafkaConfigSupport

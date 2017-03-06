@@ -1,6 +1,6 @@
-package hydra.common.akka
+package hydra.common.util
 
-import akka.actor.Actor
+import hydra.common.testing.DummyActor
 import org.scalatest.{FunSpecLike, Matchers}
 
 /**
@@ -18,8 +18,3 @@ class ActorUtilsSpec extends Matchers with FunSpecLike {
 }
 
 
-private[this] class DummyActor extends Actor {
-  override def receive: Receive = {
-    case msg => sender ! msg
-  }
-}

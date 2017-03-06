@@ -19,7 +19,7 @@ package hydra.common.config
 import akka.actor.Actor
 import com.typesafe.config.{Config, ConfigFactory}
 import configs.syntax._
-import hydra.common.akka.ActorUtils
+import hydra.common.util.ActorUtils
 
 /**
   * Created by alexsilva on 10/28/15.

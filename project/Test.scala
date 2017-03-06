@@ -1,6 +1,6 @@
 import sbt.Keys._
 import sbt._
-import scoverage.ScoverageSbtPlugin
+import scoverage.ScoverageKeys._
 
 object Test {
 
@@ -20,11 +20,11 @@ object Test {
     (test in sbt.Test) := ((test in sbt.Test) dependsOn testScalastyle).value,
 
     // Include the code coverage settings
-    ScoverageSbtPlugin.ScoverageKeys.coverageExcludedPackages := "<empty>;akka.contrib.*",
-    ScoverageSbtPlugin.ScoverageKeys.coverageMinimum := 70,
-    ScoverageSbtPlugin.ScoverageKeys.coverageFailOnMinimum := true,
+    coverageExcludedPackages := "<empty>;akka.contrib.*",
+    coverageMinimum := 70,
+    coverageFailOnMinimum := true,
 
-    ScoverageSbtPlugin.ScoverageKeys.coverageHighlighting := {
+    coverageHighlighting := {
       true
     }
   )

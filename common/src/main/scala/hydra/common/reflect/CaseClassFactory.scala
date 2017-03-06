@@ -1,7 +1,5 @@
 package hydra.common.reflect
 
-import scala.collection.immutable.ListMap
-import scala.concurrent.duration.Duration
 import scala.reflect.api.{Mirror, TypeCreator, Universe}
 import scala.reflect.runtime.universe._
 import scala.reflect.runtime.{currentMirror => cm, universe => ru}
@@ -23,12 +21,14 @@ class CaseClassFactory[T](cls: Class[T]) {
     s"CaseClassFactory only applies to case classes![$tpe],${tpe <:< typeOf[Product]},${classSymbol.isCaseClass}"
   )
 
-  val classMirror = classLoaderMirror reflectClass classSymbol
+  val classMirror: ClassMirror = classLoaderMirror.reflectClass(classSymbol)
 
-  val constructorSymbol = tpe.decl(termNames.CONSTRUCTOR)
+  val constructorSymbol: Symbol = tpe.decl(termNames.CONSTRUCTOR)
 
-  val defaultConstructor =
-    if (constructorSymbol.isMethod) constructorSymbol.asMethod
+  val defaultConstructor: MethodSymbol =
+    if (constructorSymbol.isMethod) {
+      constructorSymbol.asMethod
+    }
     else {
       val ctors = constructorSymbol.asTerm.alternatives
       ctors.map {
@@ -38,26 +38,10 @@ class CaseClassFactory[T](cls: Class[T]) {
       }.get
     }
 
-  val constructorMethod = classMirror reflectConstructor defaultConstructor
+  val constructorMethod = classMirror.reflectConstructor(defaultConstructor)
 
-  val properties: ListMap[String, TypeTag[_]] = {
-    val constructorSymbol = tpe.decl(termNames.CONSTRUCTOR)
-    val defaultConstructor =
-      if (constructorSymbol.isMethod) constructorSymbol.asMethod
-      else {
-        val ctors = constructorSymbol.asTerm.alternatives
-        ctors.map {
-          _.asMethod
-        }.find {
-          _.isPrimaryConstructor
-        }.get
-      }
-
-    ListMap[String, TypeTag[_]]() ++ defaultConstructor.paramLists.reduceLeft(_ ++ _).map {
-      sym => sym.name.toString -> tagForType(tpe.member(sym.name).asMethod.returnType)
-    }
-
-  }
+  lazy val contructorTypes: Map[String, TypeTag[_]] = Map(defaultConstructor.paramLists.reduceLeft(_ ++ _)
+    .map(sym => sym.name.toString -> tagForType(tpe.member(sym.name).asMethod.returnType)): _*)
 
   def tagForType(tpe: Type): TypeTag[_] = TypeTag(
     classLoaderMirror,
@@ -73,21 +57,9 @@ class CaseClassFactory[T](cls: Class[T]) {
     * @param args the arguments to supply to the constructor method
     */
   def buildWith(args: Seq[_]): T = {
-    val nargs = fixTypes(args)
-    constructorMethod(nargs: _*).asInstanceOf[T]
+    require(contructorTypes.size == args.size,
+      s"Class [$cls] has ${contructorTypes.size} parameters; arguments supplied have ${args.size}.")
+    constructorMethod(args: _*).asInstanceOf[T]
   }
-
-  private def fixTypes(args: Seq[Any]) = {
-    (properties zip args) map {
-      case (property, arg) => {
-        val name = property._2.tpe.typeSymbol.asClass.name.decodedName.toString
-        name match {
-          case "Duration" => Duration.create(arg.toString)
-          case x => arg
-        }
-      }
-    }
-  }.toSeq
-
 }
 

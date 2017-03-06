@@ -22,9 +22,9 @@ import akka.http.scaladsl.server.{ExceptionHandler, RequestContext, Route}
 import akka.pattern.ask
 import akka.util.Timeout
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
-import hydra.common.akka.ActorUtils
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
+import hydra.common.util.ActorUtils
 import hydra.core.http.HydraDirectives
 import hydra.core.ingest.{HydraRequest, HydraRequestMedatata}
 import hydra.core.marshallers.GenericServiceResponse
