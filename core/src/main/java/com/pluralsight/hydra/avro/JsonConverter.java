@@ -133,6 +133,7 @@ public class JsonConverter<T extends GenericRecord> {
         if (unknownFields.size() > 0) throw new UndefinedFieldsException(unknownFields, baseSchema);
     }
 
+    @SuppressWarnings("unchecked")
     private T convert(Map<String, Object> raw, Schema schema) throws IOException {
         GenericRecord result = typeClass == null ? new GenericData.Record(schema) : ClassUtil.createInstance
                 (typeClass, false);
@@ -223,6 +224,7 @@ public class JsonConverter<T extends GenericRecord> {
         return (T) result;
     }
 
+    @SuppressWarnings("unchecked")
     private Object typeConvert(Object value, String name, Schema schema) throws IOException {
         if (isNullableSchema(schema)) {
             if (value == null) {

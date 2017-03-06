@@ -58,7 +58,7 @@ abstract class HydraExtensionBase(extensionName: String, extConfig: Config)(impl
     val module = TypedActor(system).typedActorOf(
       TypedProps[HM](
         classOf[HM],
-        ReflectionUtils.instantiateClass[HM](clazz, List(cfg))
+        ReflectionUtils.instantiateClassByName[HM](clazz, List(cfg))
       ), s"${extensionName}_${moduleId}"
     )
 
