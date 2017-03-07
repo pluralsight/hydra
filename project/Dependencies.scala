@@ -41,6 +41,7 @@ object Dependencies {
       ExclusionRule(organization = "com.fasterxml.jackson.core")))
 
     val slf4j = Seq("org.slf4j" % "slf4j-api" % slf4jVersion,
+      "org.slf4j" % "slf4j-log4j12" % slf4jVersion,
       "org.apache.logging.log4j" % "log4j-core" % log4jVersion,
       "org.apache.logging.log4j" % "log4j-api" % log4jVersion,
       "org.apache.logging.log4j" % "log4j-1.2-api" % log4jVersion)

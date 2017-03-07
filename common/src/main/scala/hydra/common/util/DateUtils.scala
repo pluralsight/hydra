@@ -43,7 +43,7 @@ object DateUtils {
 
   implicit def dateTimeOrdering: Ordering[DateTime] = Ordering.fromLessThan(_ isBefore _)
 
-  class DateTimeWrapper(dt: DateTime) extends Ordered[DateTime] with Ordering[DateTime] {
+  case class DateTimeWrapper(dt: DateTime) extends Ordered[DateTime] with Ordering[DateTime] {
     def compare(that: DateTime): Int = dateComparator.compare(dt, that)
 
     def compare(a: DateTime, b: DateTime): Int = dateComparator.compare(a, b)
