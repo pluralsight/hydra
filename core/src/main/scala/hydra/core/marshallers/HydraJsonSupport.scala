@@ -20,7 +20,7 @@ import java.io.{PrintWriter, StringWriter}
 import java.util.UUID
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import hydra.common.util.Resource
+import hydra.common.util.Resource._
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 import spray.json.{JsString, _}
@@ -36,8 +36,9 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
     /** Write a throwable as an object with 'message' and 'stackTrace' fields. */
     override def write(t: Throwable): JsValue = {
-      Resource.using(new StringWriter) { stringWriter =>
-        Resource.using(new PrintWriter(stringWriter)) { printWriter =>
+
+      using(new StringWriter) { stringWriter =>
+        using(new PrintWriter(stringWriter)) { printWriter =>
           t.printStackTrace(printWriter)
           JsObject(
             "message" -> JsString(t.getMessage),

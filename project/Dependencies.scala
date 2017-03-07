@@ -21,6 +21,7 @@ object Dependencies {
   val akkaHTTPVersion = "10.0.3"
   val akkaKafkaStreamVersion = "0.13"
   val kafkaUnitVersion = "0.6"
+  val scalazVersion = "7.2.9"
 
   object Compile {
 
@@ -29,6 +30,8 @@ object Dependencies {
     val typesafeConfig = "com.typesafe" % "config" % typesafeConfigVersion
 
     val sprayJson = "io.spray" %% "spray-json" % sprayJsonVersion
+
+    val scalaz =  "org.scalaz" %% "scalaz-core" % scalazVersion
 
     val kafka = Seq(
       "org.apache.kafka" %% "kafka" % kafkaVersion,
@@ -77,16 +80,16 @@ object Dependencies {
   object Test {
     val akkaTest = "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test"
     val scalaTest = "org.scalatest" %% "scalatest" % scalaTestVersion % "test"
-    val scalazStream = "org.scalaz.stream" %% "scalaz-stream" % "0.7a" % "test"
+    val scalaMock = "org.scalamock" %% "scalamock-scalatest-support" % "3.5.0" % "test"
     val junit = "junit" % "junit" % "4.12" % "test"
   }
 
   import Compile._
   import Test._
 
-  val testDeps = Seq(akkaTest, scalazStream, scalaTest, junit)
+  val testDeps = Seq(akkaTest, scalaTest, junit, scalaMock)
 
-  val baseDeps = akka ++ slf4j ++ Seq(scalaConfigs, avro, spring, serviceContainer) ++ joda ++ testDeps
+  val baseDeps = akka ++ slf4j ++ Seq(scalaz, scalaConfigs, avro, spring, serviceContainer) ++ joda ++ testDeps
 
   val coreDeps = baseDeps ++ Seq(guavacache, reflections, slackApi) ++ confluent ++ kafka
 

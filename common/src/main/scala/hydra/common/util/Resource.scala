@@ -15,14 +15,12 @@
 
 package hydra.common.util
 
+import java.io.Closeable
+
 /**
   * Created by alexsilva on 1/10/17.
   */
 object Resource {
-
-  import scala.language.reflectiveCalls
-
-  type Closeable = {def close(): Unit}
 
   def using[A <: Closeable, B](resource: A)(f: A => B): B = {
     require(resource != null, "The supplied resource was null.")
