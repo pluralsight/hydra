@@ -40,7 +40,7 @@ lazy val noPublishSettings = Seq(
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 )
 
-lazy val moduleSettings = defaultSettings ++ Test.testSettings ++ Publish.settings
+lazy val moduleSettings = defaultSettings ++ Test.testSettings //++ Publish.settings
 
 lazy val root = Project(
   id = "hydra",

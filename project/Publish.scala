@@ -46,7 +46,7 @@ object Publish {
       * We construct _proper_ Maven-esque POMs to be able to release on Maven.
       */
     pomExtra := (
-      <url>https://github.com/pluralsight/hydra-transport</url>
+      <url>https://github.com/pluralsight/hydra</url>
         <licenses>
           <license>
             <name>The Apache Software License, Version 2.0</name>
@@ -56,8 +56,8 @@ object Publish {
         </licenses>
         <scm>
           <url>git@github.com:pluralsight/hydra.git</url>
-          <connection>scm:git@github.com:pluralsight/hydra-transport.git</connection>
-          <developerConnection>scm:git@github.com:pluralsight/hydra-transport.git</developerConnection>
+          <connection>scm:git@github.com:pluralsight/hydra.git</connection>
+          <developerConnection>scm:git@github.com:pluralsight/hydra.git</developerConnection>
           <tag>HEAD</tag>
         </scm>
         <developers>
@@ -68,8 +68,6 @@ object Publish {
           </developer>
         </developers>
       )
-
-
   )
 
 }
