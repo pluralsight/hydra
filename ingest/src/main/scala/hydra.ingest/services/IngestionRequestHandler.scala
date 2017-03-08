@@ -41,7 +41,7 @@ class IngestionRequestHandler(request: HydraRequest, registry: ActorRef,
   context.setReceiveTimeout(timeout)
 
   override def preStart(): Unit = {
-    Try(context.actorOf(IngestionSupervisor.props(registry, request, timeout))).recover {
+    Try(context.actorOf(IngestionSupervisor.props(registry, request, timeout))).map(_ ! InitiateIngestion).recover {
       case e: Exception => self ! GenericHydraError(e)
     }
   }
