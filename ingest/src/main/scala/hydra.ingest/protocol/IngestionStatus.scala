@@ -30,8 +30,9 @@ case class IngestionStatus(request: HydraRequest) {
   private val _ingestors: mutable.HashMap[String, IngestorState] = new mutable.HashMap
 
   def joined(ingestorName: String): Unit = {
-    if (_ingestors.get(ingestorName).isDefined)
+    if (_ingestors.get(ingestorName).isDefined) {
       throw new IllegalArgumentException(s"Ingestor ${ingestorName} already joined.")
+    }
 
     _ingestors.put(ingestorName, new IngestorState(DateTime.now(), status = IngestorJoined))
   }

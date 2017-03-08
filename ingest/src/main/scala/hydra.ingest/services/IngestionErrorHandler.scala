@@ -3,19 +3,18 @@ package hydra.ingest.services
 import akka.actor.{Actor, ActorRef}
 import com.pluralsight.hydra.avro.JsonToAvroConversionException
 import configs.syntax._
+import hydra.core.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.core.avro.schema.{GenericSchemaResource, SchemaResource}
 import hydra.core.ingest.{HydraRequest, IngestionParams}
 import hydra.core.notification.NotificationSupport
-import hydra.core.protocol.Produce
 import hydra.ingest.protocol.IngestionError
 import hydra.ingest.services.IngestionErrorHandler.HandleError
-import hydra.kafka.producer.{AvroRecordFactory, JsonToAvroConversionExceptionWithMetadata, KafkaProducerSupport}
 import org.springframework.core.io.ByteArrayResource
 
 /**
   * Created by alexsilva on 12/22/16.
   */
-class IngestionErrorHandler extends Actor with KafkaProducerSupport with NotificationSupport {
+class IngestionErrorHandler extends Actor with NotificationSupport {
 
   val errorAvroSchema = applicationConfig.get[String]("ingest.error.schema")
     .valueOrElse("exp.engineering.platform.IngestionError")
@@ -41,7 +40,6 @@ class IngestionErrorHandler extends Actor with KafkaProducerSupport with Notific
       schema.map(_.location), e.getClass.getSimpleName, e.getMessage)
     val errorRequest = HydraRequest(errorTopic, request.payload)
       .withMetadata(IngestionParams.HYDRA_SCHEMA_PARAM -> errorAvroSchema)
-    kafkaProducer ! Produce(AvroRecordFactory.build(errorRequest))
     observers ! errorMsg
   }
 }

@@ -6,7 +6,6 @@ import hydra.ingest.protocol.IngestionStatus
 /**
   * Created by alexsilva on 10/31/16.
   */
-
 case class IngestionResponse(status: Int, result: IngestionStatus)
 
 object IngestionResponse {

@@ -17,21 +17,22 @@
 package hydra.ingest.services
 
 import akka.actor._
-import com.github.vonnagy.service.container.service.ServicesManager
 import hydra.common.config.ConfigSupport
 import hydra.core.ingest._
 import hydra.core.protocol._
 import hydra.ingest.protocol.{IngestionCompleted, IngestionStatus}
-import hydra.ingest.services.IngestionErrorHandler.HandleError
-import hydra.ingest.services.IngestionSupervisor.InitiateIngestion
 import hydra.ingest.services.IngestorRegistry.{IngestorLookupResult, Lookup}
 
 import scala.concurrent.duration._
 
 /**
-  * This actor gets instantiated for every request, so we can keep stats and other metadata.
-  * .
-  * Created by alexsilva on 11/22/15.
+  * This actor gets instantiated for every ingestion request, so we can keep stats and other metadata.
+  *
+  * @param request  The HydraRequest
+  * @param registry A reference to the ingestor registry
+  * @param timeout  Duration after which the ingestion timesout.
+  *
+  *                 Created by alexsilva on 11/22/15.
   */
 class IngestionSupervisor(request: HydraRequest, registry: ActorRef, timeout: FiniteDuration) extends Actor with ActorLogging {
 
@@ -39,18 +40,22 @@ class IngestionSupervisor(request: HydraRequest, registry: ActorRef, timeout: Fi
 
   val status = IngestionStatus(request)
 
-  override def receive: Receive = timedOut orElse {
-    case InitiateIngestion =>
-      request.metadataValue(IngestionParams.HYDRA_INGESTOR_TARGET_PARAM) match {
-        case Some(ingestor) => registry ! Lookup(ingestor)
-        case None => registry ! Publish(request)
-      }
+  override def preStart(): Unit = {
+    request.metadataValue(IngestionParams.HYDRA_INGESTOR_TARGET_PARAM) match {
+      case Some(ingestor) => registry ! Lookup(ingestor)
+      case None => registry ! Publish(request)
+    }
+  }
 
-    case IngestorLookupResult(name, ingestorOpt) =>
-      ingestorOpt match {
-        case Some(ingestor) => self.tell(Join, ingestor)
-        case None => status.set(name, new InvalidRequest(s"Ingestor $name not found."))
-      }
+  private def ingestorLookupResult(name: String, ref: Option[ActorRef]) = {
+    ref match {
+      case Some(ingestor) => self.tell(Join, ingestor)
+      case None => status.set(name, new InvalidRequest(s"Ingestor $name not found."))
+    }
+  }
+
+  override def receive: Receive = timedOut orElse {
+    case IngestorLookupResult(name, ingestorOpt) => ingestorLookupResult(name, ingestorOpt)
 
     case Join =>
       status.joined(iname(sender))
@@ -60,33 +65,12 @@ class IngestionSupervisor(request: HydraRequest, registry: ActorRef, timeout: Fi
 
     case ValidRequest => sender ! Ingest(request)
 
-    case InvalidRequest(error) =>
-      implicit val ec = context.dispatcher
-      ServicesManager.findService("ingestion_error_handler")(context.system)
-        .foreach(_ ! HandleError(sender, request, error))
-      status.set(iname(sender), InvalidRequest(error))
-      finishIfReady()
-
-    case IngestorCompleted =>
-      status.set(iname(sender), IngestorCompleted)
-      finishIfReady()
-
-    case IngestorError(ex) =>
-      status.set(iname(sender), IngestorError(ex))
-      finishIfReady()
-
-    case IngestorTimeout =>
-      status.set(iname(sender), IngestorTimeout)
+    case s: IngestorStatus =>
+      status.set(iname(sender), s)
       finishIfReady()
 
     case err: HydraIngestionError =>
       status.set(iname(sender), IngestorError(err.cause))
-      finishIfReady()
-
-    case other =>
-      log.error("Received unknown message:" + other)
-      status.set(iname(sender),
-        IngestorError(new IllegalArgumentException(s"${sender.path.name} sent unknown message: $other")))
       finishIfReady()
   }
 

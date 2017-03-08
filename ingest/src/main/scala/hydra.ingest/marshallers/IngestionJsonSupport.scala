@@ -55,10 +55,10 @@ trait IngestionJsonSupport extends HydraJsonSupport {
 
   implicit object IngestionStatusFormat extends RootJsonFormat[IngestionStatus] {
 
-    def writeTransport[T <: IngestorState : JsonWriter](t: T) = t.toJson
+    def writeState[T <: IngestorState : JsonWriter](t: T) = t.toJson
 
     override def write(obj: IngestionStatus): JsValue = {
-      val transports = obj.ingestors.map(h => h._1 -> writeTransport(h._2))
+      val transports = obj.ingestors.map(h => h._1 -> writeState(h._2))
       JsObject(
         Map(
           "ingestionStatus" -> JsNumber(obj.ingestionStatus.intValue),

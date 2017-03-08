@@ -1,6 +1,6 @@
 package hydra.core.ingest
 
-import akka.actor.{Actor, DeadLetter, OneForOneStrategy, SupervisorStrategy}
+import akka.actor.{Actor, OneForOneStrategy, SupervisorStrategy}
 import hydra.common.config.ActorConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol._

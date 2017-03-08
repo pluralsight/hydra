@@ -17,6 +17,7 @@ package hydra.kafka.producer
 
 import com.pluralsight.hydra.avro.{JsonConverter, JsonToAvroConversionException}
 import hydra.common.config.ConfigSupport
+import hydra.core.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.core.avro.registry.ConfluentSchemaRegistry
 import hydra.core.avro.schema.{SchemaResource, SchemaResourceLoader}
 import hydra.core.ingest.{HydraRequest, IngestionParams}
@@ -69,8 +70,5 @@ object AvroRecordFactory extends KafkaRecordFactory[String, GenericRecord] with 
 }
 
 
-case class JsonToAvroConversionExceptionWithMetadata(cause: JsonToAvroConversionException, res: SchemaResource)
-  extends RuntimeException(cause) {
-  override def getMessage: String = s"${super.getMessage} [${res.location}]"
-}
+
 
