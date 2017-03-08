@@ -1,4 +1,4 @@
-package akka.contrib.pattern
+package akka.contrib.mailbox
 
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
 

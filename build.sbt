@@ -13,6 +13,8 @@ lazy val defaultSettings = Seq(
   scalaVersion := "2.11.8",
   description := "Hydra",
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
+  excludeDependencies += "org.slf4j" % "slf4j-log4j12",
+  excludeDependencies += "log4j" % "log4j",
   packageOptions in(Compile, packageBin) +=
     Package.ManifestAttributes("Implementation-Build" -> buildNumber),
   logLevel := Level.Info,
@@ -44,7 +46,6 @@ lazy val root = Project(
   id = "hydra",
   base = file("."),
   settings = noPublishSettings ++ defaultSettings
-    ++ Seq(libraryDependencies ++= Dependencies.coreDeps)
 ).aggregate(common, core, kafka, ingest)
 
 lazy val common = Project(
@@ -72,5 +73,5 @@ lazy val kafka = Project(
   id = "kafka",
   base = file("kafka"),
   settings = moduleSettings
-    ++ Seq(libraryDependencies ++= Dependencies.transportDeps)
+    ++ Seq(libraryDependencies ++= Dependencies.kafkaDeps)
 ).dependsOn(core).settings(name := "hydra-kafka")

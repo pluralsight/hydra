@@ -17,7 +17,6 @@ object Dependencies {
   val sprayJsonVersion = "1.3.2"
   val kafkaVersion = "0.10.2.0"
   val reflectionsVersion = "0.9.10"
-  val slackVersion = "0.3.0"
   val akkaHTTPVersion = "10.0.3"
   val akkaKafkaStreamVersion = "0.13"
   val kafkaUnitVersion = "0.6"
@@ -31,7 +30,7 @@ object Dependencies {
 
     val sprayJson = "io.spray" %% "spray-json" % sprayJsonVersion
 
-    val scalaz =  "org.scalaz" %% "scalaz-core" % scalazVersion
+    val scalaz = "org.scalaz" %% "scalaz-core" % scalazVersion
 
     val kafka = Seq(
       "org.apache.kafka" %% "kafka" % kafkaVersion,
@@ -43,8 +42,8 @@ object Dependencies {
       ExclusionRule(organization = "org.codehaus.jackson"),
       ExclusionRule(organization = "com.fasterxml.jackson.core")))
 
-    val slf4j = Seq("org.slf4j" % "slf4j-api" % slf4jVersion,
-      "org.slf4j" % "slf4j-log4j12" % slf4jVersion,
+    val logging = Seq(
+      "org.apache.logging.log4j" % "log4j-slf4j-impl" % log4jVersion,
       "org.apache.logging.log4j" % "log4j-core" % log4jVersion,
       "org.apache.logging.log4j" % "log4j-api" % log4jVersion,
       "org.apache.logging.log4j" % "log4j-1.2-api" % log4jVersion)
@@ -74,11 +73,11 @@ object Dependencies {
         ExclusionRule(organization = "org.slf4j")
       )
 
-    val slackApi = "com.flyberrycapital" %% "scala-slack" % slackVersion
   }
 
   object Test {
-    val akkaTest = "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test"
+    val akkaTest = Seq("com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
+      "com.typesafe.akka" %% "akka-multi-node-testkit" % akkaVersion % "test")
     val scalaTest = "org.scalatest" %% "scalatest" % scalaTestVersion % "test"
     val scalaMock = "org.scalamock" %% "scalamock-scalatest-support" % "3.5.0" % "test"
     val junit = "junit" % "junit" % "4.12" % "test"
@@ -87,13 +86,13 @@ object Dependencies {
   import Compile._
   import Test._
 
-  val testDeps = Seq(akkaTest, scalaTest, junit, scalaMock)
+  val testDeps = Seq(scalaTest, junit, scalaMock) ++ akkaTest
 
-  val baseDeps = akka ++ slf4j ++ Seq(scalaz, scalaConfigs, avro, spring, serviceContainer) ++ joda ++ testDeps
+  val baseDeps = akka ++ logging ++ Seq(scalaz, scalaConfigs, avro, spring, serviceContainer) ++ joda ++ testDeps
 
-  val coreDeps = baseDeps ++ Seq(guavacache, reflections, slackApi) ++ confluent ++ kafka
+  val coreDeps = baseDeps ++ Seq(guavacache, reflections) ++ confluent
 
-  val transportDeps = coreDeps ++ Seq(akkaKafkaStream, jsonLenses)
+  val kafkaDeps = coreDeps ++ Seq(akkaKafkaStream, jsonLenses)++ kafka
 
-  val overrides = Set(slf4j, typesafeConfig, joda)
+  val overrides = Set(logging, typesafeConfig, joda)
 }

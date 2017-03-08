@@ -45,7 +45,7 @@ public class JsonConverter<T extends GenericRecord> {
     private static final Logger LOG = LoggerFactory.getLogger(JsonConverter.class);
 
     private static final Set<Type> SUPPORTED_TYPES = ImmutableSet.of(Type.RECORD, Type.ARRAY, Type.MAP, Type.INT,
-            Type.LONG, Type.BOOLEAN, Type.FLOAT, Type.DOUBLE, Type.STRING, Type.ENUM);
+            Type.LONG, Type.BOOLEAN, Type.FLOAT, Type.DOUBLE, Type.STRING, Type.ENUM, Type.NULL);
 
     private final Class<T> typeClass;
 
@@ -149,6 +149,9 @@ public class JsonConverter<T extends GenericRecord> {
                 } catch (NumberFormatException e) {
                     throw new InvalidDataTypeException(name, f.schema());
                 }
+                usedFields.add(name);
+            } else if (f.schema().getType() == Type.NULL) {
+                result.put(f.pos(), null);
                 usedFields.add(name);
             } else {
                 missingFields.add(name);

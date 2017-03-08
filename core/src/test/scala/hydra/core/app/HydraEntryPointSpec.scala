@@ -5,7 +5,7 @@ import akka.http.scaladsl.server.Route
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import com.github.vonnagy.service.container.service.ContainerService
 import com.typesafe.config.{Config, ConfigFactory}
-import hydra.common.testing.DummyActor
+import hydra.core.testing.DummyActor
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FunSpecLike, Matchers}
 
@@ -15,7 +15,6 @@ import org.scalatest.{FunSpecLike, Matchers}
 class HydraEntryPointSpec extends Matchers with FunSpecLike with MockFactory {
   val conf =
     """
-      |hydraTest{
       |  test {
       |    endpoints = ["hydra.core.app.DummyEndpoint"]
       |  }
@@ -24,13 +23,10 @@ class HydraEntryPointSpec extends Matchers with FunSpecLike with MockFactory {
       |      enabled = true
       |    }
       |  }
-      |}
     """.stripMargin
 
   val et = new HydraEntryPoint() {
     override def moduleName: String = "test"
-
-    override def applicationName = "hydraTest"
 
     override def config: Config = ConfigFactory.parseString(conf)
 
@@ -41,7 +37,6 @@ class HydraEntryPointSpec extends Matchers with FunSpecLike with MockFactory {
 
     it("is properly configured") {
       et.moduleName shouldBe "test"
-      et.applicationName shouldBe "hydraTest"
       et.services shouldBe Seq("test" -> Props[DummyActor])
       et.endpoints shouldBe Seq(classOf[DummyEndpoint])
       et.extensions shouldBe ConfigFactory.parseString(conf).getConfig("hydraTest.extensions")

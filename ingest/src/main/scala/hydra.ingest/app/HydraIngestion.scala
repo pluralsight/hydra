@@ -19,7 +19,6 @@ package hydra.ingest.app
 import java.io.File
 
 import akka.actor.Props
-import com.github.vonnagy.service.container.ContainerBuilder
 import com.pluralsight.hydra.network.util.NetworkUtils
 import com.typesafe.config.ConfigFactory
 import hydra.common.util.ActorUtils
@@ -38,16 +37,6 @@ object HydraIngestion extends HydraEntryPoint with KafkaConfigSupport {
 
   override val config = rootConfig.withFallback(ConfigFactory.parseFile(new File("/etc/hydra/hydra-ingest.conf")))
 
-  override def beforeStart(builder: ContainerBuilder): ContainerBuilder = {
-    builder.validateConfig("hydra.schema.registry.url")
-    val lanAddress = NetworkUtils.getLocalAddress.getHostAddress
-    log.debug(s"Setting akka.remote.artery.canonical.hostname to $lanAddress")
-    val cfg = ConfigFactory.parseString(s"""akka.remote.artery.canonical.hostname="$lanAddress"""")
-      .withFallback(builder.config)
-    builder.withConfig(cfg)
-  }
-
-
   override val services = Seq(
     Tuple2(ActorUtils.actorName[KafkaProducerSupervisor], KafkaProducerSupervisor.props(kafkaProducerFormats)),
     Tuple2(ActorUtils.actorName[KafkaHealthCheckActor], Props[KafkaHealthCheckActor]),
@@ -56,9 +45,14 @@ object HydraIngestion extends HydraEntryPoint with KafkaConfigSupport {
     Tuple2(ActorUtils.actorName[IngestionErrorHandler], Props[IngestionErrorHandler]),
     Tuple2(ActorUtils.actorName[IngestionActor], Props(classOf[IngestionActor], "/user/service/ingestor_registry")))
 
-  //++: slackActor.toOption
+  lazy val fallbackCfg = {
+    val lanAddress = NetworkUtils.getLocalAddress.getHostAddress
+    log.debug(s"Setting akka.remote.artery.canonical.hostname to $lanAddress")
+    ConfigFactory.parseString(s"""akka.remote.artery.canonical.hostname="$lanAddress"""")
+  }
 
+  validateConfig("hydra.schema.registry.url")
 
-  doStart()
+  buildContainer(Some(fallbackCfg)).start()
 
 }

@@ -56,6 +56,18 @@ public class JsonConverterTest {
 
     Schema.Field f3Rec = sf("field3", sr(sf("key", Type.STRING)));
 
+    Schema.Field fn = sf("fieldN", Type.NULL);
+
+    @Test
+    public void testNullFields() throws Exception {
+
+        JsonConverter jc = new JsonConverter(sr(f1, f2, fn));
+        String json = "{\"field1\": 1729, \"field2\": [true, true, false], \"fieldN\": null}";
+        GenericRecord r = jc.convert(json);
+        assertEquals(json, r.toString());
+        assertEquals(0, jc.getConversionStats().getMissingFields().size());
+    }
+
     @Test
     public void testBasicWithMap() throws Exception {
 

@@ -19,7 +19,7 @@ class IngestorRegistrar extends Actor with ConfigSupport with LoggingAdapter {
   val registry = context.actorSelection(applicationConfig.get[String]("ingest.transport_registry.path")
     .valueOrElse("/user/service/ingestor_registry"))
 
-  private val pkgs = applicationConfig.get[List[String]]("transports.scan").valueOrElse(List.empty)
+  private val pkgs = applicationConfig.get[List[String]]("ingestors.scan").valueOrElse(List.empty)
 
   lazy val transports = new ClasspathIngestorDiscovery(pkgs).ingestors.map(h => ActorUtils.actorName(h) -> h)
 
