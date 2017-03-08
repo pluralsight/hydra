@@ -19,40 +19,30 @@ package hydra.ingest.app
 import java.io.File
 
 import akka.actor.Props
-import com.pluralsight.hydra.network.util.NetworkUtils
 import com.typesafe.config.ConfigFactory
+import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
 import hydra.core.app.HydraEntryPoint
 import hydra.ingest.services._
-import hydra.kafka.config.KafkaConfigSupport
-import hydra.kafka.health.KafkaHealthCheckActor
-import hydra.kafka.services.KafkaProducerSupervisor
 
 /**
+  * Just an example of how to bootstrap Hydra.
+  *
   * Created by alexsilva on 2/18/16.
   */
-object HydraIngestion extends HydraEntryPoint with KafkaConfigSupport {
+object HydraIngestionAppExample extends HydraEntryPoint with ConfigSupport {
 
   val moduleName = "ingest"
 
   override val config = rootConfig.withFallback(ConfigFactory.parseFile(new File("/etc/hydra/hydra-ingest.conf")))
 
   override val services = Seq(
-    Tuple2(ActorUtils.actorName[KafkaProducerSupervisor], KafkaProducerSupervisor.props(kafkaProducerFormats)),
-    Tuple2(ActorUtils.actorName[KafkaHealthCheckActor], Props[KafkaHealthCheckActor]),
     Tuple2(ActorUtils.actorName[IngestorRegistry], Props[IngestorRegistry]),
     Tuple2(ActorUtils.actorName[IngestorRegistrar], Props[IngestorRegistrar]),
     Tuple2(ActorUtils.actorName[IngestionErrorHandler], Props[IngestionErrorHandler]),
     Tuple2(ActorUtils.actorName[IngestionActor], Props(classOf[IngestionActor], "/user/service/ingestor_registry")))
 
-  lazy val fallbackCfg = {
-    val lanAddress = NetworkUtils.getLocalAddress.getHostAddress
-    log.debug(s"Setting akka.remote.artery.canonical.hostname to $lanAddress")
-    ConfigFactory.parseString(s"""akka.remote.artery.canonical.hostname="$lanAddress"""")
-  }
 
-  validateConfig("hydra.schema.registry.url")
-
-  buildContainer(Some(fallbackCfg)).start()
+  buildContainer().start()
 
 }
