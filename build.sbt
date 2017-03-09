@@ -4,12 +4,12 @@ import sbt._
 enablePlugins(JavaAppPackaging)
 
 val JDK = "1.8"
-val buildNumber = sys.env.get("BUILD_NUMBER").getOrElse("000")
-
+val buildNumber = scala.util.Properties.envOrNone("version").map(v => "." + v).getOrElse("")
+val hydraVersion = "0.6.5" + buildNumber
 
 lazy val defaultSettings = Seq(
   organization := "pluralsight",
-  version := "0.6.5",
+  version := hydraVersion,
   scalaVersion := "2.11.8",
   description := "Hydra",
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
