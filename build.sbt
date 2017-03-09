@@ -45,7 +45,7 @@ lazy val moduleSettings = defaultSettings ++ Test.testSettings //++ Publish.sett
 lazy val root = Project(
   id = "hydra",
   base = file("."),
-  settings =  defaultSettings
+  settings =  defaultSettings // ++ noPublishSettings
 ).aggregate(common, core, kafka, ingest)
 
 lazy val common = Project(
