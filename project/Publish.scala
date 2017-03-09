@@ -2,7 +2,7 @@ import sbt.Keys._
 import sbt._
 
 
-object Publish {
+object Publish_OLD {
 
   lazy val settings = Seq[Def.Setting[_]](
 
