@@ -72,10 +72,10 @@ class KafkaProducerSupervisor(producersConfig: Map[String, Config]) extends Acto
     case RecordProduced(r: KafkaRecordMetadata) =>
       if (metricsEnabled) recordStatistics(r)
 
-    case err: RecordNotProduced[Any, Any] => publishToEventStream(err)
+    case err: RecordNotProduced[_,_] => publishToEventStream(err)
   }
 
-  private def publishToEventStream(error: RecordNotProduced[Any, Any]) = {
+  private def publishToEventStream(error: RecordNotProduced[_,_]) = {
     context.system.eventStream.publish(error)
   }
 

@@ -36,10 +36,8 @@ trait HydraIngestorRegistry extends IngestorRegistryComponent with ConfigSupport
 
   val ingestorRegistry: Future[ActorRef] = system.actorSelection(registryPath).resolveOne()
 
-
   def lookupIngestor(name: String): Future[IngestorLookupResult] =
     ingestorRegistry.flatMap(_ ? Lookup(name)).mapTo[IngestorLookupResult]
-
 
 }
 

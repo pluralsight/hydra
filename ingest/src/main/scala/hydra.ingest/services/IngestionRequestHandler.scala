@@ -18,14 +18,17 @@ package hydra.ingest.services
 
 import akka.actor.SupervisorStrategy.Stop
 import akka.actor.{OneForOneStrategy, _}
+import com.github.vonnagy.service.container.service.ServicesManager
 import hydra.common.config.ConfigSupport
 import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.HydraRequest
-import hydra.core.protocol.{GenericHydraError, HydraError}
+import hydra.core.protocol._
 import hydra.ingest.marshallers.{IngestionErrorResponse, IngestionJsonSupport, IngestionResponse}
 import hydra.ingest.protocol.{IngestionCompleted, IngestionStatus}
+import hydra.ingest.services.IngestionErrorHandler.HandleError
 import hydra.ingest.services.IngestionSupervisor.InitiateIngestion
 
+import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.util.Try
 
@@ -45,7 +48,6 @@ class IngestionRequestHandler(request: HydraRequest, registry: ActorRef,
       case e: Exception => self ! GenericHydraError(e)
     }
   }
-
 
   def receive = {
     case IngestionCompleted(h: IngestionStatus) =>

@@ -30,6 +30,8 @@ import org.apache.avro.SchemaParseException
 
 
 /**
+  * A wrapper around Confluent's schema registry that facilitates schema registration and retrieval.
+  *
   * Created by alexsilva on 2/13/16.
   */
 class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
@@ -41,10 +43,11 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
   override def route: Route =
     get {
       pathPrefix("schemas" / Segment) { subject =>
-        parameters('pretty ? "false") { pretty =>
+        parameters('pretty ? "false", 'version.as[Int].?) { (pretty, version) =>
           handleExceptions(excptHandler) {
             val schemaSubject = subject + "-value"
-            val schemaMeta = registry.getLatestSchemaMetadata(schemaSubject)
+            val schemaMeta = version.map(v => registry.getSchemaMetadata(subject, v))
+              .getOrElse(registry.getLatestSchemaMetadata(schemaSubject))
             val schema = registry.getByID(schemaMeta.getId)
             val txt = schema.toString(pretty.toBoolean)
             complete(OK, txt)
