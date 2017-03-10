@@ -18,12 +18,13 @@ package hydra.ingest.endpoints
 
 import akka.actor.{ActorRefFactory, ActorSystem}
 import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.avro.registry.ConfluentSchemaRegistry
-import hydra.core.marshallers.HydraJsonSupport
+import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.Schema.Parser
 import org.apache.avro.SchemaParseException
@@ -59,12 +60,15 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
         pathPrefix("schemas") {
           entity(as[String]) { json =>
             handleExceptions(excptHandler) {
-              val schema = new Parser().parse(json)
-              val name = schema.getNamespace() + "." + schema.getName()
-              log.debug(s"Registering schema $name: $json")
-              val id = registry.register(name + "-value", schema)
-              val response = SchemasEndpointResponse(200, "Schema registered.", id.toString)
-              complete(response)
+              extractRequest { request =>
+                val schema = new Parser().parse(json)
+                val name = schema.getNamespace() + "." + schema.getName()
+                log.debug(s"Registering schema $name: $json")
+                val id = registry.register(name + "-value", schema)
+                respondWithHeader(Location(request.uri.copy(path = request.uri.path / name))) {
+                  complete(Created, SchemasEndpointResponse(201, "Schema registered.", id.toString))
+                }
+              }
             }
           }
         }
@@ -74,16 +78,17 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
   val excptHandler = ExceptionHandler {
     case e: RestClientException =>
       extractUri { uri =>
-        complete(BadRequest, s"Unable to find schema for ${uri.path.tail} : ${e.getMessage}")
+        complete(BadRequest, GenericServiceResponse(e.getErrorCode, s"Registry error: ${e.getMessage}"))
       }
 
     case e: SchemaParseException =>
-      complete(BadRequest, s"Unable to parse avro schema: ${e.getMessage}")
+      complete(BadRequest, GenericServiceResponse(400, s"Unable to parse avro schema: ${e.getMessage}"))
 
     case e: Exception =>
       extractUri { uri =>
         log.warn(s"Request to $uri could not be handled normally")
-        complete(BadRequest, s"Unable to complete request for ${uri.path.tail} : ${e.getMessage}")
+        complete(BadRequest,
+          GenericServiceResponse(400, s"Unable to complete request for ${uri.path.tail} : ${e.getMessage}"))
       }
   }
 }

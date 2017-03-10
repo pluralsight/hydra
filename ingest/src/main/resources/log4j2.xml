@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  ~ Copyright (C) 2017 Pluralsight, LLC.
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~ http://www.apache.org/licenses/LICENSE-2.0
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+
+<Configuration>
+
+    <Appenders>
+        <Console name="STDOUT" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d %-5p [%t] %C{2} (%F:%L) - %m%n"/>
+        </Console>
+
+        <File name="VARLOG" fileName="/var/log/hydra/ps_ingest.log" append="true">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} %-5p %c{1}:%L - %m%n"/>
+        </File>
+    </Appenders>
+    <Loggers>
+
+        <Logger name="hydra" level="INFO" additivity="false">
+            <AppenderRef ref="VARLOG"/>
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
+
+        <Logger name="kafka.utils.VerifiableProperties" level="warn" additivity="false">
+            <AppenderRef ref="VARLOG"/>
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
+
+        <Logger name="kafka.producer" level="error" additivity="false">
+            <AppenderRef ref="VARLOG"/>
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
+
+        <Logger name="org.apache.kafka.clients" level="error" additivity="false">
+            <AppenderRef ref="VARLOG"/>
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
+
+        <Logger name="com.github.vonnagy" level="ALL" additivity="false">
+            <AppenderRef ref="VARLOG"/>
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
+
+        <Logger name="org.apache.kafka.common" level="error"  additivity="false">
+            <AppenderRef ref="VARLOG"/>
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
+
+
+        <Logger name="kafka.network" level="warn">
+            <AppenderRef ref="VARLOG"/>
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
+
+        <Root level="debug">
+            <AppenderRef ref="STDOUT"/>
+            <AppenderRef ref="VARLOG"/>
+        </Root>
+
+    </Loggers>
+</Configuration>

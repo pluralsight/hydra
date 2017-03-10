@@ -20,7 +20,6 @@ import java.io.File
 
 import akka.actor.Props
 import com.typesafe.config.ConfigFactory
-import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
 import hydra.core.app.HydraEntryPoint
 import hydra.ingest.services._
@@ -30,7 +29,7 @@ import hydra.ingest.services._
   *
   * Created by alexsilva on 2/18/16.
   */
-object HydraIngestionAppExample extends HydraEntryPoint with ConfigSupport {
+object HydraIngestionAppExample extends HydraEntryPoint {
 
   val moduleName = "ingest"
 

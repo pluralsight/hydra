@@ -6,14 +6,14 @@ import akka.actor.ActorRefFactory
   * Created by alexsilva on 3/7/17.
   */
 object SocketConnections {
-  private var connections: Map[Int, SocketConnection] = Map.empty[Int, SocketConnection]
+  private var connections: Map[String, ChatRoom] = Map.empty[String, ChatRoom]
 
-  def findOrCreate(number: Int)(implicit factory: ActorRefFactory): SocketConnection =
-    connections.getOrElse(number, createNewConnection(number))
+  def findOrCreate(label: String)(implicit factory: ActorRefFactory): ChatRoom =
+    connections.getOrElse(label, createNewConnection(label))
 
-  private def createNewConnection(connectionId: Int)(implicit factory: ActorRefFactory): SocketConnection = {
-    val connection = SocketConnection(connectionId)
-    connections += connectionId -> connection
+  private def createNewConnection(label: String)(implicit factory: ActorRefFactory): ChatRoom = {
+    val connection = ChatRoom(label)
+    connections += label -> connection
     connection
   }
 }

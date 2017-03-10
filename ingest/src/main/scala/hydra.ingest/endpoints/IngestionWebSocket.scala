@@ -17,17 +17,14 @@
 package hydra.ingest.endpoints
 
 import akka.actor._
-import akka.http.scaladsl.model.StatusCodes.ServiceUnavailable
-import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
-import akka.http.scaladsl.server.{ExceptionHandler, RequestContext, Route}
-import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.http.scaladsl.server.{RequestContext, Route}
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
 import hydra.core.ingest.{HydraRequest, HydraRequestMedatata}
-import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
+import hydra.core.marshallers.HydraJsonSupport
 import hydra.ingest.HydraIngestorRegistry
+import hydra.ingest.ws.SocketConnections
 
 /**
   * Created by alexsilva on 12/22/15.
@@ -35,40 +32,8 @@ import hydra.ingest.HydraIngestorRegistry
 class IngestionWebSocket(implicit val system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
   extends RoutedEndpoints with LoggingAdapter with HydraJsonSupport with HydraDirectives with HydraIngestorRegistry {
 
-  implicit val materializer = ActorMaterializer()
-
-  val greeterWebSocketService =
-    Flow[Message]
-      .mapConcat {
-        // we match but don't actually consume the text message here,
-        // rather we simply stream it back as the tail of the response
-        // this means we might start sending the response even before the
-        // end of the incoming message has been received
-        case tm: TextMessage => TextMessage(Source.single("Hello ") ++ tm.textStream) :: Nil
-        case bm: BinaryMessage =>
-          // ignore binary messages but drain content to avoid the stream being clogged
-          bm.dataStream.runWith(Sink.ignore)
-          Nil
-      }
-
   override val route: Route =
-    path("ingest-socket") {
-      handleExceptions(excptHandler) {
-        println("RAR")
-        handleWebSocketMessages(greeterWebSocketService)
-      }
+    path("ingest-socket" / Segment) { label =>
+      handleWebSocketMessages(SocketConnections.findOrCreate(label).websocketFlow("test"))
     }
-
-
-  //todo: add retry strategy, etc. stuff
-  private def buildRequest(destination: String, payload: String, ctx: RequestContext) = {
-    val metadata: List[HydraRequestMedatata] = List(ctx.request.headers.map(header =>
-      HydraRequestMedatata(header.name.toLowerCase, header.value)): _*)
-    HydraRequest(destination, payload, metadata)
-  }
-
-  val excptHandler = ExceptionHandler {
-    case e: IllegalArgumentException => complete(GenericServiceResponse(400, e.getMessage))
-    case e: Exception => complete(GenericServiceResponse(ServiceUnavailable.intValue, e.getMessage))
-  }
 }
