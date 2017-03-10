@@ -34,6 +34,6 @@ class IngestionWebSocket(implicit val system: ActorSystem, implicit val actorRef
 
   override val route: Route =
     path("ingest-socket" / Segment) { label =>
-      handleWebSocketMessages(SocketConnections.findOrCreate(label).websocketFlow("test"))
+      handleWebSocketMessages(SocketConnections.findOrCreate(label).ingestionWSFlow("test"))
     }
 }

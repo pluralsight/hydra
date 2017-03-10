@@ -14,7 +14,9 @@ class ChatRoom(label: String, fact: ActorRefFactory) {
 
   private[this] val chatRoomActor = fact.actorOf(Props(classOf[ChatRoomActor], label))
 
-  def websocketFlow(user: String): Flow[Message, Message, _] = {
+  def sendMessage(message: ChatMessage): Unit = chatRoomActor ! message
+
+  def ingestionWSFlow(user: String): Flow[Message, Message, _] = {
     val source = Source.actorRef[ChatMessage](bufferSize = 5, OverflowStrategy.fail)
     Flow.fromGraph(GraphDSL.create(source) {
       implicit builder =>
@@ -58,8 +60,6 @@ class ChatRoom(label: String, fact: ActorRefFactory) {
           FlowShape.of(fromWebsocket.in, backToWebsocket.out)
     })
   }
-
-  def sendMessage(message: ChatMessage): Unit = chatRoomActor ! message
 
 
 }
