@@ -39,6 +39,7 @@ trait HydraDirectives extends Directives with ConfigSupport {
         complete(status)
       }
     }
+
 }
 
 // an imperative wrapper for request context

@@ -17,63 +17,31 @@
 package hydra.ingest.endpoints
 
 import akka.actor._
-import akka.http.scaladsl.model.StatusCodes.ServiceUnavailable
-import akka.http.scaladsl.server.{ExceptionHandler, RequestContext, Route}
+import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import akka.util.Timeout
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
-import hydra.common.util.ActorUtils
 import hydra.core.http.HydraDirectives
-import hydra.core.ingest.{HydraRequest, HydraRequestMedatata}
-import hydra.core.marshallers.GenericServiceResponse
+import hydra.ingest.HydraIngestorRegistry
 import hydra.ingest.marshallers.IngestionJsonSupport
-import hydra.ingest.services.IngestorRegistry
 import hydra.ingest.services.IngestorRegistry.{GetIngestors, RegisteredIngestors}
-
-import scala.concurrent.Future
-import scala.concurrent.duration._
-import scala.util.{Failure, Success}
 
 /**
   * Created by alexsilva on 12/22/15.
   */
-class IngestorRegistryEndpoint(implicit system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
-  extends RoutedEndpoints with LoggingAdapter with IngestionJsonSupport with HydraDirectives with ConfigSupport {
-
-  implicit val timeout = 3.seconds
-
-  implicit val askTimeout = Timeout(timeout)
-
-  lazy val registryHandle: Future[ActorRef] =
-    actorRefFactory.actorSelection(s"/user/service/${ActorUtils.actorName(classOf[IngestorRegistry])}")
-      .resolveOne()
+class IngestorRegistryEndpoint(implicit val system: ActorSystem, actorRefFactory: ActorRefFactory)
+  extends RoutedEndpoints with LoggingAdapter with IngestionJsonSupport with HydraDirectives with ConfigSupport
+    with HydraIngestorRegistry {
 
   override val route: Route =
     path("ingestors" ~ Slash.?) {
       get {
-        onComplete(registryHandle) {
-          case Success(registry) =>
-            onSuccess(registry ? GetIngestors) {
-              case response: RegisteredIngestors => complete(response.ingestors)
-            }
-          case Failure(ex) => throw ex
+        onSuccess(ingestorRegistry) { registry =>
+          onSuccess(registry ? GetIngestors) {
+            case response: RegisteredIngestors => complete(response.ingestors)
+          }
         }
       }
-
     }
-
-  //todo: add retry strategy, etc. stuff
-  private def buildRequest(destination: String, payload: String, ctx: RequestContext) = {
-    //here for backwards compatibility
-    val metadata: List[HydraRequestMedatata] = List(ctx.request.headers.map(header =>
-      HydraRequestMedatata(header.name.toLowerCase, header.value)): _*)
-    HydraRequest(destination, payload, metadata)
-  }
-
-  val excptHandler = ExceptionHandler {
-    case e: IllegalArgumentException => complete(GenericServiceResponse(400, e.getMessage))
-    case e: Exception => complete(GenericServiceResponse(ServiceUnavailable.intValue, e.getMessage))
-  }
 }

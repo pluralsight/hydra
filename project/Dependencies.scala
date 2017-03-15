@@ -92,7 +92,7 @@ object Dependencies {
 
   val coreDeps = baseDeps ++ Seq(guavacache, reflections) ++ confluent
 
-  val kafkaDeps = coreDeps ++ Seq(akkaKafkaStream, jsonLenses)++ kafka
+  val kafkaDeps = coreDeps ++ Seq(akkaKafkaStream, jsonLenses) ++ kafka
 
   val overrides = Set(logging, typesafeConfig, joda)
 }

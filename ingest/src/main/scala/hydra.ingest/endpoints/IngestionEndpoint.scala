@@ -22,12 +22,10 @@ import akka.http.scaladsl.server.{ExceptionHandler, RequestContext, Route}
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
-import hydra.core.ingest.{HydraRequest, HydraRequestMedatata, IngestionParams}
+import hydra.core.ingest.IngestionParams
 import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
 import hydra.ingest.HydraIngestorRegistry
 import hydra.ingest.services.IngestionRequestHandler
-
-import scala.util.{Failure, Success}
 
 /**
   * Created by alexsilva on 12/22/15.
@@ -35,41 +33,53 @@ import scala.util.{Failure, Success}
 class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
   extends RoutedEndpoints with LoggingAdapter with HydraJsonSupport with HydraDirectives with HydraIngestorRegistry {
 
+  import hydra.ingest.RequestFactories._
 
   override val route: Route =
     post {
       requestEntityPresent {
         pathPrefix("ingest") {
-          pathEndOrSingleSlash {
+          headerValueByName(IngestionParams.HYDRA_REQUEST_LABEL_PARAM) { destination =>
             handleExceptions(excptHandler) {
-              headerValueByName(IngestionParams.HYDRA_REQUEST_LABEL_PARAM) { destination =>
-                onComplete(ingestorRegistry) {
-                  case Success(registry) =>
-                    entity(as[String]) { payload =>
-                      imperativelyComplete { ictx =>
-                        val hydraReq = buildRequest(destination, payload, ictx.ctx)
-                        actorRefFactory.actorOf(IngestionRequestHandler.props(hydraReq, registry, ictx))
-                      }
-                    }
-                  case Failure(ex) => throw ex
-                }
+              pathEndOrSingleSlash {
+                broadcastRequest(destination)
               }
+            } ~ path(Segment) { ingestor =>
+              publishToIngestor(destination, ingestor)
             }
           }
         }
       }
     }
 
-
-  //todo: add retry strategy, etc. stuff
-  private def buildRequest(destination: String, payload: String, ctx: RequestContext) = {
-    val metadata: List[HydraRequestMedatata] = List(ctx.request.headers.map(header =>
-      HydraRequestMedatata(header.name.toLowerCase, header.value)): _*)
-    HydraRequest(destination, payload, metadata)
-  }
-
   val excptHandler = ExceptionHandler {
     case e: IllegalArgumentException => complete(GenericServiceResponse(400, e.getMessage))
     case e: Exception => complete(GenericServiceResponse(ServiceUnavailable.intValue, e.getMessage))
+  }
+
+  def broadcastRequest(destination: String) = {
+    onSuccess(ingestorRegistry) { registry =>
+      entity(as[String]) { payload =>
+        imperativelyComplete { ictx =>
+          val hydraReq = createRequest[String, RequestContext](destination, payload, ictx.ctx)
+          actorRefFactory.actorOf(IngestionRequestHandler.props(hydraReq, registry, ictx))
+        }
+      }
+    }
+  }
+
+  def publishToIngestor(destination: String, ingestor: String) = {
+    onSuccess(lookupIngestor(ingestor)) { result =>
+      result.ref match {
+        case Some(ref) =>
+          entity(as[String]) { payload =>
+            imperativelyComplete { ictx =>
+              val hydraReq = createRequest[String, RequestContext](destination, payload, ictx.ctx)
+              ingestorRegistry.foreach(r => actorRefFactory.actorOf(IngestionRequestHandler.props(hydraReq, r, ictx)))
+            }
+          }
+        case None => complete(404, GenericServiceResponse(404, s"Ingestor $ingestor not found."))
+      }
+    }
   }
 }

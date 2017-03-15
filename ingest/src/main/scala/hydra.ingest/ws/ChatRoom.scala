@@ -12,7 +12,7 @@ import akka.stream.{FlowShape, OverflowStrategy}
   */
 class ChatRoom(label: String, fact: ActorRefFactory) {
 
-  private[this] val chatRoomActor = fact.actorOf(Props(classOf[ChatRoomActor], label))
+  private[this] val chatRoomActor = fact.actorOf(Props(classOf[IngestionSocketActor], label))
 
   def sendMessage(message: ChatMessage): Unit = chatRoomActor ! message
 

@@ -52,6 +52,12 @@ object ReflectionUtils {
     instance(cl, args)
   }
 
+  def fieldsOf[T: TypeTag]: Seq[MethodSymbol] = {
+    ru.typeOf[T].members.collect {
+      case m: MethodSymbol if m.isGetter && m.isPublic => m
+    }.toSeq
+  }
+
   private def instance[M: TypeTag](cl: ClassSymbol, args: List[Any]): M = {
     val clazz = cm.reflectClass(cl)
     val ctor = cl.toType.decl(termNames.CONSTRUCTOR).asMethod
