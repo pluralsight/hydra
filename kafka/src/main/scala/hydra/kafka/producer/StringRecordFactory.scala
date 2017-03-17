@@ -25,7 +25,7 @@ import hydra.core.protocol.{MessageValidationResult, ValidRequest}
 object StringRecordFactory extends KafkaRecordFactory[String, String] {
 
   override def build(request: HydraRequest) =
-    StringRecord(request.label, getKey(request), request.payload, request.retryStrategy)
+    StringRecord(getTopic(request), getKey(request), request.payload, request.retryStrategy)
 
   override def validate(request: HydraRequest): MessageValidationResult = ValidRequest
 }

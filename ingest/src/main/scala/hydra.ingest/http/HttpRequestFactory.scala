@@ -8,9 +8,9 @@ import hydra.core.ingest.{HydraRequest, HydraRequestMedatata, RequestFactory}
   */
 class HttpRequestFactory extends RequestFactory[String, RequestContext] {
   //todo: add retry strategy, etc. stuff
-  override def createRequest(destination: String, payload: String, ctx: RequestContext): HydraRequest = {
+  override def createRequest(label: Option[String], payload: String, ctx: RequestContext): HydraRequest = {
     val metadata: List[HydraRequestMedatata] = List(ctx.request.headers.map(header =>
       HydraRequestMedatata(header.name.toLowerCase, header.value)): _*)
-    HydraRequest(destination, payload, metadata)
+    HydraRequest(label, payload, metadata)
   }
 }

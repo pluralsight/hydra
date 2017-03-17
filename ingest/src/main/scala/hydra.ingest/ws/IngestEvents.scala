@@ -7,17 +7,17 @@ import akka.actor.ActorRef
   * Created by alexsilva on 3/10/17.
   */
 
-case class ChatMessage(sender: String, text: String)
+case class SocketMessage(sender: String, text: String)
 
 object SystemMessage {
-  def apply(text: String) = ChatMessage("System", text)
+  def apply(text: String) = SocketMessage("System", text)
 }
 
 
 sealed trait ChatEvent
 
-case class UserJoined(name: String, userActor: ActorRef) extends ChatEvent
+case class SocketStarted(name: String) extends ChatEvent
 
-case class UserLeft(name: String) extends ChatEvent
+case class SocketEnded(name: String) extends ChatEvent
 
-case class IncomingMessage(sender: String, message: String) extends ChatEvent
+case class IncomingMessage(message: String) extends ChatEvent

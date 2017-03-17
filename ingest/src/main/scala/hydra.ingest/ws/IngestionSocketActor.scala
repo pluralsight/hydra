@@ -4,36 +4,40 @@ package hydra.ingest.ws
   * Created by alexsilva on 3/10/17.
   */
 
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef}
 import hydra.common.logging.LoggingAdapter
-import hydra.core.ingest.IngestionParams._
-import hydra.ingest.ws.chat._
+import hydra.ingest.ws.IngestionSocketActor._
 
-class IngestionSocketActor(destination: String) extends Actor with LoggingAdapter {
+class IngestionSocketActor(ref:ActorRef) extends Actor with LoggingAdapter {
 
   private var ingestionMetadata: Map[String, Any] = Map.empty[String, Any]
 
-  val paramList = Seq(HYDRA_INGESTOR_PARAM, HYDRA_INGESTOR_TARGET_PARAM, HYDRA_REQUEST_LABEL_PARAM
-    , RETRY_STRATEGY_PARAM, HYDRA_RECORD_FORMAT_PARAM, HYDRA_VALIDATION_PARAM)
-
   override def receive: Receive = {
-    case UserJoined(name, actorRef) =>
-      broadcast(SystemMessage(s"User $name joined channel..."))
-      println(s"User $name joined channel[$destination]")
+    case SocketStarted(name) =>
+      log.info(s"User $name started a web socket.")
 
-    case UserLeft(name) =>
-      println(s"User $name left channel[$destination]")
-      broadcast(SystemMessage(s"User $name left channel[$destination]"))
+    case SocketEnded(name) => context.stop(self)
 
     case msg: IncomingMessage =>
-      if(msg.message.startsWith("--set")) {
-        val value = msg.message.substring(5).split(" ")
-        log.debug(s"Setting property ${value(0).toUpperCase} to ${value(1)}")
-        ingestionMetadata += value(0).toUpperCase -> value(1)
-      }
-      broadcast(msg)
+      parse(msg.message)
+      sender ! "OK"
   }
 
-  def broadcast(message: ChatMessage): Unit = {}
+  def parse(msg: String) = {
+    msg match {
+      case SetPattern(set, key, value) =>
+        log.debug(s"Setting property ${key.toUpperCase} to $value")
+        ingestionMetadata += key.toUpperCase -> value
+    }
+
+
+  }
+
+  def broadcast(message: SocketMessage): Unit = {}
+
+}
+
+object IngestionSocketActor {
+  private val SetPattern = "(--set )(.*)=(.*)".r
 
 }

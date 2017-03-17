@@ -37,7 +37,7 @@ object AvroRecordFactory extends KafkaRecordFactory[String, GenericRecord] with 
 
   override def build(request: HydraRequest): AvroRecord = {
     val schemaResource: Try[SchemaResource] = Try(schemaResourceLoader.getResource(getSubject(request)))
-    AvroRecord(request.label, schemaResource.get.schema, getKey(request), request.payload, request.retryStrategy)
+    AvroRecord(getTopic(request), schemaResource.get.schema, getKey(request), request.payload, request.retryStrategy)
   }
 
   override def validate(request: HydraRequest): MessageValidationResult = {
@@ -64,7 +64,7 @@ object AvroRecordFactory extends KafkaRecordFactory[String, GenericRecord] with 
   }
 
   def getSubject(request: HydraRequest): String = {
-    request.metadataValue(IngestionParams.HYDRA_SCHEMA_PARAM).getOrElse(request.label)
+    request.metadataValue(IngestionParams.HYDRA_SCHEMA_PARAM).getOrElse(getTopic(request))
   }
 
 }

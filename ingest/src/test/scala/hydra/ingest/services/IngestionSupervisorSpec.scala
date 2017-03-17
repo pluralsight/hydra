@@ -33,7 +33,7 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
       }
   })
 
-  val request = HydraRequest("test", "test payload")
+  val request = HydraRequest(Some("test"), "test payload")
 
   val ingestorRequest = request.withMetadata(IngestionParams.HYDRA_INGESTOR_TARGET_PARAM -> "test_ingestor")
 

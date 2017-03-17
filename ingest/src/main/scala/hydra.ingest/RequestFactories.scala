@@ -10,12 +10,12 @@ import hydra.ingest.http.HttpRequestFactory
 object RequestFactories {
 
   implicit object RequestFactoryLikeHttp extends RequestFactory[String, RequestContext] {
-    override def createRequest(destination: String, payload: String, data: RequestContext): HydraRequest = {
+    override def createRequest(destination: Option[String], payload: String, data: RequestContext): HydraRequest = {
       new HttpRequestFactory().createRequest(destination, payload, data)
     }
   }
 
-  def createRequest[P, D](destination: String, payload: P, data: D)(implicit ev: RequestFactory[P, D]): HydraRequest = {
+  def createRequest[P, D](destination: Option[String], payload: P, data: D)(implicit ev: RequestFactory[P, D]): HydraRequest = {
     ev.createRequest(destination, payload, data)
   }
 }

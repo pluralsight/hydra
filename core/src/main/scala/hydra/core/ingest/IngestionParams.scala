@@ -36,13 +36,10 @@ object IngestionParams {
   val HYDRA_SCHEMA_PARAM = "hydra-schema"
 
   /**
-    *
+    * A parameter value that matches a requet to KafkaIngestor
     */
-  @deprecated(" Use IngestionParams.KAFKA instead", "0.7")
-  val GENERIC_KAFKA = "generic-kafka"
   val KAFKA = "kafka"
 
-  @deprecated(" Use IngestionParams.HYDRA_REQUEST_LABEL_PARAM instead", "0.7")
   val HYDRA_KAFKA_TOPIC_PARAM = "hydra-kafka-topic"
   val HYDRA_REQUEST_LABEL_PARAM = "hydra-request-label"
   val HYDRA_RECORD_KEY_PARAM = "hydra-record-key"

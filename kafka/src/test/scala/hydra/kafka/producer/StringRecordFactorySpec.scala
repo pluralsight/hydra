@@ -16,7 +16,7 @@
 package hydra.kafka.producer
 
 import hydra.core.ingest.HydraRequest
-import hydra.core.ingest.IngestionParams.HYDRA_RECORD_KEY_PARAM
+import hydra.core.ingest.IngestionParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_KEY_PARAM}
 import hydra.core.protocol.ValidRequest
 import org.scalatest.{FunSpecLike, Matchers}
 
@@ -28,14 +28,15 @@ class StringRecordFactorySpec extends Matchers with FunSpecLike {
   describe("When using the StringRecordFactory") {
 
     it("handles valid strings") {
-      val request = HydraRequest("test-topic","""{"name":"test"}""")
+      val request = HydraRequest(Some("test-topic"),"""{"name":"test"}""")
       val validation = StringRecordFactory.validate(request)
       validation shouldBe ValidRequest
     }
 
     it("builds") {
-      val request = HydraRequest("test-topic", """{"name":"test"}""")
+      val request = HydraRequest(Some("test-topic"), """{"name":"test"}""")
         .withMetadata(HYDRA_RECORD_KEY_PARAM -> "{$.name}")
+        .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val msg = StringRecordFactory.build(request)
       msg.destination shouldBe "test-topic"
       msg.key shouldBe Some("test")

@@ -1,9 +1,10 @@
 package hydra.kafka.producer
 
 import hydra.core.ingest.HydraRequest
-import hydra.core.ingest.IngestionParams.HYDRA_RECORD_KEY_PARAM
+import hydra.core.ingest.IngestionParams._
 import hydra.core.producer.RecordFactory
 import hydra.kafka.producer.KafkaRecordFactory.KeyInterpreter
+import org.apache.kafka.common.errors.InvalidRequestException
 
 
 /**
@@ -16,6 +17,11 @@ trait KafkaRecordFactory[K, V] extends RecordFactory[K, V] {
   //Payload is always a string right now. We'll change it later to support more types.
   def getKey(request: HydraRequest)(implicit ev: KeyInterpreter[String, String]): Option[String] =
     request.metadataValue(HYDRA_RECORD_KEY_PARAM).map(key => ev.extractKey(key, request.payload))
+
+  def getTopic(request: HydraRequest): String = {
+    request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM)
+      .getOrElse(throw new InvalidRequestException("No kafka topic present in the request."))
+  }
 }
 
 

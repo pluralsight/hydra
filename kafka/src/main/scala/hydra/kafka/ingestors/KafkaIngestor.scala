@@ -41,12 +41,12 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
       }
 
     case Validate(request) =>
-      if (request.label.isEmpty) InvalidRequest(new IllegalArgumentException("A topic name must be supplied."))
-      else {
-        val reply = KafkaRecordFactories.validate(request)
-        sender ! reply
+      val validation = request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM) match {
+        case None => InvalidRequest(new IllegalArgumentException("A topic name must be supplied."))
+        case Some(_) => KafkaRecordFactories.validate(request)
       }
 
+      sender ! validation
 
     case Ingest(request) =>
       Try(KafkaRecordFactories.build(request)) match {

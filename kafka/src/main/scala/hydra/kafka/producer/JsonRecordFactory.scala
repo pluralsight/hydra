@@ -29,7 +29,7 @@ object JsonRecordFactory extends KafkaRecordFactory[String, String] {
   val mapper = new ObjectMapper()
 
   override def build(request: HydraRequest) =
-    JsonRecord(request.label, getKey(request), request.payload, request.retryStrategy)
+    JsonRecord(getTopic(request), getKey(request), request.payload, request.retryStrategy)
 
   override def validate(request: HydraRequest): MessageValidationResult = {
     //TODO: Strict validation with a json schema

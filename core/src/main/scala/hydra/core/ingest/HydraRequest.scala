@@ -6,7 +6,7 @@ import hydra.core.producer.ValidationStrategy.Strict
 /**
   * Created by alexsilva on 12/3/16.
   */
-case class HydraRequest(label: String,
+case class HydraRequest(label: Option[String] = None,
                         payload: String,
                         metadata: List[HydraRequestMedatata] = List.empty,
                         params: Map[String, Any] = Map.empty,

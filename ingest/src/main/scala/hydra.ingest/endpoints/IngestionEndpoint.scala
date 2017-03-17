@@ -39,7 +39,7 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
     post {
       requestEntityPresent {
         pathPrefix("ingest") {
-          headerValueByName(IngestionParams.HYDRA_REQUEST_LABEL_PARAM) { destination =>
+          optionalHeaderValueByName(IngestionParams.HYDRA_REQUEST_LABEL_PARAM) { destination =>
             handleExceptions(excptHandler) {
               pathEndOrSingleSlash {
                 broadcastRequest(destination)
@@ -57,24 +57,24 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
     case e: Exception => complete(GenericServiceResponse(ServiceUnavailable.intValue, e.getMessage))
   }
 
-  def broadcastRequest(destination: String) = {
+  def broadcastRequest(label: Option[String]) = {
     onSuccess(ingestorRegistry) { registry =>
       entity(as[String]) { payload =>
         imperativelyComplete { ictx =>
-          val hydraReq = createRequest[String, RequestContext](destination, payload, ictx.ctx)
+          val hydraReq = createRequest[String, RequestContext](label, payload, ictx.ctx)
           actorRefFactory.actorOf(IngestionRequestHandler.props(hydraReq, registry, ictx))
         }
       }
     }
   }
 
-  def publishToIngestor(destination: String, ingestor: String) = {
+  def publishToIngestor(label: Option[String], ingestor: String) = {
     onSuccess(lookupIngestor(ingestor)) { result =>
       result.ref match {
         case Some(ref) =>
           entity(as[String]) { payload =>
             imperativelyComplete { ictx =>
-              val hydraReq = createRequest[String, RequestContext](destination, payload, ictx.ctx)
+              val hydraReq = createRequest[String, RequestContext](label, payload, ictx.ctx)
               ingestorRegistry.foreach(r => actorRefFactory.actorOf(IngestionRequestHandler.props(hydraReq, r, ictx)))
             }
           }
