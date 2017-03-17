@@ -20,7 +20,7 @@ import java.io.File
 import com.pluralsight.hydra.avro.{InvalidDataTypeException, JsonConverter, RequiredFieldMissingException, UndefinedFieldsException}
 import hydra.core.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.core.ingest.IngestionParams._
-import hydra.core.ingest.{HydraRequest, IngestionParams}
+import hydra.core.ingest.{HydraRequest, InvalidRequestException}
 import hydra.core.protocol.InvalidRequest
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
@@ -103,6 +103,13 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
       val request = HydraRequest(Some("test-topic"),"""{"name":"test", "rank":10}""")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       AvroRecordFactory.getSubject(request) shouldBe "test-topic"
+    }
+
+    it("throws an error if no topic is in the request") {
+      val request = HydraRequest(Some("test-topic"),"""{"name":test"}""")
+      intercept[InvalidRequestException] {
+        AvroRecordFactory.build(request)
+      }
     }
 
   }

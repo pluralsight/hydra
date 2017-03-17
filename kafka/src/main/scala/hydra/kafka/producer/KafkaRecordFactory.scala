@@ -1,10 +1,9 @@
 package hydra.kafka.producer
 
-import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.IngestionParams._
+import hydra.core.ingest.{HydraRequest, InvalidRequestException}
 import hydra.core.producer.RecordFactory
 import hydra.kafka.producer.KafkaRecordFactory.KeyInterpreter
-import org.apache.kafka.common.errors.InvalidRequestException
 
 
 /**
@@ -20,7 +19,7 @@ trait KafkaRecordFactory[K, V] extends RecordFactory[K, V] {
 
   def getTopic(request: HydraRequest): String = {
     request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM)
-      .getOrElse(throw new InvalidRequestException("No kafka topic present in the request."))
+      .getOrElse(throw new InvalidRequestException("No kafka topic present in the request.", request))
   }
 }
 

@@ -15,7 +15,7 @@
 
 package hydra.kafka.producer
 
-import hydra.core.ingest.HydraRequest
+import hydra.core.ingest.{HydraRequest, InvalidRequestException}
 import hydra.core.ingest.IngestionParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_KEY_PARAM}
 import hydra.core.protocol.ValidRequest
 import org.scalatest.{FunSpecLike, Matchers}
@@ -41,6 +41,13 @@ class StringRecordFactorySpec extends Matchers with FunSpecLike {
       msg.destination shouldBe "test-topic"
       msg.key shouldBe Some("test")
       msg.payload shouldBe """{"name":"test"}"""
+    }
+
+    it("throws an error if no topic is in the request") {
+      val request = HydraRequest(Some("test-topic"),"""{"name":test"}""")
+      intercept[InvalidRequestException] {
+        StringRecordFactory.build(request)
+      }
     }
   }
 }
