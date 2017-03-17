@@ -1,4 +1,4 @@
-package hydra.core.ingest.examples
+package hydra.core.examples.ingest
 
 import hydra.core.ingest.Ingestor
 import hydra.core.protocol._

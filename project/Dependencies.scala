@@ -21,6 +21,7 @@ object Dependencies {
   val akkaKafkaStreamVersion = "0.13"
   val kafkaUnitVersion = "0.6"
   val scalazVersion = "7.2.9"
+  val scalaMockVersion = "3.5.0"
 
   object Compile {
 
@@ -79,7 +80,7 @@ object Dependencies {
     val akkaTest = Seq("com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
       "com.typesafe.akka" %% "akka-multi-node-testkit" % akkaVersion % "test")
     val scalaTest = "org.scalatest" %% "scalatest" % scalaTestVersion % "test"
-    val scalaMock = "org.scalamock" %% "scalamock-scalatest-support" % "3.5.0" % "test"
+    val scalaMock = "org.scalamock" %% "scalamock-scalatest-support" % scalaMockVersion % "test"
     val junit = "junit" % "junit" % "4.12" % "test"
   }
 

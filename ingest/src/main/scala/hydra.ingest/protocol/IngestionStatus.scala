@@ -68,5 +68,5 @@ case class IngestionStatus(request: HydraRequest) {
     *
     * @return
     */
-  val ingestionStatus: StatusCode = if (hasErrors) ingestorsInError.head.status.statusCode else StatusCodes.OK
+  def ingestionStatus: StatusCode = if (hasErrors) ingestorsInError.head.status.statusCode else StatusCodes.OK
 }
