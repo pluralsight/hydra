@@ -13,28 +13,19 @@
  * limitations under the License.
  */
 
-package hydra.core.producer
+package hydra.core.produce
+
+import hydra.core.ingest.HydraRequest
+import hydra.core.protocol.MessageValidationResult
 
 /**
- * Created by alexsilva on 1/11/17.
- */
+  * Created by alexsilva on 1/11/17.
+  */
+trait RecordFactory[K, V] {
 
-trait ValidationStrategy
+  def build(request: HydraRequest): HydraRecord[K, V]
 
-object ValidationStrategy {
-
-  def apply(strategy: String): ValidationStrategy = {
-    Option(strategy).map(_.trim.toLowerCase) match {
-      case Some(s) => if (s.equals("strict")) Strict else if (s.equals("relaxed")) Relaxed else Unknown
-      case None => Unknown
-    }
-
-  }
-
-  case object Strict extends ValidationStrategy
-
-  case object Relaxed extends ValidationStrategy
-
-  case object Unknown extends ValidationStrategy
-
+  def validate(request: HydraRequest): MessageValidationResult
 }
+
+

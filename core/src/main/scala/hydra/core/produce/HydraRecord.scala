@@ -1,4 +1,4 @@
-package hydra.core.producer
+package hydra.core.produce
 
 import hydra.core.ingest.{HydraRequest, RetryStrategy}
 

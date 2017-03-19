@@ -78,7 +78,10 @@ object Dependencies {
 
   object Test {
     val akkaTest = Seq("com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
-      "com.typesafe.akka" %% "akka-multi-node-testkit" % akkaVersion % "test")
+      "com.typesafe.akka" %% "akka-http-testkit" % akkaHTTPVersion % "test",
+      "com.typesafe.akka" %% "akka-multi-node-testkit" % akkaVersion % "test",
+      "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % "test" )
+
     val scalaTest = "org.scalatest" %% "scalatest" % scalaTestVersion % "test"
     val scalaMock = "org.scalamock" %% "scalamock-scalatest-support" % scalaMockVersion % "test"
     val junit = "junit" % "junit" % "4.12" % "test"

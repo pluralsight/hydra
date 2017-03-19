@@ -17,8 +17,10 @@
 package hydra.ingest.endpoints
 
 import akka.actor._
+import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.StatusCodes.ServiceUnavailable
-import akka.http.scaladsl.server.{ExceptionHandler, RequestContext, Route}
+import akka.http.scaladsl.server.{ExceptionHandler, Route}
+import akka.stream.ActorMaterializer
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
@@ -34,6 +36,8 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
   extends RoutedEndpoints with LoggingAdapter with HydraJsonSupport with HydraDirectives with HydraIngestorRegistry {
 
   import hydra.ingest.RequestFactories._
+
+  implicit val mat = ActorMaterializer()
 
   override val route: Route =
     post {
@@ -59,10 +63,12 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
 
   def broadcastRequest(label: Option[String]) = {
     onSuccess(ingestorRegistry) { registry =>
-      entity(as[String]) { payload =>
-        imperativelyComplete { ictx =>
-          val hydraReq = createRequest[String, RequestContext](label, payload, ictx.ctx)
-          actorRefFactory.actorOf(IngestionRequestHandler.props(hydraReq, registry, ictx))
+      extractRequestContext { ctx =>
+        val hydraReq = createRequest[String, HttpRequest](label, ctx.request)
+        onSuccess(hydraReq) { request =>
+          imperativelyComplete { ictx =>
+            actorRefFactory.actorOf(IngestionRequestHandler.props(request, registry, ictx))
+          }
         }
       }
     }
@@ -72,10 +78,12 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
     onSuccess(lookupIngestor(ingestor)) { result =>
       result.ref match {
         case Some(ref) =>
-          entity(as[String]) { payload =>
-            imperativelyComplete { ictx =>
-              val hydraReq = createRequest[String, RequestContext](label, payload, ictx.ctx)
-              ingestorRegistry.foreach(r => actorRefFactory.actorOf(IngestionRequestHandler.props(hydraReq, r, ictx)))
+          extractRequestContext { ctx =>
+            val hydraReq = createRequest[String, HttpRequest](label, ctx.request)
+            onSuccess(hydraReq) { req =>
+              imperativelyComplete { ictx =>
+                ingestorRegistry.foreach(r => actorRefFactory.actorOf(IngestionRequestHandler.props(req, r, ictx)))
+              }
             }
           }
         case None => complete(404, GenericServiceResponse(404, s"Ingestor $ingestor not found."))

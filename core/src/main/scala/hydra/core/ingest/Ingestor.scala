@@ -3,16 +3,16 @@ package hydra.core.ingest
 import akka.actor.{Actor, OneForOneStrategy, SupervisorStrategy}
 import hydra.common.config.ActorConfigSupport
 import hydra.common.logging.LoggingAdapter
+import hydra.core.akka.ComposingReceive
 import hydra.core.protocol._
 
 /**
   * Created by alexsilva on 12/1/15.
   */
 
-trait Ingestor extends Actor with ActorConfigSupport with IngestionFlow with LoggingAdapter {
+trait Ingestor extends Actor with ActorConfigSupport with LoggingAdapter with ComposingReceive {
 
-  ingest {
-
+  override val baseReceive: Receive = {
     case Publish(request) =>
       log.info(s"Publish message was not handled by ${self}.  Will not join.")
 
@@ -21,10 +21,12 @@ trait Ingestor extends Actor with ActorConfigSupport with IngestionFlow with Log
 
 
     case Ingest(request) =>
-      log.warn("Ingest message was not handled by ${self}.")
+      log.warn(s"Ingest message was not handled by ${self}.")
       sender ! IngestorCompleted
-
   }
+
+
+  def ingest(next: Actor.Receive) = compose(next)
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     try {
@@ -40,6 +42,7 @@ trait Ingestor extends Actor with ActorConfigSupport with IngestionFlow with Log
   }
 
   def ingestionError(error: HydraIngestionError): Unit = {
+    log.error(s"Ingestion error: $error")
   }
 
   override val supervisorStrategy =

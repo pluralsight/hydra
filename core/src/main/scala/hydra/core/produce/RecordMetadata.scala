@@ -1,4 +1,4 @@
-package hydra.core.producer
+package hydra.core.produce
 
 /**
   * Created by alexsilva on 2/22/17.

@@ -21,7 +21,7 @@ import hydra.core.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.core.avro.registry.ConfluentSchemaRegistry
 import hydra.core.avro.schema.{SchemaResource, SchemaResourceLoader}
 import hydra.core.ingest.{HydraRequest, IngestionParams}
-import hydra.core.producer.ValidationStrategy.Strict
+import hydra.core.produce.ValidationStrategy.Strict
 import hydra.core.protocol.{InvalidRequest, MessageValidationResult, ValidRequest}
 import org.apache.avro.generic.GenericRecord
 

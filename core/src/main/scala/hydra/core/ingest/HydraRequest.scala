@@ -1,7 +1,7 @@
 package hydra.core.ingest
 
-import hydra.core.producer.ValidationStrategy
-import hydra.core.producer.ValidationStrategy.Strict
+import hydra.core.produce.ValidationStrategy
+import hydra.core.produce.ValidationStrategy.Strict
 
 /**
   * Created by alexsilva on 12/3/16.

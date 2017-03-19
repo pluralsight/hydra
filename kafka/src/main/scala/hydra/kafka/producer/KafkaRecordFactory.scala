@@ -2,7 +2,7 @@ package hydra.kafka.producer
 
 import hydra.core.ingest.IngestionParams._
 import hydra.core.ingest.{HydraRequest, InvalidRequestException}
-import hydra.core.producer.RecordFactory
+import hydra.core.produce.RecordFactory
 import hydra.kafka.producer.KafkaRecordFactory.KeyInterpreter
 
 

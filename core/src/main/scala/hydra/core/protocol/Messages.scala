@@ -2,7 +2,7 @@ package hydra.core.protocol
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import hydra.core.ingest.HydraRequest
-import hydra.core.producer.{HydraRecord, RecordMetadata}
+import hydra.core.produce.{HydraRecord, RecordMetadata}
 
 /**
   * Created by alexsilva on 2/22/17.
@@ -32,11 +32,13 @@ case object Ignore extends HydraMessage
 
 case class InitiateRequest(request: HydraRequest) extends HydraMessage
 
+//These are the Produce-related messages
+
 case class Produce[K, V](record: HydraRecord[K, V]) extends HydraMessage
 
-case class RecordProduced(md: RecordMetadata)
+case class RecordProduced(md: RecordMetadata) extends HydraMessage
 
-case class RecordNotProduced[K, V](record: HydraRecord[K, V], error: Throwable)
+case class RecordNotProduced[K, V](record: HydraRecord[K, V], error: Throwable) extends HydraMessage
 
 
 sealed trait IngestorStatus extends HydraMessage with Product {

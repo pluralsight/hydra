@@ -47,7 +47,7 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
       val request = HydraRequest(Some("test-topic"),"""{"name":"test","rank":1,"new-field":"new"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-        .withMetadata(HYDRA_VALIDATION_PARAM -> "strict")
+        .withMetadata(HYDRA_VALIDATION_STRATEGY -> "strict")
       val validation = KafkaRecordFactories.validate(request)
       val ex = validation.asInstanceOf[InvalidRequest].error.asInstanceOf[JsonToAvroConversionExceptionWithMetadata]
       ex.cause shouldBe an[UndefinedFieldsException]

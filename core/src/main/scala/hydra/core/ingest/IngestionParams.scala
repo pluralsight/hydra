@@ -44,8 +44,8 @@ object IngestionParams {
   val HYDRA_REQUEST_LABEL_PARAM = "hydra-request-label"
   val HYDRA_RECORD_KEY_PARAM = "hydra-record-key"
   val HYDRA_RECORD_FORMAT_PARAM = "hydra-record-format"
-  val RETRY_STRATEGY_PARAM = "retry-strategy"
-  val HYDRA_VALIDATION_PARAM = "hydra-validation"
+  val HYDRA_RETRY_STRATEGY = "hydra-retry-strategy"
+  val HYDRA_VALIDATION_STRATEGY = "hydra-validation"
   val STRICT = "strict"
   val RELAXED = "relaxed"
 }

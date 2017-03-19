@@ -1,6 +1,6 @@
 package hydra.kafka.producer
 
-import hydra.core.producer.RecordMetadata
+import hydra.core.produce.RecordMetadata
 
 /**
   * Created by alexsilva on 2/22/17.
