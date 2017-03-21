@@ -1,8 +1,13 @@
 package hydra.kafka.marshallers
 
+import akka.http.scaladsl.marshalling.{Marshaller, Marshalling}
+import akka.http.scaladsl.model.ContentTypes
+import akka.util.ByteString
 import hydra.core.marshallers.HydraJsonSupport
 import org.apache.kafka.common.{Node, PartitionInfo}
 import spray.json.{JsNumber, JsObject, JsString, JsValue, JsonFormat}
+
+import scala.concurrent.Future
 
 /**
   * Created by alexsilva on 3/19/17.
@@ -36,4 +41,13 @@ trait HydraKafkaJsonSupport extends HydraJsonSupport {
     override def read(json: JsValue): PartitionInfo = ???
   }
 
+
+  implicit val stringFormat = Marshaller[String, ByteString] { ec ⇒
+    s ⇒
+      Future.successful {
+        List(Marshalling.WithFixedContentType(ContentTypes.`application/json`, () ⇒
+          ByteString("\"" + s + "\"")) // "raw string" to be rendered as json element in our stream must be enclosed by ""
+        )
+      }
+  }
 }
