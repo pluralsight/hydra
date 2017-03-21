@@ -30,9 +30,9 @@ trait HydraEntryPoint extends App with SLF4JLogging with ConfigSupport {
   lazy val endpoints = config.get[List[String]](s"$applicationName.$moduleName.endpoints").valueOrElse(Seq.empty)
     .map(Class.forName(_).asInstanceOf[ENDPOINT])
 
-  def buildContainer(fallbackCfg: Option[Config] = None): ContainerService = {
+  def buildContainer(config: Option[Config] = None): ContainerService = {
     val builder = ContainerBuilder()
-      .withConfig(fallbackCfg.map(config.withFallback(_)).getOrElse(config))
+      .withConfig(config.map(_.withFallback(this.config)).getOrElse(this.config))
       .withRoutes(endpoints: _*)
       .withActors(services: _*)
       .withListeners(new HydraExtensionListener(moduleName, extensions))

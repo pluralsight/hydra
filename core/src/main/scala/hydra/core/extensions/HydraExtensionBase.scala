@@ -70,11 +70,11 @@ abstract class HydraExtensionBase(extensionName: String, extConfig: Config)(impl
   private def register(moduleId: String, module: HydraModule, interval: FiniteDuration, initDelay: FiniteDuration) = {
     implicit val ec = getDispatcher(moduleId)
     val wrapper = HydraModuleWrapper(extensionName, moduleId, interval, initDelay, module)
-    log.debug(s"Registering module $extensionName::moduleId.")
+    log.debug(s"Registering module $extensionName::$moduleId.")
     HydraModuleRegistry(system).addModule(wrapper)
-    log.debug(s"Starting module $extensionName::moduleId.")
+    log.debug(s"Starting module $extensionName::$moduleId.")
     wrapper.startModule(system)
-    log.debug(s"Started module $extensionName::moduleId.")
+    log.debug(s"Started module $extensionName::$moduleId.")
   }
 
   private def getDispatcher(moduleId: String) = {
