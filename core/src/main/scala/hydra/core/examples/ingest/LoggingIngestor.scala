@@ -14,7 +14,7 @@ class LoggingIngestor extends Ingestor {
       sender ! Join
 
     case Ingest(request) =>
-      log.info(request.payload)
+      log.info(request.payload.toString)
       sender ! IngestorCompleted
   }
 }

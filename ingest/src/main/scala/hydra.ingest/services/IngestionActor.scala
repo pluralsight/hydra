@@ -16,10 +16,10 @@
 
 package hydra.ingest.services
 
-import akka.actor.SupervisorStrategy._
 import akka.actor._
 import akka.util.Timeout
 import hydra.common.config.ActorConfigSupport
+import hydra.core.ingest.{IngestionParams, RequestUtils}
 import hydra.core.protocol.InitiateRequest
 import hydra.ingest.protocol.IngestionCompleted
 import hydra.ingest.services.IngestionSupervisor.InitiateIngestion
@@ -27,6 +27,7 @@ import hydra.ingest.services.IngestionSupervisor.InitiateIngestion
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.language.postfixOps
+import scala.util.Try
 
 /**
   * Created by alexsilva on 12/22/15.
@@ -44,15 +45,19 @@ class IngestionActor(registryPath: String) extends Actor with ActorConfigSupport
 
   override def receive: Receive = {
     case InitiateRequest(request) =>
-      context.actorOf(IngestionSupervisor.props(registry, request, ingestionTimeout)) ! InitiateIngestion
-    case IngestionCompleted(summary) => {
+      val split = (request.metadataValue(IngestionParams.SPLIT_JSON_ARRAY).map(_.toBoolean).getOrElse(false))
+      val requests = if (split) RequestUtils.split(request) else Seq(request)
+      requests.foreach { r =>
+        context.actorOf(IngestionSupervisor.props(registry, r, ingestionTimeout)) ! InitiateIngestion
+      }
+    case IngestionCompleted(summary) =>
       context.stop(sender)
-      //      summary.callback.foreach { c =>
-      //        Try(context.actorSelection(c) ! IngestionCompleted(summary)) recover {
-      //          case e => log.error(s"Unable to send reply back to ${receive}: ${e.getMessage}")
-      //        }
-      //      }
-    }
+      summary.request.metadataValue(IngestionParams.REPLY_TO).foreach { replyTo =>
+        Try(context.actorSelection(replyTo) ! IngestionCompleted(summary))
+          .recover {
+            case e => log.error(s"Unable to send reply back to ${receive}: ${e.getMessage}")
+          }
+      }
     case ReceiveTimeout => {
       log.error("Received a timeout from " + sender)
     }
@@ -61,11 +66,6 @@ class IngestionActor(registryPath: String) extends Actor with ActorConfigSupport
     }
   }
 
-  override val supervisorStrategy =
-    OneForOneStrategy(maxNrOfRetries = 10, withinTimeRange = 10.seconds) {
-      case _: Exception => {
-        Stop
-      }
-    }
+
 }
 

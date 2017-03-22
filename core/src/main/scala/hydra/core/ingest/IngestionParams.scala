@@ -17,10 +17,6 @@ object IngestionParams {
     */
   val HYDRA_INGESTOR_TARGET_PARAM = "hydra-ingestor-target"
 
-
-  @deprecated(" Use IngestionParams.HYDRA_SCHEMA_PARAM instead", "0.7")
-  val HYDRA_AVRO_SCHEMA_PARAM = "hydra-avro-schema"
-
   /**
     * Which schema to use.  The correct syntax is resource_type:location
     *
@@ -48,4 +44,12 @@ object IngestionParams {
   val HYDRA_VALIDATION_STRATEGY = "hydra-validation"
   val STRICT = "strict"
   val RELAXED = "relaxed"
+
+  /**
+    * If present and set to true, a single request with a JSON array payload
+    * will be split into multiple HydraRequests each corresponding to an element of the array.
+    */
+  val SPLIT_JSON_ARRAY = "split-json-array"
+
+  val REPLY_TO = "reply-to"
 }

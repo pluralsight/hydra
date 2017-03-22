@@ -8,7 +8,7 @@ import hydra.core.produce.ValidationStrategy.Strict
   */
 case class HydraRequest(label: Option[String] = None,
                         payload: String,
-                        metadata: List[HydraRequestMedatata] = List.empty,
+                        metadata: Seq[HydraRequestMedatata] = List.empty,
                         params: Map[String, Any] = Map.empty,
                         retryStrategy: RetryStrategy = RetryStrategy.Fail,
                         validationStrategy: ValidationStrategy = Strict) {
@@ -35,7 +35,7 @@ case class HydraRequest(label: Option[String] = None,
   }
 
   def withMetadata(meta: (String, String)*) =
-    copy(metadata = this.metadata ::: meta.map(m => HydraRequestMedatata(m._1, m._2)).toList)
+    copy(metadata = this.metadata ++ meta.map(m => HydraRequestMedatata(m._1, m._2)))
 
   def withRetryStrategy(retryStrategy: RetryStrategy) =
     copy(retryStrategy = retryStrategy)

@@ -15,7 +15,7 @@ object RetryStrategy {
 
   def apply(strategy: String): RetryStrategy = {
     strategy match {
-      case "until-success" => UntilSuccess
+      case "retry" => Retry
       case _ => Fail
     }
   }
@@ -25,7 +25,7 @@ object RetryStrategy {
 
   }
 
-  case object UntilSuccess extends RetryStrategy {
+  case object Retry extends RetryStrategy {
     override val retryOnFailure: Boolean = true
   }
 

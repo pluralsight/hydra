@@ -25,7 +25,7 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
         HttpMethods.POST,
         headers = Seq(RawHeader("hydra", "awesome"),
           RawHeader(IngestionParams.HYDRA_VALIDATION_STRATEGY, "relaxed"),
-          RawHeader(IngestionParams.HYDRA_RETRY_STRATEGY, "until-success")),
+          RawHeader(IngestionParams.HYDRA_RETRY_STRATEGY, "retry")),
         uri = "/test",
         entity = HttpEntity(MediaTypes.`application/json`, json))
       val req = new HttpRequestFactory().createRequest(Some("label"), httpRequest)
@@ -34,7 +34,7 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
         req.label shouldBe Some("label")
         req.metadataValue("hydra") shouldBe Some("awesome")
         req.validationStrategy shouldBe ValidationStrategy.Relaxed
-        req.retryStrategy shouldBe RetryStrategy.UntilSuccess
+        req.retryStrategy shouldBe RetryStrategy.Retry
       }
     }
   }

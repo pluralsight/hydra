@@ -15,7 +15,7 @@
 
 package hydra.core.avro.io
 
-import java.io.File
+import java.io.{File, IOException}
 import java.net.URL
 
 import hydra.core.avro.registry.SchemaRegistryException
@@ -38,7 +38,7 @@ class SchemaResourceLoaderSpec extends Matchers with FunSpecLike with BeforeAndA
   }
 
   describe("When loading schemas from the registry") {
-    it("creates a resource based on latest vers`ion") {
+    it("creates a resource based on latest version") {
       val loader = new SchemaResourceLoader("http://mock", client)
       val res = loader.getResource("registry:test-value")
       res.exists() shouldBe true
@@ -56,6 +56,13 @@ class SchemaResourceLoaderSpec extends Matchers with FunSpecLike with BeforeAndA
       res.isReadable shouldBe true
       new Parser().parse(Source.fromInputStream(res.getInputStream).mkString) shouldBe
         new Parser().parse(Source.fromFile(schema).mkString)
+    }
+
+    it("errors if can't find a schema with a specific version") {
+      val loader = new SchemaResourceLoader("http://mock", client)
+      intercept[SchemaRegistryException]{
+        loader.getResource("registry:test-value#2")
+      }
     }
 
     it("defaults to registry resources") {
