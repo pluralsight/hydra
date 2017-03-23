@@ -21,7 +21,7 @@ import com.github.vonnagy.service.container.service.ServicesManager
 import hydra.common.config.ConfigSupport
 import hydra.core.ingest._
 import hydra.core.protocol._
-import hydra.ingest.protocol.{IngestionCompleted, IngestionStatus}
+import hydra.ingest.protocol.{IngestionReport, IngestionStatus}
 import hydra.ingest.services.IngestionErrorHandler.HandleError
 import hydra.ingest.services.IngestionSupervisor.InitiateIngestion
 import hydra.ingest.services.IngestorRegistry.{IngestorLookupResult, Lookup}
@@ -102,7 +102,7 @@ class IngestionSupervisor(request: HydraRequest, registry: ActorRef, timeout: Fi
   }
 
   private def doFinish() = {
-    context.parent ! IngestionCompleted(status)
+    context.parent ! IngestionReport(status)
     context.stop(self)
   }
 

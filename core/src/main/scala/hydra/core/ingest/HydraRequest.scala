@@ -6,9 +6,9 @@ import hydra.core.produce.ValidationStrategy.Strict
 /**
   * Created by alexsilva on 12/3/16.
   */
-case class HydraRequest(label: Option[String] = None,
+case class HydraRequest(correlationId: String = "hydra",
                         payload: String,
-                        metadata: Seq[HydraRequestMedatata] = List.empty,
+                        metadata: Seq[HydraRequestMedatata] = Seq.empty,
                         params: Map[String, Any] = Map.empty,
                         retryStrategy: RetryStrategy = RetryStrategy.Fail,
                         validationStrategy: ValidationStrategy = Strict) {

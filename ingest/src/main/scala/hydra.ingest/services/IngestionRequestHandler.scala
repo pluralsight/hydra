@@ -18,17 +18,15 @@ package hydra.ingest.services
 
 import akka.actor.SupervisorStrategy.Stop
 import akka.actor.{OneForOneStrategy, _}
-import com.github.vonnagy.service.container.service.ServicesManager
+import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import hydra.common.config.ConfigSupport
 import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.HydraRequest
 import hydra.core.protocol._
-import hydra.ingest.marshallers.{IngestionErrorResponse, IngestionJsonSupport, IngestionResponse}
-import hydra.ingest.protocol.{IngestionCompleted, IngestionStatus}
-import hydra.ingest.services.IngestionErrorHandler.HandleError
+import hydra.ingest.marshallers.IngestionJsonSupport
+import hydra.ingest.protocol.IngestionReport
 import hydra.ingest.services.IngestionSupervisor.InitiateIngestion
 
-import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.util.Try
 
@@ -50,33 +48,35 @@ class IngestionRequestHandler(request: HydraRequest, registry: ActorRef,
   }
 
   def receive = {
-    case IngestionCompleted(h: IngestionStatus) =>
-      complete(IngestionResponse(h))
+    case report: IngestionReport => complete(report)
     case ReceiveTimeout =>
-      fail(IngestionErrorResponse.ingestionTimedOut(s"No transport joined within ${timeout}."))
-    case e: HydraError =>
-      fail(IngestionErrorResponse.serverError(e.cause.getMessage))
-    case _ =>
-      fail(IngestionErrorResponse.requestError("Invalid request."))
+      fail(errorWith(StatusCodes.custom(StatusCodes.RequestTimeout.intValue,
+        s"No transport joined within ${timeout}.")))
+    case e: HydraError => fail(errorWith(StatusCodes.InternalServerError))
+    case _ => fail(errorWith(StatusCodes.BadRequest))
   }
 
-  def complete(obj: IngestionResponse) = {
-    ctx.complete(obj.status, obj.result)
+  def complete(report: IngestionReport) = {
+    ctx.complete(report.statusCode, report)
     stop(self)
   }
 
-  def fail(obj: IngestionErrorResponse) = {
-    ctx.complete(obj.status, obj)
+  def fail(obj: IngestionReport) = {
+    ctx.complete(obj.statusCode, obj)
     stop(self)
   }
 
   override val supervisorStrategy =
     OneForOneStrategy() {
       case e => {
-        fail(IngestionErrorResponse.serverError(e.getMessage))
+        fail(errorWith(StatusCodes.ServiceUnavailable))
         Stop
       }
     }
+
+  private def errorWith(statusCode: StatusCode) = {
+    IngestionReport(request.correlationId, request.metadata, Map.empty, statusCode)
+  }
 }
 
 object IngestionRequestHandler extends ConfigSupport {

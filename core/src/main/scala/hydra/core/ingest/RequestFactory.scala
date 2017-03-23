@@ -9,5 +9,5 @@ import scala.concurrent.{ExecutionContext, Future}
   * Created by alexsilva on 3/14/17.
   */
 trait RequestFactory[P, S] {
-  def createRequest(label: Option[String], source: S)(implicit mat:Materializer): Future[HydraRequest]
+  def createRequest(correlationId: String, source: S)(implicit mat:Materializer): Future[HydraRequest]
 }

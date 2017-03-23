@@ -58,15 +58,4 @@ case class IngestionStatus(request: HydraRequest) {
       .foreach(i => _ingestors.update(i._1, i._2.copy(status = IngestorTimeout)))
   }
 
-  def ingestorsInError: Seq[IngestorState] =
-    _ingestors.filter(_._2.status != IngestorCompleted).values.toSeq
-
-  def hasErrors = !ingestorsInError.isEmpty
-
-  /**
-    * If any ingestor reports an error, that becomes the status.
-    *
-    * @return
-    */
-  def ingestionStatus: StatusCode = if (hasErrors) ingestorsInError.head.status.statusCode else StatusCodes.OK
 }

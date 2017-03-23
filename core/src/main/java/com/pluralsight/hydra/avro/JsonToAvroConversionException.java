@@ -26,7 +26,7 @@ public class JsonToAvroConversionException extends RuntimeException {
 
     protected final String fieldName;
 
-    protected final Schema schema;
+    protected transient final Schema schema;
 
     public JsonToAvroConversionException(String msg, Object value, String fieldName, Schema schema) {
         super(msg);

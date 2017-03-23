@@ -14,7 +14,7 @@ import scala.concurrent.Future
   */
 class HttpRequestFactory extends RequestFactory[String, HttpRequest] {
 
-  override def createRequest(label: Option[String], request: HttpRequest)
+  override def createRequest(correlationId: String, request: HttpRequest)
                             (implicit mat: Materializer): Future[HydraRequest] = {
     implicit val ec = mat.executionContext
 
@@ -27,7 +27,7 @@ class HttpRequestFactory extends RequestFactory[String, HttpRequest] {
     Unmarshal(request.entity).to[String].map { payload =>
       val metadata: List[HydraRequestMedatata] = List(request.headers.map(header =>
         HydraRequestMedatata(header.name.toLowerCase, header.value)): _*)
-      HydraRequest(label, payload, metadata, retryStrategy = rs, validationStrategy = vs)
+      HydraRequest(correlationId, payload, metadata, retryStrategy = rs, validationStrategy = vs)
     }
   }
 }

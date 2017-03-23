@@ -46,10 +46,10 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
           optionalHeaderValueByName(IngestionParams.HYDRA_REQUEST_LABEL_PARAM) { destination =>
             handleExceptions(excptHandler) {
               pathEndOrSingleSlash {
-                broadcastRequest(destination)
+                broadcastRequest(destination.getOrElse("hydra"))
               }
             } ~ path(Segment) { ingestor =>
-              publishToIngestor(destination, ingestor)
+              publishToIngestor(destination.getOrElse("hydra"), ingestor)
             }
           }
         }
@@ -61,10 +61,10 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
     case e: Exception => complete(GenericServiceResponse(ServiceUnavailable.intValue, e.getMessage))
   }
 
-  def broadcastRequest(label: Option[String]) = {
+  def broadcastRequest(correlationId: String) = {
     onSuccess(ingestorRegistry) { registry =>
       extractRequestContext { ctx =>
-        val hydraReq = createRequest[String, HttpRequest](label, ctx.request)
+        val hydraReq = createRequest[String, HttpRequest](correlationId, ctx.request)
         onSuccess(hydraReq) { request =>
           imperativelyComplete { ictx =>
             actorRefFactory.actorOf(IngestionRequestHandler.props(request, registry, ictx))
@@ -74,12 +74,12 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
     }
   }
 
-  def publishToIngestor(label: Option[String], ingestor: String) = {
+  def publishToIngestor(correlationId: String, ingestor: String) = {
     onSuccess(lookupIngestor(ingestor)) { result =>
       result.ref match {
         case Some(ref) =>
           extractRequestContext { ctx =>
-            val hydraReq = createRequest[String, HttpRequest](label, ctx.request)
+            val hydraReq = createRequest[String, HttpRequest](correlationId, ctx.request)
             onSuccess(hydraReq) { req =>
               imperativelyComplete { ictx =>
                 ingestorRegistry.foreach(r => actorRefFactory.actorOf(IngestionRequestHandler.props(req, r, ictx)))

@@ -22,6 +22,8 @@ import org.springframework.core.io.AbstractResource
   * Created by alexsilva on 1/23/17.
   */
 trait SchemaResource extends AbstractResource {
+
+  @transient
   def schema: Schema
 
   def location: String

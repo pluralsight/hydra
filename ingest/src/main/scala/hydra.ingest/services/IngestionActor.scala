@@ -21,7 +21,7 @@ import akka.util.Timeout
 import hydra.common.config.ActorConfigSupport
 import hydra.core.ingest.{IngestionParams, RequestUtils}
 import hydra.core.protocol.InitiateRequest
-import hydra.ingest.protocol.IngestionCompleted
+import hydra.ingest.protocol.IngestionReport
 import hydra.ingest.services.IngestionSupervisor.InitiateIngestion
 
 import scala.concurrent.Await
@@ -50,10 +50,10 @@ class IngestionActor(registryPath: String) extends Actor with ActorConfigSupport
       requests.foreach { r =>
         context.actorOf(IngestionSupervisor.props(registry, r, ingestionTimeout)) ! InitiateIngestion
       }
-    case IngestionCompleted(summary) =>
+    case r: IngestionReport =>
       context.stop(sender)
-      summary.request.metadataValue(IngestionParams.REPLY_TO).foreach { replyTo =>
-        Try(context.actorSelection(replyTo) ! IngestionCompleted(summary))
+      r.metadata.find(_.name == IngestionParams.REPLY_TO).foreach { replyTo =>
+        Try(context.actorSelection(replyTo.value) ! r)
           .recover {
             case e => log.error(s"Unable to send reply back to ${receive}: ${e.getMessage}")
           }

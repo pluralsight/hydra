@@ -28,10 +28,10 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
           RawHeader(IngestionParams.HYDRA_RETRY_STRATEGY, "retry")),
         uri = "/test",
         entity = HttpEntity(MediaTypes.`application/json`, json))
-      val req = new HttpRequestFactory().createRequest(Some("label"), httpRequest)
+      val req = new HttpRequestFactory().createRequest("label", httpRequest)
       whenReady(req) { req =>
         req.payload shouldBe json
-        req.label shouldBe Some("label")
+        req.correlationId shouldBe "label"
         req.metadataValue("hydra") shouldBe Some("awesome")
         req.validationStrategy shouldBe ValidationStrategy.Relaxed
         req.retryStrategy shouldBe RetryStrategy.Retry

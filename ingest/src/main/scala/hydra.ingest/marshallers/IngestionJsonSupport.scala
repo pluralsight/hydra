@@ -16,10 +16,9 @@
 
 package hydra.ingest.marshallers
 
-import hydra.core.ingest.IngestorState
+import hydra.core.ingest.{IngestorState, _}
 import hydra.core.marshallers.HydraJsonSupport
-import hydra.core.ingest._
-import hydra.ingest.protocol.IngestionStatus
+import hydra.ingest.protocol.{IngestionReport, IngestionStatus}
 
 
 /**
@@ -32,7 +31,7 @@ trait IngestionJsonSupport extends HydraJsonSupport {
 
   implicit val ingestorInfoFormat = jsonFormat3(IngestorInfo)
 
-  implicit object TransportStateFormat extends RootJsonFormat[IngestorState] {
+  implicit object IngestorStateFormat extends RootJsonFormat[IngestorState] {
 
     override def write(obj: IngestorState): JsValue = {
       val duratioOp = if (obj.duration > -1) Some(JsNumber(obj.duration)) else None
@@ -53,25 +52,22 @@ trait IngestionJsonSupport extends HydraJsonSupport {
   }
 
 
-  implicit object IngestionStatusFormat extends RootJsonFormat[IngestionStatus] {
+  implicit object IngestionReportFormat extends RootJsonFormat[IngestionReport] {
 
     def writeState[T <: IngestorState : JsonWriter](t: T) = t.toJson
 
-    override def write(obj: IngestionStatus): JsValue = {
-      val transports = obj.ingestors.map(h => h._1 -> writeState(h._2))
+    override def write(obj: IngestionReport): JsValue = {
+      val ingestors = obj.ingestors.map(h => h._1 -> writeState(h._2))
       JsObject(
         Map(
-          "ingestionStatus" -> JsNumber(obj.ingestionStatus.intValue),
-          "transports" -> JsObject(transports)
+          "statusCode" -> JsNumber(obj.statusCode.intValue),
+          "ingestors" -> JsObject(ingestors)
         )
       )
     }
 
-    override def read(json: JsValue): IngestionStatus = ???
+    override def read(json: JsValue): IngestionReport = ???
 
   }
 
-  implicit val ingestionServiceResponse = jsonFormat2(IngestionResponse.apply)
-
-  implicit val ingestionServiceErrorFormat = jsonFormat2(IngestionErrorResponse.apply)
 }

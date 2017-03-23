@@ -16,10 +16,10 @@
 package hydra.kafka.producer
 
 import com.fasterxml.jackson.core.JsonParseException
+import hydra.core.ingest.IngestionParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_KEY_PARAM}
 import hydra.core.ingest.{HydraRequest, InvalidRequestException}
 import hydra.core.protocol.{InvalidRequest, ValidRequest}
 import org.scalatest.{FunSpecLike, Matchers}
-import hydra.core.ingest.IngestionParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_KEY_PARAM}
 
 /**
   * Created by alexsilva on 1/11/17.
@@ -28,20 +28,20 @@ class JsonRecordFactorySpec extends Matchers with FunSpecLike {
 
   describe("When using the JsonRecordFactory") {
     it("handles invalid json") {
-      val request = HydraRequest(Some("test-topic"),"""{"name":test"}""")
+      val request = HydraRequest("test-topic","""{"name":test"}""")
       val validation = JsonRecordFactory.validate(request)
       val ex = validation.asInstanceOf[InvalidRequest].error
       ex shouldBe a[JsonParseException]
     }
 
     it("handles valid json") {
-      val request = HydraRequest(Some("test-topic"),"""{"name":"test"}""")
+      val request = HydraRequest("test-topic","""{"name":"test"}""")
       val validation = JsonRecordFactory.validate(request)
       validation shouldBe ValidRequest
     }
 
     it("builds") {
-      val request = HydraRequest(Some("test-topic"), """{"name":"test"}""")
+      val request = HydraRequest("test-topic", """{"name":"test"}""")
         .withMetadata(HYDRA_RECORD_KEY_PARAM -> "{$.name}")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val msg = JsonRecordFactory.build(request)
@@ -51,7 +51,7 @@ class JsonRecordFactorySpec extends Matchers with FunSpecLike {
     }
 
     it("throws an error if no topic is in the request") {
-      val request = HydraRequest(Some("test-topic"),"""{"name":test"}""")
+      val request = HydraRequest("test-topic","""{"name":test"}""")
       intercept[InvalidRequestException] {
         JsonRecordFactory.build(request)
       }
