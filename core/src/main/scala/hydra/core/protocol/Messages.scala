@@ -1,5 +1,6 @@
 package hydra.core.protocol
 
+import akka.actor.ActorRef
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import hydra.core.ingest.HydraRequest
 import hydra.core.produce.{HydraRecord, RecordMetadata}
@@ -33,13 +34,15 @@ case object Ignore extends HydraMessage
 case class InitiateRequest(request: HydraRequest) extends HydraMessage
 
 //These are the Produce-related messages
-
 case class Produce[K, V](record: HydraRecord[K, V]) extends HydraMessage
+
+case class ProduceWithAck[K, V](record: HydraRecord[K, V], ingestor: ActorRef, supervisor: ActorRef) extends HydraMessage
 
 case class RecordProduced(md: RecordMetadata) extends HydraMessage
 
 case class RecordNotProduced[K, V](record: HydraRecord[K, V], error: Throwable) extends HydraMessage
 
+case class ProducerAck(supervisor: ActorRef, error: Option[Throwable])
 
 sealed trait IngestorStatus extends HydraMessage with Product {
   val name: String = productPrefix
@@ -57,6 +60,14 @@ sealed trait IngestorStatus extends HydraMessage with Product {
 
 case object IngestorJoined extends IngestorStatus {
   val statusCode = StatusCodes.Accepted
+}
+
+case object IngestorIgnored extends IngestorStatus {
+  val statusCode = StatusCodes.NotAcceptable
+}
+
+case object RequestPublished extends IngestorStatus {
+  val statusCode = StatusCodes.Processing
 }
 
 case class IngestorError(error: Throwable) extends IngestorStatus {

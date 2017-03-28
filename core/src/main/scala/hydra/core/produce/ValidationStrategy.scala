@@ -19,7 +19,7 @@ package hydra.core.produce
   * Created by alexsilva on 1/11/17.
   */
 
-trait ValidationStrategy
+sealed trait ValidationStrategy
 
 object ValidationStrategy {
 

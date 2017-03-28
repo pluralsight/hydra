@@ -21,7 +21,7 @@ import akka.actor.{Props, _}
 import akka.routing.{FromConfig, RoundRobinPool}
 import com.typesafe.config.Config
 import hydra.common.config.ActorConfigSupport
-import hydra.core.ingest.{Ingestor, IngestorInfo}
+import hydra.core.ingest.{HydraRequest, Ingestor}
 import hydra.core.protocol.Publish
 import hydra.ingest.services.IngestorRegistry._
 import org.joda.time.DateTime
@@ -38,12 +38,12 @@ class IngestorRegistry extends Actor with ActorLogging with ActorConfigSupport {
   private object RegistrationLock
 
   override def receive: Receive = {
-    case RegisterIngestor(name, clazz) =>
+    case RegisterWithClass(name, clazz) =>
       val ingestor = doRegister(name, clazz)
       context.watch(ingestor.ref)
-      sender ! IngestorInfo(name, ingestor.ref.path.toString, ingestor.registrationTime)
+      sender ! IngestorInfo(name, ingestor.ref.path, ingestor.registrationTime)
 
-    case UnregisterIngestor(name) =>
+    case Unregister(name) =>
       ingestors.remove(name) match {
         case Some(handler) =>
           context.unwatch(handler.ref)
@@ -53,18 +53,20 @@ class IngestorRegistry extends Actor with ActorLogging with ActorConfigSupport {
         case None => log.info(s"Handler $name not found")
       }
 
-    case GetIngestors =>
-      val info = ingestors.values.map(r => IngestorInfo(r.name, r.ref.path.toString, r.registrationTime))
-      sender ! RegisteredIngestors(info.toList)
-
     case p@Publish(_) =>
       ingestors.values.foreach(_.ref forward p)
 
-    case Lookup(name) => sender ! IngestorLookupResult(name, ingestors.get(name).map(_.ref))
+    case FindByName(name) =>
+      val result = ingestors.get(name).map(r => IngestorInfo(name, r.ref.path, r.registrationTime)).toSeq
+      LookupResult(result: _*)
+
+    case FindAll =>
+      val info = ingestors.values.map(r => IngestorInfo(r.name, r.ref.path, r.registrationTime))
+      sender ! LookupResult(info.toList: _*)
 
     case Terminated(handler) => {
       //todo: ADD RESTART
-      log.error(s"Handler ${handler} terminated.")
+      log.error(s"Ingestor ${handler} terminated.")
     }
   }
 
@@ -98,31 +100,34 @@ class IngestorRegistry extends Actor with ActorLogging with ActorConfigSupport {
       }
       .valueOrElse {
         log.debug(s"Using default round robin router for ingestor $name")
-        Try(new RoundRobinPool(rootConfig.getConfig("hydra.ingest.default-ingestor-router"))).map(_.props(ip))
+        Try(new RoundRobinPool(rootConfig.getConfig("akka.actor.deployment.default-ingestor-router"))).map(_.props(ip))
           .recover { case e: Exception =>
             log.error(e, s"Ingestor $name won't be routed. Unable to instantiate default router: ${e.getMessage}")
             ip
           }.get
       }
   }
-
 }
 
 case class RegisteredIngestor(name: String, ref: ActorRef, registrationTime: DateTime)
 
+case class IngestorInfo(name: String, path: ActorPath, registeredAt: DateTime)
+
 object IngestorRegistry {
 
-  case class RegisterIngestor(name: String, clazz: Class[_ <: Ingestor])
+  case class RegisterWithClass(name: String, clazz: Class[_ <: Ingestor])
 
-  case class UnregisterIngestor(name: String)
+  case class Unregister(name: String)
 
-  case object GetIngestors
+  case object FindAll
 
-  case class Lookup(name: String)
+  case class FindByName(name: String)
 
-  case class IngestorLookupResult(name: String, ref: Option[ActorRef])
+  case class LookupResult(ingestors: IngestorInfo*)
 
-  case class RegisteredIngestors(ingestors: Seq[IngestorInfo])
+  case class FindByRequest(request: HydraRequest)
+
+  case class LookupRequestResult(request: HydraRequest, ingestors: Seq[IngestorInfo])
 
   case class IngestorAlreadyRegisteredException(msg: String) extends RuntimeException(msg)
 

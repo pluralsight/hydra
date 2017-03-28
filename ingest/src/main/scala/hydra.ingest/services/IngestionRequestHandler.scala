@@ -25,7 +25,6 @@ import hydra.core.ingest.HydraRequest
 import hydra.core.protocol._
 import hydra.ingest.marshallers.IngestionJsonSupport
 import hydra.ingest.protocol.IngestionReport
-import hydra.ingest.services.IngestionSupervisor.InitiateIngestion
 
 import scala.concurrent.duration._
 import scala.util.Try
@@ -42,7 +41,7 @@ class IngestionRequestHandler(request: HydraRequest, registry: ActorRef,
   context.setReceiveTimeout(timeout)
 
   override def preStart(): Unit = {
-    Try(context.actorOf(IngestionSupervisor.props(registry, request, timeout))).map(_ ! InitiateIngestion).recover {
+    Try(context.actorOf(IngestionSupervisor.props(request, timeout, registry))).recover {
       case e: Exception => self ! GenericHydraError(e)
     }
   }
@@ -50,8 +49,7 @@ class IngestionRequestHandler(request: HydraRequest, registry: ActorRef,
   def receive = {
     case report: IngestionReport => complete(report)
     case ReceiveTimeout =>
-      fail(errorWith(StatusCodes.custom(StatusCodes.RequestTimeout.intValue,
-        s"No transport joined within ${timeout}.")))
+      fail(errorWith(StatusCodes.custom(StatusCodes.RequestTimeout.intValue, s"No transport joined in ${timeout}.")))
     case e: HydraError => fail(errorWith(StatusCodes.InternalServerError))
     case _ => fail(errorWith(StatusCodes.BadRequest))
   }

@@ -37,7 +37,7 @@ object IngestionParams {
   val KAFKA = "kafka"
 
   val HYDRA_KAFKA_TOPIC_PARAM = "hydra-kafka-topic"
-  val HYDRA_REQUEST_LABEL_PARAM = "hydra-request-label"
+  val HYDRA_REQUEST_ID_PARAM = "hydra-request-id"
   val HYDRA_RECORD_KEY_PARAM = "hydra-record-key"
   val HYDRA_RECORD_FORMAT_PARAM = "hydra-record-format"
   val HYDRA_RETRY_STRATEGY = "hydra-retry-strategy"
@@ -52,4 +52,34 @@ object IngestionParams {
   val SPLIT_JSON_ARRAY = "split-json-array"
 
   val REPLY_TO = "reply-to"
+
+  /**
+    * Determines when the ingestion is considered completed.
+    *
+    * Actual behavior is up each ingestor, but as a general rule:
+    *
+    * If "none", ingestors should not wait for a [[hydra.core.protocol.RecordProduced]] message
+    * from the underlying producer and instead must reply with an [[hydra.core.protocol.IngestorCompleted]] message
+    * as soon as the request is sent to the producer.
+    *
+    * If "explicit", ingestors should only send an [[hydra.core.protocol.IngestorCompleted]] message
+    * after receiving a [[hydra.core.protocol.RecordProduced]] message from the producer.
+    *
+    * Do not block waiting for a RecordProduced message.
+    *
+    * Be aware that setting this parameter to true raises the possibility of clients receiving ingestion timeouts.
+    *
+    */
+  val HYDRA_ACK_STRATEGY = "hydra-ack"
+
+
+  /**
+    * Can be 'detailed' or 'simple' (default).
+    *
+    * If 'detailed', every request produces a more detailed response including duration for each ingestor, etc.
+    *
+    * A 'simple' response produces only status codes.
+    */
+  val HYDRA_RESPONSE_FORMAT = "hydra-response-format"
+
 }

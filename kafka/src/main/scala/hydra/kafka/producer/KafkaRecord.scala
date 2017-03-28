@@ -22,10 +22,12 @@ trait KafkaRecord[K, V] extends HydraRecord[K, V] {
   val formatName: String = {
     val cname = ClassUtils.getShortName(getClass)
     val idx = cname.indexOf("Record")
-    if (idx != -1)
+    if (idx != -1) {
       cname.take(idx).toLowerCase
-    else
+    }
+    else {
       getClass.getName
+    }
   }
 }
 

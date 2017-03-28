@@ -16,14 +16,14 @@
 
 package hydra.kafka.producer
 
-import hydra.core.ingest.RetryStrategy
-import hydra.core.ingest.RetryStrategy.Fail
+import hydra.core.produce.RetryStrategy
+import hydra.core.produce.RetryStrategy.Fail
 
 /**
   * Created by alexsilva on 11/30/15.
   */
-case class StringRecord(destination: String, key: Option[String], payload: String, retryStrategy: RetryStrategy = Fail)
-  extends KafkaRecord[String, String]
+case class StringRecord(destination: String, key: Option[String], payload: String,
+                        retryStrategy: RetryStrategy = Fail) extends KafkaRecord[String, String]
 
 object StringRecord {
   def apply(topic: String, payload: String): StringRecord = new StringRecord(topic, None, payload)

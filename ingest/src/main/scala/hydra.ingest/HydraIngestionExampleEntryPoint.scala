@@ -14,7 +14,7 @@
  *
  */
 
-package hydra.ingest.app
+package hydra.ingest
 
 import java.io.File
 
@@ -29,7 +29,7 @@ import hydra.ingest.services._
   *
   * Created by alexsilva on 2/18/16.
   */
-object HydraIngestionAppExample extends HydraEntryPoint {
+object HydraIngestionExampleEntryPoint extends HydraEntryPoint {
 
   val moduleName = "ingest"
 

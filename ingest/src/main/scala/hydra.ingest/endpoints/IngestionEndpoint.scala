@@ -26,8 +26,10 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
 import hydra.core.ingest.IngestionParams
 import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
-import hydra.ingest.HydraIngestorRegistry
+import hydra.ingest.bootstrap.HydraIngestorRegistry
 import hydra.ingest.services.IngestionRequestHandler
+
+import scala.util.Random
 
 /**
   * Created by alexsilva on 12/22/15.
@@ -35,7 +37,7 @@ import hydra.ingest.services.IngestionRequestHandler
 class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
   extends RoutedEndpoints with LoggingAdapter with HydraJsonSupport with HydraDirectives with HydraIngestorRegistry {
 
-  import hydra.ingest.RequestFactories._
+  import hydra.ingest.bootstrap.RequestFactories._
 
   implicit val mat = ActorMaterializer()
 
@@ -43,13 +45,13 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
     post {
       requestEntityPresent {
         pathPrefix("ingest") {
-          optionalHeaderValueByName(IngestionParams.HYDRA_REQUEST_LABEL_PARAM) { destination =>
+          optionalHeaderValueByName(IngestionParams.HYDRA_REQUEST_ID_PARAM) { correlationId =>
             handleExceptions(excptHandler) {
               pathEndOrSingleSlash {
-                broadcastRequest(destination.getOrElse("hydra"))
+                broadcastRequest(correlationId.getOrElse(randomId))
               }
             } ~ path(Segment) { ingestor =>
-              publishToIngestor(destination.getOrElse("hydra"), ingestor)
+              publishToIngestor(correlationId.getOrElse(randomId), ingestor)
             }
           }
         }
@@ -60,6 +62,8 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
     case e: IllegalArgumentException => complete(GenericServiceResponse(400, e.getMessage))
     case e: Exception => complete(GenericServiceResponse(ServiceUnavailable.intValue, e.getMessage))
   }
+
+  private def randomId = Random.alphanumeric.take(8) mkString
 
   def broadcastRequest(correlationId: String) = {
     onSuccess(ingestorRegistry) { registry =>
@@ -76,7 +80,7 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
 
   def publishToIngestor(correlationId: String, ingestor: String) = {
     onSuccess(lookupIngestor(ingestor)) { result =>
-      result.ref match {
+      result.ingestors.headOption match {
         case Some(ref) =>
           extractRequestContext { ctx =>
             val hydraReq = createRequest[String, HttpRequest](correlationId, ctx.request)

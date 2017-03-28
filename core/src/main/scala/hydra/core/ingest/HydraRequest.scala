@@ -1,20 +1,23 @@
 package hydra.core.ingest
 
-import hydra.core.produce.ValidationStrategy
 import hydra.core.produce.ValidationStrategy.Strict
+import hydra.core.produce.{AckStrategy, RetryStrategy, ValidationStrategy}
+
+import scala.util.Random
 
 /**
   * Created by alexsilva on 12/3/16.
   */
-case class HydraRequest(correlationId: String = "hydra",
+case class HydraRequest(correlationId: String = Random.alphanumeric.take(8).mkString,
                         payload: String,
                         metadata: Seq[HydraRequestMedatata] = Seq.empty,
                         params: Map[String, Any] = Map.empty,
                         retryStrategy: RetryStrategy = RetryStrategy.Fail,
-                        validationStrategy: ValidationStrategy = Strict) {
+                        validationStrategy: ValidationStrategy = Strict,
+                        ackStrategy: AckStrategy = AckStrategy.None) {
 
   def metadataValue(name: String): Option[String] = {
-    metadata.find(m => m.name == name) match {
+    metadata.find(m => m.name.equalsIgnoreCase(name)) match {
       case Some(md) => Some(md.value)
       case None => None
     }

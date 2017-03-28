@@ -1,6 +1,6 @@
 package hydra.common.util
 
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef}
 
 import scala.reflect.ClassTag
 
@@ -29,4 +29,8 @@ object ActorUtils {
     StringUtils.camel2underscores(clazz.getSimpleName)
   }
 
+  def actorName(ref: ActorRef): String = {
+    val elems = ref.path.elements.toList
+    if (elems.last.startsWith("$")) elems.takeRight(2)(0) else elems.last
+  }
 }

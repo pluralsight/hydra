@@ -1,4 +1,4 @@
-package hydra.core.ingest
+package hydra.core.produce
 
 /**
   * Defines a Retry Strategy for messages being sent through Hydra.

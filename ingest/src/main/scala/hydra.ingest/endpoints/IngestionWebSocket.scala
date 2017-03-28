@@ -17,14 +17,13 @@
 package hydra.ingest.endpoints
 
 import akka.actor._
-import akka.http.scaladsl.server.{RequestContext, Route}
+import akka.http.scaladsl.server.Route
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
-import hydra.core.ingest.{HydraRequest, HydraRequestMedatata}
 import hydra.core.marshallers.HydraJsonSupport
-import hydra.ingest.HydraIngestorRegistry
-import hydra.ingest.ws.SocketConnections
+import hydra.ingest.bootstrap.HydraIngestorRegistry
+import hydra.ingest.ws.IngestionSocket
 
 /**
   * Created by alexsilva on 12/22/15.
@@ -33,7 +32,7 @@ class IngestionWebSocket(implicit val system: ActorSystem, implicit val actorRef
   extends RoutedEndpoints with LoggingAdapter with HydraJsonSupport with HydraDirectives with HydraIngestorRegistry {
 
   override val route: Route =
-    path("ingest-socket" / Segment) { label =>
-      handleWebSocketMessages(SocketConnections.findOrCreate(label).ingestionWSFlow1("test"))
+    path("ws-ingest" / Segment) { label =>
+      handleWebSocketMessages(IngestionSocket().ingestionWSFlow(label))
     }
 }

@@ -19,7 +19,9 @@ package hydra.core.marshallers
 import java.io.{PrintWriter, StringWriter}
 import java.util.UUID
 
+import akka.actor.ActorPath
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+import akka.http.scaladsl.model.StatusCode
 import hydra.common.util.Resource._
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
@@ -31,6 +33,24 @@ import scala.util.{Failure, Success, Try}
   * Created by alexsilva on 12/4/15.
   */
 trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
+
+  implicit object StatusCodeJsonFormat extends JsonFormat[StatusCode] {
+
+    override def write(t: StatusCode): JsValue =
+      JsObject(
+        "code" -> JsNumber(t.intValue()),
+        "message" -> JsString(t.reason())
+      )
+
+    override def read(json: JsValue): StatusCode = ???
+  }
+
+  implicit object ActorPathJsonFormat extends JsonFormat[ActorPath] {
+
+    override def write(t: ActorPath): JsValue = JsString(t.toString)
+
+    override def read(json: JsValue): ActorPath = ActorPath.fromString(json.convertTo[String])
+  }
 
   implicit object ThrowableJsonFormat extends JsonFormat[Throwable] {
 

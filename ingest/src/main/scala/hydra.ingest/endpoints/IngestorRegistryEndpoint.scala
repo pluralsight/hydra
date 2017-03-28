@@ -23,9 +23,9 @@ import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
-import hydra.ingest.HydraIngestorRegistry
+import hydra.ingest.bootstrap.HydraIngestorRegistry
 import hydra.ingest.marshallers.IngestionJsonSupport
-import hydra.ingest.services.IngestorRegistry.{GetIngestors, RegisteredIngestors}
+import hydra.ingest.services.IngestorRegistry.{FindAll, LookupResult}
 
 /**
   * Created by alexsilva on 12/22/15.
@@ -38,8 +38,8 @@ class IngestorRegistryEndpoint(implicit val system: ActorSystem, actorRefFactory
     path("ingestors" ~ Slash.?) {
       get {
         onSuccess(ingestorRegistry) { registry =>
-          onSuccess(registry ? GetIngestors) {
-            case response: RegisteredIngestors => complete(response.ingestors)
+          onSuccess(registry ? FindAll) {
+            case response: LookupResult => complete(response.ingestors)
           }
         }
       }

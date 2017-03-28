@@ -8,8 +8,8 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FunSpecLike, Matchers}
 import akka.stream.testkit.StreamTestKit
 import akka.testkit.TestKit
-import hydra.core.ingest.{IngestionParams, RetryStrategy}
-import hydra.core.produce.ValidationStrategy
+import hydra.core.ingest.IngestionParams
+import hydra.core.produce.{RetryStrategy, ValidationStrategy}
 
 import scala.collection.immutable._
 

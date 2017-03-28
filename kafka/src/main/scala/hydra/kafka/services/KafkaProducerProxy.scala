@@ -7,11 +7,11 @@ import akka.kafka.ProducerSettings
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
-import hydra.core.protocol.{Produce, RecordNotProduced, RecordProduced}
+import hydra.core.protocol.{Produce, ProduceWithAck, RecordNotProduced, RecordProduced}
 import hydra.kafka.config.KafkaConfigSupport
-import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata, PropagateExceptionCallback}
+import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata, PropagateExceptionCallback, PropagateExceptionWithAckCallback}
 import hydra.kafka.services.KafkaProducerProxy.ProducerInitialized
-import org.apache.kafka.clients.producer.KafkaProducer
+import org.apache.kafka.clients.producer.{Callback, KafkaProducer}
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
@@ -38,14 +38,19 @@ class KafkaProducerProxy(parent: ActorRef, producerConfig: Config) extends Actor
     case _ => stash()
   }
 
+  private def produce(r: KafkaRecord[Any, Any], callback: Callback) = {
+    Try(producer.send(r, callback)).recover {
+      case e: Exception =>
+        callback.onCompletion(null, e)
+    }
+  }
+
   def receiving: Receive = {
     case Produce(r: KafkaRecord[Any, Any]) =>
-      val path = self.path
-      //we have to wrap this in a try because the producer tries to serialize
-      // the message synchronously before sending it
-      Try(producer.send(r, new PropagateExceptionCallback(context.actorSelection(path), r))).recover {
-        case e: Exception => parent ! RecordNotProduced[Any, Any](r, e)
-      }
+      produce(r, new PropagateExceptionCallback(context.actorSelection(self.path), r))
+
+    case ProduceWithAck(r: KafkaRecord[Any, Any], ingestor, supervisor) =>
+      produce(r, new PropagateExceptionWithAckCallback(context.actorSelection(self.path), ingestor, supervisor, r))
 
     case kmd: KafkaRecordMetadata =>
       parent ! RecordProduced(kmd)

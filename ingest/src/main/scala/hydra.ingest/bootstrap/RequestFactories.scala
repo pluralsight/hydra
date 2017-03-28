@@ -1,11 +1,11 @@
-package hydra.ingest
+package hydra.ingest.bootstrap
 
 import akka.http.scaladsl.model.HttpRequest
 import akka.stream.Materializer
 import hydra.core.ingest.{HydraRequest, RequestFactory}
 import hydra.ingest.http.HttpRequestFactory
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 /**
   * Created by alexsilva on 3/14/17.

@@ -5,8 +5,8 @@ import configs.syntax._
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.common.util.ActorUtils
-import hydra.core.ingest.{ClasspathIngestorDiscovery, IngestorInfo}
-import hydra.ingest.services.IngestorRegistry.{RegisterIngestor, UnregisterIngestor}
+import hydra.ingest.bootstrap.ClasspathIngestorLoader
+import hydra.ingest.services.IngestorRegistry.{RegisterWithClass, Unregister}
 
 /**
   * This actor serves as an proxy between the handler registry
@@ -19,23 +19,23 @@ class IngestorRegistrar extends Actor with ConfigSupport with LoggingAdapter {
   val registry = context.actorSelection(applicationConfig.get[String]("ingest.transport_registry.path")
     .valueOrElse("/user/service/ingestor_registry"))
 
-  private val pkgs = applicationConfig.get[List[String]]("ingestors.scan").valueOrElse(List.empty)
+  private val pkgs = applicationConfig.get[List[String]]("ingest.classpath-scan").valueOrElse(List.empty)
 
-  lazy val transports = new ClasspathIngestorDiscovery(pkgs).ingestors.map(h => ActorUtils.actorName(h) -> h)
+  lazy val ingestors = new ClasspathIngestorLoader(pkgs).ingestors.map(h => ActorUtils.actorName(h) -> h)
 
   override def receive = {
-    case RegisterIngestor(name, clazz) =>
-      registry ! RegisterIngestor(name, clazz)
+    case RegisterWithClass(name, clazz) =>
+      registry ! RegisterWithClass(name, clazz)
 
     case IngestorInfo(name, path, time) =>
       log.info("Transport '%s' registered at %s".format(name, path.toString))
   }
 
   override def postStop(): Unit = {
-    transports.foreach(h => registry ! UnregisterIngestor(h._1))
+    ingestors.foreach(h => registry ! Unregister(h._1))
   }
 
   override def preStart(): Unit = {
-    transports.foreach(h => registry ! RegisterIngestor(h._1, h._2))
+    ingestors.foreach(h => registry ! RegisterWithClass(h._1, h._2))
   }
 }

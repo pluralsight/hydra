@@ -22,7 +22,6 @@ import hydra.common.config.ActorConfigSupport
 import hydra.core.ingest.{IngestionParams, RequestUtils}
 import hydra.core.protocol.InitiateRequest
 import hydra.ingest.protocol.IngestionReport
-import hydra.ingest.services.IngestionSupervisor.InitiateIngestion
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -48,7 +47,7 @@ class IngestionActor(registryPath: String) extends Actor with ActorConfigSupport
       val split = (request.metadataValue(IngestionParams.SPLIT_JSON_ARRAY).map(_.toBoolean).getOrElse(false))
       val requests = if (split) RequestUtils.split(request) else Seq(request)
       requests.foreach { r =>
-        context.actorOf(IngestionSupervisor.props(registry, r, ingestionTimeout)) ! InitiateIngestion
+        context.actorOf(IngestionSupervisor.props(r, ingestionTimeout, registry))
       }
     case r: IngestionReport =>
       context.stop(sender)

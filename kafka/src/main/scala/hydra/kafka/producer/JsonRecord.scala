@@ -17,8 +17,8 @@
 package hydra.kafka.producer
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import hydra.core.ingest.RetryStrategy
-import hydra.core.ingest.RetryStrategy.Fail
+import hydra.core.produce.RetryStrategy.Fail
+import hydra.core.produce.{AckStrategy, RetryStrategy}
 
 /**
   * Created by alexsilva on 11/30/15.
@@ -26,13 +26,13 @@ import hydra.core.ingest.RetryStrategy.Fail
   * A Jackson backed JSON record implementation, where the key is a string object and the payload is a String
   * converted using Jackson.
   */
-case class JsonRecord(destination:String, key: Option[String], payload: String, retryStrategy: RetryStrategy = Fail)
+case class JsonRecord(destination: String, key: Option[String], payload: String, retryStrategy: RetryStrategy = Fail)
   extends KafkaRecord[String, String]
 
 object JsonRecord {
   val mapper = new ObjectMapper()
 
-  def apply(topic:String, key: Option[String], obj: Any): JsonRecord = {
+  def apply(topic: String, key: Option[String], obj: Any): JsonRecord = {
     val payload: String = mapper.writeValueAsString(obj)
     new JsonRecord(topic, key, payload)
   }

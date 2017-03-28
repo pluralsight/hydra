@@ -16,9 +16,11 @@
 
 package hydra.ingest.marshallers
 
-import hydra.core.ingest.{IngestorState, _}
+import hydra.core.ingest.IngestionParams
 import hydra.core.marshallers.HydraJsonSupport
-import hydra.ingest.protocol.{IngestionReport, IngestionStatus}
+import hydra.core.protocol.IngestorStatus
+import hydra.ingest.protocol.IngestionReport
+import hydra.ingest.services.IngestorInfo
 
 
 /**
@@ -31,39 +33,37 @@ trait IngestionJsonSupport extends HydraJsonSupport {
 
   implicit val ingestorInfoFormat = jsonFormat3(IngestorInfo)
 
-  implicit object IngestorStateFormat extends RootJsonFormat[IngestorState] {
 
-    override def write(obj: IngestorState): JsValue = {
-      val duratioOp = if (obj.duration > -1) Some(JsNumber(obj.duration)) else None
-      val values: Map[String, JsValue] = Map(
-        "status" -> Some(JsString(obj.status.name)),
-        "message" -> Some(JsString(obj.status.message)),
-        "startedAt" -> Some(obj.startedAt.toJson),
-        "finishedAt" -> obj.finishedAt.map(_.toJson),
-        "completed" -> Some(JsBoolean(obj.status.completed)),
-        "durationMillis" -> duratioOp
-      ).collect {
-        case (key, Some(value)) => key -> value
-      }
-      JsObject(values)
+  implicit object IngestorStatusFormat extends RootJsonFormat[IngestorStatus] {
+
+    override def write(obj: IngestorStatus): JsValue = {
+      JsObject(Map(
+        "status" -> obj.statusCode.toJson
+      ))
     }
 
-    override def read(json: JsValue): IngestorState = ???
+    override def read(json: JsValue): IngestorStatus = ???
   }
-
 
   implicit object IngestionReportFormat extends RootJsonFormat[IngestionReport] {
 
-    def writeState[T <: IngestorState : JsonWriter](t: T) = t.toJson
+    def writeState[T <: IngestorStatus : JsonWriter](t: T) = t.toJson
 
     override def write(obj: IngestionReport): JsValue = {
-      val ingestors = obj.ingestors.map(h => h._1 -> writeState(h._2))
-      JsObject(
-        Map(
-          "statusCode" -> JsNumber(obj.statusCode.intValue),
-          "ingestors" -> JsObject(ingestors)
-        )
-      )
+      val isDetailed = obj.metadata.find(_.name == IngestionParams.HYDRA_RESPONSE_FORMAT)
+        .map(_.value.equalsIgnoreCase("detailed")).getOrElse(false)
+      val ingestors = obj.ingestors
+        .map(h => if (isDetailed) h._1 -> writeState(h._2) else h._1 -> JsNumber(h._2.statusCode.intValue()))
+
+      val response = Map(
+        "requestId" -> Some(JsString(obj.correlationId)),
+        "status" -> (if (isDetailed) Some(obj.statusCode.toJson) else None),
+        "ingestors" -> Some(JsObject(ingestors))
+      ).collect {
+        case (key, Some(value)) => key -> value
+      }
+
+      JsObject(response)
     }
 
     override def read(json: JsValue): IngestionReport = ???

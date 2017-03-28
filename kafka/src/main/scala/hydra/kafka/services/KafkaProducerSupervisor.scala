@@ -24,7 +24,7 @@ import com.typesafe.config.Config
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.notification.{HydraEvent, NotificationSupport}
-import hydra.core.protocol.{Produce, RecordNotProduced, RecordProduced}
+import hydra.core.protocol.{Produce, ProduceWithAck, RecordNotProduced, RecordProduced}
 import hydra.kafka.producer.{JsonRecord, KafkaRecord, KafkaRecordMetadata}
 import hydra.kafka.services.KafkaProducerSupervisor.ProxiesInitialized
 import org.apache.kafka.common.KafkaException
@@ -60,22 +60,18 @@ class KafkaProducerSupervisor(producersConfig: Map[String, Config]) extends Acto
 
   def receiving: Receive = {
     case Produce(record: KafkaRecord[_, _]) =>
-      producers.get(record.formatName) match {
-        case Some(producer) =>
-          producer ! Produce(record)
-        case None =>
-          val error = RecordNotProduced[Any, Any](record,
-            new IllegalArgumentException(s"No producer for '${record.formatName}' format"))
-          publishToEventStream(error)
-          sender ! error
-      }
+      producers(record.formatName) ! Produce(record)
+
+    case ProduceWithAck(record: KafkaRecord[_, _], ingestor, supervisor) =>
+      producers(record.formatName) ! ProduceWithAck(record, ingestor, supervisor)
+
     case RecordProduced(r: KafkaRecordMetadata) =>
       if (metricsEnabled) recordStatistics(r)
 
-    case err: RecordNotProduced[_,_] => publishToEventStream(err)
+    case err: RecordNotProduced[_, _] => publishToEventStream(err)
   }
 
-  private def publishToEventStream(error: RecordNotProduced[_,_]) = {
+  private def publishToEventStream(error: RecordNotProduced[_, _]) = {
     context.system.eventStream.publish(error)
   }
 
@@ -117,7 +113,6 @@ class KafkaProducerSupervisor(producersConfig: Map[String, Config]) extends Acto
       case Failure(ex) => throw ex //just throw
     }
   }
-
 }
 
 object KafkaProducerSupervisor {

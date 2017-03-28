@@ -23,6 +23,9 @@ trait Ingestor extends Actor with ActorConfigSupport with LoggingAdapter with Co
     case Ingest(request) =>
       log.warn(s"Ingest message was not handled by ${self}.")
       sender ! IngestorCompleted
+
+    case ProducerAck(supervisor, error) =>
+      supervisor ! error.map(IngestorError(_)).getOrElse(IngestorCompleted)
   }
 
 

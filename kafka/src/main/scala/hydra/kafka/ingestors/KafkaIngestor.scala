@@ -18,6 +18,8 @@ package hydra.kafka.ingestors
 
 import hydra.core.ingest.IngestionParams._
 import hydra.core.ingest.Ingestor
+import hydra.core.produce.AckStrategy
+import hydra.core.produce.AckStrategy.Explicit
 import hydra.core.protocol._
 import hydra.kafka.producer.{KafkaProducerSupport, KafkaRecordFactories}
 
@@ -32,13 +34,8 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
 
   ingest {
     case Publish(request) =>
-      val mh = request.metadata.find(m => m.name == HYDRA_INGESTOR_PARAM)
-      mh match {
-        case Some(metadata) if metadata.value.equalsIgnoreCase(KAFKA) => {
-          sender ! Join
-        }
-        case _ => // sender ! Ignore
-      }
+      val hasTopic = request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM).isDefined
+      sender ! (if (hasTopic) Join else Ignore)
 
     case Validate(request) =>
       val validation = request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM) match {
@@ -51,10 +48,15 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
     case Ingest(request) =>
       Try(KafkaRecordFactories.build(request)) match {
         case Success(record) =>
-          kafkaProducer ! Produce(record)
-          sender ! IngestorCompleted
+          request.ackStrategy match {
+            case AckStrategy.None =>
+              kafkaProducer ! Produce(record)
+              sender ! IngestorCompleted
+
+            case Explicit =>
+              kafkaProducer ! ProduceWithAck(record, self, sender)
+          }
         case Failure(ex) => sender ! IngestorError(ex)
       }
-
   }
 }

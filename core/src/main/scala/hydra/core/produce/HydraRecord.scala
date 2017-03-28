@@ -1,7 +1,5 @@
 package hydra.core.produce
 
-import hydra.core.ingest.{HydraRequest, RetryStrategy}
-
 /**
   * Created by alexsilva on 10/30/15.
   *
@@ -12,20 +10,11 @@ import hydra.core.ingest.{HydraRequest, RetryStrategy}
   */
 trait HydraRecord[+K, +P] {
 
-  def destination:String
+  def destination: String
 
   def key: Option[K]
 
   def payload: P
-
-  /**
-    * The validation strategy to apply to this message. Defaults to Strict.
-    *
-    * See [[ValidationStrategy]].
-    *
-    * @return
-    */
-  def validationStrategy: ValidationStrategy = ValidationStrategy.Strict
 
   /**
     * Whether or not to retry the message in case of a failure.

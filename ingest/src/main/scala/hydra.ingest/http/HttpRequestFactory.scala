@@ -5,7 +5,7 @@ import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.Materializer
 import hydra.core.ingest.IngestionParams._
 import hydra.core.ingest._
-import hydra.core.produce.ValidationStrategy
+import hydra.core.produce.{AckStrategy, RetryStrategy, ValidationStrategy}
 
 import scala.concurrent.Future
 
@@ -23,6 +23,9 @@ class HttpRequestFactory extends RequestFactory[String, HttpRequest] {
 
     val vs = request.headers.find(_.lowercaseName() == HYDRA_VALIDATION_STRATEGY)
       .map(h => ValidationStrategy(h.value())).getOrElse(ValidationStrategy.Strict)
+
+    val as = request.headers.find(_.lowercaseName() == HYDRA_ACK_STRATEGY)
+      .map(h => AckStrategy(h.value())).getOrElse(AckStrategy.None)
 
     Unmarshal(request.entity).to[String].map { payload =>
       val metadata: List[HydraRequestMedatata] = List(request.headers.map(header =>

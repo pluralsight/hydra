@@ -14,23 +14,26 @@
  *
  */
 
-package hydra.core.ingest
+package hydra.ingest.bootstrap
 
 import java.lang.reflect.Modifier
 
+import com.typesafe.config.{Config, ConfigFactory}
+import hydra.common.config.ConfigSupport
+import hydra.core.ingest.Ingestor
 import org.reflections.Reflections
 
 import scala.collection.JavaConverters._
 
 /**
- * Created by alexsilva on 1/12/16.
- */
-trait IngestorDiscovery {
+  * Created by alexsilva on 1/12/16.
+  */
+trait IngestorLoader {
 
   def ingestors: Seq[Class[_ <: Ingestor]]
 }
 
-class ClasspathIngestorDiscovery(pkgs: Seq[String]) extends IngestorDiscovery {
+class ClasspathIngestorLoader(pkgs: Seq[String]) extends IngestorLoader {
 
   require(pkgs.size > 0, "At least one package is required.")
 
@@ -38,6 +41,15 @@ class ClasspathIngestorDiscovery(pkgs: Seq[String]) extends IngestorDiscovery {
 
   override lazy val ingestors = reflections.getSubTypesOf(classOf[Ingestor])
     .asScala.filterNot(c => Modifier.isAbstract(c.getModifiers)).toSeq
+}
 
+class ConfigIngestorLoader extends IngestorLoader with ConfigSupport {
+
+  import configs.syntax._
+
+  override def ingestors: Seq[Class[_ <: Ingestor]] = {
+    val config = applicationConfig.get[Config]("ingest.ingestors").valueOrElse(ConfigFactory.empty)
+    Seq.empty
+  }
 }
 
