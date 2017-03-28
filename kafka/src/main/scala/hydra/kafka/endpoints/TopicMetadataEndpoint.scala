@@ -4,7 +4,7 @@ import akka.actor.{ActorRefFactory, ActorSystem}
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
-import hydra.core.http.HydraDirectives
+import hydra.core.http.{CorsSupport, HydraDirectives}
 import hydra.kafka.consumer.ConsumerSupport
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import org.apache.kafka.common.PartitionInfo
@@ -20,7 +20,8 @@ import scalacache.guava.GuavaCache
   * Created by alexsilva on 3/18/17.
   */
 class TopicMetadataEndpoint(implicit val system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
-  extends RoutedEndpoints with LoggingAdapter with HydraDirectives with ConsumerSupport with HydraKafkaJsonSupport {
+  extends RoutedEndpoints with LoggingAdapter with HydraDirectives with ConsumerSupport with HydraKafkaJsonSupport
+    with CorsSupport {
 
   private implicit val cache = ScalaCache(GuavaCache())
 
@@ -31,7 +32,7 @@ class TopicMetadataEndpoint(implicit val system: ActorSystem, implicit val actor
 
   private val filterSystemTopics = (t: String) => (t.startsWith("_") && showSystemTopics) || !t.startsWith("_")
 
-  override val route =
+  override val route = corsHandler(
     get {
       path("transports" / "kafka" / "topics") {
         parameters('names ?) { n =>
@@ -41,7 +42,7 @@ class TopicMetadataEndpoint(implicit val system: ActorSystem, implicit val actor
           }
         }
       }
-    }
+    })
 
   private def topics: Future[Map[String, List[PartitionInfo]]] = {
     import scala.collection.JavaConverters._
