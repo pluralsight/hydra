@@ -5,7 +5,7 @@ import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import hydra.common.config.ConfigSupport
 import hydra.core.avro.registry.ConfluentSchemaRegistry
 import hydra.core.ingest.IngestionParams._
-import hydra.core.ingest.{HydraRequest, HydraRequestMedatata}
+import hydra.core.ingest.{HydraRequest, HydraRequestMetadata}
 import hydra.core.protocol._
 import hydra.kafka.producer.AvroRecordFactory
 import org.apache.avro.Schema.Parser
@@ -40,7 +40,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
     it("joins") {
       val request = HydraRequest("topic",
         "someString",
-        List(HydraRequestMedatata(HYDRA_INGESTOR_PARAM, KAFKA), HydraRequestMedatata(HYDRA_KAFKA_TOPIC_PARAM, "topic"))
+        List(HydraRequestMetadata(HYDRA_INGESTOR_PARAM, KAFKA), HydraRequestMetadata(HYDRA_KAFKA_TOPIC_PARAM, "topic"))
       )
       transport ! Publish(request)
       expectMsg(Join)
@@ -49,8 +49,8 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
     it("is invalid when there is no topic") {
       val request = HydraRequest("topic",
         "someString",
-        List(HydraRequestMedatata(HYDRA_INGESTOR_PARAM, KAFKA),
-          HydraRequestMedatata(HYDRA_RECORD_FORMAT_PARAM, "json"))
+        List(HydraRequestMetadata(HYDRA_INGESTOR_PARAM, KAFKA),
+          HydraRequestMetadata(HYDRA_RECORD_FORMAT_PARAM, "json"))
       )
       transport ! Validate(request)
       expectMsgType[InvalidRequest]
@@ -60,8 +60,8 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
       val request = HydraRequest("test-schema",
         """{"first":"Alex","last":"Silva"}""",
         List(
-          HydraRequestMedatata(HYDRA_INGESTOR_PARAM, KAFKA),
-          HydraRequestMedatata(HYDRA_KAFKA_TOPIC_PARAM, "test-schema")
+          HydraRequestMetadata(HYDRA_INGESTOR_PARAM, KAFKA),
+          HydraRequestMetadata(HYDRA_KAFKA_TOPIC_PARAM, "test-schema")
         )
       )
       transport ! Ingest(request)
@@ -74,8 +74,8 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
     val request = HydraRequest("topic",
       "someString",
       List(
-        HydraRequestMedatata(HYDRA_INGESTOR_PARAM, KAFKA),
-        HydraRequestMedatata(HYDRA_KAFKA_TOPIC_PARAM, "avro-topic")
+        HydraRequestMetadata(HYDRA_INGESTOR_PARAM, KAFKA),
+        HydraRequestMetadata(HYDRA_KAFKA_TOPIC_PARAM, "avro-topic")
       )
     )
     transport ! Validate(request)
@@ -86,8 +86,8 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
     val request = HydraRequest("test-schema",
       json,
       List(
-        HydraRequestMedatata(HYDRA_INGESTOR_PARAM, KAFKA),
-        HydraRequestMedatata(HYDRA_KAFKA_TOPIC_PARAM, "test-schema")
+        HydraRequestMetadata(HYDRA_INGESTOR_PARAM, KAFKA),
+        HydraRequestMetadata(HYDRA_KAFKA_TOPIC_PARAM, "test-schema")
       )
     )
     transport ! Validate(request)
@@ -99,9 +99,9 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
     val request = HydraRequest("just-a-topic",
       json,
       List(
-        HydraRequestMedatata(HYDRA_INGESTOR_PARAM, KAFKA),
-        HydraRequestMedatata(HYDRA_KAFKA_TOPIC_PARAM, "just-a-topic"),
-        HydraRequestMedatata(HYDRA_SCHEMA_PARAM, "test-schema")
+        HydraRequestMetadata(HYDRA_INGESTOR_PARAM, KAFKA),
+        HydraRequestMetadata(HYDRA_KAFKA_TOPIC_PARAM, "just-a-topic"),
+        HydraRequestMetadata(HYDRA_SCHEMA_PARAM, "test-schema")
 
       )
     )
@@ -113,9 +113,9 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
     val request = HydraRequest("topic",
       json,
       List(
-        HydraRequestMedatata(HYDRA_INGESTOR_PARAM, KAFKA),
-        HydraRequestMedatata(HYDRA_RECORD_FORMAT_PARAM, "json"),
-        HydraRequestMedatata(HYDRA_KAFKA_TOPIC_PARAM, "json-topic")
+        HydraRequestMetadata(HYDRA_INGESTOR_PARAM, KAFKA),
+        HydraRequestMetadata(HYDRA_RECORD_FORMAT_PARAM, "json"),
+        HydraRequestMetadata(HYDRA_KAFKA_TOPIC_PARAM, "json-topic")
       )
     )
     transport ! Validate(request)
@@ -125,9 +125,9 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
   it("invalidates the request if the payload is invalid") {
     val request = HydraRequest("topic", "invalid",
       List(
-        HydraRequestMedatata(HYDRA_INGESTOR_PARAM, KAFKA),
-        HydraRequestMedatata(HYDRA_REQUEST_ID_PARAM, "test-schema"),
-        HydraRequestMedatata(HYDRA_KAFKA_TOPIC_PARAM, "topic")
+        HydraRequestMetadata(HYDRA_INGESTOR_PARAM, KAFKA),
+        HydraRequestMetadata(HYDRA_REQUEST_ID_PARAM, "test-schema"),
+        HydraRequestMetadata(HYDRA_KAFKA_TOPIC_PARAM, "topic")
       )
     )
     transport ! Ingest(request)

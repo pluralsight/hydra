@@ -10,7 +10,7 @@ import scala.util.Random
   */
 case class HydraRequest(correlationId: String = Random.alphanumeric.take(8).mkString,
                         payload: String,
-                        metadata: Seq[HydraRequestMedatata] = Seq.empty,
+                        metadata: Seq[HydraRequestMetadata] = Seq.empty,
                         params: Map[String, Any] = Map.empty,
                         retryStrategy: RetryStrategy = RetryStrategy.Fail,
                         validationStrategy: ValidationStrategy = Strict,
@@ -38,7 +38,7 @@ case class HydraRequest(correlationId: String = Random.alphanumeric.take(8).mkSt
   }
 
   def withMetadata(meta: (String, String)*) =
-    copy(metadata = this.metadata ++ meta.map(m => HydraRequestMedatata(m._1, m._2)))
+    copy(metadata = this.metadata ++ meta.map(m => HydraRequestMetadata(m._1, m._2)))
 
   def withRetryStrategy(retryStrategy: RetryStrategy) =
     copy(retryStrategy = retryStrategy)
@@ -50,4 +50,4 @@ case class HydraRequest(correlationId: String = Random.alphanumeric.take(8).mkSt
 }
 
 
-case class HydraRequestMedatata(name: String, value: String)
+case class HydraRequestMetadata(name: String, value: String)

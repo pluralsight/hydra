@@ -28,8 +28,8 @@ class HttpRequestFactory extends RequestFactory[String, HttpRequest] {
       .map(h => AckStrategy(h.value())).getOrElse(AckStrategy.None)
 
     Unmarshal(request.entity).to[String].map { payload =>
-      val metadata: List[HydraRequestMedatata] = List(request.headers.map(header =>
-        HydraRequestMedatata(header.name.toLowerCase, header.value)): _*)
+      val metadata: List[HydraRequestMetadata] = List(request.headers.map(header =>
+        HydraRequestMetadata(header.name.toLowerCase, header.value)): _*)
       HydraRequest(correlationId, payload, metadata, retryStrategy = rs, validationStrategy = vs)
     }
   }
