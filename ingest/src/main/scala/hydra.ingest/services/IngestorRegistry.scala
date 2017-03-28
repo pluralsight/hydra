@@ -22,7 +22,6 @@ import akka.routing.{FromConfig, RoundRobinPool}
 import com.typesafe.config.Config
 import hydra.common.config.ActorConfigSupport
 import hydra.core.ingest.{HydraRequest, Ingestor}
-import hydra.core.protocol.Publish
 import hydra.ingest.services.IngestorRegistry._
 import org.joda.time.DateTime
 
@@ -53,16 +52,13 @@ class IngestorRegistry extends Actor with ActorLogging with ActorConfigSupport {
         case None => log.info(s"Handler $name not found")
       }
 
-    case p@Publish(_) =>
-      ingestors.values.foreach(_.ref forward p)
-
     case FindByName(name) =>
       val result = ingestors.get(name).map(r => IngestorInfo(name, r.ref.path, r.registrationTime)).toSeq
-      LookupResult(result: _*)
+      sender ! LookupResult(result)
 
     case FindAll =>
       val info = ingestors.values.map(r => IngestorInfo(r.name, r.ref.path, r.registrationTime))
-      sender ! LookupResult(info.toList: _*)
+      sender ! LookupResult(info.toList)
 
     case Terminated(handler) => {
       //todo: ADD RESTART
@@ -123,7 +119,7 @@ object IngestorRegistry {
 
   case class FindByName(name: String)
 
-  case class LookupResult(ingestors: IngestorInfo*)
+  case class LookupResult(ingestors: Seq[IngestorInfo])
 
   case class FindByRequest(request: HydraRequest)
 

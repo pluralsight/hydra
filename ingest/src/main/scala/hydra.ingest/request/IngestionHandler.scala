@@ -16,7 +16,7 @@ class IngestionHandler extends Actor with HydraIngestorRegistry {
   override def receive: Receive = {
     case Initiate(request) =>
       ingestorRegistry.foreach { registry =>
-        request.metadataValue(IngestionParams.HYDRA_INGESTOR_TARGET_PARAM) match {
+        request.metadataValue(IngestionParams.HYDRA_INGESTOR_PARAM) match {
           case Some(ingestor) => registry ! FindByName(ingestor)
           case None => registry ! FindAll
         }

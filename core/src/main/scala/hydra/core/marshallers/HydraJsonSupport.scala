@@ -39,7 +39,7 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
     override def write(t: StatusCode): JsValue =
       JsObject(
         "code" -> JsNumber(t.intValue()),
-        "message" -> JsString(t.reason())
+        "reason" -> JsString(t.reason())
       )
 
     override def read(json: JsValue): StatusCode = ???

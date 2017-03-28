@@ -38,8 +38,10 @@ trait IngestionJsonSupport extends HydraJsonSupport {
 
     override def write(obj: IngestorStatus): JsValue = {
       JsObject(Map(
-        "status" -> obj.statusCode.toJson
-      ))
+        "code" -> JsNumber(obj.statusCode.intValue()),
+        "message" -> JsString(obj.message)
+      )
+      )
     }
 
     override def read(json: JsValue): IngestorStatus = ???
@@ -56,9 +58,9 @@ trait IngestionJsonSupport extends HydraJsonSupport {
         .map(h => if (isDetailed) h._1 -> writeState(h._2) else h._1 -> JsNumber(h._2.statusCode.intValue()))
 
       val response = Map(
-        "requestId" -> Some(JsString(obj.correlationId)),
+        "requestId" -> (if (isDetailed) Some(JsString(obj.correlationId)) else None),
         "status" -> (if (isDetailed) Some(obj.statusCode.toJson) else None),
-        "ingestors" -> Some(JsObject(ingestors))
+        "ingestors" -> (if (ingestors.isEmpty) None else Some(JsObject(ingestors)))
       ).collect {
         case (key, Some(value)) => key -> value
       }

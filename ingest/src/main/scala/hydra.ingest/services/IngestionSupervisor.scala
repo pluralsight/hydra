@@ -17,6 +17,7 @@
 package hydra.ingest.services
 
 import akka.actor._
+import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import hydra.common.util.ActorUtils
 import hydra.core.ingest._
 import hydra.core.protocol._
@@ -37,8 +38,10 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
 
   private var ingestors: mutable.Map[String, IngestorStatus] = new mutable.HashMap
 
+  private val targetIngestor = request.metadataValue(IngestionParams.HYDRA_INGESTOR_PARAM)
+
   override def preStart(): Unit = {
-    request.metadataValue(IngestionParams.HYDRA_INGESTOR_TARGET_PARAM) match {
+    targetIngestor match {
       case Some(ingestor) => registry ! FindByName(ingestor)
       case None => registry ! FindAll
     }
@@ -48,10 +51,16 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
 
 
   def waitingForIngestors: Receive = timeOut orElse {
-    case r: LookupResult =>
+    case LookupResult(Nil) =>
+      val code = targetIngestor.map(i => StatusCodes.custom(404, s"No ingestor named $i was found in the registry."))
+        .getOrElse(StatusCodes.BadRequest)
+
+      stop(code)
+
+    case LookupResult(ings) =>
       context.become(ingesting)
 
-      r.ingestors.foreach { i =>
+      ings.foreach { i =>
         ingestors.put(i.name, RequestPublished)
         context.actorSelection(i.path) ! Publish(request)
       }
@@ -96,6 +105,7 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
     case ReceiveTimeout =>
       log.error(s"Ingestion timed out for $request")
       timeoutIngestors()
+      stop(StatusCodes.custom(408, s"No ingestors completed the request in ${timeout}."))
   }
 
 
@@ -104,16 +114,23 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
   }
 
   private def finishIfReady() = {
-    val ready = ingestors.values.filterNot(_.completed).isEmpty
-    if (ready) {
-      context.parent ! IngestionReport(request, ingestors.toMap)
-      context.stop(self)
+    if (ingestors.values.filterNot(_.completed).isEmpty) {
+      val status = ingestors.filter(_._2 != IngestorCompleted).values.headOption
+        .map (_.statusCode) getOrElse StatusCodes.OK
+
+      stop(status)
     }
+  }
+
+  private def stop(status: StatusCode): Unit = {
+    context.parent ! IngestionReport(request.correlationId, request.metadata, ingestors.toMap, status)
+    context.stop(self)
   }
 
 }
 
 object IngestionSupervisor {
+
   def props(request: HydraRequest, timeout: FiniteDuration, ingestorRegistry: ActorRef): Props =
     Props(classOf[IngestionSupervisor], request, timeout, ingestorRegistry)
 }

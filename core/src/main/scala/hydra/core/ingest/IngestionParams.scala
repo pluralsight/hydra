@@ -5,9 +5,6 @@ package hydra.core.ingest
   */
 object IngestionParams {
 
-
-  val HYDRA_INGESTOR_PARAM = "hydra-ingestor"
-
   /**
     * Use when targetting a specific ingestor by name.  If this parameter is present in the request, the message will
     * not be broadcast via [[hydra.core.notification.Publish]].  That phase of the protocol will be skipped and the
@@ -15,7 +12,7 @@ object IngestionParams {
     *
     * The value of this parameter needs to match to the name of a registered ingestor.
     */
-  val HYDRA_INGESTOR_TARGET_PARAM = "hydra-ingestor-target"
+  val HYDRA_INGESTOR_PARAM = "hydra-ingestor"
 
   /**
     * Which schema to use.  The correct syntax is resource_type:location
