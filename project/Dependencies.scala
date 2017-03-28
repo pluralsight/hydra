@@ -52,7 +52,8 @@ object Dependencies {
     val akka = Seq("com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.github.romix.akka" %% "akka-kryo-serialization" % "0.5.0",
-      "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion)
+      "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
+      "ch.megard" %% "akka-http-cors" % "0.1.11")
 
     val akkaKafkaStream = "com.typesafe.akka" %% "akka-stream-kafka" % akkaKafkaStreamVersion
 
@@ -80,7 +81,7 @@ object Dependencies {
     val akkaTest = Seq("com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
       "com.typesafe.akka" %% "akka-http-testkit" % akkaHTTPVersion % "test",
       "com.typesafe.akka" %% "akka-multi-node-testkit" % akkaVersion % "test",
-      "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % "test" )
+      "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % "test")
 
     val scalaTest = "org.scalatest" %% "scalatest" % scalaTestVersion % "test"
     val scalaMock = "org.scalamock" %% "scalamock-scalatest-support" % scalaMockVersion % "test"

@@ -1,6 +1,7 @@
 package hydra.kafka.endpoints
 
 import akka.actor.{ActorRefFactory, ActorSystem}
+import ch.megard.akka.http.cors.CorsDirectives._
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
@@ -32,7 +33,7 @@ class TopicMetadataEndpoint(implicit val system: ActorSystem, implicit val actor
 
   private val filterSystemTopics = (t: String) => (t.startsWith("_") && showSystemTopics) || !t.startsWith("_")
 
-  override val route = corsHandler(
+  override val route = cors(settings) {
     get {
       path("transports" / "kafka" / "topics") {
         parameters('names ?) { n =>
@@ -42,7 +43,8 @@ class TopicMetadataEndpoint(implicit val system: ActorSystem, implicit val actor
           }
         }
       }
-    })
+    }
+  }
 
   private def topics: Future[Map[String, List[PartitionInfo]]] = {
     import scala.collection.JavaConverters._
