@@ -53,7 +53,7 @@ trait IngestionJsonSupport extends HydraJsonSupport {
 
     override def write(obj: IngestionReport): JsValue = {
       val isDetailed = obj.metadata.find(_.name == IngestionParams.HYDRA_RESPONSE_FORMAT)
-        .map(_.value.equalsIgnoreCase("detailed")).getOrElse(false)
+        .map(_.value.equalsIgnoreCase("detailed")).getOrElse(true)
       val ingestors = obj.ingestors
         .map(h => if (isDetailed) h._1 -> writeState(h._2) else h._1 -> JsNumber(h._2.statusCode.intValue()))
 
