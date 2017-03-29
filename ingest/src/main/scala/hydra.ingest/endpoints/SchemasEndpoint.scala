@@ -39,7 +39,7 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
   extends RoutedEndpoints with ConfigSupport with LoggingAdapter with HydraJsonSupport
     with ConfluentSchemaRegistry {
 
-  implicit val endpointFormat = jsonFormat4(SchemasEndpointResponse)
+  implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse)
 
   override def route: Route =
     get {
@@ -51,7 +51,7 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
               .getOrElse(registry.getLatestSchemaMetadata(schemaSubject))
             val schema = registry.getByID(schemaMeta.getId)
             val txt = schema.toString(pretty.toBoolean)
-            complete(OK, SchemasEndpointResponse(200, txt, schemaMeta.getId, schemaMeta.getVersion))
+            complete(OK, SchemasEndpointResponse(txt, schemaMeta.getId, schemaMeta.getVersion))
           }
         }
       }
@@ -66,7 +66,7 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
                 log.debug(s"Registering schema $name: $json")
                 val id = registry.register(name + "-value", schema)
                 respondWithHeader(Location(request.uri.copy(path = request.uri.path / name))) {
-                  complete(Created, SchemasEndpointResponse(201, json, id, 1))
+                  complete(Created, SchemasEndpointResponse(json, id, 1))
                 }
               }
             }
@@ -93,4 +93,4 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
   }
 }
 
-case class SchemasEndpointResponse(status: Int, schema: String, id: Int, version: Int)
+case class SchemasEndpointResponse(schema: String, id: Int, version: Int)
