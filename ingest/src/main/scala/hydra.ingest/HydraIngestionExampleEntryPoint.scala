@@ -18,29 +18,19 @@ package hydra.ingest
 
 import java.io.File
 
-import akka.actor.Props
 import com.typesafe.config.ConfigFactory
-import hydra.common.util.ActorUtils
 import hydra.core.app.HydraEntryPoint
-import hydra.ingest.services._
 
 /**
   * Just an example of how to bootstrap Hydra.
   *
   * Created by alexsilva on 2/18/16.
   */
-object HydraIngestionExampleEntryPoint extends HydraEntryPoint {
+object HydraIngestionExampleEntryPoint extends HydraEntryPoint with IngestionActors {
 
   val moduleName = "ingest"
 
   override val config = rootConfig.withFallback(ConfigFactory.parseFile(new File("/etc/hydra/hydra-ingest.conf")))
-
-  override val services = Seq(
-    Tuple2(ActorUtils.actorName[IngestorRegistry], Props[IngestorRegistry]),
-    Tuple2(ActorUtils.actorName[IngestorRegistrar], Props[IngestorRegistrar]),
-    Tuple2(ActorUtils.actorName[IngestionErrorHandler], Props[IngestionErrorHandler]),
-    Tuple2(ActorUtils.actorName[IngestionActor], Props(classOf[IngestionActor], "/user/service/ingestor_registry")))
-
 
   buildContainer().start()
 

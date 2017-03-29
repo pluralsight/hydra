@@ -45,7 +45,7 @@ lazy val moduleSettings = defaultSettings ++ Test.testSettings //++ Publish.sett
 lazy val root = Project(
   id = "hydra",
   base = file("."),
-  settings =  defaultSettings // ++ noPublishSettings
+  settings = defaultSettings // ++ noPublishSettings
 ).aggregate(common, core, kafka, ingest)
 
 lazy val common = Project(
@@ -75,3 +75,10 @@ lazy val kafka = Project(
   settings = moduleSettings
     ++ Seq(libraryDependencies ++= Dependencies.kafkaDeps)
 ).dependsOn(core).settings(name := "hydra-kafka")
+
+lazy val examples = Project(
+  id = "examples",
+  base = file("examples"),
+  settings = moduleSettings
+    ++ Seq(libraryDependencies ++= Dependencies.kafkaDeps)
+).dependsOn(ingest, kafka).settings(name := "hydra-examples")

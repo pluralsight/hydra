@@ -28,7 +28,7 @@ class IngestorRegistrar extends Actor with ConfigSupport with LoggingAdapter {
       registry ! RegisterWithClass(name, clazz)
 
     case IngestorInfo(name, path, time) =>
-      log.info("Transport '%s' registered at %s".format(name, path.toString))
+      log.info("Ingestor '%s' registered at %s".format(name, path.toString))
   }
 
   override def postStop(): Unit = {
