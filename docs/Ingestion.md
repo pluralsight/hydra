@@ -89,13 +89,13 @@ response: {"requestId":"GrnuqJBX","status":{"code":200,"message":"OK"},"ingestor
 ### Clients
 You can use any client or library to communicate with the socket.
 
-####Browser
+#### Browser
 
 1. [Chrome Smart Websocket Client](https://chrome.google.com/webstore/detail/smart-websocket-client/omalebghpgejjiaoknljcfmglgbpocdp?hl=en-US)
 
 2. [Dark Socket Web Terminal](https://chrome.google.com/webstore/detail/dark-websocket-terminal/dmogdjmcpfaibncngoolgljgocdabhke?hl=en)
 
-####Native
+#### Native
 
 **Scala**
 
