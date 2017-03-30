@@ -2,22 +2,21 @@
 
 ## Web Sockets
 
-Hydra supports web sockets for event streaming with semantics are very similar to the HTTP endpoint, with a few differences:
+Hydra supports web sockets for event streaming with semantics that are very similar to the HTTP endpoint, with a few differences:
 
 #### Request Metadata
 
 These can be specified at connection time via HTTP headers beginning with `"hydra-***"` or after the socket has 
-connected by issuing `set` commands.
+connected by issuing `SET` commands.
 
 #### Request Payload
-Once the metadata for the request has been set, clients can send payloads directly to the socket, without having to 
-re-set any request metadata for every request. 
+Once the metadata for the request has been set, clients can send payloads directly to the socket, without having to re-set these for every request. 
 
 ### Using the web socket connector
 
 #### Enable the endpoint
 
-Add this entry to the config:
+Add this entry to your config:
 
 ```$xslt
 hydra.ingest.websocket.enabled = true
@@ -30,14 +29,12 @@ The socket endpoint will be available at ```ws://[host]/ws-ingest```
 | Path                      | Description                                                                                                        |
 |---------------------------|--------------------------------------------------------------------------------------------------------------------|
 | ws-ingest                 | Does not associate the request to any specific ingestor. <br> Events will be broadcast to all registered ingestors.     |
-| ws-ingest/[name] | Associates the socket to a specific ingestor. <br> Events are not broadcast and are published to this ingestor only. |
+| ws-ingest/[name] | Associates the socket to a specific ingestor. <br> Events are not broadcast and are published to that ingestor only. |
 
 
-### Communicating with the Socket
+### Communication Protocol
 
-<div class="alert alert-success">
-Web socket commands start with a ```-c``` switch.
-</div>
+> Web socket commands start with the ```-c``` switch.
 
 #### `SET` command
 Used to set request metadata.
@@ -61,7 +58,7 @@ Used to get a list of all available commands.
 
 #### Ingestion
 
-Sending any string without a command switch ```-c``` will initiate the ingestion protocol for that payload.
+Sending any payload that does not begin with the command switch will initiate the ingestion protocol.
 
 Ingestion payloads can include an optional request id, by prefixing the payload with a ```-i``` switch. For instance:
 
@@ -87,15 +84,14 @@ response: {"requestId":"GrnuqJBX","status":{"code":200,"message":"OK"},"ingestor
 
 
 ### Clients
-You can use any client or library to communicate with the socket.
 
-####Browser
+#### Browser
 
 1. [Chrome Smart Websocket Client](https://chrome.google.com/webstore/detail/smart-websocket-client/omalebghpgejjiaoknljcfmglgbpocdp?hl=en-US)
 
 2. [Dark Socket Web Terminal](https://chrome.google.com/webstore/detail/dark-websocket-terminal/dmogdjmcpfaibncngoolgljgocdabhke?hl=en)
 
-####Native
+#### Native
 
 **Scala**
 
