@@ -17,8 +17,8 @@
 package hydra.kafka.producer
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import hydra.core.produce.RetryStrategy.Fail
-import hydra.core.produce.{AckStrategy, RetryStrategy}
+import hydra.core.transport.RetryStrategy.Fail
+import hydra.core.transport.{AckStrategy, RetryStrategy}
 
 /**
   * Created by alexsilva on 11/30/15.

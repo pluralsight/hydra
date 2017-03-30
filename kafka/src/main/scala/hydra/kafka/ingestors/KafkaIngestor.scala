@@ -18,8 +18,8 @@ package hydra.kafka.ingestors
 
 import hydra.core.ingest.IngestionParams._
 import hydra.core.ingest.Ingestor
-import hydra.core.produce.AckStrategy
-import hydra.core.produce.AckStrategy.Explicit
+import hydra.core.transport.AckStrategy
+import hydra.core.transport.AckStrategy.Explicit
 import hydra.core.protocol._
 import hydra.kafka.producer.{KafkaProducerSupport, KafkaRecordFactories}
 

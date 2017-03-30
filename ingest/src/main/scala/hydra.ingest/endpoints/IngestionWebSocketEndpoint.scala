@@ -17,22 +17,38 @@
 package hydra.ingest.endpoints
 
 import akka.actor._
+import akka.http.scaladsl.model.{HttpHeader, StatusCodes}
 import akka.http.scaladsl.server.Route
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
+import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
-import hydra.core.marshallers.HydraJsonSupport
+import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
 import hydra.ingest.bootstrap.HydraIngestorRegistry
 import hydra.ingest.ws.IngestionSocket
 
 /**
   * Created by alexsilva on 12/22/15.
   */
-class IngestionWebSocket(implicit val system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
+class IngestionWebSocketEndpoint(implicit val system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
   extends RoutedEndpoints with LoggingAdapter with HydraJsonSupport with HydraDirectives with HydraIngestorRegistry {
+
+  val enabled = applicationConfig.get[Boolean]("ingest.websocket.enabled").valueOrElse(false)
 
   override val route: Route =
     path("ws-ingest" / Segment) { label =>
-      handleWebSocketMessages(IngestionSocket().ingestionWSFlow(label))
+      extractHydraHeaders { headers =>
+        if (enabled) {
+          handleWebSocketMessages(createSocket(label, headers))
+        }
+        else {
+          complete(StatusCodes.Conflict, GenericServiceResponse(409, "Websocket not available."))
+        }
+      }
     }
+
+  private def createSocket(label: String, headers: Seq[HttpHeader]) =
+    IngestionSocket(headers.map(h => h.name().toUpperCase -> h.value).toMap).ingestionWSFlow(label)
+
+  private val extractHydraHeaders = extract(_.request.headers.filter(_.lowercaseName.startsWith("hydra")))
 }

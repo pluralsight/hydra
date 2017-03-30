@@ -3,7 +3,7 @@ package hydra.core.protocol
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import hydra.core.ingest.HydraRequest
-import hydra.core.produce.{HydraRecord, RecordMetadata}
+import hydra.core.transport.{HydraRecord, RecordMetadata}
 
 /**
   * Created by alexsilva on 2/22/17.

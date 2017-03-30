@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-package hydra.core.produce
+package hydra.core.transport
 
 /**
   * Created by alexsilva on 1/11/17.

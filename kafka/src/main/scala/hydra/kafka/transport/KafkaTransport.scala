@@ -14,7 +14,7 @@
  *
  */
 
-package hydra.kafka.services
+package hydra.kafka.transport
 
 import java.net.ConnectException
 
@@ -26,7 +26,7 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.notification.{HydraEvent, NotificationSupport}
 import hydra.core.protocol.{Produce, ProduceWithAck, RecordNotProduced, RecordProduced}
 import hydra.kafka.producer.{JsonRecord, KafkaRecord, KafkaRecordMetadata}
-import hydra.kafka.services.KafkaProducerSupervisor.ProxiesInitialized
+import hydra.kafka.transport.KafkaTransport.ProxiesInitialized
 import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.errors.TimeoutException
 
@@ -38,7 +38,7 @@ import scala.util.{Failure, Success}
 /**
   * Created by alexsilva on 10/28/15.
   */
-class KafkaProducerSupervisor(producersConfig: Map[String, Config]) extends Actor with LoggingAdapter
+class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with LoggingAdapter
   with NotificationSupport with Stash {
 
   val metricsEnabled = applicationConfig.get[Boolean]("producers.kafka.metrics.enabled").valueOrElse(false)
@@ -115,13 +115,13 @@ class KafkaProducerSupervisor(producersConfig: Map[String, Config]) extends Acto
   }
 }
 
-object KafkaProducerSupervisor {
+object KafkaTransport {
 
   case class MessageNotSentEvent(source: RecordNotProduced[Any, Any]) extends HydraEvent[RecordNotProduced[_, _]]
 
   case object ProxiesInitialized
 
   def props(producersConfig: Map[String, Config]): Props =
-    Props(classOf[KafkaProducerSupervisor], producersConfig)
+    Props(classOf[KafkaTransport], producersConfig)
 }
 

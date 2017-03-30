@@ -5,7 +5,7 @@ import java.nio.file.Paths
 import akka.stream.scaladsl.{FileIO, Flow, Keep, Sink, Source}
 import akka.stream.{ActorMaterializer, IOResult}
 import akka.util.ByteString
-import hydra.core.produce.Producer
+import hydra.core.transport.Transport
 import hydra.core.protocol.Produce
 import org.reactivestreams.{Publisher, Subscriber}
 
@@ -14,7 +14,7 @@ import scala.concurrent.Future
 /**
   * Created by alexsilva on 3/29/17.
   */
-class FileProducer extends Producer with Publisher[String] {
+class FileTransport extends Transport with Publisher[String] {
 
   implicit val materializer = ActorMaterializer()
 
@@ -27,7 +27,7 @@ class FileProducer extends Producer with Publisher[String] {
     Source.fromPublisher(this).runWith(messageSink("/tmp/hydra-producer.txt")))
 
 
-  produce {
+  transport {
     case Produce(r: FileRecord) =>
       destinations.get(r.destination).map { flow =>
         subscriber.map(_.onNext(r.payload))

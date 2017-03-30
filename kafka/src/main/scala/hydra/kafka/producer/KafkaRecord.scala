@@ -1,6 +1,6 @@
 package hydra.kafka.producer
 
-import hydra.core.produce.HydraRecord
+import hydra.core.transport.HydraRecord
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.springframework.util.ClassUtils
 

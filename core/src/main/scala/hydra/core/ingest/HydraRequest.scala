@@ -1,7 +1,7 @@
 package hydra.core.ingest
 
-import hydra.core.produce.ValidationStrategy.Strict
-import hydra.core.produce.{AckStrategy, RetryStrategy, ValidationStrategy}
+import hydra.core.transport.ValidationStrategy.Strict
+import hydra.core.transport.{AckStrategy, RetryStrategy, ValidationStrategy}
 
 import scala.util.Random
 

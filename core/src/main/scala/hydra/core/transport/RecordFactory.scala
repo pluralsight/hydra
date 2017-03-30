@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-package hydra.core.produce
+package hydra.core.transport
 
 import hydra.core.ingest.HydraRequest
 import hydra.core.protocol.MessageValidationResult

@@ -1,4 +1,4 @@
-package hydra.core.produce
+package hydra.core.transport
 
 /**
   * Defines a Retry Strategy for messages being sent through Hydra.

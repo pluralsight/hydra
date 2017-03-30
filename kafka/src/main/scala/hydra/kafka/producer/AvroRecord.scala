@@ -1,8 +1,8 @@
 package hydra.kafka.producer
 
 import com.pluralsight.hydra.avro.JsonConverter
-import hydra.core.produce.RetryStrategy.Fail
-import hydra.core.produce.{AckStrategy, RetryStrategy}
+import hydra.core.transport.RetryStrategy.Fail
+import hydra.core.transport.{AckStrategy, RetryStrategy}
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
 

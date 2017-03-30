@@ -4,7 +4,9 @@ and production of data streams.
 
 It does so by abstracting these phases independently from each other while providing a unifying API across them.
 
-## Streaming Phases
+## Why Replication?
+
+## Streaming Processing Phases
 
 ### Receive
 
@@ -18,7 +20,7 @@ We highly recommend checking out the project documentation [here](www.pluralsigh
 This README file only contains basic definitions and set up instructions.
 
 ## Building Hydra
-Hydra is build using [SBT](http://www.scala-sbt.org/). To build Hydra, run:
+Hydra is built using [SBT](http://www.scala-sbt.org/). To build Hydra, run:
 
 ```
 sbt clean compile

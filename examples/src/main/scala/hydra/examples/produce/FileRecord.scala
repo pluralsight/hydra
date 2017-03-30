@@ -1,6 +1,6 @@
 package hydra.examples.produce
 
-import hydra.core.produce.{HydraRecord, RetryStrategy}
+import hydra.core.transport.{HydraRecord, RetryStrategy}
 
 /**
   * Created by alexsilva on 3/29/17.

@@ -1,4 +1,4 @@
-package hydra.kafka.services
+package hydra.kafka.transport
 
 import java.util.concurrent.TimeUnit
 
@@ -10,7 +10,7 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol.{Produce, ProduceWithAck, RecordNotProduced, RecordProduced}
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata, PropagateExceptionCallback, PropagateExceptionWithAckCallback}
-import hydra.kafka.services.KafkaProducerProxy.ProducerInitialized
+import hydra.kafka.transport.KafkaProducerProxy.ProducerInitialized
 import org.apache.kafka.clients.producer.{Callback, KafkaProducer}
 
 import scala.concurrent.Future
@@ -25,7 +25,7 @@ class KafkaProducerProxy(parent: ActorRef, producerConfig: Config) extends Actor
   /**
     * We make this a var so that it can be re-assigned during preRestart() if needed.
     */
-  private[services] var producer: KafkaProducer[Any, Any] = _
+  private[transport] var producer: KafkaProducer[Any, Any] = _
 
   implicit val ec = context.dispatcher
 

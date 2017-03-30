@@ -9,7 +9,7 @@ import org.scalatest.{FunSpecLike, Matchers}
 import akka.stream.testkit.StreamTestKit
 import akka.testkit.TestKit
 import hydra.core.ingest.IngestionParams
-import hydra.core.produce.{RetryStrategy, ValidationStrategy}
+import hydra.core.transport.{RetryStrategy, ValidationStrategy}
 
 import scala.collection.immutable._
 

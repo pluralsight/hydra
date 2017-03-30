@@ -32,11 +32,11 @@ import scala.concurrent.duration._
 trait KafkaProducerSupport extends ConfigSupport {
   this: Actor =>
 
-  private val resolveTimeout = applicationConfig.get[FiniteDuration]("kafka_supervisor.resolve.timeout")
+  private val resolveTimeout = applicationConfig.get[FiniteDuration]("transports.kafka.resolve-timeout")
     .valueOrElse(5 seconds)
 
-  val path = applicationConfig.get[String]("kafka.supervisor.path")
-    .valueOrElse("/user/service/kafka_producer_supervisor")
+  val path = applicationConfig.get[String]("transports.kafka.path")
+    .valueOrElse("/user/service/kafka_transport")
 
   val kafkaProducer = Await.result(context.actorSelection(path).resolveOne()(Timeout(resolveTimeout)), resolveTimeout)
 }

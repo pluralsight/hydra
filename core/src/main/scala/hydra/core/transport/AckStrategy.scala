@@ -1,4 +1,4 @@
-package hydra.core.produce
+package hydra.core.transport
 
 /**
   * Defines an Ack Strategy for messages being sent by a producer.

@@ -3,7 +3,7 @@ package hydra.examples.ingest
 import akka.actor.Props
 import hydra.core.ingest.Ingestor
 import hydra.core.protocol._
-import hydra.examples.produce.{FileProducer, FileRecord}
+import hydra.examples.produce.{FileTransport, FileRecord}
 
 /**
   * A simple example transport that writes all requests to a log, as configured by the application.
@@ -11,7 +11,7 @@ import hydra.examples.produce.{FileProducer, FileRecord}
   * Created by alexsilva on 2/27/17.
   */
 class FileIngestor extends Ingestor {
-  val fileProducer = context.actorOf(Props[FileProducer])
+  val fileProducer = context.actorOf(Props[FileTransport])
 
   ingest {
     case Publish(request) =>

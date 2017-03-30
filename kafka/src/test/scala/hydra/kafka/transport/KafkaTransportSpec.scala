@@ -1,4 +1,4 @@
-package hydra.kafka.services
+package hydra.kafka.transport
 
 import akka.actor.{ActorSystem, PoisonPill}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
@@ -15,12 +15,12 @@ import scala.util.Success
 /**
   * Created by alexsilva on 12/5/16.
   */
-class KafkaProducerSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike with ImplicitSender
+class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike with ImplicitSender
   with BeforeAndAfterAll with KafkaConfigSupport {
 
   val producerName = StringRecord("test_topic", Some("key"), "payload").formatName
 
-  val kafkaSupervisor = TestActorRef[KafkaProducerSupervisor](KafkaProducerSupervisor.props(kafkaProducerFormats))
+  val kafkaSupervisor = TestActorRef[KafkaTransport](KafkaTransport.props(kafkaProducerFormats))
 
   val kafka = new KafkaUnit(3181, 8092)
 

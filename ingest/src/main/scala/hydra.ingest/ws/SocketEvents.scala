@@ -2,6 +2,7 @@ package hydra.ingest.ws
 
 
 import akka.actor.ActorRef
+import hydra.ingest.protocol.IngestionReport
 
 /**
   * Created by alexsilva on 3/10/17.
@@ -15,4 +16,8 @@ case object SocketEnded extends SocketEvent
 
 case class IncomingMessage(message: String) extends SocketEvent
 
-case class OutgoingMessage(status: Int, message: String) extends SocketEvent
+sealed trait OutgoingMessage extends SocketEvent
+
+case class SimpleOutgoingMessage(status: Int, message:String) extends OutgoingMessage
+
+case class IngestionOutgoingMessage(report:IngestionReport) extends OutgoingMessage

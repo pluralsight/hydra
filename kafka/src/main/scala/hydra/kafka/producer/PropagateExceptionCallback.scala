@@ -1,7 +1,7 @@
 package hydra.kafka.producer
 
 import akka.actor.{ActorRef, ActorSelection}
-import hydra.core.produce.HydraRecord
+import hydra.core.transport.HydraRecord
 import hydra.core.protocol.{ProducerAck, RecordNotProduced}
 import org.apache.kafka.clients.producer.{Callback, RecordMetadata}
 

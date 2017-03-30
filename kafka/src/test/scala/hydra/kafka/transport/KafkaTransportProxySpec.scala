@@ -1,4 +1,4 @@
-package hydra.kafka.services
+package hydra.kafka.transport
 
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
@@ -13,7 +13,7 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 12/5/16.
   */
-class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike with ImplicitSender
+class KafkaTransportProxySpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike with ImplicitSender
   with BeforeAndAfterAll with BeforeAndAfterEach with KafkaConfigSupport {
 
   val kafka = new KafkaUnit(3181, 8092)

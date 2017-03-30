@@ -16,8 +16,8 @@
 
 package hydra.kafka.producer
 
-import hydra.core.produce.RetryStrategy
-import hydra.core.produce.RetryStrategy.Fail
+import hydra.core.transport.RetryStrategy
+import hydra.core.transport.RetryStrategy.Fail
 
 /**
   * Created by alexsilva on 11/30/15.
