@@ -1,5 +1,34 @@
 # Ingestion Endpoints and Protocols
 
+## HTTP 
+
+The HTTP ingest endpoint allows the streaming of discrete requests using the HTTP protocol.
+
+### Request Metadata
+All HTTP headers specified in the request are converted into HydraRequestMetadata objects and supplied as part of the request to all ingestors.
+
+
+### Resource Format
+| Path                      | Description                                                                                                        |
+|---------------------------|--------------------------------------------------------------------------------------------------------------------|
+| ingest                 | Does not associate the request to any specific ingestor. <br> Events will be broadcast to all registered ingestors.     |
+| ingest/[name] | Associates the request to a specific ingestor. <br> Events are published to that ingestor only. |
+
+
+### Sample cURL Request
+```
+curl -X POST http://localhost:8080/ingest \
+  -H "hydra-kafka-topic:test.TopicName" \
+  -H "hydra-schema:TestSchema" \
+  -H "hydra-validation-strategy:relaxed" \
+  -d '{"name": "001c000001nlucqiaf", "handle": "152cba6e"}'
+```
+
+### Sample Response
+```json
+{"requestId":"FX3GTeML","status":{"code":200,"message":"OK"},"ingestors":{"kafka_ingestor":{"code":200,"message":"OK"}}}%
+```
+
 ## Web Sockets
 
 Hydra supports web sockets for event streaming with semantics that are very similar to the HTTP endpoint, with a few differences:
@@ -24,12 +53,12 @@ hydra.ingest.websocket.enabled = true
 
 The socket endpoint will be available at ```ws://[host]/ws-ingest```
 
-### URL Format
+### Resource Format
 
 | Path                      | Description                                                                                                        |
 |---------------------------|--------------------------------------------------------------------------------------------------------------------|
 | ws-ingest                 | Does not associate the request to any specific ingestor. <br> Events will be broadcast to all registered ingestors.     |
-| ws-ingest/[name] | Associates the socket to a specific ingestor. <br> Events are not broadcast and are published to that ingestor only. |
+| ws-ingest/[name] | Associates the socket to a specific ingestor. <br> Events are published to that ingestor only. |
 
 
 ### Communication Protocol

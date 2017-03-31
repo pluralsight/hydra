@@ -21,7 +21,9 @@ import akka.actor.{Props, _}
 import akka.routing.{FromConfig, RoundRobinPool}
 import com.typesafe.config.Config
 import hydra.common.config.ActorConfigSupport
+import hydra.common.util.ActorUtils
 import hydra.core.ingest.{HydraRequest, Ingestor}
+import hydra.ingest.ingestors.IngestorInfo
 import hydra.ingest.services.IngestorRegistry._
 import org.joda.time.DateTime
 
@@ -32,15 +34,17 @@ import scala.util.Try
   * Created by alexsilva on 1/12/16.
   */
 class IngestorRegistry extends Actor with ActorLogging with ActorConfigSupport {
-  val ingestors: ParHashMap[String, RegisteredIngestor] = new ParHashMap()
+
+  private val ingestors: ParHashMap[String, RegisteredIngestor] = new ParHashMap()
 
   private object RegistrationLock
 
   override def receive: Receive = {
-    case RegisterWithClass(name, clazz) =>
-      val ingestor = doRegister(name, clazz)
+    case RegisterWithClass(group, clazz) =>
+      val name = ActorUtils.actorName(clazz)
+      val ingestor = doRegister(name, group, clazz)
       context.watch(ingestor.ref)
-      sender ! IngestorInfo(name, ingestor.ref.path, ingestor.registrationTime)
+      sender ! IngestorInfo(name, group, ingestor.ref.path, ingestor.registrationTime)
 
     case Unregister(name) =>
       ingestors.remove(name) match {
@@ -53,11 +57,11 @@ class IngestorRegistry extends Actor with ActorLogging with ActorConfigSupport {
       }
 
     case FindByName(name) =>
-      val result = ingestors.get(name).map(r => IngestorInfo(name, r.ref.path, r.registrationTime)).toSeq
+      val result = ingestors.get(name).map(r => IngestorInfo(name, r.group, r.ref.path, r.registrationTime)).toSeq
       sender ! LookupResult(result)
 
     case FindAll =>
-      val info = ingestors.values.map(r => IngestorInfo(r.name, r.ref.path, r.registrationTime))
+      val info = ingestors.values.map(r => IngestorInfo(r.name, r.group, r.ref.path, r.registrationTime))
       sender ! LookupResult(info.toList)
 
     case Terminated(handler) => {
@@ -66,11 +70,11 @@ class IngestorRegistry extends Actor with ActorLogging with ActorConfigSupport {
     }
   }
 
-  def doRegister(name: String, clazz: Class[_ <: Ingestor]): RegisteredIngestor = {
+  def doRegister(name: String, group:String, clazz: Class[_ <: Ingestor]): RegisteredIngestor = {
     RegistrationLock.synchronized {
       if (ingestors.contains(name))
         sender ! Failure(IngestorAlreadyRegisteredException(s"Ingestor $name is already registered."))
-      val ingestor = RegisteredIngestor(name, context.actorOf(ingestorProps(name, clazz), name), DateTime.now())
+      val ingestor = RegisteredIngestor(name, group, context.actorOf(ingestorProps(name, clazz), name), DateTime.now())
       ingestors + (name -> ingestor)
       ingestor
     }
@@ -105,13 +109,11 @@ class IngestorRegistry extends Actor with ActorLogging with ActorConfigSupport {
   }
 }
 
-case class RegisteredIngestor(name: String, ref: ActorRef, registrationTime: DateTime)
-
-case class IngestorInfo(name: String, path: ActorPath, registeredAt: DateTime)
+case class RegisteredIngestor(name: String, group: String, ref: ActorRef, registrationTime: DateTime)
 
 object IngestorRegistry {
 
-  case class RegisterWithClass(name: String, clazz: Class[_ <: Ingestor])
+  case class RegisterWithClass(group: String, clazz: Class[_ <: Ingestor])
 
   case class Unregister(name: String)
 

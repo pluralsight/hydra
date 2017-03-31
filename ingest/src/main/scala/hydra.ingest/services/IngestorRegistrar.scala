@@ -6,6 +6,7 @@ import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.common.util.ActorUtils
 import hydra.ingest.bootstrap.ClasspathIngestorLoader
+import hydra.ingest.ingestors.IngestorInfo
 import hydra.ingest.services.IngestorRegistry.{RegisterWithClass, Unregister}
 
 /**
@@ -24,11 +25,11 @@ class IngestorRegistrar extends Actor with ConfigSupport with LoggingAdapter {
   lazy val ingestors = new ClasspathIngestorLoader(pkgs).ingestors.map(h => ActorUtils.actorName(h) -> h)
 
   override def receive = {
-    case RegisterWithClass(name, clazz) =>
-      registry ! RegisterWithClass(name, clazz)
+    case RegisterWithClass(group, clazz) =>
+      registry ! RegisterWithClass(group, clazz)
 
-    case IngestorInfo(name, path, time) =>
-      log.info("Ingestor '%s' registered at %s".format(name, path.toString))
+    case IngestorInfo(name, group, path, time) =>
+      log.info(s"Ingestor $name [$group] is available at $path")
   }
 
   override def postStop(): Unit = {
@@ -36,6 +37,6 @@ class IngestorRegistrar extends Actor with ConfigSupport with LoggingAdapter {
   }
 
   override def preStart(): Unit = {
-    ingestors.foreach(h => registry ! RegisterWithClass(h._1, h._2))
+    ingestors.foreach(h => registry ! RegisterWithClass("global", h._2))
   }
 }

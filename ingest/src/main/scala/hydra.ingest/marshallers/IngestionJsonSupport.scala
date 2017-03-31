@@ -19,8 +19,8 @@ package hydra.ingest.marshallers
 import hydra.core.ingest.IngestionParams
 import hydra.core.marshallers.HydraJsonSupport
 import hydra.core.protocol.IngestorStatus
+import hydra.ingest.ingestors.IngestorInfo
 import hydra.ingest.protocol.IngestionReport
-import hydra.ingest.services.IngestorInfo
 
 
 /**
@@ -31,7 +31,7 @@ trait IngestionJsonSupport extends HydraJsonSupport {
   import spray.json._
 
 
-  implicit val ingestorInfoFormat = jsonFormat3(IngestorInfo)
+  implicit val ingestorInfoFormat = jsonFormat4(IngestorInfo)
 
 
   implicit object IngestorStatusFormat extends RootJsonFormat[IngestorStatus] {

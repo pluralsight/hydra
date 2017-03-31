@@ -55,7 +55,7 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient, 
   }
 
   private def loadFromCache(subject: String, version: String): Try[RegistrySchemaResource] = {
-    sync.cachingWithTTL[Try[RegistrySchemaResource]](s"$subject.$version")(30.minutes) {
+    sync.cachingWithTTL(s"$subject.$version")(5.minutes) {
       loadFromRegistry(subject, version)
     }
   }

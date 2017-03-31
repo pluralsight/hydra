@@ -10,7 +10,7 @@ val hydraVersion = "0.7.0" + buildNumber
 lazy val defaultSettings = Seq(
   organization := "pluralsight",
   version := hydraVersion,
-  scalaVersion := "2.11.8",
+  scalaVersion := "2.12.1",
   description := "Hydra",
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
   excludeDependencies += "org.slf4j" % "slf4j-log4j12",
@@ -46,7 +46,7 @@ lazy val root = Project(
   id = "hydra",
   base = file("."),
   settings = defaultSettings // ++ noPublishSettings
-).aggregate(common, core, kafka, ingest)
+).aggregate(common, core, kafka, ingest, examples, jdbc)
 
 lazy val common = Project(
   id = "common",
@@ -76,9 +76,16 @@ lazy val kafka = Project(
     ++ Seq(libraryDependencies ++= Dependencies.kafkaDeps)
 ).dependsOn(core).settings(name := "hydra-kafka")
 
+lazy val jdbc = Project(
+  id = "jdbc",
+  base = file("jdbc"),
+  settings = moduleSettings
+    ++ Seq(libraryDependencies ++= Dependencies.coreDeps)
+).dependsOn(core).settings(name := "hydra-jdbc")
+
 lazy val examples = Project(
   id = "examples",
   base = file("examples"),
-  settings = moduleSettings
+  settings = defaultSettings ++ Test.testSettings ++ noPublishSettings
     ++ Seq(libraryDependencies ++= Dependencies.kafkaDeps)
 ).dependsOn(ingest, kafka).settings(name := "hydra-examples")

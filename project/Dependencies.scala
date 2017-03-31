@@ -3,8 +3,8 @@ import sbt.{ExclusionRule, _}
 
 object Dependencies {
 
-  val akkaVersion = "2.4.16"
-  val scalaTestVersion = "2.2.6"
+  val akkaVersion = "2.4.17"
+  val scalaTestVersion = "3.0.1"
   val slf4jVersion = "1.7.21"
   val log4jVersion = "2.7"
   val kxbmapConfigVersion = "0.4.4"
@@ -22,6 +22,8 @@ object Dependencies {
   val kafkaUnitVersion = "0.6"
   val scalazVersion = "7.2.9"
   val scalaMockVersion = "3.5.0"
+  val serviceContainerVersion = "2.0.5"
+  val scalaCacheVersion = "0.9.3"
 
   object Compile {
 
@@ -36,7 +38,7 @@ object Dependencies {
     val kafka = Seq(
       "org.apache.kafka" %% "kafka" % kafkaVersion,
       "org.apache.kafka" % "kafka-clients" % kafkaVersion,
-      "info.batey.kafka" % "kafka-unit" % kafkaUnitVersion % "test")
+      "net.manub" %% "scalatest-embedded-kafka" % "0.12.0" % "test")
 
     val confluent = Seq("io.confluent" % "kafka-schema-registry-client" % confluentVersion,
       "io.confluent" % "kafka-avro-serializer" % confluentVersion).map(_.excludeAll(
@@ -51,7 +53,7 @@ object Dependencies {
 
     val akka = Seq("com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
-      "com.github.romix.akka" %% "akka-kryo-serialization" % "0.5.0",
+      "com.github.romix.akka" %% "akka-kryo-serialization" % "0.5.1",
       "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
       "ch.megard" %% "akka-http-cors" % "0.1.11")
 
@@ -61,20 +63,19 @@ object Dependencies {
 
     val spring = "org.springframework" % "spring-core" % springVersion
 
-    val jsonLenses = "net.virtual-void" %% "json-lenses" % "0.6.1"
+    val jsonLenses = "net.virtual-void" %% "json-lenses" % "0.6.2"
 
     val joda = Seq("joda-time" % "joda-time" % jodaTimeVersion, "org.joda" % "joda-convert" % jodaConvertVersion)
 
-    val guavacache = "com.github.cb372" %% "scalacache-guava" % "0.7.5"
+    val guavacache = "com.github.cb372" %% "scalacache-guava" % scalaCacheVersion
 
     val reflections = "org.reflections" % "reflections" % reflectionsVersion
 
-    val serviceContainer = ("com.github.vonnagy" %% "service-container" % "2.0.4")
+    val serviceContainer = ("com.github.vonnagy" %% "service-container" % serviceContainerVersion)
       .excludeAll(
         ExclusionRule(organization = "ch.qos.logback"),
         ExclusionRule(organization = "org.slf4j")
       )
-
   }
 
   object Test {
