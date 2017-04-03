@@ -60,7 +60,7 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
           } ~ path(Segment / "versions") { subject =>
             val schemaMeta = registry.getLatestSchemaMetadata(subject + "-value")
             val v = schemaMeta.getVersion
-            val versions = (1 to v) map(vs=>SchemasEndpointResponse(registry.getSchemaMetadata(subject+ "-value",vs)))
+            val versions = (1 to v) map (vs => SchemasEndpointResponse(registry.getSchemaMetadata(subject + "-value", vs)))
             complete(OK, versions)
           } ~ path(Segment / "versions" / IntNumber) { (subject, version) =>
             val meta = registry.getSchemaMetadata(subject + "-value", version)
@@ -68,16 +68,14 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
           }
         } ~
           post {
-            pathPrefix("schemas") {
-              entity(as[String]) { json =>
-                extractRequest { request =>
-                  val schema = new Parser().parse(json)
-                  val name = schema.getNamespace() + "." + schema.getName()
-                  log.debug(s"Registering schema $name: $json")
-                  val id = registry.register(name + "-value", schema)
-                  respondWithHeader(Location(request.uri.copy(path = request.uri.path / name))) {
-                    complete(Created, SchemasEndpointResponse(id, 1))
-                  }
+            entity(as[String]) { json =>
+              extractRequest { request =>
+                val schema = new Parser().parse(json)
+                val name = schema.getNamespace() + "." + schema.getName()
+                log.debug(s"Registering schema $name: $json")
+                val id = registry.register(name + "-value", schema)
+                respondWithHeader(Location(request.uri.copy(path = request.uri.path / name))) {
+                  complete(Created, SchemasEndpointResponse(id, 1, Some(json)))
                 }
               }
             }
