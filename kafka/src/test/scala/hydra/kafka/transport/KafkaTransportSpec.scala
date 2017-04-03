@@ -6,7 +6,7 @@ import akka.util.Timeout
 import hydra.core.protocol.{Produce, RecordNotProduced, RecordProduced}
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{JsonRecord, KafkaRecordMetadata, StringRecord}
-import info.batey.kafka.unit.KafkaUnit
+import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
@@ -16,24 +16,25 @@ import scala.util.Success
   * Created by alexsilva on 12/5/16.
   */
 class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike with ImplicitSender
-  with BeforeAndAfterAll with KafkaConfigSupport {
+  with BeforeAndAfterAll with KafkaConfigSupport with EmbeddedKafka {
 
   val producerName = StringRecord("test_topic", Some("key"), "payload").formatName
 
   val kafkaSupervisor = TestActorRef[KafkaTransport](KafkaTransport.props(kafkaProducerFormats))
 
-  val kafka = new KafkaUnit(3181, 8092)
+  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
+    customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
+
+  val kafka = EmbeddedKafka.start()
+
 
   override def beforeAll() = {
-    kafka.startup()
-    kafka.createTopic("test_topic")
+    EmbeddedKafka.createCustomTopic("test_topic")
   }
 
   override def afterAll() = {
-  //  kafkaSupervisor ! PoisonPill
-//    TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
-    kafka.shutdown()
-
+    kafkaSupervisor ! PoisonPill
+    //    TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
   }
 
   describe("When using the supervisor") {

@@ -39,7 +39,7 @@ class TopicsEndpoint(implicit val system: ActorSystem, implicit val actorRefFact
             .zipWithIndex
             .takeWhile(rec => rec._2 <= n && !shouldCancel(offsets, rec._1))
             .map(rec => rec._1.value().toString)
-            .watchTermination()((_, termination) => termination.onFailure {
+            .watchTermination()((_, termination) => termination.failed.foreach {
               case cause => ctx.fail(cause)
             })
           complete(source)

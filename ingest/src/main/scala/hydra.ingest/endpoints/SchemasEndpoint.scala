@@ -25,6 +25,7 @@ import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.avro.registry.ConfluentSchemaRegistry
 import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
+import io.confluent.kafka.schemaregistry.client.SchemaMetadata
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.Schema.Parser
 import org.apache.avro.SchemaParseException
@@ -39,47 +40,58 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
   extends RoutedEndpoints with ConfigSupport with LoggingAdapter with HydraJsonSupport
     with ConfluentSchemaRegistry {
 
-  implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse)
+  implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
+
+  implicit val ec = system.dispatcher
 
   override def route: Route =
-    get {
-      pathPrefix("schemas" / Segment) { subject =>
-        parameters('pretty ? "false", 'version.as[Int].?) { (pretty, version) =>
-          handleExceptions(excptHandler) {
-            val schemaSubject = subject + "-value"
-            val schemaMeta = version.map(v => registry.getSchemaMetadata(subject, v))
-              .getOrElse(registry.getLatestSchemaMetadata(schemaSubject))
-            val schema = registry.getByID(schemaMeta.getId)
-            val txt = schema.toString(pretty.toBoolean)
-            complete(OK, SchemasEndpointResponse(txt, schemaMeta.getId, schemaMeta.getVersion))
+    pathPrefix("schemas") {
+      handleExceptions(excptHandler) {
+        get {
+          pathEndOrSingleSlash {
+            onSuccess(getAllSubjects) { subjects =>
+              complete(OK, subjects)
+            }
+          } ~ path(Segment) { subject =>
+            parameters('schema ?) { schemaOnly =>
+              val meta = registry.getLatestSchemaMetadata(subject + "-value")
+              schemaOnly.map(_ => complete(OK, meta.getSchema)).getOrElse(complete(OK, SchemasEndpointResponse(meta)))
+            }
+          } ~ path(Segment / "versions") { subject =>
+            val schemaMeta = registry.getLatestSchemaMetadata(subject + "-value")
+            val v = schemaMeta.getVersion
+            val versions = (1 to v) map(vs=>SchemasEndpointResponse(registry.getSchemaMetadata(subject+ "-value",vs)))
+            complete(OK, versions)
+          } ~ path(Segment / "versions" / IntNumber) { (subject, version) =>
+            val meta = registry.getSchemaMetadata(subject + "-value", version)
+            complete(OK, SchemasEndpointResponse(meta.getId, meta.getVersion, Some(meta.getSchema)))
           }
-        }
-      }
-    } ~
-      post {
-        pathPrefix("schemas") {
-          entity(as[String]) { json =>
-            handleExceptions(excptHandler) {
-              extractRequest { request =>
-                val schema = new Parser().parse(json)
-                val name = schema.getNamespace() + "." + schema.getName()
-                log.debug(s"Registering schema $name: $json")
-                val id = registry.register(name + "-value", schema)
-                respondWithHeader(Location(request.uri.copy(path = request.uri.path / name))) {
-                  complete(Created, SchemasEndpointResponse(json, id, 1))
+        } ~
+          post {
+            pathPrefix("schemas") {
+              entity(as[String]) { json =>
+                extractRequest { request =>
+                  val schema = new Parser().parse(json)
+                  val name = schema.getNamespace() + "." + schema.getName()
+                  log.debug(s"Registering schema $name: $json")
+                  val id = registry.register(name + "-value", schema)
+                  respondWithHeader(Location(request.uri.copy(path = request.uri.path / name))) {
+                    complete(Created, SchemasEndpointResponse(id, 1))
+                  }
                 }
               }
             }
           }
-        }
       }
+    }
 
 
   val excptHandler = ExceptionHandler {
+    case e: RestClientException if (e.getErrorCode == 40401) =>
+      complete(BadRequest, GenericServiceResponse(404, e.getMessage))
+
     case e: RestClientException =>
-      extractUri { uri =>
-        complete(BadRequest, GenericServiceResponse(e.getErrorCode, s"Registry error: ${e.getMessage}"))
-      }
+      complete(BadRequest, GenericServiceResponse(e.getErrorCode, s"Registry error: ${e.getMessage}"))
 
     case e: SchemaParseException =>
       complete(BadRequest, GenericServiceResponse(400, s"Unable to parse avro schema: ${e.getMessage}"))
@@ -93,4 +105,9 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
   }
 }
 
-case class SchemasEndpointResponse(schema: String, id: Int, version: Int)
+case class SchemasEndpointResponse(id: Int, version: Int, schema: Option[String] = None)
+
+object SchemasEndpointResponse {
+  def apply(meta: SchemaMetadata): SchemasEndpointResponse =
+    SchemasEndpointResponse(meta.getId, meta.getVersion, Some(meta.getSchema))
+}

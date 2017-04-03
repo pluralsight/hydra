@@ -25,7 +25,7 @@ class StreamingTopicsEndpoint(implicit val system: ActorSystem, implicit val act
 
   implicit val jsonStreamingSupport = EntityStreamingSupport.json()
 
-  override val route = path("transports" / "kafka" / "streaming" / "topics" / Segment) { topicName =>
+  override val route = path("transports" / "kafka" / "streaming" / Segment) { topicName =>
     get {
       parameters('format.?, 'group.?) { (format, groupId) =>
         val settings = loadConsumerSettings[Any, Any](format.getOrElse("avro"), groupId.getOrElse("hydra"))

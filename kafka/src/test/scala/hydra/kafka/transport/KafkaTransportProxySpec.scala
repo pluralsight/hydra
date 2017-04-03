@@ -5,7 +5,7 @@ import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import hydra.core.protocol.{Produce, RecordNotProduced, RecordProduced}
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.StringRecord
-import info.batey.kafka.unit.KafkaUnit
+import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
@@ -14,11 +14,13 @@ import scala.concurrent.duration._
   * Created by alexsilva on 12/5/16.
   */
 class KafkaTransportProxySpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike with ImplicitSender
-  with BeforeAndAfterAll with BeforeAndAfterEach with KafkaConfigSupport {
+  with BeforeAndAfterAll with BeforeAndAfterEach with KafkaConfigSupport with EmbeddedKafka {
 
-  val kafka = new KafkaUnit(3181, 8092)
-  kafka.setKafkaBrokerConfig("auto.create.topics.enable", "false")
-  kafka.startup()
+  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
+    customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
+
+  val kafka = EmbeddedKafka.start()
+
 
   val parent = TestProbe()
   val kafkaActor = TestActorRef(KafkaProducerProxy.props(parent.ref, "string"))
@@ -26,12 +28,11 @@ class KafkaTransportProxySpec extends TestKit(ActorSystem("hydra")) with Matcher
   implicit val ex = system.dispatcher
 
   override def beforeAll() = {
-    kafka.createTopic("test_topic")
+    EmbeddedKafka.createCustomTopic("test_topic")
   }
 
   override def afterAll() = {
     TestKit.shutdownActorSystem(system)
-    kafka.shutdown()
   }
 
   describe("When creating a props object") {
