@@ -20,10 +20,12 @@ import akka.actor.{ActorRefFactory, ActorSystem}
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
+import ch.megard.akka.http.cors.CorsDirectives._
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.avro.registry.ConfluentSchemaRegistry
+import hydra.core.http.CorsSupport
 import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
 import io.confluent.kafka.schemaregistry.client.SchemaMetadata
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
@@ -38,13 +40,13 @@ import org.apache.avro.SchemaParseException
   */
 class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
   extends RoutedEndpoints with ConfigSupport with LoggingAdapter with HydraJsonSupport
-    with ConfluentSchemaRegistry {
+    with ConfluentSchemaRegistry with CorsSupport {
 
   implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
 
   implicit val ec = system.dispatcher
 
-  override def route: Route =
+  override def route: Route = cors(settings) {
     pathPrefix("schemas") {
       handleExceptions(excptHandler) {
         get {
@@ -82,6 +84,7 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
           }
       }
     }
+  }
 
 
   val excptHandler = ExceptionHandler {
