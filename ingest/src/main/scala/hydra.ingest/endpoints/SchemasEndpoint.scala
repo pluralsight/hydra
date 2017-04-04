@@ -89,7 +89,7 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
 
   val excptHandler = ExceptionHandler {
     case e: RestClientException if (e.getErrorCode == 40401) =>
-      complete(BadRequest, GenericServiceResponse(404, e.getMessage))
+      complete(NotFound, GenericServiceResponse(404, e.getMessage))
 
     case e: RestClientException =>
       complete(BadRequest, GenericServiceResponse(e.getErrorCode, s"Registry error: ${e.getMessage}"))
