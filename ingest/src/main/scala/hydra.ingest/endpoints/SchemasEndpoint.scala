@@ -66,7 +66,7 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
             complete(OK, versions)
           } ~ path(Segment / "versions" / IntNumber) { (subject, version) =>
             val meta = registry.getSchemaMetadata(subject + "-value", version)
-            complete(OK, SchemasEndpointResponse(meta.getId, meta.getVersion, Some(meta.getSchema)))
+            complete(OK, SchemasEndpointResponse(meta.getId, meta.getVersion, meta.getSchema))
           }
         } ~
           post {
@@ -77,7 +77,7 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
                 log.debug(s"Registering schema $name: $json")
                 val id = registry.register(name + "-value", schema)
                 respondWithHeader(Location(request.uri.copy(path = request.uri.path / name))) {
-                  complete(Created, SchemasEndpointResponse(id, 1, Some(json)))
+                  complete(Created, SchemasEndpointResponse(id, 1, json))
                 }
               }
             }
@@ -106,9 +106,9 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
   }
 }
 
-case class SchemasEndpointResponse(id: Int, version: Int, schema: Option[String] = None)
+case class SchemasEndpointResponse(id: Int, version: Int, schema: String)
 
 object SchemasEndpointResponse {
   def apply(meta: SchemaMetadata): SchemasEndpointResponse =
-    SchemasEndpointResponse(meta.getId, meta.getVersion, Some(meta.getSchema))
+    SchemasEndpointResponse(meta.getId, meta.getVersion, meta.getSchema)
 }
