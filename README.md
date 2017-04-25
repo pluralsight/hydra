@@ -59,10 +59,13 @@ We provide a `sandbox` module with some simple ingestors that can be used to tes
 The walk-through below shows you how to use Hydra with some example Ingetors, by running Hydra in local development mode in SBT. This is *not* an example of usage in production.
 
 ### From SBT
-We are using Spray's SBT [Revolver](https://github.com/spray/sbt-revolver) plugin:
+You need to have SBT installed.
+
+We are using Spray's SBT [Revolver](https://github.com/spray/sbt-revolver) plugin.  In order to run the example sandbox project, fire up sbt and then type:
 
 ```
-sbt sandbox/re-start
+sbt 
+> sandbox/re-start
 ```
 
 SBT Revolver forks Hydra in a separate process. If you make a code change, simply type re-start again at the SBT shell prompt, it will compile your changes and restart the process. It enables very fast turnaround cycles.
