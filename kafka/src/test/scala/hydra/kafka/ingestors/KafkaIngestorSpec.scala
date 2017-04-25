@@ -4,7 +4,7 @@ import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import hydra.common.config.ConfigSupport
 import hydra.core.avro.registry.ConfluentSchemaRegistry
-import hydra.core.ingest.IngestionParams._
+import hydra.core.ingest.RequestParams._
 import hydra.core.ingest.{HydraRequest, HydraRequestMetadata}
 import hydra.core.protocol._
 import hydra.kafka.producer.AvroRecordFactory

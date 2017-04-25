@@ -1,7 +1,7 @@
 package hydra.kafka.producer
 
 import hydra.core.ingest.HydraRequest
-import hydra.core.ingest.IngestionParams.HYDRA_RECORD_FORMAT_PARAM
+import hydra.core.ingest.RequestParams.HYDRA_RECORD_FORMAT_PARAM
 import hydra.core.protocol.{InvalidRequest, MessageValidationResult}
 
 /**

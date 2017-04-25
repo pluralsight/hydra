@@ -98,7 +98,7 @@ case class SocketSession(metadata: Map[String, String] = Map.empty) {
     copy(metadata = this.metadata ++ meta.map(m => m._1 -> m._2))
 
   def buildRequest(correlationId: Option[String], payload: String) = {
-    import hydra.core.ingest.IngestionParams._
+    import hydra.core.ingest.RequestParams._
     val rs = metadata.find(_._1.equalsIgnoreCase(HYDRA_RETRY_STRATEGY))
       .map(h => RetryStrategy(h._2)).getOrElse(RetryStrategy.Fail)
 

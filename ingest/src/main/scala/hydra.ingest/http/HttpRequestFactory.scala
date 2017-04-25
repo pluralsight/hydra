@@ -3,7 +3,7 @@ package hydra.ingest.http
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.Materializer
-import hydra.core.ingest.IngestionParams._
+import hydra.core.ingest.RequestParams._
 import hydra.core.ingest._
 import hydra.core.transport.{AckStrategy, RetryStrategy, ValidationStrategy}
 

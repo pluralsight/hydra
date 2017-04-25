@@ -1,4 +1,4 @@
-package hydra.examples.produce
+package hydra.sandbox.produce
 
 import hydra.core.transport.{HydraRecord, RetryStrategy}
 

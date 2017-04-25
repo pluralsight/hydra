@@ -31,6 +31,11 @@ lazy val defaultSettings = Seq(
   ivyScala := ivyScala.value map (_.copy(overrideScalaVersion = true))
 )
 
+lazy val restartSettings = Seq(
+  javaOptions in reStart += "-Xmx2g",
+  mainClass in reStart := Some("hydra.sandbox.app.HydraIngest")
+)
+
 lazy val noPublishSettings = Seq(
   publish := {},
   publishLocal := {},
@@ -46,7 +51,7 @@ lazy val root = Project(
   id = "hydra",
   base = file("."),
   settings = defaultSettings // ++ noPublishSettings
-).aggregate(common, core, kafka, ingest, examples, jdbc)
+).aggregate(common, core, kafka, ingest, sandbox)
 
 lazy val common = Project(
   id = "common",
@@ -76,16 +81,10 @@ lazy val kafka = Project(
     ++ Seq(libraryDependencies ++= Dependencies.kafkaDeps)
 ).dependsOn(core).settings(name := "hydra-kafka")
 
-lazy val jdbc = Project(
-  id = "jdbc",
-  base = file("jdbc"),
-  settings = moduleSettings
-    ++ Seq(libraryDependencies ++= Dependencies.coreDeps)
-).dependsOn(core).settings(name := "hydra-jdbc")
 
-lazy val examples = Project(
-  id = "examples",
-  base = file("examples"),
-  settings = defaultSettings ++ Test.testSettings ++ noPublishSettings
+lazy val sandbox = Project(
+  id = "sandbox",
+  base = file("sandbox"),
+  settings = defaultSettings ++ Test.testSettings ++ noPublishSettings ++ restartSettings
     ++ Seq(libraryDependencies ++= Dependencies.kafkaDeps)
 ).dependsOn(ingest, kafka).settings(name := "hydra-examples")

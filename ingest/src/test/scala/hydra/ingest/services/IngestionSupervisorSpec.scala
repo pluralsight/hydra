@@ -2,7 +2,7 @@ package hydra.ingest.services
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestKit, TestProbe}
-import hydra.core.ingest.{HydraRequest, IngestionParams}
+import hydra.core.ingest.{HydraRequest, RequestParams}
 import hydra.core.protocol.{Join, Publish, ValidRequest, Validate}
 import hydra.ingest.services.IngestorRegistry.{FindByName, LookupResult}
 import org.scalatest.{FunSpecLike, Matchers}
@@ -34,7 +34,7 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
 
   val request = HydraRequest("test", "test payload")
 
-  val ingestorRequest = request.withMetadata(IngestionParams.HYDRA_INGESTOR_PARAM -> "test_ingestor")
+  val ingestorRequest = request.withMetadata(RequestParams.HYDRA_INGESTOR_PARAM -> "test_ingestor")
 
   describe("When supervising an ingestion") {
     it("publishes a request") {
