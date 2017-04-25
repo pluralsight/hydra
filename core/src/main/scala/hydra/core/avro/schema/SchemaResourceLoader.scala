@@ -45,26 +45,28 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient, 
     }
   }
 
-  private def getLatestSchema(subject: String): Try[RegistrySchemaResource] = {
-    Try(registry.getLatestSchemaMetadata(subject))
-      .map(md => registry.getByID(md.getId) -> md)
-      .map(schema => RegistrySchemaResource(registryUrl, subject, schema._2.getId, schema._2.getVersion, schema._1))
-      .recoverWith {
-        case e: Exception => Failure(SchemaRegistryException(e, subject))
-      }
-  }
-
-  private def loadFromCache(subject: String, version: String): Try[RegistrySchemaResource] = {
-    sync.cachingWithTTL(s"$subject.$version")(5.minutes) {
-      loadFromRegistry(subject, version)
-    }
-  }
-
   private def retrieveSchema(subject: String) = {
     val parts = subject.split("\\#")
     parts match {
       case Array(subject, version) => loadFromCache(subject.withSuffix, version)
-      case Array(subject) => getLatestSchema(subject.withSuffix) //can't cache this!
+      case Array(subject) => getLatestSchema(subject.withSuffix)
+    }
+  }
+
+  private def getLatestSchema(subject: String): Try[RegistrySchemaResource] = {
+    sync.cachingWithTTL(subject)(5.minutes) {
+      Try(registry.getLatestSchemaMetadata(subject))
+        .map(md => registry.getByID(md.getId) -> md)
+        .map(schema => RegistrySchemaResource(registryUrl, subject, schema._2.getId, schema._2.getVersion, schema._1))
+        .recoverWith {
+          case e: Exception => Failure(SchemaRegistryException(e, subject))
+        }
+    }
+  }
+
+  private def loadFromCache(subject: String, version: String): Try[RegistrySchemaResource] = {
+    sync.cachingWithTTL(subject, version)(5.minutes) {
+      loadFromRegistry(subject, version)
     }
   }
 

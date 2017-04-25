@@ -5,7 +5,7 @@ import com.pluralsight.hydra.avro.JsonToAvroConversionException
 import configs.syntax._
 import hydra.core.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.core.avro.schema.{GenericSchemaResource, SchemaResource}
-import hydra.core.ingest.{HydraRequest, IngestionParams}
+import hydra.core.ingest.{HydraRequest, RequestParams}
 import hydra.core.notification.NotificationSupport
 import hydra.ingest.protocol.IngestionError
 import hydra.ingest.services.IngestionErrorHandler.HandleError
@@ -39,8 +39,8 @@ class IngestionErrorHandler extends Actor with NotificationSupport {
     val errorMsg = IngestionError(ingestor.path.toString, System.currentTimeMillis(), errorTopic, request.payload,
       schema.map(_.location), e.getClass.getSimpleName, e.getMessage)
     val errorRequest = HydraRequest(errorTopic, request.payload)
-      .withMetadata(IngestionParams.HYDRA_SCHEMA_PARAM -> errorAvroSchema)
-      .withMetadata(IngestionParams.HYDRA_KAFKA_TOPIC_PARAM -> errorTopic)
+      .withMetadata(RequestParams.HYDRA_SCHEMA_PARAM -> errorAvroSchema)
+      .withMetadata(RequestParams.HYDRA_KAFKA_TOPIC_PARAM -> errorTopic)
     observers ! errorMsg
   }
 }

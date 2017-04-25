@@ -3,7 +3,7 @@ package hydra.core.ingest
 /**
   * Created by alexsilva on 12/3/16.
   */
-object IngestionParams {
+object RequestParams {
 
   /**
     * Use when targetting a specific ingestor by name.  If this parameter is present in the request, the message will
@@ -78,5 +78,7 @@ object IngestionParams {
     * A 'simple' response produces only status codes.
     */
   val HYDRA_RESPONSE_FORMAT = "hydra-response-format"
+
+  val HYDRA_INGEST_TIMEOUT = "hydra-ingest-timeout"
 
 }

@@ -13,3 +13,5 @@ addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "0.8.0")
 addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.8.2")
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-multi-jvm" % "0.3.11")
+
+addSbtPlugin("io.spray" % "sbt-revolver" % "0.8.0")

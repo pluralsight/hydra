@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentHashMap
 import akka.actor.{ ActorSystem, ExtendedActorSystem, Extension, ExtensionId, ExtensionIdProvider }
 
 import scala.collection._
-import scala.collection.convert.decorateAsScala._
+import scala.collection.JavaConverters._
 
 /**
  * Created by alexsilva on 5/31/16.

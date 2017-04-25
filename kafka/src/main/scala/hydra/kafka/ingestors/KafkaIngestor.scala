@@ -16,7 +16,7 @@
 
 package hydra.kafka.ingestors
 
-import hydra.core.ingest.IngestionParams._
+import hydra.core.ingest.RequestParams._
 import hydra.core.ingest.Ingestor
 import hydra.core.transport.AckStrategy
 import hydra.core.transport.AckStrategy.Explicit

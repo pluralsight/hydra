@@ -16,7 +16,7 @@
 package hydra.kafka.producer
 
 import hydra.core.ingest.{HydraRequest, InvalidRequestException}
-import hydra.core.ingest.IngestionParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_KEY_PARAM}
+import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_KEY_PARAM}
 import hydra.core.protocol.ValidRequest
 import org.scalatest.{FunSpecLike, Matchers}
 

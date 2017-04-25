@@ -19,7 +19,7 @@ package hydra.ingest.services
 import akka.actor._
 import akka.util.Timeout
 import hydra.common.config.ActorConfigSupport
-import hydra.core.ingest.{IngestionParams, RequestUtils}
+import hydra.core.ingest.{RequestParams, RequestUtils}
 import hydra.core.protocol.InitiateRequest
 import hydra.ingest.protocol.IngestionReport
 
@@ -44,14 +44,14 @@ class IngestionActor(registryPath: String) extends Actor with ActorConfigSupport
 
   override def receive: Receive = {
     case InitiateRequest(request) =>
-      val split = (request.metadataValue(IngestionParams.SPLIT_JSON_ARRAY).map(_.toBoolean).getOrElse(false))
+      val split = (request.metadataValue(RequestParams.SPLIT_JSON_ARRAY).map(_.toBoolean).getOrElse(false))
       val requests = if (split) RequestUtils.split(request) else Seq(request)
       requests.foreach { r =>
         context.actorOf(IngestionSupervisor.props(r, ingestionTimeout, registry))
       }
     case r: IngestionReport =>
       context.stop(sender)
-      r.metadata.find(_.name == IngestionParams.REPLY_TO).foreach { replyTo =>
+      r.metadata.find(_.name == RequestParams.REPLY_TO).foreach { replyTo =>
         Try(context.actorSelection(replyTo.value) ! r)
           .recover {
             case e => log.error(s"Unable to send reply back to ${receive}: ${e.getMessage}")

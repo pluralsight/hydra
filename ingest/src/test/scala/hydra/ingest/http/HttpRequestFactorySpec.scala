@@ -8,7 +8,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FunSpecLike, Matchers}
 import akka.stream.testkit.StreamTestKit
 import akka.testkit.TestKit
-import hydra.core.ingest.IngestionParams
+import hydra.core.ingest.RequestParams
 import hydra.core.transport.{RetryStrategy, ValidationStrategy}
 
 import scala.collection.immutable._
@@ -24,8 +24,8 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
       val httpRequest = HttpRequest(
         HttpMethods.POST,
         headers = Seq(RawHeader("hydra", "awesome"),
-          RawHeader(IngestionParams.HYDRA_VALIDATION_STRATEGY, "relaxed"),
-          RawHeader(IngestionParams.HYDRA_RETRY_STRATEGY, "retry")),
+          RawHeader(RequestParams.HYDRA_VALIDATION_STRATEGY, "relaxed"),
+          RawHeader(RequestParams.HYDRA_RETRY_STRATEGY, "retry")),
         uri = "/test",
         entity = HttpEntity(MediaTypes.`application/json`, json))
       val req = new HttpRequestFactory().createRequest("label", httpRequest)

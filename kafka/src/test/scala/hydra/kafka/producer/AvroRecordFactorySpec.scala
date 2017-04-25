@@ -19,7 +19,7 @@ import java.io.File
 
 import com.pluralsight.hydra.avro.{InvalidDataTypeException, JsonConverter, RequiredFieldMissingException, UndefinedFieldsException}
 import hydra.core.avro.JsonToAvroConversionExceptionWithMetadata
-import hydra.core.ingest.IngestionParams._
+import hydra.core.ingest.RequestParams._
 import hydra.core.ingest.{HydraRequest, InvalidRequestException}
 import hydra.core.protocol.InvalidRequest
 import org.apache.avro.Schema

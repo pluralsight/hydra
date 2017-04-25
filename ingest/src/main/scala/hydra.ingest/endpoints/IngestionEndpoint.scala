@@ -24,7 +24,7 @@ import akka.stream.ActorMaterializer
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
-import hydra.core.ingest.IngestionParams
+import hydra.core.ingest.RequestParams
 import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
 import hydra.ingest.bootstrap.HydraIngestorRegistry
 import hydra.ingest.services.IngestionRequestHandler
@@ -45,7 +45,7 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
     post {
       requestEntityPresent {
         pathPrefix("ingest") {
-          optionalHeaderValueByName(IngestionParams.HYDRA_REQUEST_ID_PARAM) { correlationId =>
+          optionalHeaderValueByName(RequestParams.HYDRA_REQUEST_ID_PARAM) { correlationId =>
             handleExceptions(excptHandler) {
               pathEndOrSingleSlash {
                 broadcastRequest(correlationId.getOrElse(randomId))

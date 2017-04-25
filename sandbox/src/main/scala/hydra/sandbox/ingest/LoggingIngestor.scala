@@ -1,4 +1,4 @@
-package hydra.examples.ingest
+package hydra.sandbox.ingest
 
 import hydra.core.ingest.Ingestor
 import hydra.core.protocol._
@@ -11,7 +11,7 @@ import hydra.core.protocol._
 class LoggingIngestor extends Ingestor {
   ingest {
     case Publish(request) =>
-      sender ! (if (request.metadataValueEquals("logging.enabled", "true")) Join else Ignore)
+      sender ! (if (request.metadataValueEquals("logging-enabled", "true")) Join else Ignore)
 
     case Ingest(request) =>
       log.info(request.payload.toString)

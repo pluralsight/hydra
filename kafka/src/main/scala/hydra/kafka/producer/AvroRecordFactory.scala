@@ -20,7 +20,7 @@ import hydra.common.config.ConfigSupport
 import hydra.core.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.core.avro.registry.ConfluentSchemaRegistry
 import hydra.core.avro.schema.{SchemaResource, SchemaResourceLoader}
-import hydra.core.ingest.{HydraRequest, IngestionParams}
+import hydra.core.ingest.{HydraRequest, RequestParams}
 import hydra.core.transport.ValidationStrategy.Strict
 import hydra.core.protocol.{InvalidRequest, MessageValidationResult, ValidRequest}
 import org.apache.avro.generic.GenericRecord
@@ -64,7 +64,7 @@ object AvroRecordFactory extends KafkaRecordFactory[String, GenericRecord] with 
   }
 
   def getSubject(request: HydraRequest): String = {
-    request.metadataValue(IngestionParams.HYDRA_SCHEMA_PARAM).getOrElse(getTopic(request))
+    request.metadataValue(RequestParams.HYDRA_SCHEMA_PARAM).getOrElse(getTopic(request))
   }
 
 }

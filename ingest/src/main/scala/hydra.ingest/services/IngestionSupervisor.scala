@@ -38,7 +38,7 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
 
   private var ingestors: mutable.Map[String, IngestorStatus] = new mutable.HashMap
 
-  private val targetIngestor = request.metadataValue(IngestionParams.HYDRA_INGESTOR_PARAM)
+  private val targetIngestor = request.metadataValue(RequestParams.HYDRA_INGESTOR_PARAM)
 
   override def preStart(): Unit = {
     targetIngestor match {

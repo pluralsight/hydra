@@ -18,7 +18,7 @@ package hydra.kafka.producer
 import java.io.File
 
 import hydra.core.ingest.HydraRequest
-import hydra.core.ingest.IngestionParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_FORMAT_PARAM, HYDRA_SCHEMA_PARAM}
+import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_FORMAT_PARAM, HYDRA_SCHEMA_PARAM}
 import hydra.core.protocol.{InvalidRequest, ValidRequest}
 import org.apache.avro.Schema
 import org.scalatest.{FunSpecLike, Matchers}
