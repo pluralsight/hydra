@@ -23,9 +23,9 @@ import java.util.List;
 
 public class InvalidDataTypeException extends JsonToAvroConversionException {
 
-    public InvalidDataTypeException(String fieldName, Schema schema) {
-        super(String.format("Data type for '%s' does not match schema type of %s.", fieldName, typeInfo(schema)),
-                null, fieldName, schema);
+    public InvalidDataTypeException(String fieldName, Object value, Schema schema) {
+        super(String.format("Value %s for element '%s' is not of type %s.", value, fieldName, typeInfo(schema)), null,
+                fieldName, schema);
     }
 
     private static String typeInfo(Schema schema) {
@@ -36,7 +36,7 @@ public class InvalidDataTypeException extends JsonToAvroConversionException {
                 typeNames.add(t.getType().getName());
             });
 
-            info = schema.getType().getName() +  " [" + Joiner.on(",").join(typeNames) + "]";
+            info = schema.getType().getName() + " [" + Joiner.on(",").join(typeNames) + "]";
         }
 
 
