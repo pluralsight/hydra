@@ -37,8 +37,8 @@ public class JsonToAvroConversionException extends RuntimeException {
 
 
     public JsonToAvroConversionException(Object value, String fieldName, Schema schema) {
-        this(String.format("Avro conversion error for field %s, %s for %s", fieldName, value, schema), value,
-                fieldName, schema);
+        this(String.format("Avro conversion error for field %s: value %s cannot be converted to %s", fieldName, value,
+                schema), value, fieldName, schema);
     }
 
     public Schema getSchema() {
