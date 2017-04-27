@@ -58,15 +58,30 @@ public class JsonConverterTest {
 
     Schema.Field fn = sf("fieldN", Type.NULL);
 
+
     @Test
     public void testNullFields() throws Exception {
-
         JsonConverter jc = new JsonConverter(sr(f1, f2, fn));
         String json = "{\"field1\": 1729, \"field2\": [true, true, false], \"fieldN\": null}";
         GenericRecord r = jc.convert(json);
         assertEquals(json, r.toString());
         assertEquals(0, jc.getConversionStats().getMissingFields().size());
     }
+
+    /**
+     * This test addresses the case when a field is set to be of NULL type in a schema but a non-null
+     * value is provided.
+     * @throws Exception
+     */
+    @Test(expected = InvalidDataTypeException.class)
+    public void testNullMismatch() throws Exception {
+        JsonConverter jc = new JsonConverter(sr(f1, f2, fn));
+        String json = "{\"field1\": 1729, \"field2\": [true, true, false], \"fieldN\": \"123\"}";
+        GenericRecord r = jc.convert(json);
+        assertEquals(json, r.toString());
+        assertEquals(0, jc.getConversionStats().getMissingFields().size());
+    }
+
 
     @Test
     public void testBasicWithMap() throws Exception {

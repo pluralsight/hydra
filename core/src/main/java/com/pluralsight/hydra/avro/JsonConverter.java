@@ -86,7 +86,7 @@ public class JsonConverter<T extends GenericRecord> {
         }
         for (Field field : schema.getFields()) {
             Schema fs = field.schema();
-            if (isNullableSchema(fs)) {
+            if (isNullableUnion(fs)) {
                 fs = getNonNull(fs);
             }
             Type type = fs.getType();
@@ -101,7 +101,7 @@ public class JsonConverter<T extends GenericRecord> {
                 case MAP:
                     //trying to support options in map values
                     Schema fsVal = fs.getValueType();
-                    if (isNullableSchema(fsVal)) {
+                    if (isNullableUnion(fsVal)) {
                         fsVal = getNonNull(fsVal);
                     }
                     validate(fsVal, false);
@@ -147,7 +147,7 @@ public class JsonConverter<T extends GenericRecord> {
                 try {
                     result.put(f.pos(), typeConvert(rawValue, name, f.schema()));
                 } catch (NumberFormatException e) {
-                    throw new InvalidDataTypeException(name, f.schema());
+                    throw new InvalidDataTypeException(name, rawValue, f.schema());
                 }
                 usedFields.add(name);
             } else if (f.schema().getType() == Type.NULL) {
@@ -157,14 +157,14 @@ public class JsonConverter<T extends GenericRecord> {
                 missingFields.add(name);
                 JsonNode defaultValue = JacksonUtils.toJsonNode(f.defaultVal());
                 if (defaultValue == null || defaultValue.isNull()) {
-                    if (isNullableSchema(f.schema())) {
+                    if (isNullableUnion(f.schema())) {
                         result.put(f.pos(), null);
                     } else {
                         throw new RequiredFieldMissingException(f.name(), schema);
                     }
                 } else {
                     Schema fieldSchema = f.schema();
-                    if (isNullableSchema(fieldSchema)) {
+                    if (isNullableUnion(fieldSchema)) {
                         fieldSchema = getNonNull(fieldSchema);
                     }
                     Object value;
@@ -229,7 +229,7 @@ public class JsonConverter<T extends GenericRecord> {
 
     @SuppressWarnings("unchecked")
     private Object typeConvert(Object value, String name, Schema schema) throws IOException {
-        if (isNullableSchema(schema)) {
+        if (isNullableUnion(schema)) {
             if (value == null) {
                 return null;
             } else {
@@ -308,12 +308,12 @@ public class JsonConverter<T extends GenericRecord> {
                 }
                 return mapRes;
             default:
-                throw new IllegalArgumentException("Cannot handle type: " + schema.getType());
+                throw new InvalidDataTypeException(name, value, schema);
         }
         throw new JsonToAvroConversionException(value, name, schema);
     }
 
-    private boolean isNullableSchema(Schema schema) {
+    private boolean isNullableUnion(Schema schema) {
         return schema.getType().equals(Type.UNION) && schema.getTypes().size() == 2 && (schema.getTypes().get(0)
                 .getType().equals(Type.NULL) || schema.getTypes().get(1).getType().equals(Type.NULL));
     }
