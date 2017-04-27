@@ -25,7 +25,7 @@ class FileTransport extends Transport {
     */
   private val destinations = Map("default" ->
     Source.queue(0, OverflowStrategy.backpressure).to(messageSink("/tmp/hydra-sandbox.txt")).run())
-  
+
   transport {
     case Produce(r: FileRecord) =>
       destinations.get(r.destination).map { flow =>

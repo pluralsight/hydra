@@ -78,7 +78,7 @@ You should see a 'this is a test' message transported (or replicated) to both th
 
 
 ## Online Documentation
-We highly recommend checking out the project documentation [here](www.pluralsight.com.)  There you can find the latest documentation about the ingestion protocol, Akka actors, including examples, API endpoints, and a lot more info on how to get started.
+We highly recommend checking out the project documentation [here.](www.pluralsight.com)  There you can find the latest documentation about the ingestion protocol, Akka actors, including examples, API endpoints, and a lot more info on how to get started.
 
 This README file only contains basic definitions and set up instructions.
 
