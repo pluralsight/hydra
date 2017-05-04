@@ -285,12 +285,6 @@ public class JsonConverter<T extends GenericRecord> {
                     throw new IllegalArgumentException(value + " is not a valid symbol. Possible values are: " +
                             schema.getEnumSymbols() + ".");
                 return new GenericData.EnumSymbol(schema, value);
-//                try {
-//                    Class<Enum> enumType = (Class<Enum>) Class.forName(schema.getFullName());
-//                    return Enum.valueOf(enumType, value.toString());
-//                } catch (ClassNotFoundException e) {
-//                    throw new RuntimeException(e);
-//                }
             case RECORD:
                 return convert((Map<String, Object>) value, schema);
             case ARRAY:
