@@ -88,8 +88,8 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
     case IngestorTimeout =>
       updateStatus(sender, IngestorTimeout)
 
-    case error: IngestorError =>
-      updateStatus(sender, IngestorTimeout)
+    case err: IngestorError =>
+      updateStatus(sender, IngestorError(err.error))
 
     case err: HydraIngestionError =>
       updateStatus(sender, IngestorError(err.cause))

@@ -16,11 +16,11 @@
 
 package hydra.kafka.ingestors
 
-import hydra.core.ingest.RequestParams._
 import hydra.core.ingest.Ingestor
+import hydra.core.ingest.RequestParams._
+import hydra.core.protocol._
 import hydra.core.transport.AckStrategy
 import hydra.core.transport.AckStrategy.Explicit
-import hydra.core.protocol._
 import hydra.kafka.producer.{KafkaProducerSupport, KafkaRecordFactories}
 
 import scala.util.{Failure, Success, Try}
@@ -56,7 +56,8 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
             case Explicit =>
               kafkaProducer ! ProduceWithAck(record, self, sender)
           }
-        case Failure(ex) => sender ! IngestorError(ex)
+        case Failure(ex) =>
+          sender ! IngestorError(ex)
       }
   }
 }
