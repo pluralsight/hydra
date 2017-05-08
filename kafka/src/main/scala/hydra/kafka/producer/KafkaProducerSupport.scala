@@ -58,7 +58,7 @@ trait KafkaProducerSupport extends ConfigSupport {
             WaitingForAck
         }
       case Failure(ex) =>
-        IngestorError(ex)
+        InvalidRequest(ex)
     }
   }
 }
