@@ -15,14 +15,16 @@ import org.scalatest.{FunSpecLike, Matchers}
 class HydraEntryPointSpec extends Matchers with FunSpecLike with MockFactory {
   val conf =
     """
+      |  hydra_test{
       |  test {
       |    endpoints = ["hydra.core.app.DummyEndpoint"]
-      |  }
       |  extensions {
       |    dummy {
       |      enabled = true
       |    }
       |  }
+      | }
+      |}
     """.stripMargin
 
   val et = new HydraEntryPoint() {
@@ -39,13 +41,13 @@ class HydraEntryPointSpec extends Matchers with FunSpecLike with MockFactory {
       et.moduleName shouldBe "test"
       et.services shouldBe Seq("test" -> Props[DummyActor])
       et.endpoints shouldBe Seq(classOf[DummyEndpoint])
-      et.extensions shouldBe ConfigFactory.parseString(conf).getConfig("hydraTest.extensions")
+      et.extensions shouldBe ConfigFactory.parseString(conf).getConfig("hydra_test.test.extensions")
     }
 
     it("builds a container") {
       implicit val system = mock[ActorSystem]
       val csvc = new ContainerService(Seq(classOf[DummyEndpoint]), Nil, Seq("test" -> Props[DummyActor]), Nil,
-        "service-container")
+        "hydra_test-test")
       val container = et.buildContainer()
       csvc.name shouldBe container.name
       csvc.registeredRoutes shouldBe container.registeredRoutes

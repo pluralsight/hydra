@@ -62,12 +62,16 @@ case object IngestorJoined extends IngestorStatus {
   val statusCode = StatusCodes.Accepted
 }
 
+case object WaitingForAck extends IngestorStatus {
+  val statusCode = StatusCodes.Processing
+}
+
 case object IngestorIgnored extends IngestorStatus {
   val statusCode = StatusCodes.NotAcceptable
 }
 
 case object RequestPublished extends IngestorStatus {
-  val statusCode = StatusCodes.Processing
+  val statusCode = StatusCodes.Created
 }
 
 case class IngestorError(error: Throwable) extends IngestorStatus {

@@ -19,11 +19,7 @@ package hydra.kafka.ingestors
 import hydra.core.ingest.Ingestor
 import hydra.core.ingest.RequestParams._
 import hydra.core.protocol._
-import hydra.core.transport.AckStrategy
-import hydra.core.transport.AckStrategy.Explicit
 import hydra.kafka.producer.{KafkaProducerSupport, KafkaRecordFactories}
-
-import scala.util.{Failure, Success, Try}
 
 /**
   * Sends JSON messages to a topic in Kafka.  In order for this handler to be activated.
@@ -46,18 +42,6 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
       sender ! validation
 
     case Ingest(request) =>
-      Try(KafkaRecordFactories.build(request)) match {
-        case Success(record) =>
-          request.ackStrategy match {
-            case AckStrategy.None =>
-              kafkaProducer ! Produce(record)
-              sender ! IngestorCompleted
-
-            case Explicit =>
-              kafkaProducer ! ProduceWithAck(record, self, sender)
-          }
-        case Failure(ex) =>
-          sender ! IngestorError(ex)
-      }
+      sender ! produce(request)
   }
 }
