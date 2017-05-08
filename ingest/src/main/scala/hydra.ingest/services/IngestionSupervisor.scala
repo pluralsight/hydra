@@ -88,6 +88,9 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
     case IngestorTimeout =>
       updateStatus(sender, IngestorTimeout)
 
+    case WaitingForAck =>
+      updateStatus(sender, WaitingForAck)
+
     case err: IngestorError =>
       updateStatus(sender, IngestorError(err.error))
 
@@ -116,7 +119,7 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
   private def finishIfReady() = {
     if (ingestors.values.filterNot(_.completed).isEmpty) {
       val status = ingestors.filter(_._2 != IngestorCompleted).values.headOption
-        .map (_.statusCode) getOrElse StatusCodes.OK
+        .map(_.statusCode) getOrElse StatusCodes.OK
 
       stop(status)
     }

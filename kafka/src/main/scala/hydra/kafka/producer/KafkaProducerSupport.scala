@@ -20,9 +20,14 @@ import akka.actor.Actor
 import akka.util.Timeout
 import configs.syntax._
 import hydra.common.config.ConfigSupport
+import hydra.core.ingest.HydraRequest
+import hydra.core.protocol._
+import hydra.core.transport.AckStrategy
+import hydra.core.transport.AckStrategy.Explicit
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 /**
   * Mix this trait in to get a KafkaProducerActor automatically looked up.
@@ -39,4 +44,21 @@ trait KafkaProducerSupport extends ConfigSupport {
     .valueOrElse("/user/service/kafka_transport")
 
   val kafkaProducer = Await.result(context.actorSelection(path).resolveOne()(Timeout(resolveTimeout)), resolveTimeout)
+
+  def produce(request: HydraRequest): IngestorStatus = {
+    Try(KafkaRecordFactories.build(request)) match {
+      case Success(record) =>
+        request.ackStrategy match {
+          case AckStrategy.None =>
+            kafkaProducer ! Produce(record)
+            IngestorCompleted
+
+          case Explicit =>
+            kafkaProducer ! ProduceWithAck(record, self, sender)
+            WaitingForAck
+        }
+      case Failure(ex) =>
+        IngestorError(ex)
+    }
+  }
 }
