@@ -59,7 +59,6 @@ trait IngestionJsonSupport extends HydraJsonSupport {
 
       val response = Map(
         "requestId" -> (if (isDetailed) Some(JsString(obj.correlationId)) else None),
-        "status" -> (if (isDetailed) Some(obj.statusCode.toJson) else None),
         "ingestors" -> (if (ingestors.isEmpty) None else Some(JsObject(ingestors)))
       ).collect {
         case (key, Some(value)) => key -> value
