@@ -77,7 +77,7 @@ case object RequestPublished extends IngestorStatus {
 case class IngestorError(error: Throwable) extends IngestorStatus {
   override val completed = true
   override val message = error.getMessage
-  val statusCode = StatusCodes.InternalServerError
+  val statusCode = StatusCodes.ServiceUnavailable
 }
 
 case class InvalidRequest(error: Throwable) extends IngestorStatus with MessageValidationResult {
