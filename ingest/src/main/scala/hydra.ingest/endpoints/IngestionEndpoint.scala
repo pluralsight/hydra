@@ -45,16 +45,18 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
     post {
       requestEntityPresent {
         pathPrefix("ingest") {
-          optionalHeaderValueByName(RequestParams.HYDRA_REQUEST_ID_PARAM) { correlationId =>
-            handleExceptions(excptHandler) {
-              pathEndOrSingleSlash {
-                broadcastRequest(correlationId.getOrElse(randomId))
+         // decodeRequestWith(Gzip, Deflate) {
+            optionalHeaderValueByName(RequestParams.HYDRA_REQUEST_ID_PARAM) { correlationId =>
+              handleExceptions(excptHandler) {
+                pathEndOrSingleSlash {
+                  broadcastRequest(correlationId.getOrElse(randomId))
+                }
+              } ~ path(Segment) { ingestor =>
+                publishToIngestor(correlationId.getOrElse(randomId), ingestor)
               }
-            } ~ path(Segment) { ingestor =>
-              publishToIngestor(correlationId.getOrElse(randomId), ingestor)
             }
           }
-        }
+        //}
       }
     }
 
