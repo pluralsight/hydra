@@ -1,4 +1,4 @@
-package hydra.jdbc
+package hydra.jdbc.ingestor
 
 import hydra.core.ingest.RequestParams._
 import hydra.core.ingest.{HydraRequest, Ingestor, TransportOps}
@@ -10,13 +10,13 @@ import hydra.jdbc.transport.JdbcRecordFactory
   */
 class JdbcIngestor extends Ingestor with TransportOps {
 
-  override val transportName = "jdbc_transport"
+  override def transportName = "jdbc"
 
   implicit val recordFactory = JdbcRecordFactory
 
   ingest {
     case Publish(request) =>
-      sender ! request.metadataValue("hydra-jdbc-target").map(_ => Join).getOrElse(Ignore)
+      sender ! request.metadataValue("hydra-jdbc-profile").map(_ => Join).getOrElse(Ignore)
 
     case Validate(request) =>
       val isValid = getSchema(request).map(_ => ValidRequest)

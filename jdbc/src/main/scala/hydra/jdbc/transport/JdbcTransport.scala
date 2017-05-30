@@ -10,6 +10,6 @@ class JdbcTransport extends Transport {
 
   transport {
     case Produce(r: JdbcRecord) =>
-      println(r)
+      println(s"JDBC RECORD $r")
   }
 }
