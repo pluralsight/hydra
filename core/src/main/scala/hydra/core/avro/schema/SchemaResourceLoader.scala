@@ -33,7 +33,6 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient, 
 
   private implicit val cache = ScalaCache(GuavaCache())
 
-
   override def getResource(location: String): SchemaResource = {
     require(location ne null)
     val parts = location.split("\\:")

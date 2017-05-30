@@ -23,7 +23,7 @@ import hydra.kafka.producer.{KafkaProducerSupport, KafkaRecordFactories}
 
 /**
   * Sends JSON messages to a topic in Kafka.  In order for this handler to be activated.
-  * a request param "Hydra-Transport" must be set to "Kafka".
+  * a request param "Hydra-kafka-topic" must be present.
   *
   */
 class KafkaIngestor extends Ingestor with KafkaProducerSupport {
@@ -42,6 +42,6 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
       sender ! validation
 
     case Ingest(request) =>
-      sender ! produce(request)
+      sender ! transport(request)(KafkaRecordFactories(request).get)
   }
 }

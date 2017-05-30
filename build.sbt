@@ -5,7 +5,7 @@ enablePlugins(JavaAppPackaging)
 
 val JDK = "1.8"
 val buildNumber = scala.util.Properties.envOrNone("version").map(v => "." + v).getOrElse("")
-val hydraVersion = "0.7.1" + buildNumber
+val hydraVersion = "0.8.0" + buildNumber
 
 lazy val defaultSettings = Seq(
   organization := "pluralsight",
@@ -85,7 +85,7 @@ lazy val jdbc = Project(
   id = "jdbc",
   base = file("jdbc"),
   settings = moduleSettings
-    ++ Seq(libraryDependencies ++= Dependencies.coreDeps)
+    ++ Seq(libraryDependencies ++= Dependencies.jdbcDeps)
 ).dependsOn(core).settings(name := "hydra-jdbc")
 
 

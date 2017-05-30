@@ -17,23 +17,40 @@ private[sql] object PostgresDialect extends JdbcDialect {
 
   override def getJDBCType(schema: Schema): Option[JdbcType] = schema.getType match {
     case Type.STRING => Some(JdbcType("TEXT", Types.CHAR))
-    case BYTES if schema.getLogicalType!=null && schema.getLogicalType.getName == "decimal" =>
-      val lt = LogicalTypes.fromSchema(schema).asInstanceOf[Decimal]
-      Option(JdbcType(s"DECIMAL(${lt.getPrecision},${lt.getScale})", java.sql.Types.DECIMAL))
-    case Type.BYTES => Some(JdbcType("BYTEA", Types.BINARY))
+    case BYTES => bytesType(schema)
     case Type.BOOLEAN => Some(JdbcType("BOOLEAN", Types.BOOLEAN))
     case Type.FLOAT => Some(JdbcType("FLOAT4", Types.FLOAT))
     case Type.DOUBLE => Some(JdbcType("FLOAT8", Types.DOUBLE))
-    case UNION if (isNullableUnion(schema)) => getJDBCType(getNonNullableUnionType(schema))
-    case UNION => throw new IllegalArgumentException(s"Only nullable unions of two elements are supported.");
-    case _ => JdbcUtils.getCommonJDBCType(schema)
+    case UNION => unionType(schema)
+    case Type.ARRAY =>
+      getJDBCType(schema.getElementType).map(_.databaseTypeDefinition)
+        .orElse(JdbcUtils.getCommonJDBCType(schema.getElementType).map(_.databaseTypeDefinition))
+        .map(typeName => JdbcType(s"$typeName[]", java.sql.Types.ARRAY))
+    case _ => None
+  }
+
+  private def unionType(schema: Schema): Option[JdbcType] = {
+    if (isNullableUnion(schema)) {
+      getJDBCType(getNonNullableUnionType(schema))
+    } else {
+      throw new IllegalArgumentException(s"Only nullable unions of two elements are supported.")
+    }
+  }
+
+  private def bytesType(schema: Schema): Option[JdbcType] = {
+    if (JdbcUtils.isLogicalType(schema, "decimal")) {
+      val lt = LogicalTypes.fromSchema(schema).asInstanceOf[Decimal]
+      Option(JdbcType(s"DECIMAL(${lt.getPrecision},${lt.getScale})", java.sql.Types.DECIMAL))
+    } else {
+      throw new IllegalArgumentException(s"Unsupported type in postgresql: ${schema.getType}")
+    }
   }
 
   override def getTableExistsQuery(table: String): String = {
     s"SELECT 1 FROM $table LIMIT 1"
   }
 
-
   override def isCascadingTruncateTable(): Option[Boolean] = Some(true)
+
 }
 

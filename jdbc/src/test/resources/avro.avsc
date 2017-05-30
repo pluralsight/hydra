@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "User",
+  "namespace": "hydra",
+  "fields": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "username",
+      "type": "string"
+    }
+  ]
+}
