@@ -6,9 +6,10 @@ import org.apache.avro.Schema
 import org.scalatest.{FunSpecLike, Matchers}
 
 /**
-  * Created by alexsilva on 5/4/17.
+  * Created by alexsilva on 5/18/17.
   */
-class PostgresDialectSpec extends Matchers with FunSpecLike {
+class JdbcUtilsSpec extends Matchers with FunSpecLike {
+
   val schema =
     """
       |{
@@ -17,8 +18,7 @@ class PostgresDialectSpec extends Matchers with FunSpecLike {
       |	"namespace": "hydra",
       |	"fields": [{
       |			"name": "id",
-      |			"type": "int",
-      |     "meta":"primary-key"
+      |			"type": "int"
       |		},
       |		{
       |			"name": "username",
@@ -39,8 +39,7 @@ class PostgresDialectSpec extends Matchers with FunSpecLike {
       |		},
       |		{
       |			"name": "active",
-      |			"type": "boolean",
-      |      "doc": "active_doc"
+      |			"type": "boolean"
       |		},
       |		{
       |			"name": "score",
@@ -83,21 +82,25 @@ class PostgresDialectSpec extends Matchers with FunSpecLike {
       |}
     """.stripMargin
 
+  val avro = new Schema.Parser().parse(schema)
 
   describe("The postgres dialect") {
     it("converts a schema") {
-      val avro = new Schema.Parser().parse(schema)
-      PostgresDialect.getJDBCType(avro.getField("username").schema()).get shouldBe JdbcType("TEXT", CHAR)
-      intercept[IllegalArgumentException] {
-        PostgresDialect.getJDBCType(avro.getField("passwordHash").schema()).get shouldBe JdbcType("BYTEA", BINARY)
-      }
-      PostgresDialect.getJDBCType(avro.getField("rate").schema()) shouldBe Some(JdbcType("DECIMAL(4,2)", DECIMAL))
-      PostgresDialect.getJDBCType(avro.getField("active").schema()) shouldBe Some(JdbcType("BOOLEAN", BOOLEAN))
-      PostgresDialect.getJDBCType(avro.getField("score").schema()) shouldBe Some(JdbcType("FLOAT4", FLOAT))
-      PostgresDialect.getJDBCType(avro.getField("scored").schema()) shouldBe Some(JdbcType("FLOAT8", DOUBLE))
-      PostgresDialect.getJDBCType(avro.getField("testUnion").schema()) shouldBe Some(JdbcType("TEXT", CHAR))
-      PostgresDialect.getJDBCType(avro.getField("friends").schema()) shouldBe Some(JdbcType("TEXT[]", ARRAY))
-      PostgresDialect.getJDBCType(avro.getField("signupDate").schema()) shouldBe None
+      JdbcUtils.getCommonJDBCType(avro.getField("username").schema()).get shouldBe JdbcType("TEXT", VARCHAR)
+      JdbcUtils.getCommonJDBCType(avro.getField("passwordHash").schema()).get shouldBe JdbcType("BYTE", TINYINT)
+      JdbcUtils.getCommonJDBCType(avro.getField("rate").schema()) shouldBe Some(JdbcType("DECIMAL(4,2)", DECIMAL))
+      JdbcUtils.getCommonJDBCType(avro.getField("active").schema()) shouldBe Some(JdbcType("BIT(1)", BIT))
+      JdbcUtils.getCommonJDBCType(avro.getField("score").schema()) shouldBe Some(JdbcType("REAL", FLOAT))
+      JdbcUtils.getCommonJDBCType(avro.getField("scored").schema()) shouldBe Some(JdbcType("DOUBLE PRECISION", DOUBLE))
+      JdbcUtils.getCommonJDBCType(avro.getField("testUnion").schema()) shouldBe Some(JdbcType("TEXT", VARCHAR))
+      JdbcUtils.getCommonJDBCType(avro.getField("friends").schema()) shouldBe None
+      JdbcUtils.getCommonJDBCType(avro.getField("signupDate").schema()) shouldBe Some(JdbcType("DATE", DATE))
+      JdbcUtils.getCommonJDBCType(avro.getField("signupTimestamp").schema()) shouldBe Some(JdbcType("TIMESTAMP", TIMESTAMP))
+    }
+
+    it("extracts the right column list") {
+      JdbcUtils.columns(avro) shouldBe Seq("id", "username", "rate", "rateb", "active", "score", "scored",
+        "passwordHash", "signupTimestamp", "signupDate", "testUnion", "friends")
     }
   }
 }

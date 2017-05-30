@@ -18,12 +18,14 @@ package hydra.core.transport
 import hydra.core.ingest.HydraRequest
 import hydra.core.protocol.MessageValidationResult
 
+import scala.util.Try
+
 /**
   * Created by alexsilva on 1/11/17.
   */
 trait RecordFactory[K, V] {
 
-  def build(request: HydraRequest): HydraRecord[K, V]
+  def build(request: HydraRequest): Try[HydraRecord[K, V]]
 
   def validate(request: HydraRequest): MessageValidationResult
 }

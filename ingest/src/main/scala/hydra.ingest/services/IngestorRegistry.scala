@@ -65,15 +65,16 @@ class IngestorRegistry extends Actor with ActorLogging with ActorConfigSupport {
       sender ! LookupResult(info.toList)
 
     case Terminated(handler) => {
-      //todo: ADD RESTART
+      //todo: ADD RESTART?
       log.error(s"Ingestor ${handler} terminated.")
     }
   }
 
   def doRegister(name: String, group:String, clazz: Class[_ <: Ingestor]): RegisteredIngestor = {
     RegistrationLock.synchronized {
-      if (ingestors.contains(name))
+      if (ingestors.contains(name)) {
         sender ! Failure(IngestorAlreadyRegisteredException(s"Ingestor $name is already registered."))
+      }
       val ingestor = RegisteredIngestor(name, group, context.actorOf(ingestorProps(name, clazz), name), DateTime.now())
       ingestors + (name -> ingestor)
       ingestor

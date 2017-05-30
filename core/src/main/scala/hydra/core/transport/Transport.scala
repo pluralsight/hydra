@@ -10,12 +10,13 @@ import hydra.core.protocol._
   * Created by alexsilva on 12/1/15.
   */
 
-trait Transport extends Actor with ActorConfigSupport with LoggingAdapter with ComposingReceive {
+trait Transport extends Actor
+  with ActorConfigSupport with LoggingAdapter with ComposingReceive {
 
   override val baseReceive: Receive = {
     case Produce(_) => log.info(s"Produce message was not handled by ${thisActorName}.")
 
-    case RecordProduced => log.info(s"$thisActorName: Record produced.")
+    case RecordProduced(_) => log.info(s"$thisActorName: Record produced.")
 
     case RecordNotProduced(_, error) => log.error(s"$thisActorName: $error")
   }

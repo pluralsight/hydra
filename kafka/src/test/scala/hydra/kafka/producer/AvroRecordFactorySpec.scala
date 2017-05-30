@@ -69,7 +69,7 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
       val request = HydraRequest("test-topic", json)
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      val msg = AvroRecordFactory.build(request)
+      val msg = AvroRecordFactory.build(request).get
       msg.destination shouldBe "test-topic"
       msg.key shouldBe None
       msg.schema shouldBe avroSchema
@@ -84,7 +84,7 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_RECORD_KEY_PARAM -> "{$.name}")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      val msg = AvroRecordFactory.build(request)
+      val msg = AvroRecordFactory.build(request).get
       msg.destination shouldBe "test-topic"
       msg.schema shouldBe avroSchema
       msg.json shouldBe json

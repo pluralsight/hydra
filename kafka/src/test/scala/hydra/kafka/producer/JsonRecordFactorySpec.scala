@@ -44,7 +44,7 @@ class JsonRecordFactorySpec extends Matchers with FunSpecLike {
       val request = HydraRequest("test-topic", """{"name":"test"}""")
         .withMetadata(HYDRA_RECORD_KEY_PARAM -> "{$.name}")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      val msg = JsonRecordFactory.build(request)
+      val msg = JsonRecordFactory.build(request).get
       msg.destination shouldBe "test-topic"
       msg.key shouldBe Some("test")
       msg.payload shouldBe """{"name":"test"}"""
