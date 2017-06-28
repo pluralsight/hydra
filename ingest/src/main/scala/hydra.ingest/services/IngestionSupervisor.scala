@@ -126,7 +126,7 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
   }
 
   private def stop(status: StatusCode): Unit = {
-    context.parent ! IngestionReport(request.correlationId, request.metadata, ingestors.toMap, status)
+    context.parent ! IngestionReport(request.correlationId, request.metadata, ingestors.toMap, status.intValue())
     context.stop(self)
   }
 

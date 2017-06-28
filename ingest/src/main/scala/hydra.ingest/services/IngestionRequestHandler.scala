@@ -73,7 +73,7 @@ class IngestionRequestHandler(request: HydraRequest, registry: ActorRef,
     }
 
   private def errorWith(statusCode: StatusCode) = {
-    IngestionReport(request.correlationId, request.metadata, Map.empty, statusCode)
+    IngestionReport(request.correlationId, request.metadata, Map.empty, statusCode.intValue())
   }
 }
 
