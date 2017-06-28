@@ -16,11 +16,12 @@
 
 package hydra.core.notification
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem}
+import hydra.core.ingest.HydraRequest
 
 /**
- * Created by alexsilva on 2/18/16.
- */
+  * Created by alexsilva on 2/18/16.
+  */
 trait HydraEvent[S] {
   def source: S
 }

@@ -25,7 +25,7 @@ trait HydraEntryPoint extends App with SLF4JLogging with ConfigSupport {
 
   def containerName: String = s"$applicationName-$moduleName"
 
-  def extensions = config.get[Config](s"$applicationName.$moduleName.extensions").valueOrElse(ConfigFactory.empty)
+  def extensions = config.get[Config](s"$applicationName.extensions").valueOrElse(ConfigFactory.empty)
 
   lazy val endpoints = config.get[List[String]](s"$applicationName.$moduleName.endpoints").valueOrElse(Seq.empty)
     .map(Class.forName(_).asInstanceOf[ENDPOINT])
