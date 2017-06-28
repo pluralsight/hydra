@@ -6,9 +6,9 @@ import configs.syntax._
 import hydra.core.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.core.avro.schema.{GenericSchemaResource, SchemaResource}
 import hydra.core.ingest.{HydraRequest, RequestParams}
-import hydra.core.notification.NotificationSupport
+import hydra.core.notification.{HydraEvent, NotificationSupport}
 import hydra.ingest.protocol.IngestionError
-import hydra.ingest.services.IngestionErrorHandler.HandleError
+import hydra.ingest.services.IngestionErrorHandler.InvalidRequestError
 import org.springframework.core.io.ByteArrayResource
 
 /**
@@ -23,7 +23,7 @@ class IngestionErrorHandler extends Actor with NotificationSupport {
     .valueOrElse(".Error")
 
   override def receive: Receive = {
-    case HandleError(ingestor, request, error) => {
+    case InvalidRequestError(ingestor, target, request, error) =>
       error match {
         case e: JsonToAvroConversionException => reportError(ingestor, request, e,
           Some(GenericSchemaResource(new ByteArrayResource(e.getSchema.toString(true).getBytes))))
@@ -31,7 +31,7 @@ class IngestionErrorHandler extends Actor with NotificationSupport {
         case e: Exception => reportError(ingestor, request, e, None)
 
       }
-    }
+
   }
 
   private def reportError(ingestor: ActorRef, request: HydraRequest, e: Throwable, schema: Option[SchemaResource]) = {
@@ -47,7 +47,8 @@ class IngestionErrorHandler extends Actor with NotificationSupport {
 
 object IngestionErrorHandler {
 
-  case class HandleError(ingestor: ActorRef, request: HydraRequest, error: Throwable)
+  case class InvalidRequestError(source: ActorRef, target:Option[String], request: HydraRequest,
+                                 error: Throwable) extends HydraEvent[ActorRef]
 
 }
 
