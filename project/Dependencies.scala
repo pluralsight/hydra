@@ -27,6 +27,7 @@ object Dependencies {
   val h2Version = "1.3.176"
   val postgresVersion = "9.4.1209"
   val commonsDbcpVersion = "1.4"
+  val hydraAvroVersion = "06ee3c179f"
 
   object Compile {
 
@@ -37,6 +38,8 @@ object Dependencies {
     val sprayJson = "io.spray" %% "spray-json" % sprayJsonVersion
 
     val scalaz = "org.scalaz" %% "scalaz-core" % scalazVersion
+
+    val hydraAvro = "com.github.pluralsight" % "hydra-avro-utils" % hydraAvroVersion
 
     val kafka = Seq(
       "org.apache.kafka" %% "kafka" % kafkaVersion,
@@ -106,7 +109,7 @@ object Dependencies {
 
   val baseDeps = akka ++ logging ++ Seq(scalaz, scalaConfigs, avro, spring, serviceContainer) ++ joda ++ testDeps
 
-  val coreDeps = baseDeps ++ Seq(guavacache, reflections) ++ confluent
+  val coreDeps = baseDeps ++ Seq(guavacache, reflections, hydraAvro) ++ confluent
 
   val jdbcDeps = baseDeps ++ slick
 

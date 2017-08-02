@@ -22,9 +22,9 @@ import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import ch.megard.akka.http.cors.CorsDirectives._
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
+import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
-import hydra.core.avro.registry.ConfluentSchemaRegistry
 import hydra.core.http.CorsSupport
 import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
 import io.confluent.kafka.schemaregistry.client.SchemaMetadata
@@ -56,16 +56,16 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
             }
           } ~ path(Segment) { subject =>
             parameters('schema ?) { schemaOnly =>
-              val meta = registry.getLatestSchemaMetadata(subject + "-value")
+              val meta = registryClient.getLatestSchemaMetadata(subject + "-value")
               schemaOnly.map(_ => complete(OK, meta.getSchema)).getOrElse(complete(OK, SchemasEndpointResponse(meta)))
             }
           } ~ path(Segment / "versions") { subject =>
-            val schemaMeta = registry.getLatestSchemaMetadata(subject + "-value")
+            val schemaMeta = registryClient.getLatestSchemaMetadata(subject + "-value")
             val v = schemaMeta.getVersion
-            val versions = (1 to v) map (vs => SchemasEndpointResponse(registry.getSchemaMetadata(subject + "-value", vs)))
+            val versions = (1 to v) map (vs => SchemasEndpointResponse(registryClient.getSchemaMetadata(subject + "-value", vs)))
             complete(OK, versions)
           } ~ path(Segment / "versions" / IntNumber) { (subject, version) =>
-            val meta = registry.getSchemaMetadata(subject + "-value", version)
+            val meta = registryClient.getSchemaMetadata(subject + "-value", version)
             complete(OK, SchemasEndpointResponse(meta.getId, meta.getVersion, meta.getSchema))
           }
         } ~
@@ -75,7 +75,7 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
                 val schema = new Parser().parse(json)
                 val name = schema.getNamespace() + "." + schema.getName()
                 log.debug(s"Registering schema $name: $json")
-                val id = registry.register(name + "-value", schema)
+                val id = registryClient.register(name + "-value", schema)
                 respondWithHeader(Location(request.uri.copy(path = request.uri.path / name))) {
                   complete(Created, SchemasEndpointResponse(id, 1, json))
                 }

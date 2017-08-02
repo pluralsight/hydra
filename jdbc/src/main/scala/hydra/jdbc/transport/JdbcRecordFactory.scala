@@ -1,11 +1,12 @@
 package hydra.jdbc.transport
 
 import com.pluralsight.hydra.avro.JsonConverter
+import hydra.avro.registry.ConfluentSchemaRegistry
+import hydra.common.config.ConfigSupport
 import hydra.core.avro.AvroValidation
-import hydra.core.avro.registry.ConfluentSchemaRegistry
 import hydra.core.avro.schema.SchemaResourceLoader
-import hydra.core.ingest.RequestParams.HYDRA_SCHEMA_PARAM
 import hydra.core.ingest.HydraRequest
+import hydra.core.ingest.RequestParams.HYDRA_SCHEMA_PARAM
 import hydra.core.transport.RecordFactory
 import org.apache.avro.generic.GenericRecord
 
@@ -15,9 +16,11 @@ import scala.util.Try
   * Created by alexsilva on 5/19/17.
   */
 object JdbcRecordFactory extends RecordFactory[String, GenericRecord] with ConfluentSchemaRegistry
-  with AvroValidation {
+  with AvroValidation with ConfigSupport {
 
-  lazy val schemaResourceLoader = new SchemaResourceLoader(registryUrl, registry)
+  override val config = applicationConfig
+
+  lazy val schemaResourceLoader = new SchemaResourceLoader(registryUrl, registryClient)
 
   private val ex = new IllegalArgumentException(s"No schema ${HYDRA_SCHEMA_PARAM} defined in the request.")
 

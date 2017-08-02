@@ -15,7 +15,8 @@
 
 package hydra.ingest.protocol
 
-import hydra.core.avro.registry.{ConfluentSchemaRegistry, RegistrySchemaResource}
+import hydra.avro.registry.{ConfluentSchemaRegistry, RegistrySchemaResource}
+import hydra.common.config.ConfigSupport
 import hydra.core.notification.HydraEvent
 import org.apache.avro.Schema
 import spray.json.{DefaultJsonProtocol, JsNumber, JsObject, JsString, JsValue, JsonFormat}
@@ -30,7 +31,7 @@ case class IngestionError(source: String, timestamp: Long,
                           destinationTopic: String, payload: String, schema: Option[String], errorType: String,
                           errorMessage: String) extends HydraEvent[String]
 
-object IngestionError extends DefaultJsonProtocol with ConfluentSchemaRegistry {
+object IngestionError extends DefaultJsonProtocol with ConfluentSchemaRegistry with ConfigSupport {
 
   implicit val ingestionErrorFormat = jsonFormat7(IngestionError.apply)
 
@@ -45,7 +46,7 @@ object IngestionError extends DefaultJsonProtocol with ConfluentSchemaRegistry {
           val registryUrl = jregistry.convertTo[String]
           val locationStr = location.convertTo[String]
           val schema = locationToId(locationStr)
-            .map(id => registry.getByID(id))
+            .map(id => registryClient.getByID(id))
             .getOrElse(Schema.create(Schema.Type.RECORD))
           RegistrySchemaResource(registryUrl, subject.convertTo[String], id.convertTo[Int],
             version.convertTo[Int], schema)
@@ -56,7 +57,7 @@ object IngestionError extends DefaultJsonProtocol with ConfluentSchemaRegistry {
     override def write(obj: RegistrySchemaResource): JsValue = {
       JsObject(
         Map(
-          "registry" -> JsString(obj.registry),
+          "registry" -> JsString(obj.registryUrl),
           "subject" -> JsString(obj.subject),
           "id" -> JsNumber(obj.id),
           "version" -> JsNumber(obj.id),
