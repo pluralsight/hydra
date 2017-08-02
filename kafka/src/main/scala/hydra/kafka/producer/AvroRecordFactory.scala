@@ -15,9 +15,9 @@
 
 package hydra.kafka.producer
 
+import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.core.avro.AvroValidation
-import hydra.core.avro.registry.ConfluentSchemaRegistry
 import hydra.core.avro.schema.{SchemaResource, SchemaResourceLoader}
 import hydra.core.ingest.{HydraRequest, RequestParams}
 import org.apache.avro.generic.GenericRecord
@@ -30,7 +30,9 @@ import scala.util.Try
 object AvroRecordFactory extends KafkaRecordFactory[String, GenericRecord] with ConfigSupport
   with ConfluentSchemaRegistry with AvroValidation {
 
-  lazy val schemaResourceLoader = new SchemaResourceLoader(registryUrl, registry)
+  override val config = applicationConfig
+
+  lazy val schemaResourceLoader = new SchemaResourceLoader(registryUrl, registryClient)
 
   override def build(request: HydraRequest): Try[AvroRecord] = {
     val schemaResource: Try[SchemaResource] = Try(schemaResourceLoader.getResource(getSubject(request)))

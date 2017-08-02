@@ -117,7 +117,7 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
 
   private def finishIfReady(): Unit = {
     if (ingestors.isEmpty) {
-      stop(StatusCodes.custom(400, s"No ingestors joined this request."))
+      stop(StatusCodes.custom(404, s"No ingestors joined this request."))
     }
     else if (ingestors.values.filterNot(_.completed).isEmpty) {
       val status = ingestors.filter(_._2 != IngestorCompleted).values.headOption
