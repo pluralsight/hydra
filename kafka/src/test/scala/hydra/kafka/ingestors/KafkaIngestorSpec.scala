@@ -15,10 +15,10 @@ import org.scalatest.{FunSpecLike, Matchers}
   * Created by alexsilva on 11/18/16.
   */
 class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers with FunSpecLike
-  with ImplicitSender with ConfigSupport with ConfluentSchemaRegistry {
+  with ImplicitSender with ConfigSupport  {
 
-  override val config = applicationConfig
-
+  val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
+  val registryClient = schemaRegistry.registryClient
   val kafkaProducer = TestProbe("kafka_producer_actor")
 
   val transport = kafkaProducer.childActorOf(Props[KafkaIngestor])

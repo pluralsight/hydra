@@ -27,7 +27,7 @@ object Dependencies {
   val h2Version = "1.3.176"
   val postgresVersion = "9.4.1209"
   val commonsDbcpVersion = "1.4"
-  val hydraAvroVersion = "06ee3c179f"
+  val hydraAvroVersion = "1260aa2427"
 
   object Compile {
 

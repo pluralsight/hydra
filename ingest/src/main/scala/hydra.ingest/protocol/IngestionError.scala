@@ -31,7 +31,9 @@ case class IngestionError(source: String, timestamp: Long,
                           destinationTopic: String, payload: String, schema: Option[String], errorType: String,
                           errorMessage: String) extends HydraEvent[String]
 
-object IngestionError extends DefaultJsonProtocol with ConfluentSchemaRegistry with ConfigSupport {
+object IngestionError extends DefaultJsonProtocol with ConfigSupport {
+
+  private val registry = ConfluentSchemaRegistry.forConfig(applicationConfig)
 
   implicit val ingestionErrorFormat = jsonFormat7(IngestionError.apply)
 
@@ -46,7 +48,7 @@ object IngestionError extends DefaultJsonProtocol with ConfluentSchemaRegistry w
           val registryUrl = jregistry.convertTo[String]
           val locationStr = location.convertTo[String]
           val schema = locationToId(locationStr)
-            .map(id => registryClient.getByID(id))
+            .map(id => registry.registryClient.getByID(id))
             .getOrElse(Schema.create(Schema.Type.RECORD))
           RegistrySchemaResource(registryUrl, subject.convertTo[String], id.convertTo[Int],
             version.convertTo[Int], schema)
