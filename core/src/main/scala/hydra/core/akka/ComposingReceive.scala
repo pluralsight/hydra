@@ -12,13 +12,14 @@ import akka.actor.Actor
 trait ComposingReceive {
   this: Actor =>
 
-  var receivers: Receive = Actor.emptyBehavior
+  var composedReceive: Receive = Actor.emptyBehavior
 
   def baseReceive: Receive
 
   def compose(next: Actor.Receive) = {
-    receivers = next orElse baseReceive
+    composedReceive = next orElse baseReceive
   }
 
-  override def receive: Receive = receivers
+  override def receive: Receive = composedReceive
+
 }

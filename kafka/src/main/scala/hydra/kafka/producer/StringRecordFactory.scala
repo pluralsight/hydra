@@ -18,6 +18,8 @@ package hydra.kafka.producer
 import hydra.core.ingest.HydraRequest
 import hydra.core.protocol.{MessageValidationResult, ValidRequest}
 
+import scala.util.Success
+
 /**
   * Created by alexsilva on 9/27/16.
   */
@@ -25,7 +27,7 @@ import hydra.core.protocol.{MessageValidationResult, ValidRequest}
 object StringRecordFactory extends KafkaRecordFactory[String, String] {
 
   override def build(request: HydraRequest) =
-    StringRecord(getTopic(request), getKey(request), request.payload, request.retryStrategy)
+    Success(StringRecord(getTopic(request), getKey(request), request.payload, request.retryStrategy))
 
   override def validate(request: HydraRequest): MessageValidationResult = ValidRequest
 }

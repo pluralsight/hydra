@@ -17,12 +17,17 @@ object Dependencies {
   val sprayJsonVersion = "1.3.c2"
   val kafkaVersion = "0.10.2.0"
   val reflectionsVersion = "0.9.10"
-  val akkaHTTPVersion = "10.0.3"
+  val akkaHTTPVersion = "10.0.5"
   val akkaKafkaStreamVersion = "0.14"
   val scalazVersion = "7.2.9"
   val scalaMockVersion = "3.5.0"
   val serviceContainerVersion = "2.0.5"
   val scalaCacheVersion = "0.9.3"
+  val slickVersion = "3.2.0"
+  val h2Version = "1.3.176"
+  val postgresVersion = "9.4.1209"
+  val commonsDbcpVersion = "1.4"
+  val hydraAvroVersion = "1260aa2427"
 
   object Compile {
 
@@ -33,6 +38,8 @@ object Dependencies {
     val sprayJson = "io.spray" %% "spray-json" % sprayJsonVersion
 
     val scalaz = "org.scalaz" %% "scalaz-core" % scalazVersion
+
+    val hydraAvro = "com.github.pluralsight" % "hydra-avro-utils" % hydraAvroVersion
 
     val kafka = Seq(
       "org.apache.kafka" %% "kafka" % kafkaVersion,
@@ -75,6 +82,13 @@ object Dependencies {
         ExclusionRule(organization = "ch.qos.logback"),
         ExclusionRule(organization = "org.slf4j")
       )
+
+    val slick = Seq(
+      "com.typesafe.slick" %% "slick" % slickVersion,
+      "com.h2database" % "h2" % h2Version,
+      "org.postgresql" % "postgresql" % postgresVersion,
+      "commons-dbcp" % "commons-dbcp" % commonsDbcpVersion
+    )
   }
 
   object Test {
@@ -95,7 +109,9 @@ object Dependencies {
 
   val baseDeps = akka ++ logging ++ Seq(scalaz, scalaConfigs, avro, spring, serviceContainer) ++ joda ++ testDeps
 
-  val coreDeps = baseDeps ++ Seq(guavacache, reflections) ++ confluent
+  val coreDeps = baseDeps ++ Seq(guavacache, reflections, hydraAvro) ++ confluent
+
+  val jdbcDeps = baseDeps ++ slick
 
   val kafkaDeps = coreDeps ++ Seq(akkaKafkaStream, jsonLenses) ++ kafka
 
