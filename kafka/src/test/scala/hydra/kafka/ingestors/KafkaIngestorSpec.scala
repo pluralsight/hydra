@@ -23,6 +23,8 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
 
   val transport = kafkaProducer.childActorOf(Props[KafkaIngestor])
 
+  val KAFKA = "kafka_ingestor"
+
   val schema =
     """{
       |     "type": "record",
