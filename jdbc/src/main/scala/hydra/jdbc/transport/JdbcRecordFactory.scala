@@ -15,12 +15,11 @@ import scala.util.Try
 /**
   * Created by alexsilva on 5/19/17.
   */
-object JdbcRecordFactory extends RecordFactory[String, GenericRecord] with ConfluentSchemaRegistry
-  with AvroValidation with ConfigSupport {
+object JdbcRecordFactory extends RecordFactory[String, GenericRecord] with AvroValidation with ConfigSupport {
 
-  override val config = applicationConfig
+  val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
 
-  lazy val schemaResourceLoader = new SchemaResourceLoader(registryUrl, registryClient)
+  lazy val schemaResourceLoader = new SchemaResourceLoader(schemaRegistry.registryUrl, schemaRegistry.registryClient)
 
   private val ex = new IllegalArgumentException(s"No schema ${HYDRA_SCHEMA_PARAM} defined in the request.")
 

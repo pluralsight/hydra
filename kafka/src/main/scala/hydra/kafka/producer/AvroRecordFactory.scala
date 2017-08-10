@@ -27,12 +27,11 @@ import scala.util.Try
 /**
   * Created by alexsilva on 1/11/17.
   */
-object AvroRecordFactory extends KafkaRecordFactory[String, GenericRecord] with ConfigSupport
-  with ConfluentSchemaRegistry with AvroValidation {
+object AvroRecordFactory extends KafkaRecordFactory[String, GenericRecord] with ConfigSupport with AvroValidation {
 
-  override val config = applicationConfig
+  val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
 
-  lazy val schemaResourceLoader = new SchemaResourceLoader(registryUrl, registryClient)
+  lazy val schemaResourceLoader = new SchemaResourceLoader(schemaRegistry.registryUrl, schemaRegistry.registryClient)
 
   override def build(request: HydraRequest): Try[AvroRecord] = {
     val schemaResource: Try[SchemaResource] = Try(schemaResourceLoader.getResource(getSubject(request)))
