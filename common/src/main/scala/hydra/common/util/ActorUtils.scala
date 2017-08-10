@@ -1,6 +1,7 @@
 package hydra.common.util
 
 import akka.actor.{Actor, ActorRef}
+import hydra.common.logging.LoggingAdapter
 
 import scala.reflect.ClassTag
 
@@ -9,7 +10,7 @@ import scala.reflect.ClassTag
   *
   * Created by alexsilva on 2/17/17.
   */
-object ActorUtils {
+object ActorUtils extends LoggingAdapter {
   /**
     * @see StringUtils.camel2underscores
     * @return The "standard" default name for actors used in Hydra, which is created by converting the

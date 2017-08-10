@@ -101,7 +101,7 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
     val prods = Future {
       producersConfig.map {
         case (format, config) =>
-          format -> context.actorOf(KafkaProducerProxy.props(self, config))
+          format -> context.actorOf(KafkaProducerProxy.props(self, config), format)
       }
     }
 

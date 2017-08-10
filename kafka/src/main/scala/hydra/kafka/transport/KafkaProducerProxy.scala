@@ -55,7 +55,7 @@ class KafkaProducerProxy(parent: ActorRef, producerConfig: Config) extends Actor
     case kmd: KafkaRecordMetadata =>
       parent ! RecordProduced(kmd)
 
-    case err: RecordNotProduced[Any, Any] =>
+    case err: RecordNotProduced[_,_] =>
       parent ! err
       throw err.error
   }

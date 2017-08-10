@@ -15,52 +15,28 @@
 
 package hydra.kafka.producer
 
-import com.pluralsight.hydra.avro.{JsonConverter, JsonToAvroConversionException}
+import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
-import hydra.core.avro.JsonToAvroConversionExceptionWithMetadata
-import hydra.core.avro.registry.ConfluentSchemaRegistry
+import hydra.core.avro.AvroValidation
 import hydra.core.avro.schema.{SchemaResource, SchemaResourceLoader}
 import hydra.core.ingest.{HydraRequest, RequestParams}
-import hydra.core.transport.ValidationStrategy.Strict
-import hydra.core.protocol.{InvalidRequest, MessageValidationResult, ValidRequest}
 import org.apache.avro.generic.GenericRecord
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 /**
   * Created by alexsilva on 1/11/17.
   */
-object AvroRecordFactory extends KafkaRecordFactory[String, GenericRecord] with ConfigSupport
-  with ConfluentSchemaRegistry {
+object AvroRecordFactory extends KafkaRecordFactory[String, GenericRecord] with ConfigSupport with AvroValidation {
 
-  lazy val schemaResourceLoader = new SchemaResourceLoader(registryUrl, registry)
+  val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
 
-  override def build(request: HydraRequest): AvroRecord = {
+  lazy val schemaResourceLoader = new SchemaResourceLoader(schemaRegistry.registryUrl, schemaRegistry.registryClient)
+
+  override def build(request: HydraRequest): Try[AvroRecord] = {
     val schemaResource: Try[SchemaResource] = Try(schemaResourceLoader.getResource(getSubject(request)))
-    AvroRecord(getTopic(request), schemaResource.get.schema, getKey(request), request.payload, request.retryStrategy)
-  }
-
-  override def validate(request: HydraRequest): MessageValidationResult = {
-
-    val schemaResource: Try[SchemaResource] = Try(schemaResourceLoader.getResource(getSubject(request)))
-
-    val record = schemaResource.map { s =>
-      val strict = request.validationStrategy == Strict
-      val converter = new JsonConverter[GenericRecord](s.schema, strict)
-      converter.convert(request.payload)
-    }
-
-    record match {
-      case Success(c) => ValidRequest
-      case Failure(ex) => InvalidRequest(schemaResource.map(r => improveException(ex, r)).getOrElse(ex))
-    }
-  }
-
-  private def improveException(ex: Throwable, schemaResource: SchemaResource) = {
-    ex match {
-      case e: JsonToAvroConversionException => JsonToAvroConversionExceptionWithMetadata(e, schemaResource)
-      case e: Exception => e
-    }
+    Try(AvroRecord(getTopic(request), schemaResource.get.schema, getKey(request),
+      request.payload, request.retryStrategy))
   }
 
   def getSubject(request: HydraRequest): String = {

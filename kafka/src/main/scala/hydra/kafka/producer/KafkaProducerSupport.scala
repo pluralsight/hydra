@@ -16,49 +16,15 @@
 
 package hydra.kafka.producer
 
-import akka.actor.Actor
-import akka.util.Timeout
-import configs.syntax._
-import hydra.common.config.ConfigSupport
-import hydra.core.ingest.HydraRequest
-import hydra.core.protocol._
-import hydra.core.transport.AckStrategy
-import hydra.core.transport.AckStrategy.Explicit
-
-import scala.concurrent.Await
-import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
+import hydra.core.ingest.{Ingestor, TransportOps}
 
 /**
   * Mix this trait in to get a KafkaProducerActor automatically looked up.
   *
   * Created by alexsilva on 12/29/15.
   */
-trait KafkaProducerSupport extends ConfigSupport {
-  this: Actor =>
+trait KafkaProducerSupport extends TransportOps {
+  this: Ingestor =>
 
-  private val resolveTimeout = applicationConfig.get[FiniteDuration]("transports.kafka.resolve-timeout")
-    .valueOrElse(5 seconds)
-
-  val path = applicationConfig.get[String]("transports.kafka.path")
-    .valueOrElse("/user/service/kafka_transport")
-
-  val kafkaProducer = Await.result(context.actorSelection(path).resolveOne()(Timeout(resolveTimeout)), resolveTimeout)
-
-  def produce(request: HydraRequest): IngestorStatus = {
-    Try(KafkaRecordFactories.build(request)) match {
-      case Success(record) =>
-        request.ackStrategy match {
-          case AckStrategy.None =>
-            kafkaProducer ! Produce(record)
-            IngestorCompleted
-
-          case Explicit =>
-            kafkaProducer ! ProduceWithAck(record, self, sender)
-            WaitingForAck
-        }
-      case Failure(ex) =>
-        InvalidRequest(ex)
-    }
-  }
+  override def transportName:String = "kafka"
 }

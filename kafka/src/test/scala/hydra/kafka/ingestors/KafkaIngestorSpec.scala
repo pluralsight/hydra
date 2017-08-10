@@ -2,8 +2,8 @@ package hydra.kafka.ingestors
 
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
+import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
-import hydra.core.avro.registry.ConfluentSchemaRegistry
 import hydra.core.ingest.RequestParams._
 import hydra.core.ingest.{HydraRequest, HydraRequestMetadata}
 import hydra.core.protocol._
@@ -15,11 +15,15 @@ import org.scalatest.{FunSpecLike, Matchers}
   * Created by alexsilva on 11/18/16.
   */
 class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers with FunSpecLike
-  with ImplicitSender with ConfigSupport with ConfluentSchemaRegistry {
+  with ImplicitSender with ConfigSupport  {
 
+  val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
+  val registryClient = schemaRegistry.registryClient
   val kafkaProducer = TestProbe("kafka_producer_actor")
 
   val transport = kafkaProducer.childActorOf(Props[KafkaIngestor])
+
+  val KAFKA = "kafka_ingestor"
 
   val schema =
     """{
@@ -34,7 +38,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
 
   val json = """{"first":"hydra","last":"hydra"}"""
 
-  registry.register("test-schema-value", new Parser().parse(schema))
+  registryClient.register("test-schema-value", new Parser().parse(schema))
 
   describe("when using the KafkaIngestor") {
     it("joins") {
