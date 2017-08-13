@@ -15,7 +15,7 @@ import scala.concurrent.Future
   */
 class HttpRequestFactory extends RequestFactory[String, HttpRequest] with CodingDirectives {
 
-  override def createRequest(correlationId: String, request: HttpRequest)
+  override def createRequest(correlationId: Long, request: HttpRequest)
                             (implicit mat: Materializer): Future[HydraRequest] = {
     implicit val ec = mat.executionContext
 

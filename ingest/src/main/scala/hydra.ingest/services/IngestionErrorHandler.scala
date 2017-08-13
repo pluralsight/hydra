@@ -38,7 +38,7 @@ class IngestionErrorHandler extends Actor with NotificationSupport {
     val errorTopic = request.correlationId + errorTopicSufix
     val errorMsg = IngestionError(ingestor.path.toString, System.currentTimeMillis(), errorTopic, request.payload,
       schema.map(_.location), e.getClass.getSimpleName, e.getMessage)
-    val errorRequest = HydraRequest(errorTopic, request.payload)
+    val errorRequest = HydraRequest(1, request.payload)
       .withMetadata(RequestParams.HYDRA_SCHEMA_PARAM -> errorAvroSchema)
       .withMetadata(RequestParams.HYDRA_KAFKA_TOPIC_PARAM -> errorTopic)
     observers ! errorMsg
@@ -47,7 +47,7 @@ class IngestionErrorHandler extends Actor with NotificationSupport {
 
 object IngestionErrorHandler {
 
-  case class InvalidRequestError(source: ActorRef, target:Option[String], request: HydraRequest,
+  case class InvalidRequestError(source: ActorRef, target: Option[String], request: HydraRequest,
                                  error: Throwable) extends HydraEvent[ActorRef]
 
 }
