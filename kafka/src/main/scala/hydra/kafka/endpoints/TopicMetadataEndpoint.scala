@@ -4,7 +4,7 @@ import akka.actor.{ActorRefFactory, ActorSystem}
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.ExceptionHandler
-import ch.megard.akka.http.cors.CorsDirectives._
+import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter

@@ -130,7 +130,6 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
     val request = HydraRequest(123, "invalid",
       List(
         HydraRequestMetadata(HYDRA_INGESTOR_PARAM, KAFKA),
-        HydraRequestMetadata(HYDRA_CORRELATION_ID, "test-schema"),
         HydraRequestMetadata(HYDRA_KAFKA_TOPIC_PARAM, "topic")
       )
     )
