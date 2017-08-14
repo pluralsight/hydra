@@ -40,11 +40,6 @@ object RequestParams {
   val HYDRA_KAFKA_TOPIC_PARAM = "hydra-kafka-topic"
 
   /**
-    * A request identifier.  If not provided, a random number will be generated.
-    */
-  val HYDRA_CORRELATION_ID = "hydra-correlation-id"
-
-  /**
     * The JSON Path for a field in the body that specifies the message key.
     *
     */

@@ -3,6 +3,7 @@ package hydra.core.app
 import akka.actor.Props
 import akka.event.slf4j.SLF4JLogging
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
+import com.github.vonnagy.service.container.listener.ContainerLifecycleListener
 import com.github.vonnagy.service.container.service.ContainerService
 import com.github.vonnagy.service.container.{ContainerBuilder, MissingConfigException}
 import com.typesafe.config.{Config, ConfigFactory}
@@ -27,6 +28,8 @@ trait HydraEntryPoint extends App with SLF4JLogging with ConfigSupport {
 
   def extensions = config.get[Config](s"$applicationName.extensions").valueOrElse(ConfigFactory.empty)
 
+  def listeners: Seq[ContainerLifecycleListener] = Seq.empty
+
   lazy val endpoints = config.get[List[String]](s"$applicationName.$moduleName.endpoints").valueOrElse(Seq.empty)
     .map(Class.forName(_).asInstanceOf[ENDPOINT])
 
@@ -35,7 +38,7 @@ trait HydraEntryPoint extends App with SLF4JLogging with ConfigSupport {
       .withConfig(config)
       .withRoutes(endpoints: _*)
       .withActors(services: _*)
-      .withListeners(new HydraExtensionListener(moduleName, extensions))
+      .withListeners(Seq(new HydraExtensionListener(moduleName, extensions)) ++ listeners: _*)
       .withName(containerName)
 
     builder.build
