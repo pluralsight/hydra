@@ -108,7 +108,7 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
     it("throws an error if no topic is in the request") {
       val request = HydraRequest(123,"""{"name":test"}""")
       intercept[InvalidRequestException] {
-        AvroRecordFactory.build(request)
+        AvroRecordFactory.build(request).get
       }
     }
 

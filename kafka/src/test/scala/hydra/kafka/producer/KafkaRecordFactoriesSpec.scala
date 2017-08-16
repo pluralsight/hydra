@@ -36,7 +36,7 @@ class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = KafkaRecordFactories.build(request)
-      record shouldBe an[AvroRecord]
+      record.get shouldBe an[AvroRecord]
     }
 
     it("handles json") {
@@ -46,7 +46,7 @@ class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "json")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = KafkaRecordFactories.build(request)
-      record shouldBe an[JsonRecord]
+      record.get shouldBe an[JsonRecord]
     }
 
     it("handles strings") {
@@ -56,7 +56,7 @@ class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "string")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = KafkaRecordFactories.build(request)
-      record shouldBe an[StringRecord]
+      record.get shouldBe an[StringRecord]
     }
 
     it("validates json records") {
@@ -102,7 +102,7 @@ class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "unknown")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       intercept[IllegalArgumentException] {
-        KafkaRecordFactories.build(request)
+        KafkaRecordFactories.build(request).get
       }
     }
   }

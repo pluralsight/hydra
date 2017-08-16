@@ -2,7 +2,7 @@ package hydra.ingest.ws
 
 
 import akka.actor.ActorRef
-import hydra.ingest.protocol.IngestionReport
+import hydra.core.ingest.IngestionReport
 
 /**
   * Created by alexsilva on 3/10/17.

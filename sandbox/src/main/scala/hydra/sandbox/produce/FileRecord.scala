@@ -9,5 +9,5 @@ case class FileRecord(destination: String, payload: String) extends HydraRecord[
 
   override val key: Option[String] = None
 
-  override val retryStrategy: RetryStrategy = RetryStrategy.Fail
+  override val retryStrategy: RetryStrategy = RetryStrategy.Ignore
 }

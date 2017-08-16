@@ -33,7 +33,7 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
         req.correlationId shouldBe "label"
         req.metadataValue("hydra") shouldBe Some("awesome")
         req.validationStrategy shouldBe ValidationStrategy.Relaxed
-        req.retryStrategy shouldBe RetryStrategy.Retry
+        req.retryStrategy shouldBe RetryStrategy.Persist
       }
     }
   }

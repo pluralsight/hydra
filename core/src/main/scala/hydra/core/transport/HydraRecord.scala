@@ -24,4 +24,6 @@ trait HydraRecord[+K, +P] {
     * @return
     */
   def retryStrategy: RetryStrategy
+
+  //def correlationId: Long
 }

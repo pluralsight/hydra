@@ -16,6 +16,7 @@
 package hydra.core.extensions
 
 import akka.actor.{ActorRef, ActorSystem, Props, TypedActor, TypedProps}
+import akka.pattern.{Backoff, BackoffSupervisor}
 import com.typesafe.config.{Config, ConfigObject}
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
@@ -71,7 +72,8 @@ abstract class HydraExtensionBase(extensionName: String, extConfig: Config)(impl
 
     if (classOf[HydraExtension].isAssignableFrom(c)) {
       log.debug(s"Instantiating Hydra extension $extensionName::$moduleId.")
-      val ref = system.actorOf(Props(c, moduleId, cfg), s"${extensionName}_${moduleId}")
+      val props = backOff(Props(c, moduleId, cfg), s"${extensionName}_${moduleId}")
+      val ref = system.actorOf(props, s"${extensionName}_${moduleId}_supervisor")
       system.scheduler.schedule(initialDelay, interval, ref, Run)
       Left(ref)
     }
@@ -85,6 +87,17 @@ abstract class HydraExtensionBase(extensionName: String, extConfig: Config)(impl
 
       Right(startTypedModule(system, md, interval, initialDelay))
     }
+  }
+
+  private def backOff(moduleProps: Props, moduleName: String): Props = {
+    import scala.concurrent.duration._
+    BackoffSupervisor.props(
+      Backoff.onStop(
+        moduleProps,
+        childName = moduleName,
+        minBackoff = 1.seconds,
+        maxBackoff = 30.seconds,
+        randomFactor = 0.2))
   }
 
   private def getDispatcher(moduleId: String) = {

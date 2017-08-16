@@ -44,7 +44,7 @@ object Dependencies {
     val kafka = Seq(
       "org.apache.kafka" %% "kafka" % kafkaVersion,
       "org.apache.kafka" % "kafka-clients" % kafkaVersion,
-      "net.manub" %% "scalatest-embedded-kafka" % "0.12.0" % "test")
+      "net.manub" %% "scalatest-embedded-kafka" % "0.15.0" % "test")
 
     val confluent = Seq("io.confluent" % "kafka-schema-registry-client" % confluentVersion,
       "io.confluent" % "kafka-avro-serializer" % confluentVersion).map(_.excludeAll(
