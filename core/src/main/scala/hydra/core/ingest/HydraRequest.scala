@@ -12,7 +12,7 @@ case class HydraRequest(correlationId: Long = Random.nextInt(),
                         payload: String,
                         metadata: Seq[HydraRequestMetadata] = Seq.empty,
                         params: Map[String, Any] = Map.empty,
-                        retryStrategy: RetryStrategy = RetryStrategy.Fail,
+                        retryStrategy: RetryStrategy = RetryStrategy.Ignore,
                         validationStrategy: ValidationStrategy = Strict,
                         ackStrategy: AckStrategy = AckStrategy.None) {
 

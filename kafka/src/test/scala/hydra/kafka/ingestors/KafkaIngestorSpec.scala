@@ -134,7 +134,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
       )
     )
     transport ! Ingest(request)
-    expectMsgType[IngestorError]
+    expectMsgType[InvalidRequest]
   }
 
 }

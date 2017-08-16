@@ -9,10 +9,9 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.util.Timeout
 import com.github.vonnagy.service.container.service.ServicesManager
 import hydra.common.logging.LoggingAdapter
-import hydra.core.ingest.{HydraRequest, HydraRequestMetadata}
+import hydra.core.ingest.{HydraRequest, HydraRequestMetadata, IngestionReport}
 import hydra.core.protocol.HydraError
 import hydra.core.transport.{AckStrategy, RetryStrategy, ValidationStrategy}
-import hydra.ingest.protocol.IngestionReport
 import hydra.ingest.services.IngestionSupervisor
 import hydra.ingest.ws.IngestionSocketActor._
 
@@ -97,7 +96,7 @@ case class SocketSession(metadata: Map[String, String] = Map.empty) {
   def buildRequest(correlationId: Option[Long], payload: String) = {
     import hydra.core.ingest.RequestParams._
     val rs = metadata.find(_._1.equalsIgnoreCase(HYDRA_RETRY_STRATEGY))
-      .map(h => RetryStrategy(h._2)).getOrElse(RetryStrategy.Fail)
+      .map(h => RetryStrategy(h._2)).getOrElse(RetryStrategy.Ignore)
 
     val vs = metadata.find(_._1.equalsIgnoreCase(HYDRA_VALIDATION_STRATEGY))
       .map(h => ValidationStrategy(h._2)).getOrElse(ValidationStrategy.Strict)

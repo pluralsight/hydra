@@ -16,11 +16,10 @@
 
 package hydra.ingest.marshallers
 
-import hydra.core.ingest.RequestParams
+import hydra.core.ingest.{IngestionReport, RequestParams}
 import hydra.core.marshallers.HydraJsonSupport
 import hydra.core.protocol.IngestorStatus
 import hydra.ingest.ingestors.IngestorInfo
-import hydra.ingest.protocol.IngestionReport
 
 
 /**

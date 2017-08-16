@@ -1,6 +1,5 @@
-package hydra.ingest.protocol
+package hydra.core.ingest
 
-import hydra.core.ingest.HydraRequestMetadata
 import hydra.core.protocol.{HydraMessage, IngestorStatus}
 
 /**

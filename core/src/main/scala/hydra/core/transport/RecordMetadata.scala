@@ -5,6 +5,8 @@ package hydra.core.transport
   */
 trait RecordMetadata {
 
-  //not sure what to put here yet.
+  def deliveryId: Long
+
+  def retryStrategy: RetryStrategy
 
 }

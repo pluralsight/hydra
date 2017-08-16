@@ -77,12 +77,6 @@ object RequestParams {
   val RELAXED = "relaxed"
 
   /**
-    * If present and set to true, a single request with a JSON array payload
-    * will be split into multiple HydraRequests each corresponding to an element of the array.
-    */
-  val SPLIT_JSON_ARRAY = "split-json-array"
-
-  /**
     * If present, specifies the Akka actor address to send ingestion results to.
     */
   val REPLY_TO = "reply-to"
