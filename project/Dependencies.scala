@@ -62,7 +62,9 @@ object Dependencies {
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
       "com.github.romix.akka" %% "akka-kryo-serialization" % "0.5.1",
       "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
-      "ch.megard" %% "akka-http-cors" % "0.2.1")
+      "ch.megard" %% "akka-http-cors" % "0.2.1",
+      "org.iq80.leveldb" % "leveldb" % "0.7",
+      "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8")
 
     val akkaKafkaStream = "com.typesafe.akka" %% "akka-stream-kafka" % akkaKafkaStreamVersion
 
