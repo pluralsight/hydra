@@ -15,16 +15,19 @@
 
 package hydra.core.extensions
 
-import akka.actor.{ActorSystem, TypedActor, TypedProps}
+import akka.actor.{ActorRef, ActorSystem, Props, TypedActor, TypedProps}
+import akka.pattern.{Backoff, BackoffSupervisor}
 import com.typesafe.config.{Config, ConfigObject}
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.common.reflect.ReflectionUtils
+import hydra.core.extensions.HydraExtension.Run
 
 import scala.collection.JavaConverters._
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
-import scala.util.Try
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 /**
   * Created by alexsilva on 2/15/17.
@@ -33,7 +36,7 @@ import scala.util.control.NonFatal
 abstract class HydraExtensionBase(extensionName: String, extConfig: Config)(implicit system: ActorSystem)
   extends LoggingAdapter {
 
-  type HM = HydraModule
+  type HM = BaseHydraExtension
 
   extConfig.root.entrySet().asScala.foreach { entry =>
     val moduleId = entry.getKey
@@ -54,27 +57,47 @@ abstract class HydraExtensionBase(extensionName: String, extConfig: Config)(impl
 
   private def startModule(moduleId: String, cfg: Config) = {
     val clazz = cfg.getString("class")
-    val c = java.lang.Class.forName(clazz).asInstanceOf[Class[HydraModule]]
-    val module = TypedActor(system).typedActorOf(
-      TypedProps[HM](
-        classOf[HM],
-        ReflectionUtils.instantiateClassByName[HM](clazz, List(cfg))
-      ), s"${extensionName}_${moduleId}"
-    )
+    val c = java.lang.Class.forName(clazz).asInstanceOf[Class[HM]]
+    log.debug(s"Starting module $extensionName::$moduleId.")
+    val module = instantiate(c, moduleId, cfg)
+    log.debug(s"Started module $extensionName::$moduleId.")
+    HydraExtensionRegistry(system).register(moduleId, module)
+  }
+
+  private def instantiate(c: Class[_ <: HM], moduleId: String, cfg: Config): Either[ActorRef, HydraTypedExtension] = {
+    implicit val ec = getDispatcher(moduleId)
 
     val interval = cfg.get[FiniteDuration]("interval").value
     val initialDelay = cfg.get[FiniteDuration]("initialDelay").value
-    register(moduleId, module, interval, initialDelay)
+
+    if (classOf[HydraExtension].isAssignableFrom(c)) {
+      log.debug(s"Instantiating Hydra extension $extensionName::$moduleId.")
+      val props = backOff(Props(c, moduleId, cfg), s"${extensionName}_${moduleId}")
+      val ref = system.actorOf(props, s"${extensionName}_${moduleId}_supervisor")
+      system.scheduler.schedule(initialDelay, interval, ref, Run)
+      Left(ref)
+    }
+    else {
+      log.debug(s"Instantiating Hydra typed extension $extensionName::$moduleId.")
+      val md = TypedActor(system).typedActorOf(
+        TypedProps[HydraTypedExtension](
+          classOf[HydraTypedExtension],
+          ReflectionUtils.instantiateClass(c.asInstanceOf[Class[HydraTypedExtension]], List(moduleId, cfg))
+        ), s"${extensionName}_${moduleId}")
+
+      Right(startTypedModule(system, md, interval, initialDelay))
+    }
   }
 
-  private def register(moduleId: String, module: HydraModule, interval: FiniteDuration, initDelay: FiniteDuration) = {
-    implicit val ec = getDispatcher(moduleId)
-    val wrapper = HydraModuleWrapper(extensionName, moduleId, interval, initDelay, module)
-    log.debug(s"Registering module $extensionName::$moduleId.")
-    HydraModuleRegistry(system).addModule(wrapper)
-    log.debug(s"Starting module $extensionName::$moduleId.")
-    wrapper.startModule(system)
-    log.debug(s"Started module $extensionName::$moduleId.")
+  private def backOff(moduleProps: Props, moduleName: String): Props = {
+    import scala.concurrent.duration._
+    BackoffSupervisor.props(
+      Backoff.onStop(
+        moduleProps,
+        childName = moduleName,
+        minBackoff = 1.seconds,
+        maxBackoff = 30.seconds,
+        randomFactor = 0.2))
   }
 
   private def getDispatcher(moduleId: String) = {
@@ -86,5 +109,29 @@ abstract class HydraExtensionBase(extensionName: String, extConfig: Config)(impl
         system.dispatchers.lookup(s"akka.actor.$extensionName.default")
       }
     }.get
+  }
+
+  private def startTypedModule(system: ActorSystem, ext: HydraTypedExtension, interval: FiniteDuration,
+                               initialDelay: FiniteDuration)(implicit ec: ExecutionContext): HydraTypedExtension = {
+
+    val start = System.currentTimeMillis
+    ext.init.onComplete {
+      case Success(started) =>
+        if (started) {
+          system.scheduler.schedule(initialDelay, interval)(ext.run)
+          system.registerOnTermination(ext.stop())
+          log.info(s"Initialized extension ${ext.id} in ${System.currentTimeMillis - start} ms")
+
+        } else {
+          log.error(s"Unable to start extension ${ext.id}. Init method return false. Not going to try again.")
+          TypedActor(system).stop(ext)
+        }
+
+      case Failure(ex) =>
+        log.error(s"Unable to start extension ${ext.id}.", ex)
+        TypedActor(system).stop(ext)
+    }
+
+    ext
   }
 }

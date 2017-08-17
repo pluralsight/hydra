@@ -34,9 +34,14 @@ case object Ignore extends HydraMessage
 case class InitiateRequest(request: HydraRequest) extends HydraMessage
 
 //These are the Produce-related messages
-case class Produce[K, V](record: HydraRecord[K, V]) extends HydraMessage
+trait ProduceRecord[K, V] extends HydraMessage {
+  def record: HydraRecord[K, V]
+}
 
-case class ProduceWithAck[K, V](record: HydraRecord[K, V], ingestor: ActorRef, supervisor: ActorRef) extends HydraMessage
+case class Produce[K, V](record: HydraRecord[K, V]) extends ProduceRecord[K, V]
+
+case class ProduceWithAck[K, V](record: HydraRecord[K, V], ingestor: ActorRef, supervisor: ActorRef)
+  extends ProduceRecord[K, V]
 
 case class RecordProduced(md: RecordMetadata) extends HydraMessage
 

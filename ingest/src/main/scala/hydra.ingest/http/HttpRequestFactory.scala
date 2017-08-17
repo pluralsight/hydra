@@ -15,12 +15,12 @@ import scala.concurrent.Future
   */
 class HttpRequestFactory extends RequestFactory[String, HttpRequest] with CodingDirectives {
 
-  override def createRequest(correlationId: String, request: HttpRequest)
+  override def createRequest(correlationId: Long, request: HttpRequest)
                             (implicit mat: Materializer): Future[HydraRequest] = {
     implicit val ec = mat.executionContext
 
     val rs = request.headers.find(_.lowercaseName() == HYDRA_RETRY_STRATEGY)
-      .map(h => RetryStrategy(h.value())).getOrElse(RetryStrategy.Fail)
+      .map(h => RetryStrategy(h.value())).getOrElse(RetryStrategy.Ignore)
 
     val vs = request.headers.find(_.lowercaseName() == HYDRA_VALIDATION_STRATEGY)
       .map(h => ValidationStrategy(h.value())).getOrElse(ValidationStrategy.Strict)

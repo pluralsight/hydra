@@ -5,12 +5,12 @@ enablePlugins(JavaAppPackaging)
 
 val JDK = "1.8"
 val buildNumber = scala.util.Properties.envOrNone("version").map(v => "." + v).getOrElse("")
-val hydraVersion = "0.8.0" + buildNumber
+val hydraVersion = "0.8.3" + buildNumber
 
 lazy val defaultSettings = Seq(
   organization := "pluralsight",
   version := hydraVersion,
-  scalaVersion := "2.12.1",
+  scalaVersion := "2.12.2",
   description := "Hydra",
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
   excludeDependencies += "org.slf4j" % "slf4j-log4j12",

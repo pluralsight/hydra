@@ -3,7 +3,7 @@ package hydra.sandbox.ingest
 import akka.actor.Props
 import hydra.core.ingest.Ingestor
 import hydra.core.protocol._
-import hydra.sandbox.produce.{FileTransport, FileRecord}
+import hydra.sandbox.produce.{FileRecord, FileTransport}
 
 /**
   * A simple example transport that writes all requests to a log, as configured by the application.
@@ -17,8 +17,10 @@ class FileIngestor extends Ingestor {
     case Publish(request) =>
       sender ! (if (request.metadataValue("hydra-file-stream").isDefined) Join else Ignore)
 
-    case Ingest(request) =>
-      fileProducer ! Produce(FileRecord(request.metadataValue("hydra-file-stream").get, request.payload))
+    case Ingest(r) =>
+      fileProducer ! Produce(FileRecord(r.metadataValue("hydra-file-stream").get, r.payload))
       sender ! IngestorCompleted
   }
 }
+
+

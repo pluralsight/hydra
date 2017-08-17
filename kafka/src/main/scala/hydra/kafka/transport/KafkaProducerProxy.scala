@@ -7,10 +7,11 @@ import akka.kafka.ProducerSettings
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
-import hydra.core.protocol.{Produce, ProduceWithAck, RecordNotProduced, RecordProduced}
+import hydra.core.protocol.{Produce, RecordNotProduced, RecordProduced}
+import hydra.core.transport.HydraRecord
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata, PropagateExceptionCallback, PropagateExceptionWithAckCallback}
-import hydra.kafka.transport.KafkaProducerProxy.ProducerInitialized
+import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProduceToKafkaWithAck, ProducerInitialized}
 import org.apache.kafka.clients.producer.{Callback, KafkaProducer}
 
 import scala.concurrent.Future
@@ -46,16 +47,17 @@ class KafkaProducerProxy(parent: ActorRef, producerConfig: Config) extends Actor
   }
 
   def receiving: Receive = {
-    case Produce(r: KafkaRecord[Any, Any]) =>
-      produce(r, new PropagateExceptionCallback(context.actorSelection(self.path), r))
+    case ProduceToKafka(r: KafkaRecord[Any, Any], deliveryId) =>
+      produce(r, new PropagateExceptionCallback(context.actorSelection(self.path), r, deliveryId))
 
-    case ProduceWithAck(r: KafkaRecord[Any, Any], ingestor, supervisor) =>
-      produce(r, new PropagateExceptionWithAckCallback(context.actorSelection(self.path), ingestor, supervisor, r))
+    case ProduceToKafkaWithAck(r: KafkaRecord[Any, Any], ingestor, supervisor, deliveryId) =>
+      produce(r,
+        new PropagateExceptionWithAckCallback(context.actorSelection(self.path), ingestor, supervisor, r, deliveryId))
 
     case kmd: KafkaRecordMetadata =>
       parent ! RecordProduced(kmd)
 
-    case err: RecordNotProduced[_,_] =>
+    case err: RecordNotProduced[_, _] =>
       parent ! err
       throw err.error
   }
@@ -109,6 +111,11 @@ object KafkaProducerProxy extends KafkaConfigSupport {
   }
 
   case object ProducerInitialized
+
+  case class ProduceToKafka[K, V](r: KafkaRecord[K, V], deliveryId: Long)
+
+  case class ProduceToKafkaWithAck[K, V](record: HydraRecord[K, V], ingestor: ActorRef, supervisor: ActorRef,
+                                         deliveryId: Long)
 
 }
 

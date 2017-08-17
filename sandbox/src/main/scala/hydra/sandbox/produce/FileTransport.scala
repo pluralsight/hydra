@@ -1,7 +1,7 @@
 package hydra.sandbox.produce
 
 import java.nio.file.Paths
-import java.nio.file.StandardOpenOption.{CREATE, APPEND}
+import java.nio.file.StandardOpenOption.{APPEND, CREATE}
 
 import akka.stream._
 import akka.stream.scaladsl.{FileIO, Flow, Sink, Source}
@@ -17,8 +17,6 @@ import scala.concurrent.Future
 class FileTransport extends Transport {
 
   implicit val materializer = ActorMaterializer()
-
-  import context.dispatcher
 
   /**
     * This should be loaded from a config.

@@ -42,7 +42,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
 
   describe("when using the KafkaIngestor") {
     it("joins") {
-      val request = HydraRequest("topic",
+      val request = HydraRequest(123,
         "someString",
         List(HydraRequestMetadata(HYDRA_INGESTOR_PARAM, KAFKA), HydraRequestMetadata(HYDRA_KAFKA_TOPIC_PARAM, "topic"))
       )
@@ -51,7 +51,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
     }
 
     it("is invalid when there is no topic") {
-      val request = HydraRequest("topic",
+      val request = HydraRequest(123,
         "someString",
         List(HydraRequestMetadata(HYDRA_INGESTOR_PARAM, KAFKA),
           HydraRequestMetadata(HYDRA_RECORD_FORMAT_PARAM, "json"))
@@ -61,7 +61,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
     }
 
     it("ingests") {
-      val request = HydraRequest("test-schema",
+      val request = HydraRequest(1234,
         """{"first":"Alex","last":"Silva"}""",
         List(
           HydraRequestMetadata(HYDRA_INGESTOR_PARAM, KAFKA),
@@ -75,7 +75,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
 
 
   it("is invalid if it can't find the schema") {
-    val request = HydraRequest("topic",
+    val request = HydraRequest(213,
       "someString",
       List(
         HydraRequestMetadata(HYDRA_INGESTOR_PARAM, KAFKA),
@@ -87,7 +87,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
   }
 
   it("is valid with no schema if the topic can be resolved to a string") {
-    val request = HydraRequest("test-schema",
+    val request = HydraRequest(123,
       json,
       List(
         HydraRequestMetadata(HYDRA_INGESTOR_PARAM, KAFKA),
@@ -100,7 +100,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
   }
 
   it("is valid when a schema name overrides the topic name") {
-    val request = HydraRequest("just-a-topic",
+    val request = HydraRequest(123,
       json,
       List(
         HydraRequestMetadata(HYDRA_INGESTOR_PARAM, KAFKA),
@@ -114,7 +114,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
     expectMsg(ValidRequest)
   }
   it("is valid if schema can't be found, but json is allowed") {
-    val request = HydraRequest("topic",
+    val request = HydraRequest(123,
       json,
       List(
         HydraRequestMetadata(HYDRA_INGESTOR_PARAM, KAFKA),
@@ -127,15 +127,14 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
   }
 
   it("invalidates the request if the payload is invalid") {
-    val request = HydraRequest("topic", "invalid",
+    val request = HydraRequest(123, "invalid",
       List(
         HydraRequestMetadata(HYDRA_INGESTOR_PARAM, KAFKA),
-        HydraRequestMetadata(HYDRA_REQUEST_ID_PARAM, "test-schema"),
         HydraRequestMetadata(HYDRA_KAFKA_TOPIC_PARAM, "topic")
       )
     )
     transport ! Ingest(request)
-    expectMsgType[IngestorError]
+    expectMsgType[InvalidRequest]
   }
 
 }

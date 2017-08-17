@@ -39,8 +39,9 @@ object HydraExtensionLoader extends LoggingAdapter {
         if (enabled) {
           log.info(s"Loading extension ${extName}")
           instantiate(dm, system, clazz, name)
-        } else
+        } else {
           Failure(new IllegalArgumentException(s"Extension $name is not enabled."))
+        }
 
       }
 
