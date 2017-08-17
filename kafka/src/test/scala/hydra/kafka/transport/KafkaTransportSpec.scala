@@ -22,19 +22,18 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers wit
 
   val kafkaSupervisor = TestActorRef[KafkaTransport](KafkaTransport.props(kafkaProducerFormats))
 
-  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
+  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 33181,
     customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
 
-  val kafka = EmbeddedKafka.start()
-
-
   override def beforeAll() = {
+    EmbeddedKafka.start()
     EmbeddedKafka.createCustomTopic("test_topic")
   }
 
   override def afterAll() = {
+    EmbeddedKafka.stop()
     kafkaSupervisor ! PoisonPill
-    //    TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
+    TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
   }
 
   describe("When using the supervisor") {

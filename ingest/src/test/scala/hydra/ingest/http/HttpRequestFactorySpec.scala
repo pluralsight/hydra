@@ -4,12 +4,11 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.stream.ActorMaterializer
-import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{FunSpecLike, Matchers}
-import akka.stream.testkit.StreamTestKit
 import akka.testkit.TestKit
 import hydra.core.ingest.RequestParams
 import hydra.core.transport.{RetryStrategy, ValidationStrategy}
+import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.{FunSpecLike, Matchers}
 
 import scala.collection.immutable._
 
@@ -28,13 +27,13 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
           RawHeader(RequestParams.HYDRA_RETRY_STRATEGY, "retry")),
         uri = "/test",
         entity = HttpEntity(MediaTypes.`application/json`, json))
-      val req = new HttpRequestFactory().createRequest("label", httpRequest)
+      val req = new HttpRequestFactory().createRequest(123, httpRequest)
       whenReady(req) { req =>
         req.payload shouldBe json
         req.correlationId shouldBe "label"
         req.metadataValue("hydra") shouldBe Some("awesome")
         req.validationStrategy shouldBe ValidationStrategy.Relaxed
-        req.retryStrategy shouldBe RetryStrategy.Retry
+        req.retryStrategy shouldBe RetryStrategy.Persist
       }
     }
   }

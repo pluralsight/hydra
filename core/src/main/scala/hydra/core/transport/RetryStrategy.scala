@@ -15,17 +15,17 @@ object RetryStrategy {
 
   def apply(strategy: String): RetryStrategy = {
     strategy match {
-      case "retry" => Retry
-      case _ => Fail
+      case "persist" => Persist
+      case _ => Ignore
     }
   }
 
-  case object Fail extends RetryStrategy {
+  case object Ignore extends RetryStrategy {
     override val retryOnFailure: Boolean = false
 
   }
 
-  case object Retry extends RetryStrategy {
+  case object Persist extends RetryStrategy {
     override val retryOnFailure: Boolean = true
   }
 

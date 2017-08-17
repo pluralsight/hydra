@@ -21,10 +21,9 @@ import akka.actor.{OneForOneStrategy, _}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import hydra.common.config.ConfigSupport
 import hydra.core.http.ImperativeRequestContext
-import hydra.core.ingest.HydraRequest
+import hydra.core.ingest.{HydraRequest, IngestionReport}
 import hydra.core.protocol._
 import hydra.ingest.marshallers.IngestionJsonSupport
-import hydra.ingest.protocol.IngestionReport
 
 import scala.concurrent.duration._
 import scala.util.Try

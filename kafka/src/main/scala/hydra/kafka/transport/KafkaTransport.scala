@@ -20,12 +20,15 @@ import java.net.ConnectException
 
 import akka.actor.SupervisorStrategy._
 import akka.actor._
+import akka.persistence.{AtLeastOnceDelivery, PersistentActor}
 import com.typesafe.config.Config
 import configs.syntax._
+import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
-import hydra.core.notification.{HydraEvent, NotificationSupport}
-import hydra.core.protocol.{Produce, ProduceWithAck, RecordNotProduced, RecordProduced}
+import hydra.core.protocol._
+import hydra.core.transport.RetryStrategy
 import hydra.kafka.producer.{JsonRecord, KafkaRecord, KafkaRecordMetadata}
+import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProduceToKafkaWithAck}
 import hydra.kafka.transport.KafkaTransport.ProxiesInitialized
 import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.errors.TimeoutException
@@ -33,13 +36,15 @@ import org.apache.kafka.common.errors.TimeoutException
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.language.existentials
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 /**
   * Created by alexsilva on 10/28/15.
   */
 class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with LoggingAdapter
-  with NotificationSupport with Stash {
+  with ConfigSupport with Stash with PersistentActor with AtLeastOnceDelivery {
+
+  override val persistenceId = "hydra-kafka-transport"
 
   val metricsEnabled = applicationConfig.get[Boolean]("producers.kafka.metrics.enabled").valueOrElse(false)
 
@@ -49,34 +54,57 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
 
   implicit val ec = context.dispatcher
 
-  def receive = initializing
+  override def receiveCommand: Receive = initializing
 
   def initializing: Receive = {
     case ProxiesInitialized =>
-      context.become(receiving)
+      context.become(transporting)
       unstashAll()
     case _ => stash()
   }
 
-  def receiving: Receive = {
-    case Produce(record: KafkaRecord[_, _]) =>
-      producers(record.formatName) ! Produce(record)
+  private def transporting: Receive = {
+    case p@Produce(r: KafkaRecord[_, _]) => transport(r, p)
 
-    case ProduceWithAck(record: KafkaRecord[_, _], ingestor, supervisor) =>
-      producers(record.formatName) ! ProduceWithAck(record, ingestor, supervisor)
+    case p@ProduceWithAck(r: KafkaRecord[_, _], _, _) => transport(r, p)
 
-    case RecordProduced(r: KafkaRecordMetadata) =>
-      if (metricsEnabled) recordStatistics(r)
+    case p@RecordProduced(_: KafkaRecordMetadata) => confirm(p)
 
-    case err: RecordNotProduced[_, _] => publishToEventStream(err)
+    case e: RecordNotProduced[_, _] => notProduced(e)
   }
 
-  private def publishToEventStream(error: RecordNotProduced[_, _]) = {
-    context.system.eventStream.publish(error)
+  private def transport(kr: KafkaRecord[_, _], p: ProduceRecord[_, _]) = {
+    getRecordProducer(kr) match {
+      case Success(actorRef) =>
+        kr.retryStrategy match {
+          case RetryStrategy.Persist => persistAsync(p)(updateStore)
+          case RetryStrategy.Ignore => actorRef ! p
+        }
+      case Failure(ex) => sender ! RecordNotProduced(kr, ex)
+    }
+  }
+
+  private def updateStore(evt: HydraMessage): Unit = evt match {
+    case p@Produce(kr: KafkaRecord[_, _]) =>
+      deliver(producers(kr.formatName).path)(deliveryId => ProduceToKafka(kr, deliveryId))
+
+    case p@ProduceWithAck(kr: KafkaRecord[_, _], ingestor, supervisor) =>
+      deliver(producers(kr.formatName).path)(deliveryId => ProduceToKafkaWithAck(kr, ingestor, supervisor, deliveryId))
+
+    case RecordProduced(kmd) => confirmDelivery(kmd.deliveryId)
+  }
+
+  private def confirm(p: RecordProduced): Unit = {
+    if (p.md.retryStrategy == RetryStrategy.Persist) persistAsync(p)(updateStore)
+    recordStatistics(p.md.asInstanceOf[KafkaRecordMetadata])
+  }
+
+  private def notProduced(e: RecordNotProduced[_, _]) = {
+    context.system.eventStream.publish(e)
   }
 
   private def recordStatistics(r: KafkaRecordMetadata) = {
-    producers.get("json").foreach(_ ! Produce(JsonRecord(metricsTopic, None, r)))
+    if (metricsEnabled) producers.get("json").foreach(_ ! ProduceToKafka(JsonRecord(metricsTopic, Some(r.topic), r), 0))
   }
 
   override val supervisorStrategy =
@@ -87,6 +115,10 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
       case _: Exception => Restart
     }
 
+  override def receiveRecover: Receive = {
+    case msg: HydraMessage => updateStore(msg)
+  }
+
   override def preStart(): Unit = {
     initProducers()
   }
@@ -95,6 +127,13 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
     super.preRestart(reason, message)
     producers.values.foreach(_ ! PoisonPill)
     initProducers()
+  }
+
+  private def getRecordProducer(kr: KafkaRecord[_, _]): Try[ActorRef] = {
+    Try(producers(kr.formatName))
+      .recover { case _: NoSuchElementException =>
+        throw new IllegalArgumentException(s"No producer for records with format ${kr.formatName}")
+      }
   }
 
   private def initProducers() = {
@@ -117,11 +156,8 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
 
 object KafkaTransport {
 
-  case class MessageNotSentEvent(source: RecordNotProduced[Any, Any]) extends HydraEvent[RecordNotProduced[_, _]]
-
   case object ProxiesInitialized
 
-  def props(producersConfig: Map[String, Config]): Props =
-    Props(classOf[KafkaTransport], producersConfig)
+  def props(producersConfig: Map[String, Config]): Props = Props(classOf[KafkaTransport], producersConfig)
 }
 

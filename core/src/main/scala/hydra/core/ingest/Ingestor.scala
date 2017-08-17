@@ -40,6 +40,8 @@ trait Ingestor extends Actor with ActorConfigSupport with LoggingAdapter with Co
     case Ingestor.IngestorInitialized =>
       cancelReceiveTimeout
       context.become(composedReceive)
+      log.info("Ingestor {}[{}] initialized", Seq(thisActorName, self.path): _*)
+      unstashAll()
 
     case Ingestor.IngestorInitializationError(ex) =>
       log.error(ex.getMessage)
@@ -47,8 +49,8 @@ trait Ingestor extends Actor with ActorConfigSupport with LoggingAdapter with Co
 
     case ReceiveTimeout => initError(new RuntimeException("Ingestor did not initialize in 5 seconds."))
 
-    case _ =>
-      log.debug(s"$thisActorName received message while not initialized; stashing.")
+    case msg =>
+      log.debug(s"$thisActorName received message $msg while not initialized; stashing.")
       stash()
   }
 

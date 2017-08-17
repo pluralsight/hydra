@@ -9,11 +9,9 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.util.Timeout
 import com.github.vonnagy.service.container.service.ServicesManager
 import hydra.common.logging.LoggingAdapter
-import hydra.core.ingest.{HydraRequest, HydraRequestMetadata}
+import hydra.core.ingest.{HydraRequest, HydraRequestMetadata, IngestionReport}
 import hydra.core.protocol.HydraError
 import hydra.core.transport.{AckStrategy, RetryStrategy, ValidationStrategy}
-import hydra.ingest.marshallers.IngestionJsonSupport
-import hydra.ingest.protocol.IngestionReport
 import hydra.ingest.services.IngestionSupervisor
 import hydra.ingest.ws.IngestionSocketActor._
 
@@ -72,7 +70,7 @@ class IngestionSocketActor(initialMetadata: Map[String, String]) extends Actor w
 
   def ingesting: Receive = {
     case IncomingMessage(IngestPattern(correlationId, payload)) =>
-      val request = session.buildRequest(Option(correlationId), payload)
+      val request = session.buildRequest(Option(correlationId.toLong), payload)
       registry.map(r => context.actorOf(IngestionSupervisor.props(request, timeout, r)))
 
     case report: IngestionReport =>
@@ -90,17 +88,15 @@ object IngestionSocketActor {
 
 case class SocketSession(metadata: Map[String, String] = Map.empty) {
 
-  private val r = Random.alphanumeric
-
   lazy val hydraRequestMedatata = metadata.map(m => HydraRequestMetadata(m._1, m._2)).toSeq
 
   def withMetadata(meta: (String, String)*) =
     copy(metadata = this.metadata ++ meta.map(m => m._1 -> m._2))
 
-  def buildRequest(correlationId: Option[String], payload: String) = {
+  def buildRequest(correlationId: Option[Long], payload: String) = {
     import hydra.core.ingest.RequestParams._
     val rs = metadata.find(_._1.equalsIgnoreCase(HYDRA_RETRY_STRATEGY))
-      .map(h => RetryStrategy(h._2)).getOrElse(RetryStrategy.Fail)
+      .map(h => RetryStrategy(h._2)).getOrElse(RetryStrategy.Ignore)
 
     val vs = metadata.find(_._1.equalsIgnoreCase(HYDRA_VALIDATION_STRATEGY))
       .map(h => ValidationStrategy(h._2)).getOrElse(ValidationStrategy.Strict)
@@ -108,7 +104,7 @@ case class SocketSession(metadata: Map[String, String] = Map.empty) {
     val as = metadata.find(_._1.equalsIgnoreCase(HYDRA_ACK_STRATEGY))
       .map(h => AckStrategy(h._2)).getOrElse(AckStrategy.None)
 
-    HydraRequest(correlationId.getOrElse(r take(8) mkString), payload, hydraRequestMedatata, retryStrategy = rs,
+    HydraRequest(correlationId.getOrElse(Random.nextLong()), payload, hydraRequestMedatata, retryStrategy = rs,
       validationStrategy = vs, ackStrategy = as)
   }
 }

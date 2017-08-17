@@ -21,7 +21,6 @@ import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import hydra.common.util.ActorUtils
 import hydra.core.ingest._
 import hydra.core.protocol._
-import hydra.ingest.protocol.IngestionReport
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import org.joda.time.DateTime
 

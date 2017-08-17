@@ -24,7 +24,6 @@ import akka.stream.ActorMaterializer
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
-import hydra.core.ingest.RequestParams
 import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
 import hydra.ingest.bootstrap.HydraIngestorRegistry
 import hydra.ingest.services.IngestionRequestHandler
@@ -46,7 +45,7 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
       requestEntityPresent {
         pathPrefix("ingest") {
          // decodeRequestWith(Gzip, Deflate) {
-            optionalHeaderValueByName(RequestParams.HYDRA_REQUEST_ID_PARAM) { correlationId =>
+            parameter("correlationId".as[Long] ?) { correlationId =>
               handleExceptions(excptHandler) {
                 pathEndOrSingleSlash {
                   broadcastRequest(correlationId.getOrElse(randomId))
@@ -65,9 +64,9 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
     case e: Exception => complete(GenericServiceResponse(ServiceUnavailable.intValue, e.getMessage))
   }
 
-  private def randomId = Random.alphanumeric.take(8) mkString
+  private def randomId = Random.nextLong()
 
-  def broadcastRequest(correlationId: String) = {
+  def broadcastRequest(correlationId: Long) = {
     onSuccess(ingestorRegistry) { registry =>
       extractRequestContext { ctx =>
         val hydraReq = createRequest[String, HttpRequest](correlationId, ctx.request)
@@ -80,7 +79,7 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
     }
   }
 
-  def publishToIngestor(correlationId: String, ingestor: String) = {
+  def publishToIngestor(correlationId: Long, ingestor: String) = {
     onSuccess(lookupIngestor(ingestor)) { result =>
       result.ingestors.headOption match {
         case Some(ref) =>

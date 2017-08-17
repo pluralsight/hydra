@@ -40,11 +40,6 @@ object RequestParams {
   val HYDRA_KAFKA_TOPIC_PARAM = "hydra-kafka-topic"
 
   /**
-    * A request identifier.  If not provided, a random alphanumeric string will be generated.
-    */
-  val HYDRA_REQUEST_ID_PARAM = "hydra-request-id"
-
-  /**
     * The JSON Path for a field in the body that specifies the message key.
     *
     */
@@ -80,12 +75,6 @@ object RequestParams {
     * Param value for relaxed validation.
     */
   val RELAXED = "relaxed"
-
-  /**
-    * If present and set to true, a single request with a JSON array payload
-    * will be split into multiple HydraRequests each corresponding to an element of the array.
-    */
-  val SPLIT_JSON_ARRAY = "split-json-array"
 
   /**
     * If present, specifies the Akka actor address to send ingestion results to.

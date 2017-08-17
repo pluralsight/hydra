@@ -8,11 +8,11 @@ import scala.util.Random
 /**
   * Created by alexsilva on 12/3/16.
   */
-case class HydraRequest(correlationId: String = Random.alphanumeric.take(8).mkString,
+case class HydraRequest(correlationId: Long = Random.nextInt(),
                         payload: String,
                         metadata: Seq[HydraRequestMetadata] = Seq.empty,
                         params: Map[String, Any] = Map.empty,
-                        retryStrategy: RetryStrategy = RetryStrategy.Fail,
+                        retryStrategy: RetryStrategy = RetryStrategy.Ignore,
                         validationStrategy: ValidationStrategy = Strict,
                         ackStrategy: AckStrategy = AckStrategy.None) {
 
@@ -36,6 +36,8 @@ case class HydraRequest(correlationId: String = Random.alphanumeric.take(8).mkSt
       case None => false
     }
   }
+
+  def withCorrelationId(correlationId: Long) = copy(correlationId = correlationId)
 
   def withMetadata(meta: (String, String)*) =
     copy(metadata = this.metadata ++ meta.map(m => HydraRequestMetadata(m._1, m._2)))

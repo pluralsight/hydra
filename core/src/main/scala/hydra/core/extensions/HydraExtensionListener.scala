@@ -15,7 +15,7 @@ import scala.collection.mutable
 class HydraExtensionListener(extensionName: String, config: Config) extends ContainerLifecycleListener
   with LoggingAdapter {
 
-  val modules = new mutable.HashMap[String, HydraModule]
+  val modules = new mutable.HashMap[String, HydraExtension]
 
   override def onStartup(container: ContainerService) = {
     HydraExtensionLoader.load(extensionName, config)(container.system)

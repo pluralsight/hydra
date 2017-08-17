@@ -19,9 +19,8 @@ package hydra.ingest.services
 import akka.actor._
 import akka.util.Timeout
 import hydra.common.config.ActorConfigSupport
-import hydra.core.ingest.{RequestParams, RequestUtils}
+import hydra.core.ingest.{IngestionReport, RequestParams}
 import hydra.core.protocol.InitiateRequest
-import hydra.ingest.protocol.IngestionReport
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -39,30 +38,25 @@ class IngestionActor(registryPath: String) extends Actor with ActorConfigSupport
 
   implicit val timeout = Timeout(ingestionTimeout)
 
-  val registry: ActorRef = Await.result(context.actorSelection(registryPath).resolveOne(),
-    timeout.duration)
+  val registry: ActorRef = Await.result(context.actorSelection(registryPath).resolveOne(), timeout.duration)
 
   override def receive: Receive = {
-    case InitiateRequest(request) =>
-      val split = (request.metadataValue(RequestParams.SPLIT_JSON_ARRAY).map(_.toBoolean).getOrElse(false))
-      val requests = if (split) RequestUtils.split(request) else Seq(request)
-      requests.foreach { r =>
-        context.actorOf(IngestionSupervisor.props(r, ingestionTimeout, registry))
-      }
+    case InitiateRequest(r) =>
+      context.actorOf(IngestionSupervisor.props(r, ingestionTimeout, registry))
+
     case r: IngestionReport =>
       context.stop(sender)
       r.metadata.find(_.name == RequestParams.REPLY_TO).foreach { replyTo =>
         Try(context.actorSelection(replyTo.value) ! r)
-          .recover {
-            case e => log.error(s"Unable to send reply back to ${receive}: ${e.getMessage}")
-          }
+          .recover { case e => log.error(s"Unable to send reply back to ${receive}: ${e.getMessage}") }
       }
-    case ReceiveTimeout => {
-      log.error("Received a timeout from " + sender)
-    }
-    case other => {
+    case ReceiveTimeout =>
+      log.error(s"$thisActorName: Received timeout.")
+      context.stop(self)
+
+    case other =>
       throw new IllegalArgumentException(s"${other} is not expected at this state.")
-    }
+
   }
 
 

@@ -13,14 +13,14 @@ import scala.concurrent.Future
 object RequestFactories {
 
   implicit object RequestFactoryLikeHttp extends RequestFactory[String, HttpRequest] {
-    override def createRequest(correlationId:String, source: HttpRequest)
+    override def createRequest(correlationId:Long, source: HttpRequest)
                               (implicit mat: Materializer): Future[HydraRequest] = {
       implicit val ec = mat.executionContext
       new HttpRequestFactory().createRequest(correlationId, source)
     }
   }
 
-  def createRequest[P, D](correlationId: String, source: D)
+  def createRequest[P, D](correlationId: Long, source: D)
                          (implicit ev: RequestFactory[P, D], mat: Materializer): Future[HydraRequest] = {
     ev.createRequest(correlationId, source)
   }

@@ -22,7 +22,7 @@ This replication paradigm allows a single event to be ingested, transformed, and
 The Receive phase receives "raw" data, converts it to a Hydra request containing a payload and metadata, and broadcasts the request to the underlying Hydra Ingestors.
 
 ### Ingestion
-This phase involves matching the request with one or more ingestors, performing any data transformationm and sending the request to a Transport.  Complex streaming operations, such as joins, cross-stream aggregations are outside the scope of the ingestion phase.
+This phase involves matching the request with one or more ingestors, performing any data transformation and sending the request to a Transport.  Complex streaming operations, such as joins, cross-stream aggregations are outside the scope of the ingestion phase.
 
 ### Transport
 The transport phase of the protocol the step at which the events are actually sent (produced) to the underlying data system.
@@ -82,6 +82,10 @@ We highly recommend checking out the project documentation [here.](www.pluralsig
 
 This README file only contains basic definitions and set up instructions.
 
+# Main Features
+
+## Message Delivery Guarantees
+
 
 # Contribution and Development
 Contributions via Github Pull Request are welcome.  
@@ -98,5 +102,6 @@ Try using the gitter chat link above!
 
 ## License
 Apache 2.0, see LICENSE.md
+
 
 
