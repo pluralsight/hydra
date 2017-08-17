@@ -10,6 +10,7 @@ import hydra.core.protocol._
 
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, _}
+
 /**
   * Created by alexsilva on 12/1/15.
   */
@@ -39,7 +40,7 @@ trait Ingestor extends Actor with ActorConfigSupport with LoggingAdapter with Co
     case Ingestor.IngestorInitialized =>
       cancelReceiveTimeout
       context.become(composedReceive)
-      log.info("Ingestor {} initialized", thisActorName)
+      log.info("Ingestor {}[{}] initialized", Seq(thisActorName, self.path): _*)
       unstashAll()
 
     case Ingestor.IngestorInitializationError(ex) =>
