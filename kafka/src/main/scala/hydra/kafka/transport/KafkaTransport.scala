@@ -78,7 +78,12 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
       case Success(actorRef) =>
         kr.retryStrategy match {
           case RetryStrategy.Persist => persistAsync(p)(updateStore)
-          case RetryStrategy.Ignore => actorRef ! p
+          case RetryStrategy.Ignore =>
+            val msg = p match {
+              case Produce(kr: KafkaRecord[_, _]) => ProduceToKafka(kr, 1)
+              case ProduceWithAck(kr: KafkaRecord[_, _], ing, sup) => ProduceToKafkaWithAck(kr, ing, sup, 1)
+            }
+            actorRef ! msg
         }
       case Failure(ex) => sender ! RecordNotProduced(kr, ex)
     }
