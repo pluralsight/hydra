@@ -14,8 +14,9 @@ object JsonPathKeys {
       val theKey = key.substring(1, key.length - 1)
       val path = JsonLenses.fromPath(theKey)
       json.extract[String](path).mkString
-    } else
+    } else {
       key
+    }
   }
 
   def getKey(key: String, json: JsValue): String = {
@@ -23,7 +24,8 @@ object JsonPathKeys {
       val theKey = key.substring(1, key.length - 1)
       val path = JsonLenses.fromPath(theKey)
       json.extract[String](path).mkString
-    } else
+    } else {
       key
+    }
   }
 }
