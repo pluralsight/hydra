@@ -46,8 +46,8 @@ class IngestionActor(registryPath: String) extends Actor with ActorConfigSupport
 
     case r: IngestionReport =>
       context.stop(sender)
-      r.metadata.find(_.name == RequestParams.REPLY_TO).foreach { replyTo =>
-        Try(context.actorSelection(replyTo.value) ! r)
+      r.metadata.find(_._1.equalsIgnoreCase(RequestParams.REPLY_TO)).foreach { replyTo =>
+        Try(context.actorSelection(replyTo._2) ! r)
           .recover { case e => log.error(s"Unable to send reply back to ${receive}: ${e.getMessage}") }
       }
     case ReceiveTimeout =>

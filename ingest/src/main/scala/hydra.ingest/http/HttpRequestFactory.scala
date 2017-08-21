@@ -29,8 +29,7 @@ class HttpRequestFactory extends RequestFactory[String, HttpRequest] with Coding
       .map(h => AckStrategy(h.value())).getOrElse(AckStrategy.None)
 
     Unmarshal(request.entity).to[String].map { payload =>
-      val metadata: List[HydraRequestMetadata] = List(request.headers.map(header =>
-        HydraRequestMetadata(header.name.toLowerCase, header.value)): _*)
+      val metadata: Map[String, String] = request.headers.map(h => h.name.toLowerCase -> h.value).toMap
       HydraRequest(correlationId, payload, metadata, retryStrategy = rs, validationStrategy = vs)
     }
   }
