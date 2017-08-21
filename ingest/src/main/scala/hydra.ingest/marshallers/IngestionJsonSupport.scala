@@ -51,8 +51,8 @@ trait IngestionJsonSupport extends HydraJsonSupport {
     def writeState[T <: IngestorStatus : JsonWriter](t: T) = t.toJson
 
     override def write(obj: IngestionReport): JsValue = {
-      val isDetailed = obj.metadata.find(_.name == RequestParams.HYDRA_RESPONSE_FORMAT)
-        .map(_.value.equalsIgnoreCase("detailed")).getOrElse(true)
+      val isDetailed = obj.metadata.find(_._1 == RequestParams.HYDRA_RESPONSE_FORMAT)
+        .map(_._2.equalsIgnoreCase("detailed")).getOrElse(true)
       val ingestors = obj.ingestors
         .map(h => if (isDetailed) h._1 -> writeState(h._2) else h._1 -> JsNumber(h._2.statusCode.intValue()))
 

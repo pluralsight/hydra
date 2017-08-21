@@ -14,4 +14,3 @@ import org.joda.time.DateTime
 case class IngestorInfo(name: String, group: String, path: ActorPath, registeredAt: DateTime)
 
 
-
