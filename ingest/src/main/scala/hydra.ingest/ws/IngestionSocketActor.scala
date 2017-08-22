@@ -9,7 +9,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.util.Timeout
 import com.github.vonnagy.service.container.service.ServicesManager
 import hydra.common.logging.LoggingAdapter
-import hydra.core.ingest.{HydraRequest, HydraRequestMetadata, IngestionReport}
+import hydra.core.ingest.{HydraRequest, IngestionReport}
 import hydra.core.protocol.HydraError
 import hydra.core.transport.{AckStrategy, RetryStrategy, ValidationStrategy}
 import hydra.ingest.services.IngestionSupervisor
@@ -88,8 +88,6 @@ object IngestionSocketActor {
 
 case class SocketSession(metadata: Map[String, String] = Map.empty) {
 
-  lazy val hydraRequestMedatata = metadata.map(m => HydraRequestMetadata(m._1, m._2)).toSeq
-
   def withMetadata(meta: (String, String)*) =
     copy(metadata = this.metadata ++ meta.map(m => m._1 -> m._2))
 
@@ -104,7 +102,7 @@ case class SocketSession(metadata: Map[String, String] = Map.empty) {
     val as = metadata.find(_._1.equalsIgnoreCase(HYDRA_ACK_STRATEGY))
       .map(h => AckStrategy(h._2)).getOrElse(AckStrategy.None)
 
-    HydraRequest(correlationId.getOrElse(Random.nextLong()), payload, hydraRequestMedatata, retryStrategy = rs,
+    HydraRequest(correlationId.getOrElse(Random.nextLong()), payload, metadata, retryStrategy = rs,
       validationStrategy = vs, ackStrategy = as)
   }
 }
