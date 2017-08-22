@@ -10,17 +10,14 @@ import scala.util.Random
   */
 case class HydraRequest(correlationId: Long = Random.nextInt(),
                         payload: String,
-                        metadata: Seq[HydraRequestMetadata] = Seq.empty,
+                        metadata: Map[String, String] = Map.empty,
                         params: Map[String, Any] = Map.empty,
                         retryStrategy: RetryStrategy = RetryStrategy.Ignore,
                         validationStrategy: ValidationStrategy = Strict,
                         ackStrategy: AckStrategy = AckStrategy.None) {
 
   def metadataValue(name: String): Option[String] = {
-    metadata.find(m => m.name.equalsIgnoreCase(name)) match {
-      case Some(md) => Some(md.value)
-      case None => None
-    }
+    metadata.get(name).orElse(metadata.find(_._1.equalsIgnoreCase(name)).map(_._2))
   }
 
   /**
@@ -31,16 +28,13 @@ case class HydraRequest(correlationId: Long = Random.nextInt(),
     * @return
     */
   def metadataValueEquals(name: String, value: String): Boolean = {
-    metadata.find(_.name.equalsIgnoreCase(name)) match {
-      case Some(ua) => ua.value.equals(value)
-      case None => false
-    }
+    metadataValue(name).map(_.equals(value)).getOrElse(false)
   }
 
   def withCorrelationId(correlationId: Long) = copy(correlationId = correlationId)
 
   def withMetadata(meta: (String, String)*) =
-    copy(metadata = this.metadata ++ meta.map(m => HydraRequestMetadata(m._1, m._2)))
+    copy(metadata = this.metadata ++ meta)
 
   def withRetryStrategy(retryStrategy: RetryStrategy) =
     copy(retryStrategy = retryStrategy)
@@ -50,6 +44,3 @@ case class HydraRequest(correlationId: Long = Random.nextInt(),
 
   def withParams(params: (String, Any)*) = copy(params = this.params ++ params.toMap)
 }
-
-
-case class HydraRequestMetadata(name: String, value: String)
