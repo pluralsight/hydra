@@ -11,7 +11,6 @@ import scala.util.Random
 case class HydraRequest(correlationId: Long = Random.nextInt(),
                         payload: String,
                         metadata: Map[String, String] = Map.empty,
-                        params: Map[String, Any] = Map.empty,
                         retryStrategy: RetryStrategy = RetryStrategy.Ignore,
                         validationStrategy: ValidationStrategy = Strict,
                         ackStrategy: AckStrategy = AckStrategy.None) {
@@ -41,6 +40,4 @@ case class HydraRequest(correlationId: Long = Random.nextInt(),
 
   def withValidationStratetegy(validationStrategy: ValidationStrategy) =
     copy(validationStrategy = validationStrategy)
-
-  def withParams(params: (String, Any)*) = copy(params = this.params ++ params.toMap)
 }
