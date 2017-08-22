@@ -1,11 +1,12 @@
 package hydra.core.ingest
 
-import akka.actor.{Actor, OneForOneStrategy, ReceiveTimeout, Stash, SupervisorStrategy}
+import akka.actor.{Actor, ActorRef, OneForOneStrategy, ReceiveTimeout, Stash, SupervisorStrategy}
 import akka.pattern.pipe
 import hydra.common.config.ActorConfigSupport
 import hydra.common.logging.LoggingAdapter
+import hydra.core.HydraException
 import hydra.core.akka.ComposingReceive
-import hydra.core.ingest.Ingestor.IngestorInitialized
+import hydra.core.ingest.Ingestor.{IngestorInitializationError, IngestorInitialized}
 import hydra.core.protocol._
 
 import scala.concurrent.Future
@@ -17,19 +18,19 @@ import scala.concurrent.duration.{Duration, _}
 
 trait Ingestor extends Actor with ActorConfigSupport with LoggingAdapter with ComposingReceive with Stash {
 
-  //the initialization timeout
-  private val initTimeout = 5.seconds
+  protected val initTimeout = 2.seconds //the initialization timeout
+
   context.setReceiveTimeout(initTimeout)
 
   override def receive: Receive = waitingForInitialization
 
   /**
     * This method is called upon initialization.  It should return one of the ingestor initialization messages:
-    * `IngestorInitializationError` or `IngestorInitializationError`
+    * `IngestorInitialized` or `IngestorInitializationError`
     *
     * The default implementation returns IngestorInitialized.
     */
-  private[ingest] def initIngestor: Future[HydraMessage] = Future.successful(IngestorInitialized)
+  def initIngestor: Future[HydraMessage] = Future.successful(IngestorInitialized)
 
   override def preStart(): Unit = {
     implicit val ec = context.dispatcher
@@ -43,11 +44,14 @@ trait Ingestor extends Actor with ActorConfigSupport with LoggingAdapter with Co
       log.info("Ingestor {}[{}] initialized", Seq(thisActorName, self.path): _*)
       unstashAll()
 
-    case Ingestor.IngestorInitializationError(ex) =>
+    case err@Ingestor.IngestorInitializationError(ex) =>
       log.error(ex.getMessage)
-      initError(ex)
+      initError(err)
 
-    case ReceiveTimeout => initError(new RuntimeException("Ingestor did not initialize in 5 seconds."))
+    case ReceiveTimeout =>
+      log.error(s"Ingestor $thisActorName[${self.path}] did not initialize in $initTimeout")
+      val err = IngestorInitializationException(self, s"Ingestor did not initialize in $initTimeout.")
+      initError(IngestorInitializationError(err))
 
     case msg =>
       log.debug(s"$thisActorName received message $msg while not initialized; stashing.")
@@ -57,21 +61,20 @@ trait Ingestor extends Actor with ActorConfigSupport with LoggingAdapter with Co
   override val baseReceive: Receive = {
     case Publish(_) =>
       log.info(s"Publish message was not handled by ${self}.  Will not join.")
+      sender ! Ignore
 
     case Validate(_) =>
       sender ! ValidRequest
-
-    case Ingest(_) =>
-      log.warn(s"Ingest message was not handled by ${self}.")
-      sender ! IngestorCompleted
 
     case ProducerAck(supervisor, error) =>
       supervisor ! error.map(IngestorError(_)).getOrElse(IngestorCompleted)
   }
 
-  private def initError(ex: Throwable) = {
+  private def initError(err: IngestorInitializationError) = {
     cancelReceiveTimeout
-    context.become(initializationError(ex))
+    unstashAll()
+    context.system.eventStream.publish(err)
+    context.become(initializationError(err.t))
   }
 
   private def initializationError(ex: Throwable): Receive = {
@@ -106,12 +109,7 @@ trait Ingestor extends Actor with ActorConfigSupport with LoggingAdapter with Co
     unstashAll()
   }
 
-  override val supervisorStrategy =
-    OneForOneStrategy() {
-      case e: Exception => {
-        SupervisorStrategy.Restart
-      }
-    }
+  override val supervisorStrategy = OneForOneStrategy() { case _ => SupervisorStrategy.Restart }
 }
 
 object Ingestor {
@@ -123,4 +121,21 @@ object Ingestor {
 
   case class IngestorInitializationError(t: Throwable) extends HydraMessage
 
+}
+
+@SerialVersionUID(1L)
+class IngestorInitializationException(ingestor: ActorRef, message: String, cause: Throwable)
+  extends HydraException(IngestorInitializationException.enrichedMessage(ingestor, message), cause) {
+  def getActor: ActorRef = ingestor
+}
+
+object IngestorInitializationException {
+  private def enrichedMessage(actor: ActorRef, message: String) =
+    Option(actor).map(a => s"${a.path}: $message").getOrElse(message)
+
+  private[ingest] def apply(actor: ActorRef, message: String, cause: Throwable = null) =
+    new IngestorInitializationException(actor, message, cause)
+
+  def unapply(ex: IngestorInitializationException): Option[(ActorRef, String, Throwable)] =
+    Some((ex.getActor, ex.getMessage, ex.getCause))
 }
