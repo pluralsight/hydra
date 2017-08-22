@@ -1,5 +1,6 @@
 package hydra.core.ingest
 
+import hydra.core.transport.{RetryStrategy, ValidationStrategy}
 import org.scalatest.{FunSpecLike, Matchers}
 
 /**
@@ -21,6 +22,28 @@ class HydraRequestSpec extends Matchers with FunSpecLike {
       hr.metadataValueEquals("TEST", "value") shouldBe true
       hr.metadataValueEquals("TEST1", "value") shouldBe false
       hr.metadataValueEquals("TEST", "?") shouldBe false
+    }
+
+    it("copies correlation id") {
+      val hr = HydraRequest(123, metadata = Map("test" -> "value"), payload = "test").withCorrelationId(24)
+      hr.correlationId shouldBe 24
+      hr.payload shouldBe "test"
+    }
+
+    it("copies retry strategy") {
+      val hr = HydraRequest(123, metadata = Map("test" -> "value"), payload = "test")
+        .withRetryStrategy(RetryStrategy.Persist)
+      hr.correlationId shouldBe 123
+      hr.payload shouldBe "test"
+      hr.retryStrategy shouldBe RetryStrategy.Persist
+    }
+
+    it("copies validation strategy") {
+      val hr = HydraRequest(123, metadata = Map("test" -> "value"), payload = "test")
+        .withValidationStratetegy(ValidationStrategy.Relaxed)
+      hr.correlationId shouldBe 123
+      hr.payload shouldBe "test"
+      hr.validationStrategy shouldBe ValidationStrategy.Relaxed
     }
 
     it("copies metadata") {

@@ -14,8 +14,8 @@ trait RetryStrategy {
 object RetryStrategy {
 
   def apply(strategy: String): RetryStrategy = {
-    strategy match {
-      case "persist" => Persist
+    Option(strategy).map(_.trim.toLowerCase) match {
+      case Some("persist") => Persist
       case _ => Ignore
     }
   }
