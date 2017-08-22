@@ -23,11 +23,17 @@ sealed trait ValidationStrategy
 
 object ValidationStrategy {
 
+  /**
+    * Possible values are "strict" or "relaxed" (both case insensitive.)
+    * Everything else resolves to `Strict`
+    * @param strategy
+    * @return
+    */
   def apply(strategy: String): ValidationStrategy = {
     Option(strategy).map(_.trim.toLowerCase) match {
       case Some(s) if (s.equals("strict")) => Strict
       case Some(s) if (s.equals("relaxed")) => Relaxed
-      case None => Strict
+      case _ => Strict
     }
   }
 
