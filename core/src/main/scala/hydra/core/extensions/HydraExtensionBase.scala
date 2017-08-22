@@ -65,16 +65,21 @@ abstract class HydraExtensionBase(extensionName: String, extConfig: Config)(impl
   }
 
   private def instantiate(c: Class[_ <: HM], moduleId: String, cfg: Config): Either[ActorRef, HydraTypedExtension] = {
+    import scala.concurrent.duration._
+
     implicit val ec = getDispatcher(moduleId)
 
-    val interval = cfg.get[FiniteDuration]("interval").value
-    val initialDelay = cfg.get[FiniteDuration]("initialDelay").value
+    val intervalOpt = cfg.get[FiniteDuration]("interval").toOption
+    val initialDelay = cfg.get[FiniteDuration]("initialDelay").valueOrElse(1.second)
 
     if (classOf[HydraExtension].isAssignableFrom(c)) {
       log.debug(s"Instantiating Hydra extension $extensionName::$moduleId.")
       val props = backOff(Props(c, moduleId, cfg), s"${extensionName}_${moduleId}")
       val ref = system.actorOf(props, s"${extensionName}_${moduleId}_supervisor")
-      system.scheduler.schedule(initialDelay, interval, ref, Run)
+      intervalOpt match {
+        case Some(interval) => system.scheduler.schedule(initialDelay, interval, ref, Run)
+        case None => system.scheduler.scheduleOnce(initialDelay, ref, Run)
+      }
       Left(ref)
     }
     else {
@@ -85,7 +90,7 @@ abstract class HydraExtensionBase(extensionName: String, extConfig: Config)(impl
           ReflectionUtils.instantiateClass(c.asInstanceOf[Class[HydraTypedExtension]], List(moduleId, cfg))
         ), s"${extensionName}_${moduleId}")
 
-      Right(startTypedModule(system, md, interval, initialDelay))
+      Right(startTypedModule(system, md, intervalOpt, initialDelay))
     }
   }
 
@@ -111,14 +116,18 @@ abstract class HydraExtensionBase(extensionName: String, extConfig: Config)(impl
     }.get
   }
 
-  private def startTypedModule(system: ActorSystem, ext: HydraTypedExtension, interval: FiniteDuration,
+  private def startTypedModule(system: ActorSystem, ext: HydraTypedExtension, intervalOpt: Option[FiniteDuration],
                                initialDelay: FiniteDuration)(implicit ec: ExecutionContext): HydraTypedExtension = {
 
     val start = System.currentTimeMillis
     ext.init.onComplete {
       case Success(started) =>
         if (started) {
-          system.scheduler.schedule(initialDelay, interval)(ext.run)
+          intervalOpt match {
+            case Some(interval) => system.scheduler.schedule(initialDelay, interval)(ext.run)
+            case None => system.scheduler.scheduleOnce(initialDelay)(ext.run)
+          }
+
           system.registerOnTermination(ext.stop())
           log.info(s"Initialized extension ${ext.id} in ${System.currentTimeMillis - start} ms")
 
