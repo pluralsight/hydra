@@ -18,12 +18,12 @@ class HydraEntryPointSpec extends Matchers with FunSpecLike with MockFactory {
       |  hydra_test{
       |  test {
       |    endpoints = ["hydra.core.app.DummyEndpoint"]
-      |  extensions {
+      | }
+      | extensions {
       |    dummy {
       |      enabled = true
       |    }
       |  }
-      | }
       |}
     """.stripMargin
 
@@ -41,7 +41,7 @@ class HydraEntryPointSpec extends Matchers with FunSpecLike with MockFactory {
       et.moduleName shouldBe "test"
       et.services shouldBe Seq("test" -> Props[DummyActor])
       et.endpoints shouldBe Seq(classOf[DummyEndpoint])
-      et.extensions shouldBe ConfigFactory.parseString(conf).getConfig("hydra_test.test.extensions")
+      et.extensions shouldBe ConfigFactory.parseString(conf).getConfig("hydra_test.extensions")
     }
 
     it("builds a container") {
