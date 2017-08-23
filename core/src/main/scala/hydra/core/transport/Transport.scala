@@ -19,6 +19,10 @@ trait Transport extends InitializingActor {
       log.info(s"Produce message was not handled by ${thisActorName}.")
       sender ! RecordNotProduced(r, new IllegalStateException("Transport did not reply to Produce."))
 
+    case ProduceWithAck(r, _, _) =>
+      log.info(s"ProduceWithAck message was not handled by ${thisActorName}.")
+      sender ! RecordNotProduced(r, new IllegalStateException("Transport did not reply to Produce."))
+
     case r@RecordProduced(_) =>
       log.info(s"$thisActorName: Record produced.")
       sender ! r

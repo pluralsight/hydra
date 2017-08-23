@@ -38,6 +38,14 @@ class TransportSpec extends TestKit(ActorSystem("test")) with Matchers with FunS
           r shouldBe rec
           err shouldBe a[IllegalStateException]
       }
+
+      ing ! ProduceWithAck(rec, null, null)
+      expectMsgPF() {
+        case RecordNotProduced(r, err) =>
+          r shouldBe rec
+          err shouldBe a[IllegalStateException]
+      }
+
       ing ! RecordProduced(null)
       expectMsg(RecordProduced(null))
 
