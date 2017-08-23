@@ -26,7 +26,8 @@ lazy val defaultSettings = Seq(
   resolvers += "Scalaz Bintray Repo" at "https://dl.bintray.com/scalaz/releases",
   resolvers += "Confluent Maven Repo" at "http://packages.confluent.io/maven/",
   resolvers += "jitpack" at "https://jitpack.io",
-
+  coverageEnabled := true,
+  coverageExcludedPackages := ".*Exception*;.*RequestParams.*",
   ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet,
   ivyScala := ivyScala.value map (_.copy(overrideScalaVersion = true))
 )
