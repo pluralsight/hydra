@@ -4,7 +4,7 @@ import akka.util.Timeout
 import configs.syntax._
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
-import hydra.core.ingest.Ingestor.{IngestorInitializationError, IngestorInitialized}
+import hydra.core.akka.InitializingActor.{InitializationError, Initialized}
 import hydra.core.protocol._
 import hydra.core.transport.AckStrategy.Explicit
 import hydra.core.transport.{AckStrategy, RecordFactory}
@@ -41,11 +41,11 @@ trait TransportOps extends ConfigSupport with LoggingAdapter {
   /**
     * Overrides the init method to look up a transport
     */
-  override def initIngestor: Future[HydraMessage] = {
+  override def init: Future[HydraMessage] = {
     transportActorFuture
-      .map(t => IngestorInitialized)
+      .map(t => Initialized)
       .recover {
-        case e => IngestorInitializationError(new IllegalArgumentException(s"[$thisActorName]: No transport found " +
+        case e => InitializationError(new IllegalArgumentException(s"[$thisActorName]: No transport found " +
           s" $transportPath", e))
       }
   }

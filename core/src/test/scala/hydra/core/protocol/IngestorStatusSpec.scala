@@ -1,5 +1,6 @@
 package hydra.core.protocol
 
+import akka.http.scaladsl.model.StatusCodes
 import org.scalatest.Matchers
 import org.scalatest.FlatSpecLike
 
@@ -23,5 +24,11 @@ class IngestorStatusSpec extends Matchers with FlatSpecLike {
     IngestorError(ex).completed shouldBe true
     IngestorCompleted.statusCode.intValue shouldBe 200
     IngestorCompleted.completed shouldBe true
+    IngestorCompleted.message shouldBe StatusCodes.OK.reason
+  }
+
+  it should "create an invalid request from a string" in {
+    new InvalidRequest("error!").error shouldBe a[IllegalArgumentException]
+    new InvalidRequest("error!").error.getMessage shouldBe "error!"
   }
 }

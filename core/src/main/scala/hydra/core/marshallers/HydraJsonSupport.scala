@@ -73,7 +73,6 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
   }
 
   implicit val genericServiceResponseFormat = jsonFormat2(GenericServiceResponse)
-  implicit val genericErrorResponseFormat = jsonFormat(ExceptionalServiceResponse, "status", "error")
 
   implicit object UUIDFormat extends RootJsonFormat[UUID] {
 
@@ -82,31 +81,26 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
     }
 
     def read(json: JsValue): UUID = json match {
-      case JsString(s) => Try(UUID.fromString(s)).getOrElse(error(s))
-      case _ => error(json.toString())
-    }
-
-    def error(v: Any): UUID = {
-      error(s"'$v' is not a valid UUID.")
+      case JsString(s) => Try(UUID.fromString(s)).getOrElse(deserializationError(s))
+      case _ => deserializationError(s"'${json.toString()}' is not a valid UUID.")
     }
   }
 
 
   implicit object DateTimeFormat extends RootJsonFormat[DateTime] {
-
-    val parser = ISODateTimeFormat.dateOptionalTimeParser()
+    val formatter = ISODateTimeFormat.basicDateTimeNoMillis()
 
     def write(obj: DateTime): JsValue = {
-      JsString(ISODateTimeFormat.basicDateTime.print(obj))
+      JsString(formatter.print(obj))
     }
 
     def read(json: JsValue): DateTime = json match {
-      case JsString(s) => Try(parser.parseDateTime(s)).getOrElse(error(s))
+      case JsString(s) => Try(formatter.parseDateTime(s)).getOrElse(error(s))
       case _ => error(json.toString())
     }
 
     def error(v: Any): DateTime = {
-      error(
+      deserializationError(
         s"""
            |'$v' is not a valid date value. Dates must be in format:
            |     * date-opt-time     = date-element ['T' [time-element] [offset]]

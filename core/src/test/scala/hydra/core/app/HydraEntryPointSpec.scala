@@ -2,7 +2,7 @@ package hydra.core.app
 
 import akka.actor.{ActorRefFactory, ActorSystem, Props}
 import akka.http.scaladsl.server.Route
-import akka.testkit.TestKit
+import com.github.vonnagy.service.container.MissingConfigException
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import com.github.vonnagy.service.container.service.ContainerService
 import com.typesafe.config.{Config, ConfigFactory}
@@ -12,7 +12,7 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 /**
   * Created by alexsilva on 3/7/17.
   */
-class HydraEntryPointSpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike with BeforeAndAfterAll {
+class HydraEntryPointSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
 
 
   val conf =
@@ -40,7 +40,6 @@ class HydraEntryPointSpec extends TestKit(ActorSystem("test")) with Matchers wit
   val container = et.buildContainer()
 
   override def afterAll = {
-    TestKit.shutdownActorSystem(system)
     container.shutdown()
   }
 
@@ -53,9 +52,16 @@ class HydraEntryPointSpec extends TestKit(ActorSystem("test")) with Matchers wit
       et.extensions shouldBe ConfigFactory.parseString(conf).getConfig("hydra_test.extensions")
     }
 
+
+    it("throws error if config is missing") {
+      intercept[MissingConfigException] {
+        et.validateConfig("tester")
+      }
+    }
+
     it("builds a container") {
       val csvc = new ContainerService(Seq(classOf[DummyEndpoint]), Nil, Seq("test" -> Props[DummyActor]), Nil,
-        "hydra_test-test")
+        "hydra_test-test")(container.system)
       csvc.name shouldBe container.name
       csvc.registeredRoutes shouldBe container.registeredRoutes
       csvc.name shouldBe container.name

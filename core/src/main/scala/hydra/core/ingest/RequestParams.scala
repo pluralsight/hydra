@@ -3,6 +3,7 @@ package hydra.core.ingest
 /**
   * Created by alexsilva on 12/3/16.
   */
+// $COVERAGE-OFF$Disabling highlighting by default until a workaround for https://issues.scala-lang.org/browse/SI-8596 is found
 object RequestParams {
 
   /**
@@ -117,3 +118,4 @@ object RequestParams {
   val HYDRA_INGEST_TIMEOUT = "hydra-ingest-timeout"
 
 }
+// $COVERAGE-ON$
