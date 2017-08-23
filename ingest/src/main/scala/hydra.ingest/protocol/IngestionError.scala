@@ -17,7 +17,7 @@ package hydra.ingest.protocol
 
 import hydra.avro.registry.{ConfluentSchemaRegistry, RegistrySchemaResource}
 import hydra.common.config.ConfigSupport
-import hydra.core.notification.HydraEvent
+import hydra.core.protocol.HydraMessage
 import org.apache.avro.Schema
 import spray.json.{DefaultJsonProtocol, JsNumber, JsObject, JsString, JsValue, JsonFormat}
 
@@ -29,7 +29,7 @@ import scala.util.Try
 
 case class IngestionError(source: String, timestamp: Long,
                           destinationTopic: String, payload: String, schema: Option[String], errorType: String,
-                          errorMessage: String) extends HydraEvent[String]
+                          errorMessage: String) extends HydraMessage
 
 object IngestionError extends DefaultJsonProtocol with ConfigSupport {
 
