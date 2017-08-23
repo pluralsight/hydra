@@ -26,6 +26,7 @@ import hydra.core.extensions.HydraActorModule.Run
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{FiniteDuration, _}
+import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 /**

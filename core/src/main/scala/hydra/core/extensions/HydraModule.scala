@@ -54,7 +54,6 @@ sealed trait HydraModule {
 }
 
 trait HydraTypedModule extends HydraModule with LoggingAdapter {
-
   /**
     * The equivalent of preStart
     *

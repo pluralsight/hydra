@@ -2,6 +2,7 @@ package hydra.core.extension
 
 import akka.actor.{ActorSystem, ExtendedActorSystem, Extension, ExtensionId, ExtensionIdProvider}
 import com.typesafe.config.{Config, ConfigFactory}
+import hydra.core.extensions.HydraActorModule.Run
 import hydra.core.extensions.{HydraActorModule, HydraExtensionBase, HydraTypedModule}
 
 case class HydraTestExtensionImpl(system: ActorSystem, cfg: Config)
@@ -51,7 +52,8 @@ class TestActorModule(val id: String, val config: Config) extends HydraActorModu
 
   override def run(): Unit = counter += 1
 
-  override def receive = super.receive orElse {
+  override def receive = synchronized {
+    case Run => run()
     case "counter" => sender ! counter
   }
 }
