@@ -3,9 +3,8 @@ package hydra.kafka.health
 import akka.actor.Actor
 import com.github.vonnagy.service.container.health.{GetHealth, HealthInfo, HealthState}
 import configs.syntax._
-import hydra.core.notification.{NotificationSupport, Publish}
 import hydra.kafka.health.KafkaHealthCheckActor.GetKafkaHealth
-import org.apache.kafka.clients.producer.{Callback, KafkaProducer, ProducerRecord, RecordMetadata}
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.joda.time.DateTime
 
 import scala.collection.JavaConverters._
@@ -14,7 +13,7 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 9/30/16.
   */
-class KafkaHealthCheckActor extends Actor with ClusterHealthCheck with NotificationSupport {
+class KafkaHealthCheckActor extends Actor with ClusterHealthCheck {
 
   val interval = applicationConfig.get[FiniteDuration]("kafka.health_check.interval").valueOrElse(10.seconds)
 
@@ -39,20 +38,21 @@ class KafkaHealthCheckActor extends Actor with ClusterHealthCheck with Notificat
 
   private def maybePublish(newHealth: HealthInfo) = {
     if (newHealth.state != currentHealth.state || currentHealth.state == HealthState.CRITICAL) {
-      observers ! Publish(channel, newHealth.toString)
+      context.system.eventStream.publish(newHealth)
     }
   }
 
   private def sendTestMessage(): Unit = {
     val time = System.currentTimeMillis().toString
     val record = new ProducerRecord[String, String](healthCheckTopic, time)
-    producer.send(record, new Callback() {
-      override def onCompletion(metadata: RecordMetadata, e: Exception): Unit = {
-        val h = if (e != null) critical(e)
-        else HealthInfo("Kafka", details = s"Metadata request succeeded at ${DateTime.now.toString()}.")
-        maybePublish(h)
-        currentHealth = h
+    producer.send(record, (metadata: RecordMetadata, e: Exception) => {
+      val h = if (e != null) {
+        critical(e)
+      } else {
+        HealthInfo("Kafka", details = s"Metadata request succeeded at ${DateTime.now.toString()}.")
       }
+      maybePublish(h)
+      currentHealth = h
     })
   }
 

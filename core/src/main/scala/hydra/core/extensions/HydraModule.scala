@@ -19,6 +19,7 @@ package hydra.core.extensions
 import akka.actor._
 import com.typesafe.config.Config
 import hydra.common.logging.LoggingAdapter
+import hydra.core.extensions.HydraActorModule.Run
 
 import scala.concurrent.Future
 
@@ -32,7 +33,7 @@ import scala.concurrent.Future
   *
   * Created by alexsilva on 12/17/15.
   */
-sealed trait BaseHydraExtension {
+sealed trait HydraModule {
 
   /**
     * Must be unique.
@@ -54,9 +55,9 @@ sealed trait BaseHydraExtension {
   def run(): Unit
 }
 
-trait HydraTypedExtension extends BaseHydraExtension with LoggingAdapter {
+trait HydraTypedModule extends HydraModule with LoggingAdapter {
 
-  override val context: ActorContext = TypedActor.context
+  override def context: ActorContext = TypedActor.context
 
   /**
     * The equivalent of preStart
@@ -78,8 +79,14 @@ trait HydraTypedExtension extends BaseHydraExtension with LoggingAdapter {
 
 }
 
-trait HydraExtension extends Actor with BaseHydraExtension with LoggingAdapter
+trait HydraActorModule extends Actor with HydraModule with LoggingAdapter {
+  override def receive = {
+    case Run => run()
+  }
+}
 
-object HydraExtension {
+object HydraActorModule {
+
   case object Run
+
 }
