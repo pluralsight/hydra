@@ -2,8 +2,8 @@ package hydra.core.ingest
 
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
-import hydra.core.protocol.{IngestorCompleted, IngestorError, ValidRequest, WaitingForAck}
-import hydra.core.transport._
+import hydra.core.protocol.{IngestorCompleted, IngestorError, ValidRequest}
+import hydra.core.transport.{HydraRecord, RecordFactory, RetryStrategy, TransportTester}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.util.Success
@@ -39,13 +39,6 @@ class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers with F
       val t = system.actorOf(Props[TestTransportIngestor])
       t ! req
       expectMsg(IngestorCompleted)
-    }
-
-    it("acknowledges requests with explicit acks") {
-      val req = HydraRequest(123, "test").withAckStrategy(AckStrategy.Explicit)
-      val t = system.actorOf(Props[TestTransportIngestor])
-      t ! req
-      expectMsg(WaitingForAck)
     }
   }
 }
