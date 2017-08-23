@@ -36,7 +36,7 @@ object AvroRecordFactory extends KafkaRecordFactory[String, GenericRecord] with 
   override def build(request: HydraRequest): Try[AvroRecord] = {
     val schemaResource: Try[SchemaResource] = Try(schemaResourceLoader.getResource(getSubject(request)))
     Try(AvroRecord(getTopic(request), schemaResource.get.schema, getKey(request),
-      request.payload, request.retryStrategy))
+      request.payload, request.deliveryStrategy))
   }
 
   def getSubject(request: HydraRequest): String = {

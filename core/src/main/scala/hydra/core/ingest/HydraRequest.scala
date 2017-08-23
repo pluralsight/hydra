@@ -1,7 +1,7 @@
 package hydra.core.ingest
 
 import hydra.core.transport.ValidationStrategy.Strict
-import hydra.core.transport.{AckStrategy, RetryStrategy, ValidationStrategy}
+import hydra.core.transport.{AckStrategy, DeliveryStrategy, ValidationStrategy}
 
 import scala.util.Random
 
@@ -11,7 +11,7 @@ import scala.util.Random
 case class HydraRequest(correlationId: Long = Random.nextInt(),
                         payload: String,
                         metadata: Map[String, String] = Map.empty,
-                        retryStrategy: RetryStrategy = RetryStrategy.Ignore,
+                        deliveryStrategy: DeliveryStrategy = DeliveryStrategy.BestEffort,
                         validationStrategy: ValidationStrategy = Strict,
                         ackStrategy: AckStrategy = AckStrategy.None) {
 
@@ -37,8 +37,8 @@ case class HydraRequest(correlationId: Long = Random.nextInt(),
 
   def withAckStrategy(strategy: AckStrategy) = copy(ackStrategy = strategy)
 
-  def withRetryStrategy(retryStrategy: RetryStrategy) =
-    copy(retryStrategy = retryStrategy)
+  def withDeliveryStrategy(strategy: DeliveryStrategy) =
+    copy(deliveryStrategy = strategy)
 
   def withValidationStratetegy(validationStrategy: ValidationStrategy) =
     copy(validationStrategy = validationStrategy)

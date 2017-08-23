@@ -6,7 +6,7 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.stream.ActorMaterializer
 import akka.testkit.TestKit
 import hydra.core.ingest.RequestParams
-import hydra.core.transport.{RetryStrategy, ValidationStrategy}
+import hydra.core.transport.{DeliveryStrategy, ValidationStrategy}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FunSpecLike, Matchers}
 
@@ -24,7 +24,7 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
         HttpMethods.POST,
         headers = Seq(RawHeader("hydra", "awesome"),
           RawHeader(RequestParams.HYDRA_VALIDATION_STRATEGY, "relaxed"),
-          RawHeader(RequestParams.HYDRA_RETRY_STRATEGY, "retry")),
+          RawHeader(RequestParams.HYDRA_DELIVERY_STRATEGY, "retry")),
         uri = "/test",
         entity = HttpEntity(MediaTypes.`application/json`, json))
       val req = new HttpRequestFactory().createRequest(123, httpRequest)
@@ -33,7 +33,7 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
         req.correlationId shouldBe "label"
         req.metadataValue("hydra") shouldBe Some("awesome")
         req.validationStrategy shouldBe ValidationStrategy.Relaxed
-        req.retryStrategy shouldBe RetryStrategy.Persist
+        req.deliveryStrategy shouldBe DeliveryStrategy.AtLeastOnce
       }
     }
   }
