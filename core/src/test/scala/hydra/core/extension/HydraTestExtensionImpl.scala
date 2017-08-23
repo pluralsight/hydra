@@ -2,17 +2,34 @@ package hydra.core.extension
 
 import akka.actor.{ActorSystem, ExtendedActorSystem, Extension, ExtensionId, ExtensionIdProvider}
 import com.typesafe.config.{Config, ConfigFactory}
-import hydra.core.extensions.HydraExtensionBase
+import hydra.core.extensions.{HydraActorModule, HydraExtensionBase, HydraTypedModule}
 
 case class HydraTestExtensionImpl(system: ActorSystem, cfg: Config)
-  extends HydraExtensionBase("test-ext", cfg)(system) with Extension
+  extends HydraExtensionBase("tester", cfg)(system) with Extension
 
 object HydraTestExtension extends ExtensionId[HydraTestExtensionImpl] with ExtensionIdProvider {
+
   val cfg = ConfigFactory.parseString(
     """
-      |tester{
-      |  name=typed-test
-      |  class=hydra.core.extension.HydraTestExtension
+      |  test-typed {
+      |    name=typed-module-test
+      |    class=hydra.core.extension.TestTypedModule
+      |}
+      |
+      | test-typed-interval {
+      |    name=typed-module-test
+      |    class=hydra.core.extension.TestTypedModule
+      |    interval = 50ms
+      |}
+      |
+      |  test-actor {
+      |    name=typed-actor-test
+      |    class=hydra.core.extension.TestActorModule
+      |}
+      |  test-actor-disabled {
+      |    enabled=false
+      |    name=typed-actor-test
+      |    class=hydra.core.extension.TestActorModule
       |}
     """.stripMargin)
 
@@ -21,4 +38,25 @@ object HydraTestExtension extends ExtensionId[HydraTestExtensionImpl] with Exten
   override def createExtension(system: ExtendedActorSystem) = new HydraTestExtensionImpl(system, cfg)
 
   override def get(system: ActorSystem): HydraTestExtensionImpl = super.get(system)
+}
+
+class TestTypedModule(val id: String, val config: Config) extends HydraTypedModule {
+  override def run(): Unit = TestTypedModuleCounter.counter += 1
+}
+
+
+class TestActorModule(val id: String, val config: Config) extends HydraActorModule {
+  @volatile
+  var counter = 0
+
+  override def run(): Unit = counter += 1
+
+  override def receive = super.receive orElse {
+    case "counter" => sender ! counter
+  }
+}
+
+object TestTypedModuleCounter {
+  @volatile
+  var counter = 0
 }

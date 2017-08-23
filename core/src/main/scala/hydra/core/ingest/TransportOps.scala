@@ -30,10 +30,10 @@ trait TransportOps extends ConfigSupport with LoggingAdapter {
     */
   def transportName: String
 
-  val transportPath = applicationConfig.get[String](s"transports.$transportName.path")
+  lazy val transportPath = applicationConfig.get[String](s"transports.$transportName.path")
     .valueOrElse(s"/user/service/${transportName}_transport")
 
-  private val transportResolveTimeout = Timeout(applicationConfig
+  private lazy val transportResolveTimeout = Timeout(applicationConfig
     .getOrElse[FiniteDuration](s"transports.$transportName.resolve-timeout", 5 seconds).value)
 
   lazy val transportActorFuture = context.actorSelection(transportPath).resolveOne()(transportResolveTimeout)
@@ -46,7 +46,7 @@ trait TransportOps extends ConfigSupport with LoggingAdapter {
       .map(t => Initialized)
       .recover {
         case e => InitializationError(new IllegalArgumentException(s"[$thisActorName]: No transport found " +
-          s" $transportPath", e))
+          s" at $transportPath", e))
       }
   }
 

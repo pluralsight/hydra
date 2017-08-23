@@ -42,8 +42,6 @@ sealed trait HydraModule {
     */
   def id: String
 
-  def context: ActorContext
-
   def config: Config
 
   /**
@@ -56,8 +54,6 @@ sealed trait HydraModule {
 }
 
 trait HydraTypedModule extends HydraModule with LoggingAdapter {
-
-  override def context: ActorContext = TypedActor.context
 
   /**
     * The equivalent of preStart

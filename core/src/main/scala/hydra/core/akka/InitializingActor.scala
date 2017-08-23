@@ -49,7 +49,7 @@ trait InitializingActor extends Actor with ActorConfigSupport with Stash with Lo
     case Initialized =>
       cancelReceiveTimeout
       context.become(composedReceive)
-      log.info("Ingestor {}[{}] initialized", Seq(thisActorName, self.path): _*)
+      log.info("{}[{}] initialized", Seq(thisActorName, self.path): _*)
       unstashAll()
 
     case err@InitializationError(ex) =>

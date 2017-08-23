@@ -18,6 +18,6 @@ class HydraExtensionListener(extensionName: String, config: Config) extends Cont
   }
 
   override def onShutdown(container: ContainerService): Unit = {
-    //nothing required here; module lifecycle is managed by akka internally.
+    HydraExtensionRegistry.get(container.system).getTypedModules.foreach(_.stop())
   }
 }

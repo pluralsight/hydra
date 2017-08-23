@@ -41,11 +41,11 @@ object HydraExtensionLoader extends LoggingAdapter {
       } else {
         Failure(new IllegalArgumentException(s"Extension $name is not enabled."))
       }
-    }.valueOrThrow(_ => new IllegalArgumentException(s"No extension configured under key $name"))
+    }.valueOrThrow(e => new IllegalArgumentException(s"Error loading extension $name: ${e.configException}."))
   }
 
   private def instantiate(dm: DynamicAccess, system: ActorSystem,
-                          clazz: String, name: String): Try[HydraExtension] = {
+                          clazz: String, name: String): Try[ExtensionId[_]] = {
     val start = System.currentTimeMillis
 
     val ext = dm.getObjectFor[AnyRef](clazz).recoverWith {
@@ -55,12 +55,11 @@ object HydraExtensionLoader extends LoggingAdapter {
     //register with akka
     val hydraExt = ext match {
       case Success(p: ExtensionIdProvider) =>
-        val e = p.lookup()
-        system.registerExtension(e)
-        Success(e.asInstanceOf[HydraExtension])
+        system.registerExtension(p.lookup())
+        Success(p.lookup())
       case Success(p: ExtensionId[_]) =>
         system.registerExtension(p)
-        Success(p.asInstanceOf[HydraExtension])
+        Success(p)
       case Success(x) =>
         throw new IllegalArgumentException(s"Unexpected result $x when trying to load extension [[$clazz]. Skipping.")
       case Failure(e) =>
