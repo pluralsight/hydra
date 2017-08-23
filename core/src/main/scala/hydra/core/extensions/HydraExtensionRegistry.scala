@@ -14,6 +14,8 @@ class HydraExtensionRegistryImpl extends Extension {
 
   def register(id: String, ext: EXT) = map.put(id, ext)
 
+  def getTypedModules: Seq[HydraTypedModule] = map.filter(x => x._2.isRight).flatMap(_._2.toSeq).toSeq
+
   def getModule(id: String): Option[EXT] = map.get(id)
 
 }

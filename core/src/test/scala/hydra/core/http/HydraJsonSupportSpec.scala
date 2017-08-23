@@ -69,7 +69,7 @@ class HydraJsonSupportSpec extends Matchers with FunSpecLike with HydraJsonSuppo
         s""""123"""".parseJson.convertTo[DateTime] shouldBe s
       }
       intercept[DeserializationException] {
-        JsNumber(1).convertTo[UUID]
+        JsNumber(1).convertTo[DateTime]
       }
     }
   }

@@ -2,6 +2,7 @@ package hydra.core.app
 
 import akka.actor.{ActorRefFactory, ActorSystem, Props}
 import akka.http.scaladsl.server.Route
+import akka.testkit.TestKit
 import com.github.vonnagy.service.container.MissingConfigException
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import com.github.vonnagy.service.container.service.ContainerService
@@ -40,6 +41,7 @@ class HydraEntryPointSpec extends Matchers with FunSpecLike with BeforeAndAfterA
   val container = et.buildContainer()
 
   override def afterAll = {
+    TestKit.shutdownActorSystem(container.system)
     container.shutdown()
   }
 
