@@ -2,19 +2,20 @@ package hydra.ingest.services
 
 import akka.actor.{Actor, ActorRef}
 import com.pluralsight.hydra.avro.JsonToAvroConversionException
-import configs.syntax._
+import hydra.common.config.ConfigSupport
 import hydra.core.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.core.avro.schema.{GenericSchemaResource, SchemaResource}
 import hydra.core.ingest.{HydraRequest, RequestParams}
-import hydra.core.notification.{HydraEvent, NotificationSupport}
 import hydra.ingest.protocol.IngestionError
 import hydra.ingest.services.IngestionErrorHandler.InvalidRequestError
 import org.springframework.core.io.ByteArrayResource
+import configs.syntax._
+import hydra.core.protocol.HydraMessage
 
 /**
   * Created by alexsilva on 12/22/16.
   */
-class IngestionErrorHandler extends Actor with NotificationSupport {
+class IngestionErrorHandler extends Actor with ConfigSupport {
 
   val errorAvroSchema = applicationConfig.get[String]("ingest.error.schema")
     .valueOrElse("exp.engineering.platform.IngestionError")
@@ -41,14 +42,14 @@ class IngestionErrorHandler extends Actor with NotificationSupport {
     val errorRequest = HydraRequest(1, request.payload)
       .withMetadata(RequestParams.HYDRA_SCHEMA_PARAM -> errorAvroSchema)
       .withMetadata(RequestParams.HYDRA_KAFKA_TOPIC_PARAM -> errorTopic)
-    observers ! errorMsg
+    context.system.eventStream.publish(errorMsg)
   }
 }
 
 object IngestionErrorHandler {
 
   case class InvalidRequestError(source: ActorRef, target: Option[String], request: HydraRequest,
-                                 error: Throwable) extends HydraEvent[ActorRef]
+                                 error: Throwable) extends HydraMessage
 
 }
 
