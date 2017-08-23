@@ -58,7 +58,7 @@ class TransportSpec extends TestKit(ActorSystem("test")) with Matchers with FunS
 case class TestRecord(key: Option[String], payload: String) extends HydraRecord[String, String] {
   override def destination = "test"
 
-  override def retryStrategy = RetryStrategy.Persist
+  override def deliveryStrategy = DeliveryStrategy.AtLeastOnce
 }
 
 class TransportTester extends Transport {

@@ -3,7 +3,7 @@ package hydra.core.ingest
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
 import hydra.core.protocol.{IngestorCompleted, IngestorError, ValidRequest}
-import hydra.core.transport.{HydraRecord, RecordFactory, RetryStrategy, TransportTester}
+import hydra.core.transport.{HydraRecord, RecordFactory, DeliveryStrategy, TransportTester}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.util.Success
@@ -51,7 +51,7 @@ object TestRecordFactory extends RecordFactory[String, String] {
 
     override def payload = r.payload
 
-    override def retryStrategy = RetryStrategy.Ignore
+    override def deliveryStrategy = DeliveryStrategy.AtLeastOnce
   })
 
   override def validate(request: HydraRequest) = ValidRequest

@@ -54,10 +54,10 @@ object RequestParams {
   val HYDRA_RECORD_FORMAT_PARAM = "hydra-record-format"
 
   /**
-    * Specifies the retry strategy. The options are fail (default) or retry, which will retry using
-    * the default retry logic defined within Akka.
+    * Specifies the delivery strategy. The options are BestEffort (default) or AtLeastOnce, which will retry using
+    * the at-least-once logic defined within Akka Persistence.
     */
-  val HYDRA_RETRY_STRATEGY = "hydra-retry-strategy"
+  val HYDRA_DELIVERY_STRATEGY = "hydra-delivery-strategy"
 
   /**
     * Defines how Avro messages should be validated.

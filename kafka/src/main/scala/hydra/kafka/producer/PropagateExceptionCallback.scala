@@ -17,7 +17,7 @@ case class PropagateExceptionCallback(producer: ActorSelection,
       producer ! RecordNotProduced(record, e)
     }
     else {
-      producer ! KafkaRecordMetadata(metadata, deliveryId, record.retryStrategy)
+      producer ! KafkaRecordMetadata(metadata, deliveryId, record.deliveryStrategy)
     }
   }
 }
@@ -33,7 +33,7 @@ case class PropagateExceptionWithAckCallback(producer: ActorSelection,
       ingestor ! ProducerAck(supervisor, Some(e))
     }
     else {
-      producer ! KafkaRecordMetadata(metadata, deliveryId, record.retryStrategy)
+      producer ! KafkaRecordMetadata(metadata, deliveryId, record.deliveryStrategy)
       ingestor ! ProducerAck(supervisor, None)
     }
   }

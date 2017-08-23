@@ -1,6 +1,6 @@
 package hydra.sandbox.produce
 
-import hydra.core.transport.{HydraRecord, RetryStrategy}
+import hydra.core.transport.{HydraRecord, DeliveryStrategy}
 
 /**
   * Created by alexsilva on 3/29/17.
@@ -9,5 +9,5 @@ case class FileRecord(destination: String, payload: String) extends HydraRecord[
 
   override val key: Option[String] = None
 
-  override val retryStrategy: RetryStrategy = RetryStrategy.Ignore
+  override val deliveryStrategy: DeliveryStrategy = DeliveryStrategy.BestEffort
 }

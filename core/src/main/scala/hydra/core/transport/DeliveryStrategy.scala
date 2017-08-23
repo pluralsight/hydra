@@ -7,25 +7,25 @@ package hydra.core.transport
   *
   * Created by alexsilva on 10/4/16.
   */
-trait RetryStrategy {
+trait DeliveryStrategy {
   def retryOnFailure: Boolean
 }
 
-object RetryStrategy {
+object DeliveryStrategy {
 
-  def apply(strategy: String): RetryStrategy = {
+  def apply(strategy: String): DeliveryStrategy = {
     Option(strategy).map(_.trim.toLowerCase) match {
-      case Some("persist") => Persist
-      case _ => Ignore
+      case Some("at-least-once") => AtLeastOnce
+      case _ => BestEffort
     }
   }
 
-  case object Ignore extends RetryStrategy {
+  case object BestEffort extends DeliveryStrategy {
     override val retryOnFailure: Boolean = false
 
   }
 
-  case object Persist extends RetryStrategy {
+  case object AtLeastOnce extends DeliveryStrategy {
     override val retryOnFailure: Boolean = true
   }
 
