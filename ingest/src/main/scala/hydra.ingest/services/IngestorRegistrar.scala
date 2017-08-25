@@ -27,10 +27,10 @@ class IngestorRegistrar extends Actor with ConfigSupport with LoggingAdapter {
   lazy val ingestors = new ClasspathIngestorLoader(pkgs).ingestors.map(h => ActorUtils.actorName(h) -> h)
 
   override def receive = {
-    case RegisterWithClass(group, clazz) =>
-      registry ! RegisterWithClass(group, clazz)
+    case RegisterWithClass(group, name, clazz) =>
+      registry ! RegisterWithClass(group, name, clazz)
 
-    case IngestorInfo(name, group, path, time) =>
+    case IngestorInfo(name, group, path, _) =>
       log.info(s"Ingestor $name [$group] is available at $path")
   }
 
@@ -39,6 +39,6 @@ class IngestorRegistrar extends Actor with ConfigSupport with LoggingAdapter {
   }
 
   override def preStart(): Unit = {
-    ingestors.foreach(h => registry ! RegisterWithClass("global", h._2))
+    ingestors.foreach(h => registry ! RegisterWithClass(h._2, "global", Some(h._1)))
   }
 }
