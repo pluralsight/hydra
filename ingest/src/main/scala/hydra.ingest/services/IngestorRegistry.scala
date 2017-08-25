@@ -16,13 +16,13 @@
 
 package hydra.ingest.services
 
-import akka.actor.Status.Failure
 import akka.actor.{Props, _}
 import akka.routing.{FromConfig, RoundRobinPool}
 import com.typesafe.config.Config
 import hydra.common.config.ActorConfigSupport
 import hydra.common.util.ActorUtils
 import hydra.core.ingest.{HydraRequest, Ingestor}
+import hydra.core.protocol.HydraMessage
 import hydra.ingest.ingestors.IngestorInfo
 import hydra.ingest.services.IngestorRegistry._
 import org.joda.time.DateTime
@@ -40,11 +40,9 @@ class IngestorRegistry extends Actor with ActorLogging with ActorConfigSupport {
   private object RegistrationLock
 
   override def receive: Receive = {
-    case RegisterWithClass(group, clazz) =>
-      val name = ActorUtils.actorName(clazz)
-      val ingestor = doRegister(name, group, clazz)
-      context.watch(ingestor.ref)
-      sender ! IngestorInfo(name, group, ingestor.ref.path, ingestor.registrationTime)
+    case RegisterWithClass(clazz, group, name) =>
+      val ingestorName = name getOrElse ActorUtils.actorName(clazz)
+      sender ! doRegister(ingestorName, group, clazz)
 
     case Unregister(name) =>
       ingestors.remove(name) match {
@@ -52,8 +50,9 @@ class IngestorRegistry extends Actor with ActorLogging with ActorConfigSupport {
           context.unwatch(handler.ref)
           log.debug(s"Removed ingestor $name")
           context.stop(handler.ref)
+          sender ! Unregistered(name)
 
-        case None => log.info(s"Handler $name not found")
+        case None => sender ! IngestorNotFound(name)
       }
 
     case FindByName(name) =>
@@ -65,19 +64,21 @@ class IngestorRegistry extends Actor with ActorLogging with ActorConfigSupport {
       sender ! LookupResult(info.toList)
 
     case Terminated(handler) => {
-      //todo: ADD RESTART?
       log.error(s"Ingestor ${handler} terminated.")
+      context.system.eventStream.publish(IngestorTerminated(handler.path.toString))
     }
   }
 
-  def doRegister(name: String, group:String, clazz: Class[_ <: Ingestor]): RegisteredIngestor = {
+  def doRegister(name: String, group: String, clazz: Class[_ <: Ingestor]): HydraMessage = {
     RegistrationLock.synchronized {
-      if (ingestors.contains(name)) {
-        sender ! Failure(IngestorAlreadyRegisteredException(s"Ingestor $name is already registered."))
-      }
-      val ingestor = RegisteredIngestor(name, group, context.actorOf(ingestorProps(name, clazz), name), DateTime.now())
-      ingestors + (name -> ingestor)
-      ingestor
+      ingestors.get(name)
+        .map(i => IngestorAlreadyRegistered(s"Ingestor $name is already registered at ${i.registrationTime}."))
+        .getOrElse {
+          val ingestor = RegisteredIngestor(name, group, context.actorOf(ingestorProps(name, clazz), name), DateTime.now())
+          ingestors + (name -> ingestor)
+          context.watch(ingestor.ref)
+          IngestorInfo(name, group, ingestor.ref.path, ingestor.registrationTime)
+        }
     }
   }
 
@@ -114,7 +115,13 @@ case class RegisteredIngestor(name: String, group: String, ref: ActorRef, regist
 
 object IngestorRegistry {
 
-  case class RegisterWithClass(group: String, clazz: Class[_ <: Ingestor])
+  /**
+    *
+    * @param group The group to which register this ingestor.
+    * @param name  The name to use; if None ActorUtils.actorName(clazz) will be used.
+    * @param clazz The Ingestor class.
+    */
+  case class RegisterWithClass(clazz: Class[_ <: Ingestor], group: String, name: Option[String] = None)
 
   case class Unregister(name: String)
 
@@ -126,8 +133,12 @@ object IngestorRegistry {
 
   case class FindByRequest(request: HydraRequest)
 
-  case class LookupRequestResult(request: HydraRequest, ingestors: Seq[IngestorInfo])
+  case class IngestorAlreadyRegistered(msg: String) extends HydraMessage
 
-  case class IngestorAlreadyRegisteredException(msg: String) extends RuntimeException(msg)
+  case class IngestorNotFound(name: String) extends HydraMessage
+
+  case class Unregistered(name: String) extends HydraMessage
+
+  case class IngestorTerminated(path: String) extends HydraMessage
 
 }

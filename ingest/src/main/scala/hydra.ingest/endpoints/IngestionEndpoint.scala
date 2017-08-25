@@ -24,6 +24,7 @@ import akka.stream.ActorMaterializer
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
+import hydra.core.ingest.RequestParams
 import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
 import hydra.ingest.bootstrap.HydraIngestorRegistry
 import hydra.ingest.services.IngestionRequestHandler
@@ -44,17 +45,17 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
     post {
       requestEntityPresent {
         pathPrefix("ingest") {
-         // decodeRequestWith(Gzip, Deflate) {
-            parameter("correlationId".as[Long] ?) { correlationId =>
-              handleExceptions(excptHandler) {
-                pathEndOrSingleSlash {
-                  broadcastRequest(correlationId.getOrElse(randomId))
-                }
-              } ~ path(Segment) { ingestor =>
-                publishToIngestor(correlationId.getOrElse(randomId), ingestor)
+          // decodeRequestWith(Gzip, Deflate) {
+          parameter("correlationId".as[Long] ?) { correlationId =>
+            handleExceptions(excptHandler) {
+              pathEndOrSingleSlash {
+                broadcastRequest(correlationId.getOrElse(randomId))
               }
+            } ~ path(Segment) { ingestor =>
+              publishToIngestor(correlationId.getOrElse(randomId), ingestor)
             }
           }
+        }
         //}
       }
     }
@@ -82,12 +83,14 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
   def publishToIngestor(correlationId: Long, ingestor: String) = {
     onSuccess(lookupIngestor(ingestor)) { result =>
       result.ingestors.headOption match {
-        case Some(ref) =>
-          extractRequestContext { ctx =>
-            val hydraReq = createRequest[String, HttpRequest](correlationId, ctx.request)
-            onSuccess(hydraReq) { req =>
+        case Some(_) =>
+          extractRequest { httpRequest =>
+            val hydraReqFuture = createRequest[String, HttpRequest](correlationId, httpRequest)
+            onSuccess(hydraReqFuture) { r =>
+              val hydraReq = r.withMetadata(RequestParams.HYDRA_INGESTOR_PARAM -> ingestor)
               imperativelyComplete { ictx =>
-                ingestorRegistry.foreach(r => actorRefFactory.actorOf(IngestionRequestHandler.props(req, r, ictx)))
+                ingestorRegistry.foreach(registry =>
+                  actorRefFactory.actorOf(IngestionRequestHandler.props(hydraReq, registry, ictx)))
               }
             }
           }

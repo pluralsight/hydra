@@ -16,7 +16,7 @@ trait HydraDirectives extends Directives with ConfigSupport {
 
   def imperativelyComplete(inner: ImperativeRequestContext => Unit): Route = { ctx: RequestContext =>
     val p = Promise[RouteResult]()
-    inner(new ImperativeRequestContext(ctx, p))
+    inner(new ImperativeRequestContextImpl(ctx, p))
     p.future
   }
 
@@ -30,8 +30,16 @@ trait HydraDirectives extends Directives with ConfigSupport {
     }
 }
 
+trait ImperativeRequestContext {
+  def complete(obj: ToResponseMarshallable): Unit
+
+  def failWith(error: Throwable): Unit
+}
+
 // an imperative wrapper for request context
-final class ImperativeRequestContext(val ctx: RequestContext, promise: Promise[RouteResult]) {
+final class ImperativeRequestContextImpl(val ctx: RequestContext, promise: Promise[RouteResult])
+  extends ImperativeRequestContext {
+
   private implicit val ec = ctx.executionContext
 
   def complete(obj: ToResponseMarshallable): Unit = ctx.complete(obj).onComplete(promise.complete)

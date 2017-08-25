@@ -8,14 +8,18 @@ import akka.testkit.TestKit
 import hydra.core.ingest.RequestParams
 import hydra.core.transport.{DeliveryStrategy, ValidationStrategy}
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.collection.immutable._
 
 /**
   * Created by alexsilva on 3/17/17.
   */
-class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with FunSpecLike with ScalaFutures {
+class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with FunSpecLike
+  with ScalaFutures with BeforeAndAfterAll {
+
+  override def afterAll = TestKit.shutdownActorSystem(system)
+
   describe("When build a HydraRequest from HTTP") {
     it("builds") {
       implicit val mat = ActorMaterializer()
@@ -24,13 +28,13 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
         HttpMethods.POST,
         headers = Seq(RawHeader("hydra", "awesome"),
           RawHeader(RequestParams.HYDRA_VALIDATION_STRATEGY, "relaxed"),
-          RawHeader(RequestParams.HYDRA_DELIVERY_STRATEGY, "retry")),
+          RawHeader(RequestParams.HYDRA_DELIVERY_STRATEGY, "at-least-once")),
         uri = "/test",
         entity = HttpEntity(MediaTypes.`application/json`, json))
       val req = new HttpRequestFactory().createRequest(123, httpRequest)
       whenReady(req) { req =>
         req.payload shouldBe json
-        req.correlationId shouldBe "label"
+        req.correlationId shouldBe 123
         req.metadataValue("hydra") shouldBe Some("awesome")
         req.validationStrategy shouldBe ValidationStrategy.Relaxed
         req.deliveryStrategy shouldBe DeliveryStrategy.AtLeastOnce

@@ -35,7 +35,7 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
 
   val start = DateTime.now()
 
-  private var ingestors: mutable.Map[String, IngestorStatus] = new mutable.HashMap
+  private val ingestors: mutable.Map[String, IngestorStatus] = new mutable.HashMap
 
   private val targetIngestor = request.metadataValue(RequestParams.HYDRA_INGESTOR_PARAM)
 
@@ -51,10 +51,11 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
 
   def waitingForIngestors: Receive = timeOut orElse {
     case LookupResult(Nil) =>
-      val code = targetIngestor.map(i => StatusCodes.custom(404, s"No ingestor named $i was found in the registry."))
+      val errorCode = targetIngestor
+        .map(i => StatusCodes.custom(404, s"No ingestor named $i was found in the registry."))
         .getOrElse(StatusCodes.BadRequest)
 
-      stop(code)
+      stop(errorCode)
 
     case LookupResult(ings) =>
       context.become(ingesting)
