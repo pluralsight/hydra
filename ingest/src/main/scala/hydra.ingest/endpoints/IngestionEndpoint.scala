@@ -41,6 +41,8 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
 
   implicit val mat = ActorMaterializer()
 
+  implicit val ec = actorRefFactory.dispatcher
+
   override val route: Route =
     post {
       requestEntityPresent {
@@ -70,7 +72,7 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
   def broadcastRequest(correlationId: Long) = {
     onSuccess(ingestorRegistry) { registry =>
       extractRequestContext { ctx =>
-        val hydraReq = createRequest[String, HttpRequest](correlationId, ctx.request)
+        val hydraReq = createRequest[HttpRequest](correlationId, ctx.request)
         onSuccess(hydraReq) { request =>
           imperativelyComplete { ictx =>
             actorRefFactory.actorOf(IngestionRequestHandler.props(request, registry, ictx))
@@ -85,7 +87,7 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
       result.ingestors.headOption match {
         case Some(_) =>
           extractRequest { httpRequest =>
-            val hydraReqFuture = createRequest[String, HttpRequest](correlationId, httpRequest)
+            val hydraReqFuture = createRequest[HttpRequest](correlationId, httpRequest)
             onSuccess(hydraReqFuture) { r =>
               val hydraReq = r.withMetadata(RequestParams.HYDRA_INGESTOR_PARAM -> ingestor)
               imperativelyComplete { ictx =>

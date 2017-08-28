@@ -6,7 +6,7 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.stream.ActorMaterializer
 import akka.testkit.TestKit
 import hydra.core.ingest.RequestParams
-import hydra.core.transport.{DeliveryStrategy, ValidationStrategy}
+import hydra.core.transport.{AckStrategy, DeliveryStrategy, ValidationStrategy}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
@@ -28,7 +28,8 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
         HttpMethods.POST,
         headers = Seq(RawHeader("hydra", "awesome"),
           RawHeader(RequestParams.HYDRA_VALIDATION_STRATEGY, "relaxed"),
-          RawHeader(RequestParams.HYDRA_DELIVERY_STRATEGY, "at-least-once")),
+          RawHeader(RequestParams.HYDRA_DELIVERY_STRATEGY, "at-least-once"),
+          RawHeader(RequestParams.HYDRA_ACK_STRATEGY, "explicit")),
         uri = "/test",
         entity = HttpEntity(MediaTypes.`application/json`, json))
       val req = new HttpRequestFactory().createRequest(123, httpRequest)
@@ -38,6 +39,26 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
         req.metadataValue("hydra") shouldBe Some("awesome")
         req.validationStrategy shouldBe ValidationStrategy.Relaxed
         req.deliveryStrategy shouldBe DeliveryStrategy.AtLeastOnce
+        req.ackStrategy shouldBe AckStrategy.Explicit
+      }
+    }
+
+    it("builds with default strategy values") {
+      implicit val mat = ActorMaterializer()
+      val json = """{"name":"value"}"""
+      val httpRequest = HttpRequest(
+        HttpMethods.POST,
+        headers = Seq(RawHeader("hydra", "awesome")),
+        uri = "/test",
+        entity = HttpEntity(MediaTypes.`application/json`, json))
+      val req = new HttpRequestFactory().createRequest(123, httpRequest)
+      whenReady(req) { req =>
+        req.payload shouldBe json
+        req.correlationId shouldBe 123
+        req.metadataValue("hydra") shouldBe Some("awesome")
+        req.validationStrategy shouldBe ValidationStrategy.Strict
+        req.deliveryStrategy shouldBe DeliveryStrategy.BestEffort
+        req.ackStrategy shouldBe AckStrategy.None
       }
     }
   }

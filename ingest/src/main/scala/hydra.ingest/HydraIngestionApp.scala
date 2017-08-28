@@ -26,7 +26,7 @@ import hydra.core.app.HydraEntryPoint
   *
   * Created by alexsilva on 2/18/16.
   */
-object HydraIngestionExampleEntryPoint extends HydraEntryPoint with IngestionActors {
+object HydraIngestionApp extends HydraEntryPoint with IngestionActors {
 
   val moduleName = "ingest"
 

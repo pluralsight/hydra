@@ -23,7 +23,7 @@ import hydra.common.config.ConfigSupport
 import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.{HydraRequest, IngestionReport}
 import hydra.core.protocol._
-import hydra.ingest.marshallers.IngestionJsonSupport
+import hydra.ingest.marshallers.HydraIngestJsonSupport
 
 import scala.concurrent.duration._
 
@@ -32,7 +32,7 @@ import scala.concurrent.duration._
   */
 class IngestionRequestHandler(request: HydraRequest, ingestionSupervisorProps: Props,
                               ctx: ImperativeRequestContext, timeout: FiniteDuration) extends Actor
-  with IngestionJsonSupport {
+  with HydraIngestJsonSupport {
 
   import context._
 

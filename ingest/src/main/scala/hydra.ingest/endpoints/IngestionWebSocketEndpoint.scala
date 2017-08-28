@@ -25,7 +25,7 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
 import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
 import hydra.ingest.bootstrap.HydraIngestorRegistry
-import hydra.ingest.ws.IngestionSocket
+import hydra.ingest.ws.HydraIngestSocket
 
 /**
   * Created by alexsilva on 12/22/15.
@@ -36,19 +36,19 @@ class IngestionWebSocketEndpoint(implicit val system: ActorSystem, implicit val 
   val enabled = applicationConfig.get[Boolean]("ingest.websocket.enabled").valueOrElse(false)
 
   override val route: Route =
-    path("ws-ingest" / Segment) { label =>
+    path("ws-ingest" / Segment) { ingestor =>
       extractHydraHeaders { headers =>
         if (enabled) {
-          handleWebSocketMessages(createSocket(label, headers))
+          handleWebSocketMessages(createSocket(ingestor, headers))
         }
         else {
-          complete(StatusCodes.Conflict, GenericServiceResponse(409, "Websocket not available."))
+          complete(StatusCodes.Conflict, GenericServiceResponse(409, "Web Socket not available."))
         }
       }
     }
 
-  private def createSocket(label: String, headers: Seq[HttpHeader]) =
-    IngestionSocket(headers.map(h => h.name().toUpperCase -> h.value).toMap).ingestionWSFlow(label)
+  private[endpoints] def createSocket(ingestor: String, headers: Seq[HttpHeader]) =
+    HydraIngestSocket(headers.map(h => h.name().toUpperCase -> h.value).toMap).ingestionWSFlow(ingestor)
 
   private val extractHydraHeaders = extract(_.request.headers.filter(_.lowercaseName.startsWith("hydra")))
 }

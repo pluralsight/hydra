@@ -1,0 +1,19 @@
+{
+  "namespace": "hydra.test",
+  "type": "record",
+  "name": "NewTester",
+  "fields": [
+    {
+      "name": "newName",
+      "type": "string"
+    },
+    {
+      "name": "nickname",
+      "type": "string"
+    },
+    {
+      "name": "value",
+      "type": "string"
+    }
+  ]
+}
