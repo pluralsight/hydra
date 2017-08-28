@@ -5,12 +5,12 @@ import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.stream.scaladsl.GraphDSL.Implicits._
 import akka.stream.scaladsl._
 import akka.stream.{FlowShape, OverflowStrategy}
-import hydra.ingest.marshallers.IngestionJsonSupport
+import hydra.ingest.marshallers.HydraIngestJsonSupport
 
 /**
   * Created by alexsilva on 3/7/17.
   */
-class IngestionSocket(fact: ActorRefFactory, metadata: Map[String, String]) extends IngestionJsonSupport {
+class HydraIngestSocket(fact: ActorRefFactory, metadata: Map[String, String]) extends HydraIngestJsonSupport {
 
   import spray.json._
 
@@ -54,6 +54,6 @@ class IngestionSocket(fact: ActorRefFactory, metadata: Map[String, String]) exte
   }
 }
 
-object IngestionSocket {
-  def apply(metadata: Map[String, String])(implicit fact: ActorRefFactory) = new IngestionSocket(fact, metadata)
+object HydraIngestSocket {
+  def apply(metadata: Map[String, String])(implicit fact: ActorRefFactory) = new HydraIngestSocket(fact, metadata)
 }

@@ -1,7 +1,7 @@
 package hydra.ingest.bootstrap
 
 import akka.actor.{ActorRef, ActorSystem}
-import akka.pattern.{after, ask}
+import akka.pattern.ask
 import akka.util.Timeout
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
@@ -9,7 +9,7 @@ import hydra.ingest.bootstrap.HydraIngestorRegistry.registryPath
 import hydra.ingest.services.IngestorRegistry
 import hydra.ingest.services.IngestorRegistry.{FindByName, LookupResult}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * Created by alexsilva on 2/21/17.
@@ -24,21 +24,19 @@ trait HydraIngestorRegistry extends IngestorRegistryComponent {
 
   implicit val system: ActorSystem
 
-  implicit val timeout = Timeout(10 seconds)
-  implicit val ec = system.dispatcher
-
-  lazy val ingestorRegistry: Future[ActorRef] = system.actorSelection(registryPath).resolveOne()
+  lazy val ingestorRegistry: Future[ActorRef] = {
+    implicit val registryLookUptimeout = Timeout(10 seconds)
+    system.actorSelection(registryPath).resolveOne()
+  }
 
 
   //println(s"THe registry is ${system.actorSelection(registryPath).resolveOne()}")
 
-  def lookupIngestor(name: String): Future[LookupResult] = {
+  def lookupIngestor(name: String)(implicit ec: ExecutionContext): Future[LookupResult] = {
+    implicit val registryLookUptimeout = Timeout(10 seconds)
     ingestorRegistry.flatMap(_ ? FindByName(name)).mapTo[LookupResult]
   }
 
-  def retry[T](f: => Future[T], delays: Seq[FiniteDuration]): Future[T] = {
-    f recoverWith { case _ if delays.nonEmpty => after(delays.head, system.scheduler)(retry(f, delays.tail)) }
-  }
 }
 
 object HydraIngestorRegistry extends ConfigSupport {

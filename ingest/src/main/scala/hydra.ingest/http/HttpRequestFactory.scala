@@ -13,7 +13,7 @@ import scala.concurrent.Future
 /**
   * Created by alexsilva on 3/14/17.
   */
-class HttpRequestFactory extends RequestFactory[String, HttpRequest] with CodingDirectives {
+class HttpRequestFactory extends RequestFactory[HttpRequest] with CodingDirectives {
 
   override def createRequest(correlationId: Long, request: HttpRequest)
                             (implicit mat: Materializer): Future[HydraRequest] = {
@@ -30,7 +30,8 @@ class HttpRequestFactory extends RequestFactory[String, HttpRequest] with Coding
 
     Unmarshal(request.entity).to[String].map { payload =>
       val metadata: Map[String, String] = request.headers.map(h => h.name.toLowerCase -> h.value).toMap
-      HydraRequest(correlationId, payload, metadata, deliveryStrategy = rs, validationStrategy = vs)
+      HydraRequest(correlationId, payload, metadata, deliveryStrategy = rs,
+        validationStrategy = vs, ackStrategy = as)
     }
   }
 }
