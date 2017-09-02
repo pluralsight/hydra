@@ -30,8 +30,6 @@ trait HydraIngestorRegistry extends IngestorRegistryComponent {
   }
 
 
-  //println(s"THe registry is ${system.actorSelection(registryPath).resolveOne()}")
-
   def lookupIngestor(name: String)(implicit ec: ExecutionContext): Future[LookupResult] = {
     implicit val registryLookUptimeout = Timeout(10 seconds)
     ingestorRegistry.flatMap(_ ? FindByName(name)).mapTo[LookupResult]

@@ -27,30 +27,16 @@ trait Ingestor extends InitializingActor {
   }
 
   override def initializationError(ex: Throwable): Receive = {
+    case Publish(req) =>
+      sender ! IngestorError(ex)
+      ingestionError(HydraIngestionError(thisActorName, ex, Some(req)))
     case _ =>
       sender ! IngestorError(ex)
-      ingestionError(ex)
   }
 
   def ingest(next: Actor.Receive) = compose(next)
 
-  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    try {
-      message.foreach(m => ingestionError(HydraIngestionError(thisActorName, reason, m.toString)))
-    }
-    finally {
-      super.preRestart(reason, message)
-    }
-  }
-
-  def ingestionError(error: HydraIngestionError): Unit = {
-    log.error(s"Ingestion error: $error")
-  }
-
-
-  def ingestionError(error: Throwable): Unit = {
-    log.error(s"Ingestion error: $error")
-  }
+  def ingestionError(error: HydraIngestionError): Unit = context.system.eventStream.publish(error)
 
   override val supervisorStrategy = OneForOneStrategy() { case _ => SupervisorStrategy.Restart }
 }

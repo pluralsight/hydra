@@ -4,6 +4,7 @@ import akka.actor.ActorRef
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import hydra.core.ingest.HydraRequest
 import hydra.core.transport.{HydraRecord, RecordMetadata}
+import org.joda.time.DateTime
 
 /**
   * Created by alexsilva on 2/22/17.
@@ -11,13 +12,11 @@ import hydra.core.transport.{HydraRecord, RecordMetadata}
 trait HydraMessage
 
 trait HydraError extends HydraMessage {
-  def cause: Throwable
+  def error: Throwable
 
 }
 
-case class GenericHydraError(cause: Throwable) extends HydraError
-
-case class HydraIngestionError(handler: String, cause: Throwable, payload: String) extends HydraError
+case class IngestionError(error: Throwable) extends HydraError
 
 case class Validate(req: HydraRequest) extends HydraMessage
 
@@ -49,6 +48,11 @@ case class RecordNotProduced[K, V](record: HydraRecord[K, V], error: Throwable) 
 
 case class ProducerAck(supervisor: ActorRef, error: Option[Throwable])
 
+//todo:rename this class
+case class HydraIngestionError(ingestor: String, error: Throwable,
+                               request: Option[HydraRequest], time: DateTime = DateTime.now) extends HydraError
+
+
 sealed trait IngestorStatus extends HydraMessage with Product {
   val name: String = productPrefix
 
@@ -79,13 +83,13 @@ case object RequestPublished extends IngestorStatus {
   val statusCode = StatusCodes.Created
 }
 
-case class IngestorError(error: Throwable) extends IngestorStatus {
+case class IngestorError(error: Throwable) extends IngestorStatus with HydraError {
   override val completed = true
   override val message = error.getMessage
   val statusCode = StatusCodes.ServiceUnavailable
 }
 
-case class InvalidRequest(error: Throwable) extends IngestorStatus with MessageValidationResult {
+case class InvalidRequest(error: Throwable) extends IngestorStatus with HydraError with MessageValidationResult {
   def this(msg: String) = this(new IllegalArgumentException(msg))
 
   override val completed = true

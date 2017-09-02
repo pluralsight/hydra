@@ -32,7 +32,6 @@ trait HydraIngestJsonSupport extends HydraJsonSupport {
 
   implicit val ingestorInfoFormat = jsonFormat4(IngestorInfo)
 
-
   implicit object IngestorStatusFormat extends RootJsonFormat[IngestorStatus] {
 
     override def write(obj: IngestorStatus): JsValue = {

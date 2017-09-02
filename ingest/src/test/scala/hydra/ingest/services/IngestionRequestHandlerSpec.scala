@@ -109,7 +109,7 @@ class IngestionRequestHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
 
 private class DummySupervisor(r: HydraRequest) extends Actor {
   if (r.correlationId == 1L) {
-    context.parent ! HydraIngestionError("dummy_ingestor", new IllegalArgumentException, r.payload)
+    context.parent ! HydraIngestionError("dummy_ingestor", new IllegalArgumentException, Some(r))
   }
   else if (r.correlationId == 2L) {
     //matches the _ in RequestHandler
@@ -123,7 +123,7 @@ private class DummySupervisor(r: HydraRequest) extends Actor {
   override def receive = {
     case Publish(_) =>
     case Validate(_) => context.parent ! ValidRequest
-    case Ingest(r) => context.parent ! HydraIngestionError("dummy_ingestor", new IllegalArgumentException, r.payload)
+    case Ingest(r) => context.parent ! HydraIngestionError("dummy_ingestor", new IllegalArgumentException, Some(r))
 
   }
 }

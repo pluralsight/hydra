@@ -48,7 +48,7 @@ class IngestionRequestHandler(request: HydraRequest, ingestionSupervisorProps: P
 
     case ReceiveTimeout => complete(errorWith(StatusCodes.custom(StatusCodes.RequestTimeout.intValue, s"No transport joined in ${timeout}.")))
 
-    case e: HydraError => fail(e.cause)
+    case e: HydraError => fail(e.error)
 
     case _ => complete(errorWith(StatusCodes.BadRequest))
   }

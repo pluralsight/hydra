@@ -7,13 +7,15 @@ import hydra.ingest.ingestors.IngestorInfo
 import hydra.ingest.services.IngestorRegistry._
 import hydra.ingest.test.TestIngestor
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 /**
   * Created by alexsilva on 3/9/17.
   */
 class IngestorRegistrySpec extends TestKit(ActorSystem("hydra")) with Matchers
-  with FunSpecLike with ImplicitSender with Eventually {
+  with FunSpecLike with ImplicitSender with Eventually with BeforeAndAfterAll {
+
+  override def afterAll = TestKit.shutdownActorSystem(system)
 
   val registry = system.actorOf(Props[IngestorRegistry], "registry")
 
