@@ -17,8 +17,7 @@ import hydra.ingest.ws.IngestionSocketActor._
 
 import scala.concurrent.duration._
 
-class IngestionSocketActor(initialMetadata: Map[String, String]) extends Actor with LoggingAdapter
-  with HydraIngestorRegistry {
+class IngestionSocketActor extends Actor with LoggingAdapter with HydraIngestorRegistry {
 
   implicit val system = context.system
 
@@ -31,15 +30,14 @@ class IngestionSocketActor(initialMetadata: Map[String, String]) extends Actor w
   private var session: SocketSession = _
 
   override def preStart(): Unit = {
-    session = new SocketSession().withMetadata(initialMetadata.toSeq: _*)
+    session = new SocketSession()
   }
 
   override def receive = waitForSocket
 
   def waitForSocket: Receive = commandReceive orElse {
-    case SocketStarted(name, actor) =>
+    case SocketStarted(actor) =>
       flowActor = actor
-      log.info(s"User $name started a web socket.")
       context.become(ingesting orElse commandReceive)
   }
 
@@ -62,6 +60,7 @@ class IngestionSocketActor(initialMetadata: Map[String, String]) extends Actor w
       flowActor ! SimpleOutgoingMessage(400, "BAD_REQUEST:Not a valid message. Use 'HELP' for help.")
 
     case SocketEnded =>
+      context.stop(flowActor)
       context.stop(self)
   }
 
@@ -73,7 +72,7 @@ class IngestionSocketActor(initialMetadata: Map[String, String]) extends Actor w
     case report: IngestionReport =>
       flowActor ! IngestionOutgoingMessage(report)
 
-    case e: HydraError => flowActor ! SimpleOutgoingMessage(StatusCodes.InternalServerError.intValue, e.cause.getMessage)
+    case e: HydraError => flowActor ! SimpleOutgoingMessage(StatusCodes.InternalServerError.intValue, e.error.getMessage)
   }
 }
 

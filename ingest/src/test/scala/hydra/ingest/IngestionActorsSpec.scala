@@ -1,7 +1,7 @@
 package hydra.ingest
 
 import hydra.common.util.ActorUtils
-import hydra.ingest.services.{IngestionActor, IngestionErrorHandler, IngestorRegistrar, IngestorRegistry}
+import hydra.ingest.services.{IngestionActor, IngestorRegistrar, IngestorRegistry}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 /**
@@ -13,7 +13,6 @@ class IngestionActorsSpec extends Matchers with FlatSpecLike with BeforeAndAfter
     services.map(_._1) shouldBe Seq(
       ActorUtils.actorName[IngestorRegistry],
       ActorUtils.actorName[IngestorRegistrar],
-      ActorUtils.actorName[IngestionErrorHandler],
       ActorUtils.actorName[IngestionActor])
   }
 }
