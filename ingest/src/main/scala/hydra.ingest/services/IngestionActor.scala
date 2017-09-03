@@ -17,7 +17,6 @@
 package hydra.ingest.services
 
 import akka.actor._
-import akka.util.Timeout
 import hydra.common.config.ActorConfigSupport
 import hydra.core.ingest.{HydraRequest, IngestionReport, RequestParams}
 import hydra.core.protocol.{IngestionError, InitiateRequest}
@@ -38,8 +37,6 @@ class IngestionActor extends Actor with ActorConfigSupport with ActorLogging wit
 
   private val ingestionTimeout = applicationConfig.get[FiniteDuration]("ingestion.timeout").valueOrElse(3.seconds)
 
-  private implicit val timeout = Timeout(ingestionTimeout)
-
   private implicit val ec = context.dispatcher
 
   override def receive: Receive = {
@@ -53,14 +50,6 @@ class IngestionActor extends Actor with ActorConfigSupport with ActorLogging wit
         Try(context.actorSelection(replyTo._2) ! r)
           .recover { case e => log.error(s"Unable to send reply back to ${receive}: ${e.getMessage}") }
       }
-    case ReceiveTimeout =>
-      log.error(s"$thisActorName: Received timeout.")
-      context.stop(self)
-
-    case other =>
-      val msg = s"${other} is not expected at this state."
-      log.warning(msg)
-      sender ! IngestionError(new IllegalArgumentException(msg))
   }
 
   private def publishRequest(r: HydraRequest, requestor: ActorRef) = {

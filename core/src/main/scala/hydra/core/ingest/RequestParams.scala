@@ -103,15 +103,6 @@ object RequestParams {
 
 
   /**
-    * Can be 'detailed' or 'simple' (default).
-    *
-    * If 'detailed', every request produces a more detailed response including duration for each ingestor, etc.
-    *
-    * A 'simple' response produces only status codes.
-    */
-  val HYDRA_RESPONSE_FORMAT = "hydra-response-format"
-
-  /**
     * The amount of time, in milliseconds, to wait before a timeout error is returned to the client.
     *
     */
