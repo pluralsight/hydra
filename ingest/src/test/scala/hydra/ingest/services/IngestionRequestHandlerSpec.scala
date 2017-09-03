@@ -1,13 +1,12 @@
 package hydra.ingest.services
 
 import akka.actor.SupervisorStrategy.Stop
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.actor.{Actor, ActorSystem, Props}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestKit, TestProbe}
+import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import hydra.core.http.{HydraDirectives, ImperativeRequestContext}
 import hydra.core.ingest.{HydraRequest, IngestionReport}
 import hydra.core.protocol._
-import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
@@ -20,15 +19,6 @@ class IngestionRequestHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
   override def afterAll = TestKit.shutdownActorSystem(system)
 
   val req = HydraRequest(123, "test payload")
-
-
-  val registry = TestProbe()
-  registry.setAutoPilot((sender: ActorRef, msg: Any) => msg match {
-    case p@Publish(_) => TestActor.KeepRunning
-    case FindByName(_) => TestActor.KeepRunning
-    case FindAll => TestActor.KeepRunning
-  })
-
 
   describe("When starting an HTTP ingestion") {
     it("completes the request with 400") {

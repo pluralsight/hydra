@@ -53,7 +53,6 @@ class IngestionActorSpec extends TestKit(ActorSystem("hydra")) with Matchers
 
     it("errors an ingestion if it can't find the registry") {
       val ingestionActor = system.actorOf(Props[IngestionActor])
-
       val probe = TestProbe()
       val request = HydraRequest(123, "test payload").withMetadata(RequestParams.REPLY_TO -> probe.ref.path.toString)
       ingestionActor ! InitiateRequest(request)

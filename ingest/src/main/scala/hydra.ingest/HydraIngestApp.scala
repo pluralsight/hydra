@@ -26,12 +26,13 @@ import hydra.core.app.HydraEntryPoint
   *
   * Created by alexsilva on 2/18/16.
   */
-object HydraIngestionApp extends HydraEntryPoint with IngestionActors {
+// $COVERAGE-OFF$Disabling highlighting by default until a workaround for https://issues.scala-lang.org/browse/SI-8596 is found
+object HydraIngestApp extends HydraEntryPoint with IngestionActors {
 
   val moduleName = "ingest"
 
   override val config = rootConfig.withFallback(ConfigFactory.parseFile(new File("/etc/hydra/hydra-ingest.conf")))
 
   buildContainer().start()
-
 }
+// $COVERAGE-ON

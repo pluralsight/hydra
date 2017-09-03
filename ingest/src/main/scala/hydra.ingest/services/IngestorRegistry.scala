@@ -45,15 +45,7 @@ class IngestorRegistry extends Actor with ActorLogging with ActorConfigSupport {
       sender ! doRegister(ingestorName, group, clazz)
 
     case Unregister(name) =>
-      ingestors.remove(name) match {
-        case Some(handler) =>
-          context.unwatch(handler.ref)
-          log.debug(s"Removed ingestor $name")
-          context.stop(handler.ref)
-          sender ! Unregistered(name)
-
-        case None => sender ! IngestorNotFound(name)
-      }
+      sender ! unregister(name)
 
     case FindByName(name) =>
       val result = ingestors.get(name).map(r => IngestorInfo(name, r.group, r.ref.path, r.registrationTime)).toSeq
@@ -66,6 +58,20 @@ class IngestorRegistry extends Actor with ActorLogging with ActorConfigSupport {
     case Terminated(handler) => {
       log.error(s"Ingestor ${handler} terminated.")
       context.system.eventStream.publish(IngestorTerminated(handler.path.toString))
+    }
+  }
+
+  private def unregister(name: String): HydraMessage = {
+    RegistrationLock.synchronized {
+      ingestors.remove(name) match {
+        case Some(handler) =>
+          context.unwatch(handler.ref)
+          log.debug(s"Removed ingestor $name")
+          context.stop(handler.ref)
+          Unregistered(name)
+
+        case None => IngestorNotFound(name)
+      }
     }
   }
 

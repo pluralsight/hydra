@@ -16,7 +16,7 @@
 
 package hydra.ingest.marshallers
 
-import hydra.core.ingest.{IngestionReport, RequestParams}
+import hydra.core.ingest.IngestionReport
 import hydra.core.marshallers.HydraJsonSupport
 import hydra.core.protocol.IngestorStatus
 import hydra.ingest.ingestors.IngestorInfo
@@ -50,17 +50,12 @@ trait HydraIngestJsonSupport extends HydraJsonSupport {
     def writeState[T <: IngestorStatus : JsonWriter](t: T) = t.toJson
 
     override def write(obj: IngestionReport): JsValue = {
-      val isDetailed = obj.metadata.find(_._1 == RequestParams.HYDRA_RESPONSE_FORMAT)
-        .map(_._2.equalsIgnoreCase("detailed")).getOrElse(true)
-      val ingestors = obj.ingestors
-        .map(h => if (isDetailed) h._1 -> writeState(h._2) else h._1 -> JsNumber(h._2.statusCode.intValue()))
 
+      val ingestors = obj.ingestors.map(h => h._1 -> writeState(h._2))
       val response = Map(
-        "correlationId" -> (if (isDetailed) Some(JsNumber(obj.correlationId)) else None),
-        "ingestors" -> (if (ingestors.isEmpty) None else Some(JsObject(ingestors)))
-      ).collect {
-        case (key, Some(value)) => key -> value
-      }
+        "correlationId" -> JsNumber(obj.correlationId),
+        "ingestors" -> JsObject(ingestors)
+      )
 
       JsObject(response)
     }
