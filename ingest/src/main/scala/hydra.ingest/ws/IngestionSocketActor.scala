@@ -90,7 +90,7 @@ case class SocketSession(metadata: Map[String, String] = Map.empty) {
   def buildRequest(correlationId: Option[Long], payload: String) = {
     import hydra.core.ingest.RequestParams._
     val rs = metadata.find(_._1.equalsIgnoreCase(HYDRA_DELIVERY_STRATEGY))
-      .map(h => DeliveryStrategy(h._2)).getOrElse(DeliveryStrategy.BestEffort)
+      .map(h => DeliveryStrategy(h._2)).getOrElse(DeliveryStrategy.AtMostOnce)
 
     val vs = metadata.find(_._1.equalsIgnoreCase(HYDRA_VALIDATION_STRATEGY))
       .map(h => ValidationStrategy(h._2)).getOrElse(ValidationStrategy.Strict)

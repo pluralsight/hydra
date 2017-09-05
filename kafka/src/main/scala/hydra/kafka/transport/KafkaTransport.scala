@@ -78,7 +78,7 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
       case Success(actorRef) =>
         kr.deliveryStrategy match {
           case DeliveryStrategy.AtLeastOnce => persistAsync(p)(updateStore)
-          case DeliveryStrategy.BestEffort =>
+          case DeliveryStrategy.AtMostOnce =>
             val msg = p match {
               case Produce(kr: KafkaRecord[_, _]) => ProduceToKafka(kr, 1)
               case ProduceWithAck(kr: KafkaRecord[_, _], ing, sup) => ProduceToKafkaWithAck(kr, ing, sup, 1)

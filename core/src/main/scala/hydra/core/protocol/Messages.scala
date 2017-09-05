@@ -85,7 +85,7 @@ case object RequestPublished extends IngestorStatus {
 
 case class IngestorError(error: Throwable) extends IngestorStatus with HydraError {
   override val completed = true
-  override val message = error.getMessage
+  override val message = Option(error.getMessage).getOrElse("")
   val statusCode = StatusCodes.ServiceUnavailable
 }
 
@@ -93,7 +93,7 @@ case class InvalidRequest(error: Throwable) extends IngestorStatus with HydraErr
   def this(msg: String) = this(new IllegalArgumentException(msg))
 
   override val completed = true
-  override val message = error.getMessage
+  override val message = Option(error.getMessage).getOrElse("")
   val statusCode = StatusCodes.BadRequest
 }
 

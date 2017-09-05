@@ -38,7 +38,8 @@ import scala.util.Failure
 class IngestionWebSocketEndpoint(implicit val system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
   extends RoutedEndpoints with LoggingAdapter with HydraIngestJsonSupport with HydraDirectives {
 
-  private val enabled = applicationConfig.get[Boolean]("ingest.websocket.enabled").valueOrElse(false)
+  //visible for testing
+  private[endpoints] val enabled = applicationConfig.get[Boolean]("ingest.websocket.enabled").valueOrElse(false)
 
   private val socketFactory = IngestSocketFactory.createSocket(actorRefFactory)
 
@@ -62,7 +63,6 @@ class IngestionWebSocketEndpoint(implicit val system: ActorSystem, implicit val 
       .map {
         case m: SimpleOutgoingMessage => TextMessage(m.toJson.compactPrint)
         case r: IngestionOutgoingMessage => TextMessage(r.report.toJson.compactPrint)
-        case msg => TextMessage(s"Unexpected message $msg")
       }.via(reportErrorsFlow)
   }
 

@@ -3,7 +3,7 @@ package hydra.ingest.marshallers
 import akka.actor.ActorPath
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import hydra.core.ingest.IngestionReport
-import hydra.core.protocol.{IngestorCompleted, IngestorStatus, InvalidRequest}
+import hydra.core.protocol.{IngestorCompleted, IngestorError, IngestorStatus, InvalidRequest}
 import hydra.ingest.ingestors.IngestorInfo
 import org.joda.time.DateTime
 import org.scalatest.{FunSpecLike, Matchers}
@@ -24,10 +24,20 @@ class HydraIngestJsonSupportSpec extends Matchers with FunSpecLike with HydraIng
 
     it("converts IngestorStatus objects") {
       val st = InvalidRequest(new IllegalArgumentException("error")).asInstanceOf[IngestorStatus]
+      val stn = InvalidRequest(new IllegalArgumentException()).asInstanceOf[IngestorStatus]
       st.toJson shouldBe """{"code":400,"message":"error"}""".parseJson
+      stn.toJson shouldBe """{"code":400,"message":""}""".parseJson
       intercept[NotImplementedError] {
         """{"code":400,"message":"error"}""".parseJson.convertTo[IngestorStatus]
       }
+    }
+
+
+    it("converts IngestorError objects with no message") {
+      val st = IngestorError(new IllegalArgumentException("error")).asInstanceOf[IngestorStatus]
+      val stn = IngestorError(new IllegalArgumentException()).asInstanceOf[IngestorStatus]
+      st.toJson shouldBe """{"code":503,"message":"error"}""".parseJson
+      stn.toJson shouldBe """{"code":503,"message":""}""".parseJson
     }
 
     it("converts IngestionReport objects") {
@@ -48,7 +58,6 @@ class HydraIngestJsonSupportSpec extends Matchers with FunSpecLike with HydraIng
     it("converts IngestionReport without any ingestors") {
       val report = IngestionReport(1, Map("test" -> "test"), Map.empty, 200)
       val json = report.toJson.asJsObject.fields
-      println(report.toJson.compactPrint)
 
       val pjson ="""{"correlationId":1,"ingestors":{}}""".parseJson.asJsObject.fields
 

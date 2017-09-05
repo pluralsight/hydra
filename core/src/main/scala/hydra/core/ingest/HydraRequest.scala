@@ -11,7 +11,7 @@ import scala.util.Random
 case class HydraRequest(correlationId: Long = Random.nextInt(),
                         payload: String,
                         metadata: Map[String, String] = Map.empty,
-                        deliveryStrategy: DeliveryStrategy = DeliveryStrategy.BestEffort,
+                        deliveryStrategy: DeliveryStrategy = DeliveryStrategy.AtMostOnce,
                         validationStrategy: ValidationStrategy = Strict,
                         ackStrategy: AckStrategy = AckStrategy.None) {
 
