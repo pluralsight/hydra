@@ -1,6 +1,7 @@
 package hydra.ingest.ingestors
 
 import akka.actor.ActorPath
+import hydra.core.protocol.HydraMessage
 import org.joda.time.DateTime
 
 /**
@@ -11,7 +12,6 @@ import org.joda.time.DateTime
   *                     Ingestors belonging to the 'global' pool are included in all Publish messages.
   * @param registeredAt Timestamp at which this ingestor was registered.
   */
-case class IngestorInfo(name: String, group: String, path: ActorPath, registeredAt: DateTime)
-
+case class IngestorInfo(name: String, group: String, path: ActorPath, registeredAt: DateTime) extends HydraMessage
 
 

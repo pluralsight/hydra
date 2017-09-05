@@ -17,48 +17,45 @@
 package hydra.ingest.services
 
 import akka.actor._
-import akka.util.Timeout
 import hydra.common.config.ActorConfigSupport
-import hydra.core.ingest.{IngestionReport, RequestParams}
-import hydra.core.protocol.InitiateRequest
+import hydra.core.ingest.{HydraRequest, IngestionReport}
+import hydra.core.protocol.{IngestionError, InitiateRequest}
+import hydra.ingest.bootstrap.HydraIngestorRegistry
 
-import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.util.Try
+import scala.util.{Failure, Success}
 
 /**
   * Created by alexsilva on 12/22/15.
   */
-class IngestionActor(registryPath: String) extends Actor with ActorConfigSupport with ActorLogging {
+class IngestionActor extends Actor with ActorConfigSupport with ActorLogging with HydraIngestorRegistry {
 
   import configs.syntax._
 
-  val ingestionTimeout = applicationConfig.get[FiniteDuration]("ingestion.timeout").valueOrElse(3.seconds)
+  override val system = context.system
 
-  implicit val timeout = Timeout(ingestionTimeout)
+  private val ingestionTimeout = applicationConfig.get[FiniteDuration]("ingestion.timeout").valueOrElse(3.seconds)
 
-  val registry: ActorRef = Await.result(context.actorSelection(registryPath).resolveOne(), timeout.duration)
+  private implicit val ec = context.dispatcher
 
   override def receive: Receive = {
     case InitiateRequest(r) =>
-      context.actorOf(IngestionSupervisor.props(r, ingestionTimeout, registry))
+      val requestor = sender
+      publishRequest(r, requestor)
 
     case r: IngestionReport =>
       context.stop(sender)
-      r.metadata.find(_.name == RequestParams.REPLY_TO).foreach { replyTo =>
-        Try(context.actorSelection(replyTo.value) ! r)
-          .recover { case e => log.error(s"Unable to send reply back to ${receive}: ${e.getMessage}") }
-      }
-    case ReceiveTimeout =>
-      log.error(s"$thisActorName: Received timeout.")
-      context.stop(self)
-
-    case other =>
-      throw new IllegalArgumentException(s"${other} is not expected at this state.")
-
+      r.replyTo.foreach(context.actorSelection(_) ! r)
   }
 
-
+  private def publishRequest(r: HydraRequest, requestor: ActorRef) = {
+    ingestorRegistry onComplete {
+      case Success(registry) =>
+        context.actorOf(IngestionSupervisor.props(r, ingestionTimeout, registry))
+      case Failure(ex) =>
+        requestor ! IngestionError(ex)
+    }
+  }
 }
 

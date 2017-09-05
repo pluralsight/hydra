@@ -26,7 +26,7 @@ import configs.syntax._
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol._
-import hydra.core.transport.RetryStrategy
+import hydra.core.transport.DeliveryStrategy
 import hydra.kafka.producer.{JsonRecord, KafkaRecord, KafkaRecordMetadata}
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProduceToKafkaWithAck}
 import hydra.kafka.transport.KafkaTransport.ProxiesInitialized
@@ -76,9 +76,9 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
   private def transport(kr: KafkaRecord[_, _], p: ProduceRecord[_, _]) = {
     getRecordProducer(kr) match {
       case Success(actorRef) =>
-        kr.retryStrategy match {
-          case RetryStrategy.Persist => persistAsync(p)(updateStore)
-          case RetryStrategy.Ignore =>
+        kr.deliveryStrategy match {
+          case DeliveryStrategy.AtLeastOnce => persistAsync(p)(updateStore)
+          case DeliveryStrategy.AtMostOnce =>
             val msg = p match {
               case Produce(kr: KafkaRecord[_, _]) => ProduceToKafka(kr, 1)
               case ProduceWithAck(kr: KafkaRecord[_, _], ing, sup) => ProduceToKafkaWithAck(kr, ing, sup, 1)
@@ -100,7 +100,7 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
   }
 
   private def confirm(p: RecordProduced): Unit = {
-    if (p.md.retryStrategy == RetryStrategy.Persist) persistAsync(p)(updateStore)
+    if (p.md.retryStrategy == DeliveryStrategy.AtLeastOnce) persistAsync(p)(updateStore)
     recordStatistics(p.md.asInstanceOf[KafkaRecordMetadata])
   }
 

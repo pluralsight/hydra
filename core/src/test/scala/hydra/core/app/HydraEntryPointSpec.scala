@@ -2,28 +2,31 @@ package hydra.core.app
 
 import akka.actor.{ActorRefFactory, ActorSystem, Props}
 import akka.http.scaladsl.server.Route
+import akka.testkit.TestKit
+import com.github.vonnagy.service.container.MissingConfigException
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import com.github.vonnagy.service.container.service.ContainerService
 import com.typesafe.config.{Config, ConfigFactory}
 import hydra.core.testing.DummyActor
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 /**
   * Created by alexsilva on 3/7/17.
   */
-class HydraEntryPointSpec extends Matchers with FunSpecLike with MockFactory {
+class HydraEntryPointSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
+
+
   val conf =
     """
       |  hydra_test{
       |  test {
       |    endpoints = ["hydra.core.app.DummyEndpoint"]
-      |  extensions {
+      | }
+      | extensions {
       |    dummy {
       |      enabled = true
       |    }
       |  }
-      | }
       |}
     """.stripMargin
 
@@ -35,20 +38,32 @@ class HydraEntryPointSpec extends Matchers with FunSpecLike with MockFactory {
     override def services: Seq[(String, Props)] = Seq("test" -> Props[DummyActor])
   }
 
+  val container = et.buildContainer()
+
+  override def afterAll = {
+    TestKit.shutdownActorSystem(container.system)
+    container.shutdown()
+  }
+
   describe("When using the HydraEntryPoint class") {
 
     it("is properly configured") {
       et.moduleName shouldBe "test"
       et.services shouldBe Seq("test" -> Props[DummyActor])
       et.endpoints shouldBe Seq(classOf[DummyEndpoint])
-      et.extensions shouldBe ConfigFactory.parseString(conf).getConfig("hydra_test.test.extensions")
+      et.extensions shouldBe ConfigFactory.parseString(conf).getConfig("hydra_test.extensions")
+    }
+
+
+    it("throws error if config is missing") {
+      intercept[MissingConfigException] {
+        et.validateConfig("tester")
+      }
     }
 
     it("builds a container") {
-      implicit val system = mock[ActorSystem]
       val csvc = new ContainerService(Seq(classOf[DummyEndpoint]), Nil, Seq("test" -> Props[DummyActor]), Nil,
-        "hydra_test-test")
-      val container = et.buildContainer()
+        "hydra_test-test")(container.system)
       csvc.name shouldBe container.name
       csvc.registeredRoutes shouldBe container.registeredRoutes
       csvc.name shouldBe container.name

@@ -14,8 +14,8 @@ sealed trait AckStrategy
 object AckStrategy {
 
   def apply(strategy: String): AckStrategy = {
-    strategy match {
-      case "explicit" => Explicit
+    Option(strategy).map(_.trim.toLowerCase) match {
+      case Some("explicit") => Explicit
       case _ => None
     }
   }

@@ -4,7 +4,7 @@ import akka.util.Timeout
 import configs.syntax._
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
-import hydra.core.ingest.Ingestor.{IngestorInitializationError, IngestorInitialized}
+import hydra.core.akka.InitializingActor.{InitializationError, Initialized}
 import hydra.core.protocol._
 import hydra.core.transport.AckStrategy.Explicit
 import hydra.core.transport.{AckStrategy, RecordFactory}
@@ -30,10 +30,10 @@ trait TransportOps extends ConfigSupport with LoggingAdapter {
     */
   def transportName: String
 
-  val transportPath = applicationConfig.get[String](s"transports.$transportName.path")
+  lazy val transportPath = applicationConfig.get[String](s"transports.$transportName.path")
     .valueOrElse(s"/user/service/${transportName}_transport")
 
-  private val transportResolveTimeout = Timeout(applicationConfig
+  private lazy val transportResolveTimeout = Timeout(applicationConfig
     .getOrElse[FiniteDuration](s"transports.$transportName.resolve-timeout", 5 seconds).value)
 
   lazy val transportActorFuture = context.actorSelection(transportPath).resolveOne()(transportResolveTimeout)
@@ -41,12 +41,12 @@ trait TransportOps extends ConfigSupport with LoggingAdapter {
   /**
     * Overrides the init method to look up a transport
     */
-  override def initIngestor: Future[HydraMessage] = {
+  override def init: Future[HydraMessage] = {
     transportActorFuture
-      .map(t => IngestorInitialized)
+      .map(t => Initialized)
       .recover {
-        case e => IngestorInitializationError(new IllegalArgumentException(s"[$thisActorName]: No transport found " +
-          s" $transportPath", e))
+        case e => InitializationError(new IllegalArgumentException(s"[$thisActorName]: No transport found " +
+          s" at $transportPath", e))
       }
   }
 

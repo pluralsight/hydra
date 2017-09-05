@@ -49,6 +49,8 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
 
   private val client = schemaRegistry.registryClient
 
+  private[hydra] val prefix = "-value"
+
   override def route: Route = cors(settings) {
     pathPrefix("schemas") {
       handleExceptions(excptHandler) {
@@ -59,16 +61,16 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
             }
           } ~ path(Segment) { subject =>
             parameters('schema ?) { schemaOnly =>
-              val meta = client.getLatestSchemaMetadata(subject + "-value")
+              val meta = client.getLatestSchemaMetadata(subject + prefix)
               schemaOnly.map(_ => complete(OK, meta.getSchema)).getOrElse(complete(OK, SchemasEndpointResponse(meta)))
             }
           } ~ path(Segment / "versions") { subject =>
-            val schemaMeta = client.getLatestSchemaMetadata(subject + "-value")
+            val schemaMeta = client.getLatestSchemaMetadata(subject + prefix)
             val v = schemaMeta.getVersion
-            val versions = (1 to v) map (vs => SchemasEndpointResponse(client.getSchemaMetadata(subject + "-value", vs)))
+            val versions = (1 to v) map (vs => SchemasEndpointResponse(client.getSchemaMetadata(subject + prefix, vs)))
             complete(OK, versions)
           } ~ path(Segment / "versions" / IntNumber) { (subject, version) =>
-            val meta = client.getSchemaMetadata(subject + "-value", version)
+            val meta = client.getSchemaMetadata(subject + prefix, version)
             complete(OK, SchemasEndpointResponse(meta.getId, meta.getVersion, meta.getSchema))
           }
         } ~
@@ -78,7 +80,7 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory
                 val schema = new Parser().parse(json)
                 val name = schema.getNamespace() + "." + schema.getName()
                 log.debug(s"Registering schema $name: $json")
-                val id = client.register(name + "-value", schema)
+                val id = client.register(name + prefix, schema)
                 respondWithHeader(Location(request.uri.copy(path = request.uri.path / name))) {
                   complete(Created, SchemasEndpointResponse(id, 1, json))
                 }

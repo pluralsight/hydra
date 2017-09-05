@@ -23,34 +23,34 @@ import hydra.common.config.ConfigSupport
 import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.{HydraRequest, IngestionReport}
 import hydra.core.protocol._
-import hydra.ingest.marshallers.IngestionJsonSupport
+import hydra.ingest.marshallers.HydraIngestJsonSupport
 
 import scala.concurrent.duration._
-import scala.util.Try
 
 /**
   * Created by alexsilva on 12/22/15.
   */
-class IngestionRequestHandler(request: HydraRequest, registry: ActorRef,
+class IngestionRequestHandler(request: HydraRequest, ingestionSupervisorProps: Props,
                               ctx: ImperativeRequestContext, timeout: FiniteDuration) extends Actor
-  with IngestionJsonSupport {
+  with HydraIngestJsonSupport {
 
   import context._
 
   context.setReceiveTimeout(timeout)
 
   override def preStart(): Unit = {
-    Try(context.actorOf(IngestionSupervisor.props(request, timeout, registry))).recover {
-      case e: Exception => self ! GenericHydraError(e)
-    }
+    context.actorOf(ingestionSupervisorProps)
   }
 
-  def receive = {
-    case report: IngestionReport => complete(report)
-    case ReceiveTimeout =>
-      fail(errorWith(StatusCodes.custom(StatusCodes.RequestTimeout.intValue, s"No transport joined in ${timeout}.")))
-    case e: HydraError => fail(errorWith(StatusCodes.InternalServerError))
-    case _ => fail(errorWith(StatusCodes.BadRequest))
+  override def receive = {
+    case report: IngestionReport =>
+      complete(report)
+
+    case ReceiveTimeout => complete(errorWith(StatusCodes.custom(StatusCodes.RequestTimeout.intValue, s"No transport joined in ${timeout}.")))
+
+    case e: HydraError => fail(e.error)
+
+    case _ => complete(errorWith(StatusCodes.BadRequest))
   }
 
   def complete(report: IngestionReport) = {
@@ -58,21 +58,21 @@ class IngestionRequestHandler(request: HydraRequest, registry: ActorRef,
     stop(self)
   }
 
-  def fail(obj: IngestionReport) = {
-    ctx.complete(obj.statusCode, obj)
+  def fail(e: Throwable) = {
+    ctx.failWith(e)
     stop(self)
   }
 
   override val supervisorStrategy =
     OneForOneStrategy() {
-      case e => {
-        fail(errorWith(StatusCodes.ServiceUnavailable))
+      case _ => {
+        complete(errorWith(StatusCodes.ServiceUnavailable))
         Stop
       }
     }
 
   private def errorWith(statusCode: StatusCode) = {
-    IngestionReport(request.correlationId, request.metadata, Map.empty, statusCode.intValue())
+    IngestionReport(request.correlationId, Map.empty, statusCode.intValue())
   }
 }
 
@@ -82,6 +82,12 @@ object IngestionRequestHandler extends ConfigSupport {
 
   val ingestionTimeout = applicationConfig.get[FiniteDuration]("ingestion.timeout").valueOrElse(3.seconds)
 
-  def props(request: HydraRequest, registry: ActorRef, ctx: ImperativeRequestContext) =
-    Props(classOf[IngestionRequestHandler], request, registry, ctx, ingestionTimeout)
+  def props(request: HydraRequest, registry: ActorRef, ctx: ImperativeRequestContext) = {
+    val p = IngestionSupervisor.props(request, ingestionTimeout, registry)
+    Props(classOf[IngestionRequestHandler], request, p, ctx, ingestionTimeout)
+  }
+
+  def props(request: HydraRequest, supervisorProps: Props, ctx: ImperativeRequestContext) = {
+    Props(classOf[IngestionRequestHandler], request, supervisorProps, ctx, ingestionTimeout)
+  }
 }

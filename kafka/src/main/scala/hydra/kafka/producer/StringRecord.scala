@@ -16,14 +16,14 @@
 
 package hydra.kafka.producer
 
-import hydra.core.transport.RetryStrategy
-import hydra.core.transport.RetryStrategy.Ignore
+import hydra.core.transport.DeliveryStrategy
+import hydra.core.transport.DeliveryStrategy.AtMostOnce
 
 /**
   * Created by alexsilva on 11/30/15.
   */
 case class StringRecord(destination: String, key: Option[String], payload: String,
-                        retryStrategy: RetryStrategy = Ignore) extends KafkaRecord[String, String]
+                        deliveryStrategy: DeliveryStrategy = AtMostOnce) extends KafkaRecord[String, String]
 
 object StringRecord {
   def apply(topic: String, payload: String): StringRecord = new StringRecord(topic, None, payload)

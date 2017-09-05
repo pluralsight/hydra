@@ -5,7 +5,7 @@ enablePlugins(JavaAppPackaging)
 
 val JDK = "1.8"
 val buildNumber = scala.util.Properties.envOrNone("version").map(v => "." + v).getOrElse("")
-val hydraVersion = "0.8.3" + buildNumber
+val hydraVersion = "0.8.4" + buildNumber
 
 lazy val defaultSettings = Seq(
   organization := "pluralsight",
@@ -26,7 +26,7 @@ lazy val defaultSettings = Seq(
   resolvers += "Scalaz Bintray Repo" at "https://dl.bintray.com/scalaz/releases",
   resolvers += "Confluent Maven Repo" at "http://packages.confluent.io/maven/",
   resolvers += "jitpack" at "https://jitpack.io",
-
+  coverageExcludedPackages := "hydra\\.ingest\\.HydraIngestApp.*",
   ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet,
   ivyScala := ivyScala.value map (_.copy(overrideScalaVersion = true))
 )
@@ -51,7 +51,7 @@ lazy val root = Project(
   id = "hydra",
   base = file("."),
   settings = defaultSettings // ++ noPublishSettings
-).aggregate(common, core, kafka, ingest, sandbox)
+).aggregate(core, kafka, ingest, sandbox)
 
 lazy val common = Project(
   id = "common",
