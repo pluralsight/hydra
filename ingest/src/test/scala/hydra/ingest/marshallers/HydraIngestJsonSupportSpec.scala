@@ -41,7 +41,7 @@ class HydraIngestJsonSupportSpec extends Matchers with FunSpecLike with HydraIng
     }
 
     it("converts IngestionReport objects") {
-      val report = IngestionReport(1, Map("test" -> "test"), Map("testIngestor" -> IngestorCompleted), 200)
+      val report = IngestionReport(1, Map("testIngestor" -> IngestorCompleted), 200)
       val json = report.toJson.asJsObject.fields
 
       val pjson ="""{"correlationId":1,"ingestors":{"testIngestor":{"code":200,"message":"OK"}}}""".parseJson.asJsObject.fields
@@ -56,7 +56,7 @@ class HydraIngestJsonSupportSpec extends Matchers with FunSpecLike with HydraIng
     }
 
     it("converts IngestionReport without any ingestors") {
-      val report = IngestionReport(1, Map("test" -> "test"), Map.empty, 200)
+      val report = IngestionReport(1, Map.empty, 200, Some("test"))
       val json = report.toJson.asJsObject.fields
 
       val pjson ="""{"correlationId":1,"ingestors":{}}""".parseJson.asJsObject.fields

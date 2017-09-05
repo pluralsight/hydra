@@ -43,7 +43,7 @@ class IngestionActorSpec extends TestKit(ActorSystem("hydra")) with Matchers
       val request = HydraRequest(123, "test payload").withMetadata(RequestParams.REPLY_TO -> probe.ref.path.toString)
       ingestionActor ! InitiateRequest(request)
       probe.expectMsgPF() {
-        case IngestionReport(_, _, _, statusCode) =>
+        case IngestionReport(_, _, statusCode, _) =>
           statusCode shouldBe 200
       }
 

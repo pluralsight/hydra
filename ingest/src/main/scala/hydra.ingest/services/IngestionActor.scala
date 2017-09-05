@@ -18,7 +18,7 @@ package hydra.ingest.services
 
 import akka.actor._
 import hydra.common.config.ActorConfigSupport
-import hydra.core.ingest.{HydraRequest, IngestionReport, RequestParams}
+import hydra.core.ingest.{HydraRequest, IngestionReport}
 import hydra.core.protocol.{IngestionError, InitiateRequest}
 import hydra.ingest.bootstrap.HydraIngestorRegistry
 
@@ -46,9 +46,7 @@ class IngestionActor extends Actor with ActorConfigSupport with ActorLogging wit
 
     case r: IngestionReport =>
       context.stop(sender)
-      r.metadata.find(_._1.equalsIgnoreCase(RequestParams.REPLY_TO)).foreach { replyTo =>
-        context.actorSelection(replyTo._2) ! r
-      }
+      r.replyTo.foreach(context.actorSelection(_) ! r)
   }
 
   private def publishRequest(r: HydraRequest, requestor: ActorRef) = {
