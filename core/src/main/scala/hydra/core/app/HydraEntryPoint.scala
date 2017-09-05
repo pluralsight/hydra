@@ -34,11 +34,12 @@ trait HydraEntryPoint extends App with SLF4JLogging with ConfigSupport {
     .map(Class.forName(_).asInstanceOf[ENDPOINT])
 
   def buildContainer(): ContainerService = {
+    val hydraExts = if (extensions.isEmpty) Seq.empty else Seq(new HydraExtensionListener(moduleName, extensions))
     val builder = ContainerBuilder()
       .withConfig(config)
       .withRoutes(endpoints: _*)
       .withActors(services: _*)
-      .withListeners(Seq(new HydraExtensionListener(moduleName, extensions)) ++ listeners: _*)
+      .withListeners(hydraExts ++ listeners: _*)
       .withName(containerName)
 
     builder.build
