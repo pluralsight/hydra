@@ -6,21 +6,21 @@ import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.Materializer
 import hydra.core.ingest.RequestParams._
 import hydra.core.ingest._
-import hydra.core.transport.{AckStrategy, RetryStrategy, ValidationStrategy}
+import hydra.core.transport.{AckStrategy, DeliveryStrategy, ValidationStrategy}
 
 import scala.concurrent.Future
 
 /**
   * Created by alexsilva on 3/14/17.
   */
-class HttpRequestFactory extends RequestFactory[String, HttpRequest] with CodingDirectives {
+class HttpRequestFactory extends RequestFactory[HttpRequest] with CodingDirectives {
 
   override def createRequest(correlationId: Long, request: HttpRequest)
                             (implicit mat: Materializer): Future[HydraRequest] = {
     implicit val ec = mat.executionContext
 
-    val rs = request.headers.find(_.lowercaseName() == HYDRA_RETRY_STRATEGY)
-      .map(h => RetryStrategy(h.value())).getOrElse(RetryStrategy.Ignore)
+    val rs = request.headers.find(_.lowercaseName() == HYDRA_DELIVERY_STRATEGY)
+      .map(h => DeliveryStrategy(h.value())).getOrElse(DeliveryStrategy.AtMostOnce)
 
     val vs = request.headers.find(_.lowercaseName() == HYDRA_VALIDATION_STRATEGY)
       .map(h => ValidationStrategy(h.value())).getOrElse(ValidationStrategy.Strict)
@@ -29,9 +29,9 @@ class HttpRequestFactory extends RequestFactory[String, HttpRequest] with Coding
       .map(h => AckStrategy(h.value())).getOrElse(AckStrategy.None)
 
     Unmarshal(request.entity).to[String].map { payload =>
-      val metadata: List[HydraRequestMetadata] = List(request.headers.map(header =>
-        HydraRequestMetadata(header.name.toLowerCase, header.value)): _*)
-      HydraRequest(correlationId, payload, metadata, retryStrategy = rs, validationStrategy = vs)
+      val metadata: Map[String, String] = request.headers.map(h => h.name.toLowerCase -> h.value).toMap
+      HydraRequest(correlationId, payload, metadata, deliveryStrategy = rs,
+        validationStrategy = vs, ackStrategy = as)
     }
   }
 }

@@ -28,6 +28,7 @@ object Dependencies {
   val postgresVersion = "9.4.1209"
   val commonsDbcpVersion = "1.4"
   val hydraAvroVersion = "1260aa2427"
+  val hydraUtilsVersion = "2abfe00472"
 
   object Compile {
 
@@ -40,6 +41,8 @@ object Dependencies {
     val scalaz = "org.scalaz" %% "scalaz-core" % scalazVersion
 
     val hydraAvro = "com.github.pluralsight" % "hydra-avro-utils" % hydraAvroVersion
+
+    val hydraUtils = "com.github.pluralsight" % "hydra-utils" % hydraUtilsVersion
 
     val kafka = Seq(
       "org.apache.kafka" %% "kafka" % kafkaVersion,

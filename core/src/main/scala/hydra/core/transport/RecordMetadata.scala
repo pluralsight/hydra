@@ -7,6 +7,6 @@ trait RecordMetadata {
 
   def deliveryId: Long
 
-  def retryStrategy: RetryStrategy
+  def retryStrategy: DeliveryStrategy
 
 }

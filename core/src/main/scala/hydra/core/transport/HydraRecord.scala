@@ -23,7 +23,6 @@ trait HydraRecord[+K, +P] {
     *
     * @return
     */
-  def retryStrategy: RetryStrategy
+  def deliveryStrategy: DeliveryStrategy
 
-  //def correlationId: Long
 }

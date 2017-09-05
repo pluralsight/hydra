@@ -8,11 +8,13 @@ import scala.collection._
   * Created by alexsilva on 5/31/16.
   */
 class HydraExtensionRegistryImpl extends Extension {
-  type EXT = Either[ActorRef, HydraTypedExtension]
+  type EXT = Either[ActorRef, HydraTypedModule]
 
   private val map: concurrent.Map[String, EXT] = new scala.collection.concurrent.TrieMap[String, EXT]()
 
   def register(id: String, ext: EXT) = map.put(id, ext)
+
+  def getTypedModules: Seq[HydraTypedModule] = map.filter(x => x._2.isRight).flatMap(_._2.toSeq).toSeq
 
   def getModule(id: String): Option[EXT] = map.get(id)
 

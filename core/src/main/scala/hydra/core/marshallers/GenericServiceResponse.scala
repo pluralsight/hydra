@@ -11,8 +11,4 @@ trait ServiceResponse {
 
 case class GenericServiceResponse(status: Int, message: String) extends ServiceResponse
 
-case class ExceptionalServiceResponse(status: Int, error: Throwable) extends ServiceResponse {
-  override val message: String = error.getMessage
-}
-
 

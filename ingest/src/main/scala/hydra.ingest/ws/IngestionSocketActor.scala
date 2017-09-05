@@ -7,24 +7,19 @@ package hydra.ingest.ws
 import akka.actor.{Actor, ActorRef}
 import akka.http.scaladsl.model.StatusCodes
 import akka.util.Timeout
-import com.github.vonnagy.service.container.service.ServicesManager
 import hydra.common.logging.LoggingAdapter
-import hydra.core.ingest.{HydraRequest, HydraRequestMetadata, IngestionReport}
+import hydra.core.ingest.{HydraRequest, IngestionReport}
 import hydra.core.protocol.HydraError
-import hydra.core.transport.{AckStrategy, RetryStrategy, ValidationStrategy}
+import hydra.core.transport.{AckStrategy, DeliveryStrategy, ValidationStrategy}
+import hydra.ingest.bootstrap.HydraIngestorRegistry
 import hydra.ingest.services.IngestionSupervisor
 import hydra.ingest.ws.IngestionSocketActor._
 
-import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.Random
 
-class IngestionSocketActor(initialMetadata: Map[String, String]) extends Actor with LoggingAdapter {
+class IngestionSocketActor extends Actor with LoggingAdapter with HydraIngestorRegistry {
 
-  val registry: Future[ActorRef] = ServicesManager.findService("ingestor_registry",
-    "hydra-ingest/user/service/")(context.system)
-
-  implicit val ec = context.dispatcher
+  implicit val system = context.system
 
   private var flowActor: ActorRef = _
 
@@ -35,15 +30,14 @@ class IngestionSocketActor(initialMetadata: Map[String, String]) extends Actor w
   private var session: SocketSession = _
 
   override def preStart(): Unit = {
-    session = new SocketSession().withMetadata(initialMetadata.toSeq: _*)
+    session = new SocketSession()
   }
 
   override def receive = waitForSocket
 
   def waitForSocket: Receive = commandReceive orElse {
-    case SocketStarted(name, actor) =>
+    case SocketStarted(actor) =>
       flowActor = actor
-      log.info(s"User $name started a web socket.")
       context.become(ingesting orElse commandReceive)
   }
 
@@ -65,18 +59,20 @@ class IngestionSocketActor(initialMetadata: Map[String, String]) extends Actor w
     case IncomingMessage(_) =>
       flowActor ! SimpleOutgoingMessage(400, "BAD_REQUEST:Not a valid message. Use 'HELP' for help.")
 
-    case SocketEnded => context.stop(self)
+    case SocketEnded =>
+      context.stop(flowActor)
+      context.stop(self)
   }
 
   def ingesting: Receive = {
     case IncomingMessage(IngestPattern(correlationId, payload)) =>
-      val request = session.buildRequest(Option(correlationId.toLong), payload)
-      registry.map(r => context.actorOf(IngestionSupervisor.props(request, timeout, r)))
+      val request = session.buildRequest(Option(correlationId).map(_.toLong), payload)
+      ingestorRegistry.map(r => context.actorOf(IngestionSupervisor.props(request, timeout, r)))(context.dispatcher)
 
     case report: IngestionReport =>
       flowActor ! IngestionOutgoingMessage(report)
 
-    case e: HydraError => flowActor ! SimpleOutgoingMessage(StatusCodes.InternalServerError.intValue, e.cause.getMessage)
+    case e: HydraError => flowActor ! SimpleOutgoingMessage(StatusCodes.InternalServerError.intValue, e.error.getMessage)
   }
 }
 
@@ -88,15 +84,13 @@ object IngestionSocketActor {
 
 case class SocketSession(metadata: Map[String, String] = Map.empty) {
 
-  lazy val hydraRequestMedatata = metadata.map(m => HydraRequestMetadata(m._1, m._2)).toSeq
-
   def withMetadata(meta: (String, String)*) =
     copy(metadata = this.metadata ++ meta.map(m => m._1 -> m._2))
 
   def buildRequest(correlationId: Option[Long], payload: String) = {
     import hydra.core.ingest.RequestParams._
-    val rs = metadata.find(_._1.equalsIgnoreCase(HYDRA_RETRY_STRATEGY))
-      .map(h => RetryStrategy(h._2)).getOrElse(RetryStrategy.Ignore)
+    val rs = metadata.find(_._1.equalsIgnoreCase(HYDRA_DELIVERY_STRATEGY))
+      .map(h => DeliveryStrategy(h._2)).getOrElse(DeliveryStrategy.AtMostOnce)
 
     val vs = metadata.find(_._1.equalsIgnoreCase(HYDRA_VALIDATION_STRATEGY))
       .map(h => ValidationStrategy(h._2)).getOrElse(ValidationStrategy.Strict)
@@ -104,7 +98,7 @@ case class SocketSession(metadata: Map[String, String] = Map.empty) {
     val as = metadata.find(_._1.equalsIgnoreCase(HYDRA_ACK_STRATEGY))
       .map(h => AckStrategy(h._2)).getOrElse(AckStrategy.None)
 
-    HydraRequest(correlationId.getOrElse(Random.nextLong()), payload, hydraRequestMedatata, retryStrategy = rs,
+    HydraRequest(correlationId.getOrElse(0), payload, metadata, deliveryStrategy = rs,
       validationStrategy = vs, ackStrategy = as)
   }
 }

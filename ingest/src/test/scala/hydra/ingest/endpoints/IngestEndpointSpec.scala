@@ -1,9 +1,15 @@
 package hydra.ingest.endpoints
 
-import akka.http.scaladsl.model.headers.RawHeader
+import akka.actor.{Actor, Props}
 import akka.http.scaladsl.model.{HttpMethods, StatusCodes}
 import akka.http.scaladsl.server.{MethodRejection, RequestEntityExpectedRejection}
 import akka.http.scaladsl.testkit.ScalatestRouteTest
+import akka.testkit.TestActorRef
+import hydra.common.util.ActorUtils
+import hydra.ingest.ingestors.IngestorInfo
+import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
+import hydra.ingest.test.TestIngestor
+import org.joda.time.DateTime
 import org.scalatest.{Matchers, WordSpecLike}
 
 /**
@@ -11,25 +17,48 @@ import org.scalatest.{Matchers, WordSpecLike}
   */
 class IngestEndpointSpec extends Matchers with WordSpecLike with ScalatestRouteTest {
 
+  val probe = system.actorOf(Props[TestIngestor])
+  val ingestorInfo = IngestorInfo(ActorUtils.actorName(probe), "test", probe.path, DateTime.now)
+  val registry = TestActorRef(new Actor {
+    override def receive = {
+      case FindByName(name) if name == "tester" => sender ! LookupResult(Seq(ingestorInfo))
+      case FindByName(_) => sender ! LookupResult(Seq.empty)
+      case FindAll => sender ! LookupResult(Seq(ingestorInfo))
+    }
+  }, "ingestor_registry").underlyingActor
+
   val ingestRoute = new IngestionEndpoint().route
 
   "The ingestor endpoint" should {
 
     "rejects a GET request" in {
-      Get() ~> ingestRoute ~> check {
+      Get("/ingest") ~> ingestRoute ~> check {
         rejection shouldEqual MethodRejection(HttpMethods.POST)
       }
     }
 
     "rejects empty requests" in {
-      Post() ~> ingestRoute ~> check {
+      Post("/ingest") ~> ingestRoute ~> check {
         rejection shouldEqual RequestEntityExpectedRejection
       }
     }
 
     "publishes to a target ingestor" in {
-      val request = Post("/", "payload")
-        .addHeader(RawHeader("hydra-ingestor", "tester"))
+      val request = Post("/ingest/tester", "payload")
+      request ~> ingestRoute ~> check {
+        status shouldBe StatusCodes.OK
+      }
+    }
+
+    "returns 404 if unknown ingestor" in {
+      val request = Post("/ingest/unknown", "payload")
+      request ~> ingestRoute ~> check {
+        status shouldBe StatusCodes.NotFound
+      }
+    }
+
+    "broadcasts a request" in {
+      val request = Post("/ingest", "payload")
       request ~> ingestRoute ~> check {
         status shouldBe StatusCodes.OK
       }

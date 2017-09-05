@@ -35,7 +35,7 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
 
   val start = DateTime.now()
 
-  private var ingestors: mutable.Map[String, IngestorStatus] = new mutable.HashMap
+  private val ingestors: mutable.Map[String, IngestorStatus] = new mutable.HashMap
 
   private val targetIngestor = request.metadataValue(RequestParams.HYDRA_INGESTOR_PARAM)
 
@@ -51,10 +51,11 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
 
   def waitingForIngestors: Receive = timeOut orElse {
     case LookupResult(Nil) =>
-      val code = targetIngestor.map(i => StatusCodes.custom(404, s"No ingestor named $i was found in the registry."))
+      val errorCode = targetIngestor
+        .map(i => StatusCodes.custom(404, s"No ingestor named $i was found in the registry."))
         .getOrElse(StatusCodes.BadRequest)
 
-      stop(code)
+      stop(errorCode)
 
     case LookupResult(ings) =>
       context.become(ingesting)
@@ -77,9 +78,9 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
     case ValidRequest =>
       sender ! Ingest(request)
 
-    case error: InvalidRequest =>
-      context.system.eventStream.publish(error)
-      updateStatus(sender, error)
+    case i: InvalidRequest =>
+      context.system.eventStream.publish(HydraIngestionError(ActorUtils.actorName(sender), i.error, Some(request)))
+      updateStatus(sender, i)
 
     case IngestorCompleted =>
       updateStatus(sender, IngestorCompleted)
@@ -91,10 +92,8 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
       updateStatus(sender, WaitingForAck)
 
     case err: IngestorError =>
-      updateStatus(sender, IngestorError(err.error))
-
-    case err: HydraIngestionError =>
-      updateStatus(sender, IngestorError(err.cause))
+      context.system.eventStream.publish(HydraIngestionError(ActorUtils.actorName(sender), err.error, Some(request)))
+      updateStatus(sender, err)
   }
 
   def updateStatus(ingestor: ActorRef, status: IngestorStatus) = {
@@ -126,10 +125,10 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
   }
 
   private def stop(status: StatusCode): Unit = {
-    context.parent ! IngestionReport(request.correlationId, request.metadata, ingestors.toMap, status.intValue())
+    val replyTo = request.metadata.find(_._1.equalsIgnoreCase(RequestParams.REPLY_TO)).map(_._2)
+    context.parent ! IngestionReport(request.correlationId, ingestors.toMap, status.intValue(), replyTo)
     context.stop(self)
   }
-
 }
 
 object IngestionSupervisor {

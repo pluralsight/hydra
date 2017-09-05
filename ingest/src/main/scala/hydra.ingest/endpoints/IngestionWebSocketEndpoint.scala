@@ -17,38 +17,60 @@
 package hydra.ingest.endpoints
 
 import akka.actor._
-import akka.http.scaladsl.model.{HttpHeader, StatusCodes}
+import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.Flow
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
-import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
-import hydra.ingest.bootstrap.HydraIngestorRegistry
-import hydra.ingest.ws.IngestionSocket
+import hydra.core.marshallers.GenericServiceResponse
+import hydra.ingest.marshallers.HydraIngestJsonSupport
+import hydra.ingest.ws._
+import spray.json._
+
+import scala.util.Failure
 
 /**
   * Created by alexsilva on 12/22/15.
   */
 class IngestionWebSocketEndpoint(implicit val system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
-  extends RoutedEndpoints with LoggingAdapter with HydraJsonSupport with HydraDirectives with HydraIngestorRegistry {
+  extends RoutedEndpoints with LoggingAdapter with HydraIngestJsonSupport with HydraDirectives {
 
-  val enabled = applicationConfig.get[Boolean]("ingest.websocket.enabled").valueOrElse(false)
+  //visible for testing
+  private[endpoints] val enabled = applicationConfig.get[Boolean]("ingest.websocket.enabled").valueOrElse(false)
+
+  private val socketFactory = IngestSocketFactory.createSocket(actorRefFactory)
+
+  implicit val simpleOutgoingMessageFormat = jsonFormat2(SimpleOutgoingMessage)
 
   override val route: Route =
-    path("ws-ingest" / Segment) { label =>
-      extractHydraHeaders { headers =>
-        if (enabled) {
-          handleWebSocketMessages(createSocket(label, headers))
-        }
-        else {
-          complete(StatusCodes.Conflict, GenericServiceResponse(409, "Websocket not available."))
-        }
+    path("ws-ingest") {
+      if (enabled) {
+        handleWebSocketMessages(ingestSocketFlow())
+      }
+      else {
+        complete(StatusCodes.Conflict, GenericServiceResponse(409, "Web Socket not available."))
       }
     }
 
-  private def createSocket(label: String, headers: Seq[HttpHeader]) =
-    IngestionSocket(headers.map(h => h.name().toUpperCase -> h.value).toMap).ingestionWSFlow(label)
 
-  private val extractHydraHeaders = extract(_.request.headers.filter(_.lowercaseName.startsWith("hydra")))
+  private[endpoints] def ingestSocketFlow(): Flow[Message, Message, Any] = {
+    Flow[Message].collect {
+      case TextMessage.Strict(txt) => txt
+    }.via(socketFactory.ingestFlow())
+      .map {
+        case m: SimpleOutgoingMessage => TextMessage(m.toJson.compactPrint)
+        case r: IngestionOutgoingMessage => TextMessage(r.report.toJson.compactPrint)
+      }.via(reportErrorsFlow)
+  }
+
+  private def reportErrorsFlow[T]: Flow[T, T, Any] =
+    Flow[T]
+      .watchTermination()((_, f) => f.onComplete {
+        case Failure(cause) => log.error(s"WS stream failed with $cause")
+        case _ => //ignore
+      }(actorRefFactory.dispatcher))
+
 }

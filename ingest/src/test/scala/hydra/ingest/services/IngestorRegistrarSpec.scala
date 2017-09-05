@@ -1,0 +1,50 @@
+package hydra.ingest.services
+
+import java.util.concurrent.TimeUnit
+
+import akka.actor.{ActorSystem, Props}
+import akka.pattern.ask
+import akka.testkit.{ImplicitSender, TestKit}
+import akka.util.Timeout
+import hydra.common.util.ActorUtils
+import hydra.ingest.services.IngestorRegistrar.UnregisterAll
+import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
+import hydra.ingest.test.TestIngestor
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+
+/**
+  * Created by alexsilva on 3/9/17.
+  */
+class IngestorRegistrarSpec extends TestKit(ActorSystem("hydra")) with Matchers
+  with FunSpecLike with ImplicitSender with ScalaFutures with BeforeAndAfterAll with Eventually {
+
+  override def afterAll = TestKit.shutdownActorSystem(system)
+
+  val registry = system.actorOf(Props[IngestorRegistry], "ingestor_registry")
+
+  val act = system.actorOf(Props[IngestorRegistrar])
+
+  implicit val timeout = Timeout(3, TimeUnit.SECONDS)
+
+  describe("The ingestor registrar actor") {
+    it("registers from classpath on bootstrap") {
+      eventually {
+        whenReady((registry ? FindByName(ActorUtils.actorName(classOf[TestIngestor]))).mapTo[LookupResult]) { i =>
+          i.ingestors.size shouldBe 1
+          i.ingestors(0).name shouldBe ActorUtils.actorName(classOf[TestIngestor])
+        }
+      }
+    }
+
+    it("unregisters") {
+      act ! UnregisterAll
+      eventually {
+        whenReady((registry ? FindAll).mapTo[LookupResult]) { i =>
+          i.ingestors.size shouldBe 0
+        }
+      }
+    }
+  }
+}
+

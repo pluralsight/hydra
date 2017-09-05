@@ -19,20 +19,30 @@ package hydra.ingest.endpoints
 import akka.actor._
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
+import akka.util.Timeout
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
 import hydra.ingest.bootstrap.HydraIngestorRegistry
-import hydra.ingest.marshallers.IngestionJsonSupport
+import hydra.ingest.marshallers.HydraIngestJsonSupport
 import hydra.ingest.services.IngestorRegistry.{FindAll, LookupResult}
+
+import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
+import configs.syntax._
 
 /**
   * Created by alexsilva on 12/22/15.
   */
-class IngestorRegistryEndpoint(implicit val system: ActorSystem, actorRefFactory: ActorRefFactory)
-  extends RoutedEndpoints with LoggingAdapter with IngestionJsonSupport with HydraDirectives with ConfigSupport
+class IngestorRegistryEndpoint(implicit val system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
+  extends RoutedEndpoints with LoggingAdapter with HydraIngestJsonSupport with HydraDirectives with ConfigSupport
     with HydraIngestorRegistry {
+
+  private val registryLookupTimeout = applicationConfig
+    .get[FiniteDuration]("ingest.service-lookup.timeout").valueOrElse(5.seconds)
+
+  private implicit val timeout = Timeout(registryLookupTimeout)
 
   override val route: Route =
     path("ingestors" ~ Slash.?) {

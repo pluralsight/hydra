@@ -7,7 +7,7 @@ import hydra.core.protocol.{InvalidRequest, MessageValidationResult, ValidReques
 import hydra.core.transport.ValidationStrategy.Strict
 import org.apache.avro.generic.GenericRecord
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 /**
   *
@@ -24,16 +24,12 @@ trait AvroValidation {
     */
   def validate(request: HydraRequest): MessageValidationResult = {
     val schemaResource: Try[SchemaResource] = Try(schemaResourceLoader.getResource(getSubject(request)))
-    val record = schemaResource.map { s =>
+    schemaResource.flatMap { s =>
       val strict = request.validationStrategy == Strict
       val converter = new JsonConverter[GenericRecord](s.schema, strict)
-      converter.convert(request.payload)
-    }
-
-    record match {
-      case Success(_) => ValidRequest
-      case Failure(ex) => InvalidRequest(schemaResource.map(r => improveException(ex, r)).getOrElse(ex))
-    }
+      Try(converter.convert(request.payload)).map(_ => ValidRequest)
+        .recover { case ex => InvalidRequest(schemaResource.map(r => improveException(ex, r)).getOrElse(ex)) }
+    }.get
   }
 
   private def improveException(ex: Throwable, schemaResource: SchemaResource) = {

@@ -3,6 +3,7 @@ package hydra.core.ingest
 /**
   * Created by alexsilva on 12/3/16.
   */
+// $COVERAGE-OFF$Disabling highlighting by default until a workaround for https://issues.scala-lang.org/browse/SI-8596 is found
 object RequestParams {
 
   /**
@@ -53,10 +54,10 @@ object RequestParams {
   val HYDRA_RECORD_FORMAT_PARAM = "hydra-record-format"
 
   /**
-    * Specifies the retry strategy. The options are fail (default) or retry, which will retry using
-    * the default retry logic defined within Akka.
+    * Specifies the delivery strategy. The options are AtMostOnce (default) or AtLeastOnce, which will retry using
+    * the at-least-once logic defined within Akka Persistence.
     */
-  val HYDRA_RETRY_STRATEGY = "hydra-retry-strategy"
+  val HYDRA_DELIVERY_STRATEGY = "hydra-delivery-strategy"
 
   /**
     * Defines how Avro messages should be validated.
@@ -102,18 +103,10 @@ object RequestParams {
 
 
   /**
-    * Can be 'detailed' or 'simple' (default).
-    *
-    * If 'detailed', every request produces a more detailed response including duration for each ingestor, etc.
-    *
-    * A 'simple' response produces only status codes.
-    */
-  val HYDRA_RESPONSE_FORMAT = "hydra-response-format"
-
-  /**
     * The amount of time, in milliseconds, to wait before a timeout error is returned to the client.
     *
     */
   val HYDRA_INGEST_TIMEOUT = "hydra-ingest-timeout"
 
 }
+// $COVERAGE-ON$

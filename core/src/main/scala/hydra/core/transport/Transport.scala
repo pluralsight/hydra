@@ -1,25 +1,42 @@
 package hydra.core.transport
 
-import akka.actor.Actor
-import hydra.common.config.ActorConfigSupport
-import hydra.common.logging.LoggingAdapter
-import hydra.core.akka.ComposingReceive
+import hydra.core.akka.InitializingActor
+import hydra.core.akka.InitializingActor.InitializationError
 import hydra.core.protocol._
+
+import scala.concurrent.duration.{FiniteDuration, _}
 
 /**
   * Created by alexsilva on 12/1/15.
   */
 
-trait Transport extends Actor
-  with ActorConfigSupport with LoggingAdapter with ComposingReceive {
+trait Transport extends InitializingActor {
+
+  override def initTimeout: FiniteDuration = 2.seconds
 
   override val baseReceive: Receive = {
-    case Produce(_) => log.info(s"Produce message was not handled by ${thisActorName}.")
+    case Produce(r) =>
+      log.info(s"Produce message was not handled by ${thisActorName}.")
+      sender ! RecordNotProduced(r, new IllegalStateException("Transport did not reply to Produce."))
 
-    case RecordProduced(_) => log.info(s"$thisActorName: Record produced.")
+    case ProduceWithAck(r, _, _) =>
+      log.info(s"ProduceWithAck message was not handled by ${thisActorName}.")
+      sender ! RecordNotProduced(r, new IllegalStateException("Transport did not reply to Produce."))
 
-    case RecordNotProduced(_, error) => log.error(s"$thisActorName: $error")
+    case r@RecordProduced(_) =>
+      log.info(s"$thisActorName: Record produced.")
+      sender ! r
+
+    case r@RecordNotProduced(_, error) =>
+      log.error(s"$thisActorName: $error")
+      sender ! r
   }
 
   def transport(next: Receive) = compose(next)
+
+
+  override def initializationError(ex: Throwable): Receive = {
+    //todo: customize this error
+    case _ => sender ! InitializationError(ex)
+  }
 }

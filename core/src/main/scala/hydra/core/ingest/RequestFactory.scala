@@ -8,6 +8,6 @@ import scala.concurrent.Future
   * P - the payload type.
   * Created by alexsilva on 3/14/17.
   */
-trait RequestFactory[P, S] {
+trait RequestFactory[S] {
   def createRequest(correlationId: Long, source: S)(implicit mat:Materializer): Future[HydraRequest]
 }
