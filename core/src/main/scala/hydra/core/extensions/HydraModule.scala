@@ -19,7 +19,6 @@ package hydra.core.extensions
 import akka.actor._
 import com.typesafe.config.Config
 import hydra.common.logging.LoggingAdapter
-import hydra.core.extensions.HydraActorModule.Run
 
 import scala.concurrent.Future
 
@@ -74,11 +73,7 @@ trait HydraTypedModule extends HydraModule with LoggingAdapter {
 
 }
 
-trait HydraActorModule extends Actor with HydraModule with LoggingAdapter {
-  override def receive = {
-    case Run => run()
-  }
-}
+trait HydraActorModule extends Actor with HydraModule with LoggingAdapter
 
 object HydraActorModule {
 
