@@ -5,7 +5,7 @@ enablePlugins(JavaAppPackaging)
 
 val JDK = "1.8"
 val buildNumber = scala.util.Properties.envOrNone("version").map(v => "." + v).getOrElse("")
-val hydraVersion = "0.8.3" + buildNumber
+val hydraVersion = "0.8.4" + buildNumber
 
 lazy val defaultSettings = Seq(
   organization := "pluralsight",
