@@ -24,7 +24,7 @@ import hydra.ingest.bootstrap.HydraIngestorRegistry
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 /**
   * Created by alexsilva on 12/22/15.
@@ -47,8 +47,7 @@ class IngestionActor extends Actor with ActorConfigSupport with ActorLogging wit
     case r: IngestionReport =>
       context.stop(sender)
       r.metadata.find(_._1.equalsIgnoreCase(RequestParams.REPLY_TO)).foreach { replyTo =>
-        Try(context.actorSelection(replyTo._2) ! r)
-          .recover { case e => log.error(s"Unable to send reply back to ${receive}: ${e.getMessage}") }
+        context.actorSelection(replyTo._2) ! r
       }
   }
 

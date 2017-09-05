@@ -6,7 +6,7 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import hydra.core.ingest.IngestionReport
 
 trait IngestSocketFactory {
-  def ingestFlow(): Flow[String, SocketEvent, Any]
+  def ingestFlow(): Flow[String, OutgoingMessage, Any]
 
 }
 

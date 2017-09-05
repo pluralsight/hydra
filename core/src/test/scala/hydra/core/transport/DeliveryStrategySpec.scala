@@ -6,8 +6,8 @@ class DeliveryStrategySpec extends Matchers with FlatSpecLike {
 
   "the delivery strategy companion" should "parse strings" in {
     DeliveryStrategy("at-least-once") shouldBe DeliveryStrategy.AtLeastOnce
-    DeliveryStrategy("best-effort") shouldBe DeliveryStrategy.BestEffort
-    DeliveryStrategy("unknown") shouldBe DeliveryStrategy.BestEffort
-    DeliveryStrategy(null) shouldBe DeliveryStrategy.BestEffort
+    DeliveryStrategy("best-effort") shouldBe DeliveryStrategy.AtMostOnce
+    DeliveryStrategy("unknown") shouldBe DeliveryStrategy.AtMostOnce
+    DeliveryStrategy(null) shouldBe DeliveryStrategy.AtMostOnce
   }
 }

@@ -20,6 +20,7 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
     override def receive = {
       case Publish(_) => sender ! Join
       case Validate(_) => sender ! ValidRequest
+      case Ingest(req) if req.payload == "error" => sender ! IngestorError(new IllegalArgumentException)
       case Ingest(_) => sender ! IngestorCompleted
     }
   }, "test_ingestor")
@@ -37,6 +38,16 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
 
   "the IngestionWebSocketEndpoint" should {
 
+    "returned a 409 if not enabled" in {
+      val endpt = new IngestionWebSocketEndpoint() {
+        override val enabled = false
+      }
+      val wsClient = WSProbe()
+      WS("/ws-ingest", wsClient.flow) ~> endpt.route ~> check {
+        response.status.intValue() shouldBe 409
+      }
+
+    }
 
     "handle websocket requests" in {
       val wsClient = WSProbe()
@@ -49,6 +60,9 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
         wsClient.expectMessage("""{"status":200,"message":"OK[HYDRA-KAFKA-TOPIC=test.Topic]"}""")
         wsClient.sendMessage("-c SET hydra-ack = explicit")
         wsClient.expectMessage("""{"status":200,"message":"OK[HYDRA-ACK=explicit]"}""")
+
+        wsClient.sendMessage("-c WHAT")
+        wsClient.expectMessage("""{"status":400,"message":"BAD_REQUEST:Not a valid message. Use 'HELP' for help."}""")
 
         wsClient.sendMessage("-c SET")
         wsClient.expectMessage("""{"status":200,"message":"HYDRA-KAFKA-TOPIC -> test.Topic;HYDRA-ACK -> explicit"}""")
@@ -63,9 +77,32 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
         wsClient.sendMessage("""-i 122 {"name":"test","value":"test"}""")
         wsClient.expectMessage("""{"correlationId":122,"ingestors":{"test_ingestor":{"code":200,"message":"OK"}}}""")
 
+        wsClient.sendMessage("error")
+        wsClient.expectMessage("""{"correlationId":0,"ingestors":{"test_ingestor":{"code":503,"message":""}}}""")
+
         wsClient.sendCompletion()
         wsClient.expectCompletion()
       }
+
     }
+    "sets metadata" in {
+      val wsClient = WSProbe()
+
+      WS("/ws-ingest", wsClient.flow) ~> endpt.route ~> check {
+        // check response for WS Upgrade headers
+        isWebSocketUpgrade shouldEqual true
+
+        wsClient.sendMessage("-c SET hydra-delivery-strategy = at-most-once")
+        wsClient.expectMessage("""{"status":200,"message":"OK[HYDRA-DELIVERY-STRATEGY=at-most-once]"}""")
+
+        wsClient.sendMessage("""-i 122 {"name":"test","value":"test"}""")
+        wsClient.expectMessage("""{"correlationId":122,"ingestors":{"test_ingestor":{"code":200,"message":"OK"}}}""")
+
+        wsClient.sendCompletion()
+        wsClient.expectCompletion()
+      }
+
+    }
+
   }
 }

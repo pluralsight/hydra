@@ -16,11 +16,11 @@ object DeliveryStrategy {
   def apply(strategy: String): DeliveryStrategy = {
     Option(strategy).map(_.trim.toLowerCase) match {
       case Some("at-least-once") => AtLeastOnce
-      case _ => BestEffort
+      case _ => AtMostOnce
     }
   }
 
-  case object BestEffort extends DeliveryStrategy {
+  case object AtMostOnce extends DeliveryStrategy {
     override val retryOnFailure: Boolean = false
 
   }

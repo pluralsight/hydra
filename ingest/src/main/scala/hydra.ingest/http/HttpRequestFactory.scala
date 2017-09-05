@@ -20,7 +20,7 @@ class HttpRequestFactory extends RequestFactory[HttpRequest] with CodingDirectiv
     implicit val ec = mat.executionContext
 
     val rs = request.headers.find(_.lowercaseName() == HYDRA_DELIVERY_STRATEGY)
-      .map(h => DeliveryStrategy(h.value())).getOrElse(DeliveryStrategy.BestEffort)
+      .map(h => DeliveryStrategy(h.value())).getOrElse(DeliveryStrategy.AtMostOnce)
 
     val vs = request.headers.find(_.lowercaseName() == HYDRA_VALIDATION_STRATEGY)
       .map(h => ValidationStrategy(h.value())).getOrElse(ValidationStrategy.Strict)
