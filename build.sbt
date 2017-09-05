@@ -51,7 +51,7 @@ lazy val root = Project(
   id = "hydra",
   base = file("."),
   settings = defaultSettings // ++ noPublishSettings
-).aggregate(core, kafka, ingest, sandbox)
+).aggregate(common, core, kafka, ingest, sandbox)
 
 lazy val common = Project(
   id = "common",
