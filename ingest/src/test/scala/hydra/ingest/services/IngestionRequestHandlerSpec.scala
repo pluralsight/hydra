@@ -36,7 +36,7 @@ class IngestionRequestHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
         ctx.completed should not be null
       }
       ctx.completed.value.asInstanceOf[(_, _)]._2 match {
-        case IngestionReport(c, _, i, statusCode) =>
+        case IngestionReport(c, i, statusCode, _) =>
           c shouldBe 123
           statusCode shouldBe 400
       }
@@ -57,7 +57,7 @@ class IngestionRequestHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
         ctx.completed should not be null
       }
       ctx.completed.value.asInstanceOf[(_, _)]._2 match {
-        case IngestionReport(c, _, _, statusCode) =>
+        case IngestionReport(c, _, statusCode, _) =>
           c shouldBe 12344
           statusCode shouldBe 200
       }
@@ -106,7 +106,7 @@ private class DummySupervisor(r: HydraRequest) extends Actor {
     context.parent ! "Something else"
   }
   else {
-    val i = IngestionReport(r.correlationId, Map.empty, Map.empty, 200)
+    val i = IngestionReport(r.correlationId, Map.empty, 200)
     context.parent ! i
   }
 
