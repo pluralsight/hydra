@@ -54,7 +54,7 @@ object RequestParams {
   val HYDRA_RECORD_FORMAT_PARAM = "hydra-record-format"
 
   /**
-    * Specifies the delivery strategy. The options are BestEffort (default) or AtLeastOnce, which will retry using
+    * Specifies the delivery strategy. The options are AtMostOnce (default) or AtLeastOnce, which will retry using
     * the at-least-once logic defined within Akka Persistence.
     */
   val HYDRA_DELIVERY_STRATEGY = "hydra-delivery-strategy"
