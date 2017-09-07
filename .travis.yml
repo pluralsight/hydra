@@ -10,4 +10,7 @@ scala:
 jdk:
    - oraclejdk8
 script:
-  - sbt clean compile
+  - sbt clean coverage test coverageReport
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
