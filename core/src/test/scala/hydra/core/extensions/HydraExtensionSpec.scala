@@ -1,10 +1,8 @@
-package hydra.core.extension
+package hydra.core.extensions
 
 import akka.actor.{ActorRef, ActorSystem, ExtensionId}
 import akka.parboiled2.RuleTrace.Run
 import akka.testkit.{ImplicitSender, TestKit}
-import com.typesafe.config.ConfigFactory
-import hydra.core.extensions._
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
@@ -13,8 +11,7 @@ class HydraExtensionSpec extends TestKit(ActorSystem("test"))
 
   import akka.actor.ActorSystem
   import akka.testkit.TestKit
-  import com.typesafe.config.{Config, ConfigFactory}
-  import hydra.core.extensions._
+  import com.typesafe.config.ConfigFactory
   import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
   class HydraExtensionSpec extends TestKit(ActorSystem("test"))
@@ -27,7 +24,7 @@ class HydraExtensionSpec extends TestKit(ActorSystem("test"))
         |test-extension {
         |tester{
         |  name=typed-test
-        |  class=hydra.core.extension.HydraTestExtension
+        |  class=hydra.core.extensions.HydraTestExtension
         |}
       """.stripMargin)
 

@@ -13,11 +13,13 @@ import hydra.common.logging.LoggingAdapter
 class HydraExtensionListener(extensionName: String, config: Config) extends ContainerLifecycleListener
   with LoggingAdapter {
 
+  private[extensions] val hasExtensions = !config.isEmpty
+
   override def onStartup(container: ContainerService) = {
-    HydraExtensionLoader.load(extensionName, config)(container.system)
+    if (hasExtensions) HydraExtensionLoader.load(extensionName, config)(container.system)
   }
 
   override def onShutdown(container: ContainerService): Unit = {
-    HydraExtensionRegistry.get(container.system).getTypedModules.foreach(_.stop())
+    if (hasExtensions) HydraExtensionRegistry.get(container.system).getTypedModules.foreach(_.stop())
   }
 }
