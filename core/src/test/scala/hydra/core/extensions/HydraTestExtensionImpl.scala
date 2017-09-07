@@ -1,9 +1,8 @@
-package hydra.core.extension
+package hydra.core.extensions
 
 import akka.actor.{ActorSystem, ExtendedActorSystem, Extension, ExtensionId, ExtensionIdProvider}
 import com.typesafe.config.{Config, ConfigFactory}
 import hydra.core.extensions.HydraActorModule.Run
-import hydra.core.extensions.{HydraActorModule, HydraExtensionBase, HydraTypedModule}
 
 case class HydraTestExtensionImpl(system: ActorSystem, cfg: Config)
   extends HydraExtensionBase("tester", cfg)(system) with Extension
@@ -14,23 +13,23 @@ object HydraTestExtension extends ExtensionId[HydraTestExtensionImpl] with Exten
     """
       |  test-typed {
       |    name=typed-module-test
-      |    class=hydra.core.extension.TestTypedModule
+      |    class=hydra.core.extensions.TestTypedModule
       |}
       |
       | test-typed-interval {
       |    name=typed-module-test
-      |    class=hydra.core.extension.TestTypedModule
+      |    class=hydra.core.extensions.TestTypedModule
       |    interval = 50ms
       |}
       |
       |  test-actor {
       |    name=typed-actor-test
-      |    class=hydra.core.extension.TestActorModule
+      |    class=hydra.core.extensions.TestActorModule
       |}
       |  test-actor-disabled {
       |    enabled=false
       |    name=typed-actor-test
-      |    class=hydra.core.extension.TestActorModule
+      |    class=hydra.core.extensions.TestActorModule
       |}
     """.stripMargin)
 

@@ -1,10 +1,9 @@
-package hydra.core.extension
+package hydra.core.extensions
 
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.TestKit
 import com.typesafe.config.{Config, ConfigFactory}
 import hydra.core.app.HydraEntryPoint
-import hydra.core.extensions._
 import hydra.core.testing.DummyActor
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
@@ -34,7 +33,7 @@ class HydraExtensionListenerSpec extends TestKit(ActorSystem("test"))
     """
       |test-extension {
       |  name=typed-test
-      |  class=hydra.core.extension.HydraTestExtension
+      |  class=hydra.core.extensions.HydraTestExtension
       |}
     """.stripMargin)
 
@@ -51,6 +50,13 @@ class HydraExtensionListenerSpec extends TestKit(ActorSystem("test"))
     it("can be loaded from configuration") {
       e.onStartup(container)
       HydraExtensionRegistry(container.system).getModule("test-typed").isDefined shouldBe true
+    }
+
+    it("skips loading on empty config") {
+      val e = new HydraExtensionListener("test-extension", ConfigFactory.empty())
+      e.hasExtensions shouldBe false
+      e.onStartup(container)
+      e.onShutdown(container)
     }
   }
 }
