@@ -40,6 +40,38 @@ class KafkaConfigSupportSpec extends Matchers with FunSpecLike with KafkaConfigS
 
   describe("When testing producer configs") {
 
+    it("returns a producer with the global schema registry") {
+
+      val producerCfg = ConfigFactory.parseString(
+        """
+          |kafka {
+          |    formats {
+          |      avro {
+          |        key.serializer = "org.apache.kafka.common.serialization.StringSerializer"
+          |        key.deserializer = "org.apache.kafka.common.serialization.StringDeserializer"
+          |        value.serializer = "io.confluent.kafka.serializers.KafkaAvroSerializer"
+          |        value.deserializer = "io.confluent.kafka.serializers.KafkaAvroDeserializer"
+          |        client.id = "hydra.avro"
+          |      }
+          |     }
+          |  producer {
+          |    bootstrap.servers = "kafka:6667"
+          |  }
+          |}
+        """.stripMargin
+      )
+
+      val m = KafkaConfigSupport.loadProducerFormats(producerCfg)("avro")
+      m.getString("schema.registry.url") shouldBe "mock"
+      m.getString("bootstrap.servers") shouldBe "kafka:6667"
+      m.getString("key.deserializer") shouldBe "org.apache.kafka.common.serialization.StringDeserializer"
+      m.getString("key.serializer") shouldBe "org.apache.kafka.common.serialization.StringSerializer"
+      m.getString("client.id") shouldBe "hydra.avro"
+      m.hasPath("zookeeper.connect") shouldBe false
+      m.getString("value.serializer") shouldBe "io.confluent.kafka.serializers.KafkaAvroSerializer"
+      m.getString("value.deserializer") shouldBe "io.confluent.kafka.serializers.KafkaAvroDeserializer"
+    }
+
     it("returns a producer with default values.") {
 
       val producerCfg = ConfigFactory.parseString(

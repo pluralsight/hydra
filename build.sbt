@@ -67,6 +67,7 @@ lazy val core = Project(
     ++ Seq(libraryDependencies ++= Dependencies.coreDeps)
 ).dependsOn(common).settings(name := "hydra-core")
 
+
 lazy val ingest = Project(
   id = "ingest",
   base = file("ingest"),

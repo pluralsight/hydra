@@ -10,7 +10,7 @@ import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
 import hydra.core.marshallers.GenericServiceResponse
-import hydra.kafka.consumer.ConsumerSupport
+import hydra.kafka.util.KafkaUtils._
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.util.KafkaUtils
 
@@ -23,7 +23,7 @@ import scala.util.{Random, Try}
   * Created by alexsilva on 3/18/17.
   */
 class StreamingTopicsEndpoint(implicit val system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
-  extends RoutedEndpoints with LoggingAdapter with HydraDirectives with ConsumerSupport with HydraKafkaJsonSupport {
+  extends RoutedEndpoints with LoggingAdapter with HydraDirectives  with HydraKafkaJsonSupport {
 
   implicit val ec = actorRefFactory.dispatcher
 
