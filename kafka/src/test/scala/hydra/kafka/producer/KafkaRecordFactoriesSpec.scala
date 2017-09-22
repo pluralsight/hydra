@@ -29,7 +29,6 @@ import org.scalatest.{FunSpecLike, Matchers}
 class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
 
   describe("When using KafkaRecordFactories") {
-
     it("handles avro") {
       val json = """{"name":"test", "rank":10}"""
       val request = HydraRequest(123, json)

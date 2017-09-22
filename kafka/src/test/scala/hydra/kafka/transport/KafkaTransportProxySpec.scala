@@ -15,7 +15,7 @@ import scala.concurrent.duration._
   * Created by alexsilva on 12/5/16.
   */
 class KafkaTransportProxySpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike with ImplicitSender
-  with BeforeAndAfterAll with BeforeAndAfterEach with KafkaConfigSupport with EmbeddedKafka {
+  with BeforeAndAfterAll with BeforeAndAfterEach with KafkaConfigSupport with EmbeddedKafka{
 
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 33181,
     customBrokerProperties = Map("auto.create.topics.enable" -> "false"))

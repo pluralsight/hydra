@@ -29,7 +29,7 @@ trait Ingestor extends InitializingActor {
   override def initializationError(ex: Throwable): Receive = {
     case Publish(req) =>
       sender ! IngestorError(ex)
-      ingestionError(HydraIngestionError(thisActorName, ex, Some(req)))
+      ingestionError(HydraIngestionError(thisActorName, ex, req))
     case _ =>
       sender ! IngestorError(ex)
   }

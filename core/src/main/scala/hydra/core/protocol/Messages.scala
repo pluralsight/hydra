@@ -50,7 +50,7 @@ case class ProducerAck(supervisor: ActorRef, error: Option[Throwable])
 
 //todo:rename this class
 case class HydraIngestionError(ingestor: String, error: Throwable,
-                               request: Option[HydraRequest], time: DateTime = DateTime.now) extends HydraError
+                               request: HydraRequest, time: DateTime = DateTime.now) extends HydraError
 
 
 sealed trait IngestorStatus extends HydraMessage with Product {

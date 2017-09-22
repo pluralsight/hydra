@@ -1,11 +1,15 @@
 package hydra.kafka.health
 
-import akka.actor.Actor
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.github.vonnagy.service.container.health.{CheckHealth, GetHealth, HealthInfo}
-import configs.syntax._
-import org.apache.zookeeper.ZooKeeper
+import java.io.Closeable
 
+import akka.actor.Actor
+import com.github.vonnagy.service.container.health.HealthInfo
+import configs.syntax._
+import org.I0Itec.zkclient.ZkClient
+import org.joda.time.DateTime
+import hydra.common.util.Resource._
+
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
@@ -13,29 +17,23 @@ import scala.concurrent.duration._
   */
 class ZookeeperHealthCheckActor extends Actor with ClusterHealthCheck {
 
-  val interval = applicationConfig.get[FiniteDuration]("zk.health_check.interval").valueOrElse(10.seconds)
+  val interval = applicationConfig.get[FiniteDuration]("health.zookeeper.interval").valueOrElse(10.seconds)
 
-  private val zkConnect = kafkaConfig.getString("settings.zookeeper.connect")
+  override val name = s"Zookeeper [$zkString]"
 
-  private val currentHealth: HealthInfo = HealthInfo("Zookeeper", details = "")
-
-  private val mapper = new ObjectMapper()
-
-  implicit val ec = context.dispatcher
-
-  context.system.scheduler.schedule(interval, interval, self, CheckHealth)
-
-  override def receive: Receive = {
-    case GetHealth => sender ! currentHealth
+  override def checkHealth(): Future[HealthInfo] = {
+    Future {
+      import scala.collection.JavaConverters._
+      using(CloseableZkClient(new ZkClient(zkString, 1000, 1000))) { czk =>
+        czk.zk.getChildren("/brokers/topics").asScala.headOption
+          .map(_ => HealthInfo(name, details = s"Zookeeper request succeeded at ${DateTime.now.toString()}."))
+          .getOrElse(HealthInfo(name, details = s"Empty znode /brokers/topics reported at ${DateTime.now.toString()}."))
+      }
+    }
   }
+}
 
-  def checkHealth(): Unit = {
-    import scala.collection.JavaConverters._
-    val zk = new ZooKeeper(zkConnect, 10000, null);
-    val brokerList = zk.getChildren("/brokers/ids", false).asScala
-      .map(s => mapper.readValue(zk.getData(s"/brokers/ids/$s", false, null), classOf[Map[Any, Any]]))
-
-    println(brokerList)
-  }
+private case class CloseableZkClient(zk: ZkClient) extends Closeable {
+  override def close() = zk.close()
 }
 

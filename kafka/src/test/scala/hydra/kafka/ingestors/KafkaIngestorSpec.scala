@@ -7,21 +7,26 @@ import hydra.common.config.ConfigSupport
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams._
 import hydra.core.protocol._
+import hydra.kafka.ForwardActor
 import hydra.kafka.producer.AvroRecordFactory
 import org.apache.avro.Schema.Parser
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 /**
   * Created by alexsilva on 11/18/16.
   */
 class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers with FunSpecLike
-  with ImplicitSender with ConfigSupport {
+  with ImplicitSender with ConfigSupport  with BeforeAndAfterAll {
+
+  override def afterAll = TestKit.shutdownActorSystem(system)
 
   val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
   val registryClient = schemaRegistry.registryClient
-  val kafkaProducer = TestProbe("kafka_producer_actor")
+  val probe = TestProbe()
 
-  val transport = kafkaProducer.childActorOf(Props[KafkaIngestor])
+  val kafkaProducer = system.actorOf(Props(new ForwardActor(probe.ref)), "kafka_producer")
+
+  val transport = probe.childActorOf(Props[KafkaIngestor])
 
   val KAFKA = "kafka_ingestor"
 
