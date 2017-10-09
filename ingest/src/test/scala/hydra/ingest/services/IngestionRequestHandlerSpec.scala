@@ -89,8 +89,8 @@ class IngestionRequestHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
 
         override def failWith(error: Throwable): Unit = this.error = error
       }
-      val reg = TestActorRef[IngestionRequestHandler](IngestionRequestHandler.
-        props(req, Props(classOf[DummySupervisor], req), ctx))
+      val reg = TestActorRef[IngestionRequestHandler](IngestionRequestHandler.props(req.withCorrelationId(12344),
+        Props(classOf[DummySupervisor], req.withCorrelationId(12344)), ctx))
       val strategy = reg.underlyingActor.supervisorStrategy.decider
       strategy(new IllegalArgumentException) should be(Stop)
     }

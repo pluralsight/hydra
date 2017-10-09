@@ -1,9 +1,11 @@
 package hydra.kafka.transport
 
-import akka.actor.{ActorSystem, PoisonPill}
-import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
+import akka.actor.{ActorSystem, Props}
+import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import akka.util.Timeout
+import com.typesafe.config.ConfigFactory
 import hydra.core.protocol.{Produce, RecordNotProduced, RecordProduced}
+import hydra.kafka.ForwardActor
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{JsonRecord, KafkaRecordMetadata, StringRecord}
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
@@ -20,9 +22,9 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers wit
 
   val producerName = StringRecord("test_topic", Some("key"), "payload").formatName
 
-  val kafkaSupervisor = TestActorRef[KafkaTransport](KafkaTransport.props(kafkaProducerFormats))
+  lazy val kafkaSupervisor = TestActorRef[KafkaTransport](KafkaTransport.props(kafkaProducerFormats))
 
-  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 33181,
+  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
     customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
 
   override def beforeAll() = {
@@ -32,11 +34,30 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers wit
 
   override def afterAll() = {
     EmbeddedKafka.stop()
-    kafkaSupervisor ! PoisonPill
     TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
   }
 
   describe("When using the supervisor") {
+    it("errors out with invalid producer config") {
+      val cfg = ConfigFactory.parseString(
+        """
+          | acks = "1"
+          | metadata.fetch.timeout.ms = 1000
+          | key.serializer = "org.apache.kafka.common.serialization.StringSerializer"
+          | key.deserializer = "org.apache.kafka.common.serialization.StringDeserializer"
+          | value.serializer = "io.confluent.kafka.serializers.KafkaAvroSerializer"
+          | value.deserializer = "io.confluent.kafka.serializers.KafkaAvroDeserializer"
+          | client.id = "hydra.avro"
+        """.stripMargin)
+      val probe = TestProbe()
+      val act = probe.childActorOf(KafkaTransport.props(Map("json" -> cfg)), "json")
+      val p = system.actorOf(Props(new ForwardActor(act)), "kafka_producer")
+      p ! Produce(JsonRecord("test_topic", Some("key"), """{"name":"alex"}"""))
+      probe.expectMsgPF(10.seconds) {
+        case x=>println(x)//ProducerInitializationError("json", ex) => ex shouldBe "RAR"
+      }
+    }
+
     it("has the right producers") {
       kafkaSupervisor.underlyingActor.producers.size shouldBe 2
       kafkaSupervisor.underlyingActor.producers.keys should contain allOf("avro", "string")
@@ -58,6 +79,24 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers wit
       val Success(result: RecordProduced) = future.value.get
       result.md.asInstanceOf[KafkaRecordMetadata].topic shouldBe "test-topic"
       result.md.asInstanceOf[KafkaRecordMetadata].partition shouldBe 0
+    }
+
+    it("creates producers from config") {
+      val cfg = ConfigFactory.parseString(
+        """
+          | acks = "1"
+          | batch.size = 0 //disable
+          | metadata.fetch.timeout.ms = 1000
+          | bootstrap.servers = "localhost:8092"
+          | zookeeper.connect = "localhost:3181"
+          | key.serializer = "org.apache.kafka.common.serialization.StringSerializer"
+          | key.deserializer = "org.apache.kafka.common.serialization.StringDeserializer"
+          | value.serializer = "io.confluent.kafka.serializers.KafkaAvroSerializer"
+          | value.deserializer = "io.confluent.kafka.serializers.KafkaAvroDeserializer"
+          | client.id = "hydra.avro"
+        """.stripMargin)
+      // val act = TestActorRef[KafkaTransport](KafkaTransport.props(Map("avro" -> cfg)))
+      // act.underlyingActor.initProducers() shouldBe Map("avro" -> "rar")
     }
   }
 

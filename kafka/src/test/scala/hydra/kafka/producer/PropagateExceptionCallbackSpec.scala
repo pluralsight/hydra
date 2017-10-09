@@ -38,7 +38,7 @@ class PropagateExceptionCallbackSpec extends TestKit(ActorSystem("hydra")) with 
     it("sends the completion to the actor selection") {
       val record = StringRecord("test", "test")
       val e = new PropagateExceptionCallback(ActorSelection(probe.ref, Seq.empty), record, 112)
-      val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1, 1, 1)
+      val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1L, 1, 1)
       e.onCompletion(md, null)
       probe.expectMsg(KafkaRecordMetadata(md, 112, record.deliveryStrategy))
     }
@@ -46,7 +46,7 @@ class PropagateExceptionCallbackSpec extends TestKit(ActorSystem("hydra")) with 
     it("sends the error to the actor selection") {
       val record = StringRecord("test", "test")
       val e = new PropagateExceptionCallback(ActorSelection(probe.ref, Seq.empty), record, 112)
-      val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1, 1, 1)
+      val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1L:java.lang.Long, 1, 1)
       val err = new IllegalArgumentException("test")
       e.onCompletion(md, err)
       probe.expectMsg(RecordNotProduced(record, err))
@@ -56,7 +56,7 @@ class PropagateExceptionCallbackSpec extends TestKit(ActorSystem("hydra")) with 
       val record = StringRecord("test", "test")
       val e = new PropagateExceptionWithAckCallback(ActorSelection(probe.ref, Seq.empty), ingestor.ref,
         supervisor.ref, record, 112)
-      val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1, 1, 1)
+      val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1L:java.lang.Long, 1, 1)
       e.onCompletion(md, null)
       probe.expectMsg(KafkaRecordMetadata(md, 112, record.deliveryStrategy))
       ingestor.expectMsg(ProducerAck(supervisor.ref, None))
@@ -66,7 +66,7 @@ class PropagateExceptionCallbackSpec extends TestKit(ActorSystem("hydra")) with 
       val record = StringRecord("test", "test")
       val e = new PropagateExceptionWithAckCallback(ActorSelection(probe.ref, Seq.empty), ingestor.ref,
         supervisor.ref, record, 112)
-      val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1, 1, 1)
+      val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1L:java.lang.Long, 1, 1)
       val err = new IllegalArgumentException("test")
       e.onCompletion(md, err)
       probe.expectMsg(RecordNotProduced(record, err))
