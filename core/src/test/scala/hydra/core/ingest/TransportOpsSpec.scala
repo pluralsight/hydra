@@ -2,11 +2,9 @@ package hydra.core.ingest
 
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
-import hydra.core.protocol.{IngestorCompleted, IngestorError, ValidRequest}
-import hydra.core.transport.{HydraRecord, RecordFactory, DeliveryStrategy, TransportTester}
+import hydra.core.protocol.{IngestorCompleted, IngestorError}
+import hydra.core.transport._
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
-
-import scala.util.Success
 
 /**
   * Created by alexsilva on 3/22/17.
@@ -43,31 +41,22 @@ class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers with F
   }
 }
 
-object TestRecordFactory extends RecordFactory[String, String] {
-  override def build(r: HydraRequest) = Success(new HydraRecord[String, String] {
-    override def destination = "test-topic"
-
-    override def key = Some(r.correlationId.toString)
-
-    override def payload = r.payload
-
-    override def deliveryStrategy = DeliveryStrategy.AtLeastOnce
-  })
-
-  override def validate(request: HydraRequest) = ValidRequest
-}
 
 class TestTransportIngestor extends Ingestor with TransportOps {
 
+  override val recordFactory = TestRecordFactory
+
   ingest {
     case "hello" => sender ! "hi!"
-    case req: HydraRequest => sender ! transport(req)(TestRecordFactory)
+    case req: HydraRequest => sender ! transport(TestRecordFactory.build(req).get)
   }
 
   override def transportName = "test-transport"
 }
 
 class TestTransportIngestorError extends Ingestor with TransportOps {
+
+  override val recordFactory = TestRecordFactory
 
   override def transportName = "test-transport-unknown"
 }

@@ -113,7 +113,7 @@ private class DummySupervisor(r: HydraRequest) extends Actor {
   override def receive = {
     case Publish(_) =>
     case Validate(_) => context.parent ! ValidRequest
-    case Ingest(r) => context.parent ! HydraIngestionError("dummy_ingestor", new IllegalArgumentException, Some(r))
+    case Ingest(_) => context.parent ! HydraIngestionError("dummy_ingestor", new IllegalArgumentException, None)
 
   }
 }

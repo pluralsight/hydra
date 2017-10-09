@@ -24,7 +24,7 @@ trait MessageValidationResult extends HydraMessage
 
 case class Publish(request: HydraRequest) extends HydraMessage
 
-case class Ingest(request: HydraRequest) extends HydraMessage
+case class Ingest[K, V](record: HydraRecord[K, V]) extends HydraMessage
 
 case object Join extends HydraMessage
 
@@ -97,7 +97,7 @@ case class InvalidRequest(error: Throwable) extends IngestorStatus with HydraErr
   val statusCode = StatusCodes.BadRequest
 }
 
-case object ValidRequest extends IngestorStatus with MessageValidationResult {
+case class ValidRequest[K, V](record: HydraRecord[K, V]) extends IngestorStatus with MessageValidationResult {
   override val completed = true
   val statusCode = StatusCodes.Continue
 }

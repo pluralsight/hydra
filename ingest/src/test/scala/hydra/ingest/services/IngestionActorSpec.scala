@@ -2,7 +2,7 @@ package hydra.ingest.services
 
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
-import hydra.core.ingest.{HydraRequest, IngestionReport, RequestParams}
+import hydra.core.ingest.{HydraRequest, IngestionReport, RequestParams, TestRecordFactory}
 import hydra.core.protocol._
 import hydra.ingest.ingestors.IngestorInfo
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
@@ -22,7 +22,7 @@ class IngestionActorSpec extends TestKit(ActorSystem("hydra")) with Matchers
   val ingestor = TestActorRef(new Actor {
     override def receive = {
       case Publish(_) => sender ! Join
-      case Validate(_) => sender ! ValidRequest
+      case Validate(r) => sender ! ValidRequest(TestRecordFactory.build(r).get)
       case Ingest(_) => sender ! IngestorCompleted
     }
   }, "test_ingestor")
