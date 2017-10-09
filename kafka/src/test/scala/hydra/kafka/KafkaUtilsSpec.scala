@@ -38,7 +38,8 @@ class KafkaUtilsSpec extends WordSpec with Matchers with EmbeddedKafka with Befo
         "value.deserializer" -> "io.confluent.kafka.serializers.KafkaAvroDeserializer",
         "zookeeper.connect" -> "localhost:3181", "client.id" -> "hydra.avro", "metadata.fetch.timeout.ms" -> "1000",
         "value.serializer" -> "io.confluent.kafka.serializers.KafkaAvroSerializer",
-        "key.serializer" -> "org.apache.kafka.common.serialization.StringSerializer")
+        "key.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
+        "schema.registry.url" -> "mock")
 
       d.properties shouldBe props
     }
@@ -52,7 +53,8 @@ class KafkaUtilsSpec extends WordSpec with Matchers with EmbeddedKafka with Befo
         "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
         "zookeeper.connect" -> "localhost:3181", "client.id" -> "hydra.string", "metadata.fetch.timeout.ms" -> "1000",
         "value.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
-        "key.serializer" -> "org.apache.kafka.common.serialization.StringSerializer")
+        "key.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
+        "schema.registry.url" -> "mock")
 
       d.properties shouldBe props
     }
