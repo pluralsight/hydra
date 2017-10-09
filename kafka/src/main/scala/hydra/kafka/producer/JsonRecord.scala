@@ -16,8 +16,8 @@
 
 package hydra.kafka.producer
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import hydra.core.transport.DeliveryStrategy
+import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
+import hydra.core.transport.{AckStrategy, DeliveryStrategy}
 import hydra.core.transport.DeliveryStrategy.AtMostOnce
 
 /**
@@ -26,14 +26,15 @@ import hydra.core.transport.DeliveryStrategy.AtMostOnce
   * A Jackson backed JSON record implementation, where the key is a string object and the payload is a String
   * converted using Jackson.
   */
-case class JsonRecord(destination: String, key: Option[String], payload: String,
-                      deliveryStrategy: DeliveryStrategy = AtMostOnce) extends KafkaRecord[String, String]
+case class JsonRecord(destination: String, key: Option[String], payload: JsonNode,
+                      deliveryStrategy: DeliveryStrategy = AtMostOnce,
+                      ackStrategy: AckStrategy = AckStrategy.None) extends KafkaRecord[String, JsonNode]
 
 object JsonRecord {
   val mapper = new ObjectMapper()
 
   def apply(topic: String, key: Option[String], obj: Any): JsonRecord = {
-    val payload: String = mapper.writeValueAsString(obj)
+    val payload = mapper.convertValue[JsonNode](obj, classOf[JsonNode])
     new JsonRecord(topic, key, payload)
   }
 }

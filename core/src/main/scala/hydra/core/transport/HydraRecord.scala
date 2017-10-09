@@ -25,4 +25,11 @@ trait HydraRecord[+K, +P] {
     */
   def deliveryStrategy: DeliveryStrategy
 
+  /**
+    * Should be copied over from HydraRequest
+    *
+    * @return
+    */
+  def ackStrategy: AckStrategy
+
 }
