@@ -28,6 +28,8 @@ import hydra.kafka.producer.{KafkaProducerSupport, KafkaRecordFactories}
   */
 class KafkaIngestor extends Ingestor with KafkaProducerSupport {
 
+  override val recordFactory = KafkaRecordFactories
+
   ingest {
     case Publish(request) =>
       val hasTopic = request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM).isDefined
@@ -36,12 +38,12 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
     case Validate(request) =>
       val validation = request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM) match {
         case None => InvalidRequest(new IllegalArgumentException("A topic name must be supplied."))
-        case Some(_) => KafkaRecordFactories.validate(request)
+        case Some(_) => validate(request)
       }
 
       sender ! validation
 
-    case Ingest(request) =>
-      sender ! transport(request)(KafkaRecordFactories(request).get)
+    case Ingest(record) =>
+      sender ! transport(record)
   }
 }

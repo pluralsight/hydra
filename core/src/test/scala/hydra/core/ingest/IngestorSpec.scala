@@ -5,6 +5,7 @@ import akka.testkit.{ImplicitSender, TestKit}
 import hydra.core.akka.ActorInitializationException
 import hydra.core.akka.InitializingActor.{InitializationError, Initialized}
 import hydra.core.protocol._
+import hydra.core.test.{TestRecord, TestRecordFactory}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.Future
@@ -63,7 +64,7 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
       ing ! Publish(req)
       expectMsg(Ignore)
       ing ! Validate(req)
-      expectMsg(ValidRequest)
+      expectMsg(ValidRequest(TestRecord("test-topic", Some("1"), "test")))
       ing ! ProducerAck(self, None)
       expectMsg(IngestorCompleted)
       ing ! ProducerAck(self, Some(new IllegalArgumentException))
@@ -76,6 +77,8 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
 }
 
 class TestIngestorDefault extends Ingestor {
+
+
   /**
     * This will _not_ override; instead it will use the default value of 1.second. We'll test it.
     */
@@ -87,6 +90,8 @@ class TestIngestorDefault extends Ingestor {
     case "hello" => sender ! "hi!"
     case "timeout" => sender ! to
   }
+
+  override val recordFactory = TestRecordFactory
 }
 
 class TestIngestor(completeInit: Boolean, delayInit: Boolean) extends Ingestor {
@@ -94,6 +99,8 @@ class TestIngestor(completeInit: Boolean, delayInit: Boolean) extends Ingestor {
   implicit val ec = context.dispatcher
 
   val err = ActorInitializationException(self, "ERROR")
+
+  override val recordFactory = TestRecordFactory
 
   override def init: Future[HydraMessage] = {
     Future {

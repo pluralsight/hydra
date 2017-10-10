@@ -3,10 +3,11 @@ package hydra.ingest.services
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestKit, TestProbe}
 import hydra.common.util.ActorUtils
-import hydra.core.ingest.{HydraRequest, IngestionReport, RequestParams}
+import hydra.core.ingest._
 import hydra.core.protocol._
 import hydra.ingest.ingestors.IngestorInfo
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
+import hydra.ingest.test.{TestRecordFactory, TimeoutRecord}
 import org.joda.time.DateTime
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FunSpecLike, Matchers}
 
@@ -43,11 +44,11 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
         sender.tell(getPublishMsg(req), ingestor.ref)
         TestActor.KeepRunning
       case Validate(req) =>
-        val reply = if (req.metadataValueEquals("invalid", "true")) InvalidRequest(except) else ValidRequest
+        val reply = if (req.metadataValueEquals("invalid", "true")) InvalidRequest(except) else ValidRequest(TestRecordFactory.build(req).get)
         sender.tell(reply, ingestor.ref)
         TestActor.KeepRunning
-      case Ingest(req) =>
-        val timeout = req.metadataValueEquals("timeout", "true")
+      case Ingest(rec) =>
+        val timeout = rec.isInstanceOf[TimeoutRecord]
         if (!timeout) sender.tell(IngestorCompleted, ingestor.ref)
         TestActor.KeepRunning
     })
@@ -106,7 +107,7 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
       parent.childActorOf(IngestionSupervisor.props(ingestorRequest, 1.second, registryProbe.ref), "sup")
       ingestor.expectMsg(Publish(ingestorRequest))
       ingestor.expectMsg(Validate(ingestorRequest))
-      ingestor.expectMsg(Ingest(ingestorRequest))
+      ingestor.expectMsg(Ingest(TestRecordFactory.build(ingestorRequest).get))
       parent.expectMsgPF() {
         case i: IngestionReport =>
           i.statusCode shouldBe 200
@@ -138,7 +139,7 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
       registryProbe.expectMsg(FindByName(ActorUtils.actorName(ingestor.ref)))
       ingestor.expectMsg(Publish(req))
       ingestor.expectMsg(Validate(req))
-      ingestor.expectMsg(Ingest(req))
+      ingestor.expectMsg(Ingest(TestRecordFactory.build(req).get))
       parent.expectMsgPF() {
         case i: IngestionReport =>
           i.statusCode shouldBe 408

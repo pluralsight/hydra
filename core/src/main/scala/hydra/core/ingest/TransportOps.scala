@@ -7,7 +7,7 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.InitializingActor.{InitializationError, Initialized}
 import hydra.core.protocol._
 import hydra.core.transport.AckStrategy.Explicit
-import hydra.core.transport.{AckStrategy, RecordFactory}
+import hydra.core.transport.{AckStrategy, HydraRecord}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.{FiniteDuration, _}
@@ -50,23 +50,15 @@ trait TransportOps extends ConfigSupport with LoggingAdapter {
       }
   }
 
-  def transport[K, V](request: HydraRequest)
-                     (implicit recordFactory: RecordFactory[K, V]): IngestorStatus = {
-    val record = recordFactory.build(request)
-    val status = record.map { rec =>
-      request.ackStrategy match {
-        case AckStrategy.None =>
-          transportActorFuture.foreach(_ ! Produce(rec))
-          IngestorCompleted
+  def transport[K, V](record: HydraRecord[K, V]): IngestorStatus = {
+    record.ackStrategy match {
+      case AckStrategy.None =>
+        transportActorFuture.foreach(_ ! Produce(record))
+        IngestorCompleted
 
-        case Explicit =>
-          transportActorFuture.foreach(_ ! ProduceWithAck(rec, self, sender))
-          WaitingForAck
-      }
-    }.recover { case e =>
-      InvalidRequest(e)
+      case Explicit =>
+        transportActorFuture.foreach(_ ! ProduceWithAck(record, self, sender))
+        WaitingForAck
     }
-
-    status.get
   }
 }

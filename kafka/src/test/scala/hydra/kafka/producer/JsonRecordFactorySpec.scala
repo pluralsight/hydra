@@ -16,9 +16,9 @@
 package hydra.kafka.producer
 
 import com.fasterxml.jackson.core.JsonParseException
+import com.fasterxml.jackson.databind.ObjectMapper
 import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_KEY_PARAM}
 import hydra.core.ingest.{HydraRequest, InvalidRequestException}
-import hydra.core.protocol.{InvalidRequest, ValidRequest}
 import org.scalatest.{FunSpecLike, Matchers}
 
 /**
@@ -29,15 +29,16 @@ class JsonRecordFactorySpec extends Matchers with FunSpecLike {
   describe("When using the JsonRecordFactory") {
     it("handles invalid json") {
       val request = HydraRequest(123,"""{"name":test"}""")
-      val validation = JsonRecordFactory.validate(request)
-      val ex = validation.asInstanceOf[InvalidRequest].error
+      val rec = JsonRecordFactory.build(request)
+      val ex = rec.failed.get
       ex shouldBe a[JsonParseException]
     }
 
     it("handles valid json") {
-      val request = HydraRequest(123,"""{"name":"test"}""")
-      val validation = JsonRecordFactory.validate(request)
-      validation shouldBe ValidRequest
+      val request = HydraRequest(123,"""{"name":"test"}""").withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
+      val rec = JsonRecordFactory.build(request)
+      val node = new ObjectMapper().reader().readTree("""{"name":"test"}""")
+      rec.get shouldBe JsonRecord("test-topic", None, node)
     }
 
     it("builds") {
@@ -47,11 +48,11 @@ class JsonRecordFactorySpec extends Matchers with FunSpecLike {
       val msg = JsonRecordFactory.build(request).get
       msg.destination shouldBe "test-topic"
       msg.key shouldBe Some("test")
-      msg.payload shouldBe """{"name":"test"}"""
+      msg.payload shouldBe new ObjectMapper().reader().readTree("""{"name":"test"}""")
     }
 
     it("throws an error if no topic is in the request") {
-      val request = HydraRequest(123,"""{"name":test"}""")
+      val request = HydraRequest(123,"""{"name":"test"}""")
       intercept[InvalidRequestException] {
         JsonRecordFactory.build(request).get
       }
