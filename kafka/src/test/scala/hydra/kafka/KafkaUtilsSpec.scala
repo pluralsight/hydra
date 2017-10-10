@@ -2,12 +2,13 @@ package hydra.kafka
 
 import hydra.kafka.util.KafkaUtils
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
+import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, WordSpec}
 
 /**
   * Created by alexsilva on 5/17/17.
   */
-class KafkaUtilsSpec extends WordSpec with EmbeddedKafka with BeforeAndAfterAll {
+class KafkaUtilsSpec extends WordSpec with EmbeddedKafka with BeforeAndAfterAll with Eventually {
 
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
 
@@ -22,7 +23,7 @@ class KafkaUtilsSpec extends WordSpec with EmbeddedKafka with BeforeAndAfterAll 
 
     "return true for a topic that exists" in {
       EmbeddedKafka.createCustomTopic("test-topic")
-      assert(KafkaUtils.topicExists("test-topic"))
+      eventually(assert(KafkaUtils.topicExists("test-topic")))
     }
   }
 

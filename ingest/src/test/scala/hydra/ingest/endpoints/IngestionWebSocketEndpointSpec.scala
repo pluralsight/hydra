@@ -3,8 +3,8 @@ package hydra.ingest.endpoints
 import akka.actor.Actor
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
 import akka.testkit.TestActorRef
-import hydra.core.ingest.TestRecordFactory
 import hydra.core.protocol._
+import hydra.ingest.test.TestRecordFactory
 import hydra.ingest.ingestors.IngestorInfo
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import org.joda.time.DateTime

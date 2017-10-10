@@ -3,6 +3,7 @@ package hydra.core.ingest
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
 import hydra.core.protocol.{IngestorCompleted, IngestorError}
+import hydra.core.test.TestRecordFactory
 import hydra.core.transport._
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 

@@ -6,8 +6,9 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.core.ingest.RequestParams._
-import hydra.core.ingest.{HydraRequest, TestRecordFactory}
+import hydra.core.ingest.HydraRequest
 import hydra.core.protocol._
+import hydra.kafka.test.TestRecordFactory
 import hydra.core.transport.{AckStrategy, DeliveryStrategy}
 import hydra.kafka.producer.{AvroRecord, AvroRecordFactory, JsonRecord}
 import org.apache.avro.Schema

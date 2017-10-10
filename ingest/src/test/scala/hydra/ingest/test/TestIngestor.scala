@@ -1,6 +1,6 @@
 package hydra.ingest.test
 
-import hydra.core.ingest.{Ingestor, TestRecordFactory}
+import hydra.core.ingest.Ingestor
 import hydra.core.protocol.{Ingest, IngestorCompleted, Join, Publish}
 import hydra.core.transport.RecordFactory
 
