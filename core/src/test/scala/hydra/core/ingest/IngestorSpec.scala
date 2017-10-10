@@ -5,6 +5,7 @@ import akka.testkit.{ImplicitSender, TestKit}
 import hydra.core.akka.ActorInitializationException
 import hydra.core.akka.InitializingActor.{InitializationError, Initialized}
 import hydra.core.protocol._
+import hydra.core.test.{TestRecord, TestRecordFactory}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.Future

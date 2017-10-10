@@ -1,5 +1,6 @@
-package hydra.core.ingest
+package hydra.ingest.test
 
+import hydra.core.ingest.HydraRequest
 import hydra.core.transport.{AckStrategy, DeliveryStrategy, HydraRecord, RecordFactory}
 
 import scala.util.Success

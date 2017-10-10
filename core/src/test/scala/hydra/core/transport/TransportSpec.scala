@@ -3,8 +3,8 @@ package hydra.core.transport
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
 import hydra.core.akka.InitializingActor.InitializationError
-import hydra.core.ingest.TestRecord
 import hydra.core.protocol._
+import hydra.core.test.TestRecord
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.Future
