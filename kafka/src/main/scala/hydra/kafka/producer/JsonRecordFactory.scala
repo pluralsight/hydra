@@ -17,26 +17,20 @@ package hydra.kafka.producer
 
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import hydra.core.ingest.HydraRequest
-import hydra.core.protocol.{InvalidRequest, MessageValidationResult, ValidRequest}
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 /**
   * Created by alexsilva on 1/11/17.
   */
-object JsonRecordFactory extends KafkaRecordFactory[String, String] {
+object JsonRecordFactory extends KafkaRecordFactory[String, JsonNode] {
 
   val mapper = new ObjectMapper()
 
-  override def build(request: HydraRequest):Try[KafkaRecord[String,String]] =
-    Try(JsonRecord(getTopic(request), getKey(request), request.payload, request.deliveryStrategy))
-
-  override def validate(request: HydraRequest): MessageValidationResult = {
+  override def build(request: HydraRequest): Try[KafkaRecord[String, JsonNode]] = {
     //TODO: Strict validation with a json schema
-    parseJson(request.payload) match {
-      case Success(x) => ValidRequest
-      case Failure(e) => InvalidRequest(e)
-    }
+    parseJson(request.payload)
+      .map(n => JsonRecord(getTopic(request), getKey(request), n, request.deliveryStrategy))
   }
 
   private def parseJson(json: String): Try[JsonNode] = Try(mapper.reader().readTree(json))

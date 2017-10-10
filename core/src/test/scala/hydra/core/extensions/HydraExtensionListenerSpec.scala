@@ -4,7 +4,7 @@ import akka.actor.{ActorSystem, Props}
 import akka.testkit.TestKit
 import com.typesafe.config.{Config, ConfigFactory}
 import hydra.core.app.HydraEntryPoint
-import hydra.core.testing.DummyActor
+import hydra.core.test.DummyActor
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 class HydraExtensionListenerSpec extends TestKit(ActorSystem("test"))

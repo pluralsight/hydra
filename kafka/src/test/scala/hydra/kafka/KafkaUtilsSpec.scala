@@ -2,12 +2,14 @@ package hydra.kafka
 
 import hydra.kafka.util.KafkaUtils
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
+import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
+
 
 /**
   * Created by alexsilva on 5/17/17.
   */
-class KafkaUtilsSpec extends WordSpec with Matchers with EmbeddedKafka with BeforeAndAfterAll {
+class KafkaUtilsSpec extends WordSpec with EmbeddedKafka with BeforeAndAfterAll with Matchers with Eventually {
 
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
 

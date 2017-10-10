@@ -75,8 +75,8 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
       ingestors.remove(ActorUtils.actorName(sender))
       finishIfReady()
 
-    case ValidRequest =>
-      sender ! Ingest(request)
+    case ValidRequest(record) =>
+      sender ! Ingest(record)
 
     case i: InvalidRequest =>
       context.system.eventStream.publish(HydraIngestionError(ActorUtils.actorName(sender), i.error, request))

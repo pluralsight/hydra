@@ -7,7 +7,7 @@ import com.github.vonnagy.service.container.MissingConfigException
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import com.github.vonnagy.service.container.service.ContainerService
 import com.typesafe.config.{Config, ConfigFactory}
-import hydra.core.testing.DummyActor
+import hydra.core.test.DummyActor
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 /**

@@ -98,6 +98,9 @@ class IngestionRequestHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
 }
 
 private class DummySupervisor(r: HydraRequest) extends Actor {
+
+  val req = HydraRequest(123, "test payload")
+
   if (r.correlationId == 1L) {
     context.parent ! HydraIngestionError("dummy_ingestor", new IllegalArgumentException, r)
   }
@@ -113,7 +116,6 @@ private class DummySupervisor(r: HydraRequest) extends Actor {
   override def receive = {
     case Publish(_) =>
     case Validate(_) => context.parent ! ValidRequest
-    case Ingest(r) => context.parent ! HydraIngestionError("dummy_ingestor", new IllegalArgumentException, r)
-
+    case Ingest(r) => context.parent ! HydraIngestionError("dummy_ingestor", new IllegalArgumentException, req)
   }
 }
