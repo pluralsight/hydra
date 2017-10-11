@@ -3,7 +3,7 @@ package hydra.kafka.transport
 import akka.actor.ActorSystem
 import com.typesafe.config.Config
 import hydra.kafka.producer.{JsonRecord, KafkaRecordMetadata}
-import hydra.kafka.transport.KafkaProducerProxy.ProduceToKafka
+import hydra.kafka.transport.KafkaProducerProxy.ProduceOnly
 
 trait KafkaMetrics {
   def saveMetrics(record: KafkaRecordMetadata): Unit
@@ -17,7 +17,7 @@ class PublishMetrics(producerPath: String, topic: String)(implicit system: Actor
   private lazy val producer = system.actorSelection(producerPath)
 
   def saveMetrics(record: KafkaRecordMetadata) = {
-    producer ! ProduceToKafka(JsonRecord(topic, Some(record.topic), record), 0)
+    producer ! ProduceOnly(JsonRecord(topic, Some(record.topic), record))
   }
 }
 

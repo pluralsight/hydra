@@ -2,8 +2,6 @@ package hydra.kafka.health
 
 import akka.actor.Actor
 import com.github.vonnagy.service.container.health._
-import com.typesafe.config.{Config, ConfigFactory}
-import hydra.kafka.config.KafkaConfigSupport
 
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
@@ -12,11 +10,9 @@ import scala.util.{Failure, Success}
 /**
   * Created by alexsilva on 10/1/16.
   */
-trait ClusterHealthCheck extends KafkaConfigSupport with RegisteredHealthCheckActor {
+trait ClusterHealthCheck extends RegisteredHealthCheckActor {
 
   this: Actor =>
-
-  import scala.collection.JavaConverters._
 
   implicit val ec = context.dispatcher
 
@@ -49,16 +45,16 @@ trait ClusterHealthCheck extends KafkaConfigSupport with RegisteredHealthCheckAc
 
   def checkHealth(): Future[HealthInfo]
 
-  protected lazy val producerConfig: Config =
-    ConfigFactory.parseMap(Map(
-      "metadata.fetch.timeout.ms" -> (interval.toMillis / 2).toString,
-      "client.id" -> "hydra.health.check").asJava).withFallback(kafkaProducerFormats("string"))
-
-
-  protected lazy val consumerConfig: Config =
-    ConfigFactory.parseMap(Map(
-      "metadata.fetch.timeout.ms" -> (interval.toMillis / 2).toString,
-      "client.id" -> "hydra.health.check").asJava).withFallback(kafkaConsumerFormats("string"))
+//  protected lazy val producerConfig: Config =
+//    ConfigFactory.parseMap(Map(
+//      "metadata.fetch.timeout.ms" -> (interval.toMillis / 2).toString,
+//      "client.id" -> "hydra.health.check").asJava).withFallback(kafkaProducerFormats("string"))
+//
+//
+//  protected lazy val consumerConfig: Config =
+//    ConfigFactory.parseMap(Map(
+//      "metadata.fetch.timeout.ms" -> (interval.toMillis / 2).toString,
+//      "client.id" -> "hydra.health.check").asJava).withFallback(kafkaConsumerFormats("string"))
 }
 
 

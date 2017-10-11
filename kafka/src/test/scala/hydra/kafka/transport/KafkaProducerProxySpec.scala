@@ -3,11 +3,11 @@ package hydra.kafka.transport
 import akka.actor.{ActorSystem, PoisonPill}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
-import hydra.core.protocol.{Produce, RecordNotProduced, RecordProduced}
+import hydra.core.protocol.{RecordNotProduced, RecordProduced}
 import hydra.core.transport.DeliveryStrategy
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{JsonRecord, KafkaRecordMetadata, StringRecord}
-import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
+import hydra.kafka.transport.KafkaProducerProxy.{ProduceOnly, ProducerInitializationError}
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.clients.producer.RecordMetadata
 import org.apache.kafka.common.TopicPartition
@@ -26,7 +26,6 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
     customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
 
   val parent = TestProbe()
-  println(parent.ref.path)
 
   val kafkaActor = parent.childActorOf(KafkaProducerProxy.props("string", kafkaProducerFormats("string")))
 
@@ -39,18 +38,24 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
 
   override def afterAll() = {
     system.stop(parent.ref)
+    system.stop(kafkaActor)
     EmbeddedKafka.stop()
     TestKit.shutdownActorSystem(system)
   }
 
   describe("When Producing messages") {
     it("produces") {
-      kafkaActor ! ProduceToKafka(StringRecord("test_topic", Some("key"), "payload"), 0)
+      kafkaActor ! ProduceOnly(StringRecord("test_topic", Some("key"), "payload"))
       parent.expectMsgType[RecordProduced](15.seconds)
     }
     it("throws an exception") {
-      kafkaActor ! ProduceToKafka(StringRecord("unkown_topic", Some("key"), "payload"), 0)
-      parent.expectMsgType[RecordNotProduced[String, String]](15.seconds)
+      val sr = StringRecord("unkown_topic", Some("key"), "payload")
+      kafkaActor ! ProduceOnly(sr)
+      parent.expectMsgPF(30.seconds) {
+        case r: RecordNotProduced[_, _] =>
+          r.record shouldBe sr
+          r.error should not be null
+      }
     }
 
     it("sends metadata back to the parent") {
@@ -85,7 +90,7 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
         """.stripMargin)
       val probe = TestProbe()
       val act = probe.childActorOf(KafkaProducerProxy.props("json", cfg))
-      act ! Produce(JsonRecord("test_topic", Some("key"), """{"name":"alex"}"""))
+      act ! ProduceOnly(JsonRecord("test_topic", Some("key"), """{"name":"alex"}"""))
       probe.expectMsgPF(10.seconds) {
         case ProducerInitializationError("json", ex) => ex shouldBe a[ConfigException]
       }

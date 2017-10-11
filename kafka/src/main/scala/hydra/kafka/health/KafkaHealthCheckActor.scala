@@ -4,7 +4,6 @@ import java.util.concurrent.TimeUnit
 
 import akka.actor.{Actor, Props}
 import com.github.vonnagy.service.container.health.{HealthInfo, HealthState}
-import configs.syntax._
 import hydra.common.config.ConfigSupport
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.joda.time.DateTime
@@ -16,26 +15,33 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 9/30/16.
   */
-class KafkaHealthCheckActor(val interval: FiniteDuration) extends Actor with ClusterHealthCheck {
-
-  val healthCheckTopic = applicationConfig.get[String]("kafka.health_check.topic").valueOrElse("__hydra_health_check")
+class KafkaHealthCheckActor(bootstrapServers: String, healthCheckTopic: String, val interval: FiniteDuration)
+  extends Actor with ClusterHealthCheck {
 
   override val name = s"Kafka [$bootstrapServers]"
 
-  lazy val producer = new KafkaProducer[String, String](toMap(producerConfig).asJava)
+  private val producerConfig = Map[String, AnyRef](
+    "metadata.fetch.timeout.ms" -> "10000",
+    "bootstrap.servers" -> bootstrapServers,
+    "client.id" -> "hydra.health.check",
+    "key.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
+    "value.serializer" -> "org.apache.kafka.common.serialization.StringSerializer")
+
+  private lazy val producer = new KafkaProducer[String, String](producerConfig.asJava)
 
   override def postStop(): Unit = producer.close()
+
 
   override def checkHealth(): Future[HealthInfo] = {
     val time = System.currentTimeMillis().toString
     val record = new ProducerRecord[String, String](healthCheckTopic, time)
     Future {
       try {
-        val md = producer.send(record).get(interval.toMillis, TimeUnit.MILLISECONDS)
+        val md = producer.send(record).get(5, TimeUnit.SECONDS)
         HealthInfo(name, details = s"Metadata request succeeded at ${DateTime.now.toString()} : [${md.topic()}]}.")
-      } catch {
-        case e: Throwable =>
-          critical(e)
+      }
+      catch {
+        case e: Exception => critical(e)
       }
     }
   }
@@ -49,9 +55,12 @@ object KafkaHealthCheckActor extends ConfigSupport {
 
   import configs.syntax._
 
-  def props(interval: Option[FiniteDuration]) = {
+  def props(bootstrapServers: String, healthCheckTopic: Option[String] = None, interval: Option[FiniteDuration] = None) = {
     val intv = interval.orElse(applicationConfig.get[FiniteDuration]("kafka.health_check.interval").toOption)
       .getOrElse(20.seconds)
-    Props(classOf[KafkaHealthCheckActor], intv)
+    val topic = healthCheckTopic.orElse(applicationConfig.get[String]("kafka.health_check.topic").toOption)
+      .getOrElse("__hydra_health_check")
+
+    Props(classOf[KafkaHealthCheckActor], bootstrapServers, topic, intv)
   }
 }

@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.typesafe.config.ConfigFactory
 import hydra.core.transport.DeliveryStrategy
 import hydra.kafka.producer.KafkaRecordMetadata
-import hydra.kafka.transport.KafkaProducerProxy.ProduceToKafka
+import hydra.kafka.transport.KafkaProducerProxy.ProduceOnly
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 /**
@@ -33,7 +33,7 @@ class KafkaMetricsSpec extends TestKit(ActorSystem("hydra")) with Matchers with 
       val pm = KafkaMetrics(cfg)
       pm shouldBe a[PublishMetrics]
       pm.saveMetrics(KafkaRecordMetadata(1, 1, "topic", 1, 1, DeliveryStrategy.AtLeastOnce))
-      probe.expectMsgType[ProduceToKafka[String, JsonNode]]
+      probe.expectMsgType[ProduceOnly[String, JsonNode]]
     }
   }
 }

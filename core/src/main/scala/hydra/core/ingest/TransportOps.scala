@@ -53,11 +53,11 @@ trait TransportOps extends ConfigSupport with LoggingAdapter {
   def transport[K, V](record: HydraRecord[K, V]): IngestorStatus = {
     record.ackStrategy match {
       case AckStrategy.None =>
-        transportActorFuture.foreach(_ ! Produce(record))
+        transportActorFuture.foreach(_ ! Produce(record, self, sender))
         IngestorCompleted
 
       case Explicit =>
-        transportActorFuture.foreach(_ ! ProduceWithAck(record, self, sender))
+        transportActorFuture.foreach(_ ! Produce(record, self, sender))
         WaitingForAck
     }
   }

@@ -38,7 +38,7 @@ class KafkaUtilsSpec extends WordSpec with EmbeddedKafka with BeforeAndAfterAll 
         "bootstrap.servers" -> "localhost:8092",
         "enable.auto.commit" -> "false",
         "value.deserializer" -> "io.confluent.kafka.serializers.KafkaAvroDeserializer",
-        "zookeeper.connect" -> "localhost:3181", "client.id" -> "hydra.avro", "metadata.fetch.timeout.ms" -> "1000",
+        "zookeeper.connect" -> "localhost:3181", "client.id" -> "hydra.avro", "metadata.fetch.timeout.ms" -> "10000",
         "value.serializer" -> "io.confluent.kafka.serializers.KafkaAvroSerializer",
         "key.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
         "schema.registry.url" -> "mock")
@@ -53,7 +53,7 @@ class KafkaUtilsSpec extends WordSpec with EmbeddedKafka with BeforeAndAfterAll 
         "bootstrap.servers" -> "localhost:8092",
         "enable.auto.commit" -> "false",
         "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
-        "zookeeper.connect" -> "localhost:3181", "client.id" -> "hydra.string", "metadata.fetch.timeout.ms" -> "1000",
+        "zookeeper.connect" -> "localhost:3181", "client.id" -> "hydra.string", "metadata.fetch.timeout.ms" -> "10000",
         "value.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
         "key.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
         "schema.registry.url" -> "mock")

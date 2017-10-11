@@ -21,7 +21,7 @@ class FileIngestor extends Ingestor {
       sender ! (if (request.metadataValue("hydra-file-stream").isDefined) Join else Ignore)
 
     case Ingest(r) =>
-      fileProducer ! Produce(r)
+      fileProducer ! Produce(r, self, sender)
       sender ! IngestorCompleted
   }
 
