@@ -20,27 +20,26 @@ import akka.testkit.{ImplicitSender, TestKit}
 import hydra.kafka.consumer.KafkaConsumerProxy._
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.common.TopicPartition
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
 /**
   * Created by alexsilva on 9/7/16.
   */
+@DoNotDiscover
 class KafkaConsumerProxySpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike
-  with EmbeddedKafka with BeforeAndAfterAll with ImplicitSender {
+  with BeforeAndAfterAll with ImplicitSender {
 
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
 
   override def beforeAll() = {
-    EmbeddedKafka.start()
-    EmbeddedKafka.createCustomTopic("test-consumer1")
+     EmbeddedKafka.createCustomTopic("test-consumer1")
     EmbeddedKafka.createCustomTopic("test-consumer2")
   }
 
   override def afterAll() = {
-    TestKit.shutdownActorSystem(system)
-    EmbeddedKafka.stop()
+     TestKit.shutdownActorSystem(system)
   }
 
   val kafkaProxy = system.actorOf(Props[KafkaConsumerProxy])
@@ -55,7 +54,7 @@ class KafkaConsumerProxySpec extends TestKit(ActorSystem("test")) with Matchers 
     it("lists topics") {
       kafkaProxy ! ListTopics
       expectMsgPF(10.seconds) {
-        case ListTopicsResponse(topics) => topics.keys shouldBe Set("test-consumer1", "test-consumer2")
+        case ListTopicsResponse(topics) => topics.keys should contain allOf("test-consumer1", "test-consumer2")
       }
     }
 
