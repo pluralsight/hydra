@@ -5,19 +5,17 @@ import akka.testkit.{TestActorRef, TestKit}
 import com.github.vonnagy.service.container.health.HealthState
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
+@DoNotDiscover
 class ZookeeperHealthCheckSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike
-  with BeforeAndAfterAll with EmbeddedKafka with ScalaFutures {
-
+  with BeforeAndAfterAll with ScalaFutures {
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
 
-  override def beforeAll() = EmbeddedKafka.start()
-
   override def afterAll() = {
-    EmbeddedKafka.stop()
+    super.afterAll()
     TestKit.shutdownActorSystem(system)
   }
 
@@ -28,6 +26,7 @@ class ZookeeperHealthCheckSpec extends TestKit(ActorSystem("hydra")) with Matche
         h.name shouldBe "Zookeeper [localhost:1234]"
         h.state shouldBe HealthState.CRITICAL
       }
+      system.stop(act)
     }
 
 
@@ -39,6 +38,7 @@ class ZookeeperHealthCheckSpec extends TestKit(ActorSystem("hydra")) with Matche
         h.name shouldBe "Zookeeper [localhost:3181]"
         h.state shouldBe HealthState.OK
       }
+      system.stop(act)
     }
   }
 }

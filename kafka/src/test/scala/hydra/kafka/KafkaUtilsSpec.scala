@@ -3,18 +3,19 @@ package hydra.kafka
 import hydra.kafka.util.KafkaUtils
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
+import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, Matchers, WordSpec}
 
 
 /**
   * Created by alexsilva on 5/17/17.
   */
-class KafkaUtilsSpec extends WordSpec with EmbeddedKafka with BeforeAndAfterAll with Matchers with Eventually {
+@DoNotDiscover
+class KafkaUtilsSpec extends WordSpec with BeforeAndAfterAll with Matchers with Eventually {
 
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
 
   override def beforeAll() = {
-    EmbeddedKafka.start()
+    super.beforeAll()
     EmbeddedKafka.createCustomTopic("test-kafka-utils")
   }
 
@@ -64,6 +65,5 @@ class KafkaUtilsSpec extends WordSpec with EmbeddedKafka with BeforeAndAfterAll 
 
   override def afterAll() = {
     KafkaUtils.zkUtils.foreach(_.close())
-    EmbeddedKafka.stop()
   }
 }

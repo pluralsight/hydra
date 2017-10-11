@@ -12,15 +12,16 @@ import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.clients.producer.RecordMetadata
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.config.ConfigException
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FunSpecLike, Matchers}
+import org.scalatest._
 
 import scala.concurrent.duration._
 
 /**
   * Created by alexsilva on 12/5/16.
   */
+@DoNotDiscover
 class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike with ImplicitSender
-  with BeforeAndAfterAll with BeforeAndAfterEach with KafkaConfigSupport with EmbeddedKafka {
+  with BeforeAndAfterAll with BeforeAndAfterEach with KafkaConfigSupport {
 
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
     customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
@@ -32,14 +33,12 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
   implicit val ex = system.dispatcher
 
   override def beforeAll() = {
-    EmbeddedKafka.start()
     EmbeddedKafka.createCustomTopic("test_topic")
   }
 
   override def afterAll() = {
-    system.stop(parent.ref)
+     system.stop(parent.ref)
     system.stop(kafkaActor)
-    EmbeddedKafka.stop()
     TestKit.shutdownActorSystem(system)
   }
 
@@ -47,15 +46,6 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
     it("produces") {
       kafkaActor ! ProduceOnly(StringRecord("test_topic", Some("key"), "payload"))
       parent.expectMsgType[RecordProduced](15.seconds)
-    }
-    it("throws an exception") {
-      val sr = StringRecord("unkown_topic", Some("key"), "payload")
-      kafkaActor ! ProduceOnly(sr)
-      parent.expectMsgPF(30.seconds) {
-        case r: RecordNotProduced[_, _] =>
-          r.record shouldBe sr
-          r.error should not be null
-      }
     }
 
     it("sends metadata back to the parent") {
