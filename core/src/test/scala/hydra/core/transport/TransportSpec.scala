@@ -1,7 +1,7 @@
 package hydra.core.transport
 
 import akka.actor.{ActorSystem, Props}
-import akka.testkit.{ImplicitSender, TestKit}
+import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import hydra.core.akka.InitializingActor.InitializationError
 import hydra.core.protocol._
 import hydra.core.test.TestRecord
@@ -33,17 +33,19 @@ class TransportSpec extends TestKit(ActorSystem("test")) with Matchers with FunS
     it("handle the base transport protocol") {
       val ing = system.actorOf(Props(classOf[TransportTester]))
       val rec = TestRecord("test", Some("1"), "test")
-      ing ! Produce(rec)
+      val supervisor = TestProbe()
+      ing ! Produce(rec, ing, supervisor.ref)
       expectMsgPF() {
         case RecordNotProduced(r, err) =>
           r shouldBe rec
           err shouldBe a[IllegalStateException]
       }
 
-      ing ! ProduceWithAck(rec, null, null)
+      val er = rec.copy(ackStrategy = AckStrategy.Explicit)
+      ing ! Produce(er, ing, supervisor.ref)
       expectMsgPF() {
         case RecordNotProduced(r, err) =>
-          r shouldBe rec
+          r shouldBe er
           err shouldBe a[IllegalStateException]
       }
 

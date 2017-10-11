@@ -1,58 +1,45 @@
 package hydra.kafka.health
 
 import akka.actor.{ActorSystem, PoisonPill}
-import akka.testkit.{TestActorRef, TestKit, TestProbe}
-import com.github.vonnagy.service.container.health.{CheckHealth, HealthInfo, HealthState}
+import akka.testkit.{TestActorRef, TestKit}
+import com.github.vonnagy.service.container.health.HealthState
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
-import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
 class KafkaHealthCheckSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike
-  with BeforeAndAfterAll with EmbeddedKafka with Eventually {
+  with BeforeAndAfterAll with EmbeddedKafka with Eventually with ScalaFutures {
 
   implicit override val patienceConfig = PatienceConfig(timeout = Span(12, Seconds), interval = Span(5, Millis))
+  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
 
   override def afterAll = {
+    EmbeddedKafka.stop()
     TestKit.shutdownActorSystem(system)
   }
 
-  val listener = TestProbe()
-
-  system.eventStream.subscribe(listener.ref, classOf[HealthInfo])
+  override def beforeAll() = EmbeddedKafka.start()
 
   describe("the Kafka health check") {
     it("publishes an error when it cannot produce to kafka") {
-      val act = system.actorOf(KafkaHealthCheckActor.props(Some(1.second)))
-      act ! CheckHealth
-      listener.expectMsgPF() {
-        case h: HealthInfo =>
-          h.name shouldBe "Kafka [localhost:8092]"
-          h.state shouldBe HealthState.CRITICAL
+      val act = TestActorRef[KafkaHealthCheckActor](KafkaHealthCheckActor.props("localhost:1111", interval = Some(1.day)))
+      whenReady(act.underlyingActor.checkHealth()) { h =>
+        h.name shouldBe "Kafka [localhost:1111]"
+        h.state shouldBe HealthState.CRITICAL
       }
       act ! PoisonPill
     }
 
     it("checks health") {
-      implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
-      val act = TestActorRef[KafkaHealthCheckActor](KafkaHealthCheckActor.props(None))
-      withRunningKafka {
-        EmbeddedKafka.createCustomTopic("__hydra_health_check")
-        EmbeddedKafka.publishStringMessageToKafka("__hydra_health_check", "test")
-        //change the underlying state on purpose to see if we get the "OK" after the health check completes
-        act.underlyingActor.currentHealth = HealthInfo("test", details = "", state = HealthState.CRITICAL)
-        act ! CheckHealth
-        listener.expectMsgPF() {
-          case h: HealthInfo =>
-            h.name shouldBe "Kafka [localhost:8092]"
-            h.state shouldBe HealthState.OK
-        }
-        //make sure it doesn't publish the same event twice
-        act ! CheckHealth
-        listener.expectNoMsg()
+      val act = TestActorRef[KafkaHealthCheckActor](KafkaHealthCheckActor.props("localhost:8092"))
+      whenReady(act.underlyingActor.checkHealth()) { h =>
+        h.name shouldBe "Kafka [localhost:8092]"
+        h.state shouldBe HealthState.OK
       }
+
       act ! PoisonPill
     }
   }

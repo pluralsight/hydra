@@ -2,17 +2,16 @@ package hydra.kafka.transport
 
 import java.util.concurrent.TimeUnit
 
-import akka.actor.{Actor, ActorRef, Props, Stash}
+import akka.actor.{Actor, Props, Stash}
 import akka.kafka.ProducerSettings
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
-import hydra.core.protocol.{RecordNotProduced, RecordProduced}
-import hydra.core.transport.HydraRecord
+import hydra.core.protocol._
 import hydra.kafka.config.KafkaConfigSupport
-import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata, PropagateExceptionCallback, PropagateExceptionWithAckCallback}
-import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProduceToKafkaWithAck, ProducerInitializationError}
-import org.apache.kafka.clients.producer.{Callback, KafkaProducer}
+import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata, PropagateExceptionWithAckCallback}
+import hydra.kafka.transport.KafkaProducerProxy.{ProduceOnly, ProducerInitializationError}
+import org.apache.kafka.clients.producer.{Callback, KafkaProducer, RecordMetadata}
 
 import scala.util.{Failure, Success, Try}
 
@@ -33,19 +32,22 @@ class KafkaProducerProxy(format: String, producerConfig: Config)
   }
 
   private def producing: Receive = {
-    case ProduceToKafka(r: KafkaRecord[Any, Any], deliveryId) =>
-      produce(r, new PropagateExceptionCallback(context.actorSelection(self.path), r, deliveryId))
+    case Produce(r: KafkaRecord[Any, Any], ingestor, supervisor, deliveryId) =>
+      val p = context.actorSelection(self.path)
+      val cb = new PropagateExceptionWithAckCallback(p, ingestor, supervisor, r, r.ackStrategy, deliveryId)
+      produce(r, cb)
 
-    case ProduceToKafkaWithAck(r: KafkaRecord[Any, Any], ingestor, supervisor, deliveryId) =>
-      produce(r,
-        new PropagateExceptionWithAckCallback(context.actorSelection(self.path), ingestor, supervisor, r, deliveryId))
+    case ProduceOnly(kr: KafkaRecord[Any, Any]) =>
+      producer.send(kr, (metadata: RecordMetadata, e: Exception) => {
+        val msg = if (e != null) RecordNotProduced(kr, e) else KafkaRecordMetadata(metadata, 0, kr.deliveryStrategy)
+        self ! msg
+      })
 
     case kmd: KafkaRecordMetadata =>
       context.parent ! RecordProduced(kmd)
 
     case err: RecordNotProduced[_, _] =>
       context.parent ! err
-      throw err.error
   }
 
   private def produce(r: KafkaRecord[Any, Any], callback: Callback) = {
@@ -53,6 +55,15 @@ class KafkaProducerProxy(format: String, producerConfig: Config)
       case e: Exception =>
         callback.onCompletion(null, e)
     }
+  }
+
+  private def notInitialized(err: Throwable): Receive = {
+    case Produce(r: KafkaRecord[Any, Any], ingestor, supervisor, _) =>
+      context.parent ! RecordNotProduced(r, err)
+      ingestor ! ProducerAck(supervisor, Some(err))
+
+    case _ =>
+      context.parent ! ProducerInitializationError(format, err)
   }
 
   override def preStart(): Unit = {
@@ -64,11 +75,8 @@ class KafkaProducerProxy(format: String, producerConfig: Config)
         unstashAll()
       case Failure(ex) =>
         log.error(s"Unable to initialize producer with format $format.", ex)
-        context.become {
-          case _ => context.parent ! ProducerInitializationError(format, ex)
-        }
+        context.become(notInitialized(ex))
         unstashAll()
-        println("RAR"+context.parent.path)
         context.parent ! ProducerInitializationError(format, ex)
     }
   }
@@ -93,16 +101,20 @@ class KafkaProducerProxy(format: String, producerConfig: Config)
   override def postStop(): Unit = closeProducer()
 }
 
+
 object KafkaProducerProxy extends KafkaConfigSupport {
 
   case class ProducerInitializationError(format: String, ex: Throwable)
 
   def props(format: String, producerConfig: Config): Props = Props(classOf[KafkaProducerProxy], format, producerConfig)
 
-  case class ProduceToKafka[K, V](r: KafkaRecord[K, V], deliveryId: Long)
-
-  case class ProduceToKafkaWithAck[K, V](record: HydraRecord[K, V], ingestor: ActorRef, supervisor: ActorRef,
-                                         deliveryId: Long)
+  /**
+    * Sends a message to kafka without having to track ingestor and supervisors.
+    * No acknowledgment logic is provided either.
+    *
+    * @param kafkaRecord
+    */
+  case class ProduceOnly[K, V](kafkaRecord: KafkaRecord[K, V])
 
 }
 

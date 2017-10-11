@@ -8,8 +8,9 @@ import hydra.core.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.core.avro.schema.GenericSchemaResource
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
-import hydra.core.protocol.{HydraIngestionError, Produce}
+import hydra.core.protocol.HydraIngestionError
 import hydra.kafka.ForwardActor
+import hydra.kafka.transport.KafkaProducerProxy.ProduceOnly
 import org.apache.avro.Schema
 import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
@@ -69,7 +70,7 @@ class IngestionErrorHandlerSpec extends TestKit(ActorSystem("hydra-test")) with 
       println(kafkaProducer.path)
       val err = HydraIngestionError("test", new JsonToAvroConversionException("test", "field", schema), request)
       handlerRef ! err
-      probe.expectMsgType[Produce[String, GenericRecord]](10.seconds)
+      probe.expectMsgType[ProduceOnly[String, GenericRecord]](10.seconds)
     }
 
   }

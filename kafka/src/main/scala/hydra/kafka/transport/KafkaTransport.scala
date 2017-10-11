@@ -25,7 +25,7 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol._
 import hydra.core.transport.DeliveryStrategy
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata}
-import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProduceToKafkaWithAck}
+import hydra.kafka.transport.KafkaProducerProxy.{ProduceOnly, ProducerInitializationError}
 
 import scala.concurrent.duration.Duration
 import scala.language.existentials
@@ -45,23 +45,25 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
   private[kafka] val producers = new scala.collection.mutable.HashMap[String, ActorRef]()
 
   override def receiveCommand: Receive = {
-    case p@Produce(_: KafkaRecord[_, _]) =>
+    case p@Produce(_: KafkaRecord[_, _], _, _, _) =>
       transport(p)
 
-    case p@ProduceWithAck(_: KafkaRecord[_, _], _, _) =>
-      transport(p)
+    case p@ProduceOnly(k: KafkaRecord[_, _]) =>
+      lookupProducer(k)(_ ! p)
 
     case p@RecordProduced(kmd: KafkaRecordMetadata) =>
       confirm(p)
       metrics.saveMetrics(kmd)
 
     case e: RecordNotProduced[_, _] => context.system.eventStream.publish(e)
+
+    case p:ProducerInitializationError=> context.system.eventStream.publish(p)
   }
 
-  private def transport(pr: ProduceRecord[_, _]) = {
+  private def transport(pr: Produce[_, _]) = {
     val kr = pr.record.asInstanceOf[KafkaRecord[_, _]]
     lookupProducer(kr) { producer =>
-      kr.deliveryStrategy match {
+      pr.record.deliveryStrategy match {
         case DeliveryStrategy.AtLeastOnce => persistAsync(pr)(updateStore)
         case DeliveryStrategy.AtMostOnce => producer ! pr
       }
@@ -78,11 +80,8 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
   }
 
   private def updateStore(evt: HydraMessage): Unit = evt match {
-    case Produce(kr: KafkaRecord[_, _]) =>
-      deliver(producers(kr.formatName).path)(deliveryId => ProduceToKafka(kr, deliveryId))
-
-    case ProduceWithAck(kr: KafkaRecord[_, _], ingestor, supervisor) =>
-      deliver(producers(kr.formatName).path)(deliveryId => ProduceToKafkaWithAck(kr, ingestor, supervisor, deliveryId))
+    case p@Produce(kr: KafkaRecord[_, _], _, _, _) =>
+      deliver(producers(kr.formatName).path)(deliveryId => p.copy(deliveryId = deliveryId))
 
     case RecordProduced(kmd) => confirmDelivery(kmd.deliveryId)
   }
