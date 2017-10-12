@@ -1,6 +1,6 @@
-package hydra.sandbox.produce
+package hydra.sandbox.transport
 
-import hydra.core.transport.{AckStrategy, DeliveryStrategy, HydraRecord}
+import hydra.core.transport.{AckStrategy, DeliveryStrategy, HydraRecord, RecordMetadata}
 
 /**
   * Created by alexsilva on 3/29/17.
@@ -12,3 +12,7 @@ case class FileRecord(destination: String, payload: String) extends HydraRecord[
   override val deliveryStrategy: DeliveryStrategy = DeliveryStrategy.AtMostOnce
   override val ackStrategy: AckStrategy = AckStrategy.None
 }
+
+
+case class FileRecordMetadata(path: String, deliveryId: Long = 0L,
+                              retryStrategy: DeliveryStrategy) extends RecordMetadata

@@ -21,7 +21,7 @@ class KafkaUtilsSpec extends WordSpec with BeforeAndAfterAll with Matchers with 
 
   "Kafka Utils" should {
     "return false for a topic that doesn't exist" in {
-      assert(!KafkaUtils.topicExists("test"))
+      assert(!KafkaUtils.topicExists("test_123123"))
     }
 
     "return true for a topic that exists" in {
@@ -29,7 +29,7 @@ class KafkaUtilsSpec extends WordSpec with BeforeAndAfterAll with Matchers with 
     }
 
     "return a list of topics" in {
-      KafkaUtils.topicNames().get shouldBe Seq("test-kafka-utils")
+      KafkaUtils.topicNames().get.indexOf("test-kafka-utils") should be > -1
     }
 
     "loads default consumer" in {

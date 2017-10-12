@@ -4,7 +4,7 @@ import akka.actor.Props
 import hydra.core.ingest.{HydraRequest, Ingestor}
 import hydra.core.protocol._
 import hydra.core.transport.RecordFactory
-import hydra.sandbox.produce.{FileRecord, FileTransport}
+import hydra.sandbox.transport.{FileRecord, FileTransport}
 
 import scala.util.Success
 
