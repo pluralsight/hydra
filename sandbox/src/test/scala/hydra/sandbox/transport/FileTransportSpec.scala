@@ -7,7 +7,7 @@ import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import hydra.core.protocol.{Produce, ProduceOnly, RecordNotProduced, RecordProduced}
 import hydra.core.transport.{AckStrategy, DeliveryStrategy}
 import org.scalatest.concurrent.Eventually
-import org.scalatest.time.{Millis, Seconds, Span}
+import org.scalatest.time.{Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.io.Source
@@ -17,7 +17,7 @@ class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with 
 
   override def afterAll = TestKit.shutdownActorSystem(system)
 
-  implicit override val patienceConfig = PatienceConfig(timeout = Span(2, Seconds), interval = Span(20, Millis))
+  implicit override val patienceConfig = PatienceConfig(timeout = Span(10, Seconds), interval = Span(1, Seconds))
 
   val files = Map("test" -> Files.createTempFile("hydra", "test").toFile)
 
@@ -52,7 +52,7 @@ class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with 
       ingestor.expectMsg(RecordProduced(FileRecordMetadata(files("test").getAbsolutePath,
         0, DeliveryStrategy.AtMostOnce), Some(supervisor.ref)))
 
-      Source.fromFile(files("test")).getLines().toSeq should contain("test-payload1")
+      eventually(Source.fromFile(files("test")).getLines().toSeq should contain("test-payload1"))
     }
   }
 

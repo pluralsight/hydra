@@ -22,8 +22,14 @@ class FileTransport(destinations: Map[String, String]) extends Transport {
 
   private implicit val ec = context.dispatcher
 
+  private val sharedKillSwitch = KillSwitches.shared("file-transport-switch")
+
   private val sinks = destinations.map { e =>
     e._1 -> Source.queue(0, OverflowStrategy.backpressure).to(toMessageSink(e._2)).run()
+  }
+
+  override def postStop(): Unit = {
+    sharedKillSwitch.shutdown()
   }
 
   transport {
@@ -51,6 +57,7 @@ class FileTransport(destinations: Map[String, String]) extends Transport {
     val fileSink = FileIO.toPath(Paths.get(fileName), Set(APPEND, CREATE))
     Flow[String]
       .map(s => ByteString(s + "\n"))
+      .via(sharedKillSwitch.flow)
       .toMat(fileSink)((_, bytesWritten) => bytesWritten)
   }
 }
