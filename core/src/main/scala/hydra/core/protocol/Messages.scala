@@ -36,11 +36,20 @@ case class InitiateRequest(request: HydraRequest) extends HydraMessage
 case class Produce[K, V](record: HydraRecord[K, V], ingestor: ActorRef, supervisor: ActorRef,
                          deliveryId: Long = 0) extends HydraMessage
 
-case class RecordProduced(md: RecordMetadata) extends HydraMessage
+/**
+  * Produces a message without having to track ingestor and supervisors.
+  * No acknowledgment logic is provided either.
+  *
+  * @param kafkaRecord
+  */
+case class ProduceOnly[K, V](kafkaRecord: HydraRecord[K, V]) extends HydraMessage
 
-case class RecordNotProduced[K, V](record: HydraRecord[K, V], error: Throwable) extends HydraMessage
+case class RecordProduced(md: RecordMetadata, supervisor: Option[ActorRef] = None) extends HydraMessage
 
-case class ProducerAck(supervisor: ActorRef, error: Option[Throwable])
+case class RecordNotProduced[K, V](record: HydraRecord[K, V], error: Throwable,
+                                   supervisor: Option[ActorRef] = None) extends HydraMessage
+
+//case class ProducerAck(supervisor: ActorRef, error: Option[Throwable])
 
 //todo:rename this class
 case class HydraIngestionError(ingestor: String, error: Throwable,

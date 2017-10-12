@@ -25,8 +25,11 @@ trait Ingestor extends InitializingActor {
     case Validate(request) =>
       sender ! validate(request)
 
-    case ProducerAck(supervisor, error) =>
-      supervisor ! error.map(IngestorError(_)).getOrElse(IngestorCompleted)
+    case RecordProduced(_, supervisor) =>
+      supervisor.foreach(_ ! IngestorCompleted)
+
+    case RecordNotProduced(_, error, supervisor) =>
+      supervisor.foreach(_ ! IngestorError(error))
   }
 
   def validate(request: HydraRequest): MessageValidationResult = {

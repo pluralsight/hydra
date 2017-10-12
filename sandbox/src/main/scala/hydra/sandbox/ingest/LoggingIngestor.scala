@@ -11,6 +11,7 @@ import scala.util.Success
   *
   * Created by alexsilva on 2/27/17.
   */
+// $COVERAGE-OFF$
 class LoggingIngestor extends Ingestor {
   override val recordFactory = new RecordFactory[String, String] {
     override def build(request: HydraRequest) = Success(StringRecord("", None, request.payload))
@@ -24,3 +25,4 @@ class LoggingIngestor extends Ingestor {
       sender ! IngestorCompleted
   }
 }
+// $COVERAGE-ON

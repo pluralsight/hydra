@@ -4,9 +4,9 @@ import akka.actor.ActorSystem
 import akka.testkit.{TestKit, TestProbe}
 import com.fasterxml.jackson.databind.JsonNode
 import com.typesafe.config.ConfigFactory
+import hydra.core.protocol.ProduceOnly
 import hydra.core.transport.DeliveryStrategy
 import hydra.kafka.producer.KafkaRecordMetadata
-import hydra.kafka.transport.KafkaProducerProxy.ProduceOnly
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 /**

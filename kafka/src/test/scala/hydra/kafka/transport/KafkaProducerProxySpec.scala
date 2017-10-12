@@ -3,11 +3,11 @@ package hydra.kafka.transport
 import akka.actor.{ActorSystem, PoisonPill}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
-import hydra.core.protocol.{RecordNotProduced, RecordProduced}
+import hydra.core.protocol.{ProduceOnly, RecordNotProduced, RecordProduced}
 import hydra.core.transport.DeliveryStrategy
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{JsonRecord, KafkaRecordMetadata, StringRecord}
-import hydra.kafka.transport.KafkaProducerProxy.{ProduceOnly, ProducerInitializationError}
+import hydra.kafka.transport.KafkaProducerProxy.ProducerInitializationError
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.clients.producer.RecordMetadata
 import org.apache.kafka.common.TopicPartition
@@ -37,7 +37,7 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
   }
 
   override def afterAll() = {
-     system.stop(parent.ref)
+    system.stop(parent.ref)
     system.stop(kafkaActor)
     TestKit.shutdownActorSystem(system)
   }
@@ -53,7 +53,7 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
       val kmd = KafkaRecordMetadata(recordMetadata, 0, DeliveryStrategy.AtMostOnce)
       kafkaActor ! kmd
       parent.expectMsgPF() {
-        case RecordProduced(k) => k shouldBe kmd
+        case RecordProduced(k, _) => k shouldBe kmd
       }
       kafkaActor ! PoisonPill
     }

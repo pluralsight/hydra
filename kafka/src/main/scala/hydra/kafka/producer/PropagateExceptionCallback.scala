@@ -1,8 +1,8 @@
 package hydra.kafka.producer
 
 import akka.actor.{ActorRef, ActorSelection}
+import hydra.core.protocol.{RecordNotProduced, RecordProduced}
 import hydra.core.transport.{AckStrategy, HydraRecord}
-import hydra.core.protocol.{ProducerAck, RecordNotProduced}
 import org.apache.kafka.clients.producer.{Callback, RecordMetadata}
 
 /**
@@ -15,14 +15,19 @@ case class PropagateExceptionWithAckCallback(producer: ActorSelection,
                                              ackStrategy: AckStrategy,
                                              deliveryId: Long) extends Callback {
 
+  val shouldAck = ackStrategy == AckStrategy.Explicit
+
   override def onCompletion(metadata: RecordMetadata, e: Exception): Unit = {
     if (e != null) {
       producer ! RecordNotProduced(record, e)
+      if (shouldAck) ingestor ! RecordNotProduced(record, e, Some(supervisor))
     }
     else {
-      producer ! KafkaRecordMetadata(metadata, deliveryId, record.deliveryStrategy)
+      val kmd = KafkaRecordMetadata(metadata, deliveryId, record.deliveryStrategy)
+      producer ! kmd
+      if (shouldAck) ingestor ! RecordProduced(kmd, Some(supervisor))
     }
 
-    if (ackStrategy == AckStrategy.Explicit) ingestor ! ProducerAck(supervisor, Option(e))
+
   }
 }

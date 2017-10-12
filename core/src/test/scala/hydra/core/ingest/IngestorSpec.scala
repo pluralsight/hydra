@@ -5,7 +5,7 @@ import akka.testkit.{ImplicitSender, TestKit}
 import hydra.core.akka.ActorInitializationException
 import hydra.core.akka.InitializingActor.{InitializationError, Initialized}
 import hydra.core.protocol._
-import hydra.core.test.{TestRecord, TestRecordFactory}
+import hydra.core.test.{TestRecord, TestRecordFactory, TestRecordMetadata}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.Future
@@ -65,9 +65,9 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
       expectMsg(Ignore)
       ing ! Validate(req)
       expectMsg(ValidRequest(TestRecord("test-topic", Some("1"), "test")))
-      ing ! ProducerAck(self, None)
+      ing ! RecordProduced(TestRecordMetadata(0), Some(self))
       expectMsg(IngestorCompleted)
-      ing ! ProducerAck(self, Some(new IllegalArgumentException))
+      ing ! RecordNotProduced(TestRecord("test-topic", Some("1"), "test"), new IllegalArgumentException, Some(self))
       expectMsgPF() {
         case i: IngestorError =>
           i.error shouldBe a[IllegalArgumentException]

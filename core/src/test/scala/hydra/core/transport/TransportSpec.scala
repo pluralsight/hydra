@@ -36,7 +36,7 @@ class TransportSpec extends TestKit(ActorSystem("test")) with Matchers with FunS
       val supervisor = TestProbe()
       ing ! Produce(rec, ing, supervisor.ref)
       expectMsgPF() {
-        case RecordNotProduced(r, err) =>
+        case RecordNotProduced(r, err, _) =>
           r shouldBe rec
           err shouldBe a[IllegalStateException]
       }
@@ -44,7 +44,7 @@ class TransportSpec extends TestKit(ActorSystem("test")) with Matchers with FunS
       val er = rec.copy(ackStrategy = AckStrategy.Explicit)
       ing ! Produce(er, ing, supervisor.ref)
       expectMsgPF() {
-        case RecordNotProduced(r, err) =>
+        case RecordNotProduced(r, err, _) =>
           r shouldBe er
           err shouldBe a[IllegalStateException]
       }

@@ -20,11 +20,11 @@ trait Transport extends InitializingActor {
       sender ! RecordNotProduced(r, new IllegalStateException("Transport did not reply to Produce."))
 
 
-    case r@RecordProduced(_) =>
+    case r@RecordProduced(_, _) =>
       log.info(s"$thisActorName: Record produced.")
       sender ! r
 
-    case r@RecordNotProduced(_, error) =>
+    case r@RecordNotProduced(_, error, _) =>
       log.error(s"$thisActorName: $error")
       sender ! r
   }

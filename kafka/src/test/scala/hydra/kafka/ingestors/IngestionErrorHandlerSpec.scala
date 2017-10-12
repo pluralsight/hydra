@@ -8,9 +8,8 @@ import hydra.core.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.core.avro.schema.GenericSchemaResource
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
-import hydra.core.protocol.HydraIngestionError
+import hydra.core.protocol.{HydraIngestionError, ProduceOnly}
 import hydra.kafka.ForwardActor
-import hydra.kafka.transport.KafkaProducerProxy.ProduceOnly
 import org.apache.avro.Schema
 import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
