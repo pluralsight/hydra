@@ -1,9 +1,8 @@
 package hydra.ingest.services
 
-import akka.actor.SupervisorStrategy.Stop
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
+import akka.testkit.{ImplicitSender, TestKit}
 import hydra.core.http.{HydraDirectives, ImperativeRequestContext}
 import hydra.core.ingest.{HydraRequest, IngestionReport}
 import hydra.core.protocol._
@@ -79,21 +78,6 @@ class IngestionRequestHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
         ctx.error should not be null
       }
       ctx.error shouldBe an[IllegalArgumentException]
-    }
-
-    it("stops itself on error") {
-      val ctx = new ImperativeRequestContext {
-        var completed: ToResponseMarshallable = _
-        var error: Throwable = _
-
-        override def complete(obj: ToResponseMarshallable): Unit = completed = obj
-
-        override def failWith(error: Throwable): Unit = this.error = error
-      }
-      val reg = TestActorRef[IngestionRequestHandler](IngestionRequestHandler.props(req.withCorrelationId(12344),
-        Props(classOf[DummySupervisor], req.withCorrelationId(12344)), ctx))
-      val strategy = reg.underlyingActor.supervisorStrategy.decider
-      strategy(new IllegalArgumentException) should be(Stop)
     }
   }
 }

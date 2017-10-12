@@ -29,6 +29,12 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
 
   val except = new IllegalArgumentException
 
+  override def afterEach(): Unit = {
+    system.stop(ingestor.ref)
+    system.stop(registryProbe.ref)
+
+  }
+
   override def beforeEach(): Unit = {
     super.beforeEach()
 
@@ -97,7 +103,9 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
 
     it("publishes to an ingestor") {
       val parent = TestProbe()
-      parent.childActorOf(IngestionSupervisor.props(ingestorRequest, 1.second, registryProbe.ref), "sup")
+      val req = publishRequest
+        .withMetadata(RequestParams.HYDRA_INGESTOR_PARAM -> ActorUtils.actorName(ingestor.ref))
+      parent.childActorOf(IngestionSupervisor.props(req, 1.second, registryProbe.ref), "sup")
       registryProbe.expectMsgType[FindByName]
       ingestor.expectMsg(Publish(ingestorRequest))
     }
