@@ -6,6 +6,7 @@ import hydra.common.config.ConfigSupport
 import hydra.core.ingest.HydraRequest
 import hydra.core.protocol._
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import scala.concurrent.duration._
 
 class FileIngestorSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with Matchers with FunSpecLike
   with ImplicitSender with ConfigSupport with BeforeAndAfterAll {
@@ -24,19 +25,19 @@ class FileIngestorSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with M
     it("ignores") {
       val hr = HydraRequest(0, "test")
       ingestor ! Publish(hr)
-      expectMsg(Ignore)
+      expectMsg(10.seconds, Ignore)
     }
 
     it("joins") {
       val hr = HydraRequest(0, "test").withMetadata("hydra-file-stream" -> "test")
       ingestor ! Publish(hr)
-      expectMsg(Join)
+      expectMsg(10.seconds, Join)
     }
 
     it("transports") {
       val hr = HydraRequest(0, "test").withMetadata("hydra-file-stream" -> "test")
       ingestor ! Ingest(FileRecordFactory.build(hr).get)
-      expectMsg(IngestorCompleted)
+      expectMsg(10.seconds, IngestorCompleted)
     }
   }
 
