@@ -14,7 +14,6 @@ import hydra.core.http.{CorsSupport, HydraDirectives, NotFoundException}
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{ListTopics, ListTopicsResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
-import hydra.kafka.model.TopicMetadata
 import org.apache.kafka.common.PartitionInfo
 
 import scala.concurrent.Future
@@ -38,27 +37,29 @@ class TopicMetadataEndpoint(implicit val system: ActorSystem, implicit val actor
   private val showSystemTopics = applicationConfig
     .get[Boolean]("transports.kafka.show-system-topics").valueOrElse(false)
 
-  private val consumerProxy = actorRefFactory
-    .actorSelection(s"/user/service/${ActorUtils.actorName(classOf[KafkaConsumerProxy])}")
+  private val consumerPath = applicationConfig.get[String]("actors.kafka.consumer_proxy.path")
+    .valueOrElse(s"/user/service/${ActorUtils.actorName(classOf[KafkaConsumerProxy])}")
+
+  private val consumerProxy = actorRefFactory.actorSelection(consumerPath)
 
   private val filterSystemTopics = (t: String) => (t.startsWith("_") && showSystemTopics) || !t.startsWith("_")
 
   override val route = cors(settings) {
+
     pathPrefix("transports" / "kafka") {
-      get {
-        path("topics") {
-          parameters('names ?) { n =>
-            n match {
-              case Some(name) => complete(topics.map(_.keys))
-              case None => complete(topics)
+      handleExceptions(exceptionHandler) {
+        get {
+          path("topics") {
+            parameters('names ?) { n =>
+              n match {
+                case Some(_) => complete(topics.map(_.keys))
+                case None => complete(topics)
+              }
             }
-          }
-        } ~ path("topics" / Segment) { name =>
-          onSuccess(topics) { topics =>
-            topics.get(name).map { topic =>
-              complete(TopicMetadata(name, "topic description", "Engineering", "Data Team", "John Smith"
-                , name, Seq("certified", "revenue", "finance")))
-            } getOrElse failWith(new NotFoundException(s"Topic $name not found."))
+          } ~ path("topics" / Segment) { name =>
+            onSuccess(topics) { topics =>
+              topics.get(name).map(complete(_)).getOrElse(failWith(new NotFoundException(s"Topic $name not found.")))
+            }
           }
         }
       }
