@@ -17,7 +17,7 @@ package hydra.kafka.config
 
 import java.util.Properties
 
-import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
+import com.typesafe.config._
 import configs.syntax._
 import hydra.common.config.ConfigSupport
 
@@ -39,6 +39,12 @@ trait KafkaConfigSupport extends ConfigSupport {
   lazy val kafkaProducerFormats: Map[String, Config] = loadProducerFormats(kafkaConfig)
 
   lazy val kafkaConsumerFormats: Map[String, Config] = loadConsumerFormats(kafkaConfig)
+
+  val zkString = kafkaConfig.getString("kafka.consumer.zookeeper.connect")
+
+  val bootstrapServers = kafkaConfig.getString("kafka.producer.bootstrap.servers")
+
+  val schemaRegistryUrl = applicationConfig.getString("schema.registry.url")
 
   /**
     * Allows specific topic config parameters (schema name, etc.) to be configured by topic name, message types, ack,
@@ -63,7 +69,7 @@ trait KafkaConfigSupport extends ConfigSupport {
     }
   }
 
-  lazy val kafkaConsumerDefaults: Config = loadConsumerDefaults(kafkaConfig)
+  lazy val kafkaConsumerDefaults: Config = loadConsumerDefaults(kafkaConfig).withFallback(kafkaConsumerFormats("string"))
 
   /**
     * Allows the configuration of a Kafka consumer 'on the fly', meaning that it doesn't have to be present in
@@ -89,7 +95,12 @@ trait KafkaConfigSupport extends ConfigSupport {
   }
 }
 
-object KafkaConfigSupport {
+object KafkaConfigSupport extends ConfigSupport {
+
+  val schemaRegistryUrl = applicationConfig.getString("schema.registry.url")
+
+  private val schemaRegistryConfig = ConfigFactory.parseString(s"""schema.registry.url="$schemaRegistryUrl"""")
+
   def loadConsumerFormats(cfg: Config): Map[String, Config] = {
     val formats = cfg.getObject("kafka.formats").entrySet.asScala.toSeq
     val consumerDefaults = loadConsumerDefaults(cfg)
@@ -103,6 +114,7 @@ object KafkaConfigSupport {
 
   def loadProducerFormats(cfg: Config): Map[String, Config] = {
     val producerDefaults = cfg.get[Config]("kafka.producer").valueOrElse(ConfigFactory.empty)
+      .withFallback(schemaRegistryConfig)
     val formats = cfg.getObject("kafka.formats").entrySet.asScala.toSeq
     Map(formats.map { entry => {
       val c = entry.getValue.asInstanceOf[ConfigObject].toConfig
@@ -113,6 +125,6 @@ object KafkaConfigSupport {
   }
 
   def loadConsumerDefaults(cfg: Config): Config =
-    cfg.get[Config]("kafka.consumer").valueOrElse(ConfigFactory.empty)
+    cfg.get[Config]("kafka.consumer").valueOrElse(ConfigFactory.empty).withFallback(schemaRegistryConfig)
 
 }

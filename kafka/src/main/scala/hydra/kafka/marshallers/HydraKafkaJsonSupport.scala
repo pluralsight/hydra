@@ -20,13 +20,18 @@ trait HydraKafkaJsonSupport extends HydraJsonSupport {
   implicit object NodeJsonFormat extends JsonFormat[Node] {
     override def write(node: Node): JsValue = {
       JsObject(
-        "id" -> JsString(node.idString),
+        "id" -> JsNumber(node.idString),
         "host" -> JsString(node.host),
         "port" -> JsNumber(node.port)
       )
     }
 
-    override def read(json: JsValue): Node = ???
+    override def read(json: JsValue): Node = {
+      json.asJsObject.getFields("id", "host", "port") match {
+        case Seq(id, host, port) => new Node(id.convertTo[Int], host.convertTo[String], port.convertTo[Int])
+        case other => spray.json.deserializationError("Cannot deserialize Node. Invalid input: " + other)
+      }
+    }
   }
 
   implicit object PartitionInfoJsonFormat extends JsonFormat[PartitionInfo] {
@@ -52,3 +57,4 @@ trait HydraKafkaJsonSupport extends HydraJsonSupport {
       }
   }
 }
+

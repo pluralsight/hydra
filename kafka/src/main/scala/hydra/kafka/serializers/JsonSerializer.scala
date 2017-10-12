@@ -35,8 +35,8 @@ class JsonSerializer extends Serializer[JsonNode] with ConfigSupport {
   }
 
   override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = {
-    val indent: String = configs.get("kafka.encoders.json.indent.output", "false").toString()
-    mapper.configure(SerializationFeature.INDENT_OUTPUT, indent.toBoolean)
+    val indent = Option(configs.get("kafka.encoders.json.indent.output")).map(_.toString.toBoolean).getOrElse(false)
+    mapper.configure(SerializationFeature.INDENT_OUTPUT, indent)
   }
 
   override def close(): Unit = {
@@ -57,8 +57,8 @@ class JsonDeserializer extends Deserializer[JsonNode] {
   }
 
   override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = {
-    val indent: String = configs.get("kafka.encoders.json.indent.output", "false").toString()
-    mapper.configure(SerializationFeature.INDENT_OUTPUT, indent.toBoolean)
+    val indent = Option(configs.get("kafka.encoders.json.indent.output")).map(_.toString.toBoolean).getOrElse(false)
+    mapper.configure(SerializationFeature.INDENT_OUTPUT, indent)
   }
 
   override def close(): Unit = {

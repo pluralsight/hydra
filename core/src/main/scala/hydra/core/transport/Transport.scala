@@ -15,19 +15,16 @@ trait Transport extends InitializingActor {
   override def initTimeout: FiniteDuration = 2.seconds
 
   override val baseReceive: Receive = {
-    case Produce(r) =>
+    case Produce(r, _, _, _) =>
       log.info(s"Produce message was not handled by ${thisActorName}.")
       sender ! RecordNotProduced(r, new IllegalStateException("Transport did not reply to Produce."))
 
-    case ProduceWithAck(r, _, _) =>
-      log.info(s"ProduceWithAck message was not handled by ${thisActorName}.")
-      sender ! RecordNotProduced(r, new IllegalStateException("Transport did not reply to Produce."))
 
-    case r@RecordProduced(_) =>
+    case r@RecordProduced(_, _) =>
       log.info(s"$thisActorName: Record produced.")
       sender ! r
 
-    case r@RecordNotProduced(_, error) =>
+    case r@RecordNotProduced(_, error, _) =>
       log.error(s"$thisActorName: $error")
       sender ! r
   }

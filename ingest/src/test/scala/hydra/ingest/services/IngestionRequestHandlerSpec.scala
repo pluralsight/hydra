@@ -1,9 +1,8 @@
 package hydra.ingest.services
 
-import akka.actor.SupervisorStrategy.Stop
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
+import akka.testkit.{ImplicitSender, TestKit}
 import hydra.core.http.{HydraDirectives, ImperativeRequestContext}
 import hydra.core.ingest.{HydraRequest, IngestionReport}
 import hydra.core.protocol._
@@ -74,32 +73,21 @@ class IngestionRequestHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
       }
       system.actorOf(IngestionRequestHandler
         .props(req.withCorrelationId(1L), Props(classOf[DummySupervisor], req.withCorrelationId(1L)), ctx))
+      Thread.sleep(1000)
       eventually {
         ctx.error should not be null
       }
       ctx.error shouldBe an[IllegalArgumentException]
     }
-
-    it("stops itself on error") {
-      val ctx = new ImperativeRequestContext {
-        var completed: ToResponseMarshallable = _
-        var error: Throwable = _
-
-        override def complete(obj: ToResponseMarshallable): Unit = completed = obj
-
-        override def failWith(error: Throwable): Unit = this.error = error
-      }
-      val reg = TestActorRef[IngestionRequestHandler](IngestionRequestHandler.
-        props(req, Props(classOf[DummySupervisor], req), ctx))
-      val strategy = reg.underlyingActor.supervisorStrategy.decider
-      strategy(new IllegalArgumentException) should be(Stop)
-    }
   }
 }
 
 private class DummySupervisor(r: HydraRequest) extends Actor {
+
+  val req = HydraRequest(123, "test payload")
+
   if (r.correlationId == 1L) {
-    context.parent ! HydraIngestionError("dummy_ingestor", new IllegalArgumentException, Some(r))
+    context.parent ! HydraIngestionError("dummy_ingestor", new IllegalArgumentException, r)
   }
   else if (r.correlationId == 2L) {
     //matches the _ in RequestHandler
@@ -113,7 +101,6 @@ private class DummySupervisor(r: HydraRequest) extends Actor {
   override def receive = {
     case Publish(_) =>
     case Validate(_) => context.parent ! ValidRequest
-    case Ingest(r) => context.parent ! HydraIngestionError("dummy_ingestor", new IllegalArgumentException, Some(r))
-
+    case Ingest(r) => context.parent ! HydraIngestionError("dummy_ingestor", new IllegalArgumentException, req)
   }
 }

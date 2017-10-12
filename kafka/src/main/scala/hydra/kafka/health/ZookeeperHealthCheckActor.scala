@@ -1,41 +1,52 @@
 package hydra.kafka.health
 
-import akka.actor.Actor
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.github.vonnagy.service.container.health.{CheckHealth, GetHealth, HealthInfo}
-import configs.syntax._
-import org.apache.zookeeper.ZooKeeper
+import java.io.Closeable
 
+import akka.actor.{Actor, Props}
+import com.github.vonnagy.service.container.health.{HealthInfo, HealthState}
+import hydra.common.util.Resource._
+import org.I0Itec.zkclient.ZkClient
+import org.joda.time.DateTime
+
+import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 /**
   * Created by alexsilva on 9/30/16.
   */
-class ZookeeperHealthCheckActor extends Actor with ClusterHealthCheck {
+class ZookeeperHealthCheckActor(zookeeper: String, val interval: FiniteDuration) extends Actor with ClusterHealthCheck {
 
-  val interval = applicationConfig.get[FiniteDuration]("zk.health_check.interval").valueOrElse(10.seconds)
+  override val name = s"Zookeeper [$zookeeper]"
 
-  private val zkConnect = kafkaConfig.getString("settings.zookeeper.connect")
-
-  private val currentHealth: HealthInfo = HealthInfo("Zookeeper", details = "")
-
-  private val mapper = new ObjectMapper()
-
-  implicit val ec = context.dispatcher
-
-  context.system.scheduler.schedule(interval, interval, self, CheckHealth)
-
-  override def receive: Receive = {
-    case GetHealth => sender ! currentHealth
+  override def checkHealth(): Future[HealthInfo] = {
+    Future {
+      import scala.collection.JavaConverters._
+      val healthInfo = withZookeeper { czk =>
+        czk.getChildren("/").asScala.headOption
+          .map(_ => HealthInfo(name, details = s"Zookeeper request succeeded at ${DateTime.now.toString()}."))
+          .getOrElse(HealthInfo(name, state = HealthState.CRITICAL,
+            details = s"Empty znode /brokers/topics reported at ${DateTime.now.toString()}."))
+      }
+      healthInfo
+    }
   }
 
-  def checkHealth(): Unit = {
-    import scala.collection.JavaConverters._
-    val zk = new ZooKeeper(zkConnect, 10000, null);
-    val brokerList = zk.getChildren("/brokers/ids", false).asScala
-      .map(s => mapper.readValue(zk.getData(s"/brokers/ids/$s", false, null), classOf[Map[Any, Any]]))
+  def withZookeeper(body: (ZkClient) => HealthInfo): HealthInfo = {
+    Try(new ZkClient(zookeeper, 1000, 1000)) match {
+      case Success(zk) => using(CloseableZkClient(zk))(c => body(c.zk))
 
-    println(brokerList)
+      case Failure(ex) => HealthInfo(name, state = HealthState.CRITICAL, details = ex.getMessage)
+    }
   }
 }
 
+private case class CloseableZkClient(zk: ZkClient) extends Closeable {
+  override def close() = zk.close()
+}
+
+object ZookeeperHealthCheckActor {
+  def props(zkString: String, interval: FiniteDuration): Props =
+    Props(classOf[ZookeeperHealthCheckActor], zkString, interval)
+
+}

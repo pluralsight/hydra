@@ -3,12 +3,14 @@ package hydra.common.logging
 import akka.actor.ActorDSL._
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestKit, TestProbe}
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 /**
   * Created by alexsilva on 3/7/17.
   */
-class LoggingAdapterSpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike {
+class LoggingAdapterSpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike with BeforeAndAfterAll {
+
+  override def afterAll = TestKit.shutdownActorSystem(system)
 
   describe("The logging adapter") {
 
