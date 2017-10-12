@@ -17,7 +17,7 @@ package hydra.kafka.producer
 
 import akka.actor.{ActorSelection, ActorSystem}
 import akka.testkit.{TestKit, TestProbe}
-import hydra.core.protocol.{ProducerAck, RecordNotProduced}
+import hydra.core.protocol.{RecordNotProduced, RecordProduced}
 import hydra.core.transport.AckStrategy
 import org.apache.kafka.clients.producer.RecordMetadata
 import org.apache.kafka.common.TopicPartition
@@ -62,7 +62,7 @@ class PropagateExceptionCallbackSpec extends TestKit(ActorSystem("hydra")) with 
       val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1L: java.lang.Long, 1, 1)
       e.onCompletion(md, null)
       probe.expectMsg(KafkaRecordMetadata(md, 112, record.deliveryStrategy))
-      ingestor.expectMsg(ProducerAck(supervisor.ref, None))
+      ingestor.expectMsg(RecordProduced(KafkaRecordMetadata(md, 112, record.deliveryStrategy), Some(supervisor.ref)))
     }
 
     it("sends the error to the actor selection and acks the ingestor") {
@@ -73,7 +73,7 @@ class PropagateExceptionCallbackSpec extends TestKit(ActorSystem("hydra")) with 
       val err = new IllegalArgumentException("test")
       e.onCompletion(md, err)
       probe.expectMsg(RecordNotProduced(record, err))
-      ingestor.expectMsg(ProducerAck(supervisor.ref, Some(err)))
+      ingestor.expectMsg(RecordNotProduced(record, err, Some(supervisor.ref)))
     }
   }
 }

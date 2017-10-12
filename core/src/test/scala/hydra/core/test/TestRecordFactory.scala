@@ -1,7 +1,7 @@
 package hydra.core.test
 
 import hydra.core.ingest.HydraRequest
-import hydra.core.transport.{AckStrategy, DeliveryStrategy, HydraRecord, RecordFactory}
+import hydra.core.transport._
 
 import scala.util.Success
 
@@ -23,6 +23,9 @@ case class TestRecord(destination: String,
                       deliveryStrategy: DeliveryStrategy = DeliveryStrategy.AtLeastOnce,
                       ackStrategy: AckStrategy = AckStrategy.None) extends HydraRecord[String, String]
 
+
+case class TestRecordMetadata(deliveryId: Long, deliveryStrategy: DeliveryStrategy = DeliveryStrategy.AtMostOnce)
+  extends RecordMetadata
 
 case class TimeoutRecord(destination: String,
                          key: Option[String],

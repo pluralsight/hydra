@@ -10,7 +10,7 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol._
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata, PropagateExceptionWithAckCallback}
-import hydra.kafka.transport.KafkaProducerProxy.{ProduceOnly, ProducerInitializationError}
+import hydra.kafka.transport.KafkaProducerProxy.ProducerInitializationError
 import org.apache.kafka.clients.producer.{Callback, KafkaProducer, RecordMetadata}
 
 import scala.util.{Failure, Success, Try}
@@ -60,7 +60,7 @@ class KafkaProducerProxy(format: String, producerConfig: Config)
   private def notInitialized(err: Throwable): Receive = {
     case Produce(r: KafkaRecord[Any, Any], ingestor, supervisor, _) =>
       context.parent ! RecordNotProduced(r, err)
-      ingestor ! ProducerAck(supervisor, Some(err))
+      ingestor ! RecordNotProduced(r, err, Some(supervisor))
 
     case _ =>
       context.parent ! ProducerInitializationError(format, err)
@@ -108,13 +108,6 @@ object KafkaProducerProxy extends KafkaConfigSupport {
 
   def props(format: String, producerConfig: Config): Props = Props(classOf[KafkaProducerProxy], format, producerConfig)
 
-  /**
-    * Sends a message to kafka without having to track ingestor and supervisors.
-    * No acknowledgment logic is provided either.
-    *
-    * @param kafkaRecord
-    */
-  case class ProduceOnly[K, V](kafkaRecord: KafkaRecord[K, V])
 
 }
 

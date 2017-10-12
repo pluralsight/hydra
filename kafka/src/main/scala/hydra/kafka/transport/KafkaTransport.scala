@@ -25,7 +25,7 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol._
 import hydra.core.transport.DeliveryStrategy
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata}
-import hydra.kafka.transport.KafkaProducerProxy.{ProduceOnly, ProducerInitializationError}
+import hydra.kafka.transport.KafkaProducerProxy.ProducerInitializationError
 
 import scala.concurrent.duration.Duration
 import scala.language.existentials
@@ -51,13 +51,13 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
     case p@ProduceOnly(k: KafkaRecord[_, _]) =>
       lookupProducer(k)(_ ! p)
 
-    case p@RecordProduced(kmd: KafkaRecordMetadata) =>
+    case p@RecordProduced(kmd: KafkaRecordMetadata, _) =>
       confirm(p)
       metrics.saveMetrics(kmd)
 
     case e: RecordNotProduced[_, _] => context.system.eventStream.publish(e)
 
-    case p:ProducerInitializationError=> context.system.eventStream.publish(p)
+    case p: ProducerInitializationError => context.system.eventStream.publish(p)
   }
 
   private def transport(pr: Produce[_, _]) = {
@@ -83,11 +83,11 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
     case p@Produce(kr: KafkaRecord[_, _], _, _, _) =>
       deliver(producers(kr.formatName).path)(deliveryId => p.copy(deliveryId = deliveryId))
 
-    case RecordProduced(kmd) => confirmDelivery(kmd.deliveryId)
+    case RecordProduced(kmd, _) => confirmDelivery(kmd.deliveryId)
   }
 
   private def confirm(p: RecordProduced): Unit = {
-    if (p.md.retryStrategy == DeliveryStrategy.AtLeastOnce) {
+    if (p.md.deliveryStrategy == DeliveryStrategy.AtLeastOnce) {
       persistAsync(p)(r => confirmDelivery(r.md.deliveryId))
     }
   }

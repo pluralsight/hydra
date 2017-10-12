@@ -2,10 +2,10 @@ package hydra.kafka.transport
 
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
-import hydra.core.protocol.{Produce, ProducerAck, RecordNotProduced}
+import hydra.core.protocol.{Produce, RecordNotProduced, RecordProduced}
 import hydra.core.transport.AckStrategy
 import hydra.kafka.config.KafkaConfigSupport
-import hydra.kafka.producer.{JsonRecord, StringRecord}
+import hydra.kafka.producer.{JsonRecord, KafkaRecordMetadata, StringRecord}
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSpecLike, Matchers}
 
@@ -47,7 +47,7 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers wit
     it("errors if no proxy can be found for the format") {
       kafkaSupervisor ! Produce(JsonRecord("transport_test", Some("key"), """{"name":"alex"}"""), ingestor.ref, supervisor.ref)
       expectMsgPF(max = 5.seconds) {
-        case RecordNotProduced(record: JsonRecord, error) =>
+        case RecordNotProduced(record: JsonRecord, error, _) =>
           error shouldBe an[IllegalArgumentException]
           record.destination shouldBe "transport_test"
       }
@@ -57,9 +57,12 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers wit
       val rec = StringRecord("transport_test", Some("key"), "payload", ackStrategy = AckStrategy.Explicit)
       kafkaSupervisor ! Produce(rec, ingestor.ref, supervisor.ref)
       ingestor.expectMsgPF(max = 10.seconds) {
-        case ProducerAck(s, e) =>
-          s shouldBe supervisor.ref
-          e shouldBe None
+        case RecordProduced(md, s) =>
+          s.get shouldBe supervisor.ref
+          md shouldBe a[KafkaRecordMetadata]
+          val kmd = md.asInstanceOf[KafkaRecordMetadata]
+          kmd.offset shouldBe 0
+          kmd.topic shouldBe "transport_test"
       }
     }
   }

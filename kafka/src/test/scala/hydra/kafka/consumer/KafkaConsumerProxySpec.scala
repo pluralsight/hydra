@@ -34,12 +34,13 @@ class KafkaConsumerProxySpec extends TestKit(ActorSystem("test")) with Matchers 
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
 
   override def beforeAll() = {
-     EmbeddedKafka.createCustomTopic("test-consumer1")
+    super.beforeAll()
     EmbeddedKafka.createCustomTopic("test-consumer2")
+    EmbeddedKafka.createCustomTopic("test-consumer1")
   }
 
   override def afterAll() = {
-     TestKit.shutdownActorSystem(system)
+    TestKit.shutdownActorSystem(system)
   }
 
   val kafkaProxy = system.actorOf(Props[KafkaConsumerProxy])
