@@ -74,6 +74,7 @@ class IngestionRequestHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
       }
       system.actorOf(IngestionRequestHandler
         .props(req.withCorrelationId(1L), Props(classOf[DummySupervisor], req.withCorrelationId(1L)), ctx))
+      Thread.sleep(1000)
       eventually {
         ctx.error should not be null
       }
