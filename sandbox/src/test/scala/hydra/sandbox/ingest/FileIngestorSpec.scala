@@ -9,14 +9,16 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 class FileIngestorSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with Matchers with FunSpecLike
   with ImplicitSender with ConfigSupport with BeforeAndAfterAll {
-
-  override def afterAll = TestKit.shutdownActorSystem(system)
-
   val probe = TestProbe()
 
   val fileProducer = system.actorOf(Props(new ForwardActor(probe.ref)), "file_producer")
 
   val ingestor = probe.childActorOf(Props[FileIngestor])
+
+  override def afterAll = {
+    system.stop(ingestor)
+    TestKit.shutdownActorSystem(system)
+  }
 
   describe("The FileIngestor") {
     it("ignores") {
