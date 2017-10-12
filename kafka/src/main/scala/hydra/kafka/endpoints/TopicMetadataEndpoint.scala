@@ -4,14 +4,16 @@ import akka.actor.{ActorRefFactory, ActorSystem}
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.ExceptionHandler
+import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
+import hydra.common.util.ActorUtils
 import hydra.core.http.{CorsSupport, HydraDirectives, NotFoundException}
-import hydra.kafka.consumer.ConsumerSupport
+import hydra.kafka.consumer.KafkaConsumerProxy
+import hydra.kafka.consumer.KafkaConsumerProxy.{ListTopics, ListTopicsResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
-import hydra.kafka.model.TopicMetadata
 import org.apache.kafka.common.PartitionInfo
 
 import scala.concurrent.Future
@@ -25,7 +27,7 @@ import scalacache.guava.GuavaCache
   * Created by alexsilva on 3/18/17.
   */
 class TopicMetadataEndpoint(implicit val system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
-  extends RoutedEndpoints with LoggingAdapter with HydraDirectives with ConsumerSupport with HydraKafkaJsonSupport
+  extends RoutedEndpoints with LoggingAdapter with HydraDirectives with HydraKafkaJsonSupport
     with CorsSupport {
 
   private implicit val cache = ScalaCache(GuavaCache())
@@ -35,35 +37,42 @@ class TopicMetadataEndpoint(implicit val system: ActorSystem, implicit val actor
   private val showSystemTopics = applicationConfig
     .get[Boolean]("transports.kafka.show-system-topics").valueOrElse(false)
 
+  private val consumerPath = applicationConfig.get[String]("actors.kafka.consumer_proxy.path")
+    .valueOrElse(s"/user/service/${ActorUtils.actorName(classOf[KafkaConsumerProxy])}")
+
+  private val consumerProxy = actorRefFactory.actorSelection(consumerPath)
+
   private val filterSystemTopics = (t: String) => (t.startsWith("_") && showSystemTopics) || !t.startsWith("_")
 
   override val route = cors(settings) {
+
     pathPrefix("transports" / "kafka") {
-      get {
-        path("topics") {
-          parameters('names ?) { n =>
-            n match {
-              case Some(name) => complete(topics.map(_.keys))
-              case None => complete(topics)
+      handleExceptions(exceptionHandler) {
+        get {
+          path("topics") {
+            parameters('names ?) { n =>
+              n match {
+                case Some(_) => complete(topics.map(_.keys))
+                case None => complete(topics)
+              }
             }
-          }
-        } ~ path("topics" / Segment) { name =>
-          onSuccess(topics) { topics =>
-            topics.get(name).map { topic =>
-              complete(TopicMetadata(name,"topic description","Engineering","Data Team","John Smith"
-                ,name,Seq("certified","revenue","finance")))
-            } getOrElse failWith(new NotFoundException(s"Topic $name not found."))
+          } ~ path("topics" / Segment) { name =>
+            onSuccess(topics) { topics =>
+              topics.get(name).map(complete(_)).getOrElse(failWith(new NotFoundException(s"Topic $name not found.")))
+            }
           }
         }
       }
     }
   }
 
-  private def topics: Future[Map[String, List[PartitionInfo]]] = {
-    import scala.collection.JavaConverters._
+  private def topics: Future[Map[String, Seq[PartitionInfo]]] = {
+    implicit val timeout = Timeout(5 seconds)
     cachingWithTTL("topics")(30.seconds) {
-      Future(defaultConsumer.listTopics().asScala
-        .filter(t => filterSystemTopics(t._1)).map { case (k, v) => k -> v.asScala.toList }.toMap)
+      import akka.pattern.ask
+      (consumerProxy ? ListTopics).mapTo[ListTopicsResponse].map { response =>
+        response.topics.filter(t => filterSystemTopics(t._1)).map { case (k, v) => k -> v.toList }
+      }
     }
   }
 

@@ -16,107 +16,86 @@
 
 package hydra.kafka.transport
 
-import java.net.ConnectException
-
 import akka.actor.SupervisorStrategy._
 import akka.actor._
 import akka.persistence.{AtLeastOnceDelivery, PersistentActor}
 import com.typesafe.config.Config
-import configs.syntax._
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol._
 import hydra.core.transport.DeliveryStrategy
-import hydra.kafka.producer.{JsonRecord, KafkaRecord, KafkaRecordMetadata}
-import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProduceToKafkaWithAck}
-import hydra.kafka.transport.KafkaTransport.ProxiesInitialized
-import org.apache.kafka.common.KafkaException
-import org.apache.kafka.common.errors.TimeoutException
+import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata}
+import hydra.kafka.transport.KafkaProducerProxy.ProducerInitializationError
 
-import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.language.existentials
-import scala.util.{Failure, Success, Try}
 
 /**
   * Created by alexsilva on 10/28/15.
   */
 class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with LoggingAdapter
-  with ConfigSupport with Stash with PersistentActor with AtLeastOnceDelivery {
+  with ConfigSupport with PersistentActor with AtLeastOnceDelivery {
 
   override val persistenceId = "hydra-kafka-transport"
 
-  val metricsEnabled = applicationConfig.get[Boolean]("producers.kafka.metrics.enabled").valueOrElse(false)
-
-  lazy val metricsTopic = applicationConfig.get[String]("producers.kafka.metrics.topic").valueOrElse("HydraKafkaError")
-
-  var producers: Map[String, ActorRef] = _
-
   implicit val ec = context.dispatcher
 
-  override def receiveCommand: Receive = initializing
+  private[kafka] lazy val metrics = KafkaMetrics(applicationConfig)(context.system)
 
-  def initializing: Receive = {
-    case ProxiesInitialized =>
-      context.become(transporting)
-      unstashAll()
-    case _ => stash()
+  private[kafka] val producers = new scala.collection.mutable.HashMap[String, ActorRef]()
+
+  override def receiveCommand: Receive = {
+    case p@Produce(_: KafkaRecord[_, _], _, _, _) =>
+      transport(p)
+
+    case p@ProduceOnly(k: KafkaRecord[_, _]) =>
+      lookupProducer(k)(_ ! p)
+
+    case p@RecordProduced(kmd: KafkaRecordMetadata, _) =>
+      confirm(p)
+      metrics.saveMetrics(kmd)
+
+    case e: RecordNotProduced[_, _] => context.system.eventStream.publish(e)
+
+    case p: ProducerInitializationError => context.system.eventStream.publish(p)
   }
 
-  private def transporting: Receive = {
-    case p@Produce(r: KafkaRecord[_, _]) => transport(r, p)
-
-    case p@ProduceWithAck(r: KafkaRecord[_, _], _, _) => transport(r, p)
-
-    case p@RecordProduced(_: KafkaRecordMetadata) => confirm(p)
-
-    case e: RecordNotProduced[_, _] => notProduced(e)
+  private def transport(pr: Produce[_, _]) = {
+    val kr = pr.record.asInstanceOf[KafkaRecord[_, _]]
+    lookupProducer(kr) { producer =>
+      pr.record.deliveryStrategy match {
+        case DeliveryStrategy.AtLeastOnce => persistAsync(pr)(updateStore)
+        case DeliveryStrategy.AtMostOnce => producer ! pr
+      }
+    }
   }
 
-  private def transport(kr: KafkaRecord[_, _], p: ProduceRecord[_, _]) = {
-    getRecordProducer(kr) match {
-      case Success(actorRef) =>
-        kr.deliveryStrategy match {
-          case DeliveryStrategy.AtLeastOnce => persistAsync(p)(updateStore)
-          case DeliveryStrategy.AtMostOnce =>
-            val msg = p match {
-              case Produce(kr: KafkaRecord[_, _]) => ProduceToKafka(kr, 1)
-              case ProduceWithAck(kr: KafkaRecord[_, _], ing, sup) => ProduceToKafkaWithAck(kr, ing, sup, 1)
-            }
-            actorRef ! msg
-        }
-      case Failure(ex) => sender ! RecordNotProduced(kr, ex)
+  private def lookupProducer(kr: KafkaRecord[_, _])(success: ActorRef => Unit) = {
+    val format = kr.formatName
+    producers.get(format) match {
+      case Some(p) => success(p)
+      case None => sender ! RecordNotProduced(kr,
+        new IllegalArgumentException(s"A Kafka producer for records of type $format could not found."))
     }
   }
 
   private def updateStore(evt: HydraMessage): Unit = evt match {
-    case p@Produce(kr: KafkaRecord[_, _]) =>
-      deliver(producers(kr.formatName).path)(deliveryId => ProduceToKafka(kr, deliveryId))
+    case p@Produce(kr: KafkaRecord[_, _], _, _, _) =>
+      deliver(producers(kr.formatName).path)(deliveryId => p.copy(deliveryId = deliveryId))
 
-    case p@ProduceWithAck(kr: KafkaRecord[_, _], ingestor, supervisor) =>
-      deliver(producers(kr.formatName).path)(deliveryId => ProduceToKafkaWithAck(kr, ingestor, supervisor, deliveryId))
-
-    case RecordProduced(kmd) => confirmDelivery(kmd.deliveryId)
+    case RecordProduced(kmd, _) => confirmDelivery(kmd.deliveryId)
   }
 
   private def confirm(p: RecordProduced): Unit = {
-    if (p.md.retryStrategy == DeliveryStrategy.AtLeastOnce) persistAsync(p)(updateStore)
-    recordStatistics(p.md.asInstanceOf[KafkaRecordMetadata])
+    if (p.md.deliveryStrategy == DeliveryStrategy.AtLeastOnce) {
+      persistAsync(p)(r => confirmDelivery(r.md.deliveryId))
+    }
   }
 
-  private def notProduced(e: RecordNotProduced[_, _]) = {
-    context.system.eventStream.publish(e)
-  }
-
-  private def recordStatistics(r: KafkaRecordMetadata) = {
-    if (metricsEnabled) producers.get("json").foreach(_ ! ProduceToKafka(JsonRecord(metricsTopic, Some(r.topic), r), 0))
-  }
 
   override val supervisorStrategy =
     OneForOneStrategy(maxNrOfRetries = -1, withinTimeRange = Duration.Inf) {
-      case _: TimeoutException => Restart
-      case _: ConnectException => Restart
-      case _: KafkaException => Restart
+      case _: InvalidProducerSettingsException => Resume
       case _: Exception => Restart
     }
 
@@ -125,44 +104,16 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
   }
 
   override def preStart(): Unit = {
-    initProducers()
-  }
-
-  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    super.preRestart(reason, message)
-    producers.values.foreach(_ ! PoisonPill)
-    initProducers()
-  }
-
-  private def getRecordProducer(kr: KafkaRecord[_, _]): Try[ActorRef] = {
-    Try(producers(kr.formatName))
-      .recover { case _: NoSuchElementException =>
-        throw new IllegalArgumentException(s"No producer for records with format ${kr.formatName}")
-      }
-  }
-
-  private def initProducers() = {
-    val prods = Future {
-      producersConfig.map {
-        case (format, config) =>
-          format -> context.actorOf(KafkaProducerProxy.props(self, config), format)
-      }
-    }
-
-    prods onComplete {
-      case Success(producers) =>
-        this.producers = producers
-        self ! ProxiesInitialized
-
-      case Failure(ex) => throw ex //just throw
-    }
+    producersConfig
+      .foreach { case (f, c) => producers += f -> context.actorOf(KafkaProducerProxy.props(f, c), f) }
   }
 }
 
 object KafkaTransport {
 
-  case object ProxiesInitialized
-
   def props(producersConfig: Map[String, Config]): Props = Props(classOf[KafkaTransport], producersConfig)
+
 }
+
+
 

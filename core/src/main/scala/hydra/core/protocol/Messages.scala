@@ -24,7 +24,7 @@ trait MessageValidationResult extends HydraMessage
 
 case class Publish(request: HydraRequest) extends HydraMessage
 
-case class Ingest(request: HydraRequest) extends HydraMessage
+case class Ingest[K, V](record: HydraRecord[K, V]) extends HydraMessage
 
 case object Join extends HydraMessage
 
@@ -32,25 +32,28 @@ case object Ignore extends HydraMessage
 
 case class InitiateRequest(request: HydraRequest) extends HydraMessage
 
-//These are the Produce-related messages
-trait ProduceRecord[K, V] extends HydraMessage {
-  def record: HydraRecord[K, V]
-}
 
-case class Produce[K, V](record: HydraRecord[K, V]) extends ProduceRecord[K, V]
+case class Produce[K, V](record: HydraRecord[K, V], ingestor: ActorRef, supervisor: ActorRef,
+                         deliveryId: Long = 0) extends HydraMessage
 
-case class ProduceWithAck[K, V](record: HydraRecord[K, V], ingestor: ActorRef, supervisor: ActorRef)
-  extends ProduceRecord[K, V]
+/**
+  * Produces a message without having to track ingestor and supervisors.
+  * No acknowledgment logic is provided either.
+  *
+  * @param kafkaRecord
+  */
+case class ProduceOnly[K, V](kafkaRecord: HydraRecord[K, V]) extends HydraMessage
 
-case class RecordProduced(md: RecordMetadata) extends HydraMessage
+case class RecordProduced(md: RecordMetadata, supervisor: Option[ActorRef] = None) extends HydraMessage
 
-case class RecordNotProduced[K, V](record: HydraRecord[K, V], error: Throwable) extends HydraMessage
+case class RecordNotProduced[K, V](record: HydraRecord[K, V], error: Throwable,
+                                   supervisor: Option[ActorRef] = None) extends HydraMessage
 
-case class ProducerAck(supervisor: ActorRef, error: Option[Throwable])
+//case class ProducerAck(supervisor: ActorRef, error: Option[Throwable])
 
 //todo:rename this class
 case class HydraIngestionError(ingestor: String, error: Throwable,
-                               request: Option[HydraRequest], time: DateTime = DateTime.now) extends HydraError
+                               request: HydraRequest, time: DateTime = DateTime.now) extends HydraError
 
 
 sealed trait IngestorStatus extends HydraMessage with Product {
@@ -97,7 +100,7 @@ case class InvalidRequest(error: Throwable) extends IngestorStatus with HydraErr
   val statusCode = StatusCodes.BadRequest
 }
 
-case object ValidRequest extends IngestorStatus with MessageValidationResult {
+case class ValidRequest[K, V](record: HydraRecord[K, V]) extends IngestorStatus with MessageValidationResult {
   override val completed = true
   val statusCode = StatusCodes.Continue
 }

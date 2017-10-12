@@ -2,8 +2,7 @@ package hydra.kafka.producer
 
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_RECORD_FORMAT_PARAM
-import hydra.core.protocol.{InvalidRequest, MessageValidationResult}
-import hydra.core.transport.HydraRecord
+import hydra.core.transport.{HydraRecord, RecordFactory}
 
 import scala.util.{Failure, Success, Try}
 
@@ -12,9 +11,9 @@ import scala.util.{Failure, Success, Try}
   *
   * Created by alexsilva on 2/23/17.
   */
-object KafkaRecordFactories {
+object KafkaRecordFactories extends RecordFactory[Any,Any] {
 
-  def apply(request: HydraRequest): Try[KafkaRecordFactory[_, _]] = {
+  def factoryFor(request: HydraRequest): Try[KafkaRecordFactory[_, _]] = {
     request.metadataValue(HYDRA_RECORD_FORMAT_PARAM) match {
       case Some(value) if (value.equalsIgnoreCase("string")) => Success(StringRecordFactory)
       case Some(value) if (value.equalsIgnoreCase("json")) => Success(JsonRecordFactory)
@@ -24,12 +23,9 @@ object KafkaRecordFactories {
     }
   }
 
-  def validate(request: HydraRequest): MessageValidationResult = {
-    apply(request).map(_.validate(request))
-      .recover { case e => InvalidRequest(e) }.get
-  }
-
-  def build(request: HydraRequest): Try[HydraRecord[_, _]] = {
-    apply(request).flatMap(_.build(request))
+  override def build(request: HydraRequest): Try[HydraRecord[_, _]] = {
+    factoryFor(request).flatMap(_.build(request))
   }
 }
+
+

@@ -1,4 +1,4 @@
-package hydra.core.testing
+package hydra.core.test
 
 import akka.actor.Actor
 import hydra.common.config.ActorConfigSupport

@@ -1,0 +1,43 @@
+{
+  "namespace": "hydra",
+  "name": "HydraIngestError",
+  "type": "record",
+  "version": 1,
+  "fields": [
+    {
+      "name": "ingestor",
+      "type": "string"
+    },
+    {
+      "name": "destination",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "errorMessage",
+      "type": "string"
+    },
+    {
+      "name": "metadata",
+      "type": {
+        "type": "map",
+        "values": "string"
+      }
+    },
+    {
+      "name": "schema",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "payload",
+      "type": "string"
+    }
+  ]
+}

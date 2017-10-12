@@ -9,6 +9,7 @@ import hydra.ingest.IngestionActors
 /**
   * Created by alexsilva on 3/29/17.
   */
+// $COVERAGE-OFF$
 object HydraIngest extends HydraEntryPoint with IngestionActors {
   override def moduleName: String = "sandbox"
 
@@ -16,3 +17,5 @@ object HydraIngest extends HydraEntryPoint with IngestionActors {
 
   buildContainer().start()
 }
+
+// $COVERAGE-ON$

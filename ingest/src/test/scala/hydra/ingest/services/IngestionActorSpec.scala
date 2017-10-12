@@ -6,6 +6,7 @@ import hydra.core.ingest.{HydraRequest, IngestionReport, RequestParams}
 import hydra.core.protocol._
 import hydra.ingest.ingestors.IngestorInfo
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
+import hydra.ingest.test.TestRecordFactory
 import org.joda.time.DateTime
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
@@ -22,7 +23,7 @@ class IngestionActorSpec extends TestKit(ActorSystem("hydra")) with Matchers
   val ingestor = TestActorRef(new Actor {
     override def receive = {
       case Publish(_) => sender ! Join
-      case Validate(_) => sender ! ValidRequest
+      case Validate(r) => sender ! ValidRequest(TestRecordFactory.build(r).get)
       case Ingest(_) => sender ! IngestorCompleted
     }
   }, "test_ingestor")

@@ -21,10 +21,13 @@ import com.pluralsight.hydra.avro.{InvalidDataTypeException, JsonConverter, Requ
 import hydra.core.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.core.ingest.RequestParams._
 import hydra.core.ingest.{HydraRequest, InvalidRequestException}
-import hydra.core.protocol.InvalidRequest
+import hydra.core.transport.AckStrategy
+import hydra.core.transport.DeliveryStrategy.AtMostOnce
 import org.apache.avro.Schema
-import org.apache.avro.generic.GenericRecord
+import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
 import org.scalatest.{FunSpecLike, Matchers}
+
+import scala.io.Source
 
 /**
   * Created by alexsilva on 1/11/17.
@@ -38,8 +41,8 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
       val request = HydraRequest(123,"""{"name":"test"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      val validation = AvroRecordFactory.validate(request)
-      val ex = validation.asInstanceOf[InvalidRequest].error.asInstanceOf[JsonToAvroConversionExceptionWithMetadata]
+      val rec = AvroRecordFactory.build(request)
+      val ex = rec.failed.get.asInstanceOf[JsonToAvroConversionExceptionWithMetadata]
       ex.cause shouldBe an[RequiredFieldMissingException]
     }
 
@@ -48,8 +51,8 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
         .withMetadata(HYDRA_VALIDATION_STRATEGY -> "strict")
-      val validation = KafkaRecordFactories.validate(request)
-      val ex = validation.asInstanceOf[InvalidRequest].error.asInstanceOf[JsonToAvroConversionExceptionWithMetadata]
+      val rec = KafkaRecordFactories.build(request)
+      val ex = rec.failed.get.asInstanceOf[JsonToAvroConversionExceptionWithMetadata]
       ex.cause shouldBe an[UndefinedFieldsException]
 
     }
@@ -58,8 +61,8 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
       val request = HydraRequest(123,"""{"name":"test", "rank":"booyah"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      val validation = AvroRecordFactory.validate(request)
-      val ex = validation.asInstanceOf[InvalidRequest].error.asInstanceOf[JsonToAvroConversionExceptionWithMetadata]
+      val rec = AvroRecordFactory.build(request)
+      val ex = rec.failed.get.asInstanceOf[JsonToAvroConversionExceptionWithMetadata]
       ex.cause shouldBe an[InvalidDataTypeException]
     }
 
@@ -73,7 +76,8 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
       msg.destination shouldBe "test-topic"
       msg.key shouldBe None
       msg.schema shouldBe avroSchema
-      msg.json shouldBe json
+      msg.payload.get("name") shouldBe "test"
+      msg.payload.get("rank") shouldBe 10
       msg.payload shouldBe new JsonConverter[GenericRecord](avroSchema).convert(json)
     }
 
@@ -87,7 +91,8 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
       val msg = AvroRecordFactory.build(request).get
       msg.destination shouldBe "test-topic"
       msg.schema shouldBe avroSchema
-      msg.json shouldBe json
+      msg.payload.get("name") shouldBe "test"
+      msg.payload.get("rank") shouldBe 10
       msg.key shouldBe Some("test")
       msg.payload shouldBe new JsonConverter[GenericRecord](avroSchema).convert(json)
     }
@@ -110,6 +115,27 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
       intercept[InvalidRequestException] {
         AvroRecordFactory.build(request).get
       }
+    }
+
+    //validation
+    it("returns invalid for payloads that do not conform to the schema") {
+      val r = HydraRequest(1,"""{"name":"test"}""")
+        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
+        .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
+      val rec = AvroRecordFactory.build(r)
+      rec.failed.get.getCause shouldBe a[RequiredFieldMissingException]
+    }
+
+    it("validates good avro payloads") {
+      val r = HydraRequest(1,"""{"name":"test","rank":10}""")
+        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
+        .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
+      val rec = AvroRecordFactory.build(r).get
+      val avroSchema = new Schema.Parser().parse(Source.fromResource("schema.avsc").mkString)
+      val genericRecord = new GenericRecordBuilder(avroSchema).set("name", "test").set("rank", 10).build()
+      val avroRecord = AvroRecord("test-topic", avroSchema, None, genericRecord, AtMostOnce, AckStrategy.None)
+      rec shouldBe avroRecord
+
     }
 
   }

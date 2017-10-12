@@ -11,6 +11,7 @@ import hydra.ingest.services.IngestorRegistrar.UnregisterAll
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.TestIngestor
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import org.scalatest.time.{Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 /**
@@ -20,6 +21,8 @@ class IngestorRegistrarSpec extends TestKit(ActorSystem("hydra")) with Matchers
   with FunSpecLike with ImplicitSender with ScalaFutures with BeforeAndAfterAll with Eventually {
 
   override def afterAll = TestKit.shutdownActorSystem(system)
+
+  implicit override val patienceConfig = PatienceConfig(timeout = Span(10, Seconds), interval = Span(1, Seconds))
 
   val registry = system.actorOf(Props[IngestorRegistry], "ingestor_registry")
 

@@ -1,9 +1,10 @@
 package hydra.core.transport
 
 import akka.actor.{ActorSystem, Props}
-import akka.testkit.{ImplicitSender, TestKit}
+import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import hydra.core.akka.InitializingActor.InitializationError
 import hydra.core.protocol._
+import hydra.core.test.TestRecord
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.Future
@@ -31,18 +32,20 @@ class TransportSpec extends TestKit(ActorSystem("test")) with Matchers with FunS
 
     it("handle the base transport protocol") {
       val ing = system.actorOf(Props(classOf[TransportTester]))
-      val rec = TestRecord(Some("1"), "test")
-      ing ! Produce(rec)
+      val rec = TestRecord("test", Some("1"), "test")
+      val supervisor = TestProbe()
+      ing ! Produce(rec, ing, supervisor.ref)
       expectMsgPF() {
-        case RecordNotProduced(r, err) =>
+        case RecordNotProduced(r, err, _) =>
           r shouldBe rec
           err shouldBe a[IllegalStateException]
       }
 
-      ing ! ProduceWithAck(rec, null, null)
+      val er = rec.copy(ackStrategy = AckStrategy.Explicit)
+      ing ! Produce(er, ing, supervisor.ref)
       expectMsgPF() {
-        case RecordNotProduced(r, err) =>
-          r shouldBe rec
+        case RecordNotProduced(r, err, _) =>
+          r shouldBe er
           err shouldBe a[IllegalStateException]
       }
 
@@ -53,12 +56,6 @@ class TransportSpec extends TestKit(ActorSystem("test")) with Matchers with FunS
       expectMsgType[RecordNotProduced[_, _]]
     }
   }
-}
-
-case class TestRecord(key: Option[String], payload: String) extends HydraRecord[String, String] {
-  override def destination = "test"
-
-  override def deliveryStrategy = DeliveryStrategy.AtLeastOnce
 }
 
 class TransportTester extends Transport {
