@@ -24,11 +24,11 @@ object Dependencies {
   val serviceContainerVersion = "2.0.6"
   val scalaCacheVersion = "0.9.3"
   val slickVersion = "3.2.0"
-  val h2Version = "1.3.176"
   val postgresVersion = "9.4.1209"
   val commonsDbcpVersion = "1.4"
-  val hydraAvroVersion = "1260aa2427"
   val hydraUtilsVersion = "2abfe00472"
+  val hikariCPVersion = "2.6.2"
+  val jacksonVersion = "2.8.4"
 
   object Compile {
 
@@ -39,8 +39,6 @@ object Dependencies {
     val sprayJson = "io.spray" %% "spray-json" % sprayJsonVersion
 
     val scalaz = "org.scalaz" %% "scalaz-core" % scalazVersion
-
-    val hydraAvro = "com.github.pluralsight" % "hydra-avro-utils" % hydraAvroVersion
 
     val hydraUtils = "com.github.pluralsight" % "hydra-utils" % hydraUtilsVersion
 
@@ -83,18 +81,18 @@ object Dependencies {
 
     val reflections = "org.reflections" % "reflections" % reflectionsVersion
 
+    val hikariCP = "com.zaxxer" % "HikariCP" % hikariCPVersion
+
+    val jackson = Seq(
+      "com.fasterxml.jackson.core" % "jackson-core" % jacksonVersion,
+      "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion
+    )
+
     val serviceContainer = ("com.github.vonnagy" %% "service-container" % serviceContainerVersion)
       .excludeAll(
         ExclusionRule(organization = "ch.qos.logback"),
         ExclusionRule(organization = "org.slf4j")
       )
-
-    val slick = Seq(
-      "com.typesafe.slick" %% "slick" % slickVersion,
-      "com.h2database" % "h2" % h2Version,
-      "org.postgresql" % "postgresql" % postgresVersion,
-      "commons-dbcp" % "commons-dbcp" % commonsDbcpVersion
-    )
   }
 
   object Test {
@@ -106,6 +104,8 @@ object Dependencies {
     val scalaTest = "org.scalatest" %% "scalatest" % scalaTestVersion % "test"
     val scalaMock = "org.scalamock" %% "scalamock-scalatest-support" % scalaMockVersion % "test"
     val junit = "junit" % "junit" % "4.12" % "test"
+
+    val h2db = "com.h2database" % "h2" % "1.4.196" % "test"
   }
 
   import Compile._
@@ -113,11 +113,13 @@ object Dependencies {
 
   val testDeps = Seq(scalaTest, junit, scalaMock) ++ akkaTest
 
-  val baseDeps = akka ++ logging ++ Seq(scalaz, scalaConfigs, avro, spring, serviceContainer) ++ joda ++ testDeps
+  val baseDeps = akka ++ logging ++ Seq(scalaz, scalaConfigs, avro, spring) ++ joda ++ testDeps
 
-  val coreDeps = baseDeps ++ Seq(guavacache, reflections, hydraAvro) ++ confluent
+  val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
-  val jdbcDeps = baseDeps ++ slick
+  val coreDeps = akka ++ baseDeps ++ Seq(guavacache, reflections, serviceContainer) ++ confluent
+
+  val sqlDeps = logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
 
   val kafkaDeps = coreDeps ++ Seq(akkaKafkaStream, jsonLenses) ++ kafka
 

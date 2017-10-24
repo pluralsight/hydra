@@ -3,9 +3,9 @@ package hydra.kafka.ingestors
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.pluralsight.hydra.avro.JsonToAvroConversionException
+import hydra.avro.JsonToAvroConversionExceptionWithMetadata
+import hydra.avro.resource.GenericSchemaResource
 import hydra.common.config.ConfigSupport
-import hydra.core.avro.JsonToAvroConversionExceptionWithMetadata
-import hydra.core.avro.schema.GenericSchemaResource
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
 import hydra.core.protocol.{HydraIngestionError, ProduceOnly}

@@ -9,15 +9,16 @@ import hydra.core.transport.{AckStrategy, DeliveryStrategy}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.{Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import scala.concurrent.duration._
 
 import scala.io.Source
 
 class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with Matchers with FunSpecLike
   with ImplicitSender with BeforeAndAfterAll with Eventually {
 
-  override def afterAll = TestKit.shutdownActorSystem(system)
+  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 
-  implicit override val patienceConfig = PatienceConfig(timeout = Span(10, Seconds), interval = Span(1, Seconds))
+  implicit override val patienceConfig = PatienceConfig(timeout = Span(60, Seconds), interval = Span(1, Seconds))
 
   val files = Map("test" -> Files.createTempFile("hydra", "test").toFile)
 
@@ -35,11 +36,13 @@ class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with 
       val supervisor = TestProbe()
       transport ! Produce(fr, ingestor.ref, supervisor.ref)
 
-      ingestor.expectMsgPF() {
-        case RecordNotProduced(r, error, sup) =>
-          r shouldBe fr
-          error.getClass shouldBe classOf[IllegalArgumentException]
-          sup.get shouldBe supervisor.ref
+      eventually {
+        ingestor.expectMsgPF(20.seconds) {
+          case RecordNotProduced(r, error, sup) =>
+            r shouldBe fr
+            error.getClass shouldBe classOf[IllegalArgumentException]
+            sup.get shouldBe supervisor.ref
+        }
       }
     }
 
@@ -49,7 +52,7 @@ class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with 
       val fr = FileRecord("test", "test-payload1").copy(ackStrategy = AckStrategy.Explicit)
       transport ! Produce(fr, ingestor.ref, supervisor.ref)
 
-      ingestor.expectMsg(RecordProduced(FileRecordMetadata(files("test").getAbsolutePath,
+      ingestor.expectMsg(20.seconds, RecordProduced(FileRecordMetadata(files("test").getAbsolutePath,
         0, DeliveryStrategy.AtMostOnce), Some(supervisor.ref)))
 
       eventually(Source.fromFile(files("test")).getLines().toSeq should contain("test-payload1"))
