@@ -1,0 +1,15 @@
+{
+  "namespace": "hydra.test",
+  "type": "record",
+  "name": "Tester",
+  "fields": [
+    {
+      "name": "name",
+      "type": "string"
+    },
+    {
+      "name": "value",
+      "type": "string"
+    }
+  ]
+}
