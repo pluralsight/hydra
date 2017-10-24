@@ -26,7 +26,6 @@ object Dependencies {
   val slickVersion = "3.2.0"
   val postgresVersion = "9.4.1209"
   val commonsDbcpVersion = "1.4"
-  val hydraUtilsVersion = "2abfe00472"
   val hikariCPVersion = "2.6.2"
   val jacksonVersion = "2.8.4"
 
@@ -39,8 +38,6 @@ object Dependencies {
     val sprayJson = "io.spray" %% "spray-json" % sprayJsonVersion
 
     val scalaz = "org.scalaz" %% "scalaz-core" % scalazVersion
-
-    val hydraUtils = "com.github.pluralsight" % "hydra-utils" % hydraUtilsVersion
 
     val kafka = Seq(
       "org.apache.kafka" %% "kafka" % kafkaVersion,
