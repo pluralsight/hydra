@@ -5,7 +5,7 @@ enablePlugins(JavaAppPackaging)
 
 val JDK = "1.8"
 val buildNumber = scala.util.Properties.envOrNone("version").map(v => "." + v).getOrElse("")
-val hydraVersion = "0.9.0" + buildNumber
+val hydraVersion = "0.9.2" + buildNumber
 
 lazy val defaultSettings = Seq(
   organization := "pluralsight",
@@ -51,7 +51,7 @@ lazy val root = Project(
   id = "hydra",
   base = file("."),
   settings = defaultSettings // ++ noPublishSettings
-).aggregate(common, core, kafka, ingest, sandbox)
+).aggregate(common, core, avro, ingest, kafka, sql, sandbox)
 
 lazy val common = Project(
   id = "common",
@@ -65,7 +65,7 @@ lazy val core = Project(
   base = file("core"),
   settings = moduleSettings
     ++ Seq(libraryDependencies ++= Dependencies.coreDeps)
-).dependsOn(common).settings(name := "hydra-core")
+).dependsOn(common, avro).settings(name := "hydra-core")
 
 
 lazy val ingest = Project(
@@ -81,6 +81,20 @@ lazy val kafka = Project(
   settings = moduleSettings
     ++ Seq(libraryDependencies ++= Dependencies.kafkaDeps)
 ).dependsOn(core).settings(name := "hydra-kafka")
+
+lazy val avro = Project(
+  id = "avro",
+  base = file("avro"),
+  settings = moduleSettings
+    ++ Seq(libraryDependencies ++= Dependencies.avroDeps)
+).settings(name := "hydra-avro")
+
+lazy val sql = Project(
+  id = "sql",
+  base = file("sql"),
+  settings = moduleSettings
+    ++ Seq(libraryDependencies ++= Dependencies.sqlDeps)
+).dependsOn(core).settings(name := "hydra-sql")
 
 
 lazy val sandbox = Project(

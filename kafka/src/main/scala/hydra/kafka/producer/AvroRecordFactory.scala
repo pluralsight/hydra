@@ -16,10 +16,10 @@
 package hydra.kafka.producer
 
 import com.pluralsight.hydra.avro.{JsonConverter, JsonToAvroConversionException}
+import hydra.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.avro.registry.ConfluentSchemaRegistry
+import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
 import hydra.common.config.ConfigSupport
-import hydra.core.avro.JsonToAvroConversionExceptionWithMetadata
-import hydra.core.avro.schema.{SchemaResource, SchemaResourceLoader}
 import hydra.core.ingest.{HydraRequest, RequestParams}
 import hydra.core.transport.ValidationStrategy.Strict
 import org.apache.avro.generic.GenericRecord

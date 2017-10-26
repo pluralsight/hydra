@@ -18,7 +18,7 @@ package hydra.kafka.producer
 import java.io.File
 
 import com.pluralsight.hydra.avro.{InvalidDataTypeException, JsonConverter, RequiredFieldMissingException, UndefinedFieldsException}
-import hydra.core.avro.JsonToAvroConversionExceptionWithMetadata
+import hydra.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.core.ingest.RequestParams._
 import hydra.core.ingest.{HydraRequest, InvalidRequestException}
 import hydra.core.transport.AckStrategy
