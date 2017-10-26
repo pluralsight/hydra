@@ -1,7 +1,7 @@
-package hydra.core.avro
+package hydra.avro
 
 import com.pluralsight.hydra.avro.JsonToAvroConversionException
-import hydra.core.avro.schema.SchemaResource
+import hydra.avro.resource.SchemaResource
 
 /**
   * Created by alexsilva on 3/8/17.
