@@ -59,18 +59,18 @@ class AvroSchemaGeneratorSpec extends Matchers with FunSpecLike {
           |	"clipId": "shawn-wildermuth|front-end-web-app-html5-javascript-css-m01|front-end-web-app-html5-javascript-css-m1-02",
           |	"clipModuleIndex": 1,
           |	"clipName": "front-end-web-app-html5-javascript-css-m1-02",
-          |	"contentIndexPosition": 93769,
+          |	"contentIndexPosition": 99999,
           |	"countsTowardTrialLimits": false,
           |	"courseName": "front-end-web-app-html5-javascript-css",
           |	"courseTitle": "Front-End Web Development Quick Start With HTML5, CSS, and JavaScript",
-          |	"ipAddress": "10.107.172.19",
+          |	"ipAddress": "127.0.0.1",
           |	"moduleAuthorHandle": "shawn-wildermuth",
           |	"moduleId": "shawn-wildermuth|front-end-web-app-html5-javascript-css-m01",
           |	"moduleName": "front-end-web-app-html5-javascript-css-m01",
           |	"online": true,
           |	"royaltiesPaid": true,
           |	"started": "2016-11-30T20:30:45.3136582Z",
-          |	"userHandle": "40def024-fd72-428a-b144-f491bebb0b5d"
+          |	"userHandle": "44bbf444-ba44-444a-b444-b444bebb4b4b"
           |}
         """.stripMargin
 
