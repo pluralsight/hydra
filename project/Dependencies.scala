@@ -28,6 +28,7 @@ object Dependencies {
   val commonsDbcpVersion = "1.4"
   val hikariCPVersion = "2.6.2"
   val jacksonVersion = "2.8.4"
+  val opRabbitVersion = "2.0.0"
 
   object Compile {
 
@@ -80,6 +81,12 @@ object Dependencies {
 
     val hikariCP = "com.zaxxer" % "HikariCP" % hikariCPVersion
 
+    val opRabbit = Seq(
+      "com.spingo" %% "op-rabbit-core" % opRabbitVersion,
+      "com.spingo" %% "op-rabbit-json4s" % opRabbitVersion,
+      "com.spingo" %% "op-rabbit-airbrake" % opRabbitVersion
+    )
+
     val jackson = Seq(
       "com.fasterxml.jackson.core" % "jackson-core" % jacksonVersion,
       "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion
@@ -117,6 +124,8 @@ object Dependencies {
   val coreDeps = akka ++ baseDeps ++ Seq(guavacache, reflections, serviceContainer) ++ confluent
 
   val sqlDeps = logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
+
+  val rabbitDeps = logging ++ Seq(scalaConfigs) ++ joda ++ opRabbit ++ testDeps
 
   val kafkaDeps = coreDeps ++ Seq(akkaKafkaStream, jsonLenses) ++ kafka
 

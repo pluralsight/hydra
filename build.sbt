@@ -28,7 +28,6 @@ lazy val defaultSettings = Seq(
   resolvers += "jitpack" at "https://jitpack.io",
   coverageExcludedPackages := "hydra\\.ingest\\.HydraIngestApp.*",
   ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet,
-  ivyScala := ivyScala.value map (_.copy(overrideScalaVersion = true))
 )
 
 lazy val restartSettings = Seq(
@@ -49,57 +48,56 @@ lazy val moduleSettings = defaultSettings ++ Test.testSettings //++ Publish.sett
 
 lazy val root = Project(
   id = "hydra",
-  base = file("."),
-  settings = defaultSettings // ++ noPublishSettings
-).aggregate(common, core, avro, ingest, kafka, sql, sandbox)
+  base = file(".")
+).settings(defaultSettings).aggregate(common, core, avro, ingest, kafka, sql, sandbox)
 
 lazy val common = Project(
   id = "common",
-  base = file("common"),
-  settings = moduleSettings
-    ++ Seq(libraryDependencies ++= Dependencies.baseDeps)
-).settings(name := "hydra-common")
+  base = file("common")
+).settings(moduleSettings, name := "hydra-common", libraryDependencies ++= Dependencies.baseDeps)
 
 lazy val core = Project(
   id = "core",
-  base = file("core"),
-  settings = moduleSettings
-    ++ Seq(libraryDependencies ++= Dependencies.coreDeps)
-).dependsOn(common, avro).settings(name := "hydra-core")
+  base = file("core")
+).dependsOn(common, avro)
+  .settings(moduleSettings, name := "hydra-core", libraryDependencies ++= Dependencies.coreDeps)
 
 
 lazy val ingest = Project(
   id = "ingest",
-  base = file("ingest"),
-  settings = moduleSettings
-    ++ Seq(libraryDependencies ++= Dependencies.coreDeps)
-).dependsOn(core).settings(name := "hydra-ingest")
+  base = file("ingest")
+).dependsOn(core)
+  .settings(moduleSettings, name := "hydra-ingest", libraryDependencies ++= Dependencies.coreDeps)
 
 lazy val kafka = Project(
   id = "kafka",
-  base = file("kafka"),
-  settings = moduleSettings
-    ++ Seq(libraryDependencies ++= Dependencies.kafkaDeps)
-).dependsOn(core).settings(name := "hydra-kafka")
+  base = file("kafka")
+).dependsOn(core).settings(moduleSettings, name := "hydra-kafka", libraryDependencies ++= Dependencies.kafkaDeps)
 
 lazy val avro = Project(
   id = "avro",
-  base = file("avro"),
-  settings = moduleSettings
-    ++ Seq(libraryDependencies ++= Dependencies.avroDeps)
-).settings(name := "hydra-avro")
+  base = file("avro")
+).settings(moduleSettings, name := "hydra-avro", libraryDependencies ++= Dependencies.avroDeps)
 
 lazy val sql = Project(
   id = "sql",
-  base = file("sql"),
-  settings = moduleSettings
-    ++ Seq(libraryDependencies ++= Dependencies.sqlDeps)
-).dependsOn(core).settings(name := "hydra-sql")
+  base = file("sql")
+).dependsOn(core)
+  .settings(moduleSettings, name := "hydra-sql", libraryDependencies ++= Dependencies.sqlDeps)
 
+lazy val rabbitmq = Project(
+  id = "rabbitmq",
+  base = file("rabbitmq")
+).dependsOn(core)
+  .settings(moduleSettings, name := "hydra-rabbitmq", libraryDependencies ++= Dependencies.rabbitDeps)
 
+val sbSettings = defaultSettings ++ Test.testSettings ++ noPublishSettings ++ restartSettings
 lazy val sandbox = Project(
   id = "sandbox",
-  base = file("sandbox"),
-  settings = defaultSettings ++ Test.testSettings ++ noPublishSettings ++ restartSettings
-    ++ Seq(libraryDependencies ++= Dependencies.kafkaDeps)
-).dependsOn(ingest, kafka).settings(name := "hydra-examples")
+  base = file("sandbox")
+).dependsOn(ingest, kafka)
+  .settings(sbSettings, name := "hydra-examples", libraryDependencies ++= Dependencies.kafkaDeps)
+
+//scala style
+lazy val testScalastyle = taskKey[Unit]("testScalastyle")
+testScalastyle := scalastyle.in(sbt.Test).toTask("").value

@@ -46,9 +46,7 @@ sealed trait HydraModule {
   /**
     * Runs the module functionality.
     *
-    * @throws java.lang.Exception
     */
-  @throws(classOf[Exception])
   def run(): Unit
 }
 
@@ -56,7 +54,6 @@ trait HydraTypedModule extends HydraModule with LoggingAdapter {
   /**
     * The equivalent of preStart
     *
-    * @throws java.lang.Exception
     * @return
     */
   @throws(classOf[Exception])
@@ -65,10 +62,8 @@ trait HydraTypedModule extends HydraModule with LoggingAdapter {
   /**
     * The equivalent of postStop
     *
-    * @throws java.lang.Exception
     * @return
     */
-  @throws(classOf[Exception])
   def stop(): Unit = {}
 
 }
