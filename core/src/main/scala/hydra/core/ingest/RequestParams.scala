@@ -10,7 +10,7 @@ object RequestParams {
     * Used when targeting a specific ingestor by name.
     *
     * If this parameter is present in the request, the message will
-    * not be broadcast via a [[hydra.core.notification.Publish]] message.
+    * not be broadcast via a [[hydra.core.protocol.Publish]] message.
     *
     * Instead, the Publish phase of the protocol will be skipped and the
     * ingestion will begin with a [[hydra.core.protocol.Join]] message sent directly to that ingestor.
