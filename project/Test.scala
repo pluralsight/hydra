@@ -16,7 +16,7 @@ object Test {
 
     // Include the code coverage settings
     coverageExcludedPackages := "<empty>;akka.contrib.*",
-    coverageMinimum := 80,
+    coverageMinimum := 70,
     coverageFailOnMinimum := true,
 
     coverageHighlighting := {
