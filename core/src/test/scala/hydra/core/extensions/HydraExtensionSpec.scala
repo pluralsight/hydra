@@ -12,35 +12,25 @@ class HydraExtensionSpec extends TestKit(ActorSystem("test"))
   import akka.testkit.TestKit
   import com.typesafe.config.ConfigFactory
 
-  override def afterAll() = TestKit.shutdownActorSystem(system)
+  override def afterAll() = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 
   val cfg = ConfigFactory.parseString(
     """
-      |test-extension {
-      |tester{
-      |  name=typed-test
-      |  class=hydra.core.extensions.HydraTestExtension
-      |}
-      |}
+      |  extensions {
+      |    test-extension {
+      |      enabled = true
+      |      class = hydra.core.extensions.HydraTestExtension
+      |    }
+      |  }
     """.stripMargin)
 
   describe("Hydra extensions") {
-    ignore("can be loaded from configuration") {
-
-      val cfg = ConfigFactory.parseString(
-        """
-          |test-extension {
-          |tester{
-          |  name=typed-test
-          |  class=hydra.core.extensions.HydraTestExtension
-          |}
-          |}
-        """.stripMargin)
-      val ext = HydraExtensionLoader.load("test-extension", cfg.getConfig("tester").atKey("tester"))
+    it("can be loaded from configuration") {
+      val ext = HydraExtensionLoader.load("test-extension", cfg.getConfig("extensions"))
       ext.get.asInstanceOf[ExtensionId[HydraTestExtensionImpl]].get(system).extName shouldBe "tester"
     }
 
-    ignore("register modules with the extension registry") {
+    it("register modules with the extension registry") {
       HydraExtensionRegistry(system).getModule("test-typed").isDefined shouldBe true
       HydraExtensionRegistry(system).getModule("test-actor").isDefined shouldBe true
       HydraExtensionRegistry.get(system).getModule("test-actor-disabled").isDefined shouldBe false
