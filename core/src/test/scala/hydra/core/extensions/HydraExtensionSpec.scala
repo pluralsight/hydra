@@ -1,22 +1,21 @@
 package hydra.core.extensions
 
-import akka.actor.{ActorRef, ActorSystem, ExtensionId}
-import akka.parboiled2.RuleTrace.Run
-import akka.testkit.{ImplicitSender, TestKit}
-import org.scalatest.concurrent.Eventually
-import org.scalatest.time.{Millis, Seconds, Span}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, ExtensionId, Props}
+import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
+import hydra.core.extensions.HydraActorModule.Run
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 class HydraExtensionSpec extends TestKit(ActorSystem("test"))
-  with Matchers with FunSpecLike with BeforeAndAfterAll with ImplicitSender with Eventually {
+  with Matchers with FunSpecLike with BeforeAndAfterAll with ImplicitSender {
 
   import akka.testkit.TestKit
   import com.typesafe.config.ConfigFactory
 
-  implicit override val patienceConfig =
-    PatienceConfig(timeout = scaled(Span(10, Seconds)), interval = scaled(Span(100, Millis)))
+  override def afterAll(): Unit = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 
-  override def afterAll() = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
+  val probe = TestProbe()
+
+  val testerActor = TestActorRef[ExtTestActor](Props(new ExtTestActor(probe.ref)), "ext-test")
 
   val cfg = ConfigFactory.parseString(
     """
@@ -49,21 +48,22 @@ class HydraExtensionSpec extends TestKit(ActorSystem("test"))
         .asInstanceOf[Either[ActorRef, HydraTypedModule]].left.toOption.get
       act ! Run
 
-      Thread.sleep(1000)
-      eventually {
-        act ! "counter"
-        expectMsg(1)
-      }
+      probe.expectMsg("called")
     }
 
     it("calls the run method on typed modules") {
       val act: HydraTypedModule = HydraExtensionRegistry(system).getModule("test-typed").get
         .asInstanceOf[Either[ActorRef, HydraTypedModule]].right.toOption.get
-      TestTypedModuleCounter.counter = 0
       act.run()
-      eventually {
-        TestTypedModuleCounter.counter should be > 1
-      }
+      probe.expectMsg("called")
     }
   }
 }
+
+class ExtTestActor(probe: ActorRef) extends Actor with ActorLogging {
+  override def receive = {
+    case Run => probe ! "called"
+  }
+}
+
+
