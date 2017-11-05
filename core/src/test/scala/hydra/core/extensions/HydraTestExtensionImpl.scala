@@ -1,6 +1,6 @@
 package hydra.core.extensions
 
-import akka.actor.{ActorSystem, ExtendedActorSystem, Extension, ExtensionId, ExtensionIdProvider}
+import akka.actor.{ActorSystem, ExtendedActorSystem, Extension, ExtensionId, ExtensionIdProvider, TypedActor}
 import com.typesafe.config.{Config, ConfigFactory}
 import hydra.core.extensions.HydraActorModule.Run
 
@@ -14,11 +14,13 @@ object HydraTestExtension extends ExtensionId[HydraTestExtensionImpl] with Exten
       |  test-typed {
       |    name=typed-module-test
       |    class=hydra.core.extensions.TestTypedModule
+      |    actorPath = "/user/ext-test"
       |}
       |
       | test-typed-interval {
       |    name=typed-module-test
       |    class=hydra.core.extensions.TestTypedModule
+      |    actorPath = "/user/ext-test"
       |    interval = 50ms
       |}
       |
@@ -41,23 +43,21 @@ object HydraTestExtension extends ExtensionId[HydraTestExtensionImpl] with Exten
 }
 
 class TestTypedModule(val id: String, val config: Config) extends HydraTypedModule {
-  override def run(): Unit = TestTypedModuleCounter.counter += 1
+
+  override def run(): Unit = {
+    val act = TypedActor.context.actorSelection(config.getString("actorPath"))
+    act ! Run
+  }
 }
 
 
 class TestActorModule(val id: String, val config: Config) extends HydraActorModule {
-  @volatile
-  var counter = 0
+  val act = context.actorSelection(config.getString("actorPath"))
 
-  override def run(): Unit = counter += 1
+  override def run(): Unit = act ! Run
 
-  override def receive = synchronized {
+  override def receive = {
     case Run => run()
-    case "counter" => sender ! counter
   }
 }
 
-object TestTypedModuleCounter {
-  @volatile
-  var counter = 0
-}

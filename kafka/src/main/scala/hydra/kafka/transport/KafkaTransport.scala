@@ -64,7 +64,9 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
     val kr = pr.record.asInstanceOf[KafkaRecord[_, _]]
     lookupProducer(kr) { producer =>
       pr.record.deliveryStrategy match {
-        case DeliveryStrategy.AtLeastOnce => persistAsync(pr)(updateStore)
+        case DeliveryStrategy.AtLeastOnce =>
+          log.debug("Atleastonce: " + pr.record.destination)
+          producer ! pr//persistAsync(pr)(updateStore)
         case DeliveryStrategy.AtMostOnce => producer ! pr
       }
     }
