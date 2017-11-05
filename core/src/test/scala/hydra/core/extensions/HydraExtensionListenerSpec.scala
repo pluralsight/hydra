@@ -42,8 +42,8 @@ class HydraExtensionListenerSpec extends TestKit(ActorSystem("test"))
   override def afterAll() = {
     e.onShutdown(container)
     container.shutdown()
-    TestKit.shutdownActorSystem(system)
-    TestKit.shutdownActorSystem(container.system)
+    TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
+    TestKit.shutdownActorSystem(container.system, verifySystemShutdown = true)
   }
 
   describe("Hydra Listeners") {
