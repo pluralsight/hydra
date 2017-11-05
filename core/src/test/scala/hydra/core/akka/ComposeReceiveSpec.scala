@@ -7,7 +7,7 @@ import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 class ComposeReceiveSpec extends TestKit(ActorSystem("test")) with Matchers with
   FlatSpecLike with BeforeAndAfterAll with ImplicitSender {
 
-  override def afterAll = TestKit.shutdownActorSystem(system)
+  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 
   "The ComposingReceiveTrait" should "compose" in {
     system.actorOf(Props[TestBaseActor]) ! "foo"
