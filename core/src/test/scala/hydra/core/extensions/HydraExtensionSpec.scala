@@ -4,6 +4,7 @@ import akka.actor.{ActorRef, ActorSystem, ExtensionId}
 import akka.parboiled2.RuleTrace.Run
 import akka.testkit.{ImplicitSender, TestKit}
 import org.scalatest.concurrent.Eventually
+import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 class HydraExtensionSpec extends TestKit(ActorSystem("test"))
@@ -11,6 +12,9 @@ class HydraExtensionSpec extends TestKit(ActorSystem("test"))
 
   import akka.testkit.TestKit
   import com.typesafe.config.ConfigFactory
+
+  implicit override val patienceConfig =
+    PatienceConfig(timeout = scaled(Span(10, Seconds)), interval = scaled(Span(100, Millis)))
 
   override def afterAll() = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 
