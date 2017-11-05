@@ -66,7 +66,7 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
       pr.record.deliveryStrategy match {
         case DeliveryStrategy.AtLeastOnce =>
           log.debug("Atleastonce: " + pr.record.destination)
-          persistAsync(pr)(updateStore)
+          producer ! pr//persistAsync(pr)(updateStore)
         case DeliveryStrategy.AtMostOnce => producer ! pr
       }
     }
