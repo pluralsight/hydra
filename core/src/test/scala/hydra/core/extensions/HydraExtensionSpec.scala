@@ -62,7 +62,7 @@ class HydraExtensionSpec extends TestKit(ActorSystem("test"))
       TestTypedModuleCounter.counter = 0
       act.run()
       eventually {
-        TestTypedModuleCounter.counter shouldBe 1
+        TestTypedModuleCounter.counter should be > 1
       }
     }
   }
