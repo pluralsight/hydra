@@ -65,7 +65,6 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
     lookupProducer(kr) { producer =>
       pr.record.deliveryStrategy match {
         case DeliveryStrategy.AtLeastOnce =>
-          log.debug("Atleastonce: " + pr.record.destination)
           producer ! pr//persistAsync(pr)(updateStore)
         case DeliveryStrategy.AtMostOnce => producer ! pr
       }
@@ -89,9 +88,9 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
   }
 
   private def confirm(p: RecordProduced): Unit = {
-    if (p.md.deliveryStrategy == DeliveryStrategy.AtLeastOnce) {
-      persistAsync(p)(r => confirmDelivery(r.md.deliveryId))
-    }
+//    if (p.md.deliveryStrategy == DeliveryStrategy.AtLeastOnce) {
+//      persistAsync(p)(r => confirmDelivery(r.md.deliveryId))
+//    }
   }
 
 
