@@ -23,7 +23,7 @@ case class PropagateExceptionWithAckCallback(producer: ActorSelection,
       if (shouldAck) ingestor ! RecordNotProduced(record, e, Some(supervisor))
     }
     else {
-      val kmd = KafkaRecordMetadata(metadata, deliveryId, record.deliveryStrategy)
+      val kmd = KafkaRecordMetadata(metadata, deliveryId)
       producer ! kmd
       if (shouldAck) ingestor ! RecordProduced(kmd, Some(supervisor))
     }

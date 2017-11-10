@@ -39,7 +39,7 @@ class FileTransport(destinations: Map[String, String]) extends Transport {
         f.onComplete {
           case Success(_) =>
             //todo: look at the QueueOfferResult object
-            val md = FileRecordMetadata(destinations(r.destination), 0, r.deliveryStrategy)
+            val md = FileRecordMetadata(destinations(r.destination), 0)
             ingestor ! RecordProduced(md, Some(supervisor))
           case Failure(ex) => ingestor ! RecordNotProduced(r, ex, Some(supervisor))
         }
