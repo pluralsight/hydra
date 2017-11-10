@@ -5,12 +5,12 @@ import java.nio.file.Files
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import hydra.core.protocol.{Produce, ProduceOnly, RecordNotProduced, RecordProduced}
-import hydra.core.transport.{AckStrategy, DeliveryStrategy}
+import hydra.core.transport.AckStrategy
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.{Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
-import scala.concurrent.duration._
 
+import scala.concurrent.duration._
 import scala.io.Source
 
 class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with Matchers with FunSpecLike
@@ -53,7 +53,7 @@ class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with 
       transport ! Produce(fr, ingestor.ref, supervisor.ref)
 
       ingestor.expectMsg(20.seconds, RecordProduced(FileRecordMetadata(files("test").getAbsolutePath,
-        0, DeliveryStrategy.AtMostOnce), Some(supervisor.ref)))
+        0), Some(supervisor.ref)))
 
       eventually(Source.fromFile(files("test")).getLines().toSeq should contain("test-payload1"))
     }
