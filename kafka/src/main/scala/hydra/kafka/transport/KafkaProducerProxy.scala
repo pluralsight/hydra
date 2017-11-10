@@ -39,7 +39,7 @@ class KafkaProducerProxy(format: String, producerConfig: Config)
 
     case ProduceOnly(kr: KafkaRecord[Any, Any]) =>
       producer.send(kr, (metadata: RecordMetadata, e: Exception) => {
-        val msg = if (e != null) RecordNotProduced(kr, e) else KafkaRecordMetadata(metadata, 0, kr.deliveryStrategy)
+        val msg = if (e != null) RecordNotProduced(kr, e) else KafkaRecordMetadata(metadata, 0)
         self ! msg
       })
 
