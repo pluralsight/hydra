@@ -4,7 +4,6 @@ import akka.actor.{ActorSystem, PoisonPill}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import hydra.core.protocol.{ProduceOnly, RecordNotProduced, RecordProduced}
-import hydra.core.transport.DeliveryStrategy
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{JsonRecord, KafkaRecordMetadata, StringRecord}
 import hydra.kafka.transport.KafkaProducerProxy.ProducerInitializationError
@@ -50,7 +49,7 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
 
     it("sends metadata back to the parent") {
       val kafkaActor = parent.childActorOf(KafkaProducerProxy.props("string", kafkaProducerFormats("string")))
-      val kmd = KafkaRecordMetadata(recordMetadata, 0, DeliveryStrategy.AtMostOnce)
+      val kmd = KafkaRecordMetadata(recordMetadata, 0)
       kafkaActor ! kmd
       parent.expectMsgPF() {
         case RecordProduced(k, _) => k shouldBe kmd
