@@ -1,33 +1,39 @@
 package hydra.kafka.producer
 
 import akka.actor.{ActorRef, ActorSelection}
-import hydra.core.protocol.{RecordNotProduced, RecordProduced}
-import hydra.core.transport.{AckStrategy, HydraRecord}
+import hydra.core.protocol
+import hydra.core.protocol.RecordNotProduced
+import hydra.core.transport.AckStrategy
+import hydra.kafka.transport.KafkaTransport.RecordProduceError
 import org.apache.kafka.clients.producer.{Callback, RecordMetadata}
 
 /**
   * Created by alexsilva on 2/22/17.
   */
-case class PropagateExceptionWithAckCallback(producer: ActorSelection,
-                                             ingestor: ActorRef,
+case class PropagateExceptionWithAckCallback(deliveryId: Long,
+                                             record: KafkaRecord[_, _],
+                                             producer: ActorSelection,
+                                             ingestor: ActorSelection,
                                              supervisor: ActorRef,
-                                             record: HydraRecord[Any, Any],
-                                             ackStrategy: AckStrategy,
-                                             deliveryId: Long) extends Callback {
+                                             ack: AckStrategy) extends Callback {
 
-  val shouldAck = ackStrategy == AckStrategy.Explicit
+  private lazy val shouldAck = ack == AckStrategy.TransportAck
 
   override def onCompletion(metadata: RecordMetadata, e: Exception): Unit = {
-    if (e != null) {
-      producer ! RecordNotProduced(record, e)
-      if (shouldAck) ingestor ! RecordNotProduced(record, e, Some(supervisor))
+    Option(e) match {
+      case Some(err) => ackError(err)
+      case None => doAck(metadata)
     }
-    else {
-      val kmd = KafkaRecordMetadata(metadata, deliveryId)
-      producer ! kmd
-      if (shouldAck) ingestor ! RecordProduced(kmd, Some(supervisor))
-    }
+  }
 
+  private def doAck(md: RecordMetadata) = {
+    val kmd = KafkaRecordMetadata(md, deliveryId)
+    producer ! kmd
+    if (shouldAck) ingestor ! protocol.RecordProduced(kmd, supervisor)
+  }
 
+  private def ackError(e: Exception) = {
+    producer ! RecordProduceError(deliveryId, record, e)
+    if (shouldAck) ingestor ! RecordNotProduced(deliveryId, record, e, supervisor)
   }
 }

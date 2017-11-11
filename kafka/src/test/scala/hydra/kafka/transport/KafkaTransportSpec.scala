@@ -45,20 +45,21 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers wit
     }
 
     it("errors if no proxy can be found for the format") {
-      kafkaSupervisor ! Produce(JsonRecord("transport_test", Some("key"), """{"name":"alex"}"""), ingestor.ref, supervisor.ref)
+      kafkaSupervisor ! Produce(JsonRecord("transport_test", Some("key"), """{"name":"alex"}"""),
+        supervisor.ref, AckStrategy.NoAck)
       expectMsgPF(max = 5.seconds) {
-        case RecordNotProduced(record: JsonRecord, error, _) =>
+        case RecordNotProduced(_, record: JsonRecord, error, _) =>
           error shouldBe an[IllegalArgumentException]
           record.destination shouldBe "transport_test"
       }
     }
 
     it("forwards to the right proxy") {
-      val rec = StringRecord("transport_test", Some("key"), "payload", ackStrategy = AckStrategy.Explicit)
-      kafkaSupervisor ! Produce(rec, ingestor.ref, supervisor.ref)
+      val rec = StringRecord("transport_test", Some("key"), "payload")
+      kafkaSupervisor ! Produce(rec, supervisor.ref, AckStrategy.NoAck)
       ingestor.expectMsgPF(max = 10.seconds) {
         case RecordProduced(md, s) =>
-          s.get shouldBe supervisor.ref
+          s shouldBe supervisor.ref
           md shouldBe a[KafkaRecordMetadata]
           val kmd = md.asInstanceOf[KafkaRecordMetadata]
           kmd.offset shouldBe 0

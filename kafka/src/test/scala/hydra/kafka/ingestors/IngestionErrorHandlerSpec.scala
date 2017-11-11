@@ -8,10 +8,11 @@ import hydra.avro.resource.GenericSchemaResource
 import hydra.common.config.ConfigSupport
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
-import hydra.core.protocol.{HydraIngestionError, ProduceOnly}
+import hydra.core.protocol.HydraIngestionError
 import hydra.kafka.ForwardActor
+import hydra.kafka.transport.KafkaTransport.ProduceOnly
 import org.apache.avro.Schema
-import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
+import org.apache.avro.generic.GenericRecordBuilder
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 import org.springframework.core.io.ClassPathResource
 
@@ -69,7 +70,7 @@ class IngestionErrorHandlerSpec extends TestKit(ActorSystem("hydra-test")) with 
       println(kafkaProducer.path)
       val err = HydraIngestionError("test", new JsonToAvroConversionException("test", "field", schema), request)
       handlerRef ! err
-      probe.expectMsgType[ProduceOnly[String, GenericRecord]](10.seconds)
+      probe.expectMsgType[ProduceOnly](10.seconds)
     }
 
   }

@@ -1,7 +1,7 @@
 package hydra.kafka.test
 
 import hydra.core.ingest.HydraRequest
-import hydra.core.transport.{AckStrategy, DeliveryStrategy, HydraRecord, RecordFactory}
+import hydra.core.transport.{HydraRecord, RecordFactory}
 
 import scala.util.Success
 
@@ -19,13 +19,9 @@ object TestRecordFactory extends RecordFactory[String, String] {
 
 case class TestRecord(destination: String,
                       key: Option[String],
-                      payload: String,
-                      deliveryStrategy: DeliveryStrategy = DeliveryStrategy.AtLeastOnce,
-                      ackStrategy: AckStrategy = AckStrategy.None) extends HydraRecord[String, String]
+                      payload: String) extends HydraRecord[String, String]
 
 
 case class TimeoutRecord(destination: String,
                          key: Option[String],
-                         payload: String,
-                         deliveryStrategy: DeliveryStrategy = DeliveryStrategy.AtLeastOnce,
-                         ackStrategy: AckStrategy = AckStrategy.None) extends HydraRecord[String, String]
+                         payload: String) extends HydraRecord[String, String]

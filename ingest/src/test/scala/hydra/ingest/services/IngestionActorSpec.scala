@@ -24,7 +24,7 @@ class IngestionActorSpec extends TestKit(ActorSystem("hydra")) with Matchers
     override def receive = {
       case Publish(_) => sender ! Join
       case Validate(r) => sender ! ValidRequest(TestRecordFactory.build(r).get)
-      case Ingest(_) => sender ! IngestorCompleted
+      case Ingest(_, _, _) => sender ! IngestorCompleted
     }
   }, "test_ingestor")
 

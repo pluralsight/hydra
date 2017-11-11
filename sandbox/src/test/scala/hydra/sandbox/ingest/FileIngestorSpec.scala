@@ -5,6 +5,7 @@ import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import hydra.common.config.ConfigSupport
 import hydra.core.ingest.HydraRequest
 import hydra.core.protocol._
+import hydra.core.transport.AckStrategy
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
@@ -47,7 +48,7 @@ class FileIngestorSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with M
 
     it("transports") {
       val hr = HydraRequest(0, "test").withMetadata("hydra-file-stream" -> "test")
-      ingestor ! Ingest(FileRecordFactory.build(hr).get)
+      ingestor ! Ingest(FileRecordFactory.build(hr).get, TestProbe().ref, AckStrategy.NoAck)
       eventually {
         expectMsg(10.seconds, IngestorCompleted)
       }

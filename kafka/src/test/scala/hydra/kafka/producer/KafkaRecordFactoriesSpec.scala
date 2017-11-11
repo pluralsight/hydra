@@ -21,8 +21,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_FORMAT_PARAM, HYDRA_SCHEMA_PARAM}
 import hydra.core.protocol.InvalidRequest
-import hydra.core.transport.AckStrategy
-import hydra.core.transport.DeliveryStrategy.AtMostOnce
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecordBuilder
 import org.scalatest.{FunSpecLike, Matchers}
@@ -44,7 +42,7 @@ class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
       val avroSchema = new Schema.Parser().parse(Source.fromResource("schema.avsc").mkString)
       val genericRecord = new GenericRecordBuilder(avroSchema).set("name", "test").set("rank", 10).build()
 
-      record.get shouldBe AvroRecord("test-topic", avroSchema, None, genericRecord, AtMostOnce, AckStrategy.None)
+      record.get shouldBe AvroRecord("test-topic", avroSchema, None, genericRecord)
     }
 
     it("handles json") {

@@ -1,9 +1,10 @@
 package hydra.core.ingest
 
-import akka.actor.{ActorSystem, Props}
-import akka.testkit.{ImplicitSender, TestKit}
+import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import hydra.core.protocol.{IngestorCompleted, IngestorError}
 import hydra.core.test.TestRecordFactory
+import hydra.core.transport.AckStrategy.NoAck
 import hydra.core.transport._
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
@@ -17,9 +18,11 @@ class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers with F
 
   override def afterAll() = TestKit.shutdownActorSystem(system)
 
+  val supervisor = TestProbe()
+
   describe("TransportOps") {
     it("looks up a transport") {
-      val t = system.actorOf(Props[TestTransportIngestor])
+      val t = system.actorOf(Props(classOf[TestTransportIngestor], supervisor.ref))
       t ! "hello"
       expectMsg("hi!")
     }
@@ -34,22 +37,33 @@ class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers with F
     }
 
     it("transports a record") {
-      val req = HydraRequest(123, "test")
-      val t = system.actorOf(Props[TestTransportIngestor])
+      val req = HydraRequest(123, "test-produce")
+      val t = system.actorOf(Props(classOf[TestTransportIngestor], supervisor.ref))
       t ! req
-      expectMsg(IngestorCompleted)
+      supervisor.expectMsg(IngestorCompleted)
+    }
+
+    it("sends a produce error") {
+      val req = HydraRequest(123, "test-error-produce")
+      val t = system.actorOf(Props(classOf[TestTransportIngestor], supervisor.ref))
+      t ! req
+      supervisor.expectMsgPF() {
+        case IngestorError(c, err) =>
+          c shouldBe -2
+          err.getMessage shouldBe "test-error-produce"
+      }
     }
   }
 }
 
 
-class TestTransportIngestor extends Ingestor with TransportOps {
+class TestTransportIngestor(supervisor: ActorRef) extends Ingestor with TransportOps {
 
   override val recordFactory = TestRecordFactory
 
   ingest {
     case "hello" => sender ! "hi!"
-    case req: HydraRequest => sender ! transport(TestRecordFactory.build(req).get)
+    case req: HydraRequest => transport(TestRecordFactory.build(req).get, supervisor, NoAck)
   }
 
   override def transportName = "test-transport"

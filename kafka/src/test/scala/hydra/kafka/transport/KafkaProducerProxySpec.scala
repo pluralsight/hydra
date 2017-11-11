@@ -3,10 +3,11 @@ package hydra.kafka.transport
 import akka.actor.{ActorSystem, PoisonPill}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
-import hydra.core.protocol.{ProduceOnly, RecordNotProduced, RecordProduced}
+import hydra.core.protocol.{RecordNotProduced, RecordProduced}
+import hydra.core.transport.AckStrategy
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{JsonRecord, KafkaRecordMetadata, StringRecord}
-import hydra.kafka.transport.KafkaProducerProxy.ProducerInitializationError
+import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.clients.producer.RecordMetadata
 import org.apache.kafka.common.TopicPartition
@@ -32,6 +33,7 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
   implicit val ex = system.dispatcher
 
   override def beforeAll() = {
+    EmbeddedKafka.start()
     EmbeddedKafka.createCustomTopic("test_topic")
   }
 
@@ -42,9 +44,24 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
   }
 
   describe("When Producing messages") {
-    it("produces") {
-      kafkaActor ! ProduceOnly(StringRecord("test_topic", Some("key"), "payload"))
+    it("produces without acking") {
+      kafkaActor ! ProduceToKafka(0, StringRecord("test_topic", Some("key"), "payload"),
+        null, TestProbe().ref, AckStrategy.NoAck)
       parent.expectMsgType[RecordProduced](15.seconds)
+    }
+
+    it("acks") {
+      val record = StringRecord("test_topic", Some("key"), "payload")
+      val i = TestProbe()
+      val s = TestProbe()
+      kafkaActor ! ProduceToKafka(123, record, i.ref.path, s.ref, AckStrategy.TransportAck)
+      parent.expectMsgType[RecordProduced](15.seconds)
+      i.expectMsgPF() {
+        case RecordProduced(md: KafkaRecordMetadata, s) =>
+          md.topic shouldBe "test_topic"
+          md.deliveryId shouldBe 123
+          s shouldBe Some(s)
+      }
     }
 
     it("sends metadata back to the parent") {
@@ -61,8 +78,8 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
       val kafkaActor = parent.childActorOf(KafkaProducerProxy.props("string", kafkaProducerFormats("string")))
       val record = StringRecord("test_topic", Some("key"), "payload")
       val err = new IllegalArgumentException("ERROR")
-      kafkaActor ! RecordNotProduced(record, err)
-      parent.expectMsg(RecordNotProduced(record, err))
+      kafkaActor ! RecordNotProduced(111, record, err, null)
+      parent.expectMsg(RecordNotProduced(111, record, err, null))
       kafkaActor ! PoisonPill
     }
 
@@ -79,7 +96,8 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
         """.stripMargin)
       val probe = TestProbe()
       val act = probe.childActorOf(KafkaProducerProxy.props("json", cfg))
-      act ! ProduceOnly(JsonRecord("test_topic", Some("key"), """{"name":"alex"}"""))
+      act ! ProduceToKafka(0, JsonRecord("test_topic", Some("key"), """{"name":"alex"}"""),
+        probe.ref.path, probe.ref, AckStrategy.NoAck)
       probe.expectMsgPF(10.seconds) {
         case ProducerInitializationError("json", ex) => ex shouldBe a[ConfigException]
       }

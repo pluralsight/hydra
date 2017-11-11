@@ -20,9 +20,10 @@ class LoggingIngestor extends Ingestor {
     case Publish(request) =>
       sender ! (if (request.metadataValueEquals("logging-enabled", "true")) Join else Ignore)
 
-    case Ingest(record) =>
+    case Ingest(record, sup, ack) =>
       log.info(record.payload.toString)
       sender ! IngestorCompleted
   }
 }
+
 // $COVERAGE-ON

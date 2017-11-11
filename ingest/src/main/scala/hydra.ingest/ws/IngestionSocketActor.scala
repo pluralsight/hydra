@@ -8,9 +8,10 @@ import akka.actor.{Actor, ActorRef}
 import akka.http.scaladsl.model.StatusCodes
 import akka.util.Timeout
 import hydra.common.logging.LoggingAdapter
-import hydra.core.ingest.{HydraRequest, IngestionReport}
+import hydra.core.ingest
+import hydra.core.ingest.IngestionReport
 import hydra.core.protocol.HydraError
-import hydra.core.transport.{AckStrategy, DeliveryStrategy, ValidationStrategy}
+import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.ingest.bootstrap.HydraIngestorRegistry
 import hydra.ingest.services.IngestionSupervisor
 import hydra.ingest.ws.IngestionSocketActor._
@@ -89,16 +90,14 @@ case class SocketSession(metadata: Map[String, String] = Map.empty) {
 
   def buildRequest(correlationId: Option[Long], payload: String) = {
     import hydra.core.ingest.RequestParams._
-    val rs = metadata.find(_._1.equalsIgnoreCase(HYDRA_DELIVERY_STRATEGY))
-      .map(h => DeliveryStrategy(h._2)).getOrElse(DeliveryStrategy.AtMostOnce)
 
     val vs = metadata.find(_._1.equalsIgnoreCase(HYDRA_VALIDATION_STRATEGY))
       .map(h => ValidationStrategy(h._2)).getOrElse(ValidationStrategy.Strict)
 
     val as = metadata.find(_._1.equalsIgnoreCase(HYDRA_ACK_STRATEGY))
-      .map(h => AckStrategy(h._2)).getOrElse(AckStrategy.None)
+      .map(h => AckStrategy(h._2)).getOrElse(AckStrategy.NoAck)
 
-    HydraRequest(correlationId.getOrElse(0), payload, metadata, deliveryStrategy = rs,
+    ingest.HydraRequest(correlationId.getOrElse(0), payload, metadata,
       validationStrategy = vs, ackStrategy = as)
   }
 }

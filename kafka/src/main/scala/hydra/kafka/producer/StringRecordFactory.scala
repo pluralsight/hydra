@@ -26,7 +26,7 @@ import scala.util.Success
 object StringRecordFactory extends KafkaRecordFactory[String, String] {
 
   override def build(request: HydraRequest) =
-    Success(StringRecord(getTopic(request), getKey(request), request.payload, request.deliveryStrategy))
+    Success(StringRecord(getTopic(request), getKey(request), request.payload))
 
 }
 

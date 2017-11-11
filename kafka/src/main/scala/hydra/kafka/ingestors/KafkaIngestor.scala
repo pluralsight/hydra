@@ -43,7 +43,6 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
 
       sender ! validation
 
-    case Ingest(record) =>
-      sender ! transport(record)
+    case Ingest(record, supervisor, ackStrategy) => transport(record, supervisor, ackStrategy)
   }
 }
