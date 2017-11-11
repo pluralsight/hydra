@@ -4,7 +4,8 @@ import java.nio.file.Files
 
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
-import hydra.core.protocol.{Produce, ProduceOnly, RecordNotProduced, RecordProduced}
+import hydra.core.protocol
+import hydra.core.protocol.{Produce, RecordNotProduced, RecordProduced}
 import hydra.core.transport.AckStrategy
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.{Seconds, Span}
@@ -24,24 +25,26 @@ class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with 
 
   val transport = system.actorOf(FileTransport.props(files.mapValues(_.getAbsolutePath)))
 
+  val supervisor = TestProbe().ref
+
   describe("The FileTransport") {
     it("saves to a file") {
-      transport ! ProduceOnly(FileRecord("test", "test-payload"))
+      transport ! Produce(FileRecord("test", "test-payload"), supervisor, AckStrategy.NoAck)
       eventually(Source.fromFile(files("test")).getLines().toSeq should contain("test-payload"))
     }
 
     it("reports record not produced") {
-      val fr = FileRecord("???", "test-payload1").copy(ackStrategy = AckStrategy.Explicit)
+      val fr = FileRecord("???", "test-payload1")
       val ingestor = TestProbe()
       val supervisor = TestProbe()
-      transport ! Produce(fr, ingestor.ref, supervisor.ref)
+      transport ! protocol.Produce(fr, supervisor.ref, AckStrategy.TransportAck)
 
       eventually {
         ingestor.expectMsgPF(20.seconds) {
-          case RecordNotProduced(r, error, sup) =>
+          case RecordNotProduced(0, r, error, sup) =>
             r shouldBe fr
             error.getClass shouldBe classOf[IllegalArgumentException]
-            sup.get shouldBe supervisor.ref
+            sup shouldBe supervisor.ref
         }
       }
     }
@@ -49,11 +52,11 @@ class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with 
     it("saves to a file and acks the ingestor") {
       val ingestor = TestProbe()
       val supervisor = TestProbe()
-      val fr = FileRecord("test", "test-payload1").copy(ackStrategy = AckStrategy.Explicit)
-      transport ! Produce(fr, ingestor.ref, supervisor.ref)
+      val fr = FileRecord("test", "test-payload1")
+      transport ! Produce(fr, supervisor.ref, AckStrategy.TransportAck)
 
       ingestor.expectMsg(20.seconds, RecordProduced(FileRecordMetadata(files("test").getAbsolutePath,
-        0), Some(supervisor.ref)))
+        0), supervisor.ref))
 
       eventually(Source.fromFile(files("test")).getLines().toSeq should contain("test-payload1"))
     }

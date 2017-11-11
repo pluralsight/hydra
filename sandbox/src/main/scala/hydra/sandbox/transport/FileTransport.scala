@@ -9,6 +9,7 @@ import akka.stream.scaladsl.{FileIO, Flow, Sink, Source}
 import akka.util.ByteString
 import hydra.core.protocol._
 import hydra.core.transport.Transport
+import hydra.kafka.transport.KafkaTransport.ProduceOnly
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -33,18 +34,19 @@ class FileTransport(destinations: Map[String, String]) extends Transport {
   }
 
   transport {
-    case Produce(r: FileRecord, ingestor, supervisor, _) =>
+    case Produce(r: FileRecord, supervisor, ack) =>
       sinks.get(r.destination).map { flow =>
+        val ingestor = sender
         val f = flow.offer(r.payload)
         f.onComplete {
           case Success(_) =>
             //todo: look at the QueueOfferResult object
             val md = FileRecordMetadata(destinations(r.destination), 0)
-            ingestor ! RecordProduced(md, Some(supervisor))
-          case Failure(ex) => ingestor ! RecordNotProduced(r, ex, Some(supervisor))
+            ingestor ! RecordProduced(md, supervisor)
+          case Failure(ex) => ingestor ! RecordNotProduced(0, r, ex, supervisor)
         }
-      }.getOrElse(ingestor ! RecordNotProduced(r,
-        new IllegalArgumentException(s"File stream ${r.destination} not found."), Some(supervisor)))
+      }.getOrElse(sender ! RecordNotProduced(0, r,
+        new IllegalArgumentException(s"File stream ${r.destination} not found."), supervisor))
 
     case ProduceOnly(r: FileRecord) =>
       sinks.get(r.destination).map { flow =>

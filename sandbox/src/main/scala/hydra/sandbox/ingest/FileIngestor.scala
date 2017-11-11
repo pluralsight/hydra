@@ -19,8 +19,7 @@ class FileIngestor extends Ingestor with TransportOps {
     case Publish(request) =>
       sender ! (if (request.metadataValue("hydra-file-stream").isDefined) Join else Ignore)
 
-    case Ingest(r) =>
-      sender ! transport(r)
+    case Ingest(r, supervisor, ack) => transport(r, supervisor, ack)
   }
 
   override val recordFactory = FileRecordFactory

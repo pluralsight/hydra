@@ -5,6 +5,7 @@ import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import hydra.core.akka.InitializingActor.InitializationError
 import hydra.core.protocol._
 import hydra.core.test.TestRecord
+import hydra.core.transport.AckStrategy.NoAck
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.Future
@@ -34,25 +35,27 @@ class TransportSpec extends TestKit(ActorSystem("test")) with Matchers with FunS
       val ing = system.actorOf(Props(classOf[TransportTester]))
       val rec = TestRecord("test", Some("1"), "test")
       val supervisor = TestProbe()
-      ing ! Produce(rec, ing, supervisor.ref)
+      ing ! Produce(rec, supervisor.ref, NoAck)
       expectMsgPF() {
-        case RecordNotProduced(r, err, _) =>
+        case RecordNotProduced(deliveryId, r, err, sup) =>
+          deliveryId shouldBe -1 //this is coming from the base Transport class
           r shouldBe rec
           err shouldBe a[IllegalStateException]
+          sup shouldBe supervisor.ref
       }
 
-      val er = rec.copy(ackStrategy = AckStrategy.Explicit)
-      ing ! Produce(er, ing, supervisor.ref)
+      ing ! Produce(rec, supervisor.ref, AckStrategy.TransportAck)
       expectMsgPF() {
-        case RecordNotProduced(r, err, _) =>
-          r shouldBe er
+        case RecordNotProduced(deliveryId, r, err, _) =>
+          r shouldBe rec
+          deliveryId shouldBe -1 //coming from base transport class
           err shouldBe a[IllegalStateException]
       }
 
-      ing ! RecordProduced(null)
-      expectMsg(RecordProduced(null))
+      ing ! RecordProduced(null, supervisor.ref)
+      expectMsg(RecordProduced(null, supervisor.ref))
 
-      ing ! RecordNotProduced(null, new IllegalArgumentException)
+      ing ! RecordNotProduced(133, null, new IllegalArgumentException, null)
       expectMsgType[RecordNotProduced[_, _]]
     }
   }
@@ -63,6 +66,11 @@ class TransportTester extends Transport {
   transport {
     case "hello" => sender ! "hi!"
     case "error" => throw new RuntimeException("ERROR!")
+    case Produce(req, sup, ack) if (req.payload == "test-produce") =>
+      sender ! RecordProduced(SimpleRecordMetadata(0), sup)
+
+    case Produce(req, sup, ack) if (req.payload == "test-error-produce") =>
+      sender ! RecordNotProduced(-2, req, new IllegalArgumentException("test-error-produce"), sup)
   }
 }
 

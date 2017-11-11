@@ -8,3 +8,5 @@ trait RecordMetadata {
   def deliveryId: Long
 
 }
+
+case class SimpleRecordMetadata(deliveryId:Long) extends RecordMetadata

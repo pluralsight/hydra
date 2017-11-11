@@ -21,8 +21,6 @@ import com.pluralsight.hydra.avro.{InvalidDataTypeException, JsonConverter, Requ
 import hydra.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.core.ingest.RequestParams._
 import hydra.core.ingest.{HydraRequest, InvalidRequestException}
-import hydra.core.transport.AckStrategy
-import hydra.core.transport.DeliveryStrategy.AtMostOnce
 import org.apache.avro.Schema
 import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
 import org.scalatest.{FunSpecLike, Matchers}
@@ -133,7 +131,7 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
       val rec = AvroRecordFactory.build(r).get
       val avroSchema = new Schema.Parser().parse(Source.fromResource("schema.avsc").mkString)
       val genericRecord = new GenericRecordBuilder(avroSchema).set("name", "test").set("rank", 10).build()
-      val avroRecord = AvroRecord("test-topic", avroSchema, None, genericRecord, AtMostOnce, AckStrategy.None)
+      val avroRecord = AvroRecord("test-topic", avroSchema, None, genericRecord)
       rec shouldBe avroRecord
 
     }

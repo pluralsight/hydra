@@ -2,8 +2,8 @@ package hydra.kafka.transport
 
 import akka.actor.ActorSystem
 import com.typesafe.config.Config
-import hydra.core.protocol.ProduceOnly
 import hydra.kafka.producer.{JsonRecord, KafkaRecordMetadata}
+import hydra.kafka.transport.KafkaTransport.ProduceOnly
 
 trait KafkaMetrics {
   def saveMetrics(record: KafkaRecordMetadata): Unit

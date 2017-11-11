@@ -1,12 +1,12 @@
 package hydra.core.ingest
 
+import akka.actor.ActorRef
 import akka.util.Timeout
 import configs.syntax._
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.InitializingActor.{InitializationError, Initialized}
 import hydra.core.protocol._
-import hydra.core.transport.AckStrategy.Explicit
 import hydra.core.transport.{AckStrategy, HydraRecord}
 
 import scala.concurrent.Future
@@ -50,15 +50,7 @@ trait TransportOps extends ConfigSupport with LoggingAdapter {
       }
   }
 
-  def transport[K, V](record: HydraRecord[K, V]): IngestorStatus = {
-    record.ackStrategy match {
-      case AckStrategy.None =>
-        transportActorFuture.foreach(_ ! Produce(record, self, sender))
-        IngestorCompleted
-
-      case Explicit =>
-        transportActorFuture.foreach(_ ! Produce(record, self, sender))
-        WaitingForAck
-    }
+  def transport[K, V](record: HydraRecord[K, V], supervisor: ActorRef, ack: AckStrategy): Unit = {
+    transportActorFuture.foreach(_ ! Produce(record, supervisor, ack))
   }
 }

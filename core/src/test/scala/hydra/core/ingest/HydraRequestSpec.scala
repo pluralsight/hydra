@@ -1,6 +1,6 @@
 package hydra.core.ingest
 
-import hydra.core.transport.{AckStrategy, DeliveryStrategy, ValidationStrategy}
+import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import org.scalatest.{FunSpecLike, Matchers}
 
 /**
@@ -30,14 +30,6 @@ class HydraRequestSpec extends Matchers with FunSpecLike {
       hr.payload shouldBe "test"
     }
 
-    it("copies delivery strategy") {
-      val hr = HydraRequest(123, metadata = Map("test" -> "value"), payload = "test")
-        .withDeliveryStrategy(DeliveryStrategy.AtLeastOnce)
-      hr.correlationId shouldBe 123
-      hr.payload shouldBe "test"
-      hr.deliveryStrategy shouldBe DeliveryStrategy.AtLeastOnce
-    }
-
     it("copies validation strategy") {
       val hr = HydraRequest(123, metadata = Map("test" -> "value"), payload = "test")
         .withValidationStratetegy(ValidationStrategy.Relaxed)
@@ -48,10 +40,10 @@ class HydraRequestSpec extends Matchers with FunSpecLike {
 
     it("copies request strategy") {
       val hr = HydraRequest(123, metadata = Map("test" -> "value"), payload = "test")
-        .withAckStrategy(AckStrategy.Explicit)
+        .withAckStrategy(AckStrategy.TransportAck)
       hr.correlationId shouldBe 123
       hr.payload shouldBe "test"
-      hr.ackStrategy shouldBe AckStrategy.Explicit
+      hr.ackStrategy shouldBe AckStrategy.TransportAck
     }
 
     it("copies metadata") {

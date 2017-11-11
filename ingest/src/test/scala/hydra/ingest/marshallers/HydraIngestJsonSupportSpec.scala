@@ -34,8 +34,8 @@ class HydraIngestJsonSupportSpec extends Matchers with FunSpecLike with HydraIng
 
 
     it("converts IngestorError objects with no message") {
-      val st = IngestorError(new IllegalArgumentException("error")).asInstanceOf[IngestorStatus]
-      val stn = IngestorError(new IllegalArgumentException()).asInstanceOf[IngestorStatus]
+      val st = IngestorError(0, new IllegalArgumentException("error")).asInstanceOf[IngestorStatus]
+      val stn = IngestorError(0, new IllegalArgumentException()).asInstanceOf[IngestorStatus]
       st.toJson shouldBe """{"code":503,"message":"error"}""".parseJson
       stn.toJson shouldBe """{"code":503,"message":""}""".parseJson
     }
