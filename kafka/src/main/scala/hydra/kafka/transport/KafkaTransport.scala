@@ -24,7 +24,7 @@ import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol._
 import hydra.core.transport.AckStrategy.{LocalAck, NoAck, TransportAck}
-import hydra.core.transport.SimpleRecordMetadata
+import hydra.core.transport.HydraRecordMetadata
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata}
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
 import hydra.kafka.transport.KafkaTransport.{ProduceOnly, RecordProduceError}
@@ -52,18 +52,18 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
       case Some(producer) =>
         p.ack match {
           case NoAck =>
-
-            sender ! RecordProduced(SimpleRecordMetadata(0), p.supervisor)
+            sender ! RecordAccepted(p.supervisor)
+            producer ! ProduceToKafka(0, kr, None)
           case LocalAck =>
             val ingestor = sender
-            val kafkaMsg = ProduceToKafka(0, kr, sender.path, p.supervisor, p.ack)
-            persistAsync(kafkaMsg) { msg =>
-              ingestor ! RecordProduced(SimpleRecordMetadata(0), p.supervisor)
-              updateStore(msg) //saves it to the journal and sends to Kafka
+            persistAsync(p) { msg =>
+              val kafkaMsg = ProduceToKafka(msg.deliveryId, kr, None)
+              updateState(kafkaMsg) //saves it to the journal and sends to Kafka
+              ingestor ! RecordProduced(HydraRecordMetadata(p.deliveryId, System.currentTimeMillis), p.supervisor)
             }
           case TransportAck =>
             val ingestor = sender
-            producer ! ProduceToKafka(0, kr, ingestor.path, p.supervisor, p.ack)
+            producer ! ProduceToKafka(0, kr, Some(context.actorSelection(ingestor.path), p.supervisor))
         }
       case None =>
         sender ! RecordNotProduced(0, kr,
@@ -72,11 +72,12 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
     }
   }
 
+
   override def receiveCommand: Receive = {
-    case p@Produce(_: KafkaRecord[_, _], _, _) => produce(p)
+    case p@Produce(_: KafkaRecord[_, _], _, _, _) => produce(p)
 
     case ProduceOnly(kr: KafkaRecord[_, _]) =>
-      producers.get(kr.formatName).foreach(_ ! ProduceOnly(kr))
+      producers.get(kr.formatName).foreach(_ ! ProduceToKafka(0, kr, None))
 
     case kmd: KafkaRecordMetadata =>
       confirm(kmd)
@@ -87,8 +88,8 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
     case p: ProducerInitializationError => context.system.eventStream.publish(p)
   }
 
-  private def updateStore(evt: HydraMessage): Unit = evt match {
-    case p@ProduceToKafka(_, _, kr: KafkaRecord[_, _], _, _) =>
+  private def updateState(evt: HydraMessage): Unit = evt match {
+    case p@ProduceToKafka(_, kr, _) =>
       deliver(producers(kr.formatName).path)(deliveryId => p.copy(deliveryId = deliveryId))
 
     case kmd: KafkaRecordMetadata => confirm(kmd)
@@ -106,8 +107,8 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
     }
 
   override def receiveRecover: Receive = {
-    case p@Produce(_: KafkaRecord[_, _], _, _) => produce(p)
-    case msg: HydraMessage => updateStore(msg)
+    case p@Produce(_: KafkaRecord[_, _], _, _, _) => produce(p)
+    case msg: HydraMessage => updateState(msg)
   }
 
   override def preStart(): Unit = {

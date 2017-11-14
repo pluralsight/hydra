@@ -7,6 +7,8 @@ trait RecordMetadata {
 
   def deliveryId: Long
 
+  def timestamp: Long
+
 }
 
-case class SimpleRecordMetadata(deliveryId:Long) extends RecordMetadata
+case class HydraRecordMetadata(deliveryId: Long, timestamp: Long) extends RecordMetadata

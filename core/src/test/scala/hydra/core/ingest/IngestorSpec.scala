@@ -58,6 +58,7 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
       expectMsg(1.second) //testing that override with a val won't take effect until after the constructor ends
     }
 
+
     it("handle the base ingestion protocol") {
       val sup = TestProbe()
       val ing = system.actorOf(Props(classOf[TestIngestor], true, false))
@@ -73,6 +74,9 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
         case i: IngestorError =>
           i.error shouldBe a[IllegalArgumentException]
       }
+
+      ing ! RecordAccepted(sup.ref)
+      sup.expectMsg(IngestorCompleted)
     }
   }
 }
