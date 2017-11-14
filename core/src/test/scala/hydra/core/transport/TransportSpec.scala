@@ -66,10 +66,10 @@ class TransportTester extends Transport {
   transport {
     case "hello" => sender ! "hi!"
     case "error" => throw new RuntimeException("ERROR!")
-    case Produce(req, sup, ack) if (req.payload == "test-produce") =>
-      sender ! RecordProduced(SimpleRecordMetadata(0), sup)
+    case Produce(req, sup, ack, _) if (req.payload == "test-produce") =>
+      sender ! RecordProduced(HydraRecordMetadata(0, System.currentTimeMillis), sup)
 
-    case Produce(req, sup, ack) if (req.payload == "test-error-produce") =>
+    case Produce(req, sup, ack, _) if (req.payload == "test-error-produce") =>
       sender ! RecordNotProduced(-2, req, new IllegalArgumentException("test-error-produce"), sup)
   }
 }

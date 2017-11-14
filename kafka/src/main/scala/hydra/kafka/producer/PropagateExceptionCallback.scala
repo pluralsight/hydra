@@ -3,7 +3,6 @@ package hydra.kafka.producer
 import akka.actor.{ActorRef, ActorSelection}
 import hydra.core.protocol
 import hydra.core.protocol.RecordNotProduced
-import hydra.core.transport.AckStrategy
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
 import org.apache.kafka.clients.producer.{Callback, RecordMetadata}
 
@@ -13,11 +12,7 @@ import org.apache.kafka.clients.producer.{Callback, RecordMetadata}
 case class PropagateExceptionWithAckCallback(deliveryId: Long,
                                              record: KafkaRecord[_, _],
                                              producer: ActorSelection,
-                                             ingestor: ActorSelection,
-                                             supervisor: ActorRef,
-                                             ack: AckStrategy) extends Callback {
-
-  private lazy val shouldAck = ack == AckStrategy.TransportAck
+                                             ingestionActors: Option[(ActorSelection, ActorRef)]) extends Callback {
 
   override def onCompletion(metadata: RecordMetadata, e: Exception): Unit = {
     Option(e) match {
@@ -29,11 +24,11 @@ case class PropagateExceptionWithAckCallback(deliveryId: Long,
   private def doAck(md: RecordMetadata) = {
     val kmd = KafkaRecordMetadata(md, deliveryId)
     producer ! kmd
-    if (shouldAck) ingestor ! protocol.RecordProduced(kmd, supervisor)
+    ingestionActors.foreach(a => a._1 ! protocol.RecordProduced(kmd, a._2))
   }
 
   private def ackError(e: Exception) = {
     producer ! RecordProduceError(deliveryId, record, e)
-    if (shouldAck) ingestor ! RecordNotProduced(deliveryId, record, e, supervisor)
+    ingestionActors.foreach(a => a._1 ! RecordNotProduced(deliveryId, record, e, a._2))
   }
 }

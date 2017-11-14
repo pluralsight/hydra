@@ -12,4 +12,5 @@ case class FileRecord(destination: String, payload: String)
 }
 
 
-case class FileRecordMetadata(path: String, deliveryId: Long = 0L) extends RecordMetadata
+case class FileRecordMetadata(path: String, deliveryId: Long = 0L, timestamp: Long = System.currentTimeMillis)
+  extends RecordMetadata

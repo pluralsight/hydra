@@ -2,8 +2,8 @@ package hydra.kafka.transport
 
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
-import hydra.core.protocol.{Produce, RecordNotProduced, RecordProduced}
-import hydra.core.transport.AckStrategy
+import hydra.core.protocol.{Produce, RecordAccepted, RecordNotProduced, RecordProduced}
+import hydra.core.transport.{AckStrategy, HydraRecordMetadata}
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{JsonRecord, KafkaRecordMetadata, StringRecord}
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
@@ -29,6 +29,7 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers wit
   val supervisor = TestProbe()
 
   override def beforeAll() = {
+    EmbeddedKafka.start()
     EmbeddedKafka.createCustomTopic("transport_test")
   }
 
@@ -54,15 +55,37 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers wit
       }
     }
 
-    it("forwards to the right proxy") {
+    it("forwards to the right proxy with no ack") {
       val rec = StringRecord("transport_test", Some("key"), "payload")
-      kafkaSupervisor ! Produce(rec, supervisor.ref, AckStrategy.NoAck)
+      kafkaSupervisor.tell(Produce(rec, supervisor.ref, AckStrategy.NoAck), ingestor.ref)
+      ingestor.expectMsgPF(max = 10.seconds) {
+        case RecordAccepted(sup) =>
+          sup shouldBe supervisor.ref
+      }
+    }
+
+    it("forwards to the right proxy and replies with local ack") {
+      val rec = StringRecord("transport_test", Some("key"), "payload")
+      kafkaSupervisor.tell(Produce(rec, supervisor.ref, AckStrategy.LocalAck, 1234), ingestor.ref)
+      ingestor.expectMsgPF(max = 10.seconds) {
+        case RecordProduced(md, s) =>
+          s shouldBe supervisor.ref
+          md shouldBe a[HydraRecordMetadata]
+          val kmd = md.asInstanceOf[HydraRecordMetadata]
+          kmd.deliveryId shouldBe 1234
+          kmd.timestamp should be > 0L
+      }
+    }
+
+    it("forwards to the right proxy and replies with transport ack") {
+      val rec = StringRecord("transport_test", Some("key"), "payload")
+      kafkaSupervisor.tell(Produce(rec, supervisor.ref, AckStrategy.TransportAck), ingestor.ref)
       ingestor.expectMsgPF(max = 10.seconds) {
         case RecordProduced(md, s) =>
           s shouldBe supervisor.ref
           md shouldBe a[KafkaRecordMetadata]
           val kmd = md.asInstanceOf[KafkaRecordMetadata]
-          kmd.offset shouldBe 0
+          kmd.offset should be >= 0L
           kmd.topic shouldBe "transport_test"
       }
     }

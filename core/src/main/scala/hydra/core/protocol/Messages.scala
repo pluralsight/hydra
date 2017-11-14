@@ -32,7 +32,26 @@ case object Ignore extends HydraMessage
 
 case class InitiateRequest(request: HydraRequest) extends HydraMessage
 
-case class Produce[K, V](record: HydraRecord[K, V], supervisor: ActorRef, ack: AckStrategy) extends HydraMessage
+/**
+  *
+  * @param deliveryId The delivery id for this message;
+  *                   may be overwritten once processed by the underlying ack framework.
+  * @param record
+  * @param supervisor
+  * @param ack
+  * @tparam K
+  * @tparam V
+  */
+case class Produce[K, V](record: HydraRecord[K, V], supervisor: ActorRef, ack: AckStrategy,
+                         deliveryId: Long = -1) extends HydraMessage
+
+/**
+  * Signals the record was accepted by a transport for production, but it hasn't been necessarily saved yet.
+  * Used exclusively for NoAck replication pipelines.
+  *
+  * @param supervisor
+  */
+case class RecordAccepted(supervisor: ActorRef) extends HydraMessage
 
 /**
   * Signals that a record was successfully produced by Hydra.

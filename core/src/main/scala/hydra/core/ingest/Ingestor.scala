@@ -28,6 +28,9 @@ trait Ingestor extends InitializingActor {
     case RecordProduced(_, sup) =>
       sup ! IngestorCompleted
 
+    case RecordAccepted(sup) =>
+      sup ! IngestorCompleted
+
     case RecordNotProduced(deliveryId, _, error, supervisor) =>
       supervisor ! IngestorError(deliveryId, error)
   }

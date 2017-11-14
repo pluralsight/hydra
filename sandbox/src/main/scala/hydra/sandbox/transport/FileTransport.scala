@@ -33,7 +33,7 @@ class FileTransport(destinations: Map[String, String]) extends Transport {
   }
 
   transport {
-    case Produce(r: FileRecord, supervisor, ack) =>
+    case Produce(r: FileRecord, supervisor, ack, deliveryId) =>
       sinks.get(r.destination).map { flow =>
         val ingestor = sender
         val f = flow.offer(r.payload)
@@ -42,9 +42,9 @@ class FileTransport(destinations: Map[String, String]) extends Transport {
             //todo: look at the QueueOfferResult object
             val md = FileRecordMetadata(destinations(r.destination), 0)
             ingestor ! RecordProduced(md, supervisor)
-          case Failure(ex) => ingestor ! RecordNotProduced(0, r, ex, supervisor)
+          case Failure(ex) => ingestor ! RecordNotProduced(deliveryId, r, ex, supervisor)
         }
-      }.getOrElse(sender ! RecordNotProduced(0, r,
+      }.getOrElse(sender ! RecordNotProduced(deliveryId, r,
         new IllegalArgumentException(s"File stream ${r.destination} not found."), supervisor))
   }
 

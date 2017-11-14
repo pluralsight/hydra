@@ -22,7 +22,7 @@ case class TestRecord(destination: String,
                       payload: String) extends HydraRecord[String, String]
 
 
-case class TestRecordMetadata(deliveryId: Long) extends RecordMetadata
+case class TestRecordMetadata(deliveryId: Long, timestamp: Long = System.currentTimeMillis) extends RecordMetadata
 
 case class TimeoutRecord(destination: String,
                          key: Option[String],
