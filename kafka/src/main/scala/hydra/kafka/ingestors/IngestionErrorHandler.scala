@@ -8,9 +8,9 @@ import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.avro.resource.SchemaResourceLoader
 import hydra.common.config.ConfigSupport
 import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
-import hydra.core.protocol.{HydraIngestionError, Produce}
-import hydra.core.transport.AckStrategy.NoAck
+import hydra.core.protocol.HydraIngestionError
 import hydra.kafka.producer.AvroRecord
+import hydra.kafka.transport.KafkaTransport.ProduceOnly
 import spray.json.DefaultJsonProtocol
 
 /**
@@ -39,7 +39,7 @@ class IngestionErrorHandler extends Actor with ConfigSupport with DefaultJsonPro
 
 
   override def receive: Receive = {
-    case error: HydraIngestionError => kafkaTransport ! Produce(buildPayload(error), self, NoAck)
+    case error: HydraIngestionError => kafkaTransport ! ProduceOnly(buildPayload(error))
   }
 
   private[ingestors] def buildPayload(err: HydraIngestionError): AvroRecord = {

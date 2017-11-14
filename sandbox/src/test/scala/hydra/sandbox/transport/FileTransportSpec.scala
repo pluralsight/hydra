@@ -4,7 +4,6 @@ import java.nio.file.Files
 
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
-import hydra.core.protocol
 import hydra.core.protocol.{Produce, RecordNotProduced, RecordProduced}
 import hydra.core.transport.AckStrategy
 import org.scalatest.concurrent.Eventually
@@ -37,7 +36,7 @@ class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with 
       val fr = FileRecord("???", "test-payload1")
       val ingestor = TestProbe()
       val supervisor = TestProbe()
-      transport ! protocol.Produce(fr, supervisor.ref, AckStrategy.TransportAck)
+      transport.tell(Produce(fr, supervisor.ref, AckStrategy.TransportAck), ingestor.ref)
 
       eventually {
         ingestor.expectMsgPF(20.seconds) {
@@ -53,7 +52,7 @@ class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with 
       val ingestor = TestProbe()
       val supervisor = TestProbe()
       val fr = FileRecord("test", "test-payload1")
-      transport ! Produce(fr, supervisor.ref, AckStrategy.TransportAck)
+      transport.tell(Produce(fr, supervisor.ref, AckStrategy.TransportAck), ingestor.ref)
 
       ingestor.expectMsg(20.seconds, RecordProduced(FileRecordMetadata(files("test").getAbsolutePath,
         0), supervisor.ref))

@@ -68,9 +68,7 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
       val kafkaActor = parent.childActorOf(KafkaProducerProxy.props("string", kafkaProducerFormats("string")))
       val kmd = KafkaRecordMetadata(recordMetadata, 0)
       kafkaActor ! kmd
-      parent.expectMsgPF() {
-        case RecordProduced(k, _) => k shouldBe kmd
-      }
+      parent.expectMsg(kmd)
       kafkaActor ! PoisonPill
     }
 
