@@ -19,6 +19,7 @@ import akka.actor.{ActorSelection, ActorSystem}
 import akka.testkit.{TestKit, TestProbe}
 import hydra.core.protocol.{RecordNotProduced, RecordProduced}
 import hydra.core.transport.AckStrategy
+import hydra.kafka.transport.KafkaTransport.RecordProduceError
 import org.apache.kafka.clients.producer.RecordMetadata
 import org.apache.kafka.common.TopicPartition
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
@@ -58,7 +59,7 @@ class PropagateExceptionCallbackSpec extends TestKit(ActorSystem("hydra")) with 
       val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1L: java.lang.Long, 1, 1)
       val err = new IllegalArgumentException("test")
       e.onCompletion(md, err)
-      probe.expectMsg(RecordNotProduced(0, record, err, supervisor.ref))
+      probe.expectMsg(RecordProduceError(112, record, err))
     }
 
     it("sends the completion to the actor selection and acks the ingestor") {
@@ -84,7 +85,12 @@ class PropagateExceptionCallbackSpec extends TestKit(ActorSystem("hydra")) with 
       val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1L: java.lang.Long, 1, 1)
       val err = new IllegalArgumentException("test")
       e.onCompletion(md, err)
-      probe.expectMsg(RecordNotProduced(0, record, err, supervisor.ref))
+      probe.expectMsgPF() {
+        case RecordProduceError(112, r, e) =>
+          r shouldBe record
+          e.getMessage shouldBe "test"
+          e shouldBe a[IllegalArgumentException]
+      }
       ingestor.expectMsgPF() {
         case RecordNotProduced(d, r, ex, s) =>
           r shouldBe record
