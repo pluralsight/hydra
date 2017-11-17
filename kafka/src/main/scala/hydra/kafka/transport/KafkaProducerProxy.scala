@@ -2,16 +2,17 @@ package hydra.kafka.transport
 
 import java.util.concurrent.TimeUnit
 
-import akka.actor.{Actor, ActorRef, ActorSelection, Props, Stash}
+import akka.actor.{Actor, Props, Stash}
 import akka.kafka.ProducerSettings
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol._
+import hydra.core.transport.Transport
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata, PropagateExceptionWithAckCallback}
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
-import hydra.kafka.transport.KafkaTransport.{ProduceOnly, RecordProduceError}
+import hydra.kafka.transport.KafkaTransport.RecordProduceError
 import org.apache.kafka.clients.producer.{Callback, KafkaProducer}
 
 import scala.util.{Failure, Success, Try}
@@ -35,16 +36,14 @@ class KafkaProducerProxy(format: String, producerConfig: Config)
   }
 
   private def producing: Receive = {
-    case ProduceToKafka(deliveryId, kr: KafkaRecord[Any, Any], actors) =>
-      val cb = new PropagateExceptionWithAckCallback(deliveryId, kr, selfSel, actors)
+    case ProduceToKafka(deliveryId, kr: KafkaRecord[Any, Any], ackCallback) =>
+      val cb = new PropagateExceptionWithAckCallback(deliveryId, kr, selfSel, ackCallback)
       produce(kr, cb)
-
-    case ProduceOnly(kr: KafkaRecord[Any, Any]) => producer.send(kr)
 
     case kmd: KafkaRecordMetadata =>
       context.parent ! kmd
 
-    case err: RecordNotProduced[_, _] =>
+    case err: RecordProduceError =>
       context.parent ! err
   }
 
@@ -56,9 +55,9 @@ class KafkaProducerProxy(format: String, producerConfig: Config)
   }
 
   private def notInitialized(err: Throwable): Receive = {
-    case ProduceToKafka(deliveryId, kr, actors) =>
+    case ProduceToKafka(deliveryId, kr, callback) =>
       context.parent ! RecordProduceError(deliveryId, kr, err)
-      actors.map(a => a._1 ! RecordNotProduced(deliveryId, kr, err, a._2))
+      callback(None, Some(err))
 
     case _ =>
       context.parent ! ProducerInitializationError(format, err)
@@ -102,15 +101,8 @@ class KafkaProducerProxy(format: String, producerConfig: Config)
 
 object KafkaProducerProxy extends KafkaConfigSupport {
 
-  /**
-    *
-    * @param deliveryId
-    * @param kr
-    * @param ingestionActors A tuple where the first element is the ingestion actor's path and the second element is
-    *                        the supervisor ref.
-    */
-  case class ProduceToKafka(deliveryId: Long, kr: KafkaRecord[_, _], ingestionActors: Option[(ActorSelection, ActorRef)])
-    extends HydraMessage
+  case class ProduceToKafka(deliveryId: Long, kr: KafkaRecord[_, _],
+                            ackCallback: Transport.AckCallback) extends HydraMessage
 
   case class ProducerInitializationError(format: String, ex: Throwable)
 

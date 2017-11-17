@@ -1,11 +1,11 @@
 package hydra.core.ingest
 
 import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.testkit.TestActors.ForwardActor
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
-import hydra.core.protocol.{IngestorCompleted, IngestorError}
+import hydra.core.protocol.{IngestorError, Produce}
 import hydra.core.test.TestRecordFactory
 import hydra.core.transport.AckStrategy.NoAck
-import hydra.core.transport._
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 /**
@@ -14,11 +14,14 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike
   with BeforeAndAfterAll with ImplicitSender {
 
-  val transportAct = system.actorOf(Props[TransportTester], "test-transport_transport")
-
   override def afterAll() = TestKit.shutdownActorSystem(system)
 
   val supervisor = TestProbe()
+
+  val tm = TestProbe()
+
+  val transport = system.actorOf(Props(new ForwardActor(tm.ref)), "test-transport")
+
 
   describe("TransportOps") {
     it("looks up a transport") {
@@ -40,18 +43,7 @@ class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers with F
       val req = HydraRequest(123, "test-produce")
       val t = system.actorOf(Props(classOf[TestTransportIngestor], supervisor.ref))
       t ! req
-      supervisor.expectMsg(IngestorCompleted)
-    }
-
-    it("sends a produce error") {
-      val req = HydraRequest(123, "test-error-produce")
-      val t = system.actorOf(Props(classOf[TestTransportIngestor], supervisor.ref))
-      t ! req
-      supervisor.expectMsgPF() {
-        case IngestorError(c, err) =>
-          c shouldBe -2
-          err.getMessage shouldBe "test-error-produce"
-      }
+      tm.expectMsg(Produce(TestRecordFactory.build(req).get, supervisor.ref, NoAck))
     }
   }
 }

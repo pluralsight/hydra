@@ -18,8 +18,8 @@ class IngestorStatusSpec extends Matchers with FlatSpecLike {
     RequestPublished.completed shouldBe false
     InvalidRequest(ex).statusCode.intValue shouldBe 400
     InvalidRequest(ex).completed shouldBe true
-    IngestorError(0, ex).statusCode.intValue shouldBe 503
-    IngestorError(0, ex).completed shouldBe true
+    IngestorError(ex).statusCode.intValue shouldBe 503
+    IngestorError(ex).completed shouldBe true
     IngestorCompleted.statusCode.intValue shouldBe 200
     IngestorCompleted.completed shouldBe true
     IngestorCompleted.message shouldBe StatusCodes.OK.reason

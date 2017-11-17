@@ -31,8 +31,8 @@ trait Ingestor extends InitializingActor {
     case RecordAccepted(sup) =>
       sup ! IngestorCompleted
 
-    case RecordNotProduced(deliveryId, _, error, supervisor) =>
-      supervisor ! IngestorError(deliveryId, error)
+    case RecordNotProduced(_, error, supervisor) =>
+      supervisor ! IngestorError(error)
   }
 
   def validate(request: HydraRequest): MessageValidationResult = {
@@ -42,10 +42,10 @@ trait Ingestor extends InitializingActor {
 
   override def initializationError(ex: Throwable): Receive = {
     case Publish(req) =>
-      sender ! IngestorError(-1, ex)
+      sender ! IngestorError(ex)
       ingestionError(HydraIngestionError(thisActorName, ex, req))
     case _ =>
-      sender ! IngestorError(-1, ex)
+      sender ! IngestorError(ex)
   }
 
   def ingest(next: Actor.Receive) = compose(next)

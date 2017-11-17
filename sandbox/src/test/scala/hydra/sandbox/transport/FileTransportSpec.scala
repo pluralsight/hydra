@@ -40,7 +40,7 @@ class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with 
 
       eventually {
         ingestor.expectMsgPF(20.seconds) {
-          case RecordNotProduced(0, r, error, sup) =>
+          case RecordNotProduced(r, error, sup) =>
             r shouldBe fr
             error.getClass shouldBe classOf[IllegalArgumentException]
             sup shouldBe supervisor.ref

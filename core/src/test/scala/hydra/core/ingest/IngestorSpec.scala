@@ -69,7 +69,7 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
       expectMsg(ValidRequest(TestRecord("test-topic", Some("1"), "test")))
       ing ! RecordProduced(TestRecordMetadata(0), self)
       expectMsg(IngestorCompleted)
-      ing ! RecordNotProduced(0, TestRecord("test-topic", Some("1"), "test"), new IllegalArgumentException, sup.ref)
+      ing ! RecordNotProduced(TestRecord("test-topic", Some("1"), "test"), new IllegalArgumentException, sup.ref)
       sup.expectMsgPF() {
         case i: IngestorError =>
           i.error shouldBe a[IllegalArgumentException]
