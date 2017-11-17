@@ -34,16 +34,13 @@ case class InitiateRequest(request: HydraRequest) extends HydraMessage
 
 /**
   *
-  * @param deliveryId The delivery id for this message;
-  *                   may be overwritten once processed by the underlying ack framework.
   * @param record
   * @param supervisor
   * @param ack
   * @tparam K
   * @tparam V
   */
-case class Produce[K, V](record: HydraRecord[K, V], supervisor: ActorRef, ack: AckStrategy,
-                         deliveryId: Long = -1) extends HydraMessage
+case class Produce[K, V](record: HydraRecord[K, V], supervisor: ActorRef, ack: AckStrategy) extends HydraMessage
 
 /**
   * Signals the record was accepted by a transport for production, but it hasn't been necessarily saved yet.
@@ -69,7 +66,7 @@ case class RecordAccepted(supervisor: ActorRef) extends HydraMessage
   */
 case class RecordProduced(md: RecordMetadata, supervisor: ActorRef) extends HydraMessage
 
-case class RecordNotProduced[K, V](deliveryId: Long, record: HydraRecord[K, V], error: Throwable,
+case class RecordNotProduced[K, V](record: HydraRecord[K, V], error: Throwable,
                                    supervisor: ActorRef) extends HydraMessage
 
 //case class ProducerAck(supervisor: ActorRef, error: Option[Throwable])
@@ -105,7 +102,7 @@ case object RequestPublished extends IngestorStatus {
   val statusCode = StatusCodes.Created
 }
 
-case class IngestorError(deliveryId: Long, error: Throwable) extends IngestorStatus with HydraError {
+case class IngestorError(error: Throwable) extends IngestorStatus with HydraError {
   override val completed = true
   override val message = Option(error.getMessage).getOrElse("")
   val statusCode = StatusCodes.ServiceUnavailable

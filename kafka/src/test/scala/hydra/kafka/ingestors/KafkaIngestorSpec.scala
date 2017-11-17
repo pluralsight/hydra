@@ -1,6 +1,7 @@
 package hydra.kafka.ingestors
 
 import akka.actor.{ActorSystem, Props}
+import akka.testkit.TestActors.ForwardActor
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.fasterxml.jackson.databind.ObjectMapper
 import hydra.avro.registry.ConfluentSchemaRegistry
@@ -9,9 +10,9 @@ import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams._
 import hydra.core.protocol._
 import hydra.core.transport.AckStrategy.NoAck
+import hydra.kafka.producer
 import hydra.kafka.producer.{AvroRecord, AvroRecordFactory, JsonRecord}
 import hydra.kafka.test.TestRecordFactory
-import hydra.kafka.{ForwardActor, producer}
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Parser
 import org.apache.avro.generic.GenericRecordBuilder

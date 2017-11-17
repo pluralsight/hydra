@@ -42,7 +42,7 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
     def getPublishMsg(req: HydraRequest) = {
       val ignore = req.metadataValueEquals("ignore", "true")
       val error = req.metadataValueEquals("error", "true")
-      if (ignore) Ignore else if (error) IngestorError(0, except) else Join
+      if (ignore) Ignore else if (error) IngestorError(except) else Join
     }
 
     ingestor = TestProbe("ingestor")
@@ -187,7 +187,7 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
       parent.expectMsgPF() {
         case i: IngestionReport =>
           i.statusCode shouldBe 503
-          i.ingestors shouldBe Map(ActorUtils.actorName(ingestor.ref) -> IngestorError(0, except))
+          i.ingestors shouldBe Map(ActorUtils.actorName(ingestor.ref) -> IngestorError(except))
       }
     }
   }

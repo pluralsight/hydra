@@ -3,12 +3,11 @@ package hydra.sandbox.transport
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption.{APPEND, CREATE}
 
-import akka.actor.Props
+import akka.actor.{Actor, Props}
 import akka.stream._
 import akka.stream.scaladsl.{FileIO, Flow, Sink, Source}
 import akka.util.ByteString
 import hydra.core.protocol._
-import hydra.core.transport.Transport
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -16,7 +15,7 @@ import scala.util.{Failure, Success}
 /**
   * Created by alexsilva on 3/29/17.
   */
-class FileTransport(destinations: Map[String, String]) extends Transport {
+class FileTransport(destinations: Map[String, String]) extends Actor {
 
   implicit val materializer = ActorMaterializer()
 
@@ -32,8 +31,8 @@ class FileTransport(destinations: Map[String, String]) extends Transport {
     sharedKillSwitch.shutdown()
   }
 
-  transport {
-    case Produce(r: FileRecord, supervisor, ack, deliveryId) =>
+  override def receive: Receive = {
+    case Produce(r: FileRecord, supervisor, ack) =>
       sinks.get(r.destination).map { flow =>
         val ingestor = sender
         val f = flow.offer(r.payload)
@@ -42,9 +41,9 @@ class FileTransport(destinations: Map[String, String]) extends Transport {
             //todo: look at the QueueOfferResult object
             val md = FileRecordMetadata(destinations(r.destination), 0)
             ingestor ! RecordProduced(md, supervisor)
-          case Failure(ex) => ingestor ! RecordNotProduced(deliveryId, r, ex, supervisor)
+          case Failure(ex) => ingestor ! RecordNotProduced(r, ex, supervisor)
         }
-      }.getOrElse(sender ! RecordNotProduced(deliveryId, r,
+      }.getOrElse(sender ! RecordNotProduced(r,
         new IllegalArgumentException(s"File stream ${r.destination} not found."), supervisor))
   }
 
