@@ -20,26 +20,29 @@ import akka.testkit.{ImplicitSender, TestKit}
 import hydra.kafka.consumer.KafkaConsumerProxy._
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.common.TopicPartition
-import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
 /**
   * Created by alexsilva on 9/7/16.
   */
-@DoNotDiscover
 class KafkaConsumerProxySpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike
   with BeforeAndAfterAll with ImplicitSender {
 
-  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
+  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
+    customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
 
   override def beforeAll() = {
     super.beforeAll()
-    EmbeddedKafka.createCustomTopic("test-consumer2")
+    EmbeddedKafka.start()
     EmbeddedKafka.createCustomTopic("test-consumer1")
+    EmbeddedKafka.createCustomTopic("test-consumer2")
   }
 
   override def afterAll() = {
+    super.afterAll()
+    EmbeddedKafka.stop()
     TestKit.shutdownActorSystem(system)
   }
 
@@ -73,7 +76,7 @@ class KafkaConsumerProxySpec extends TestKit(ActorSystem("test")) with Matchers 
       expectMsgPF(10.seconds) {
         case PartitionInfoResponse(topic, response) =>
           response(0).leader().idString shouldBe "0"
-          topic shouldBe "test-consumer-unknown"
+          topic should startWith("test-consumer-unknown")
       }
     }
   }

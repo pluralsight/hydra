@@ -20,17 +20,19 @@ class KafkaHealthCheckActor(bootstrapServers: String, healthCheckTopic: String, 
 
   override val name = s"Kafka [$bootstrapServers]"
 
+  //TODO: all these intervals should be configurable based on the interval above
   private val producerConfig = Map[String, AnyRef](
     "metadata.fetch.timeout.ms" -> "10000",
+    "max.block.ms" -> "10000",
     "bootstrap.servers" -> bootstrapServers,
     "client.id" -> "hydra.health.check",
+    "retries" -> "0",
     "key.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
     "value.serializer" -> "org.apache.kafka.common.serialization.StringSerializer")
 
-  private lazy val producer = new KafkaProducer[String, String](producerConfig.asJava)
+  private val producer = new KafkaProducer[String, String](producerConfig.asJava)
 
-  override def postStop(): Unit = producer.close()
-
+  override def postStop(): Unit = producer.close(5, TimeUnit.SECONDS)
 
   override def checkHealth(): Future[HealthInfo] = {
     val time = System.currentTimeMillis().toString
@@ -44,6 +46,7 @@ class KafkaHealthCheckActor(bootstrapServers: String, healthCheckTopic: String, 
         case e: Exception => critical(e)
       }
     }
+
   }
 
   private def critical(e: Throwable): HealthInfo =

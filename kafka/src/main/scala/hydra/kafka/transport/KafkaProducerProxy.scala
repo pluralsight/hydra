@@ -90,7 +90,7 @@ class KafkaProducerProxy(format: String, producerConfig: Config)
     Try {
       if (producer != null) {
         producer.flush()
-        producer.close(10000, TimeUnit.MILLISECONDS)
+        producer.close(5000, TimeUnit.MILLISECONDS)
       }
     }
   }

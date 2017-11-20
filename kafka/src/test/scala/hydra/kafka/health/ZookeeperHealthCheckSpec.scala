@@ -5,18 +5,23 @@ import akka.testkit.{TestActorRef, TestKit}
 import com.github.vonnagy.service.container.health.HealthState
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
-@DoNotDiscover
 class ZookeeperHealthCheckSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike
   with BeforeAndAfterAll with ScalaFutures {
-  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
+  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
+    customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
 
   override def afterAll() = {
     super.afterAll()
+    EmbeddedKafka.stop()
     TestKit.shutdownActorSystem(system)
+  }
+
+  override def beforeAll()={
+    EmbeddedKafka.start()
   }
 
   describe("the ZK health check") {

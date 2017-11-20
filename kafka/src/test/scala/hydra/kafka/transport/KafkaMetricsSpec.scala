@@ -11,7 +11,6 @@ import spray.json.DefaultJsonProtocol
 /**
   * Created by alexsilva on 12/5/16.
   */
-@DoNotDiscover
 class KafkaMetricsSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike
   with BeforeAndAfterAll with DefaultJsonProtocol {
 
@@ -21,11 +20,14 @@ class KafkaMetricsSpec extends TestKit(ActorSystem("hydra")) with Matchers with 
     customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
 
   override def afterAll() = {
+    EmbeddedKafka.stop()
+    super.afterAll()
     TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
   }
 
   override def beforeAll() = {
     super.beforeAll()
+    EmbeddedKafka.start()
     EmbeddedKafka.createCustomTopic("metrics_topic")
   }
 

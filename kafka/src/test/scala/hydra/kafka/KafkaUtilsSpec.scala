@@ -9,14 +9,21 @@ import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, Matchers, WordSpec}
 /**
   * Created by alexsilva on 5/17/17.
   */
-@DoNotDiscover
 class KafkaUtilsSpec extends WordSpec with BeforeAndAfterAll with Matchers with Eventually {
 
-  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
+  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
+    customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
 
   override def beforeAll() = {
     super.beforeAll()
+    EmbeddedKafka.start()
     EmbeddedKafka.createCustomTopic("test-kafka-utils")
+  }
+
+  override def afterAll() = {
+    super.afterAll()
+    EmbeddedKafka.stop()
+    KafkaUtils.zkUtils.foreach(_.close())
   }
 
   "Kafka Utils" should {
@@ -61,9 +68,5 @@ class KafkaUtilsSpec extends WordSpec with BeforeAndAfterAll with Matchers with 
 
       d.properties shouldBe props
     }
-  }
-
-  override def afterAll() = {
-    KafkaUtils.zkUtils.foreach(_.close())
   }
 }
