@@ -30,6 +30,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
   val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
   val registryClient = schemaRegistry.registryClient
   val probe = TestProbe()
+  val supervisor = TestProbe()
 
   val kafkaProducer = system.actorOf(Props(new ForwardActor(probe.ref)), "kafka_producer")
 
@@ -81,8 +82,8 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
         """{"first":"Roar","last":"King"}""",
         Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema")
       )
-      transport ! Ingest(TestRecordFactory.build(request).get, self, NoAck)
-      expectMsg(IngestorCompleted)
+      transport ! Ingest(TestRecordFactory.build(request).get, supervisor.ref, NoAck)
+      probe.expectMsg(Produce(TestRecordFactory.build(request).get, supervisor.ref, NoAck))
     }
   }
 

@@ -27,7 +27,7 @@ lazy val defaultSettings = Seq(
   resolvers += "Confluent Maven Repo" at "http://packages.confluent.io/maven/",
   resolvers += "jitpack" at "https://jitpack.io",
   coverageExcludedPackages := "hydra\\.ingest\\.HydraIngestApp.*",
-  ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet,
+  ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet
 )
 
 lazy val restartSettings = Seq(

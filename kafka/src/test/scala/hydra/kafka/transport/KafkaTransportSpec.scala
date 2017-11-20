@@ -11,14 +11,13 @@ import hydra.kafka.transport.KafkaProducerProxy.ProducerInitializationError
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.common.errors.TimeoutException
-import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
 /**
   * Created by alexsilva on 12/5/16.
   */
-@DoNotDiscover
 class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike with ImplicitSender
   with BeforeAndAfterAll with KafkaConfigSupport {
 
@@ -36,10 +35,14 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers wit
   system.eventStream.subscribe(streamActor.ref, classOf[ProducerInitializationError])
 
   override def beforeAll() = {
+    super.beforeAll()
+    EmbeddedKafka.start()
     EmbeddedKafka.createCustomTopic("transport_test")
   }
 
   override def afterAll() = {
+    super.afterAll()
+    EmbeddedKafka.stop()
     system.stop(kafkaSupervisor)
     TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
   }
