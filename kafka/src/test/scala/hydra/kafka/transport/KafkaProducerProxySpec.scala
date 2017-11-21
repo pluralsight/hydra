@@ -88,8 +88,6 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
     }
 
     it("acks the produce error") {
-      val cfg = ConfigFactory.parseString("request.timeout.ms=100").withFallback(kafkaProducerFormats("string"))
-      val producer = parent.childActorOf(KafkaProducerProxy.props("ack-error", cfg))
       val record = StringRecord("unknown", Some("key"), "test-error-payload")
       kafkaProducer ! ProduceToKafka(123, record, callback(record))
       parent.expectMsgPF(15.seconds) {
@@ -105,7 +103,6 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
           r shouldBe record
           sup shouldBe supervisor.ref
       }
-      system.stop(producer)
     }
 
     it("sends metadata back to the parent") {
