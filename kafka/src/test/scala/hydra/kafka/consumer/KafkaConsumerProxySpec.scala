@@ -30,8 +30,7 @@ import scala.concurrent.duration._
 class KafkaConsumerProxySpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike
   with BeforeAndAfterAll with ImplicitSender {
 
-  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
-    customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
+  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
 
   override def beforeAll() = {
     super.beforeAll()
@@ -42,11 +41,11 @@ class KafkaConsumerProxySpec extends TestKit(ActorSystem("test")) with Matchers 
 
   override def afterAll() = {
     super.afterAll()
-    EmbeddedKafka.stop()
     TestKit.shutdownActorSystem(system)
+    EmbeddedKafka.stop()
   }
 
-  val kafkaProxy = system.actorOf(Props[KafkaConsumerProxy])
+  lazy val kafkaProxy = system.actorOf(Props[KafkaConsumerProxy])
 
   describe("When using KafkaConsumerProxy") {
     it("gets latest offsets for a topic") {
