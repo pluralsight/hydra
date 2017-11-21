@@ -3,7 +3,7 @@ package hydra.kafka
 import hydra.kafka.util.KafkaUtils
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, Matchers, WordSpec}
+import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
 
 
 /**
@@ -11,8 +11,7 @@ import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, Matchers, WordSpec}
   */
 class KafkaUtilsSpec extends WordSpec with BeforeAndAfterAll with Matchers with Eventually {
 
-  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
-    customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
+  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
 
   override def beforeAll() = {
     super.beforeAll()
@@ -46,7 +45,7 @@ class KafkaUtilsSpec extends WordSpec with BeforeAndAfterAll with Matchers with 
         "bootstrap.servers" -> "localhost:8092",
         "enable.auto.commit" -> "false",
         "value.deserializer" -> "io.confluent.kafka.serializers.KafkaAvroDeserializer",
-        "zookeeper.connect" -> "localhost:3181", "client.id" -> "hydra.avro", "metadata.fetch.timeout.ms" -> "10000",
+        "zookeeper.connect" -> "localhost:3181", "client.id" -> "hydra.avro", "metadata.fetch.timeout.ms" -> "100000",
         "value.serializer" -> "io.confluent.kafka.serializers.KafkaAvroSerializer",
         "key.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
         "schema.registry.url" -> "mock")
@@ -61,7 +60,7 @@ class KafkaUtilsSpec extends WordSpec with BeforeAndAfterAll with Matchers with 
         "bootstrap.servers" -> "localhost:8092",
         "enable.auto.commit" -> "false",
         "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
-        "zookeeper.connect" -> "localhost:3181", "client.id" -> "hydra.string", "metadata.fetch.timeout.ms" -> "10000",
+        "zookeeper.connect" -> "localhost:3181", "client.id" -> "hydra.string", "metadata.fetch.timeout.ms" -> "100000",
         "value.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
         "key.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
         "schema.registry.url" -> "mock")
@@ -70,3 +69,4 @@ class KafkaUtilsSpec extends WordSpec with BeforeAndAfterAll with Matchers with 
     }
   }
 }
+

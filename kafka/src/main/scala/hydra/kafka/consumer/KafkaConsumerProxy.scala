@@ -21,7 +21,6 @@ class KafkaConsumerProxy extends Actor with KafkaConfigSupport {
 
   override def preStart(): Unit = {
     _defaultConsumer = defaultSettings.createKafkaConsumer()
-    println("tita"+_defaultConsumer.listTopics())
   }
 
   override def receive: Receive = {
@@ -44,7 +43,6 @@ class KafkaConsumerProxy extends Actor with KafkaConfigSupport {
 
   private def latestOffsets(topic: String): Future[Map[TopicPartition, Long]] = {
     Future {
-      println(_defaultConsumer.listTopics())
       val ts = _defaultConsumer.partitionsFor(topic).asScala.map(pi => new TopicPartition(topic, pi.partition()))
       _defaultConsumer.endOffsets(ts.asJava).asScala.map(tp => tp._1 -> tp._2.toLong).toMap
     }
