@@ -21,8 +21,8 @@ class KafkaUtilsSpec extends WordSpec with BeforeAndAfterAll with Matchers with 
 
   override def afterAll() = {
     super.afterAll()
-    EmbeddedKafka.stop()
     KafkaUtils.zkUtils.foreach(_.close())
+    EmbeddedKafka.stop()
   }
 
   "Kafka Utils" should {
