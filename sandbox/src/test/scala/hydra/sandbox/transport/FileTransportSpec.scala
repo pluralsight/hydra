@@ -54,8 +54,12 @@ class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with 
       val fr = FileRecord("test", "test-payload1")
       transport.tell(Produce(fr, supervisor.ref, AckStrategy.TransportAck), ingestor.ref)
 
-      ingestor.expectMsg(20.seconds, RecordProduced(FileRecordMetadata(files("test").getAbsolutePath,
-        0), supervisor.ref))
+      ingestor.expectMsgPF(20.seconds) { case RecordProduced(fmd, sup) =>
+        fmd shouldBe a[FileRecordMetadata]
+        fmd.asInstanceOf[FileRecordMetadata].path shouldBe files("test").getAbsolutePath
+        fmd.deliveryId shouldBe 0
+        sup shouldBe supervisor.ref
+      }
 
       eventually(Source.fromFile(files("test")).getLines().toSeq should contain("test-payload1"))
     }

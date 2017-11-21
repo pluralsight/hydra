@@ -1,6 +1,6 @@
 package hydra.kafka.transport
 
-import akka.actor.{ActorSystem, PoisonPill}
+import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import hydra.core.protocol.{RecordNotProduced, RecordProduced}
@@ -30,7 +30,7 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
 
   private val parent = TestProbe()
 
-  private val kafkaActor = parent.childActorOf(KafkaProducerProxy.props("string", kafkaProducerFormats("string")))
+  private val kafkaProducer = parent.childActorOf(KafkaProducerProxy.props("string", kafkaProducerFormats("string")))
 
   implicit private val ex = system.dispatcher
 
@@ -47,7 +47,7 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
     super.afterAll()
     EmbeddedKafka.stop()
     system.stop(parent.ref)
-    system.stop(kafkaActor)
+    system.stop(kafkaProducer)
     TestKit.shutdownActorSystem(system)
   }
 
@@ -59,7 +59,7 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
   describe("When Producing messages") {
     it("produces without acking") {
       val record = StringRecord("kafka_producer_spec", Some("key"), "payload")
-      kafkaActor ! ProduceToKafka(10, record, Transport.NoAck)
+      kafkaProducer ! ProduceToKafka(10, record, Transport.NoAck)
       parent.expectMsgPF(10.seconds) {
         case KafkaRecordMetadata(offset, ts, "kafka_producer_spec", part, deliveryId) =>
           deliveryId shouldBe 10
@@ -72,7 +72,7 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
 
     it("acks") {
       val record = StringRecord("kafka_producer_spec", Some("key"), "payload")
-      kafkaActor ! ProduceToKafka(123, record, callback(record))
+      kafkaProducer ! ProduceToKafka(123, record, callback(record))
       parent.expectMsgPF(15.seconds) {
         case md: KafkaRecordMetadata =>
           md.topic shouldBe "kafka_producer_spec"
@@ -90,8 +90,8 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
     it("acks the produce error") {
       val cfg = ConfigFactory.parseString("request.timeout.ms=100").withFallback(kafkaProducerFormats("string"))
       val producer = parent.childActorOf(KafkaProducerProxy.props("ack-error", cfg))
-      val record = StringRecord("unknown", Some("key"), "payloadpayloadpayloadpayload")
-      producer ! ProduceToKafka(123, record, callback(record))
+      val record = StringRecord("unknown", Some("key"), "test-error-payload")
+      kafkaProducer ! ProduceToKafka(123, record, callback(record))
       parent.expectMsgPF(15.seconds) {
         case err: RecordProduceError =>
           err.deliveryId shouldBe 123
@@ -109,20 +109,16 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
     }
 
     it("sends metadata back to the parent") {
-      val kafkaActor = parent.childActorOf(KafkaProducerProxy.props("string", kafkaProducerFormats("string")))
       val kmd = KafkaRecordMetadata(recordMetadata, 0)
-      kafkaActor ! kmd
+      kafkaProducer ! kmd
       parent.expectMsg(kmd)
-      kafkaActor ! PoisonPill
     }
 
     it("sends the error back to the parent") {
-      val kafkaActor = parent.childActorOf(KafkaProducerProxy.props("string", kafkaProducerFormats("string")))
       val record = StringRecord("kafka_producer_spec", Some("key"), "payload")
       val err = new IllegalArgumentException("ERROR")
-      kafkaActor ! RecordProduceError(123, record, err)
+      kafkaProducer ! RecordProduceError(123, record, err)
       parent.expectMsg(RecordProduceError(123, record, err))
-      kafkaActor ! PoisonPill
     }
 
     it("errors out with invalid producer config") {
