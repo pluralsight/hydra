@@ -28,4 +28,3 @@ class FileIngestor extends Ingestor with TransportOps {
 object FileRecordFactory extends RecordFactory[String, String] {
   override def build(r: HydraRequest) = Success(FileRecord(r.metadataValue("hydra-file-stream").get, r.payload))
 }
-

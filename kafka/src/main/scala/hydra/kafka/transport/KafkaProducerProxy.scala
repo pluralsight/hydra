@@ -8,7 +8,7 @@ import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol._
-import hydra.core.transport.Transport
+import hydra.core.transport.TransportCallback
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata, PropagateExceptionWithAckCallback}
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
@@ -57,7 +57,7 @@ class KafkaProducerProxy(format: String, producerConfig: Config)
   private def notInitialized(err: Throwable): Receive = {
     case ProduceToKafka(deliveryId, kr, callback) =>
       context.parent ! RecordProduceError(deliveryId, kr, err)
-      callback(None, Some(err))
+      callback.onCompletion(deliveryId, None, Some(err))
 
     case _ =>
       context.parent ! ProducerInitializationError(format, err)
@@ -102,7 +102,7 @@ class KafkaProducerProxy(format: String, producerConfig: Config)
 object KafkaProducerProxy extends KafkaConfigSupport {
 
   case class ProduceToKafka(deliveryId: Long, kr: KafkaRecord[_, _],
-                            ackCallback: Transport.AckCallback) extends HydraMessage
+                            callback: TransportCallback) extends HydraMessage
 
   case class ProducerInitializationError(format: String, ex: Throwable)
 

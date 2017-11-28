@@ -43,7 +43,7 @@ class TransportSpec extends TestKit(ActorSystem("test")) with Matchers with FunS
       val rec = TestRecord("OK", Some("1"), "test")
       transportManager ! Produce(rec, supervisor.ref, NoAck)
       expectMsg(RecordAccepted(supervisor.ref))
-      transport.expectMsg(Deliver(rec, -1, Transport.NoAck))
+      transport.expectMsg(Deliver(rec, -1, NoCallback))
     }
 
     it("handles LocalAck produces") {
@@ -53,14 +53,14 @@ class TransportSpec extends TestKit(ActorSystem("test")) with Matchers with FunS
         case Deliver(r, id, ack) =>
           r shouldBe rec
           id should be > 0L
-          ack shouldBe Transport.NoAck
+          ack shouldBe NoCallback
           //simulate confirm
           transportManager ! Confirm(id)
       }
 
       expectMsgPF() {
         case RecordProduced(md, sup) =>
-          md.deliveryId shouldBe -1
+          md shouldBe a[HydraRecordMetadata]
           sup shouldBe supervisor.ref
       }
     }
@@ -69,21 +69,20 @@ class TransportSpec extends TestKit(ActorSystem("test")) with Matchers with FunS
       val rec = TestRecord("OK", Some("1"), "test")
       transportManager ! Produce(rec, supervisor.ref, TransportAck)
       transport.expectMsgPF() {
-        case Deliver(r, deliveryId, ack) =>
+        case Deliver(r, deliveryId, callback) =>
           r shouldBe rec
           deliveryId shouldBe -1 //we don't save transport acks to the journal
 
-          //simulate an ack from the transport
-          ack.apply(Some(HydraRecordMetadata(deliveryId, System.currentTimeMillis)), None)
+          //simulate an callback from the transport
+          callback.onCompletion(-1, Some(HydraRecordMetadata(System.currentTimeMillis)), None)
           transportManager ! Confirm(-1)
           expectMsgPF() { //ingestor receives this message
-            case RecordProduced(md, sup) =>
-              md.deliveryId shouldBe -1
+            case RecordProduced(_, sup) =>
               sup shouldBe supervisor.ref
           }
 
           //simulate an error from the transport
-          ack.apply(None, Some(new IllegalArgumentException("ERROR!!")))
+          callback.onCompletion(-1, None, Some(new IllegalArgumentException("ERROR!!")))
           transportManager ! TransportError(-1)
           expectMsgPF() { //ingestor receives this message
             case RecordNotProduced(r, e, s) =>

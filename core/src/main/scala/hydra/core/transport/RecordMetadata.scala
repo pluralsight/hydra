@@ -5,10 +5,8 @@ package hydra.core.transport
   */
 trait RecordMetadata {
 
-  def deliveryId: Long
-
   def timestamp: Long
 
 }
 
-case class HydraRecordMetadata(deliveryId: Long, timestamp: Long) extends RecordMetadata
+case class HydraRecordMetadata(timestamp: Long) extends RecordMetadata

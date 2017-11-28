@@ -4,8 +4,8 @@ import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import hydra.core.protocol.{RecordNotProduced, RecordProduced}
-import hydra.core.transport.Transport.AckCallback
-import hydra.core.transport.{HydraRecord, Transport}
+import hydra.core.transport
+import hydra.core.transport.{HydraRecord, NoCallback, TransportCallback}
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{JsonRecord, KafkaRecordMetadata, StringRecord}
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
@@ -46,20 +46,23 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
   override def afterAll() = {
     super.afterAll()
     EmbeddedKafka.stop()
-    system.stop(parent.ref)
     system.stop(kafkaProducer)
     TestKit.shutdownActorSystem(system)
   }
 
-  private def callback(record: HydraRecord[_, _]): AckCallback =
-    (md, err) => ingestor.ref ! (md.map(RecordProduced(_, supervisor.ref))
-      .getOrElse(RecordNotProduced(record, err.get, supervisor.ref)))
+  private def callback(record: HydraRecord[_, _]): TransportCallback =
+    (deliveryId: Long, md: Option[transport.RecordMetadata], exception: Option[Throwable]) => {
+      val msg = md.map(RecordProduced(_, supervisor.ref))
+        .getOrElse(RecordNotProduced(record, exception.get, supervisor.ref))
+
+      ingestor.ref ! msg
+    }
 
 
   describe("When Producing messages") {
     it("produces without acking") {
       val record = StringRecord("kafka_producer_spec", Some("key"), "payload")
-      kafkaProducer ! ProduceToKafka(10, record, Transport.NoAck)
+      kafkaProducer ! ProduceToKafka(10, record, NoCallback)
       parent.expectMsgPF(10.seconds) {
         case KafkaRecordMetadata(offset, ts, "kafka_producer_spec", part, deliveryId) =>
           deliveryId shouldBe 10

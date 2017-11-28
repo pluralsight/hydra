@@ -1,7 +1,7 @@
 package hydra.kafka.producer
 
 import akka.actor.ActorSelection
-import hydra.core.transport.Transport
+import hydra.core.transport.TransportCallback
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
 import org.apache.kafka.clients.producer.{Callback, RecordMetadata}
 
@@ -11,7 +11,7 @@ import org.apache.kafka.clients.producer.{Callback, RecordMetadata}
 case class PropagateExceptionWithAckCallback(deliveryId: Long,
                                              record: KafkaRecord[_, _],
                                              producer: ActorSelection,
-                                             ackCallback: Transport.AckCallback) extends Callback {
+                                             callback: TransportCallback) extends Callback {
 
   override def onCompletion(metadata: RecordMetadata, e: Exception): Unit = {
     Option(e) match {
@@ -23,11 +23,11 @@ case class PropagateExceptionWithAckCallback(deliveryId: Long,
   private def doAck(md: RecordMetadata) = {
     val kmd = KafkaRecordMetadata(md, deliveryId)
     producer ! kmd
-    ackCallback(Some(kmd), None)
+    callback.onCompletion(deliveryId, Some(kmd), None)
   }
 
   private def ackError(e: Exception) = {
     producer ! RecordProduceError(deliveryId, record, e)
-    ackCallback(None, Some(e))
+    callback.onCompletion(deliveryId, None, Some(e))
   }
 }

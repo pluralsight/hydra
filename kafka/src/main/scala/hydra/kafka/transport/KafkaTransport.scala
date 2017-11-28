@@ -20,7 +20,7 @@ import akka.actor.SupervisorStrategy._
 import akka.actor._
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
-import hydra.core.transport.Transport.{Deliver, TransportError}
+import hydra.core.transport.Transport.Deliver
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata}
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
@@ -43,10 +43,7 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Co
 
   override def receive: Receive = {
     case Deliver(kr: KafkaRecord[_, _], deliveryId, ack) =>
-      withProducer(kr.formatName)(_ ! ProduceToKafka(deliveryId, kr, ack)) { error =>
-        ack.apply(None, error)
-        sender ! TransportError(deliveryId)
-      }
+      withProducer(kr.formatName)(_ ! ProduceToKafka(deliveryId, kr, ack))(e => ack.onCompletion(deliveryId, None, e))
 
     case kmd: KafkaRecordMetadata => metrics.saveMetrics(kmd)
 
@@ -60,8 +57,6 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Co
     producers.get(format) match {
       case Some(producer) => success(producer)
       case None => fail(Some(new IllegalArgumentException(s"No Kafka producer for $format records found.")))
-
-
     }
   }
 

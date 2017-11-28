@@ -40,24 +40,23 @@ class Transport(id: String, destProps: Props) extends PersistentActor with AtLea
       case NoAck =>
         sender ! RecordAccepted(p.supervisor)
         destination ! Deliver(p.record)
+
       case LocalAck =>
         val ingestor = sender
-        persistAsync(p)(updateState)
-        ingestor ! RecordProduced(HydraRecordMetadata(-1, System.currentTimeMillis), p.supervisor)
+        persistAsync(p) { p =>
+          updateState(p)
+          ingestor ! RecordProduced(HydraRecordMetadata(System.currentTimeMillis), p.supervisor)
+        }
+
       case TransportAck =>
         val ingestor = sender
-        val callback: AckCallback = (md, err) => ingestor ! (md.map(RecordProduced(_, p.supervisor))
-          .getOrElse(RecordNotProduced(p.record, err.get, p.supervisor)))
-        destination ! Deliver(p.record, -1, callback)
+        destination ! Deliver(p.record, -1, new IngestorCallback[Any, Any](p.record, ingestor, p.supervisor, self))
     }
   }
 }
 
+
 object Transport {
-
-  type AckCallback = (Option[RecordMetadata], Option[Throwable]) => Unit
-
-  val NoAck: AckCallback = (_, _) => Unit
 
   trait TransportMessage extends HydraMessage
 
@@ -68,8 +67,7 @@ object Transport {
   case class TransportError(deliveryId: Long) extends TransportMessage
 
   case class Deliver[K, V](record: HydraRecord[K, V], deliveryId: Long = -1,
-                           ackCallback: AckCallback = NoAck) extends TransportMessage
-
+                           callback: TransportCallback = NoCallback) extends TransportMessage
 
   def props(name: String, destProps: Props): Props = Props(new Transport(name, destProps))
 

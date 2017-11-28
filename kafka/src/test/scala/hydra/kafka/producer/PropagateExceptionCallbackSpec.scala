@@ -18,8 +18,7 @@ package hydra.kafka.producer
 import akka.actor.{ActorSelection, ActorSystem}
 import akka.testkit.{TestKit, TestProbe}
 import hydra.core.protocol.{RecordNotProduced, RecordProduced}
-import hydra.core.transport.HydraRecord
-import hydra.core.transport.Transport.AckCallback
+import hydra.core.transport.{HydraRecord, IngestorCallback, TransportCallback}
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
 import org.apache.kafka.clients.producer.RecordMetadata
 import org.apache.kafka.common.TopicPartition
@@ -37,9 +36,8 @@ class PropagateExceptionCallbackSpec extends TestKit(ActorSystem("hydra")) with 
   val ingestor = TestProbe()
   val supervisor = TestProbe()
 
-  private def callback(record: HydraRecord[_, _]): AckCallback =
-    (md, err) => ingestor.ref ! (md.map(RecordProduced(_, supervisor.ref))
-      .getOrElse(RecordNotProduced(record, err.get, supervisor.ref)))
+  private def callback(record: HydraRecord[_, _]): TransportCallback =
+    new IngestorCallback[Any, Any](record, ingestor.ref, supervisor.ref, probe.ref)
 
   describe("When using json PropagateExceptionCallback") {
     it("sends the completion to the actor selection") {
