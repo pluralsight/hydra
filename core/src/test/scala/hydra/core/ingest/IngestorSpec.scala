@@ -103,6 +103,8 @@ class TestIngestor(completeInit: Boolean, delayInit: Boolean) extends Ingestor {
 
   implicit val ec = context.dispatcher
 
+  override def initTimeout: FiniteDuration = 2.seconds
+
   val err = ActorInitializationException(self, "ERROR")
 
   override val recordFactory = TestRecordFactory

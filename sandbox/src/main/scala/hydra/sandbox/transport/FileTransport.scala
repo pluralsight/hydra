@@ -3,11 +3,14 @@ package hydra.sandbox.transport
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption.{APPEND, CREATE}
 
-import akka.actor.{Actor, Props}
+import akka.actor.Props
 import akka.stream._
 import akka.stream.scaladsl.{FileIO, Flow, Sink, Source}
 import akka.util.ByteString
-import hydra.core.transport.Transport.Deliver
+import com.typesafe.config.Config
+import hydra.common.config.ConfigSupport
+import hydra.core.transport.Transport
+import hydra.core.transport.TransportSupervisor.Deliver
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -15,7 +18,7 @@ import scala.util.{Failure, Success}
 /**
   * Created by alexsilva on 3/29/17.
   */
-class FileTransport(destinations: Map[String, String]) extends Actor {
+class FileTransport(destinations: Map[String, String]) extends Transport {
 
   implicit val materializer = ActorMaterializer()
 
@@ -40,10 +43,9 @@ class FileTransport(destinations: Map[String, String]) extends Actor {
             //todo: look at the QueueOfferResult object
             val md = FileRecordMetadata(destinations(r.destination), 0)
             callback.onCompletion(deliveryId, Some(md), None)
-          case Failure(ex) => callback.onCompletion(deliveryId, None, Some(ex))
+          case Failure(ex) => ex.printStackTrace(); callback.onCompletion(deliveryId, None, Some(ex))
         }
-      }.getOrElse(
-        callback.onCompletion(deliveryId, None,
+      }.getOrElse(callback.onCompletion(deliveryId, None,
         Some(new IllegalArgumentException(s"File stream ${r.destination} not found."))))
   }
 
@@ -57,6 +59,9 @@ class FileTransport(destinations: Map[String, String]) extends Actor {
   }
 }
 
-object FileTransport {
-  def props(destinations: Map[String, String]): Props = Props(classOf[FileTransport], destinations)
+object FileTransport extends ConfigSupport {
+  def props(destinations: Config): Props = {
+    val map = toMap(destinations.getConfig("transports.file.destinations"))
+    Props(classOf[FileTransport], map)
+  }
 }

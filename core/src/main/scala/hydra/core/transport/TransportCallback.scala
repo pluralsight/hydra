@@ -2,7 +2,7 @@ package hydra.core.transport
 
 import akka.actor.ActorRef
 import hydra.core.protocol.{RecordNotProduced, RecordProduced}
-import hydra.core.transport.Transport.Confirm
+import hydra.core.transport.TransportSupervisor.Confirm
 
 /**
   * A callback interface that the user can implement to allow code to execute when the transport is complete.
@@ -36,10 +36,22 @@ class IngestorCallback[K, V](record: HydraRecord[K, V], ingestor: ActorRef, supe
 
   private def onError(deliveryId: Long, err: Throwable) = {
     ingestor ! RecordNotProduced(record, err, supervisor)
-    transport ! Transport.TransportError(deliveryId)
+    transport ! TransportSupervisor.TransportError(deliveryId)
   }
 }
 
 object NoCallback extends TransportCallback {
   override def onCompletion(deliveryId: Long, md: Option[RecordMetadata], exception: Option[Throwable]): Unit = {}
+}
+
+/**
+  * Does not ack ingestor/supervisor; only sends the record production messages to the transport supervisor.
+  */
+class TransportSupervisorCallback(transport: ActorRef) extends TransportCallback {
+  override def onCompletion(deliveryId: Long, md: Option[RecordMetadata], exception: Option[Throwable]): Unit = {
+    md match {
+      case Some(_) => transport ! Confirm(deliveryId)
+      case None => transport ! TransportSupervisor.TransportError(deliveryId)
+    }
+  }
 }

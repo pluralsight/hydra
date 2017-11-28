@@ -10,7 +10,7 @@ import hydra.common.config.ConfigSupport
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
 import hydra.core.protocol.HydraIngestionError
-import hydra.core.transport.Transport.Deliver
+import hydra.core.transport.TransportSupervisor.Deliver
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecordBuilder
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}

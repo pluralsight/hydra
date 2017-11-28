@@ -9,7 +9,7 @@ import hydra.avro.resource.SchemaResourceLoader
 import hydra.common.config.ConfigSupport
 import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
 import hydra.core.protocol.HydraIngestionError
-import hydra.core.transport.Transport.Deliver
+import hydra.core.transport.TransportSupervisor.Deliver
 import hydra.kafka.producer.AvroRecord
 import spray.json.DefaultJsonProtocol
 

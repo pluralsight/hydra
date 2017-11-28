@@ -19,8 +19,8 @@ package hydra.kafka.transport
 import akka.actor.SupervisorStrategy._
 import akka.actor._
 import com.typesafe.config.Config
-import hydra.common.config.ConfigSupport
-import hydra.core.transport.Transport.Deliver
+import hydra.core.transport.Transport
+import hydra.core.transport.TransportSupervisor.Deliver
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata}
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
@@ -31,7 +31,7 @@ import scala.language.existentials
 /**
   * Created by alexsilva on 10/28/15.
   */
-class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with ConfigSupport {
+class KafkaTransport(producersConfig: Map[String, Config]) extends Transport {
 
   private type KR = KafkaRecord[_, _]
 

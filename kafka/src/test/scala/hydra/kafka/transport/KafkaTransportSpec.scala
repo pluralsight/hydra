@@ -3,7 +3,7 @@ package hydra.kafka.transport
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
-import hydra.core.transport.Transport.Deliver
+import hydra.core.transport.TransportSupervisor.Deliver
 import hydra.core.transport.{RecordMetadata, TransportCallback}
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{JsonRecord, StringRecord}

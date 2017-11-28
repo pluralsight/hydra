@@ -9,11 +9,11 @@ import hydra.common.config.ConfigSupport
 import hydra.core.protocol._
 import hydra.core.test.TestRecord
 import hydra.core.transport.AckStrategy.{LocalAck, NoAck, TransportAck}
-import hydra.core.transport.Transport.{Confirm, Deliver, TransportError}
+import hydra.core.transport.TransportSupervisor.{Confirm, Deliver, TransportError}
 import org.iq80.leveldb.util.FileUtils
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
-class TransportSpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike with BeforeAndAfterAll
+class TransportSupervisorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike with BeforeAndAfterAll
   with ImplicitSender with ConfigSupport {
 
   override def afterAll() {
@@ -24,7 +24,7 @@ class TransportSpec extends TestKit(ActorSystem("test")) with Matchers with FunS
 
   val transport = TestProbe()
 
-  val transportManager = system.actorOf(Transport.props("tester", Props(classOf[ForwardActor], transport.ref)))
+  val transportManager = system.actorOf(TransportSupervisor.props("tester", Props(classOf[ForwardActor], transport.ref)))
 
   val supervisor = TestProbe()
 
@@ -37,7 +37,7 @@ class TransportSpec extends TestKit(ActorSystem("test")) with Matchers with FunS
     storageLocations foreach FileUtils.deleteRecursively
   }
 
-  describe("Transports") {
+  describe("Transport supervisors") {
 
     it("handles NoAck produces") {
       val rec = TestRecord("OK", Some("1"), "test")

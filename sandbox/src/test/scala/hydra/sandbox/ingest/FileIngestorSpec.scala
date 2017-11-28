@@ -39,6 +39,19 @@ class FileIngestorSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with M
       }
     }
 
+    it("validates") {
+      val hr = HydraRequest(0, "test").withMetadata("hydra-file-stream" -> "test")
+      ingestor ! Validate(hr)
+      expectMsg(ValidRequest(FileRecordFactory.build(hr).get))
+
+      val hr1 = HydraRequest(0, "test").withMetadata("hydra-file-stream" -> "unknown")
+      ingestor ! Validate(hr1)
+      expectMsgPF() {
+        case InvalidRequest(ex) =>
+          ex shouldBe a[IllegalArgumentException]
+      }
+    }
+
     it("joins") {
       val hr = HydraRequest(0, "test").withMetadata("hydra-file-stream" -> "test")
       ingestor ! Publish(hr)
