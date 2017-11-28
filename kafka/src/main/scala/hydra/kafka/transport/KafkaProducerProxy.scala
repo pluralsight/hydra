@@ -10,7 +10,7 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol._
 import hydra.core.transport.TransportCallback
 import hydra.kafka.config.KafkaConfigSupport
-import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata, PropagateExceptionWithAckCallback}
+import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata, HydraKafkaCallback}
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
 import org.apache.kafka.clients.producer.{Callback, KafkaProducer}
@@ -37,7 +37,7 @@ class KafkaProducerProxy(format: String, producerConfig: Config)
 
   private def producing: Receive = {
     case ProduceToKafka(deliveryId, kr: KafkaRecord[Any, Any], ackCallback) =>
-      val cb = new PropagateExceptionWithAckCallback(deliveryId, kr, selfSel, ackCallback)
+      val cb = new HydraKafkaCallback(deliveryId, kr, selfSel, ackCallback)
       produce(kr, cb)
 
     case kmd: KafkaRecordMetadata =>

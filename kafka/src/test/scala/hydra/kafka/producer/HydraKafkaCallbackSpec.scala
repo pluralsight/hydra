@@ -18,6 +18,7 @@ package hydra.kafka.producer
 import akka.actor.{ActorSelection, ActorSystem}
 import akka.testkit.{TestKit, TestProbe}
 import hydra.core.protocol.{RecordNotProduced, RecordProduced}
+import hydra.core.transport.Transport.{Confirm, TransportError}
 import hydra.core.transport.{HydraRecord, IngestorCallback, TransportCallback}
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
 import org.apache.kafka.clients.producer.RecordMetadata
@@ -27,7 +28,7 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 /**
   * Created by alexsilva on 1/11/17.
   */
-class PropagateExceptionCallbackSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike
+class HydraKafkaCallbackSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike
   with BeforeAndAfterAll {
 
   override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
@@ -35,32 +36,34 @@ class PropagateExceptionCallbackSpec extends TestKit(ActorSystem("hydra")) with 
   val probe = TestProbe()
   val ingestor = TestProbe()
   val supervisor = TestProbe()
+  val transport = TestProbe()
 
   private def callback(record: HydraRecord[_, _]): TransportCallback =
-    new IngestorCallback[Any, Any](record, ingestor.ref, supervisor.ref, probe.ref)
+    new IngestorCallback[Any, Any](record, ingestor.ref, supervisor.ref, transport.ref)
 
-  describe("When using json PropagateExceptionCallback") {
+  describe("When using the HydraCallback") {
     it("sends the completion to the actor selection") {
       val record = StringRecord("test", "test")
-      val e = new PropagateExceptionWithAckCallback(112, record, ActorSelection(probe.ref, Seq.empty), callback(record))
+      val e = new HydraKafkaCallback(112, record, ActorSelection(probe.ref, Seq.empty), callback(record))
       val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1L: java.lang.Long, 1, 1)
       e.onCompletion(md, null)
       probe.expectMsg(KafkaRecordMetadata(md, 112))
+      transport.expectMsg(Confirm(112))
     }
 
     it("sends the error to the actor selection") {
       val record = StringRecord("test", "test")
-      val e = new PropagateExceptionWithAckCallback(112, record,
+      val e = new HydraKafkaCallback(112, record,
         ActorSelection(probe.ref, Seq.empty), callback(record))
-      val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1L: java.lang.Long, 1, 1)
       val err = new IllegalArgumentException("test")
-      e.onCompletion(md, err)
+      e.onCompletion(null, err)
       probe.expectMsg(RecordProduceError(112, record, err))
+      transport.expectMsg(TransportError(112))
     }
 
     it("sends the completion to the actor selection and acks the ingestor") {
       val record = StringRecord("test", "test")
-      val e = new PropagateExceptionWithAckCallback(112, record,
+      val e = new HydraKafkaCallback(112, record,
         ActorSelection(probe.ref, Seq.empty), callback(record))
       val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1L: java.lang.Long, 1, 1)
       e.onCompletion(md, null)
@@ -70,7 +73,7 @@ class PropagateExceptionCallbackSpec extends TestKit(ActorSystem("hydra")) with 
 
     it("sends the error to the actor selection and acks the ingestor") {
       val record = StringRecord("test", "test")
-      val e = new PropagateExceptionWithAckCallback(112, record,
+      val e = new HydraKafkaCallback(112, record,
         ActorSelection(probe.ref, Seq.empty), callback(record))
       val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1L: java.lang.Long, 1, 1)
       val err = new IllegalArgumentException("test")
