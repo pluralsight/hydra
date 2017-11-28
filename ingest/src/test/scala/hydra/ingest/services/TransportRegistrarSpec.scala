@@ -3,7 +3,7 @@ package hydra.ingest.services
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import com.typesafe.config.Config
-import hydra.core.test.TestRecord
+import hydra.ingest.test.TestRecord
 import hydra.core.transport.Transport
 import hydra.core.transport.TransportSupervisor.Deliver
 import org.scalatest.concurrent.ScalaFutures
