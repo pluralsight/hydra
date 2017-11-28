@@ -3,10 +3,13 @@ package hydra.core.ingest
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.TestActors.ForwardActor
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
+import hydra.core.akka.ActorInitializationException
 import hydra.core.protocol.{IngestorError, Produce}
 import hydra.core.test.TestRecordFactory
 import hydra.core.transport.AckStrategy.NoAck
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+
+import scala.concurrent.duration._
 
 /**
   * Created by alexsilva on 3/22/17.
@@ -35,7 +38,7 @@ class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers with F
       t ! "hello"
       expectMsgPF() {
         case i: IngestorError =>
-          i.error shouldBe a[IllegalArgumentException]
+          i.error shouldBe a[ActorInitializationException]
       }
     }
 
@@ -62,6 +65,7 @@ class TestTransportIngestor(supervisor: ActorRef) extends Ingestor with Transpor
 }
 
 class TestTransportIngestorError extends Ingestor with TransportOps {
+  override def initTimeout = 1.second
 
   override val recordFactory = TestRecordFactory
 
