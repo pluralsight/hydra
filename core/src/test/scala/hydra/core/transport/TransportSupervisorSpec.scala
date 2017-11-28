@@ -53,7 +53,7 @@ class TransportSupervisorSpec extends TestKit(ActorSystem("test")) with Matchers
         case Deliver(r, id, ack) =>
           r shouldBe rec
           id should be > 0L
-          ack shouldBe NoCallback
+          ack shouldBe a[TransportSupervisorCallback]
           //simulate confirm
           transportManager ! Confirm(id)
       }
