@@ -34,7 +34,7 @@ import scala.language.existentials
 class KafkaTransport(producersConfig: Map[String, Config]) extends Transport {
 
   private type KR = KafkaRecord[_, _]
-  
+
   private[kafka] lazy val metrics = KafkaMetrics(applicationConfig)(context.system)
 
   private[kafka] val producers = new scala.collection.mutable.HashMap[String, ActorRef]()
