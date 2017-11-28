@@ -1,0 +1,65 @@
+package hydra.ingest.services
+
+import akka.actor.{ActorSystem, Props}
+import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
+import com.typesafe.config.Config
+import hydra.core.test.TestRecord
+import hydra.core.transport.Transport
+import hydra.core.transport.TransportSupervisor.Deliver
+import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+
+class TransportRegistrarSpec extends TestKit(ActorSystem("test")) with Matchers
+  with FunSpecLike with BeforeAndAfterAll with ImplicitSender with ScalaFutures {
+
+  val tr = TestActorRef[TransportRegistrar](Props[TransportRegistrar], "transport_registrar")
+
+  override def afterAll = {
+    system.stop(tr)
+    TestKit.shutdownActorSystem(system)
+  }
+
+
+  describe("The Transport Registrar") {
+    it("registers a transport using its companion object") {
+      val transports = tr.underlyingActor.bootstrap(Map("transport_test1" -> classOf[TransportTest]))
+      transports(0).get ! Deliver(TestRecord("transport_test", Some("key"), """{"name":"alex"}"""))
+      expectMsg("HELLO!") //defined in reference.conf
+    }
+
+    it("registers a transport without a companion object") {
+      val transports = tr.underlyingActor.bootstrap(Map("transport_test2" -> classOf[CompanionLessTransportTest]))
+      transports(0).get ! Deliver(TestRecord("transport_test", Some("key"), """{"name":"alex"}"""))
+      expectMsg("HI!")
+    }
+
+    it("reports the error if it can't instantiate") {
+      val transports = tr.underlyingActor.bootstrap(Map("transport_test3" -> classOf[ErrorTransport]))
+      intercept[IllegalArgumentException] {
+        transports(0).get
+      }
+    }
+  }
+}
+
+class ErrorTransport(map: Map[String, String]) extends Transport {
+  override def receive: Receive = {
+    case Deliver(record, deliveryId, callback) => //ignore
+  }
+}
+
+class TransportTest(config: Config) extends Transport {
+  override def receive: Receive = {
+    case Deliver(record, deliveryId, callback) => sender ! config.getString("transports.test.message")
+  }
+}
+
+object TransportTest {
+  def props(config: Config) = Props(new TransportTest(config))
+}
+
+class CompanionLessTransportTest extends Transport {
+  override def receive: Receive = {
+    case Deliver(record, deliveryId, callback) => sender ! "HI!"
+  }
+}

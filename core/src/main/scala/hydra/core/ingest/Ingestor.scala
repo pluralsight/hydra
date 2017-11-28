@@ -5,15 +5,13 @@ import hydra.core.akka.InitializingActor
 import hydra.core.protocol._
 import hydra.core.transport.RecordFactory
 
-import scala.concurrent.duration._
-
 /**
   * Created by alexsilva on 12/1/15.
   */
 
 trait Ingestor extends InitializingActor {
 
-  override def initTimeout = 2.seconds
+  //override def initTimeout = 2.seconds
 
   def recordFactory: RecordFactory[_, _]
 

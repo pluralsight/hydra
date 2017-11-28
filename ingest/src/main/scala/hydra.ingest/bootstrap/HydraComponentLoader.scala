@@ -19,6 +19,7 @@ package hydra.ingest.bootstrap
 import java.lang.reflect.Modifier
 
 import hydra.core.ingest.Ingestor
+import hydra.core.transport.Transport
 import org.reflections.Reflections
 
 import scala.collection.JavaConverters._
@@ -26,17 +27,22 @@ import scala.collection.JavaConverters._
 /**
   * Created by alexsilva on 1/12/16.
   */
-trait IngestorLoader {
+trait HydraComponentLoader {
 
   def ingestors: Seq[Class[_ <: Ingestor]]
+
+  def transports: Seq[Class[_ <: Transport]]
 }
 
-class ClasspathIngestorLoader(pkgs: Seq[String]) extends IngestorLoader {
+class ClasspathHydraComponentLoader(pkgs: Seq[String]) extends HydraComponentLoader {
 
   require(pkgs.size > 0, "At least one package is required.")
 
   private val reflections = new Reflections(pkgs.toArray)
 
   override lazy val ingestors = reflections.getSubTypesOf(classOf[Ingestor])
+    .asScala.filterNot(c => Modifier.isAbstract(c.getModifiers)).toSeq
+
+  override lazy val transports = reflections.getSubTypesOf(classOf[Transport])
     .asScala.filterNot(c => Modifier.isAbstract(c.getModifiers)).toSeq
 }

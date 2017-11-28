@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import hydra.core.protocol.{RecordNotProduced, RecordProduced}
 import hydra.core.test.{TestRecord, TestRecordMetadata}
-import hydra.core.transport.Transport.{Confirm, TransportError}
+import hydra.core.transport.TransportSupervisor.{Confirm, TransportError}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 class TransportCallbackSpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike with BeforeAndAfterAll
@@ -23,6 +23,19 @@ class TransportCallbackSpec extends TestKit(ActorSystem("test")) with Matchers w
       NoCallback.onCompletion(-1, None, Some(new IllegalArgumentException("test")))
       ingestor.expectNoMsg()
       supervisor.expectNoMsg()
+    }
+
+    it("handles simple/transport only callbacks") {
+      val probe = TestProbe()
+      new TransportSupervisorCallback(probe.ref).onCompletion(-11, None, Some(new IllegalArgumentException("test")))
+      ingestor.expectNoMsg()
+      supervisor.expectNoMsg()
+      probe.expectMsg(TransportError(-11))
+
+      new TransportSupervisorCallback(probe.ref).onCompletion(-11, Some(TestRecordMetadata(1)), None)
+      ingestor.expectNoMsg()
+      supervisor.expectNoMsg()
+      probe.expectMsg(Confirm(-11))
     }
 
     it("handles ingestor callbacks") {

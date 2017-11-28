@@ -5,7 +5,7 @@ import configs.syntax._
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.common.util.ActorUtils
-import hydra.ingest.bootstrap.ClasspathIngestorLoader
+import hydra.ingest.bootstrap.ClasspathHydraComponentLoader
 import hydra.ingest.ingestors.IngestorInfo
 import hydra.ingest.services.IngestorRegistrar.UnregisterAll
 import hydra.ingest.services.IngestorRegistry.{RegisterWithClass, Unregister, Unregistered}
@@ -18,21 +18,21 @@ import hydra.ingest.services.IngestorRegistry.{RegisterWithClass, Unregister, Un
   */
 class IngestorRegistrar extends Actor with ConfigSupport with LoggingAdapter {
 
-  val registry = context.actorSelection(applicationConfig.get[String]("ingest.ingestor-registry.path")
+  private val ingestorRegistry = context.actorSelection(applicationConfig.get[String]("ingest.ingestor-registry.path")
     .valueOrElse("/user/service/ingestor_registry"))
 
   private val pkgs = applicationConfig.get[List[String]]("ingest.classpath-scan").valueOrElse(List.empty)
 
-  log.debug(s"Scanning package(s) [$pkgs].")
+  log.debug(s"Scanning package(s): [${pkgs.mkString}].")
 
-  lazy val ingestors = new ClasspathIngestorLoader(pkgs).ingestors.map(h => ActorUtils.actorName(h) -> h)
+  lazy val ingestors = new ClasspathHydraComponentLoader(pkgs).ingestors.map(h => ActorUtils.actorName(h) -> h)
 
   override def receive = {
     case RegisterWithClass(group, name, clazz) =>
-      registry ! RegisterWithClass(group, name, clazz)
+      ingestorRegistry ! RegisterWithClass(group, name, clazz)
 
     case UnregisterAll =>
-      ingestors.foreach(h => registry ! Unregister(h._1))
+      ingestors.foreach(h => ingestorRegistry ! Unregister(h._1))
 
     case Unregistered(name) =>
       log.info(s"Ingestor $name was removed from the registry.")
@@ -42,7 +42,7 @@ class IngestorRegistrar extends Actor with ConfigSupport with LoggingAdapter {
   }
 
   override def preStart(): Unit = {
-    ingestors.foreach(h => registry ! RegisterWithClass(h._2, "global", Some(h._1)))
+    ingestors.foreach(h => ingestorRegistry ! RegisterWithClass(h._2, "global", Some(h._1)))
   }
 }
 
