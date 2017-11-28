@@ -26,6 +26,9 @@ object AckStrategy {
     */
   case object TransportAck extends AckStrategy
 
+  /**
+    * It is in the journal, but not necessarily acked by the underlying transport.
+    */
   case object LocalAck extends AckStrategy
 
   case object NoAck extends AckStrategy

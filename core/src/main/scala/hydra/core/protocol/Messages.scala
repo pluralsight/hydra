@@ -69,8 +69,6 @@ case class RecordProduced(md: RecordMetadata, supervisor: ActorRef) extends Hydr
 case class RecordNotProduced[K, V](record: HydraRecord[K, V], error: Throwable,
                                    supervisor: ActorRef) extends HydraMessage
 
-//case class ProducerAck(supervisor: ActorRef, error: Option[Throwable])
-
 //todo:rename this class
 case class HydraIngestionError(ingestor: String, error: Throwable,
                                request: HydraRequest, time: DateTime = DateTime.now) extends HydraError
