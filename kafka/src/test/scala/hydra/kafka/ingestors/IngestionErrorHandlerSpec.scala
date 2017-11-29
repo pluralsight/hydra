@@ -67,7 +67,6 @@ class IngestionErrorHandlerSpec extends TestKit(ActorSystem("hydra-test")) with 
     }
 
     it("publishes to Kafka") {
-      println(kafkaProducer.path)
       val err = HydraIngestionError("test", new JsonToAvroConversionException("test", "field", schema), request)
       handlerRef ! err
       probe.expectMsgType[Deliver[_,_]](10.seconds)

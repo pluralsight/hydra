@@ -5,7 +5,7 @@ import akka.kafka.ProducerSettings
 import com.typesafe.config.Config
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.KafkaRecordMetadata
-import org.apache.kafka.clients.producer.{Callback, ProducerRecord, RecordMetadata}
+import org.apache.kafka.clients.producer.ProducerRecord
 import spray.json.DefaultJsonProtocol
 
 trait KafkaMetrics {
@@ -32,12 +32,7 @@ class PublishMetrics(topic: String)(implicit system: ActorSystem) extends KafkaM
 
   def saveMetrics(record: KafkaRecordMetadata) = {
     val payload = record.toJson.compactPrint
-    producer.send(new ProducerRecord(topic, record.topic, payload), new Callback {
-      override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit = {
-        println(metadata)
-        println(exception)
-      }
-    })
+    producer.send(new ProducerRecord(topic, record.topic, payload))
   }
 }
 

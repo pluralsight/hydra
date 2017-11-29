@@ -18,6 +18,8 @@ package hydra.ingest.bootstrap
 
 import java.lang.reflect.Modifier
 
+import hydra.common.config.ConfigSupport
+import hydra.common.logging.LoggingAdapter
 import hydra.core.ingest.Ingestor
 import hydra.core.transport.Transport
 import org.reflections.Reflections
@@ -34,9 +36,19 @@ trait HydraComponentLoader {
   def transports: Seq[Class[_ <: Transport]]
 }
 
-class ClasspathHydraComponentLoader(pkgs: Seq[String]) extends HydraComponentLoader {
+object ClasspathHydraComponentLoader extends HydraComponentLoader with ConfigSupport with LoggingAdapter {
 
-  require(pkgs.size > 0, "At least one package is required.")
+  import configs.syntax._
+
+  private val ingestorsPkg = applicationConfig.get[List[String]]("ingest.classpath-scan").valueOrElse(List.empty)
+
+  log.debug(s"Scanning for ingestors in package(s): [${ingestorsPkg.mkString}].")
+
+  private val transportsPkg = applicationConfig.get[List[String]]("transports.classpath-scan").valueOrElse(List.empty)
+
+  log.debug(s"Scanning for transports in package(s): [${transportsPkg.mkString}].")
+
+  private val pkgs = ingestorsPkg ::: transportsPkg
 
   private val reflections = new Reflections(pkgs.toArray)
 

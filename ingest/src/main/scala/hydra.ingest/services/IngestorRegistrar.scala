@@ -21,11 +21,8 @@ class IngestorRegistrar extends Actor with ConfigSupport with LoggingAdapter {
   private val ingestorRegistry = context.actorSelection(applicationConfig.get[String]("ingest.ingestor-registry.path")
     .valueOrElse("/user/service/ingestor_registry"))
 
-  private val pkgs = applicationConfig.get[List[String]]("ingest.classpath-scan").valueOrElse(List.empty)
 
-  log.debug(s"Scanning package(s): [${pkgs.mkString}].")
-
-  lazy val ingestors = new ClasspathHydraComponentLoader(pkgs).ingestors.map(h => ActorUtils.actorName(h) -> h)
+  lazy val ingestors =  ClasspathHydraComponentLoader.ingestors.map(h => ActorUtils.actorName(h) -> h)
 
   override def receive = {
     case RegisterWithClass(group, name, clazz) =>
