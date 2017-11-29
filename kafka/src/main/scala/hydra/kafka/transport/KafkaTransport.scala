@@ -21,6 +21,7 @@ import akka.actor._
 import com.typesafe.config.Config
 import hydra.core.transport.Transport
 import hydra.core.transport.TransportSupervisor.Deliver
+import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata}
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
@@ -71,11 +72,20 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Transport {
   }
 }
 
-object KafkaTransport {
+object KafkaTransport extends KafkaConfigSupport {
 
   case class RecordProduceError(deliveryId: Long, record: KafkaRecord[_, _], error: Throwable)
 
   def props(producersConfig: Map[String, Config]): Props = Props(classOf[KafkaTransport], producersConfig)
+
+  /**
+    * Method to comply with TransportRegistrar that looks for a method in the companion object called props
+    * that takes a config param.
+    *
+    * @param cfg - We are not using this (this is the applicationConfig)
+    * @return
+    */
+  def props(cfg: Config): Props = Props(classOf[KafkaTransport], kafkaProducerFormats)
 
 }
 

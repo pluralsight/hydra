@@ -63,9 +63,6 @@ object TransportTest {
 
 class CompanionLessTransportTest extends Transport {
   override def receive: Receive = {
-    case Deliver(record, deliveryId, callback) =>
-      sender ! "HI!"
-    case x =>
-      println(x)
+    case Deliver(record, deliveryId, callback) => sender ! "HI!"
   }
 }

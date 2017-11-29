@@ -29,10 +29,9 @@ class TransportRegistrar extends Actor with ConfigSupport with LoggingAdapter {
   private val pkgs = applicationConfig.get[List[String]]("transports.classpath-scan")
     .valueOrElse(Seq("hydra.transports"))
 
-  private lazy val transports: Map[String, Class[_ <: Transport]] = {
-    log.debug(s"Scanning package(s): [${pkgs.mkString}].")
-    new ClasspathHydraComponentLoader(pkgs).transports.map(h => ActorUtils.actorName(h) -> h).toMap
-  }
+  private lazy val transports: Map[String, Class[_ <: Transport]] =
+    ClasspathHydraComponentLoader.transports.map(h => ActorUtils.actorName(h) -> h).toMap
+
 
   override def receive = {
     case Unregistered(name) =>
