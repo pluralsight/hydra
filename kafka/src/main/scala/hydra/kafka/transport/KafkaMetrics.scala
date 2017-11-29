@@ -26,12 +26,13 @@ class PublishMetrics(topic: String)(implicit system: ActorSystem) extends KafkaM
   private val producer = {
     val akkaConfigs = rootConfig.getConfig("akka.kafka.producer")
     val configs = akkaConfigs.withFallback(kafkaProducerFormats("string").atKey("kafka-clients"))
-    ProducerSettings[String, String](configs, None, None).createKafkaProducer()
+    ProducerSettings[String, String](configs, None, None).withProperty("client.id", "hydra.kafka.metrics")
+      .createKafkaProducer()
   }
 
   def saveMetrics(record: KafkaRecordMetadata) = {
     val payload = record.toJson.compactPrint
-    producer.send(new ProducerRecord(topic, record.topic, payload),new Callback {
+    producer.send(new ProducerRecord(topic, record.topic, payload), new Callback {
       override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit = {
         println(metadata)
         println(exception)
