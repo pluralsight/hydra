@@ -23,7 +23,7 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers wit
 
   val producerName = StringRecord("transport_test", Some("key"), "payload").formatName
 
-  val transport = TestActorRef[KafkaTransport](KafkaTransport.props(kafkaProducerFormats), "kafka")
+  lazy val transport = TestActorRef[KafkaTransport](KafkaTransport.props(kafkaProducerFormats), "kafka")
 
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
     customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
@@ -48,6 +48,10 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers wit
   }
 
   describe("When using the KafkaTransport") {
+
+    it("Uses the same kafkaProducerFormats when props is called in the companion object") {
+      KafkaTransport.props(ConfigFactory.empty).args(0) shouldBe kafkaProducerFormats
+    }
 
     it("has the right producers") {
       transport.underlyingActor.producers.size shouldBe 2
