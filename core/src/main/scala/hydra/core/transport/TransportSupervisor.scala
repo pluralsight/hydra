@@ -19,6 +19,8 @@ class TransportSupervisor(id: String, destProps: Props) extends PersistentActor 
   override def receiveCommand: Receive = {
     case p@Produce(_, _, _) => transport(p)
 
+    case d@Deliver(_, _, _) => destination forward d
+
     case Confirm(deliveryId) =>
       if (deliveryId > 0) persistAsync(DestinationConfirmed(deliveryId))(updateState)
 

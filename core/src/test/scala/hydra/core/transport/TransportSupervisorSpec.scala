@@ -39,6 +39,12 @@ class TransportSupervisorSpec extends TestKit(ActorSystem("test")) with Matchers
 
   describe("Transport supervisors") {
 
+    it("forwards Deliver messages") {
+      val rec = TestRecord("OK", Some("1"), "test")
+      transportManager ! Deliver(rec)
+      transport.expectMsg(Deliver(rec))
+    }
+
     it("handles NoAck produces") {
       val rec = TestRecord("OK", Some("1"), "test")
       transportManager ! Produce(rec, supervisor.ref, NoAck)
@@ -93,6 +99,5 @@ class TransportSupervisorSpec extends TestKit(ActorSystem("test")) with Matchers
           }
       }
     }
-
   }
 }

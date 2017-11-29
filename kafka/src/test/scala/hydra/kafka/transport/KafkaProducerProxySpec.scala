@@ -69,7 +69,6 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
           offset should be >= 0L
           ts should be > 0L
           part shouldBe 0
-
       }
     }
 
