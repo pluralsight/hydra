@@ -1,38 +1,55 @@
 package hydra.kafka.transport
 
 import akka.actor.ActorSystem
-import akka.testkit.{TestKit, TestProbe}
-import com.fasterxml.jackson.databind.JsonNode
+import akka.testkit.TestKit
 import com.typesafe.config.ConfigFactory
-import hydra.core.protocol.ProduceOnly
 import hydra.kafka.producer.KafkaRecordMetadata
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
+import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSpecLike, Matchers}
+import spray.json.DefaultJsonProtocol
 
 /**
   * Created by alexsilva on 12/5/16.
   */
-class KafkaMetricsSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike with BeforeAndAfterAll {
+class KafkaMetricsSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike
+  with BeforeAndAfterAll with DefaultJsonProtocol {
 
-  override def afterAll() = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
+  private implicit val mdFormat = jsonFormat5(KafkaRecordMetadata.apply)
 
-  val probe = TestProbe()
+  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
+    customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
+
+  override def afterAll() = {
+    EmbeddedKafka.stop()
+    super.afterAll()
+    TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
+  }
+
+  override def beforeAll() = {
+    super.beforeAll()
+    EmbeddedKafka.start()
+    EmbeddedKafka.createCustomTopic("metrics_topic")
+  }
 
   describe("When using the KafkaMetrics object") {
 
     it("uses the NoOpMetrics") {
       KafkaMetrics(ConfigFactory.empty()) shouldBe NoOpMetrics
-      KafkaMetrics(ConfigFactory.parseString("producers.kafka.metrics.enabled=false")) shouldBe NoOpMetrics
+      KafkaMetrics(ConfigFactory.parseString("transports.kafka.metrics.enabled=false")) shouldBe NoOpMetrics
     }
 
     it("uses the PublishMetrics") {
+      import spray.json._
       val cfg = ConfigFactory.parseString(
         s"""
-           |producers.kafka.metrics.enabled=true
-           |producers.kafka.metrics.actor_path="${probe.ref.path}"""".stripMargin)
+           | transports.kafka.metrics.topic = metrics_topic
+           | transports.kafka.metrics.enabled=true""".stripMargin)
       val pm = KafkaMetrics(cfg)
       pm shouldBe a[PublishMetrics]
-      pm.saveMetrics(KafkaRecordMetadata(1, 1, "topic", 1, 1))
-      probe.expectMsgType[ProduceOnly[String, JsonNode]]
+      val kmd = KafkaRecordMetadata(1, 1, "topic", 1, 1)
+      pm.saveMetrics(kmd)
+      EmbeddedKafka.consumeFirstStringMessageFrom("metrics_topic").parseJson shouldBe kmd.toJson
+
     }
   }
 }

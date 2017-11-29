@@ -15,14 +15,23 @@ object AckStrategy {
 
   def apply(strategy: String): AckStrategy = {
     Option(strategy).map(_.trim.toLowerCase) match {
-      case Some("explicit") => Explicit
-      case _ => None
+      case Some("transport") => TransportAck
+      case Some("local") => LocalAck
+      case _ => NoAck
     }
   }
 
-  case object Explicit extends AckStrategy
+  /**
+    * Waits for an explicit acknowledgment from the underlying transport.
+    */
+  case object TransportAck extends AckStrategy
 
-  case object None extends AckStrategy
+  /**
+    * It is in the journal, but not necessarily acked by the underlying transport.
+    */
+  case object LocalAck extends AckStrategy
+
+  case object NoAck extends AckStrategy
 
 }
 

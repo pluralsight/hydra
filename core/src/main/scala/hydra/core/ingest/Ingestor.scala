@@ -5,15 +5,13 @@ import hydra.core.akka.InitializingActor
 import hydra.core.protocol._
 import hydra.core.transport.RecordFactory
 
-import scala.concurrent.duration._
-
 /**
   * Created by alexsilva on 12/1/15.
   */
 
 trait Ingestor extends InitializingActor {
 
-  override def initTimeout = 2.seconds
+  //override def initTimeout = 2.seconds
 
   def recordFactory: RecordFactory[_, _]
 
@@ -25,11 +23,14 @@ trait Ingestor extends InitializingActor {
     case Validate(request) =>
       sender ! validate(request)
 
-    case RecordProduced(_, supervisor) =>
-      supervisor.foreach(_ ! IngestorCompleted)
+    case RecordProduced(_, sup) =>
+      sup ! IngestorCompleted
+
+    case RecordAccepted(sup) =>
+      sup ! IngestorCompleted
 
     case RecordNotProduced(_, error, supervisor) =>
-      supervisor.foreach(_ ! IngestorError(error))
+      supervisor ! IngestorError(error)
   }
 
   def validate(request: HydraRequest): MessageValidationResult = {

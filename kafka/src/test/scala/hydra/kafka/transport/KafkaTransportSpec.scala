@@ -2,69 +2,92 @@ package hydra.kafka.transport
 
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
-import hydra.core.protocol.{Produce, RecordNotProduced, RecordProduced}
-import hydra.core.transport.AckStrategy
+import com.typesafe.config.ConfigFactory
+import hydra.core.transport.TransportSupervisor.Deliver
+import hydra.core.transport.{RecordMetadata, TransportCallback}
 import hydra.kafka.config.KafkaConfigSupport
-import hydra.kafka.producer.{JsonRecord, KafkaRecordMetadata, StringRecord}
+import hydra.kafka.producer.{JsonRecord, StringRecord}
+import hydra.kafka.transport.KafkaProducerProxy.ProducerInitializationError
+import hydra.kafka.transport.KafkaTransport.RecordProduceError
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
-import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSpecLike, Matchers}
+import org.apache.kafka.common.errors.TimeoutException
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
 /**
   * Created by alexsilva on 12/5/16.
   */
-@DoNotDiscover
 class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike with ImplicitSender
   with BeforeAndAfterAll with KafkaConfigSupport {
 
   val producerName = StringRecord("transport_test", Some("key"), "payload").formatName
 
-  val kafkaSupervisor = TestActorRef[KafkaTransport](KafkaTransport.props(kafkaProducerFormats))
+  lazy val transport = TestActorRef[KafkaTransport](KafkaTransport.props(kafkaProducerFormats), "kafka")
 
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
     customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
 
   val ingestor = TestProbe()
-  val supervisor = TestProbe()
+  val streamActor = TestProbe()
+
+  system.eventStream.subscribe(streamActor.ref, classOf[RecordProduceError])
+  system.eventStream.subscribe(streamActor.ref, classOf[ProducerInitializationError])
 
   override def beforeAll() = {
+    super.beforeAll()
+    EmbeddedKafka.start()
     EmbeddedKafka.createCustomTopic("transport_test")
   }
 
   override def afterAll() = {
-    system.stop(kafkaSupervisor)
+    super.afterAll()
+    system.stop(transport)
+    EmbeddedKafka.stop()
     TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
   }
 
-  describe("When using the supervisor") {
+  describe("When using the KafkaTransport") {
+
+    it("Uses the same kafkaProducerFormats when props is called in the companion object") {
+      KafkaTransport.props(ConfigFactory.empty).args(0) shouldBe kafkaProducerFormats
+    }
 
     it("has the right producers") {
-      kafkaSupervisor.underlyingActor.producers.size shouldBe 2
-      kafkaSupervisor.underlyingActor.producers.keys should contain allOf("avro", "string")
+      transport.underlyingActor.producers.size shouldBe 2
+      transport.underlyingActor.producers.keys should contain allOf("avro", "string")
     }
 
     it("errors if no proxy can be found for the format") {
-      kafkaSupervisor ! Produce(JsonRecord("transport_test", Some("key"), """{"name":"alex"}"""), ingestor.ref, supervisor.ref)
-      expectMsgPF(max = 5.seconds) {
-        case RecordNotProduced(record: JsonRecord, error, _) =>
-          error shouldBe an[IllegalArgumentException]
-          record.destination shouldBe "transport_test"
-      }
+      val probe = TestProbe()
+      val ack: TransportCallback = (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) => probe.ref ! err.get
+      transport ! Deliver(JsonRecord("transport_test", Some("key"), """{"name":"alex"}"""), 1, ack)
+      probe.expectMsgType[IllegalArgumentException]
     }
 
     it("forwards to the right proxy") {
-      val rec = StringRecord("transport_test", Some("key"), "payload", ackStrategy = AckStrategy.Explicit)
-      kafkaSupervisor ! Produce(rec, ingestor.ref, supervisor.ref)
-      ingestor.expectMsgPF(max = 10.seconds) {
-        case RecordProduced(md, s) =>
-          s.get shouldBe supervisor.ref
-          md shouldBe a[KafkaRecordMetadata]
-          val kmd = md.asInstanceOf[KafkaRecordMetadata]
-          kmd.offset shouldBe 0
-          kmd.topic shouldBe "transport_test"
+      val ack: TransportCallback = (d: Long, m: Option[RecordMetadata], e: Option[Throwable]) => ingestor.ref ! "DONE"
+      val rec = StringRecord("transport_test", Some("key"), "payload")
+      transport ! Deliver(rec, 1, ack)
+      ingestor.expectMsg(max = 10.seconds, "DONE")
+    }
+
+    it("publishes errors to the stream") {
+      val rec = StringRecord("unknown_topic", Some("key"), "payload")
+      transport ! Deliver(rec)
+      streamActor.expectMsgPF(max = 15.seconds) { //need max so Kafka times out
+        case RecordProduceError(deliveryId, r, err) =>
+          deliveryId shouldBe -1
+          r shouldBe rec
+          err shouldBe a[TimeoutException]
+      }
+    }
+
+    it("publishes producer init errors to the stream") {
+      system.actorOf(KafkaTransport.props(Map("frmt" -> ConfigFactory.parseString("format=false"))))
+      streamActor.expectMsgPF() { case ProducerInitializationError("frmt", err) =>
+        err shouldBe a[IllegalArgumentException]
       }
     }
   }
-
 }

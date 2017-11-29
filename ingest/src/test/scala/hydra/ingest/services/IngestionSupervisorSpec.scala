@@ -5,6 +5,7 @@ import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestKit, TestProbe
 import hydra.common.util.ActorUtils
 import hydra.core.ingest._
 import hydra.core.protocol._
+import hydra.core.transport.AckStrategy
 import hydra.ingest.ingestors.IngestorInfo
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.{TestRecordFactory, TimeoutRecord}
@@ -53,7 +54,7 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
         val reply = if (req.metadataValueEquals("invalid", "true")) InvalidRequest(except) else ValidRequest(TestRecordFactory.build(req).get)
         sender.tell(reply, ingestor.ref)
         TestActor.KeepRunning
-      case Ingest(rec) =>
+      case Ingest(rec, _, _) =>
         val timeout = rec.isInstanceOf[TimeoutRecord]
         if (!timeout) sender.tell(IngestorCompleted, ingestor.ref)
         TestActor.KeepRunning
@@ -112,10 +113,10 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
 
     it("follows the ingestion protocol") {
       val parent = TestProbe()
-      parent.childActorOf(IngestionSupervisor.props(ingestorRequest, 1.second, registryProbe.ref), "sup")
+      val sup = parent.childActorOf(IngestionSupervisor.props(ingestorRequest, 1.second, registryProbe.ref), "sup")
       ingestor.expectMsg(Publish(ingestorRequest))
       ingestor.expectMsg(Validate(ingestorRequest))
-      ingestor.expectMsg(Ingest(TestRecordFactory.build(ingestorRequest).get))
+      ingestor.expectMsg(Ingest(TestRecordFactory.build(ingestorRequest).get, sup, AckStrategy.NoAck))
       parent.expectMsgPF() {
         case i: IngestionReport =>
           i.statusCode shouldBe 200
@@ -143,11 +144,11 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
     it("times out") {
       val parent = TestProbe()
       val req = ingestorRequest.withMetadata("timeout" -> "true")
-      parent.childActorOf(IngestionSupervisor.props(req, 500.millisecond, registryProbe.ref), "sup")
+      val sup = parent.childActorOf(IngestionSupervisor.props(req, 500.millisecond, registryProbe.ref), "sup")
       registryProbe.expectMsg(FindByName(ActorUtils.actorName(ingestor.ref)))
       ingestor.expectMsg(Publish(req))
       ingestor.expectMsg(Validate(req))
-      ingestor.expectMsg(Ingest(TestRecordFactory.build(req).get))
+      ingestor.expectMsg(Ingest(TestRecordFactory.build(req).get, sup, AckStrategy.NoAck))
       parent.expectMsgPF() {
         case i: IngestionReport =>
           i.statusCode shouldBe 408

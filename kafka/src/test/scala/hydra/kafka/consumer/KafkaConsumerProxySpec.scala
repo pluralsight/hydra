@@ -20,14 +20,13 @@ import akka.testkit.{ImplicitSender, TestKit}
 import hydra.kafka.consumer.KafkaConsumerProxy._
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.common.TopicPartition
-import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
 /**
   * Created by alexsilva on 9/7/16.
   */
-@DoNotDiscover
 class KafkaConsumerProxySpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike
   with BeforeAndAfterAll with ImplicitSender {
 
@@ -35,15 +34,18 @@ class KafkaConsumerProxySpec extends TestKit(ActorSystem("test")) with Matchers 
 
   override def beforeAll() = {
     super.beforeAll()
-    EmbeddedKafka.createCustomTopic("test-consumer2")
+    EmbeddedKafka.start()
     EmbeddedKafka.createCustomTopic("test-consumer1")
+    EmbeddedKafka.createCustomTopic("test-consumer2")
   }
 
   override def afterAll() = {
+    super.afterAll()
     TestKit.shutdownActorSystem(system)
+    EmbeddedKafka.stop()
   }
 
-  val kafkaProxy = system.actorOf(Props[KafkaConsumerProxy])
+  lazy val kafkaProxy = system.actorOf(Props[KafkaConsumerProxy])
 
   describe("When using KafkaConsumerProxy") {
     it("gets latest offsets for a topic") {
@@ -73,7 +75,7 @@ class KafkaConsumerProxySpec extends TestKit(ActorSystem("test")) with Matchers 
       expectMsgPF(10.seconds) {
         case PartitionInfoResponse(topic, response) =>
           response(0).leader().idString shouldBe "0"
-          topic shouldBe "test-consumer-unknown"
+          topic should startWith("test-consumer-unknown")
       }
     }
   }

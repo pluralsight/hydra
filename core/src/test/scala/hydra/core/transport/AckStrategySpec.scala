@@ -5,9 +5,10 @@ import org.scalatest.{FlatSpecLike, Matchers}
 class AckStrategySpec extends Matchers with FlatSpecLike{
 
   "the ack strategy companion" should "parse strings" in {
-    AckStrategy("explicit") shouldBe AckStrategy.Explicit
-    AckStrategy("none") shouldBe AckStrategy.None
-    AckStrategy("unknown") shouldBe AckStrategy.None
-    AckStrategy(null) shouldBe AckStrategy.None
+    AckStrategy("transport") shouldBe AckStrategy.TransportAck
+    AckStrategy("locAl") shouldBe AckStrategy.LocalAck
+    AckStrategy("none") shouldBe AckStrategy.NoAck
+    AckStrategy("unknown") shouldBe AckStrategy.NoAck
+    AckStrategy(null) shouldBe AckStrategy.NoAck
   }
 }

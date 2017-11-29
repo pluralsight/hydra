@@ -16,15 +16,11 @@
 
 package hydra.kafka.producer
 
-import hydra.core.transport.{AckStrategy, DeliveryStrategy}
-import hydra.core.transport.DeliveryStrategy.AtMostOnce
-
 /**
   * Created by alexsilva on 11/30/15.
   */
-case class StringRecord(destination: String, key: Option[String], payload: String,
-                        deliveryStrategy: DeliveryStrategy = AtMostOnce,
-                        ackStrategy: AckStrategy = AckStrategy.None) extends KafkaRecord[String, String]
+case class StringRecord(destination: String, key: Option[String], payload: String)
+  extends KafkaRecord[String, String]
 
 object StringRecord {
   def apply(topic: String, payload: String): StringRecord = new StringRecord(topic, None, payload)

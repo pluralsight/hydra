@@ -1,15 +1,16 @@
 package hydra.kafka.ingestors
 
 import akka.actor.{ActorSystem, Props}
+import akka.testkit.TestActors.ForwardActor
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.fasterxml.jackson.databind.ObjectMapper
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
-import hydra.core.ingest.RequestParams._
 import hydra.core.ingest.HydraRequest
+import hydra.core.ingest.RequestParams._
 import hydra.core.protocol._
-import hydra.core.transport.{AckStrategy, DeliveryStrategy}
-import hydra.kafka.ForwardActor
+import hydra.core.transport.AckStrategy.NoAck
+import hydra.kafka.producer
 import hydra.kafka.producer.{AvroRecord, AvroRecordFactory, JsonRecord}
 import hydra.kafka.test.TestRecordFactory
 import org.apache.avro.Schema
@@ -29,6 +30,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
   val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
   val registryClient = schemaRegistry.registryClient
   val probe = TestProbe()
+  val supervisor = TestProbe()
 
   val kafkaProducer = system.actorOf(Props(new ForwardActor(probe.ref)), "kafka_producer")
 
@@ -50,7 +52,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
   val avroSchema = new Schema.Parser().parse(schema)
 
   val record = new GenericRecordBuilder(avroSchema).set("first", "hydra").set("last", "hydra").build()
-  val ar = AvroRecord("test-schema", avroSchema, None, record, DeliveryStrategy.AtMostOnce, AckStrategy.None)
+  val ar = producer.AvroRecord("test-schema", avroSchema, None, record)
 
   val json = """{"first":"hydra","last":"hydra"}"""
 
@@ -80,8 +82,8 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
         """{"first":"Roar","last":"King"}""",
         Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema")
       )
-      transport ! Ingest(TestRecordFactory.build(request).get)
-      expectMsg(IngestorCompleted)
+      transport ! Ingest(TestRecordFactory.build(request).get, supervisor.ref, NoAck)
+      probe.expectMsg(Produce(TestRecordFactory.build(request).get, supervisor.ref, NoAck))
     }
   }
 
@@ -112,7 +114,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
     )
     AvroRecordFactory.getSubject(request) shouldBe "test-schema"
     transport ! Validate(request)
-    val ar = AvroRecord("just-a-topic", avroSchema, None, record, DeliveryStrategy.AtMostOnce, AckStrategy.None)
+    val ar = AvroRecord("just-a-topic", avroSchema, None, record)
     expectMsg(ValidRequest(ar))
   }
   it("is valid if schema can't be found, but json is allowed") {

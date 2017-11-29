@@ -36,6 +36,7 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
       sender ! (if (hasTopic) Join else Ignore)
 
     case Validate(request) =>
+      //todo: Validate topic Name Topic.validate(topic)
       val validation = request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM) match {
         case None => InvalidRequest(new IllegalArgumentException("A topic name must be supplied."))
         case Some(_) => validate(request)
@@ -43,7 +44,6 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
 
       sender ! validation
 
-    case Ingest(record) =>
-      sender ! transport(record)
+    case Ingest(record, supervisor, ackStrategy) => transport(record, supervisor, ackStrategy)
   }
 }

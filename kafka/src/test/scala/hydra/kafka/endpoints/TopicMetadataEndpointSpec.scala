@@ -23,9 +23,6 @@ class TopicMetadataEndpointSpec extends Matchers with WordSpecLike with Scalates
     }
   }), "kafka_consumer_proxy_test")
 
-
-  println(proxy.path)
-
   "The topics endpoint" should {
 
     "returns a list of topics names" in {

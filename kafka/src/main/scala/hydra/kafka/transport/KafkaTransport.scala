@@ -18,14 +18,13 @@ package hydra.kafka.transport
 
 import akka.actor.SupervisorStrategy._
 import akka.actor._
-import akka.persistence.{AtLeastOnceDelivery, PersistentActor}
 import com.typesafe.config.Config
-import hydra.common.config.ConfigSupport
-import hydra.common.logging.LoggingAdapter
-import hydra.core.protocol._
-import hydra.core.transport.DeliveryStrategy
+import hydra.core.transport.Transport
+import hydra.core.transport.TransportSupervisor.Deliver
+import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata}
-import hydra.kafka.transport.KafkaProducerProxy.ProducerInitializationError
+import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
+import hydra.kafka.transport.KafkaTransport.RecordProduceError
 
 import scala.concurrent.duration.Duration
 import scala.language.existentials
@@ -33,66 +32,32 @@ import scala.language.existentials
 /**
   * Created by alexsilva on 10/28/15.
   */
-class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with LoggingAdapter
-  with ConfigSupport with PersistentActor with AtLeastOnceDelivery {
+class KafkaTransport(producersConfig: Map[String, Config]) extends Transport {
 
-  override val persistenceId = "hydra-kafka-transport"
-
-  implicit val ec = context.dispatcher
+  private type KR = KafkaRecord[_, _]
 
   private[kafka] lazy val metrics = KafkaMetrics(applicationConfig)(context.system)
 
   private[kafka] val producers = new scala.collection.mutable.HashMap[String, ActorRef]()
 
-  override def receiveCommand: Receive = {
-    case p@Produce(_: KafkaRecord[_, _], _, _, _) =>
-      transport(p)
+  override def receive: Receive = {
+    case Deliver(kr: KafkaRecord[_, _], deliveryId, ack) =>
+      withProducer(kr.formatName)(_ ! ProduceToKafka(deliveryId, kr, ack))(e => ack.onCompletion(deliveryId, None, e))
 
-    case p@ProduceOnly(k: KafkaRecord[_, _]) =>
-      lookupProducer(k)(_ ! p)
+    case kmd: KafkaRecordMetadata => metrics.saveMetrics(kmd)
 
-    case p@RecordProduced(kmd: KafkaRecordMetadata, _) =>
-      confirm(p)
-      metrics.saveMetrics(kmd)
-
-    case e: RecordNotProduced[_, _] => context.system.eventStream.publish(e)
+    case e: RecordProduceError => context.system.eventStream.publish(e)
 
     case p: ProducerInitializationError => context.system.eventStream.publish(p)
   }
 
-  private def transport(pr: Produce[_, _]) = {
-    val kr = pr.record.asInstanceOf[KafkaRecord[_, _]]
-    lookupProducer(kr) { producer =>
-      pr.record.deliveryStrategy match {
-        case DeliveryStrategy.AtLeastOnce =>
-          producer ! pr//persistAsync(pr)(updateStore)
-        case DeliveryStrategy.AtMostOnce => producer ! pr
-      }
-    }
-  }
 
-  private def lookupProducer(kr: KafkaRecord[_, _])(success: ActorRef => Unit) = {
-    val format = kr.formatName
+  private def withProducer(format: String)(success: (ActorRef) => Unit)(fail: (Option[Throwable]) => Unit) = {
     producers.get(format) match {
-      case Some(p) => success(p)
-      case None => sender ! RecordNotProduced(kr,
-        new IllegalArgumentException(s"A Kafka producer for records of type $format could not found."))
+      case Some(producer) => success(producer)
+      case None => fail(Some(new IllegalArgumentException(s"No Kafka producer for $format records found.")))
     }
   }
-
-  private def updateStore(evt: HydraMessage): Unit = evt match {
-    case p@Produce(kr: KafkaRecord[_, _], _, _, _) =>
-      deliver(producers(kr.formatName).path)(deliveryId => p.copy(deliveryId = deliveryId))
-
-    case RecordProduced(kmd, _) => confirmDelivery(kmd.deliveryId)
-  }
-
-  private def confirm(p: RecordProduced): Unit = {
-//    if (p.md.deliveryStrategy == DeliveryStrategy.AtLeastOnce) {
-//      persistAsync(p)(r => confirmDelivery(r.md.deliveryId))
-//    }
-  }
-
 
   override val supervisorStrategy =
     OneForOneStrategy(maxNrOfRetries = -1, withinTimeRange = Duration.Inf) {
@@ -100,9 +65,6 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
       case _: Exception => Restart
     }
 
-  override def receiveRecover: Receive = {
-    case msg: HydraMessage => updateStore(msg)
-  }
 
   override def preStart(): Unit = {
     producersConfig
@@ -110,11 +72,24 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Actor with Lo
   }
 }
 
-object KafkaTransport {
+object KafkaTransport extends KafkaConfigSupport {
+
+  case class RecordProduceError(deliveryId: Long, record: KafkaRecord[_, _], error: Throwable)
 
   def props(producersConfig: Map[String, Config]): Props = Props(classOf[KafkaTransport], producersConfig)
 
+  /**
+    * Method to comply with TransportRegistrar that looks for a method in the companion object called props
+    * that takes a config param.
+    *
+    * @param cfg - We are not using this (this is the applicationConfig)
+    * @return
+    */
+  def props(cfg: Config): Props = Props(classOf[KafkaTransport], kafkaProducerFormats)
+
 }
+
+
 
 
 

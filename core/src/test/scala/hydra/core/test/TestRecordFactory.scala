@@ -19,16 +19,11 @@ object TestRecordFactory extends RecordFactory[String, String] {
 
 case class TestRecord(destination: String,
                       key: Option[String],
-                      payload: String,
-                      deliveryStrategy: DeliveryStrategy = DeliveryStrategy.AtLeastOnce,
-                      ackStrategy: AckStrategy = AckStrategy.None) extends HydraRecord[String, String]
+                      payload: String) extends HydraRecord[String, String]
 
 
-case class TestRecordMetadata(deliveryId: Long, deliveryStrategy: DeliveryStrategy = DeliveryStrategy.AtMostOnce)
-  extends RecordMetadata
+case class TestRecordMetadata(deliveryId: Long, timestamp: Long = System.currentTimeMillis) extends RecordMetadata
 
 case class TimeoutRecord(destination: String,
                          key: Option[String],
-                         payload: String,
-                         deliveryStrategy: DeliveryStrategy = DeliveryStrategy.AtLeastOnce,
-                         ackStrategy: AckStrategy = AckStrategy.None) extends HydraRecord[String, String]
+                         payload: String) extends HydraRecord[String, String]
