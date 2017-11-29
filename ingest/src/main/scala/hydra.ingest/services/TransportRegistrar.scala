@@ -2,7 +2,7 @@ package hydra.ingest.services
 
 import java.lang.reflect.Method
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorRef, ActorRefFactory, Props}
 import com.typesafe.config.Config
 import configs.syntax._
 import hydra.common.config.ConfigSupport
@@ -43,19 +43,21 @@ class TransportRegistrar extends Actor with ConfigSupport with LoggingAdapter {
   }
 
   override def preStart(): Unit = {
-    bootstrap(transports)
+    TransportRegistrar.bootstrap(transports, context, applicationConfig)
   }
+}
 
-  private[services] def bootstrap(transports: Map[String, Class[_ <: Transport]]): Seq[Try[ActorRef]] = {
+object TransportRegistrar extends LoggingAdapter {
+  private[services] def bootstrap(transports: Map[String, Class[_ <: Transport]],
+                                  fact: ActorRefFactory, config: Config): Seq[Try[ActorRef]] = {
     transports.map { case (name, clazz) =>
-      val maybeProps = Try(companion(clazz).map(c => c._2.invoke(c._1, applicationConfig).asInstanceOf[Props])
+      val maybeProps = Try(companion(clazz).map(c => c._2.invoke(c._1, config).asInstanceOf[Props])
         .getOrElse(Props(clazz)))
 
       //todo: add to registry
       maybeProps.map { props =>
-        val actor = context.actorOf(TransportSupervisor.props(name, props), name)
-        println(actor.path)
-        actor
+        log.debug(s"Initializing transport actor $name")
+        fact.actorOf(TransportSupervisor.props(name, props), name)
       }.recover {
         case e: Exception => log.error(s"Unable to instantiate transport $name: ${e.getMessage}"); throw e
       }
