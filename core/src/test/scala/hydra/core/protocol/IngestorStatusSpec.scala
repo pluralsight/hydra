@@ -16,8 +16,6 @@ class IngestorStatusSpec extends Matchers with FlatSpecLike {
     IngestorIgnored.completed shouldBe false
     RequestPublished.statusCode.intValue shouldBe 201
     RequestPublished.completed shouldBe false
-    WaitingForAck.statusCode.intValue shouldBe 102
-    WaitingForAck.completed shouldBe false
     InvalidRequest(ex).statusCode.intValue shouldBe 400
     InvalidRequest(ex).completed shouldBe true
     IngestorError(ex).statusCode.intValue shouldBe 503

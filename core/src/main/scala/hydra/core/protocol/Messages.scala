@@ -3,7 +3,7 @@ package hydra.core.protocol
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import hydra.core.ingest.HydraRequest
-import hydra.core.transport.{HydraRecord, RecordMetadata}
+import hydra.core.transport.{AckStrategy, HydraRecord, RecordMetadata}
 import org.joda.time.DateTime
 
 /**
@@ -24,7 +24,7 @@ trait MessageValidationResult extends HydraMessage
 
 case class Publish(request: HydraRequest) extends HydraMessage
 
-case class Ingest[K, V](record: HydraRecord[K, V]) extends HydraMessage
+case class Ingest[K, V](record: HydraRecord[K, V], supervisor: ActorRef, ack: AckStrategy) extends HydraMessage
 
 case object Join extends HydraMessage
 
@@ -32,24 +32,42 @@ case object Ignore extends HydraMessage
 
 case class InitiateRequest(request: HydraRequest) extends HydraMessage
 
-
-case class Produce[K, V](record: HydraRecord[K, V], ingestor: ActorRef, supervisor: ActorRef,
-                         deliveryId: Long = 0) extends HydraMessage
+/**
+  *
+  * @param record
+  * @param supervisor
+  * @param ack
+  * @tparam K
+  * @tparam V
+  */
+case class Produce[K, V](record: HydraRecord[K, V], supervisor: ActorRef, ack: AckStrategy) extends HydraMessage
 
 /**
-  * Produces a message without having to track ingestor and supervisors.
-  * No acknowledgment logic is provided either.
+  * Signals the record was accepted by a transport for production, but it hasn't been necessarily saved yet.
+  * Used exclusively for NoAck replication pipelines.
   *
-  * @param kafkaRecord
+  * @param supervisor
   */
-case class ProduceOnly[K, V](kafkaRecord: HydraRecord[K, V]) extends HydraMessage
+case class RecordAccepted(supervisor: ActorRef) extends HydraMessage
 
-case class RecordProduced(md: RecordMetadata, supervisor: Option[ActorRef] = None) extends HydraMessage
+/**
+  * Signals that a record was successfully produced by Hydra.
+  *
+  * The semantics of this varies according to the Ack tye and the underlying transport.
+  *
+  * For all local acks, this message is sent as soon as the message is saved into the journal.
+  *
+  * For transport acks this depends on the underlying acking mechanism. For Kafka, for instance,
+  * this message is sent when the broker acknowledge the receipt (and potential replication) of the record.
+  *
+  * @param md         The record metadata specific to the record produced.
+  * @param supervisor The ingestor should send this message to its supervisor if present.
+  *                   This reference is here because most times the record is produced asynchronously.
+  */
+case class RecordProduced(md: RecordMetadata, supervisor: ActorRef) extends HydraMessage
 
 case class RecordNotProduced[K, V](record: HydraRecord[K, V], error: Throwable,
-                                   supervisor: Option[ActorRef] = None) extends HydraMessage
-
-//case class ProducerAck(supervisor: ActorRef, error: Option[Throwable])
+                                   supervisor: ActorRef) extends HydraMessage
 
 //todo:rename this class
 case class HydraIngestionError(ingestor: String, error: Throwable,
@@ -72,10 +90,6 @@ sealed trait IngestorStatus extends HydraMessage with Product {
 
 case object IngestorJoined extends IngestorStatus {
   val statusCode = StatusCodes.Accepted
-}
-
-case object WaitingForAck extends IngestorStatus {
-  val statusCode = StatusCodes.Processing
 }
 
 case object IngestorIgnored extends IngestorStatus {

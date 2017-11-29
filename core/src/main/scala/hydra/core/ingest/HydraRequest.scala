@@ -1,7 +1,7 @@
 package hydra.core.ingest
 
 import hydra.core.transport.ValidationStrategy.Strict
-import hydra.core.transport.{AckStrategy, DeliveryStrategy, ValidationStrategy}
+import hydra.core.transport.{AckStrategy, ValidationStrategy}
 
 import scala.util.Random
 
@@ -11,9 +11,8 @@ import scala.util.Random
 case class HydraRequest(correlationId: Long = Random.nextInt(),
                         payload: String,
                         metadata: Map[String, String] = Map.empty,
-                        deliveryStrategy: DeliveryStrategy = DeliveryStrategy.AtMostOnce,
                         validationStrategy: ValidationStrategy = Strict,
-                        ackStrategy: AckStrategy = AckStrategy.None) {
+                        ackStrategy: AckStrategy = AckStrategy.NoAck) {
 
   def metadataValue(name: String): Option[String] = {
     metadata.get(name).orElse(metadata.find(_._1.equalsIgnoreCase(name)).map(_._2))
@@ -36,9 +35,6 @@ case class HydraRequest(correlationId: Long = Random.nextInt(),
     copy(metadata = this.metadata ++ meta)
 
   def withAckStrategy(strategy: AckStrategy) = copy(ackStrategy = strategy)
-
-  def withDeliveryStrategy(strategy: DeliveryStrategy) =
-    copy(deliveryStrategy = strategy)
 
   def withValidationStratetegy(validationStrategy: ValidationStrategy) =
     copy(validationStrategy = validationStrategy)

@@ -7,8 +7,10 @@ import akka.actor.Props
 import akka.stream._
 import akka.stream.scaladsl.{FileIO, Flow, Sink, Source}
 import akka.util.ByteString
-import hydra.core.protocol._
+import com.typesafe.config.Config
+import hydra.common.config.ConfigSupport
 import hydra.core.transport.Transport
+import hydra.core.transport.TransportSupervisor.Deliver
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -32,24 +34,19 @@ class FileTransport(destinations: Map[String, String]) extends Transport {
     sharedKillSwitch.shutdown()
   }
 
-  transport {
-    case Produce(r: FileRecord, ingestor, supervisor, _) =>
+  override def receive: Receive = {
+    case Deliver(r: FileRecord, deliveryId, callback) =>
       sinks.get(r.destination).map { flow =>
         val f = flow.offer(r.payload)
         f.onComplete {
           case Success(_) =>
             //todo: look at the QueueOfferResult object
             val md = FileRecordMetadata(destinations(r.destination), 0)
-            ingestor ! RecordProduced(md, Some(supervisor))
-          case Failure(ex) => ingestor ! RecordNotProduced(r, ex, Some(supervisor))
+            callback.onCompletion(deliveryId, Some(md), None)
+          case Failure(ex) => ex.printStackTrace(); callback.onCompletion(deliveryId, None, Some(ex))
         }
-      }.getOrElse(ingestor ! RecordNotProduced(r,
-        new IllegalArgumentException(s"File stream ${r.destination} not found."), Some(supervisor)))
-
-    case ProduceOnly(r: FileRecord) =>
-      sinks.get(r.destination).map { flow =>
-        flow.offer(r.payload)
-      }
+      }.getOrElse(callback.onCompletion(deliveryId, None,
+        Some(new IllegalArgumentException(s"File stream ${r.destination} not found."))))
   }
 
 
@@ -62,6 +59,9 @@ class FileTransport(destinations: Map[String, String]) extends Transport {
   }
 }
 
-object FileTransport {
-  def props(destinations: Map[String, String]): Props = Props(classOf[FileTransport], destinations)
+object FileTransport extends ConfigSupport {
+  def props(destinations: Config): Props = {
+    val map = toMap(destinations.getConfig("transports.file.destinations"))
+    Props(classOf[FileTransport], map)
+  }
 }

@@ -1,7 +1,7 @@
 package hydra.core.ingest
 
 import akka.actor.{ActorSystem, Props}
-import akka.testkit.{ImplicitSender, TestKit}
+import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import hydra.core.akka.ActorInitializationException
 import hydra.core.akka.InitializingActor.{InitializationError, Initialized}
 import hydra.core.protocol._
@@ -58,20 +58,25 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
       expectMsg(1.second) //testing that override with a val won't take effect until after the constructor ends
     }
 
+
     it("handle the base ingestion protocol") {
+      val sup = TestProbe()
       val ing = system.actorOf(Props(classOf[TestIngestor], true, false))
       val req = HydraRequest(1, "test")
       ing ! Publish(req)
       expectMsg(Ignore)
       ing ! Validate(req)
       expectMsg(ValidRequest(TestRecord("test-topic", Some("1"), "test")))
-      ing ! RecordProduced(TestRecordMetadata(0), Some(self))
+      ing ! RecordProduced(TestRecordMetadata(0), self)
       expectMsg(IngestorCompleted)
-      ing ! RecordNotProduced(TestRecord("test-topic", Some("1"), "test"), new IllegalArgumentException, Some(self))
-      expectMsgPF() {
+      ing ! RecordNotProduced(TestRecord("test-topic", Some("1"), "test"), new IllegalArgumentException, sup.ref)
+      sup.expectMsgPF() {
         case i: IngestorError =>
           i.error shouldBe a[IllegalArgumentException]
       }
+
+      ing ! RecordAccepted(sup.ref)
+      sup.expectMsg(IngestorCompleted)
     }
   }
 }
@@ -97,6 +102,8 @@ class TestIngestorDefault extends Ingestor {
 class TestIngestor(completeInit: Boolean, delayInit: Boolean) extends Ingestor {
 
   implicit val ec = context.dispatcher
+
+  override def initTimeout: FiniteDuration = 2.seconds
 
   val err = ActorInitializationException(self, "ERROR")
 

@@ -5,7 +5,7 @@ enablePlugins(JavaAppPackaging)
 
 val JDK = "1.8"
 val buildNumber = scala.util.Properties.envOrNone("version").map(v => "." + v).getOrElse("")
-val hydraVersion = "0.9.3" + buildNumber
+val hydraVersion = "0.9.5" + buildNumber
 
 lazy val defaultSettings = Seq(
   organization := "pluralsight",
@@ -27,7 +27,7 @@ lazy val defaultSettings = Seq(
   resolvers += "Confluent Maven Repo" at "http://packages.confluent.io/maven/",
   resolvers += "jitpack" at "https://jitpack.io",
   coverageExcludedPackages := "hydra\\.ingest\\.HydraIngestApp.*",
-  ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet,
+  ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet
 )
 
 lazy val restartSettings = Seq(

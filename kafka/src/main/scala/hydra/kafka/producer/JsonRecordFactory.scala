@@ -30,7 +30,7 @@ object JsonRecordFactory extends KafkaRecordFactory[String, JsonNode] {
   override def build(request: HydraRequest): Try[KafkaRecord[String, JsonNode]] = {
     //TODO: Strict validation with a json schema
     parseJson(request.payload)
-      .map(n => JsonRecord(getTopic(request), getKey(request), n, request.deliveryStrategy))
+      .map(n => JsonRecord(getTopic(request), getKey(request), n))
   }
 
   private def parseJson(json: String): Try[JsonNode] = Try(mapper.reader().readTree(json))

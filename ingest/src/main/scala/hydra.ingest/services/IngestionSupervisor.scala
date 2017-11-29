@@ -76,7 +76,7 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
       finishIfReady()
 
     case ValidRequest(record) =>
-      sender ! Ingest(record)
+      sender ! Ingest(record, self, request.ackStrategy)
 
     case i: InvalidRequest =>
       context.system.eventStream.publish(HydraIngestionError(ActorUtils.actorName(sender), i.error, request))
@@ -87,9 +87,6 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
 
     case IngestorTimeout =>
       updateStatus(sender, IngestorTimeout)
-
-    case WaitingForAck =>
-      updateStatus(sender, WaitingForAck)
 
     case err: IngestorError =>
       context.system.eventStream.publish(HydraIngestionError(ActorUtils.actorName(sender), err.error, request))

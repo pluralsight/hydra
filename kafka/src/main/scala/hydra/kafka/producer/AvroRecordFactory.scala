@@ -55,8 +55,7 @@ object AvroRecordFactory extends KafkaRecordFactory[String, GenericRecord] with 
   }
 
   private def buildRecord(request: HydraRequest, rec: GenericRecord, schemaResource: Try[SchemaResource]) = {
-    AvroRecord(getTopic(request), schemaResource.get.schema, getKey(request), rec,
-      request.deliveryStrategy, request.ackStrategy)
+    AvroRecord(getTopic(request), schemaResource.get.schema, getKey(request), rec)
   }
 
   def getSubject(request: HydraRequest): String = {

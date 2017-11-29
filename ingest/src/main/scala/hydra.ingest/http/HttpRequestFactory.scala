@@ -6,7 +6,7 @@ import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.Materializer
 import hydra.core.ingest.RequestParams._
 import hydra.core.ingest._
-import hydra.core.transport.{AckStrategy, DeliveryStrategy, ValidationStrategy}
+import hydra.core.transport.{AckStrategy, ValidationStrategy}
 
 import scala.concurrent.Future
 
@@ -19,19 +19,16 @@ class HttpRequestFactory extends RequestFactory[HttpRequest] with CodingDirectiv
                             (implicit mat: Materializer): Future[HydraRequest] = {
     implicit val ec = mat.executionContext
 
-    val rs = request.headers.find(_.lowercaseName() == HYDRA_DELIVERY_STRATEGY)
-      .map(h => DeliveryStrategy(h.value())).getOrElse(DeliveryStrategy.AtMostOnce)
 
     val vs = request.headers.find(_.lowercaseName() == HYDRA_VALIDATION_STRATEGY)
       .map(h => ValidationStrategy(h.value())).getOrElse(ValidationStrategy.Strict)
 
     val as = request.headers.find(_.lowercaseName() == HYDRA_ACK_STRATEGY)
-      .map(h => AckStrategy(h.value())).getOrElse(AckStrategy.None)
+      .map(h => AckStrategy(h.value())).getOrElse(AckStrategy.NoAck)
 
     Unmarshal(request.entity).to[String].map { payload =>
       val metadata: Map[String, String] = request.headers.map(h => h.name.toLowerCase -> h.value).toMap
-      HydraRequest(correlationId, payload, metadata, deliveryStrategy = rs,
-        validationStrategy = vs, ackStrategy = as)
+      HydraRequest(correlationId, payload, metadata, validationStrategy = vs, ackStrategy = as)
     }
   }
 }

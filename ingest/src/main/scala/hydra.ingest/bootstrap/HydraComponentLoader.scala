@@ -18,7 +18,10 @@ package hydra.ingest.bootstrap
 
 import java.lang.reflect.Modifier
 
+import hydra.common.config.ConfigSupport
+import hydra.common.logging.LoggingAdapter
 import hydra.core.ingest.Ingestor
+import hydra.core.transport.Transport
 import org.reflections.Reflections
 
 import scala.collection.JavaConverters._
@@ -26,17 +29,32 @@ import scala.collection.JavaConverters._
 /**
   * Created by alexsilva on 1/12/16.
   */
-trait IngestorLoader {
+trait HydraComponentLoader {
 
   def ingestors: Seq[Class[_ <: Ingestor]]
+
+  def transports: Seq[Class[_ <: Transport]]
 }
 
-class ClasspathIngestorLoader(pkgs: Seq[String]) extends IngestorLoader {
+object ClasspathHydraComponentLoader extends HydraComponentLoader with ConfigSupport with LoggingAdapter {
 
-  require(pkgs.size > 0, "At least one package is required.")
+  import configs.syntax._
+
+  private val ingestorsPkg = applicationConfig.get[List[String]]("ingest.classpath-scan").valueOrElse(List.empty)
+
+  log.debug(s"Scanning for ingestors in package(s): [${ingestorsPkg.mkString}].")
+
+  private val transportsPkg = applicationConfig.get[List[String]]("transports.classpath-scan").valueOrElse(List.empty)
+
+  log.debug(s"Scanning for transports in package(s): [${transportsPkg.mkString}].")
+
+  private val pkgs = ingestorsPkg ::: transportsPkg
 
   private val reflections = new Reflections(pkgs.toArray)
 
   override lazy val ingestors = reflections.getSubTypesOf(classOf[Ingestor])
+    .asScala.filterNot(c => Modifier.isAbstract(c.getModifiers)).toSeq
+
+  override lazy val transports = reflections.getSubTypesOf(classOf[Transport])
     .asScala.filterNot(c => Modifier.isAbstract(c.getModifiers)).toSeq
 }

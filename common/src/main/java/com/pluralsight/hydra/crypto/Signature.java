@@ -44,9 +44,4 @@ public class Signature {
         mac.init(signingKey);
         return toHexString(mac.doFinal(data.getBytes()));
     }
-
-    public static void main(String[] args) throws Exception {
-        String hmac = calculateRFC2104HMAC("data", "key");
-        System.out.println(hmac);
-    }
 }
