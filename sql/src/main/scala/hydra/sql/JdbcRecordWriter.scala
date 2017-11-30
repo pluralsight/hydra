@@ -6,6 +6,7 @@ import com.zaxxer.hikari.HikariDataSource
 import hydra.avro.io.SaveMode.SaveMode
 import hydra.avro.io.{RecordWriter, SaveMode}
 import hydra.avro.util.AvroUtils
+import hydra.common.util.TryWith
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
 import org.slf4j.LoggerFactory
@@ -63,9 +64,18 @@ class JdbcRecordWriter(val dataSource: HikariDataSource,
 
   private val name = dbSyntax.format(tableObj.name)
 
+  private var valueSetter = new AvroValueSetter(schema, dialect)
+
   private var stmt = dialect.upsert(dbSyntax.format(name), schema, dbSyntax)
 
-  private val valueSetter = new AvroValueSetter(schema, dialect)
+  private var _conn = dataSource.getConnection
+
+  private def connection = {
+    if (_conn.isClosed) {
+      _conn = dataSource.getConnection
+    }
+    _conn
+  }
 
   def add(record: GenericRecord): Unit = {
     if (AvroUtils.areEqual(currentSchema, record.getSchema)) {
@@ -85,6 +95,25 @@ class JdbcRecordWriter(val dataSource: HikariDataSource,
     store.createOrAlterTable(Table(tableId.table, record.getSchema))
     currentSchema = record.getSchema
     stmt = dialect.upsert(dbSyntax.format(name), currentSchema, dbSyntax)
+    valueSetter = new AvroValueSetter(currentSchema, dialect)
+  }
+
+  /**
+    * Convenience method to write exactly one record to the underlying database.
+    *
+    * @param record
+    */
+  def writeOne(record: GenericRecord): Unit = {
+    if (AvroUtils.areEqual(currentSchema, record.getSchema)) {
+      TryWith(connection.prepareStatement(stmt)) { pstmt =>
+        valueSetter.bind(record, pstmt)
+        pstmt.executeUpdate()
+      }.get //TODO: better error handling here, we do the get just so that we throw an exception if there is one.
+    }
+    else {
+      updateDb(record)
+      writeOne(record)
+    }
   }
 
   def flush(): Unit = synchronized {
