@@ -15,6 +15,9 @@
 
 package hydra.avro.util
 
+import com.pluralsight.hydra.avro.JsonToAvroConversionException
+import hydra.avro.JsonToAvroConversionExceptionWithMetadata
+import hydra.avro.resource.SchemaResource
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Field
 
@@ -92,6 +95,14 @@ object AvroUtils {
     if (equals) seen.add(here)
 
     equals
+  }
+
+
+  def improveException(ex: Throwable, schemaResource: SchemaResource) = {
+    ex match {
+      case e: JsonToAvroConversionException => JsonToAvroConversionExceptionWithMetadata(e, schemaResource)
+      case e: Exception => e
+    }
   }
 
   private[avro] case class SeenPair private(s1: Int, s2: Int) {
