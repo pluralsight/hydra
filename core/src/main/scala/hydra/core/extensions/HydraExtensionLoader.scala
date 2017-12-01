@@ -16,10 +16,11 @@
 package hydra.core.extensions
 
 import akka.actor.{ActorSystem, DynamicAccess, ExtensionId, ExtensionIdProvider, ReflectiveDynamicAccess}
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 
+import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -27,21 +28,24 @@ import scala.util.{Failure, Success, Try}
   */
 object HydraExtensionLoader extends LoggingAdapter {
 
-  def load(name: String, config: Config)(implicit system: ActorSystem): Try[AnyRef] = {
-
-    config.get[Config](name).map { cfg =>
-      //is there a way to plug into akka's classloader?
-      val dm = new ReflectiveDynamicAccess(Thread.currentThread.getContextClassLoader)
-      val clazz = cfg.getString("class")
-      val enabled = cfg.get[Boolean]("enabled").valueOrElse(true)
-      val extName = s"$name ($clazz)"
-      if (enabled) {
-        log.info(s"Loading extension ${extName}")
-        instantiate(dm, system, clazz, name)
-      } else {
-        Failure(new IllegalArgumentException(s"Extension $name is not enabled."))
+  def load(config: Config)(implicit system: ActorSystem): Seq[Try[ExtensionId[_]]] = {
+    config.getOrElse[Config]("extensions", ConfigFactory.empty).map { c =>
+      c.root().entrySet().asScala.map { entry =>
+        val name = entry.getKey
+        val cfg = entry.getValue.asInstanceOf[ConfigObject].toConfig
+        //is there a way to plug into akka's classloader?
+        val dm = new ReflectiveDynamicAccess(Thread.currentThread.getContextClassLoader)
+        val clazz = cfg.getString("class")
+        val enabled = cfg.get[Boolean]("enabled").valueOrElse(true)
+        val extName = s"$name ($clazz)"
+        if (enabled) {
+          log.info(s"Loading extension ${extName}")
+          instantiate(dm, system, clazz, name)
+        } else {
+          Failure(new IllegalArgumentException(s"Extension $name is not enabled."))
+        }
       }
-    }.valueOrThrow(e => new IllegalArgumentException(s"Error loading extension $name: ${e.configException}."))
+    }.value.toSeq
   }
 
   private def instantiate(dm: DynamicAccess, system: ActorSystem,

@@ -19,9 +19,9 @@ class HydraEntryPointSpec extends Matchers with FunSpecLike with BeforeAndAfterA
   val conf =
     """
       |  hydra_test{
-      |  test {
-      |    endpoints = ["hydra.core.app.DummyEndpoint"]
-      | }
+      |
+      |  endpoints = ["hydra.core.app.DummyEndpoint"]
+      |
       | extensions {
       |    dummy {
       |      enabled = true
@@ -31,7 +31,6 @@ class HydraEntryPointSpec extends Matchers with FunSpecLike with BeforeAndAfterA
     """.stripMargin
 
   val et = new HydraEntryPoint() {
-    override def moduleName: String = "test"
 
     override def config: Config = ConfigFactory.parseString(conf)
 
@@ -48,10 +47,8 @@ class HydraEntryPointSpec extends Matchers with FunSpecLike with BeforeAndAfterA
   describe("When using the HydraEntryPoint class") {
 
     it("is properly configured") {
-      et.moduleName shouldBe "test"
-      et.services shouldBe Seq("test" -> Props[DummyActor])
+       et.services shouldBe Seq("test" -> Props[DummyActor])
       et.endpoints shouldBe Seq(classOf[DummyEndpoint])
-      et.extensions shouldBe ConfigFactory.parseString(conf).getConfig("hydra_test.extensions")
     }
 
 
@@ -63,7 +60,7 @@ class HydraEntryPointSpec extends Matchers with FunSpecLike with BeforeAndAfterA
 
     it("builds a container") {
       val csvc = new ContainerService(Seq(classOf[DummyEndpoint]), Nil, Seq("test" -> Props[DummyActor]), Nil,
-        "hydra_test-test")(container.system)
+        "hydra_test")(container.system)
       csvc.name shouldBe container.name
       csvc.registeredRoutes shouldBe container.registeredRoutes
       csvc.name shouldBe container.name
