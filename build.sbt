@@ -85,6 +85,12 @@ lazy val sql = Project(
 ).dependsOn(core)
   .settings(moduleSettings, name := "hydra-sql", libraryDependencies ++= Dependencies.sqlDeps)
 
+lazy val jdbc = Project(
+  id = "jdbc",
+  base = file("jdbc")
+).dependsOn(sql)
+  .settings(moduleSettings, name := "hydra-jdbc", libraryDependencies ++= Dependencies.sqlDeps)
+
 lazy val rabbitmq = Project(
   id = "rabbitmq",
   base = file("rabbitmq")
@@ -95,8 +101,8 @@ val sbSettings = defaultSettings ++ Test.testSettings ++ noPublishSettings ++ re
 lazy val sandbox = Project(
   id = "sandbox",
   base = file("sandbox")
-).dependsOn(ingest, kafka)
-  .settings(sbSettings, name := "hydra-examples", libraryDependencies ++= Dependencies.kafkaDeps)
+).dependsOn(ingest, kafka, jdbc)
+  .settings(sbSettings, name := "hydra-examples", libraryDependencies ++= Dependencies.sandboxDeps)
 
 //scala style
 lazy val testScalastyle = taskKey[Unit]("testScalastyle")
