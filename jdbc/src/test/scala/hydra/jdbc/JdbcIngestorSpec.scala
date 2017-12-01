@@ -20,7 +20,7 @@ class JdbcIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers 
   val jdbcTransport = system.actorOf(Props(new ForwardActor(probe.ref)), "jdbc_transport")
 
   override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
-  
+
   describe("When using the jdbc ingestor") {
     it("Joins") {
       val request = HydraRequest(123, "someString", Map(JdbcRecordFactory.DB_PROFILE_PARAM -> "testdb"))
