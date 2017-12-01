@@ -26,12 +26,17 @@ class HydraExtensionSpec extends TestKit(ActorSystem("test"))
       |      enabled = true
       |      class = hydra.core.extensions.HydraTestExtension
       |    }
+      |    test-extension-disabled {
+      |      enabled = false
+      |      class = hydra.core.extensions.HydraTestExtension
+      |    }
       |  }
     """.stripMargin)
 
   describe("Hydra extensions") {
     it("can be loaded from configuration") {
       val ext: Seq[Try[ExtensionId[_]]] = HydraExtensionLoader.load(cfg)
+      ext(1).isFailure shouldBe true
       ext(0).get.asInstanceOf[ExtensionId[HydraTestExtensionImpl]].get(system).extName shouldBe "tester"
     }
 

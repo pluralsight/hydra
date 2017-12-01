@@ -15,7 +15,6 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
   */
 class HydraEntryPointSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
 
-
   val conf =
     """
       |  hydra_test{
@@ -31,7 +30,6 @@ class HydraEntryPointSpec extends Matchers with FunSpecLike with BeforeAndAfterA
     """.stripMargin
 
   val et = new HydraEntryPoint() {
-
     override def config: Config = ConfigFactory.parseString(conf)
 
     override def services: Seq[(String, Props)] = Seq("test" -> Props[DummyActor])
@@ -47,10 +45,10 @@ class HydraEntryPointSpec extends Matchers with FunSpecLike with BeforeAndAfterA
   describe("When using the HydraEntryPoint class") {
 
     it("is properly configured") {
-       et.services shouldBe Seq("test" -> Props[DummyActor])
+      et.config shouldBe ConfigFactory.parseString(conf)
+      et.services shouldBe Seq("test" -> Props[DummyActor])
       et.endpoints shouldBe Seq(classOf[DummyEndpoint])
     }
-
 
     it("throws error if config is missing") {
       intercept[MissingConfigException] {
