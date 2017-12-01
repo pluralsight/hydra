@@ -14,6 +14,7 @@ object Test {
 
     // Don't package test jars since it does not handle resources properly
     exportJars in sbt.Test := false,
+    coverageEnabled in sbt.Test := true,
 
     // Include the code coverage settings
     coverageExcludedPackages := "<empty>;akka.contrib.*",
