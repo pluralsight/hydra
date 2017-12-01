@@ -34,8 +34,6 @@ import scala.util.{Failure, Success, Try}
   */
 class JdbcCatalog(ds: DataSource, dbSyntax: DbSyntax, dialect: JdbcDialect) extends Catalog with JdbcHelper {
 
-  import JdbcCatalog.log
-
   override def createSchema(schema: String): Boolean = {
     withConnection(ds.getConnection) { conn =>
       validateName(schema)
@@ -62,7 +60,9 @@ class JdbcCatalog(ds: DataSource, dbSyntax: DbSyntax, dialect: JdbcDialect) exte
       val tableExists = JdbcUtils.tableExists(conn, dialect, name)
       if (tableExists) {
         alterIfNeeded(table, conn)
-          .recover { case e: SQLException => throw UnableToCreateException(e.getMessage) }
+          .recover { case e: SQLException =>
+            throw UnableToCreateException(e.getMessage)
+          }
           .get
       } else {
         Try(JdbcUtils.createTable(table.schema, dialect, name, "", dbSyntax, conn))
@@ -93,11 +93,13 @@ class JdbcCatalog(ds: DataSource, dbSyntax: DbSyntax, dialect: JdbcDialect) exte
             throw new RuntimeException(s"Table ${table.name} is missing fields ${fields.map(_.name())} and auto-evolution is disabled")
           }
 
-          val alterQueries = dialect.alterTableQueries(table.name, fields, dbSyntax)
-          log.info("Amending table to add missing fields:{} with SQL: {}",
+          val alterQueries = dialect.alterTableQueries(dbSyntax.format(table.name), fields, dbSyntax)
+          JdbcCatalog.log.info("Amending table to add missing fields:{} with SQL: {}",
             fields.mkString(","), alterQueries.mkString(","), "")
-          TryWith(connection.createStatement())(stmt => alterQueries.foreach(stmt.executeUpdate))
-          Success(true)
+          TryWith(connection.createStatement()) { stmt =>
+            alterQueries.foreach(stmt.executeUpdate)
+            true
+          }
       }
     }
   }
@@ -110,13 +112,11 @@ class JdbcCatalog(ds: DataSource, dbSyntax: DbSyntax, dialect: JdbcDialect) exte
     missing.map(schema.getField)
   }
 
-
   override def tableExists(tId: TableIdentifier): Boolean = synchronized {
     withConnection(ds.getConnection) { conn =>
       JdbcUtils.tableExists(conn, dialect, getTableName(tId))
     }
   }
-
 
   private def getTableName(t: TableIdentifier): String = {
     val db = t.schema.filterNot(_.isEmpty).map(d => formatDatabaseName(d) + ".")

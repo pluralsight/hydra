@@ -15,13 +15,14 @@
 
 package hydra.kafka.producer
 
-import com.pluralsight.hydra.avro.{JsonConverter, JsonToAvroConversionException}
-import hydra.avro.JsonToAvroConversionExceptionWithMetadata
+import com.pluralsight.hydra.avro.JsonConverter
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
+import hydra.avro.util.AvroUtils
 import hydra.common.config.ConfigSupport
 import hydra.core.ingest.{HydraRequest, RequestParams}
 import hydra.core.transport.ValidationStrategy.Strict
+import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
 
 import scala.util.Try
@@ -42,20 +43,13 @@ object AvroRecordFactory extends KafkaRecordFactory[String, GenericRecord] with 
       val strict = request.validationStrategy == Strict
       val converter = new JsonConverter[GenericRecord](s.schema, strict)
       Try(converter.convert(request.payload))
-        .map(rec => buildRecord(request, rec, schemaResource))
-        .recover { case ex => throw schemaResource.map(r => improveException(ex, r)).getOrElse(ex) }
+        .map(rec => buildRecord(request, rec, s.schema))
+        .recover { case ex => throw schemaResource.map(r => AvroUtils.improveException(ex, r)).getOrElse(ex) }
     }
   }
 
-  private def improveException(ex: Throwable, schemaResource: SchemaResource) = {
-    ex match {
-      case e: JsonToAvroConversionException => JsonToAvroConversionExceptionWithMetadata(e, schemaResource)
-      case e: Exception => e
-    }
-  }
-
-  private def buildRecord(request: HydraRequest, rec: GenericRecord, schemaResource: Try[SchemaResource]) = {
-    AvroRecord(getTopic(request), schemaResource.get.schema, getKey(request), rec)
+  private def buildRecord(request: HydraRequest, rec: GenericRecord, schema: Schema) = {
+    AvroRecord(getTopic(request), schema, getKey(request), rec)
   }
 
   def getSubject(request: HydraRequest): String = {
@@ -63,7 +57,5 @@ object AvroRecordFactory extends KafkaRecordFactory[String, GenericRecord] with 
   }
 
 }
-
-
 
 

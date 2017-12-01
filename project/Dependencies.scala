@@ -129,5 +129,7 @@ object Dependencies {
 
   val kafkaDeps = coreDeps ++ Seq(akkaKafkaStream, jsonLenses) ++ kafka
 
+  val sandboxDeps = kafkaDeps ++ sqlDeps ++ Seq("com.h2database" % "h2" % "1.4.196")
+
   val overrides = Set(logging, typesafeConfig, joda)
 }
