@@ -78,9 +78,9 @@ object JdbcTransport {
 }
 
 
-class DbProfile(val name: String, props: Properties) extends ConfigSupport {
+class DbProfile(val name: String, props: Properties) {
 
-  val hcfg = new HikariConfig(props)
+  private val hcfg = new HikariConfig(props)
 
   lazy val ds = new HikariDataSource(hcfg)
 
