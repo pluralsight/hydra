@@ -15,6 +15,9 @@
 
 package hydra.avro.util
 
+import com.pluralsight.hydra.avro.JsonToAvroConversionException
+import hydra.avro.JsonToAvroConversionExceptionWithMetadata
+import hydra.avro.resource.SchemaResource
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Field
 
@@ -94,6 +97,14 @@ object AvroUtils {
     equals
   }
 
+
+  def improveException(ex: Throwable, schemaResource: SchemaResource) = {
+    ex match {
+      case e: JsonToAvroConversionException => JsonToAvroConversionExceptionWithMetadata(e, schemaResource)
+      case e: Exception => e
+    }
+  }
+
   private[avro] case class SeenPair private(s1: Int, s2: Int) {
     override def equals(o: Any): Boolean =
       (this.s1 == o.asInstanceOf[SeenPair].s1) && (this.s2 == o.asInstanceOf[SeenPair].s2)
@@ -102,7 +113,3 @@ object AvroUtils {
   }
 
 }
-
-
-
-

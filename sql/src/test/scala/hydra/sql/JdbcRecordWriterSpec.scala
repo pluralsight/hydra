@@ -155,6 +155,88 @@ class JdbcRecordWriterSpec extends Matchers with FunSpecLike with BeforeAndAfter
       writer.close()
     }
 
+    it("writes a single record") {
+      val schemaStr =
+        """
+          |{
+          |	"type": "record",
+          |	"name": "WriteSingleRecord",
+          |	"namespace": "hydra",
+          |	"fields": [{
+          |			"name": "id",
+          |			"type": "int",
+          |			"doc": "doc"
+          |		},
+          |		{
+          |			"name": "username",
+          |			"type": ["null", "string"]
+          |		}
+          |	]
+          |}""".stripMargin
+
+      val srecord = new GenericData.Record(new Schema.Parser().parse(schemaStr))
+      srecord.put("id", 1)
+      srecord.put("username", "alex")
+
+      val writer = new JdbcRecordWriter(ds, new Schema.Parser().parse(schemaStr), batchSize = 2, dialect = H2Dialect)
+
+      writer.writeOne(srecord)
+
+      withConnection(ds.getConnection) { c =>
+        val stmt = c.createStatement()
+        val rs = stmt.executeQuery("select \"id\",\"username\" from write_single_record")
+        rs.next() shouldBe true
+        rs.getString(2) shouldBe "alex"
+        rs.getInt(1) shouldBe 1
+      }
+
+      //test schema update
+
+      val newSchema =
+        """
+          |{
+          |	"type": "record",
+          |	"name": "WriteSingleRecord",
+          |	"namespace": "hydra",
+          |	"fields": [{
+          |			"name": "id",
+          |			"type": "int",
+          |			"doc": "doc"
+          |		},
+          |  {
+          |			"name": "rank",
+          |			"type": "int"
+          |		},
+          |		{
+          |			"name": "username",
+          |			"type": ["null", "string"]
+          |		}
+          |	]
+          |}""".stripMargin
+
+      val newRecord = new GenericData.Record(new Schema.Parser().parse(newSchema))
+      newRecord.put("id", 2)
+      newRecord.put("rank", 2)
+      newRecord.put("username", "alex-new")
+
+      withConnection(ds.getConnection) { c =>
+        val stmt = c.createStatement()
+        stmt.executeUpdate("delete from write_single_record")
+        stmt.close()
+      }
+
+      writer.writeOne(newRecord)
+
+      withConnection(ds.getConnection) { c =>
+        val stmt = c.createStatement()
+        val rs = stmt.executeQuery("select \"id\",\"username\", \"rank\" from write_single_record")
+        rs.next() shouldBe true
+        rs.getString(2) shouldBe "alex-new"
+        rs.getInt(1) shouldBe 2
+        rs.getInt(3) shouldBe 2
+      }
+    }
+
     it("flushesOnClose") {
 
       val schemaStr =

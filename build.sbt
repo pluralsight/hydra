@@ -15,6 +15,7 @@ lazy val defaultSettings = Seq(
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
   excludeDependencies += "org.slf4j" % "slf4j-log4j12",
   excludeDependencies += "log4j" % "log4j",
+  coverageEnabled := true,
   packageOptions in(Compile, packageBin) +=
     Package.ManifestAttributes("Implementation-Build" -> buildNumber),
   logLevel := Level.Info,
@@ -49,7 +50,7 @@ lazy val moduleSettings = defaultSettings ++ Test.testSettings //++ Publish.sett
 lazy val root = Project(
   id = "hydra",
   base = file(".")
-).settings(defaultSettings).aggregate(common, core, avro, ingest, kafka, sql, sandbox)
+).settings(defaultSettings).aggregate(common, core, avro, ingest, kafka, sql, jdbc, sandbox)
 
 lazy val common = Project(
   id = "common",
@@ -85,6 +86,12 @@ lazy val sql = Project(
 ).dependsOn(core)
   .settings(moduleSettings, name := "hydra-sql", libraryDependencies ++= Dependencies.sqlDeps)
 
+lazy val jdbc = Project(
+  id = "jdbc",
+  base = file("jdbc")
+).dependsOn(sql)
+  .settings(moduleSettings, name := "hydra-jdbc", libraryDependencies ++= Dependencies.sqlDeps)
+
 lazy val rabbitmq = Project(
   id = "rabbitmq",
   base = file("rabbitmq")
@@ -95,8 +102,8 @@ val sbSettings = defaultSettings ++ Test.testSettings ++ noPublishSettings ++ re
 lazy val sandbox = Project(
   id = "sandbox",
   base = file("sandbox")
-).dependsOn(ingest, kafka)
-  .settings(sbSettings, name := "hydra-examples", libraryDependencies ++= Dependencies.kafkaDeps)
+).dependsOn(ingest, kafka, jdbc)
+  .settings(sbSettings, name := "hydra-examples", libraryDependencies ++= Dependencies.sandboxDeps)
 
 //scala style
 lazy val testScalastyle = taskKey[Unit]("testScalastyle")

@@ -34,7 +34,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
 
   val kafkaProducer = system.actorOf(Props(new ForwardActor(probe.ref)), "kafka_producer")
 
-  val transport = probe.childActorOf(Props[KafkaIngestor])
+  val kafkaIngestor = probe.childActorOf(Props[KafkaIngestor])
 
   val KAFKA = "kafka_ingestor"
 
@@ -64,7 +64,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
         "someString",
         Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "topic")
       )
-      transport ! Publish(request)
+      kafkaIngestor ! Publish(request)
       expectMsg(Join)
     }
 
@@ -73,7 +73,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
         "someString",
         Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_RECORD_FORMAT_PARAM -> "json")
       )
-      transport ! Validate(request)
+      kafkaIngestor ! Validate(request)
       expectMsgType[InvalidRequest]
     }
 
@@ -82,7 +82,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
         """{"first":"Roar","last":"King"}""",
         Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema")
       )
-      transport ! Ingest(TestRecordFactory.build(request).get, supervisor.ref, NoAck)
+      kafkaIngestor ! Ingest(TestRecordFactory.build(request).get, supervisor.ref, NoAck)
       probe.expectMsg(Produce(TestRecordFactory.build(request).get, supervisor.ref, NoAck))
     }
   }
@@ -93,7 +93,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
       "someString",
       Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "avro-topic")
     )
-    transport ! Validate(request)
+    kafkaIngestor ! Validate(request)
     expectMsgType[InvalidRequest]
   }
 
@@ -102,7 +102,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
       json,
       Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema")
     )
-    transport ! Validate(request)
+    kafkaIngestor ! Validate(request)
     AvroRecordFactory.getSubject(request) shouldBe "test-schema"
     expectMsg(ValidRequest(ar))
   }
@@ -113,14 +113,14 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
       Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "just-a-topic", HYDRA_SCHEMA_PARAM -> "test-schema")
     )
     AvroRecordFactory.getSubject(request) shouldBe "test-schema"
-    transport ! Validate(request)
+    kafkaIngestor ! Validate(request)
     val ar = AvroRecord("just-a-topic", avroSchema, None, record)
     expectMsg(ValidRequest(ar))
   }
   it("is valid if schema can't be found, but json is allowed") {
     val request = HydraRequest(123, json,
       Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_RECORD_FORMAT_PARAM -> "json", HYDRA_KAFKA_TOPIC_PARAM -> "json-topic"))
-    transport ! Validate(request)
+    kafkaIngestor ! Validate(request)
     val node = new ObjectMapper().reader().readTree("""{"first":"hydra","last":"hydra"}""")
     expectMsg(ValidRequest(JsonRecord("json-topic", None, node)))
   }
