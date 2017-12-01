@@ -10,13 +10,13 @@ import hydra.common.logging.LoggingAdapter
   * Created by alexsilva on 2/1/16.
   *
   */
-class HydraExtensionListener(extensionName: String, config: Config) extends ContainerLifecycleListener
+class HydraExtensionListener(config: Config) extends ContainerLifecycleListener
   with LoggingAdapter {
 
   private[extensions] val hasExtensions = !config.isEmpty
 
   override def onStartup(container: ContainerService) = {
-    if (hasExtensions) HydraExtensionLoader.load(extensionName, config)(container.system)
+    if (hasExtensions) HydraExtensionLoader.load(config)(container.system)
   }
 
   override def onShutdown(container: ContainerService): Unit = {

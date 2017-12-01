@@ -52,7 +52,10 @@ class TestTypedModule(val id: String, val config: Config) extends HydraTypedModu
 
 
 class TestActorModule(val id: String, val config: Config) extends HydraActorModule {
-  val act = context.actorSelection(config.getString("actorPath"))
+
+  import configs.syntax._
+
+  val act = context.actorSelection(config.getOrElse[String]("actorPath", "").value)
 
   override def run(): Unit = act ! Run
 

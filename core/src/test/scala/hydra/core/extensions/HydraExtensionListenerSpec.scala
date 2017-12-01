@@ -20,7 +20,6 @@ class HydraExtensionListenerSpec extends TestKit(ActorSystem("test"))
     """.stripMargin
 
   val et = new HydraEntryPoint() {
-    override def moduleName: String = "test"
 
     override def config: Config = ConfigFactory.parseString(conf)
 
@@ -31,13 +30,15 @@ class HydraExtensionListenerSpec extends TestKit(ActorSystem("test"))
 
   val cfg = ConfigFactory.parseString(
     """
-      |test-extension {
-      |  name=typed-test
-      |  class=hydra.core.extensions.HydraTestExtension
+      |extensions {
+      |   test-extension {
+      |     name = typed-test
+      |     class = hydra.core.extensions.HydraTestExtension
+      |   }
       |}
     """.stripMargin)
 
-  val e = new HydraExtensionListener("test-extension", cfg)
+  val e = new HydraExtensionListener(cfg)
 
   override def afterAll() = {
     e.onShutdown(container)
@@ -53,7 +54,7 @@ class HydraExtensionListenerSpec extends TestKit(ActorSystem("test"))
     }
 
     it("skips loading on empty config") {
-      val e = new HydraExtensionListener("test-extension", ConfigFactory.empty())
+      val e = new HydraExtensionListener(ConfigFactory.empty())
       e.hasExtensions shouldBe false
       e.onStartup(container)
       e.onShutdown(container)

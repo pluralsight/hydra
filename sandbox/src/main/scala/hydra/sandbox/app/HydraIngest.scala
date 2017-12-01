@@ -11,9 +11,8 @@ import hydra.ingest.IngestionActors
   */
 // $COVERAGE-OFF$
 object HydraIngest extends HydraEntryPoint with IngestionActors {
-  override def moduleName: String = "sandbox"
 
-  override def config = rootConfig.withFallback(ConfigFactory.parseFile(new File("/etc/hydra/hydra-sandbox.conf")))
+  override val config = rootConfig.withFallback(ConfigFactory.parseFile(new File("/etc/hydra/hydra-sandbox.conf")))
 
   buildContainer().start()
 }

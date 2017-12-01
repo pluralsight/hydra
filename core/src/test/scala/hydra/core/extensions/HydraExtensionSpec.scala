@@ -5,6 +5,8 @@ import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import hydra.core.extensions.HydraActorModule.Run
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
+import scala.util.Try
+
 class HydraExtensionSpec extends TestKit(ActorSystem("test"))
   with Matchers with FunSpecLike with BeforeAndAfterAll with ImplicitSender {
 
@@ -29,8 +31,24 @@ class HydraExtensionSpec extends TestKit(ActorSystem("test"))
 
   describe("Hydra extensions") {
     it("can be loaded from configuration") {
-      val ext = HydraExtensionLoader.load("test-extension", cfg.getConfig("extensions"))
-      ext.get.asInstanceOf[ExtensionId[HydraTestExtensionImpl]].get(system).extName shouldBe "tester"
+      val ext: Seq[Try[ExtensionId[_]]] = HydraExtensionLoader.load(cfg)
+      ext(0).get.asInstanceOf[ExtensionId[HydraTestExtensionImpl]].get(system).extName shouldBe "tester"
+    }
+
+    it("reports failure") {
+      val cfg = ConfigFactory.parseString(
+        """
+          |    extensions {
+          |      test-extension-disabled {
+          |      enabled = false
+          |      class = hydra.core.extensions.HydraTestExtension
+          |    }
+          |  }
+        """.stripMargin)
+      val ext: Seq[Try[ExtensionId[_]]] = HydraExtensionLoader.load(cfg)
+      intercept[IllegalArgumentException] {
+        ext(0).get
+      }
     }
 
     it("register modules with the extension registry") {
