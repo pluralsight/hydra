@@ -82,8 +82,8 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
         """{"first":"Roar","last":"King"}""",
         Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema")
       )
-      kafkaIngestor ! Ingest(TestRecordFactory.build(request).get, supervisor.ref, NoAck)
-      probe.expectMsg(Produce(TestRecordFactory.build(request).get, supervisor.ref, NoAck))
+      kafkaIngestor ! Ingest(TestRecordFactory.build(request).get, NoAck)
+      probe.expectMsg(Produce(TestRecordFactory.build(request).get, self, NoAck))
     }
   }
 

@@ -22,7 +22,7 @@ class JdbcIngestor extends Ingestor with TransportOps {
 
       sender ! validation
 
-    case Ingest(record, supervisor, ackStrategy) => transport(record, supervisor, ackStrategy)
+    case Ingest(record, ackStrategy) => transport(record, ackStrategy)
   }
 
   override def transportName = "jdbc"

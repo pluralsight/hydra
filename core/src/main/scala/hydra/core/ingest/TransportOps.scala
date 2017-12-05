@@ -1,6 +1,7 @@
 package hydra.core.ingest
 
-import akka.actor.{ActorRef, Scheduler}
+import akka.actor.Scheduler
+import akka.pattern.after
 import configs.syntax._
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
@@ -10,7 +11,6 @@ import hydra.core.transport.{AckStrategy, HydraRecord}
 
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.concurrent.{ExecutionContext, Future}
-import akka.pattern.after
 
 /**
   * Encapsulates basic transport operations: Look up an existing transport and
@@ -53,7 +53,8 @@ trait TransportOps extends ConfigSupport with LoggingAdapter {
       }
   }
 
-  def transport[K, V](record: HydraRecord[K, V], supervisor: ActorRef, ack: AckStrategy): Unit = {
+  def transport[K, V](record: HydraRecord[K, V], ack: AckStrategy): Unit = {
+    val supervisor = sender()
     transportActorFuture.foreach(_ ! Produce(record, supervisor, ack))
   }
 

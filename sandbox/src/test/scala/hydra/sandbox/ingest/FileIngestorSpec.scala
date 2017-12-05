@@ -62,9 +62,8 @@ class FileIngestorSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with M
 
     it("transports") {
       val hr = HydraRequest(0, "test").withMetadata("hydra-file-stream" -> "test")
-      val supervisor = TestProbe()
-      ingestor ! Ingest(FileRecordFactory.build(hr).get, supervisor.ref, AckStrategy.NoAck)
-      transportProbe.expectMsg(10.seconds, Produce(FileRecord("test", "test"), supervisor.ref, AckStrategy.NoAck))
+      ingestor ! Ingest(FileRecordFactory.build(hr).get, AckStrategy.NoAck)
+      transportProbe.expectMsg(10.seconds, Produce(FileRecord("test", "test"), self, AckStrategy.NoAck))
     }
   }
 }

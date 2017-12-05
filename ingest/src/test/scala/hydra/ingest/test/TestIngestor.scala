@@ -18,7 +18,7 @@ class TestIngestor extends Ingestor {
     case Publish(_) =>
       sender ! Join
 
-    case Ingest(request, _, _) =>
+    case Ingest(request, _) =>
       log.info(request.payload.toString)
       sender ! IngestorCompleted
   }

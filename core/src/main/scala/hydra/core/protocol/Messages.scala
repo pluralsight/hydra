@@ -24,7 +24,7 @@ trait MessageValidationResult extends HydraMessage
 
 case class Publish(request: HydraRequest) extends HydraMessage
 
-case class Ingest[K, V](record: HydraRecord[K, V], supervisor: ActorRef, ack: AckStrategy) extends HydraMessage
+case class Ingest[K, V](record: HydraRecord[K, V], ack: AckStrategy) extends HydraMessage
 
 case object Join extends HydraMessage
 
