@@ -54,7 +54,7 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
         val reply = if (req.metadataValueEquals("invalid", "true")) InvalidRequest(except) else ValidRequest(TestRecordFactory.build(req).get)
         sender.tell(reply, ingestor.ref)
         TestActor.KeepRunning
-      case Ingest(rec, _, _) =>
+      case Ingest(rec, _) =>
         val timeout = rec.isInstanceOf[TimeoutRecord]
         if (!timeout) sender.tell(IngestorCompleted, ingestor.ref)
         TestActor.KeepRunning
@@ -116,7 +116,7 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
       val sup = parent.childActorOf(IngestionSupervisor.props(ingestorRequest, 1.second, registryProbe.ref), "sup")
       ingestor.expectMsg(Publish(ingestorRequest))
       ingestor.expectMsg(Validate(ingestorRequest))
-      ingestor.expectMsg(Ingest(TestRecordFactory.build(ingestorRequest).get, sup, AckStrategy.NoAck))
+      ingestor.expectMsg(Ingest(TestRecordFactory.build(ingestorRequest).get, AckStrategy.NoAck))
       parent.expectMsgPF() {
         case i: IngestionReport =>
           i.statusCode shouldBe 200
@@ -148,7 +148,7 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
       registryProbe.expectMsg(FindByName(ActorUtils.actorName(ingestor.ref)))
       ingestor.expectMsg(Publish(req))
       ingestor.expectMsg(Validate(req))
-      ingestor.expectMsg(Ingest(TestRecordFactory.build(req).get, sup, AckStrategy.NoAck))
+      ingestor.expectMsg(Ingest(TestRecordFactory.build(req).get, AckStrategy.NoAck))
       parent.expectMsgPF() {
         case i: IngestionReport =>
           i.statusCode shouldBe 408

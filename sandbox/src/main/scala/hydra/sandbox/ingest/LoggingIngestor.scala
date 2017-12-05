@@ -23,7 +23,7 @@ class LoggingIngestor extends Ingestor {
     case Publish(request) =>
       sender ! (if (request.metadataValueEquals("logging-enabled", "true")) Join else Ignore)
 
-    case Ingest(record, sup, ack) =>
+    case Ingest(record, _) =>
       log.info(record.payload.toString)
       sender ! IngestorCompleted
   }

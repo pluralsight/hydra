@@ -46,7 +46,7 @@ class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers with F
       val req = HydraRequest(123, "test-produce")
       val t = system.actorOf(Props(classOf[TestTransportIngestor], supervisor.ref))
       t ! req
-      tm.expectMsg(Produce(TestRecordFactory.build(req).get, supervisor.ref, NoAck))
+      tm.expectMsg(Produce(TestRecordFactory.build(req).get, self, NoAck))
     }
   }
 }
@@ -58,7 +58,7 @@ class TestTransportIngestor(supervisor: ActorRef) extends Ingestor with Transpor
 
   ingest {
     case "hello" => sender ! "hi!"
-    case req: HydraRequest => transport(TestRecordFactory.build(req).get, supervisor, NoAck)
+    case req: HydraRequest => transport(TestRecordFactory.build(req).get, NoAck)
   }
 
   override def transportName = "test-transport"

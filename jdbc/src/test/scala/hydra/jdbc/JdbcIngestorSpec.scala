@@ -58,9 +58,8 @@ class JdbcIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers 
     }
 
     it("transports") {
-      val supervisor = TestProbe()
-      ingestor ! Ingest(TestRecord("test", "test", None), supervisor.ref, NoAck)
-      probe.expectMsg(Produce(TestRecord("test", "test", None), supervisor.ref, NoAck))
+      ingestor ! Ingest(TestRecord("test", "test", None), NoAck)
+      probe.expectMsg(Produce(TestRecord("test", "test", None), self, NoAck))
     }
   }
 
