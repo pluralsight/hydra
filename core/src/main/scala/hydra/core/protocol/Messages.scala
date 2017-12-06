@@ -30,8 +30,6 @@ case object Join extends HydraMessage
 
 case object Ignore extends HydraMessage
 
-case class InitiateRequest(request: HydraRequest) extends HydraMessage
-
 /**
   *
   * @param record
