@@ -19,7 +19,7 @@ package hydra.ingest.services
 import akka.actor._
 import hydra.common.config.ActorConfigSupport
 import hydra.core.ingest.{HydraRequest, IngestionReport}
-import hydra.core.protocol.{IngestionError, InitiateRequest}
+import hydra.core.protocol.IngestionError
 import hydra.ingest.bootstrap.HydraIngestorRegistry
 
 import scala.concurrent.duration._
@@ -40,9 +40,9 @@ class IngestionActor extends Actor with ActorConfigSupport with ActorLogging wit
   private implicit val ec = context.dispatcher
 
   override def receive: Receive = {
-    case InitiateRequest(r) =>
+    case request:HydraRequest =>
       val requestor = sender
-      publishRequest(r, requestor)
+      publishRequest(request, requestor)
 
     case r: IngestionReport =>
       context.stop(sender)
