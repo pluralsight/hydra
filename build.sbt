@@ -26,7 +26,7 @@ lazy val defaultSettings = Seq(
   resolvers += "Scalaz Bintray Repo" at "https://dl.bintray.com/scalaz/releases",
   resolvers += "Confluent Maven Repo" at "http://packages.confluent.io/maven/",
   resolvers += "jitpack" at "https://jitpack.io",
-  coverageExcludedPackages := "hydra\\.ingest\\.HydraIngestApp.*",
+  resolvers += Resolver.bintrayRepo("hseeberger", "maven"),
   ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet
 )
 

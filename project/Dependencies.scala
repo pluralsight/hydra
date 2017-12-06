@@ -29,6 +29,7 @@ object Dependencies {
   val hikariCPVersion = "2.6.2"
   val jacksonVersion = "2.8.4"
   val opRabbitVersion = "2.0.0"
+  val constructRVersion = "0.18.0"
 
   object Compile {
 
@@ -97,6 +98,11 @@ object Dependencies {
         ExclusionRule(organization = "ch.qos.logback"),
         ExclusionRule(organization = "org.slf4j")
       )
+
+    val constructR = Seq(
+      "de.heikoseeberger" %% "constructr" % constructRVersion,
+      "com.lightbend.constructr" %% "constructr-coordination-zookeeper" % "0.4.0" //if using zk
+    )
   }
 
   object Test {
@@ -122,6 +128,8 @@ object Dependencies {
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
   val coreDeps = akka ++ baseDeps ++ Seq(guavacache, reflections, serviceContainer) ++ confluent
+
+  val ingestDeps = coreDeps ++ constructR
 
   val sqlDeps = logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
 
