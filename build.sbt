@@ -67,7 +67,7 @@ lazy val ingest = Project(
   id = "ingest",
   base = file("ingest")
 ).dependsOn(core)
-  .settings(moduleSettings, name := "hydra-ingest", libraryDependencies ++= Dependencies.coreDeps)
+  .settings(moduleSettings, name := "hydra-ingest", libraryDependencies ++= Dependencies.ingestDeps)
 
 lazy val kafka = Project(
   id = "kafka",
