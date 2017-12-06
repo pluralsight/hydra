@@ -166,6 +166,36 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
         DbColumn("optional", JDBCType.CLOB, true, Some("")))
       store.getTableMetadata(TableIdentifier("test_table", None, Some(""))).get shouldBe DbTable("test_table", cols, None)
     }
-  }
 
+    it("finds the missing fields for a schema") {
+      val sc = new Schema.Parser().parse(
+        """
+          |{
+          |	"type": "record",
+          |	"name": "User",
+          |	"namespace": "hydra",
+          |	"fields": [{
+          |			"name": "id",
+          |			"type": "int"
+          |		},
+          |		{
+          |			"name": "firstName",
+          |			"type": "string"
+          |		},
+          |  {
+          |			"name": "lastName",
+          |			"type": "string"
+          |		}
+          |	]
+          |}""".stripMargin)
+
+      val cols = List(
+        DbColumn("id", JDBCType.INTEGER, false, Some("")),
+        DbColumn("first_name", JDBCType.INTEGER, true, Some("")))
+
+      val catalog = new JdbcCatalog(ds, UnderscoreSyntax, PostgresDialect)
+
+      catalog.findMissingFields(sc, cols) shouldBe Seq(sc.getField("lastName"))
+    }
+  }
 }

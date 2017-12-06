@@ -106,10 +106,10 @@ class JdbcCatalog(ds: DataSource, dbSyntax: DbSyntax, dialect: JdbcDialect) exte
 
   def findMissingFields(schema: Schema, columns: Seq[DbColumn]): Seq[Field] = {
     import scala.collection.JavaConverters._
-    val fields = schema.getFields.asScala
+    val fields = schema.getFields.asScala.map(f => dbSyntax.format(f.name) -> f).toMap
     val cols = columns.map(_.name).toSet
-    val missing = fields.map(_.name()).filterNot(cols)
-    missing.map(schema.getField)
+    val missing = fields -- cols
+    missing.values.toSeq
   }
 
   override def tableExists(tId: TableIdentifier): Boolean = synchronized {
