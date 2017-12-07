@@ -1,3 +1,4 @@
+import com.typesafe.sbt.packager.docker.Dockerfile
 import sbt.Resolver
 
 val JDK = "1.8"
