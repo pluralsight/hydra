@@ -22,8 +22,6 @@ trait HydraEntryPoint extends App with SLF4JLogging with ConfigSupport {
 
   def services: Seq[(String, Props)]
 
-  def containerName: String = s"$applicationName"
-
   def listeners: Seq[ContainerLifecycleListener] = Seq.empty
 
   lazy val endpoints = config.get[List[String]](s"$applicationName.endpoints").valueOrElse(Seq.empty)
@@ -35,7 +33,7 @@ trait HydraEntryPoint extends App with SLF4JLogging with ConfigSupport {
       .withRoutes(endpoints: _*)
       .withActors(services: _*)
       .withListeners(new HydraExtensionListener(applicationConfig) +: listeners: _*)
-      .withName(containerName)
+      .withName(applicationName)
 
     builder.build
   }

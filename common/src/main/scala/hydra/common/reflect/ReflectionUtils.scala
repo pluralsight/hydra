@@ -58,6 +58,11 @@ object ReflectionUtils {
     }.toSeq
   }
 
+  def getObjectInstance[T](clazz: Class[T]): T = {
+    val module = universeMirror.staticModule(clazz.getName)
+    universeMirror.reflectModule(module).instance.asInstanceOf[T]
+  }
+
   private def instance[M: TypeTag](cl: ClassSymbol, args: List[Any]): M = {
     val clazz = cm.reflectClass(cl)
     val ctor = cl.toType.decl(termNames.CONSTRUCTOR).asMethod

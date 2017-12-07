@@ -42,19 +42,20 @@ object ClasspathHydraComponentLoader extends HydraComponentLoader with ConfigSup
 
   private val ingestorsPkg = applicationConfig.get[List[String]]("ingest.classpath-scan").valueOrElse(List.empty)
 
-  log.debug(s"Scanning for ingestors in package(s): [${ingestorsPkg.mkString}].")
+  //log.debug(s"Scanning for ingestors in package(s): [${ingestorsPkg.mkString}].")
 
   private val transportsPkg = applicationConfig.get[List[String]]("transports.classpath-scan").valueOrElse(List.empty)
 
-  log.debug(s"Scanning for transports in package(s): [${transportsPkg.mkString}].")
+ // log.debug(s"Scanning for transports in package(s): [${transportsPkg.mkString}].")
 
-  private val pkgs = ingestorsPkg ::: transportsPkg
+  private val pkgs = ingestorsPkg ::: transportsPkg ::: List("hydra")
 
-  private val reflections = new Reflections(pkgs.toArray)
+  private val reflections = new Reflections(pkgs.toSet.toArray)
 
   override lazy val ingestors = reflections.getSubTypesOf(classOf[Ingestor])
     .asScala.filterNot(c => Modifier.isAbstract(c.getModifiers)).toSeq
 
   override lazy val transports = reflections.getSubTypesOf(classOf[Transport])
     .asScala.filterNot(c => Modifier.isAbstract(c.getModifiers)).toSeq
+
 }

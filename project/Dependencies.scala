@@ -16,14 +16,13 @@ object Dependencies {
   val confluentVersion = "3.2.0"
   val sprayJsonVersion = "1.3.c2"
   val kafkaVersion = "0.10.2.1"
-  val reflectionsVersion = "0.9.10"
+  val reflectionsVersion = "0.9.11"
   val akkaHTTPVersion = "10.0.9"
   val akkaKafkaStreamVersion = "0.14"
   val scalazVersion = "7.2.9"
   val scalaMockVersion = "3.5.0"
   val serviceContainerVersion = "2.0.6"
   val scalaCacheVersion = "0.9.3"
-  val slickVersion = "3.2.0"
   val postgresVersion = "9.4.1209"
   val commonsDbcpVersion = "1.4"
   val hikariCPVersion = "2.6.2"
@@ -58,6 +57,7 @@ object Dependencies {
       "org.apache.logging.log4j" % "log4j-1.2-api" % log4jVersion)
 
     val akka = Seq("com.typesafe.akka" %% "akka-actor" % akkaVersion,
+      "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
       "com.github.romix.akka" %% "akka-kryo-serialization" % "0.5.1",
@@ -127,9 +127,9 @@ object Dependencies {
 
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
-  val coreDeps = akka ++ baseDeps ++ Seq(guavacache, reflections, serviceContainer) ++ confluent
+  val coreDeps = akka ++ baseDeps ++ Seq(guavacache, reflections, serviceContainer) ++ confluent ++ constructR
 
-  val ingestDeps = coreDeps ++ constructR
+  val ingestDeps = coreDeps
 
   val sqlDeps = logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
 
