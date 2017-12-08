@@ -19,7 +19,7 @@ import scala.io.Source
 class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with Matchers with FunSpecLike
   with ImplicitSender with BeforeAndAfterAll with Eventually {
 
-  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
+  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 30.seconds)
 
   implicit override val patienceConfig = PatienceConfig(timeout = Span(60, Seconds), interval = Span(1, Seconds))
 
