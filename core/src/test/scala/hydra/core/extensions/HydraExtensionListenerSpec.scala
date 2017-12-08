@@ -1,14 +1,13 @@
 package hydra.core.extensions
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.ActorSystem
 import akka.testkit.TestKit
-import com.typesafe.config.{Config, ConfigFactory}
-import hydra.core.app.HydraEntryPoint
-import hydra.core.test.DummyActor
+import com.typesafe.config.ConfigFactory
+import hydra.core.app.BootstrappingSupport
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 class HydraExtensionListenerSpec extends TestKit(ActorSystem("test"))
-  with Matchers with FunSpecLike with BeforeAndAfterAll {
+  with Matchers with FunSpecLike with BeforeAndAfterAll with BootstrappingSupport {
 
   val conf =
     """
@@ -19,14 +18,7 @@ class HydraExtensionListenerSpec extends TestKit(ActorSystem("test"))
       |}
     """.stripMargin
 
-  val et = new HydraEntryPoint() {
-
-    override def config: Config = ConfigFactory.parseString(conf)
-
-    override def services: Seq[(String, Props)] = Seq("test" -> Props[DummyActor])
-  }
-
-  val container = et.buildContainer()
+  val container = buildContainer()
 
   val cfg = ConfigFactory.parseString(
     """
@@ -38,7 +30,7 @@ class HydraExtensionListenerSpec extends TestKit(ActorSystem("test"))
       |}
     """.stripMargin)
 
-  val e = new HydraExtensionListener(cfg)
+  val e = HydraExtensionListener(cfg)
 
   override def afterAll() = {
     e.onShutdown(container)

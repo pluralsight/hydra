@@ -22,9 +22,16 @@ class ReflectionUtilsSpec extends Matchers with FunSpecLike {
       obj shouldBe TestClass("value")
     }
 
+    it("Instantiates classes with empty constructor lists") {
+      val obj = ReflectionUtils.instantiateClass(classOf[TestDefaultConstructor])
+      obj shouldBe a[TestDefaultConstructor]
+    }
+
   }
 
 }
+
+class TestDefaultConstructor
 
 case class TestClass(value: String)
 

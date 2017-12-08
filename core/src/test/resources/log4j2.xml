@@ -25,6 +25,9 @@
 
     <Loggers>
 
+        <Logger name="org.reflections" level="ERROR">
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
 
         <Root level="debug">
             <AppenderRef ref="STDOUT"/>
