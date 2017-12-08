@@ -1,4 +1,3 @@
-import com.typesafe.sbt.packager.docker.Dockerfile
 import sbt.Resolver
 
 val JDK = "1.8"
@@ -115,7 +114,9 @@ lazy val app = Project(
   id = "app",
   base = file("app")
 ).dependsOn(ingest, kafka, jdbc, rabbitmq)
-  .settings(moduleSettings ++ noPublishSettings, name := "hydra-app", libraryDependencies ++= Dependencies.sandboxDeps)
+  .settings(moduleSettings ++ noPublishSettings ++ dockerSettings, name := "hydra-app",
+    libraryDependencies ++= Dependencies.sandboxDeps)
+  .enablePlugins(JavaAppPackaging, sbtdocker.DockerPlugin)
 
 //scala style
 lazy val testScalastyle = taskKey[Unit]("testScalastyle")
@@ -130,10 +131,6 @@ lazy val dockerSettings = Seq(
   dockerfile in docker := {
     val appDir: File = stage.value
     val targetDir = "/app"
-    val classpath = (managedClasspath in Compile).value
-    println(classpath)
-    val mainclass = "hydra.ingest.HydraIngestApp"
-
     val dockerFiles = IO.listFiles(new java.io.File("docker")).find(_.getPath.endsWith(".conf")).toSeq
 
     new Dockerfile {
@@ -143,8 +140,7 @@ lazy val dockerSettings = Seq(
       env("JAVA_OPTS", "-Xmx2G")
       runRaw("mkdir -p /etc/hydra")
       run("mkdir", "-p", "/var/log/hydra")
-      copy(dockerFiles, "/etc/hydra")
-      //   copy(dockerFiles("docker/application.conf"), file("/etc/hydra/application.conf"))
+      copy(dockerFiles, "/etc/hydra/")
       expose(8088)
       entryPoint(s"$targetDir/bin/${executableScriptName.value}")
       copy(appDir, targetDir)
@@ -153,13 +149,13 @@ lazy val dockerSettings = Seq(
 
   imageNames in docker := Seq(
     // Sets the latest tag
-    ImageName(s"${organization.value}/${name.value}:latest"),
+    ImageName(s"${organization.value}/hydra:latest"),
 
     // Sets a name with a tag that contains the project version
     ImageName(
       namespace = Some(organization.value),
-      repository = name.value,
-      tag = Some("v" + version.value)
+      repository = "hydra",
+      tag = Some(version.value)
     )
   )
 )

@@ -16,8 +16,8 @@
 
 package hydra.app
 
-import hydra.core.app.ServiceLoader
+import hydra.core.app.BootstrappingSupport
 
 // $COVERAGE-OFF$Disabling highlighting by default until a workaround for https://issues.scala-lang.org/browse/SI-8596 is found
-object Main extends App with ServiceLoader
+object Main extends App with BootstrappingSupport
 // $COVERAGE-ON

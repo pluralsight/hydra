@@ -13,7 +13,7 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 /**
   * Created by alexsilva on 3/7/17.
   */
-class HydraEntryPointSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
+class BootstrappingSupportSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
 
   val conf =
     """

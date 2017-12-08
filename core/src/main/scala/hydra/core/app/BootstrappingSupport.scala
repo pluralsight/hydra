@@ -15,7 +15,7 @@ import org.reflections.scanners.SubTypesScanner
 
 import scala.util.Try
 
-trait ServiceLoader extends ConfigSupport {
+trait BootstrappingSupport extends ConfigSupport {
   private val reflections = new Reflections("hydra", new SubTypesScanner)
 
   import configs.syntax._

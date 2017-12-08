@@ -40,7 +40,7 @@ services:
         - 8081
 
   hydra:
-    image: registry.pluralsight.private:5000/hydra:latest
+    image: pluralsight/hydra:0.9.5
     command: bash
     volumes:
       - /app
