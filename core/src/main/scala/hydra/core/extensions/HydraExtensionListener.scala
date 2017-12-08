@@ -3,9 +3,8 @@ package hydra.core.extensions
 import com.github.vonnagy.service.container.listener.ContainerLifecycleListener
 import com.github.vonnagy.service.container.service.ContainerService
 import com.typesafe.config.{Config, ConfigFactory}
-import hydra.common.config.ConfigSupport
-import hydra.common.logging.LoggingAdapter
 import configs.syntax._
+import hydra.common.logging.LoggingAdapter
 
 /**
   * Waits for the main actor system to be available before starting the extensions.
@@ -13,7 +12,7 @@ import configs.syntax._
   *
   */
 class HydraExtensionListener(config: Config) extends ContainerLifecycleListener
-  with LoggingAdapter with ConfigSupport {
+  with LoggingAdapter {
 
   private lazy val extensions = config.getOrElse[Config]("extensions", ConfigFactory.empty).value
 

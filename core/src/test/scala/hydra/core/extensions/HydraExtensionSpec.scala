@@ -21,12 +21,10 @@ class HydraExtensionSpec extends TestKit(ActorSystem("test"))
 
   val cfg = ConfigFactory.parseString(
     """
-      |  extensions {
       |    test-extension {
       |      enabled = true
       |      class = hydra.core.extensions.HydraTestExtension
       |    }
-      |  }
     """.stripMargin)
 
   describe("Hydra extensions") {
@@ -38,12 +36,11 @@ class HydraExtensionSpec extends TestKit(ActorSystem("test"))
     it("reports failure") {
       val cfg = ConfigFactory.parseString(
         """
-          |    extensions {
           |      test-extension-disabled {
           |      enabled = false
           |      class = hydra.core.extensions.HydraTestExtension
           |    }
-          |  }
+          |
         """.stripMargin)
       val ext: Seq[Try[ExtensionId[_]]] = HydraExtensionLoader.load(cfg)
       intercept[IllegalArgumentException] {

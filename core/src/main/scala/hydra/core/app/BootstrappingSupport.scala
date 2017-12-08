@@ -53,6 +53,4 @@ trait BootstrappingSupport extends ConfigSupport with LoggingAdapter {
 
     builder.build
   }
-
-  buildContainer().start()
 }
