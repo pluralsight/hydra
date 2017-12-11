@@ -2,7 +2,7 @@ package hydra.ingest.endpoints
 
 import akka.actor.Actor
 import akka.http.scaladsl.testkit.ScalatestRouteTest
-import akka.testkit.{TestActorRef, TestProbe}
+import akka.testkit.{TestActorRef, TestKit, TestProbe}
 import hydra.common.util.ActorUtils
 import hydra.ingest.ingestors.IngestorInfo
 import hydra.ingest.marshallers.HydraIngestJsonSupport
@@ -10,12 +10,19 @@ import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult
 import org.joda.time.DateTime
 import org.scalatest.{Matchers, WordSpecLike}
 
+import scala.concurrent.duration._
+
 /**
   * Created by alexsilva on 5/12/17.
   */
 class IngestorsEndpointSpec extends Matchers with WordSpecLike with ScalatestRouteTest with HydraIngestJsonSupport {
 
   val ingestorsRoute = new IngestorRegistryEndpoint().route
+
+  override def afterAll = {
+    super.afterAll()
+    TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10 seconds)
+  }
 
   val probe = TestProbe()
   val ingestorInfo = IngestorInfo(ActorUtils.actorName(probe.ref), "test", probe.ref.path, DateTime.now)

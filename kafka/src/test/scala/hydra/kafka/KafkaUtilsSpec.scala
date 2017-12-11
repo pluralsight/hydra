@@ -27,11 +27,12 @@ class KafkaUtilsSpec extends WordSpec with BeforeAndAfterAll with Matchers with 
 
   "Kafka Utils" should {
     "return false for a topic that doesn't exist" in {
-      assert(!KafkaUtils.topicExists("test_123123"))
+      val exists = KafkaUtils.topicExists("test_123123").get //should be false
+      assert(!exists)
     }
 
     "return true for a topic that exists" in {
-      assert(KafkaUtils.topicExists("test-kafka-utils"))
+      assert(KafkaUtils.topicExists("test-kafka-utils").isSuccess)
     }
 
     "return a list of topics" in {

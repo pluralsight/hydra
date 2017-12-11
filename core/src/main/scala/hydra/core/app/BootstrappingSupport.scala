@@ -12,6 +12,7 @@ import hydra.common.logging.LoggingAdapter
 import hydra.common.reflect.{ComponentInstantiator, ReflectionUtils}
 import org.reflections.Reflections
 import org.reflections.scanners.SubTypesScanner
+import com.pluralsight.hydra.reflect.DoNotScan
 
 import scala.util.Try
 
@@ -40,10 +41,13 @@ trait BootstrappingSupport extends ConfigSupport with LoggingAdapter {
 
   private def scanFor[T](clazz: Class[T]): Seq[Class[_ <: T]] = {
     reflections.getSubTypesOf(clazz)
-      .asScala.filterNot(c => Modifier.isAbstract(c.getModifiers)).toSeq
+      .asScala
+      .filterNot(c => Modifier.isAbstract(c.getModifiers))
+      .filterNot(c => c.isAnnotationPresent(classOf[DoNotScan])).toSeq
   }
 
   def buildContainer(): ContainerService = {
+    log.info(s"The following services will be started: ${services.map(_._1).mkString(", ")}")
     val builder = ContainerBuilder()
       .withConfig(rootConfig)
       .withRoutes(endpoints: _*)

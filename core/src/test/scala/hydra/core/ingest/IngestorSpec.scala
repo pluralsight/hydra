@@ -2,6 +2,7 @@ package hydra.core.ingest
 
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
+import com.pluralsight.hydra.reflect.DoNotScan
 import hydra.core.akka.ActorInitializationException
 import hydra.core.akka.InitializingActor.{InitializationError, Initialized}
 import hydra.core.protocol._
@@ -99,6 +100,7 @@ class TestIngestorDefault extends Ingestor {
   override val recordFactory = TestRecordFactory
 }
 
+@DoNotScan
 class TestIngestor(completeInit: Boolean, delayInit: Boolean) extends Ingestor {
 
   implicit val ec = context.dispatcher

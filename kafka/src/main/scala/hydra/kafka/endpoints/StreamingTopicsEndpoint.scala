@@ -15,7 +15,7 @@ import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.util.KafkaUtils
 
 import scala.concurrent.duration._
-import scala.util.{Random, Try}
+import scala.util.{Failure, Random, Success, Try}
 
 /**
   * A cluster metadata endpoint implemented exclusively with akka streams.
@@ -23,7 +23,7 @@ import scala.util.{Random, Try}
   * Created by alexsilva on 3/18/17.
   */
 class StreamingTopicsEndpoint(implicit val system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
-  extends RoutedEndpoints with LoggingAdapter with HydraDirectives  with HydraKafkaJsonSupport {
+  extends RoutedEndpoints with LoggingAdapter with HydraDirectives with HydraKafkaJsonSupport {
 
   implicit val ec = actorRefFactory.dispatcher
 
@@ -32,10 +32,10 @@ class StreamingTopicsEndpoint(implicit val system: ActorSystem, implicit val act
   override val route = path("transports" / "kafka" / "streaming" / Segment) { topicName =>
     get {
       parameters('format.?, 'group.?, 'timeout ? "300s") { (format, groupId, timeout) =>
-        if (!KafkaUtils.topicExists(topicName)) {
-          complete(404, GenericServiceResponse(404, s"Topic $topicName doesn't exist."))
-        } else {
-          complete(buildStream(timeout, format, topicName, groupId))
+        KafkaUtils.topicExists(topicName) match {
+          case Success(e) if e => complete(buildStream(timeout, format, topicName, groupId))
+          case Success(e) if !e => complete(404, GenericServiceResponse(404, s"Topic $topicName doesn't exist."))
+          case Failure(ex) => ex.printStackTrace; complete(503, GenericServiceResponse(503, ex.getMessage))
         }
       }
     }

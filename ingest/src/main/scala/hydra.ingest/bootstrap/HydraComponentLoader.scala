@@ -18,6 +18,7 @@ package hydra.ingest.bootstrap
 
 import java.lang.reflect.Modifier
 
+import com.pluralsight.hydra.reflect.DoNotScan
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.ingest.Ingestor
@@ -46,16 +47,18 @@ object ClasspathHydraComponentLoader extends HydraComponentLoader with ConfigSup
 
   private val transportsPkg = applicationConfig.get[List[String]]("transports.classpath-scan").valueOrElse(List.empty)
 
- // log.debug(s"Scanning for transports in package(s): [${transportsPkg.mkString}].")
+  // log.debug(s"Scanning for transports in package(s): [${transportsPkg.mkString}].")
 
   private val pkgs = ingestorsPkg ::: transportsPkg ::: List("hydra")
 
   private val reflections = new Reflections(pkgs.toSet.toArray)
 
   override lazy val ingestors = reflections.getSubTypesOf(classOf[Ingestor])
-    .asScala.filterNot(c => Modifier.isAbstract(c.getModifiers)).toSeq
+    .asScala.filterNot(c => Modifier.isAbstract(c.getModifiers))
+    .filterNot(c => c.isAnnotationPresent(classOf[DoNotScan])).toSeq
 
   override lazy val transports = reflections.getSubTypesOf(classOf[Transport])
-    .asScala.filterNot(c => Modifier.isAbstract(c.getModifiers)).toSeq
+    .asScala.filterNot(c => Modifier.isAbstract(c.getModifiers))
+    .filterNot(c => c.isAnnotationPresent(classOf[DoNotScan])).toSeq
 
 }

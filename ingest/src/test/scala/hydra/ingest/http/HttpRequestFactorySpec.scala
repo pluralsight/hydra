@@ -11,6 +11,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.collection.immutable._
+import scala.concurrent.duration._
 
 /**
   * Created by alexsilva on 3/17/17.
@@ -18,7 +19,7 @@ import scala.collection.immutable._
 class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with FunSpecLike
   with ScalaFutures with BeforeAndAfterAll {
 
-  override def afterAll = TestKit.shutdownActorSystem(system)
+  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true,duration=10 seconds)
 
   describe("When build a HydraRequest from HTTP") {
     it("builds") {

@@ -18,27 +18,18 @@ import scala.util.Try
 object KafkaUtils extends KafkaConfigSupport with LoggingAdapter {
   private[kafka] var zkUtils = Try(new ZkClient(zkString, 5000)).map(ZkUtils(_, false))
 
-  def withRunningZookeeper[T](body: => T) = {
+  private[kafka] def withRunningZookeeper[T](body: ZkUtils => T): Try[T] = {
     if (zkUtils.isFailure) {
       synchronized {
         zkUtils = Try(new ZkClient(zkString, 5000)).map(ZkUtils(_, false))
       }
     }
-    body
+    zkUtils.map(body)
   }
 
-  def topicExists(name: String): Boolean = {
-    withRunningZookeeper {
-      zkUtils.map(AdminUtils.topicExists(_, name)) getOrElse {
-        log.error("Zookeeper error", zkUtils.failed.get)
-        false
-      }
-    }
-  }
+  def topicExists(name: String): Try[Boolean] = withRunningZookeeper(AdminUtils.topicExists(_, name))
 
-  def topicNames(): Try[Seq[String]] = withRunningZookeeper {
-    zkUtils.map(_.getAllTopics())
-  }
+  def topicNames(): Try[Seq[String]] = withRunningZookeeper(_.getAllTopics())
 
   //bootstrap with the known configs
   val defaultConsumerSettings: Map[String, ConsumerSettings[Any, Any]] = {

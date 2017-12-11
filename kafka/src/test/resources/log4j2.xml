@@ -33,7 +33,7 @@
         </Logger>
 
 
-        <Logger name="kafka.utils" level="ERROR" additivity="false">
+        <Logger name="kafka" level="ERROR" additivity="false">
             <AppenderRef ref="STDOUT"/>
         </Logger>
 
@@ -46,23 +46,7 @@
             <AppenderRef ref="STDOUT"/>
         </Logger>
 
-        <Logger name="org.apache.kafka" level="DEBUG" additivity="false">
-            <AppenderRef ref="STDOUT"/>
-        </Logger>
-
-        <Logger name="kafka.utils" level="ERROR" additivity="false">
-            <AppenderRef ref="STDOUT"/>
-        </Logger>
-
-        <Logger name="org.apache.kafka.common.network" level="ERROR" additivity="false">
-            <AppenderRef ref="STDOUT"/>
-        </Logger>
-
-        <Logger name="org.apache.kafka.clients" level="ERROR" additivity="false">
-            <AppenderRef ref="STDOUT"/>
-        </Logger>
-
-        <Logger name="org.apache.kafka.common.metrics" level="ERROR" additivity="false">
+        <Logger name="org.apache.kafka" level="ERROR" additivity="false">
             <AppenderRef ref="STDOUT"/>
         </Logger>
 

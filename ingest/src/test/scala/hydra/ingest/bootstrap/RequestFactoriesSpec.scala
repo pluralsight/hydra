@@ -7,9 +7,11 @@ import akka.testkit.TestKit
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
+import scala.concurrent.duration._
+
 class RequestFactoriesSpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike
   with BeforeAndAfterAll with ScalaFutures {
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10.seconds)
 
   import RequestFactories._
 

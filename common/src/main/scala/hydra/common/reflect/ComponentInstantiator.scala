@@ -44,3 +44,4 @@ object ComponentInstantiator {
     methodParamTypes.zip(argParamTypes).filter(x => x._1.isAssignableFrom(x._2)).size > 0
   }
 }
+

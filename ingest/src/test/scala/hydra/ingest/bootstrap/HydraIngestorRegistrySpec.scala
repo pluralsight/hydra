@@ -8,13 +8,14 @@ import hydra.ingest.services.IngestorRegistry.RegisterWithClass
 import hydra.ingest.test.TestIngestor
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import scala.concurrent.duration._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class HydraIngestorRegistrySpec extends TestKit(ActorSystem("test")) with Matchers
   with FunSpecLike with HydraIngestorRegistry with BeforeAndAfterAll with ImplicitSender with ScalaFutures {
 
-  override def afterAll = TestKit.shutdownActorSystem(system)
+  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10.seconds)
 
   val registry = system.actorOf(Props[IngestorRegistry], "ingestor_registry")
 
