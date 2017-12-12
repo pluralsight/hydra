@@ -21,15 +21,16 @@ import akka.pattern.ask
 import akka.util.Timeout
 import com.spingo.op_rabbit.Message.{Ack, ConfirmResponse, Fail, Nack}
 import com.spingo.op_rabbit._
+import com.typesafe.config.Config
 import hydra.core.transport.Transport
 import hydra.core.transport.TransportSupervisor.Deliver
 
 import scala.concurrent.duration._
 
-class RabbitTransport extends Transport {
+class RabbitTransport(rabbitControlProps: Props) extends Transport {
   implicit val ec = context.dispatcher
 
-  val rabbitControl = context.actorOf(Props[RabbitControl])
+  val rabbitControl = context.actorOf(rabbitControlProps)
 
   private def sendMessage(r: RabbitRecord) = {
     implicit val timeout = Timeout(3 seconds)
@@ -58,6 +59,19 @@ class RabbitTransport extends Transport {
         }
       }
   }
+}
+
+object RabbitTransport {
+
+  def props(p: Props): Props = { // will be used in testing
+    return Props(classOf[RabbitTransport], p)
+  }
+
+  def props(c: Config): Props = {
+    return Props(classOf[RabbitTransport], Props[RabbitControl])
+  }
+
+
 }
 
 case class RabbitProducerException(msg: String) extends Exception(msg)
