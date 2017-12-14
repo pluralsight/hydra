@@ -4,13 +4,14 @@ import akka.actor.{Actor, Props}
 import akka.http.scaladsl.model.{HttpMethods, StatusCodes}
 import akka.http.scaladsl.server.{MethodRejection, RequestEntityExpectedRejection}
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
-import akka.testkit.TestActorRef
+import akka.testkit.{TestActorRef, TestKit}
 import hydra.common.util.ActorUtils
 import hydra.ingest.ingestors.IngestorInfo
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.TestIngestor
 import org.joda.time.DateTime
 import org.scalatest.{Matchers, WordSpecLike}
+
 import scala.concurrent.duration._
 /**
   * Created by alexsilva on 5/12/17.
@@ -29,6 +30,11 @@ class IngestEndpointSpec extends Matchers with WordSpecLike with ScalatestRouteT
   }, "ingestor_registry").underlyingActor
 
   val ingestRoute = new IngestionEndpoint().route
+
+  override def afterAll = {
+    super.afterAll()
+    TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10 seconds)
+  }
 
   "The ingestor endpoint" should {
 

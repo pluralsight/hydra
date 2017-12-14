@@ -31,7 +31,7 @@ object ReflectionUtils {
     instance(cl, args)
   }
 
-  def instantiateClass[M](cls: Class[M], args: List[Any]): M = {
+  def instantiateClass[M](cls: Class[M], args: List[Any] = List.empty): M = {
     val cl = cm.classSymbol(cls)
     instance(cl, args)
   }
@@ -47,7 +47,7 @@ object ReflectionUtils {
     companionMirror.instance.asInstanceOf[T]
   }
 
-  def instantiateClassByName[M: TypeTag](clazz: String, args: List[Any]): M = {
+  def instantiateClassByName[M: TypeTag](clazz: String, args: List[Any] = List.empty): M = {
     val cl = cm.classSymbol(Class.forName(clazz))
     instance(cl, args)
   }
@@ -56,6 +56,11 @@ object ReflectionUtils {
     ru.typeOf[T].members.collect {
       case m: MethodSymbol if m.isGetter && m.isPublic => m
     }.toSeq
+  }
+
+  def getObjectInstance[T](clazz: Class[T]): T = {
+    val module = universeMirror.staticModule(clazz.getName)
+    universeMirror.reflectModule(module).instance.asInstanceOf[T]
   }
 
   private def instance[M: TypeTag](cl: ClassSymbol, args: List[Any]): M = {

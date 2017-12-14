@@ -1,8 +1,9 @@
 package hydra.kafka.health
 
 import akka.actor.ActorSystem
-import akka.testkit.{TestActorRef, TestKit}
+import akka.testkit.{TestActorRef, TestKit, TestProbe}
 import com.github.vonnagy.service.container.health.HealthState
+import hydra.core.protocol.HydraApplicationError
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Millis, Seconds, Span}
@@ -17,13 +18,16 @@ class KafkaHealthCheckSpec extends TestKit(ActorSystem("hydra")) with Matchers w
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
     customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
 
+  val listener = TestProbe()
+  system.eventStream.subscribe(listener.ref, classOf[HydraApplicationError])
+
   override def afterAll = {
     EmbeddedKafka.stop()
     super.afterAll()
     TestKit.shutdownActorSystem(system)
   }
 
-  override def beforeAll()={
+  override def beforeAll() = {
     EmbeddedKafka.start()
     EmbeddedKafka.createCustomTopic("__hydra_health_check")
   }
@@ -35,6 +39,7 @@ class KafkaHealthCheckSpec extends TestKit(ActorSystem("hydra")) with Matchers w
         h.name shouldBe "Kafka [localhost:1111]"
         h.state shouldBe HealthState.CRITICAL
       }
+      listener.expectMsgType[HydraApplicationError]
       system.stop(act)
     }
 

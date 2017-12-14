@@ -1,12 +1,14 @@
 package hydra.ingest.endpoints
 
 import akka.http.scaladsl.testkit.ScalatestRouteTest
+import akka.testkit.TestKit
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.core.marshallers.HydraJsonSupport
 import org.apache.avro.Schema
 import org.scalatest.{Matchers, WordSpecLike}
 
+import scala.concurrent.duration._
 import scala.io.Source
 
 /**
@@ -24,6 +26,11 @@ class SchemasEndpointSpec extends Matchers with WordSpecLike with ScalatestRoute
   schemaRegistry.registryClient.register("hydra.test.Tester-value", schema)
 
   val schemaEvolved = new Schema.Parser().parse(Source.fromResource("schema2.avsc").mkString)
+
+  override def afterAll = {
+    super.afterAll()
+    TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10 seconds)
+  }
 
   "The schemas endpoint" should {
 

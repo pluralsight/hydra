@@ -65,7 +65,7 @@ We are using Spray's SBT [Revolver](https://github.com/spray/sbt-revolver) plugi
 
 ```
 sbt 
-> sandbox/re-start
+> sandbox/reStart
 ```
 
 SBT Revolver forks Hydra in a separate process. If you make a code change, simply type re-start again at the SBT shell prompt, it will compile your changes and restart the process. It enables very fast turnaround cycles.

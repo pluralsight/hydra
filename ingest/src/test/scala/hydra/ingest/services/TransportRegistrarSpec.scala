@@ -10,12 +10,13 @@ import hydra.ingest.services.TransportRegistrar._
 import hydra.ingest.test.TestRecord
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
+import scala.concurrent.duration._
 class TransportRegistrarSpec extends TestKit(ActorSystem("test")) with Matchers
   with FunSpecLike with BeforeAndAfterAll with ImplicitSender with ConfigSupport {
 
   val tr = TestActorRef[TransportRegistrar](Props[TransportRegistrar], "transport_registrar")
 
-  override def afterAll = TestKit.shutdownActorSystem(system)
+  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10 seconds)
 
 
   describe("The Transport Registrar") {
