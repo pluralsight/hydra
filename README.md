@@ -54,7 +54,7 @@ sbt clean compile
 ```
 
 ## Running Hydra
-We provide a `sandbox` module with some simple ingestors that can be used to test Hydra's main functionality.
+We provide a `sandbox` module with some simple ingestors that can be run from SBT to test Hydra's main functionality.
 
 The walk-through below shows you how to use Hydra with some example Ingetors, by running Hydra in local development mode in SBT. This is *not* an example of usage in production.
 
@@ -76,6 +76,9 @@ Once Hydra is up and running you can send an HTTP request:
 
 You should see a 'this is a test' message transported (or replicated) to both the sbt console and the ```/tmp/hydra-sandbox.txt``` file.
 
+
+### Using Docker
+We provide a docker compose file that can be used to bootstrap Hydra.  
 
 ## Online Documentation
 We highly recommend checking out the project documentation [here.](www.pluralsight.com)  There you can find the latest documentation about the ingestion protocol, Akka actors, including examples, API endpoints, and a lot more info on how to get started.
