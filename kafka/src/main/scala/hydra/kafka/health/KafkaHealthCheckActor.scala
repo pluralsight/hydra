@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 import akka.actor.{Actor, Props}
 import com.github.vonnagy.service.container.health.{HealthInfo, HealthState}
 import hydra.common.config.ConfigSupport
+import hydra.core.protocol.HydraApplicationError
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.joda.time.DateTime
 
@@ -49,9 +50,11 @@ class KafkaHealthCheckActor(bootstrapServers: String, healthCheckTopic: String, 
 
   }
 
-  private def critical(e: Throwable): HealthInfo =
+  private def critical(e: Throwable): HealthInfo = {
+    context.system.eventStream.publish(HydraApplicationError(e))
     HealthInfo(name, state = HealthState.CRITICAL,
       details = s"Metadata request failed at ${DateTime.now.toString()}. Error: ${e.getMessage}", extra = None)
+  }
 }
 
 object KafkaHealthCheckActor extends ConfigSupport {

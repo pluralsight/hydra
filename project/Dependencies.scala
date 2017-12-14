@@ -3,7 +3,7 @@ import sbt.{ExclusionRule, _}
 
 object Dependencies {
 
-  val akkaVersion = "2.5.4"
+  val akkaVersion = "2.5.7"
   val scalaTestVersion = "3.0.4"
   val slf4jVersion = "1.7.29"
   val log4jVersion = "2.7"
@@ -16,19 +16,21 @@ object Dependencies {
   val confluentVersion = "3.2.0"
   val sprayJsonVersion = "1.3.c2"
   val kafkaVersion = "0.10.2.1"
-  val reflectionsVersion = "0.9.10"
+  val reflectionsVersion = "0.9.11"
   val akkaHTTPVersion = "10.0.9"
   val akkaKafkaStreamVersion = "0.14"
   val scalazVersion = "7.2.9"
   val scalaMockVersion = "3.5.0"
   val serviceContainerVersion = "2.0.6"
   val scalaCacheVersion = "0.9.3"
-  val slickVersion = "3.2.0"
   val postgresVersion = "9.4.1209"
   val commonsDbcpVersion = "1.4"
   val hikariCPVersion = "2.6.2"
   val jacksonVersion = "2.8.4"
   val opRabbitVersion = "2.0.0"
+  val constructRVersion = "0.18.0"
+  val akkaHTTPCorsVersion = "0.2.2"
+  val akkaKryoVersion = "0.5.1"
 
   object Compile {
 
@@ -57,11 +59,12 @@ object Dependencies {
       "org.apache.logging.log4j" % "log4j-1.2-api" % log4jVersion)
 
     val akka = Seq("com.typesafe.akka" %% "akka-actor" % akkaVersion,
+      "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
-      "com.github.romix.akka" %% "akka-kryo-serialization" % "0.5.1",
+      "com.github.romix.akka" %% "akka-kryo-serialization" % akkaKryoVersion,
       "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
-      "ch.megard" %% "akka-http-cors" % "0.2.1",
+      "ch.megard" %% "akka-http-cors" % akkaHTTPCorsVersion,
       "org.iq80.leveldb" % "leveldb" % "0.7",
       "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8")
 
@@ -97,6 +100,11 @@ object Dependencies {
         ExclusionRule(organization = "ch.qos.logback"),
         ExclusionRule(organization = "org.slf4j")
       )
+
+    val constructR = Seq(
+      "de.heikoseeberger" %% "constructr" % constructRVersion,
+      "com.lightbend.constructr" %% "constructr-coordination-zookeeper" % "0.4.0" //if using zk
+    )
   }
 
   object Test {
@@ -121,7 +129,9 @@ object Dependencies {
 
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
-  val coreDeps = akka ++ baseDeps ++ Seq(guavacache, reflections, serviceContainer) ++ confluent
+  val coreDeps = akka ++ baseDeps ++ Seq(guavacache, reflections, serviceContainer) ++ confluent ++ constructR
+
+  val ingestDeps = coreDeps
 
   val sqlDeps = logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
 

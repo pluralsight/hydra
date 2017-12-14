@@ -13,14 +13,13 @@ import org.joda.time.DateTime
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
-
 /**
   * Created by alexsilva on 3/9/17.
   */
 class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike
   with ImplicitSender with BeforeAndAfterAll with BeforeAndAfterEach {
 
-  override def afterAll = TestKit.shutdownActorSystem(system)
+  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10 seconds)
 
   var ingestor: TestProbe = _
   var registryProbe: TestProbe = _

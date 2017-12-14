@@ -10,12 +10,11 @@ class ClasspathHydraComponentLoaderSpec extends Matchers with FunSpecLike {
 
   describe("When scanning the classpath for ingestors") {
     it("loads ingestors from a package") {
-      ClasspathHydraComponentLoader.ingestors shouldBe Seq(classOf[TestIngestor])
+      ClasspathHydraComponentLoader.ingestors should contain (classOf[TestIngestor])
     }
 
     it("loads transports from a package") {
-      ClasspathHydraComponentLoader.transports shouldBe Seq(classOf[TestTransport])
+      ClasspathHydraComponentLoader.transports should contain (classOf[TestTransport])
     }
-
   }
 }

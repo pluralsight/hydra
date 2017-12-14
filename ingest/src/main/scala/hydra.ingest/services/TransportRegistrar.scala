@@ -79,7 +79,7 @@ object TransportRegistrar extends LoggingAdapter {
         case _ => None
       }
     } catch {
-      case _: ClassNotFoundException => None
+      case _: Throwable => None
     }
   }
 }

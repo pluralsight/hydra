@@ -2,13 +2,14 @@ package hydra.ingest.endpoints
 
 import akka.actor.Actor
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
-import akka.testkit.TestActorRef
+import akka.testkit.{TestActorRef, TestKit}
 import hydra.core.protocol._
 import hydra.ingest.test.TestRecordFactory
 import hydra.ingest.ingestors.IngestorInfo
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import org.joda.time.DateTime
 import org.scalatest.{Matchers, WordSpecLike}
+import scala.concurrent.duration._
 
 /**
   * Created by alexsilva on 5/12/17.
@@ -16,6 +17,11 @@ import org.scalatest.{Matchers, WordSpecLike}
 class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with ScalatestRouteTest {
 
   val endpt = new IngestionWebSocketEndpoint()
+
+  override def afterAll = {
+    super.afterAll()
+    TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10 seconds)
+  }
 
   val ingestor = TestActorRef(new Actor {
     override def receive = {
