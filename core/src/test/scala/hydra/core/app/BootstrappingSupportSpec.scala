@@ -30,7 +30,7 @@ class BootstrappingSupportSpec extends Matchers with FlatSpecLike
     """.stripMargin
 
 
-  lazy val container = buildContainer()
+  lazy val container = containerService
 
   override def afterAll = {
     TestKit.shutdownActorSystem(container.system)

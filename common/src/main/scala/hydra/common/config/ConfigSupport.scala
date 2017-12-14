@@ -59,7 +59,8 @@ trait ConfigSupport extends ConfigComponent {
   }
 
   def loadExternalConfig(c: Config): Config = {
-    c.getOrElse[String]("application.config.location",s"/etc/hydra/$applicationName.conf")
-      .map(f => ConfigFactory.parseFile(new java.io.File(f))).valueOrElse(ConfigFactory.empty())
+    c.getOrElse[String]("application.config.location", s"/etc/hydra/$applicationName.conf")
+      .map(f => ConfigFactory.parseFile(new java.io.File(f)))
+      .valueOrThrow(err => err.configException)
   }
 }
