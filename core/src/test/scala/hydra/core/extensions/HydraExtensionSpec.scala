@@ -31,6 +31,7 @@ class HydraExtensionSpec extends TestKit(ActorSystem("test"))
     it("can be loaded from configuration") {
       val ext: Seq[Try[ExtensionId[_]]] = HydraExtensionLoader.load(cfg)
       ext(0).get.asInstanceOf[ExtensionId[HydraTestExtensionImpl]].get(system).extName shouldBe "tester"
+      probe.expectMsg("called")
     }
 
     it("reports failure") {
@@ -52,10 +53,16 @@ class HydraExtensionSpec extends TestKit(ActorSystem("test"))
       HydraExtensionRegistry(system).getModule("test-typed").isDefined shouldBe true
       HydraExtensionRegistry(system).getModule("test-actor").isDefined shouldBe true
       HydraExtensionRegistry.get(system).getModule("test-actor-disabled").isDefined shouldBe false
+      probe.expectMsg("called")
     }
 
     it("errors with a module with the same name exists") {
       HydraTestExtension(system).registerModule("test-typed", ConfigFactory.empty)
+    }
+
+    it("stops an extension") {
+      val ext = HydraExtensionRegistry(system).getModule("test-typed").get.toOption.get
+      ext.stop()
     }
 
     it("calls the run method on actor modules") {
