@@ -51,7 +51,8 @@ class RabbitTransport(rabbitControlProps: Props) extends Transport {
       sendMessage(r).foreach { result =>
         result match {
           case x: Ack =>
-            callback.onCompletion(deliveryId, Some(RabbitRecordMetadata(System.currentTimeMillis(), x.id)), None)
+            callback.onCompletion(deliveryId, Some(RabbitRecordMetadata(System.currentTimeMillis(), x.id, r.destination,
+              r.destinationType)), None)
           case x: Nack =>
             callback.onCompletion(deliveryId, None, Some(RabbitProducerException("Rabbit returned Nack, record not produced")))
           case x: Fail =>
@@ -67,10 +68,11 @@ object RabbitTransport {
     return Props(classOf[RabbitTransport], p)
   }
 
+  // $COVERAGE-OFF$
   def props(c: Config): Props = {
     return Props(classOf[RabbitTransport], Props[RabbitControl])
   }
-
+  // $COVERAGE-ON$
 
 }
 

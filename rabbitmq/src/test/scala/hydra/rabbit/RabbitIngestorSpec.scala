@@ -57,23 +57,6 @@ class RabbitIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matcher
       expectMsg(10.seconds, Ignore)
     }
 
-    it("validates") {
-      val r = HydraRequest(123, "{'name': 'test'}").withMetadata(RabbitRecord.HYDRA_RABBIT_EXCHANGE -> "test.exchange",
-        RabbitRecord.HYDRA_RABBIT_QUEUE -> "test.queue")
-      ingestor ! Validate(r)
-      expectMsgType[InvalidRequest]
-
-      val request = HydraRequest(123,"""{"id":1, "name":"test", "rank" : 1}""")
-        .withMetadata(RabbitRecord.HYDRA_RABBIT_EXCHANGE -> "test.exchange")
-      ingestor ! Validate(request)
-      expectMsg(ValidRequest(RabbitRecordFactory.build(request).get))
-
-      val request2 = HydraRequest(123,"""{"id":1, "name":"test", "rank" : 1}""")
-        .withMetadata(RabbitRecord.HYDRA_RABBIT_QUEUE -> "test.queue")
-      ingestor ! Validate(request2)
-      expectMsg(ValidRequest(RabbitRecordFactory.build(request2).get))
-    }
-
     it("transports") {
       ingestor ! Ingest(TestRecord("test", "test", None), NoAck)
       probe.expectMsg(Produce(TestRecord("test", "test", None), self, NoAck))
