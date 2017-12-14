@@ -16,7 +16,7 @@
 package hydra.core.extensions
 
 import akka.actor.{ActorSystem, DynamicAccess, ExtensionId, ExtensionIdProvider, ReflectiveDynamicAccess}
-import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
+import com.typesafe.config.{Config, ConfigObject}
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 
@@ -29,24 +29,23 @@ import scala.util.{Failure, Success, Try}
 object HydraExtensionLoader extends LoggingAdapter {
 
   def load(config: Config)(implicit system: ActorSystem): Seq[Try[ExtensionId[_]]] = {
-    config.getOrElse[Config]("extensions", ConfigFactory.empty).map { c =>
-      c.root().entrySet().asScala.map { entry =>
-        val name = entry.getKey
-        val cfg = entry.getValue.asInstanceOf[ConfigObject].toConfig
-        //is there a way to plug into akka's classloader?
-        val dm = new ReflectiveDynamicAccess(Thread.currentThread.getContextClassLoader)
-        val clazz = cfg.getString("class")
-        val enabled = cfg.get[Boolean]("enabled").valueOrElse(true)
-        val extName = s"$name ($clazz)"
-        if (enabled) {
-          log.info(s"Loading extension ${extName}")
-          instantiate(dm, system, clazz, name)
-        } else {
-          Failure(new IllegalArgumentException(s"Extension $name is not enabled."))
-        }
+    config.root().entrySet().asScala.map { entry =>
+      val name = entry.getKey
+      val cfg = entry.getValue.asInstanceOf[ConfigObject].toConfig
+      //is there a way to plug into akka's classloader?
+      val dm = new ReflectiveDynamicAccess(Thread.currentThread.getContextClassLoader)
+      val clazz = cfg.getString("class")
+      val enabled = cfg.get[Boolean]("enabled").valueOrElse(true)
+      val extName = s"$name ($clazz)"
+      if (enabled) {
+        log.info(s"Loading extension ${extName}")
+        instantiate(dm, system, clazz, name)
+      } else {
+        Failure(new IllegalArgumentException(s"Extension $name is not enabled."))
       }
-    }.value.toSeq
-  }
+    }
+  }.toSeq
+
 
   private def instantiate(dm: DynamicAccess, system: ActorSystem,
                           clazz: String, name: String): Try[ExtensionId[_]] = {

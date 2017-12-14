@@ -11,6 +11,7 @@ object Test {
     // Don't run the tests in parallel
     parallelExecution in sbt.Test := false,
     logBuffered in sbt.Test := false,
+    coverageExcludedPackages := "hydra\\.ingest\\.HydraIngestApp.*",
 
     // Don't package test jars since it does not handle resources properly
     exportJars in sbt.Test := false,

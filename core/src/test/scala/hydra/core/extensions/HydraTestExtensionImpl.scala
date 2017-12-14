@@ -48,6 +48,11 @@ class TestTypedModule(val id: String, val config: Config) extends HydraTypedModu
     val act = TypedActor.context.actorSelection(config.getString("actorPath"))
     act ! Run
   }
+
+  override def stop(): Unit = {
+    val act = TypedActor.context.actorSelection(config.getString("actorPath"))
+    act ! "stopped"
+  }
 }
 
 

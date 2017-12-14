@@ -2,14 +2,19 @@ package hydra.kafka.endpoints
 
 import akka.actor.{Actor, Props}
 import akka.http.scaladsl.testkit.ScalatestRouteTest
+import akka.testkit.TestKit
 import hydra.kafka.consumer.KafkaConsumerProxy.{ListTopics, ListTopicsResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import org.apache.kafka.common.{Node, PartitionInfo}
-import org.scalatest.{Matchers, WordSpecLike}
+import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
-class TopicMetadataEndpointSpec extends Matchers with WordSpecLike with ScalatestRouteTest with HydraKafkaJsonSupport {
+class TopicMetadataEndpointSpec extends Matchers with WordSpecLike with ScalatestRouteTest
+  with HydraKafkaJsonSupport with BeforeAndAfterAll {
 
   import spray.json._
+  import scala.concurrent.duration._
+
+  override def cleanUp(): Unit = TestKit.shutdownActorSystem(system, duration = 30.seconds)
 
   val route = new TopicMetadataEndpoint().route
 

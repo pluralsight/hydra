@@ -9,13 +9,15 @@ import hydra.core.protocol._
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
+import scala.concurrent.duration._
+
 /**
   * Created by alexsilva on 3/9/17.
   */
 class IngestionRequestHandlerSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike
   with ImplicitSender with BeforeAndAfterAll with HydraDirectives with Eventually {
 
-  override def afterAll = TestKit.shutdownActorSystem(system)
+  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10 seconds)
 
   val req = HydraRequest(123, "test payload")
 

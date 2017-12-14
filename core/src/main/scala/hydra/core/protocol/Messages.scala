@@ -16,6 +16,8 @@ trait HydraError extends HydraMessage {
 
 }
 
+case class HydraApplicationError(error:Throwable) extends HydraError
+
 case class IngestionError(error: Throwable) extends HydraError
 
 case class Validate(req: HydraRequest) extends HydraMessage

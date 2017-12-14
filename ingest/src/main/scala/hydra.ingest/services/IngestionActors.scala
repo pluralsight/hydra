@@ -1,15 +1,15 @@
-package hydra.ingest
+package hydra.ingest.services
 
 import akka.actor.Props
 import hydra.common.util.ActorUtils
-import hydra.ingest.services.{IngestionActor, IngestorRegistrar, IngestorRegistry, TransportRegistrar}
+import hydra.core.app.ServiceProvider
 
 /**
   * Created by alexsilva on 3/29/17.
   */
-trait IngestionActors {
+object IngestionActors extends ServiceProvider {
 
-  val services = Seq(
+  override val services = Seq(
     Tuple2(ActorUtils.actorName[TransportRegistrar], Props[TransportRegistrar]),
     Tuple2(ActorUtils.actorName[IngestorRegistry], Props[IngestorRegistry]),
     Tuple2(ActorUtils.actorName[IngestorRegistrar], Props[IngestorRegistrar]),

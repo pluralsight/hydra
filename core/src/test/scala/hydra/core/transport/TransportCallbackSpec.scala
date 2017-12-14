@@ -6,6 +6,7 @@ import hydra.core.protocol.{RecordNotProduced, RecordProduced}
 import hydra.core.test.{TestRecord, TestRecordMetadata}
 import hydra.core.transport.TransportSupervisor.{Confirm, TransportError}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import scala.concurrent.duration._
 
 class TransportCallbackSpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike with BeforeAndAfterAll
   with ImplicitSender {
@@ -21,20 +22,20 @@ class TransportCallbackSpec extends TestKit(ActorSystem("test")) with Matchers w
   describe("Transports Acks") {
     it("handles empty callbacks") {
       NoCallback.onCompletion(-1, None, Some(new IllegalArgumentException("test")))
-      ingestor.expectNoMsg()
-      supervisor.expectNoMsg()
+      ingestor.expectNoMessage(3 seconds)
+      supervisor.expectNoMessage(3 seconds)
     }
 
     it("handles simple/transport only callbacks") {
       val probe = TestProbe()
       new TransportSupervisorCallback(probe.ref).onCompletion(-11, None, Some(new IllegalArgumentException("test")))
-      ingestor.expectNoMsg()
-      supervisor.expectNoMsg()
+      ingestor.expectNoMessage(3 seconds)
+      supervisor.expectNoMessage(3 seconds)
       probe.expectMsg(TransportError(-11))
 
       new TransportSupervisorCallback(probe.ref).onCompletion(-11, Some(TestRecordMetadata(1)), None)
-      ingestor.expectNoMsg()
-      supervisor.expectNoMsg()
+      ingestor.expectNoMessage(3 seconds)
+      supervisor.expectNoMessage(3 seconds)
       probe.expectMsg(Confirm(-11))
     }
 

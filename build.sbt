@@ -1,11 +1,8 @@
-import sbt.Keys.version
-import sbt._
-
-enablePlugins(JavaAppPackaging)
+import sbt.Resolver
 
 val JDK = "1.8"
 val buildNumber = scala.util.Properties.envOrNone("version").map(v => "." + v).getOrElse("")
-val hydraVersion = "0.9.5" + buildNumber
+val hydraVersion = "0.10.0" + buildNumber
 
 lazy val defaultSettings = Seq(
   organization := "pluralsight",
@@ -26,7 +23,7 @@ lazy val defaultSettings = Seq(
   resolvers += "Scalaz Bintray Repo" at "https://dl.bintray.com/scalaz/releases",
   resolvers += "Confluent Maven Repo" at "http://packages.confluent.io/maven/",
   resolvers += "jitpack" at "https://jitpack.io",
-  coverageExcludedPackages := "hydra\\.ingest\\.HydraIngestApp.*",
+  resolvers += Resolver.bintrayRepo("hseeberger", "maven"),
   ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet
 )
 
@@ -35,13 +32,22 @@ lazy val restartSettings = Seq(
   mainClass in reStart := Some("hydra.sandbox.app.HydraIngest")
 )
 
-lazy val noPublishSettings = Seq(
+val noPublishSettings = Seq(
   publish := {},
   publishLocal := {},
   publishArtifact := false,
   // required until these tickets are closed https://github.com/sbt/sbt-pgp/issues/42,
   // https://github.com/sbt/sbt-pgp/issues/36
-  publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
+  publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
+  packageBin := {
+    new File("")
+  },
+  packageSrc := {
+    new File("")
+  },
+  packageDoc := {
+    new File("")
+  }
 )
 
 lazy val moduleSettings = defaultSettings ++ Test.testSettings //++ Publish.settings
@@ -49,7 +55,7 @@ lazy val moduleSettings = defaultSettings ++ Test.testSettings //++ Publish.sett
 lazy val root = Project(
   id = "hydra",
   base = file(".")
-).settings(defaultSettings).aggregate(common, core, avro, ingest, kafka, sql, jdbc, sandbox)
+).settings(defaultSettings ++ noPublishSettings).aggregate(common, core, avro, ingest, kafka, sql, jdbc, sandbox)
 
 lazy val common = Project(
   id = "common",
@@ -67,7 +73,7 @@ lazy val ingest = Project(
   id = "ingest",
   base = file("ingest")
 ).dependsOn(core)
-  .settings(moduleSettings, name := "hydra-ingest", libraryDependencies ++= Dependencies.coreDeps)
+  .settings(moduleSettings, name := "hydra-ingest", libraryDependencies ++= Dependencies.ingestDeps)
 
 lazy val kafka = Project(
   id = "kafka",
@@ -104,6 +110,52 @@ lazy val sandbox = Project(
 ).dependsOn(ingest, kafka, jdbc)
   .settings(sbSettings, name := "hydra-examples", libraryDependencies ++= Dependencies.sandboxDeps)
 
+lazy val app = Project(
+  id = "app",
+  base = file("app")
+).dependsOn(ingest, kafka, jdbc, rabbitmq)
+  .settings(moduleSettings ++ noPublishSettings ++ dockerSettings, name := "hydra-app",
+    libraryDependencies ++= Dependencies.sandboxDeps)
+  .enablePlugins(JavaAppPackaging, sbtdocker.DockerPlugin)
+
 //scala style
 lazy val testScalastyle = taskKey[Unit]("testScalastyle")
 testScalastyle := scalastyle.in(sbt.Test).toTask("").value
+
+lazy val dockerSettings = Seq(
+  buildOptions in docker := BuildOptions(
+    cache = false,
+    removeIntermediateContainers = BuildOptions.Remove.Always,
+    pullBaseImage = BuildOptions.Pull.IfMissing
+  ),
+  dockerfile in docker := {
+    val appDir: File = stage.value
+    val targetDir = "/app"
+    val dockerFiles = IO.listFiles(new java.io.File("docker")).find(_.getPath.endsWith(".conf")).toSeq
+
+    new Dockerfile {
+      from("java")
+      maintainer("Alex Silva <alex-silva@pluralsight.com>")
+      user("root")
+      env("JAVA_OPTS", "-Xmx2G")
+      runRaw("mkdir -p /etc/hydra")
+      run("mkdir", "-p", "/var/log/hydra")
+      copy(dockerFiles, "/etc/hydra/")
+      expose(8088)
+      entryPoint(s"$targetDir/bin/${executableScriptName.value}")
+      copy(appDir, targetDir)
+    }
+  },
+
+  imageNames in docker := Seq(
+    // Sets the latest tag
+    ImageName(s"${organization.value}/hydra:latest"),
+
+    // Sets a name with a tag that contains the project version
+    ImageName(
+      namespace = Some(organization.value),
+      repository = "hydra",
+      tag = Some(version.value)
+    )
+  )
+)

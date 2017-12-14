@@ -3,6 +3,7 @@ package hydra.core.ingest
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.TestActors.ForwardActor
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
+import com.pluralsight.hydra.reflect.DoNotScan
 import hydra.core.akka.ActorInitializationException
 import hydra.core.protocol.{IngestorError, Produce}
 import hydra.core.test.TestRecordFactory
@@ -51,7 +52,7 @@ class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers with F
   }
 }
 
-
+@DoNotScan
 class TestTransportIngestor(supervisor: ActorRef) extends Ingestor with TransportOps {
 
   override val recordFactory = TestRecordFactory
