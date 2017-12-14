@@ -222,6 +222,4 @@ You can leave a window/tab open in your browser and messages sent to that topic 
 
 Dispatch endpoints with Spark DSL coming soon.
 
-Questions email me at alex-silva@pluralsight.com.
-
 Have fun!
