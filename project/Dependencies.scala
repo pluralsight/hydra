@@ -30,7 +30,6 @@ object Dependencies {
   val opRabbitVersion = "2.0.0"
   val constructRVersion = "0.18.0"
   val akkaHTTPCorsVersion = "0.2.2"
-  val akkaClusterManagementHttpVersion = "0.6"
   val akkaKryoVersion = "0.5.1"
 
   object Compile {
@@ -65,7 +64,6 @@ object Dependencies {
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
       "com.github.romix.akka" %% "akka-kryo-serialization" % akkaKryoVersion,
       "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
-      "com.lightbend.akka" %% "akka-management-cluster-http" % akkaClusterManagementHttpVersion,
       "ch.megard" %% "akka-http-cors" % akkaHTTPCorsVersion,
       "org.iq80.leveldb" % "leveldb" % "0.7",
       "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8")
