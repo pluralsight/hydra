@@ -16,15 +16,13 @@
 
 package hydra.rabbit
 
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props, Stash}
-import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestKit, TestProbe}
-import com.newmotion.akka.rabbitmq.ChannelCreated
-import com.rabbitmq.client.AMQP.Confirm
-import com.spingo.op_rabbit.{ConnectionParams, Message}
-import com.spingo.op_rabbit.Message.{ConfirmResponse, _}
+import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
+import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
+import com.spingo.op_rabbit.Message
+import com.spingo.op_rabbit.Message._
 import hydra.common.config.ConfigSupport
-import hydra.core.transport.{RecordMetadata, TransportCallback}
 import hydra.core.transport.TransportSupervisor.Deliver
+import hydra.core.transport.{RecordMetadata, TransportCallback}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 class RabbitTransportSpec extends TestKit(ActorSystem("hydra-test")) with Matchers with FunSpecLike
@@ -32,13 +30,8 @@ class RabbitTransportSpec extends TestKit(ActorSystem("hydra-test")) with Matche
 
   val probe = TestProbe()
 
-//  object RabbitControlMock{}
-
-  val testRabbitControl = Props[RabbitControlMock] //Props.empty //Props[RabbitControlMock]
+  val testRabbitControl = Props[RabbitControlMock]
   val rabbitTransport = TestActorRef[RabbitTransport](RabbitTransport.props(testRabbitControl), "rabbit_transport")
-
-  //val c =  rootConfig.getConfig("op-rabbit") //applicationConfig.getConfig("op-rabbit") //.get("op-rabbit")
-  //val rabbitTransport = TestActorRef[RabbitTransport](RabbitTransport.props(c), "rabbit_transport")
 
   override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 

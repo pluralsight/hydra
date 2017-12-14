@@ -24,6 +24,14 @@ class HydraRequestSpec extends Matchers with FunSpecLike {
       hr.metadataValueEquals("TEST", "?") shouldBe false
     }
 
+    it("checks if metadata value exists regardless of case") {
+      val hr = HydraRequest(123, metadata = Map("test" -> "value"), payload = "test")
+      hr.hasMetadata("test") shouldBe true
+      hr.hasMetadata("TEST") shouldBe true
+      hr.hasMetadata("TEST1") shouldBe false
+
+    }
+
     it("copies correlation id") {
       val hr = HydraRequest(123, metadata = Map("test" -> "value"), payload = "test").withCorrelationId(24)
       hr.correlationId shouldBe 24
