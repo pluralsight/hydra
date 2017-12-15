@@ -14,16 +14,16 @@ In order to use the Rabbit ingest, first start hydra ingestors by running hydra.
 To send to an exchange, use the hydra-rabbit-exchange header:
 ```
 curl -X POST http://localhost:8080/ingest \
-  -H "hydra-rabbit-exchange:test.exchange"
-  -H "hydra-ack:transport"
+  -H "hydra-rabbit-exchange:test.exchange" \
+  -H "hydra-ack:transport" \
   -d '{"name": "001c000001nlucqiaf", "handle": "152cba6e"}'
 ```
 
 To send to a queue, use the hydra-rabbit-queue header:
 ```
 curl -X POST http://localhost:8080/ingest \
-  -H "hydra-rabbit-queue:test.queue"
-  -H "hydra-ack:transport"
+  -H "hydra-rabbit-queue:test.queue" \
+  -H "hydra-ack:transport" \
   -d '{"name": "001c000001nlucqiaf", "handle": "152cba6e"}'
 ```
 
