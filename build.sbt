@@ -107,7 +107,7 @@ val sbSettings = defaultSettings ++ Test.testSettings ++ noPublishSettings ++ re
 lazy val sandbox = Project(
   id = "sandbox",
   base = file("sandbox")
-).dependsOn(ingest, kafka, jdbc, rabbitmq)
+).dependsOn(ingest, kafka, jdbc)
   .settings(sbSettings, name := "hydra-examples", libraryDependencies ++= Dependencies.sandboxDeps)
 
 lazy val app = Project(
