@@ -28,7 +28,7 @@ curl -X POST http://localhost:8080/ingest \
 ```
 
 #### Sample Response
-
+```{"correlationId":-8000123412807474687,"ingestors":{"rabbit_ingestor":{"code":200,"message":"OK"}}}```
 
 ### Rabbit libraries used
 This module makes use of the RabbitMQ library[Op-Rabbit](https://github.com/SpinGo/op-rabbit)
