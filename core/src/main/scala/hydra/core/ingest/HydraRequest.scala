@@ -34,6 +34,8 @@ case class HydraRequest(correlationId: Long = Random.nextInt(),
   def withMetadata(meta: (String, String)*) =
     copy(metadata = this.metadata ++ meta)
 
+  def hasMetadata(key: String): Boolean = metadata.find(_._1.equalsIgnoreCase(key)).isDefined
+
   def withAckStrategy(strategy: AckStrategy) = copy(ackStrategy = strategy)
 
   def withValidationStratetegy(validationStrategy: ValidationStrategy) =
