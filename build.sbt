@@ -45,7 +45,7 @@ val noPublishSettings = Seq(
   packageSrc := {
     new File("")
   },
-  packageDoc := {y
+  packageDoc := {
     new File("")
   }
 )
