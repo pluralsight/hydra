@@ -43,7 +43,7 @@ class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with 
   describe("The FileTransport") {
     it("saves to a file") {
       transport ! Deliver(FileRecord("test", "test-payload"))
-      eventually(Source.fromFile(files("transports.file.destinations.test"))
+      eventually(Source.fromFile(files("hydra.transports.file.destinations.test"))
         .getLines().toSeq should contain("test-payload"))
     }
 
@@ -67,11 +67,11 @@ class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with 
       ingestor.expectMsgPF(20.seconds) {
         case RecordProduced(fmd, sup) =>
           fmd shouldBe a[FileRecordMetadata]
-          fmd.asInstanceOf[FileRecordMetadata].path shouldBe files("transports.file.destinations.test").getAbsolutePath
+          fmd.asInstanceOf[FileRecordMetadata].path shouldBe files("hydra.transports.file.destinations.test").getAbsolutePath
           sup shouldBe supervisor
       }
 
-      eventually(Source.fromFile(files("transports.file.destinations.test"))
+      eventually(Source.fromFile(files("hydra.transports.file.destinations.test"))
         .getLines().toSeq should contain("test-payload1"))
     }
   }
