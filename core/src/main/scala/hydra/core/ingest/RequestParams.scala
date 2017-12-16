@@ -99,7 +99,7 @@ object RequestParams {
     * Be aware that setting this parameter to "explicit" raises the possibility of clients receiving ingestion timeouts.
     *
     */
-  val HYDRA_ACK_STRATEGY = "hydra-ack-strategy"
+  val HYDRA_ACK_STRATEGY = "hydra-ack"
 
 
   /**

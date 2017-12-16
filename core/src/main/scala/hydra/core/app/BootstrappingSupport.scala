@@ -29,6 +29,7 @@ trait BootstrappingSupport extends ConfigSupport with LoggingAdapter {
   val serviceProviders = scanFor(classOf[ServiceProvider])
 
   def services: Seq[(String, Props)] = serviceProviders.flatMap { clz =>
+    ReflectionUtils.getObjectInstance(clz)
     Try(ReflectionUtils.getObjectInstance(clz)).map(_.services)
       .getOrElse(clz.newInstance().services)
   }

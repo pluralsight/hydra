@@ -61,7 +61,7 @@ class FileTransport(destinations: Map[String, String]) extends Transport {
 
 object FileTransport extends ConfigSupport {
   def props(destinations: Config): Props = {
-    val map = toMap(destinations.getConfig("transports.file.destinations"))
+    val map = toMap(destinations.getConfig("hydra.transports.file.destinations"))
     Props(classOf[FileTransport], map)
   }
 }

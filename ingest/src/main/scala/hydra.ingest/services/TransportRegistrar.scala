@@ -4,7 +4,6 @@ import java.lang.reflect.Method
 
 import akka.actor.{Actor, ActorRef, ActorRefFactory, Props}
 import com.typesafe.config.Config
-import configs.syntax._
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.common.reflect.ReflectionUtils
@@ -25,13 +24,8 @@ import scala.util.Try
 class TransportRegistrar extends Actor with ConfigSupport with LoggingAdapter {
 
   //TODO: Make this work like IngestorRegistrar
-
-  private val pkgs = applicationConfig.get[List[String]]("transports.classpath-scan")
-    .valueOrElse(Seq("hydra.transports"))
-
   private lazy val transports: Map[String, Class[_ <: Transport]] =
     ClasspathHydraComponentLoader.transports.map(h => ActorUtils.actorName(h) -> h).toMap
-
 
   override def receive = {
     case Unregistered(name) =>
@@ -42,7 +36,7 @@ class TransportRegistrar extends Actor with ConfigSupport with LoggingAdapter {
   }
 
   override def preStart(): Unit = {
-    TransportRegistrar.bootstrap(transports, context, applicationConfig)
+    TransportRegistrar.bootstrap(transports, context, rootConfig)
   }
 }
 
@@ -58,7 +52,9 @@ object TransportRegistrar extends LoggingAdapter {
         log.debug(s"Initializing transport actor $name")
         fact.actorOf(TransportSupervisor.props(name, props), name)
       }.recover {
-        case e: Exception => log.error(s"Unable to instantiate transport $name: ${e.getMessage}"); throw e
+        case e: Exception =>
+          e.getCause.printStackTrace()
+          log.error(s"Unable to instantiate transport $name: ${e.getMessage}"); throw e
       }
     }.toSeq
   }

@@ -47,13 +47,12 @@ class RabbitTransport(rabbitControlProps: Props) extends Transport {
 
   override def receive = {
     case Deliver(r: RabbitRecord, deliveryId, callback) =>
-      val destKey = r.destinationType + ":" + r.destination
       sendMessage(r).foreach { result =>
         result match {
           case x: Ack =>
             callback.onCompletion(deliveryId, Some(RabbitRecordMetadata(System.currentTimeMillis(), x.id, r.destination,
               r.destinationType)), None)
-          case x: Nack =>
+          case _: Nack =>
             callback.onCompletion(deliveryId, None, Some(RabbitProducerException("Rabbit returned Nack, record not produced")))
           case x: Fail =>
             callback.onCompletion(deliveryId, None, Some(x.exception))
@@ -63,17 +62,14 @@ class RabbitTransport(rabbitControlProps: Props) extends Transport {
 }
 
 object RabbitTransport {
-
-  def props(p: Props): Props = { // will be used in testing
-    return Props(classOf[RabbitTransport], p)
-  }
+  // will be used in testing
+  def props(p: Props): Props = Props(classOf[RabbitTransport], p)
 
   // $COVERAGE-OFF$
-  def props(c: Config): Props = {
-    return Props(classOf[RabbitTransport], Props[RabbitControl])
-  }
-  // $COVERAGE-ON$
+  def props(c: Config): Props = Props(classOf[RabbitTransport],
+    Props(classOf[RabbitControl], Left(ConnectionParams.fromConfig(c.getConfig("op-rabbit.connection")))))
 
+  // $COVERAGE-ON$
 }
 
 case class RabbitProducerException(msg: String) extends Exception(msg)

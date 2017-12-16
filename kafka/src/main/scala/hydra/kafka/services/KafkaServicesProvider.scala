@@ -11,7 +11,6 @@ import configs.syntax._
 
 object KafkaServicesProvider extends ServiceProvider with KafkaConfigSupport {
 
-
   val healthCheckTopic = applicationConfig.getOrElse[String]("kafka.health-check-topic", "__hydra_health_check").value
 
   override val services = Seq(
