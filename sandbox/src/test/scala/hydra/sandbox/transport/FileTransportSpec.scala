@@ -23,7 +23,7 @@ class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with 
 
   implicit override val patienceConfig = PatienceConfig(timeout = Span(60, Seconds), interval = Span(1, Seconds))
 
-  val files = Map("transports.file.destinations.test" -> Files.createTempFile("hydra", "test").toFile)
+  val files = Map("hydra.transports.file.destinations.test" -> Files.createTempFile("hydra", "test").toFile)
 
   val transport = system.actorOf(FileTransport.props(ConfigFactory.parseMap(files.mapValues(_.getAbsolutePath).asJava)))
 
