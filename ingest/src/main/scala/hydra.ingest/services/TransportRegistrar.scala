@@ -53,8 +53,8 @@ object TransportRegistrar extends LoggingAdapter {
         fact.actorOf(TransportSupervisor.props(name, props), name)
       }.recover {
         case e: Exception =>
-          e.getCause.printStackTrace()
-          log.error(s"Unable to instantiate transport $name: ${e.getMessage}"); throw e
+          log.error(s"Unable to instantiate transport $name: ${e.getMessage}")
+          throw e
       }
     }.toSeq
   }
