@@ -38,7 +38,7 @@ class TransportRegistrarSpec extends TestKit(ActorSystem("test")) with Matchers
 
     it("reports the error if it can't instantiate") {
       val transports = bootstrap(Map("transport_test3" -> classOf[ErrorTransport]), system, applicationConfig)
-      intercept[IllegalArgumentException] {
+       intercept[IllegalArgumentException] {
         transports(0).get
       }
     }

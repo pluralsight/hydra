@@ -2,7 +2,7 @@ package hydra.kafka.services
 
 import akka.actor.Props
 import hydra.common.util.ActorUtils
-import hydra.core.app.ServiceProvider
+import hydra.core.bootstrap.ServiceProvider
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.health.KafkaHealthCheckActor

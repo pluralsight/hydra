@@ -1,4 +1,4 @@
-package hydra.core.app
+package hydra.core.bootstrap
 
 import java.lang.reflect.Modifier
 
@@ -11,16 +11,16 @@ import com.pluralsight.hydra.reflect.DoNotScan
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.common.reflect.{ComponentInstantiator, ReflectionUtils}
-import org.reflections.Reflections
-import org.reflections.scanners.SubTypesScanner
 
 import scala.util.Try
 
 trait BootstrappingSupport extends ConfigSupport with LoggingAdapter {
-  private val reflections = new Reflections("hydra", new SubTypesScanner)
+
+  import ReflectionsWrapper._
 
   import scala.collection.JavaConverters._
   import scala.util.control.Exception._
+
 
   private val exceptionLogger = handling(classOf[Exception]) by { ex =>
     log.error("Could not instantiate class.", ex); None

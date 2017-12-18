@@ -16,7 +16,7 @@
 
 package hydra.sandbox.app
 
-import hydra.core.app.BootstrappingSupport
+import hydra.core.bootstrap.BootstrappingSupport
 
 object HydraSandbox extends App with BootstrappingSupport {
   containerService.start()
