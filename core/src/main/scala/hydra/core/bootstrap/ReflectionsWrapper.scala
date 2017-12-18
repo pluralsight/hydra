@@ -12,8 +12,13 @@ object ReflectionsWrapper extends ConfigSupport {
   private[bootstrap] val scanPkgs = "hydra" +: applicationConfig
     .getOrElse[Seq[String]]("scan-packages", Seq.empty).value
 
-  private val reflectionsCfg = new ConfigurationBuilder().forPackages(scanPkgs: _*)
+  private def reflectionsCfg = new ConfigurationBuilder().forPackages(scanPkgs: _*)
     .addScanners(new SubTypesScanner).useParallelExecutor()
 
-  val reflections = new Reflections(reflectionsCfg)
+  private var _reflections = new Reflections(reflectionsCfg)
+
+  val reflections = _reflections
+
+  //for testing only
+  def rescan():Unit = _reflections = new Reflections(reflectionsCfg)
 }

@@ -23,7 +23,6 @@ import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.ingest.Ingestor
 import hydra.core.transport.Transport
-import org.reflections.Reflections
 
 import scala.collection.JavaConverters._
 
@@ -39,19 +38,7 @@ trait HydraComponentLoader {
 
 object ClasspathHydraComponentLoader extends HydraComponentLoader with ConfigSupport with LoggingAdapter {
 
-  import configs.syntax._
-
-  private val ingestorsPkg = applicationConfig.get[List[String]]("ingest.classpath-scan").valueOrElse(List.empty)
-
-  //log.debug(s"Scanning for ingestors in package(s): [${ingestorsPkg.mkString}].")
-
-  private val transportsPkg = applicationConfig.get[List[String]]("transports.classpath-scan").valueOrElse(List.empty)
-
-  // log.debug(s"Scanning for transports in package(s): [${transportsPkg.mkString}].")
-
-  private val pkgs = ingestorsPkg ::: transportsPkg ::: List("hydra")
-
-  private val reflections = new Reflections(pkgs.toSet.toArray)
+  import hydra.core.bootstrap.ReflectionsWrapper._
 
   override lazy val ingestors = reflections.getSubTypesOf(classOf[Ingestor])
     .asScala.filterNot(c => Modifier.isAbstract(c.getModifiers))

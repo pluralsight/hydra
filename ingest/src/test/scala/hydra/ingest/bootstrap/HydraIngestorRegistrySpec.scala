@@ -2,14 +2,15 @@ package hydra.ingest.bootstrap
 
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
+import hydra.core.bootstrap.ReflectionsWrapper
 import hydra.ingest.ingestors.IngestorInfo
 import hydra.ingest.services.IngestorRegistry
 import hydra.ingest.services.IngestorRegistry.RegisterWithClass
 import hydra.ingest.test.TestIngestor
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
-import scala.concurrent.duration._
 
+import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class HydraIngestorRegistrySpec extends TestKit(ActorSystem("test")) with Matchers
@@ -20,6 +21,8 @@ class HydraIngestorRegistrySpec extends TestKit(ActorSystem("test")) with Matche
   val registry = system.actorOf(Props[IngestorRegistry], "ingestor_registry")
 
   implicit val actorRefFactory = system
+
+  ReflectionsWrapper.rescan()
 
   registry ! RegisterWithClass(classOf[TestIngestor], "global")
   expectMsgType[IngestorInfo]
