@@ -11,6 +11,7 @@ import hydra.ingest.test.TestRecord
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
+
 class TransportRegistrarSpec extends TestKit(ActorSystem("test")) with Matchers
   with FunSpecLike with BeforeAndAfterAll with ImplicitSender with ConfigSupport {
 
@@ -40,6 +41,14 @@ class TransportRegistrarSpec extends TestKit(ActorSystem("test")) with Matchers
       val transports = bootstrap(Map("transport_test3" -> classOf[ErrorTransport]), system, applicationConfig)
       intercept[IllegalArgumentException] {
         transports(0).get
+      }
+    }
+
+    it("returns all transports") {
+      tr ! GetTransports
+      expectMsgPF() {
+        case r: GetTransportsResponse => r.transports should contain allOf("transport_test",
+          "companion_less_transport_test", "error_transport", "test_transport")
       }
     }
   }

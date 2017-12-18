@@ -1,4 +1,4 @@
-package hydra.core.app
+package hydra.core.bootstrap
 
 import akka.Done
 import akka.actor.{ActorSystem, Address}

@@ -29,7 +29,7 @@ lazy val defaultSettings = Seq(
 
 lazy val restartSettings = Seq(
   javaOptions in reStart += "-Xmx2g",
-  mainClass in reStart := Some("hydra.sandbox.app.HydraIngest")
+  mainClass in reStart := Some("hydra.sandbox.app.HydraSandbox")
 )
 
 val noPublishSettings = Seq(
@@ -107,7 +107,7 @@ val sbSettings = defaultSettings ++ Test.testSettings ++ noPublishSettings ++ re
 lazy val sandbox = Project(
   id = "sandbox",
   base = file("sandbox")
-).dependsOn(ingest, kafka, jdbc)
+).dependsOn(ingest, jdbc, rabbitmq)
   .settings(sbSettings, name := "hydra-examples", libraryDependencies ++= Dependencies.sandboxDeps)
 
 lazy val app = Project(

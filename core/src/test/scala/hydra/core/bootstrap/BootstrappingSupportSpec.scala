@@ -1,4 +1,4 @@
-package hydra.core.app
+package hydra.core.bootstrap
 
 import akka.actor.{ActorRefFactory, ActorSystem, Props}
 import akka.http.scaladsl.server.Route

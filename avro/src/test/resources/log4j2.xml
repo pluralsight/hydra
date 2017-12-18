@@ -25,7 +25,6 @@
 
     <Loggers>
 
-
         <Root level="debug">
             <AppenderRef ref="STDOUT"/>
         </Root>
