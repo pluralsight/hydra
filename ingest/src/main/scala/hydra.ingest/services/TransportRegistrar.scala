@@ -10,8 +10,7 @@ import hydra.common.reflect.ReflectionUtils
 import hydra.common.util.ActorUtils
 import hydra.core.transport.{Transport, TransportSupervisor}
 import hydra.ingest.bootstrap.ClasspathHydraComponentLoader
-import hydra.ingest.ingestors.IngestorInfo
-import hydra.ingest.services.IngestorRegistry.Unregistered
+import hydra.ingest.services.TransportRegistrar.{GetTransports, GetTransportsResponse}
 
 import scala.util.Try
 
@@ -28,11 +27,7 @@ class TransportRegistrar extends Actor with ConfigSupport with LoggingAdapter {
     ClasspathHydraComponentLoader.transports.map(h => ActorUtils.actorName(h) -> h).toMap
 
   override def receive = {
-    case Unregistered(name) =>
-      log.info(s"Ingestor $name was removed from the registry.")
-
-    case IngestorInfo(name, group, path, _) =>
-      log.info(s"Ingestor $name [$group] is available at $path")
+    case GetTransports => sender ! GetTransportsResponse(transports.keys.toSeq)
   }
 
   override def preStart(): Unit = {
@@ -41,6 +36,11 @@ class TransportRegistrar extends Actor with ConfigSupport with LoggingAdapter {
 }
 
 object TransportRegistrar extends LoggingAdapter {
+
+  case object GetTransports
+
+  case class GetTransportsResponse(transports: Seq[String])
+
   private[services] def bootstrap(transports: Map[String, Class[_ <: Transport]],
                                   fact: ActorRefFactory, config: Config): Seq[Try[ActorRef]] = {
     transports.map { case (name, clazz) =>
