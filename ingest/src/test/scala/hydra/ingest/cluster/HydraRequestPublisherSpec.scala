@@ -6,12 +6,14 @@ import akka.cluster.pubsub.DistributedPubSubMediator.Subscribe
 import akka.testkit.{TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import hydra.core.ingest
+import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 class HydraRequestPublisherSpec extends
   TestKit(ActorSystem("hydra",
     config = ConfigFactory.parseString("akka.actor.provider=cluster")
-      .withFallback(ConfigFactory.load()))) with Matchers with FlatSpecLike with BeforeAndAfterAll {
+      .withFallback(ConfigFactory.load()))) with Matchers with FlatSpecLike
+  with BeforeAndAfterAll with Eventually {
 
   val publisher = system.actorOf(HydraRequestPublisher.props(HydraRequestPublisher.TopicName))
 
@@ -25,6 +27,6 @@ class HydraRequestPublisherSpec extends
   "The HydraRequestPublisher" should "broadcast HydraRequests" in {
     val request = ingest.HydraRequest(1, "payload")
     publisher ! request
-    sub.expectMsg(request)
+    eventually(sub.expectMsg(request))
   }
 }
