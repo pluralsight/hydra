@@ -69,12 +69,6 @@ lazy val core = Project(
   .settings(moduleSettings, name := "hydra-core", libraryDependencies ++= Dependencies.coreDeps)
 
 
-lazy val ingest = Project(
-  id = "ingest",
-  base = file("ingest")
-).dependsOn(core)
-  .settings(moduleSettings, name := "hydra-ingest", libraryDependencies ++= Dependencies.ingestDeps)
-
 lazy val kafka = Project(
   id = "kafka",
   base = file("kafka")
@@ -110,12 +104,12 @@ lazy val sandbox = Project(
 ).dependsOn(ingest, jdbc, rabbitmq)
   .settings(sbSettings, name := "hydra-examples", libraryDependencies ++= Dependencies.sandboxDeps)
 
-lazy val app = Project(
-  id = "app",
-  base = file("app")
-).dependsOn(ingest, kafka, jdbc, rabbitmq)
-  .settings(moduleSettings ++ noPublishSettings ++ dockerSettings, name := "hydra-app",
-    libraryDependencies ++= Dependencies.sandboxDeps)
+lazy val ingest = Project(
+  id = "ingest",
+  base = file("ingest")
+).dependsOn(core, kafka)
+  .settings(moduleSettings ++ dockerSettings,
+    name := "hydra-ingest", libraryDependencies ++= Dependencies.ingestDeps)
   .enablePlugins(JavaAppPackaging, sbtdocker.DockerPlugin)
 
 //scala style
