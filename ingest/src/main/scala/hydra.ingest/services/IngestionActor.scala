@@ -17,10 +17,13 @@
 package hydra.ingest.services
 
 import akka.actor._
+import akka.cluster.pubsub.DistributedPubSub
+import akka.cluster.pubsub.DistributedPubSubMediator.Subscribe
 import hydra.common.config.ActorConfigSupport
 import hydra.core.ingest.{HydraRequest, IngestionReport}
 import hydra.core.protocol.IngestionError
 import hydra.ingest.bootstrap.HydraIngestorRegistry
+import hydra.ingest.cluster.HydraRequestPublisher
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -39,8 +42,12 @@ class IngestionActor extends Actor with ActorConfigSupport with ActorLogging wit
 
   private implicit val ec = context.dispatcher
 
+  private val mediator = DistributedPubSub(context.system).mediator
+
+  mediator ! Subscribe(HydraRequestPublisher.TopicName, Some(HydraRequestPublisher.GroupName), self)
+
   override def receive: Receive = {
-    case request:HydraRequest =>
+    case request: HydraRequest =>
       val requestor = sender
       publishRequest(request, requestor)
 

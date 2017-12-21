@@ -30,18 +30,19 @@ import hydra.ingest.marshallers.HydraIngestJsonSupport
 import hydra.ingest.ws._
 import spray.json._
 
+import scala.concurrent.ExecutionContext
 import scala.util.Failure
 
 /**
   * Created by alexsilva on 12/22/15.
   */
-class IngestionWebSocketEndpoint(implicit val system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
+class IngestionWebSocketEndpoint(implicit system: ActorSystem, implicit val e: ExecutionContext)
   extends RoutedEndpoints with LoggingAdapter with HydraIngestJsonSupport with HydraDirectives {
 
   //visible for testing
   private[endpoints] val enabled = applicationConfig.get[Boolean]("ingest.websocket.enabled").valueOrElse(false)
 
-  private val socketFactory = IngestSocketFactory.createSocket(actorRefFactory)
+  private val socketFactory = IngestSocketFactory.createSocket(system)
 
   implicit val simpleOutgoingMessageFormat = jsonFormat2(SimpleOutgoingMessage)
 
@@ -71,6 +72,6 @@ class IngestionWebSocketEndpoint(implicit val system: ActorSystem, implicit val 
       .watchTermination()((_, f) => f.onComplete {
         case Failure(cause) => log.error(s"WS stream failed with $cause")
         case _ => //ignore
-      }(actorRefFactory.dispatcher))
+      }(e))
 
 }

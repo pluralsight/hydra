@@ -1,6 +1,6 @@
 package hydra.core.bootstrap
 
-import akka.actor.{ActorRefFactory, ActorSystem, Props}
+import akka.actor.{ActorSystem, Props}
 import akka.http.scaladsl.server.Route
 import akka.testkit.TestKit
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
@@ -8,6 +8,8 @@ import com.github.vonnagy.service.container.listener.ContainerLifecycleListener
 import com.github.vonnagy.service.container.service.ContainerService
 import hydra.core.ingest.TestIngestorDefault
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+
+import scala.concurrent.ExecutionContext
 
 /**
   * Created by alexsilva on 3/7/17.
@@ -79,7 +81,8 @@ private object DummyServiceProviderObject extends ServiceProvider {
   override val services = Seq("test2" -> Props[TestIngestorDefault])
 }
 
-private class DummyEndpoint(implicit s: ActorSystem, implicit val a: ActorRefFactory) extends RoutedEndpoints {
+private class DummyEndpoint(implicit s: ActorSystem, implicit val e: ExecutionContext)
+  extends RoutedEndpoints {
   override def route: Route = get {
     complete("DONE")
   }

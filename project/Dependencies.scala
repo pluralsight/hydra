@@ -21,7 +21,7 @@ object Dependencies {
   val akkaKafkaStreamVersion = "0.14"
   val scalazVersion = "7.2.9"
   val scalaMockVersion = "3.5.0"
-  val serviceContainerVersion = "2.0.6"
+  val serviceContainerVersion = "2.0.7"
   val scalaCacheVersion = "0.9.3"
   val postgresVersion = "9.4.1209"
   val commonsDbcpVersion = "1.4"
@@ -60,6 +60,7 @@ object Dependencies {
 
     val akka = Seq("com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
+      "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
       "com.github.romix.akka" %% "akka-kryo-serialization" % akkaKryoVersion,

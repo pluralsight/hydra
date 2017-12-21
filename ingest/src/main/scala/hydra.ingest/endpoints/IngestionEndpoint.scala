@@ -29,19 +29,18 @@ import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
 import hydra.ingest.bootstrap.HydraIngestorRegistry
 import hydra.ingest.services.IngestionRequestHandler
 
+import scala.concurrent.ExecutionContext
 import scala.util.Random
 
 /**
   * Created by alexsilva on 12/22/15.
   */
-class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
+class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: ExecutionContext)
   extends RoutedEndpoints with LoggingAdapter with HydraJsonSupport with HydraDirectives with HydraIngestorRegistry {
 
   import hydra.ingest.bootstrap.RequestFactories._
 
   implicit val mat = ActorMaterializer()
-
-  implicit val ec = actorRefFactory.dispatcher
 
   override val route: Route =
     post {
@@ -75,7 +74,7 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
         val hydraReq = createRequest[HttpRequest](correlationId, ctx.request)
         onSuccess(hydraReq) { request =>
           imperativelyComplete { ictx =>
-            actorRefFactory.actorOf(IngestionRequestHandler.props(request, registry, ictx))
+            system.actorOf(IngestionRequestHandler.props(request, registry, ictx))
           }
         }
       }
@@ -92,7 +91,7 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val actorRefF
               val hydraReq = r.withMetadata(RequestParams.HYDRA_INGESTOR_PARAM -> ingestor)
               imperativelyComplete { ictx =>
                 ingestorRegistry.foreach(registry =>
-                  actorRefFactory.actorOf(IngestionRequestHandler.props(hydraReq, registry, ictx)))
+                  system.actorOf(IngestionRequestHandler.props(hydraReq, registry, ictx)))
               }
             }
           }

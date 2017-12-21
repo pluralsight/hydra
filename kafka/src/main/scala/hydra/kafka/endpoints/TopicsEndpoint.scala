@@ -1,6 +1,6 @@
 package hydra.kafka.endpoints
 
-import akka.actor.{ActorRefFactory, ActorSystem}
+import akka.actor.ActorSystem
 import akka.http.scaladsl.common.EntityStreamingSupport
 import akka.kafka.Subscriptions
 import akka.kafka.scaladsl.Consumer
@@ -17,23 +17,21 @@ import org.apache.kafka.common.TopicPartition
 
 import scala.collection.immutable.Map
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
 
 /**
   * A cluster metadata endpoint implemented exclusively with akka streams.
   *
   * Created by alexsilva on 3/18/17.
   */
-class TopicsEndpoint(implicit val system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
+class TopicsEndpoint(implicit system: ActorSystem, implicit val e: ExecutionContext)
   extends RoutedEndpoints with LoggingAdapter with HydraDirectives with HydraKafkaJsonSupport {
 
   import hydra.kafka.util.KafkaUtils._
 
   implicit val jsonStreamingSupport = EntityStreamingSupport.json()
 
-  implicit val ec = actorRefFactory.dispatcher
-
-  private val consumerProxy = actorRefFactory
+  private val consumerProxy = system
     .actorSelection(s"/user/service/${ActorUtils.actorName(classOf[KafkaConsumerProxy])}")
 
   override val route = path("transports" / "kafka" / "consumer" / "topics" / Segment) { topicName =>

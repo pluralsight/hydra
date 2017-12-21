@@ -32,10 +32,12 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.duration._
 import configs.syntax._
 
+import scala.concurrent.ExecutionContext
+
 /**
   * Created by alexsilva on 12/22/15.
   */
-class IngestorRegistryEndpoint(implicit val system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
+class IngestorRegistryEndpoint(implicit val system: ActorSystem, implicit val e: ExecutionContext)
   extends RoutedEndpoints with LoggingAdapter with HydraIngestJsonSupport with HydraDirectives with ConfigSupport
     with HydraIngestorRegistry {
 
