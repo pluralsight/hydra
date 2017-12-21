@@ -48,10 +48,10 @@ class HydraRequestSpec extends Matchers with FunSpecLike {
 
     it("copies request strategy") {
       val hr = HydraRequest(123, metadata = Map("test" -> "value"), payload = "test")
-        .withAckStrategy(AckStrategy.TransportAck)
+        .withAckStrategy(AckStrategy.Replicated)
       hr.correlationId shouldBe 123
       hr.payload shouldBe "test"
-      hr.ackStrategy shouldBe AckStrategy.TransportAck
+      hr.ackStrategy shouldBe AckStrategy.Replicated
     }
 
     it("copies metadata") {

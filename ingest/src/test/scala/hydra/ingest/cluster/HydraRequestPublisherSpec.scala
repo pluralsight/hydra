@@ -13,16 +13,16 @@ class HydraRequestPublisherSpec extends
     config = ConfigFactory.parseString("akka.actor.provider=cluster")
       .withFallback(ConfigFactory.load()))) with Matchers with FlatSpecLike with BeforeAndAfterAll {
 
+  val publisher = system.actorOf(HydraRequestPublisher.props(HydraRequestPublisher.TopicName))
+
   val mediator = DistributedPubSub(system).mediator
   val sub = TestProbe()
-  val topic = "test"
-  val group = "ingest"
-  mediator ! Subscribe(topic, Some(group), sub.ref)
+  mediator ! Subscribe(HydraRequestPublisher.TopicName, Some(HydraRequestPublisher.GroupName),
+    sub.ref)
 
   override def afterAll(): Unit = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 
   "The HydraRequestPublisher" should "broadcast HydraRequests" in {
-    val publisher = system.actorOf(HydraRequestPublisher.props(topic))
     val request = ingest.HydraRequest(1, "payload")
     publisher ! request
     sub.expectMsg(request)

@@ -24,7 +24,6 @@ class HydraRequestPublisher(topic: String) extends Actor with ActorLogging {
     case request: HydraRequest ⇒
       mediator ! Publish(topic, request, true)
   }
-
 }
 
 object HydraRequestPublisher {

@@ -1,6 +1,7 @@
 package hydra.ingest
 
 import hydra.common.util.ActorUtils
+import hydra.ingest.cluster.HydraRequestPublisher
 import hydra.ingest.services._
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
@@ -11,6 +12,7 @@ class IngestionActorsSpec extends Matchers with FlatSpecLike with BeforeAndAfter
 
   "The ingestion actors sequence" should "contain all actors" in {
     IngestionActors.services.map(_._1) shouldBe Seq(
+      ActorUtils.actorName[HydraRequestPublisher],
       ActorUtils.actorName[TransportRegistrar],
       ActorUtils.actorName[IngestorRegistry],
       ActorUtils.actorName[IngestorRegistrar],

@@ -3,7 +3,7 @@ package hydra.core.transport
 import akka.actor.Props
 import akka.persistence.{AtLeastOnceDelivery, PersistentActor}
 import hydra.core.protocol._
-import hydra.core.transport.AckStrategy.{LocalAck, NoAck, TransportAck}
+import hydra.core.transport.AckStrategy.{Persisted, NoAck, Replicated}
 import hydra.core.transport.TransportSupervisor._
 
 /**
@@ -44,14 +44,14 @@ class TransportSupervisor(id: String, destProps: Props) extends PersistentActor 
         sender ! RecordAccepted(p.supervisor)
         destination ! Deliver(p.record)
 
-      case LocalAck =>
+      case Persisted =>
         val ingestor = sender
         persistAsync(p) { p =>
           updateState(p)
           ingestor ! RecordProduced(HydraRecordMetadata(System.currentTimeMillis), p.supervisor)
         }
 
-      case TransportAck =>
+      case Replicated =>
         val ingestor = sender
         destination ! Deliver(p.record, -1, new IngestorCallback[Any, Any](p.record, ingestor, p.supervisor, self))
     }
