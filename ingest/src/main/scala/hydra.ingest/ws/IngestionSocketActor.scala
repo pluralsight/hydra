@@ -67,7 +67,7 @@ class IngestionSocketActor extends Actor with LoggingAdapter with HydraIngestorR
 
   def ingesting: Receive = {
     case IncomingMessage(IngestPattern(correlationId, payload)) =>
-      val request = session.buildRequest(Option(correlationId).map(_.toLong), payload)
+      val request = session.buildRequest(Option(correlationId), payload)
       ingestorRegistry.map(r => context.actorOf(IngestionSupervisor.props(request, timeout, r)))(context.dispatcher)
 
     case report: IngestionReport =>
@@ -88,7 +88,7 @@ case class SocketSession(metadata: Map[String, String] = Map.empty) {
   def withMetadata(meta: (String, String)*) =
     copy(metadata = this.metadata ++ meta.map(m => m._1 -> m._2))
 
-  def buildRequest(correlationId: Option[Long], payload: String) = {
+  def buildRequest(correlationId: Option[String], payload: String) = {
     import hydra.core.ingest.RequestParams._
 
     val vs = metadata.find(_._1.equalsIgnoreCase(HYDRA_VALIDATION_STRATEGY))
@@ -97,7 +97,7 @@ case class SocketSession(metadata: Map[String, String] = Map.empty) {
     val as = metadata.find(_._1.equalsIgnoreCase(HYDRA_ACK_STRATEGY))
       .map(h => AckStrategy(h._2)).getOrElse(AckStrategy.NoAck)
 
-    ingest.HydraRequest(correlationId.getOrElse(0), payload, metadata,
+    ingest.HydraRequest(correlationId.getOrElse("0"), payload, metadata,
       validationStrategy = vs, ackStrategy = as)
   }
 }

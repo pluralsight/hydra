@@ -16,30 +16,30 @@ class JdbcRecordFactorySpec extends Matchers with FunSpecLike {
 
   describe("The JDBC record factory") {
     it("extracts primary keys if present") {
-      val req = HydraRequest(1, "test")
+      val req = HydraRequest("1", "test")
       JdbcRecordFactory.pk(req, schemaPK) shouldBe Seq(schemaPK.getField("id"))
 
-      val req1 = HydraRequest(1, "test")
+      val req1 = HydraRequest("1", "test")
       JdbcRecordFactory.pk(req1, schema) shouldBe Seq.empty
 
-      val req2 = HydraRequest(1, "test").withMetadata(JdbcRecordFactory.PRIMARY_KEY_PARAM -> "id")
+      val req2 = HydraRequest("1", "test").withMetadata(JdbcRecordFactory.PRIMARY_KEY_PARAM -> "id")
       JdbcRecordFactory.pk(req2, schema) shouldBe Seq(schema.getField("id"))
 
-      val req3 = HydraRequest(1, "test").withMetadata(JdbcRecordFactory.PRIMARY_KEY_PARAM -> "unknown")
+      val req3 = HydraRequest("1", "test").withMetadata(JdbcRecordFactory.PRIMARY_KEY_PARAM -> "unknown")
       intercept[IllegalArgumentException] {
         JdbcRecordFactory.pk(req3, schema) shouldBe Seq(schema.getField("id"))
       }
     }
 
     it("throws an error if no schema is in the request metadata") {
-      val req = HydraRequest(1, "test")
+      val req = HydraRequest("1", "test")
       intercept[IllegalArgumentException] {
         JdbcRecordFactory.build(req).get
       }
     }
 
     it("throws an error if payload does not comply to schema") {
-      val request = HydraRequest(123,"""{"name":"test"}""")
+      val request = HydraRequest("123","""{"name":"test"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
       intercept[JsonToAvroConversionExceptionWithMetadata] {
         JdbcRecordFactory.build(request).get
@@ -47,7 +47,7 @@ class JdbcRecordFactorySpec extends Matchers with FunSpecLike {
     }
 
     it("throws an error if payload if validation is strict") {
-      val request = HydraRequest(123,"""{"id":1, "field":2, "name":"test"}""")
+      val request = HydraRequest("123","""{"id":1, "field":2, "name":"test"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
       intercept[JsonToAvroConversionExceptionWithMetadata] {
         JdbcRecordFactory.build(request).get
@@ -55,7 +55,7 @@ class JdbcRecordFactorySpec extends Matchers with FunSpecLike {
     }
 
     it("Uses the schema as the table name") {
-      val request = HydraRequest(123,"""{"id":1, "name":"test", "rank" : 1}""")
+      val request = HydraRequest("123","""{"id":1, "name":"test", "rank" : 1}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc", JdbcRecordFactory.DB_PROFILE_PARAM -> "table")
 
       JdbcRecordFactory.build(request).get.destination shouldBe schema.getName
@@ -63,7 +63,7 @@ class JdbcRecordFactorySpec extends Matchers with FunSpecLike {
     }
 
     it("throws an error if no db profile is present in the request") {
-      val request = HydraRequest(123,"""{"id":1, "name":"test", "rank" : 1}""")
+      val request = HydraRequest("123","""{"id":1, "name":"test", "rank" : 1}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc", JdbcRecordFactory.TABLE_PARAM -> "table")
       intercept[IllegalArgumentException] {
         JdbcRecordFactory.build(request).get
@@ -71,7 +71,7 @@ class JdbcRecordFactorySpec extends Matchers with FunSpecLike {
     }
 
     it("builds a record without a PK") {
-      val request = HydraRequest(123,"""{"id":1, "name":"test", "rank" : 1}""")
+      val request = HydraRequest("123","""{"id":1, "name":"test", "rank" : 1}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc",
           JdbcRecordFactory.TABLE_PARAM -> "table", JdbcRecordFactory.DB_PROFILE_PARAM -> "table")
 
@@ -82,7 +82,7 @@ class JdbcRecordFactorySpec extends Matchers with FunSpecLike {
     }
 
     it("builds a record with a PK") {
-      val request = HydraRequest(123,"""{"id":1, "name":"test", "rank" : 1}""")
+      val request = HydraRequest("123","""{"id":1, "name":"test", "rank" : 1}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schemaPK.avsc", JdbcRecordFactory.DB_PROFILE_PARAM -> "table")
 
       val rec = JdbcRecordFactory.build(request).get

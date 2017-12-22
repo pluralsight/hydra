@@ -63,7 +63,7 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
     it("handle the base ingestion protocol") {
       val sup = TestProbe()
       val ing = system.actorOf(Props(classOf[TestIngestor], true, false))
-      val req = HydraRequest(1, "test")
+      val req = HydraRequest("1", "test")
       ing ! Publish(req)
       expectMsg(Ignore)
       ing ! Validate(req)

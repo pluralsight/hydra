@@ -10,6 +10,11 @@ trait IngestionCallback {
     */
   def onCompletion(report: IngestionReport): Unit
 
+  /**
+    * Reserved for unrecoverable errors.
+    * @param system
+    * @param error
+    */
   def onError(system: ActorSystem, error: HydraError): Unit = {
     system.eventStream.publish(HydraApplicationError(error.cause))
   }

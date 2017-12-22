@@ -53,7 +53,7 @@ trait HydraIngestJsonSupport extends HydraJsonSupport {
 
       val ingestors = obj.ingestors.map(h => h._1 -> writeState(h._2))
       val response = Map(
-        "correlationId" -> JsNumber(obj.correlationId),
+        "correlationId" -> JsString(obj.correlationId),
         "ingestors" -> JsObject(ingestors)
       )
 

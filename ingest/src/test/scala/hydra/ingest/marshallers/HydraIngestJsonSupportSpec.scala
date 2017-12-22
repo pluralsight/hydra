@@ -41,25 +41,25 @@ class HydraIngestJsonSupportSpec extends Matchers with FunSpecLike with HydraIng
     }
 
     it("converts IngestionReport objects") {
-      val report = IngestionReport(1, Map("testIngestor" -> IngestorCompleted), 200)
+      val report = IngestionReport("a123", Map("testIngestor" -> IngestorCompleted), 200)
       val json = report.toJson.asJsObject.fields
 
-      val pjson ="""{"correlationId":1,"ingestors":{"testIngestor":{"code":200,"message":"OK"}}}""".parseJson.asJsObject.fields
+      val pjson ="""{"correlationId":"a123","ingestors":{"testIngestor":{"code":200,"message":"OK"}}}""".parseJson.asJsObject.fields
 
       json("correlationId") shouldBe pjson("correlationId")
       json("ingestors") shouldBe pjson("ingestors")
 
       intercept[NotImplementedError] {
-        """{"correlationId":1,"ingestors":{"testIngestor":{"code":200,
+        """{"correlationId":"1","ingestors":{"testIngestor":{"code":200,
           "message":"OK"}}}""".parseJson.convertTo[IngestionReport]
       }
     }
 
     it("converts IngestionReport without any ingestors") {
-      val report = IngestionReport(1, Map.empty, 200, Some("test"))
+      val report = IngestionReport("1", Map.empty, 200, Some("test"))
       val json = report.toJson.asJsObject.fields
 
-      val pjson ="""{"correlationId":1,"ingestors":{}}""".parseJson.asJsObject.fields
+      val pjson ="""{"correlationId":"1","ingestors":{}}""".parseJson.asJsObject.fields
 
       json("correlationId") shouldBe pjson("correlationId")
       json("ingestors") shouldBe pjson("ingestors")

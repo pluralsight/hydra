@@ -31,7 +31,7 @@ class FileIngestorSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with M
 
   describe("The FileIngestor") {
     it("ignores") {
-      val hr = HydraRequest(0, "test")
+      val hr = HydraRequest("0", "test")
       ingestor ! Publish(hr)
       eventually {
         expectMsg(60.seconds, Ignore)
@@ -40,11 +40,11 @@ class FileIngestorSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with M
     }
 
     it("validates") {
-      val hr = HydraRequest(0, "test").withMetadata("hydra-file-stream" -> "test")
+      val hr = HydraRequest("0", "test").withMetadata("hydra-file-stream" -> "test")
       ingestor ! Validate(hr)
       expectMsg(ValidRequest(FileRecordFactory.build(hr).get))
 
-      val hr1 = HydraRequest(0, "test").withMetadata("hydra-file-stream" -> "unknown")
+      val hr1 = HydraRequest("0", "test").withMetadata("hydra-file-stream" -> "unknown")
       ingestor ! Validate(hr1)
       expectMsgPF() {
         case InvalidRequest(ex) =>
@@ -53,7 +53,7 @@ class FileIngestorSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with M
     }
 
     it("joins") {
-      val hr = HydraRequest(0, "test").withMetadata("hydra-file-stream" -> "test")
+      val hr = HydraRequest("0", "test").withMetadata("hydra-file-stream" -> "test")
       ingestor ! Publish(hr)
       eventually {
         expectMsg(60.seconds, Join)
@@ -61,7 +61,7 @@ class FileIngestorSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with M
     }
 
     it("transports") {
-      val hr = HydraRequest(0, "test").withMetadata("hydra-file-stream" -> "test")
+      val hr = HydraRequest("0", "test").withMetadata("hydra-file-stream" -> "test")
       ingestor ! Ingest(FileRecordFactory.build(hr).get, AckStrategy.NoAck)
       transportProbe.expectMsg(10.seconds, Produce(FileRecord("test", "test"), self, AckStrategy.NoAck))
     }

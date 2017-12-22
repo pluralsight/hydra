@@ -46,7 +46,7 @@ class IngestionActorSpec extends TestKit(ActorSystem("hydra",
   describe("The ingestion actor") {
     it("initiates an ingestion") {
       val probe = TestProbe()
-      val request = HydraRequest(123, "test payload").withMetadata(RequestParams.REPLY_TO -> probe.ref.path.toString)
+      val request = HydraRequest("123", "test payload").withMetadata(RequestParams.REPLY_TO -> probe.ref.path.toString)
       ingestionActor ! request
       probe.expectMsgPF() {
         case IngestionReport(_, _, statusCode, _) =>
@@ -56,7 +56,7 @@ class IngestionActorSpec extends TestKit(ActorSystem("hydra",
 
     it("receives HydraRequest cluster pubsub events") {
       val probe = TestProbe()
-      val request = HydraRequest(123, "test payload").withMetadata(RequestParams.REPLY_TO -> probe.ref.path.toString)
+      val request = HydraRequest("123", "test payload").withMetadata(RequestParams.REPLY_TO -> probe.ref.path.toString)
 
       val mediator = DistributedPubSub(system).mediator
 

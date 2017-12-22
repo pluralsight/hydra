@@ -25,7 +25,7 @@ class HydraRequestPublisherSpec extends
   override def afterAll(): Unit = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 
   "The HydraRequestPublisher" should "broadcast HydraRequests" in {
-    val request = ingest.HydraRequest(1, "payload")
+    val request = ingest.HydraRequest("1", "payload")
     publisher ! request
     eventually(sub.expectMsg(request))
   }

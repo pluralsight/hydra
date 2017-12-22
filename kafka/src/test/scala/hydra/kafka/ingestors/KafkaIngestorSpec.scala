@@ -60,7 +60,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
 
   describe("when using the KafkaIngestor") {
     it("joins") {
-      val request = HydraRequest(123,
+      val request = HydraRequest("123",
         "someString",
         Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "topic")
       )
@@ -69,7 +69,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
     }
 
     it("is invalid when there is no topic") {
-      val request = HydraRequest(123,
+      val request = HydraRequest("123",
         "someString",
         Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_RECORD_FORMAT_PARAM -> "json")
       )
@@ -78,7 +78,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
     }
 
     it("ingests") {
-      val request = HydraRequest(1234,
+      val request = HydraRequest("123",
         """{"first":"Roar","last":"King"}""",
         Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema")
       )
@@ -89,7 +89,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
 
 
   it("is invalid if it can't find the schema") {
-    val request = HydraRequest(213,
+    val request = HydraRequest("213",
       "someString",
       Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "avro-topic")
     )
@@ -98,7 +98,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
   }
 
   it("is valid with no schema if the topic can be resolved to a string") {
-    val request = HydraRequest(123,
+    val request = HydraRequest("123",
       json,
       Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema")
     )
@@ -108,7 +108,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
   }
 
   it("is valid when a schema name overrides the topic name") {
-    val request = HydraRequest(123,
+    val request = HydraRequest("123",
       json,
       Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "just-a-topic", HYDRA_SCHEMA_PARAM -> "test-schema")
     )
@@ -118,7 +118,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
     expectMsg(ValidRequest(ar))
   }
   it("is valid if schema can't be found, but json is allowed") {
-    val request = HydraRequest(123, json,
+    val request = HydraRequest("123", json,
       Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_RECORD_FORMAT_PARAM -> "json", HYDRA_KAFKA_TOPIC_PARAM -> "json-topic"))
     kafkaIngestor ! Validate(request)
     val node = new ObjectMapper().reader().readTree("""{"first":"hydra","last":"hydra"}""")

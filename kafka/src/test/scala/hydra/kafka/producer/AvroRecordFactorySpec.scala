@@ -36,7 +36,7 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
 
   describe("When performing validation") {
     it("handles Avro default value errors") {
-      val request = HydraRequest(123,"""{"name":"test"}""")
+      val request = HydraRequest("123","""{"name":"test"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = AvroRecordFactory.build(request)
@@ -45,7 +45,7 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
     }
 
     it("handles fields not defined in the schema") {
-      val request = HydraRequest(123,"""{"name":"test","rank":1,"new-field":"new"}""")
+      val request = HydraRequest("123","""{"name":"test","rank":1,"new-field":"new"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
         .withMetadata(HYDRA_VALIDATION_STRATEGY -> "strict")
@@ -56,7 +56,7 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
     }
 
     it("handles Avro datatype errors") {
-      val request = HydraRequest(123,"""{"name":"test", "rank":"booyah"}""")
+      val request = HydraRequest("123","""{"name":"test", "rank":"booyah"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = AvroRecordFactory.build(request)
@@ -67,7 +67,7 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
     it("builds keyless messages") {
       val avroSchema = new Schema.Parser().parse(new File(schema))
       val json = """{"name":"test", "rank":10}"""
-      val request = HydraRequest(123, json)
+      val request = HydraRequest("123", json)
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val msg = AvroRecordFactory.build(request).get
@@ -82,7 +82,7 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
     it("builds keyed messages") {
       val avroSchema = new Schema.Parser().parse(new File(schema))
       val json = """{"name":"test", "rank":10}"""
-      val request = HydraRequest(123, json)
+      val request = HydraRequest("123", json)
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_RECORD_KEY_PARAM -> "{$.name}")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
@@ -96,20 +96,20 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
     }
 
     it("has the right subject when a schema is specified") {
-      val request = HydraRequest(123,"""{"name":"test", "rank":10}""")
+      val request = HydraRequest("123","""{"name":"test", "rank":10}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       AvroRecordFactory.getSubject(request) shouldBe "classpath:schema.avsc"
     }
 
     it("defaults to target as the subject") {
-      val request = HydraRequest(123,"""{"name":"test", "rank":10}""")
+      val request = HydraRequest("123","""{"name":"test", "rank":10}""")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       AvroRecordFactory.getSubject(request) shouldBe "test-topic"
     }
 
     it("throws an error if no topic is in the request") {
-      val request = HydraRequest(123,"""{"name":test"}""")
+      val request = HydraRequest("123","""{"name":test"}""")
       intercept[InvalidRequestException] {
         AvroRecordFactory.build(request).get
       }
@@ -117,7 +117,7 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
 
     //validation
     it("returns invalid for payloads that do not conform to the schema") {
-      val r = HydraRequest(1,"""{"name":"test"}""")
+      val r = HydraRequest("1","""{"name":"test"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = AvroRecordFactory.build(r)
@@ -125,7 +125,7 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike {
     }
 
     it("validates good avro payloads") {
-      val r = HydraRequest(1,"""{"name":"test","rank":10}""")
+      val r = HydraRequest("1","""{"name":"test","rank":10}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = AvroRecordFactory.build(r).get

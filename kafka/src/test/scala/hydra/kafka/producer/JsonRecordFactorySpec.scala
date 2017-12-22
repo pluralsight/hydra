@@ -28,21 +28,21 @@ class JsonRecordFactorySpec extends Matchers with FunSpecLike {
 
   describe("When using the JsonRecordFactory") {
     it("handles invalid json") {
-      val request = HydraRequest(123,"""{"name":test"}""")
+      val request = HydraRequest("123","""{"name":test"}""")
       val rec = JsonRecordFactory.build(request)
       val ex = rec.failed.get
       ex shouldBe a[JsonParseException]
     }
 
     it("handles valid json") {
-      val request = HydraRequest(123,"""{"name":"test"}""").withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
+      val request = HydraRequest("123","""{"name":"test"}""").withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = JsonRecordFactory.build(request)
       val node = new ObjectMapper().reader().readTree("""{"name":"test"}""")
       rec.get shouldBe JsonRecord("test-topic", None, node)
     }
 
     it("builds") {
-      val request = HydraRequest(123, """{"name":"test"}""")
+      val request = HydraRequest("123", """{"name":"test"}""")
         .withMetadata(HYDRA_RECORD_KEY_PARAM -> "{$.name}")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val msg = JsonRecordFactory.build(request).get
@@ -52,7 +52,7 @@ class JsonRecordFactorySpec extends Matchers with FunSpecLike {
     }
 
     it("throws an error if no topic is in the request") {
-      val request = HydraRequest(123,"""{"name":"test"}""")
+      val request = HydraRequest("123","""{"name":"test"}""")
       intercept[InvalidRequestException] {
         JsonRecordFactory.build(request).get
       }

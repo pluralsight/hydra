@@ -3,12 +3,10 @@ package hydra.core.ingest
 import hydra.core.transport.ValidationStrategy.Strict
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 
-import scala.util.Random
-
 /**
   * Created by alexsilva on 12/3/16.
   */
-case class HydraRequest(correlationId: Long = Random.nextInt(),
+case class HydraRequest(correlationId: String = CorrelationIdBuilder.generate(),
                         payload: String,
                         metadata: Map[String, String] = Map.empty,
                         validationStrategy: ValidationStrategy = Strict,
@@ -29,7 +27,7 @@ case class HydraRequest(correlationId: Long = Random.nextInt(),
     metadataValue(name).map(_.equals(value)).getOrElse(false)
   }
 
-  def withCorrelationId(correlationId: Long) = copy(correlationId = correlationId)
+  def withCorrelationId(correlationId: String) = copy(correlationId = correlationId)
 
   def withMetadata(meta: (String, String)*) =
     copy(metadata = this.metadata ++ meta)

@@ -25,7 +25,7 @@ import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
-import hydra.core.ingest.RequestParams
+import hydra.core.ingest.{CorrelationIdBuilder, RequestParams}
 import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
 import hydra.ingest.bootstrap.HydraIngestorRegistry
 import hydra.ingest.services.IngestRequestGateway
@@ -33,7 +33,6 @@ import hydra.ingest.services.IngestRequestGateway.InitiateHttpRequest
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{FiniteDuration, _}
-import scala.util.Random
 
 /**
   * Created by alexsilva on 12/22/15.
@@ -51,19 +50,18 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: Execut
   private val ingestTimeout = applicationConfig.get[FiniteDuration]("ingest.timeout")
     .valueOrElse(3.seconds)
 
-
   override val route: Route =
     post {
       requestEntityPresent {
         pathPrefix("ingest") {
           // decodeRequestWith(Gzip, Deflate) {
-          parameter("correlationId".as[Long] ?) { correlationId =>
+          parameter("correlationId" ?) { correlationId =>
             handleExceptions(excptHandler) {
               pathEndOrSingleSlash {
-                broadcastRequest(correlationId.getOrElse(randomId))
+                broadcastRequest(correlationId.getOrElse(cId))
               }
             } ~ path(Segment) { ingestor =>
-              publishToIngestor(correlationId.getOrElse(randomId), ingestor)
+              publishToIngestor(correlationId.getOrElse(cId), ingestor)
             }
           }
         }
@@ -76,9 +74,9 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: Execut
     case e: Exception => complete(GenericServiceResponse(ServiceUnavailable.intValue, e.getMessage))
   }
 
-  private def randomId = Random.nextLong()
+  private def cId = CorrelationIdBuilder.generate()
 
-  def broadcastRequest(correlationId: Long) = {
+  def broadcastRequest(correlationId: String) = {
     onSuccess(ingestorRegistry) { registry =>
       extractRequestContext { ctx =>
         val hydraReq = createRequest[HttpRequest](correlationId, ctx.request)
@@ -93,7 +91,7 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: Execut
     }
   }
 
-  def publishToIngestor(correlationId: Long, ingestor: String) = {
+  def publishToIngestor(correlationId: String, ingestor: String) = {
     onSuccess(lookupIngestor(ingestor)) { result =>
       result.ingestors.headOption match {
         case Some(_) =>

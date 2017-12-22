@@ -39,20 +39,20 @@ class RabbitIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matcher
   override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 
   describe("When using the rabbit ingestor") {
-    it("Joins if exchange provided"){
-      val request = HydraRequest(123,"{'name': 'test'}",Map(RabbitRecord.HYDRA_RABBIT_EXCHANGE -> "test.exchange"))
+    it("Joins if exchange provided") {
+      val request = HydraRequest("123", "{'name': 'test'}", Map(RabbitRecord.HYDRA_RABBIT_EXCHANGE -> "test.exchange"))
       ingestor ! Publish(request)
       expectMsg(10.seconds, Join)
     }
 
-    it("Joins if queue provided"){
-      val request = HydraRequest(123,"{'name': 'test'}",Map(RabbitRecord.HYDRA_RABBIT_QUEUE -> "test.queue"))
+    it("Joins if queue provided") {
+      val request = HydraRequest("123", "{'name': 'test'}", Map(RabbitRecord.HYDRA_RABBIT_QUEUE -> "test.queue"))
       ingestor ! Publish(request)
       expectMsg(10.seconds, Join)
     }
 
     it("Ignores") {
-      val request = HydraRequest(123, "test string")
+      val request = HydraRequest("123", "test string")
       ingestor ! Publish(request)
       expectMsg(10.seconds, Ignore)
     }

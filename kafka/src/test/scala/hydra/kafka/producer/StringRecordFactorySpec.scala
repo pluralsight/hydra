@@ -27,13 +27,13 @@ class StringRecordFactorySpec extends Matchers with FunSpecLike {
   describe("When using the StringRecordFactory") {
 
     it("handles valid strings") {
-      val request = HydraRequest(123,"""{"name":"test"}""").withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test")
+      val request = HydraRequest("123","""{"name":"test"}""").withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test")
       val rec = StringRecordFactory.build(request)
       rec.get shouldBe StringRecord("test", None,"""{"name":"test"}""")
     }
 
     it("builds") {
-      val request = HydraRequest(123, """{"name":"test"}""")
+      val request = HydraRequest("123", """{"name":"test"}""")
         .withMetadata(HYDRA_RECORD_KEY_PARAM -> "{$.name}")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val msg = StringRecordFactory.build(request).get
@@ -43,10 +43,11 @@ class StringRecordFactorySpec extends Matchers with FunSpecLike {
     }
 
     it("throws an error if no topic is in the request") {
-      val request = HydraRequest(123,"""{"name":test"}""")
+      val request = HydraRequest("123","""{"name":test"}""")
       intercept[InvalidRequestException] {
         StringRecordFactory.build(request)
       }
     }
   }
+
 }

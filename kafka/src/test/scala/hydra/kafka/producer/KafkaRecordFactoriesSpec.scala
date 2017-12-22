@@ -35,7 +35,7 @@ class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
   describe("When using KafkaRecordFactories") {
     it("handles avro") {
       val json = """{"name":"test", "rank":10}"""
-      val request = HydraRequest(123, json)
+      val request = HydraRequest("123", json)
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = KafkaRecordFactories.build(request)
@@ -47,7 +47,7 @@ class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
 
     it("handles json") {
       val json = """{"name":"test", "rank":10}"""
-      val request = HydraRequest(123, json)
+      val request = HydraRequest("123", json)
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "json")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
@@ -57,7 +57,7 @@ class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
 
     it("handles strings") {
       val json = """{"name":"test", "rank":10}"""
-      val request = HydraRequest(123, json)
+      val request = HydraRequest("123", json)
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "string")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
@@ -66,7 +66,7 @@ class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
     }
 
     it("validates json records") {
-      val request = HydraRequest(123,"""{"name":"test"}""")
+      val request = HydraRequest("123","""{"name":"test"}""")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "json")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val validation = KafkaRecordFactories.build(request)
@@ -74,7 +74,7 @@ class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
     }
 
     it("validates string records") {
-      val request = HydraRequest(123,"""{"name":"test"}""")
+      val request = HydraRequest("123","""{"name":"test"}""")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "string")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val validation = KafkaRecordFactories.build(request)
@@ -85,7 +85,7 @@ class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
       val schema = Thread.currentThread().getContextClassLoader.getResource("schema.avsc").getFile
       val avroSchema = new Schema.Parser().parse(new File(schema))
       val json = """{"name":"test", "rank":10}"""
-      val request = HydraRequest(123, json)
+      val request = HydraRequest("123", json)
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val validation = AvroRecordFactory.build(request)
@@ -93,7 +93,7 @@ class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
     }
 
     it("invalidates unknown formats") {
-      val request = HydraRequest(123,"""{"name":"test"}""")
+      val request = HydraRequest("123","""{"name":"test"}""")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "unknown-format")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val validation = KafkaRecordFactories.build(request)
@@ -103,7 +103,7 @@ class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
 
     it("throws error with unknown formats") {
       val json = """{"name":"test", "rank":10}"""
-      val request = HydraRequest(123, json)
+      val request = HydraRequest("123", json)
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "unknown")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
