@@ -23,7 +23,52 @@
         </Console>
     </Appenders>
     <Loggers>
-        <Logger name="org.reflections" level="error" additivity="false">
+        <Logger name="com.pluralsight.hydra" level="ERROR" additivity="false">
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
+
+        <Logger name="org.reflections" level="ERROR" additivity="false">
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
+
+        <Logger name="hydra" level="DEBUG" additivity="false">
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
+
+        <Logger name="scalacache" level="ERROR" additivity="false">
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
+
+        <Logger name="org.apache.curator" level="ERROR" additivity="false">
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
+
+
+        <Logger name="kafka.utils.VerifiableProperties" level="warn" additivity="false">
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
+
+        <Logger name="kafka.producer" level="error" additivity="false">
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
+
+        <Logger name="org.apache.kafka.clients" level="error" additivity="false">
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
+
+        <Logger name="com.github.vonnagy" level="ALL" additivity="false">
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
+
+        <Logger name="org.apache.kafka.common" level="error" additivity="false">
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
+
+        <Logger name="org.apache.zookeeper" level="error" additivity="false">
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
+
+        <Logger name="kafka.network" level="warn">
             <AppenderRef ref="STDOUT"/>
         </Logger>
 

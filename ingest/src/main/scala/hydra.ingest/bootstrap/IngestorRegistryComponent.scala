@@ -41,6 +41,7 @@ object HydraIngestorRegistry extends ConfigSupport {
 
   import configs.syntax._
 
+  //for testing
   val registryPath = applicationConfig.get[String]("ingest.ingestor-registry.path")
     .valueOrElse(s"/user/service/${ActorUtils.actorName(classOf[IngestorRegistry])}")
 }

@@ -28,7 +28,8 @@ import scala.collection.mutable
 import scala.concurrent.duration._
 
 
-class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, registry: ActorRef) extends Actor
+class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration,
+                          registry: ActorRef) extends Actor
   with ActorLogging {
 
   context.setReceiveTimeout(timeout)
@@ -79,7 +80,7 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
       sender ! Ingest(record, request.ackStrategy)
 
     case i: InvalidRequest =>
-      context.system.eventStream.publish(HydraIngestionError(ActorUtils.actorName(sender), i.error, request))
+      context.system.eventStream.publish(HydraIngestionError(ActorUtils.actorName(sender), i.cause, request))
       updateStatus(sender, i)
 
     case IngestorCompleted =>
@@ -89,7 +90,7 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
       updateStatus(sender, IngestorTimeout)
 
     case err: IngestorError =>
-      context.system.eventStream.publish(HydraIngestionError(ActorUtils.actorName(sender), err.error, request))
+      context.system.eventStream.publish(HydraIngestionError(ActorUtils.actorName(sender), err.cause, request))
       updateStatus(sender, err)
   }
 
@@ -107,7 +108,8 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
   }
 
   private def timeoutIngestors(): Unit = {
-    ingestors.filter(_._2 != IngestorCompleted).foreach(i => ingestors.update(i._1, IngestorTimeout))
+    ingestors.filter(_._2 != IngestorCompleted)
+      .foreach(i => ingestors.update(i._1, IngestorTimeout))
   }
 
   private def finishIfReady(): Unit = {
@@ -123,13 +125,13 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration, regist
 
   private def stop(status: StatusCode): Unit = {
     val replyTo = request.metadata.find(_._1.equalsIgnoreCase(RequestParams.REPLY_TO)).map(_._2)
-    context.parent ! IngestionReport(request.correlationId, ingestors.toMap, status.intValue(), replyTo)
+    val report = IngestionReport(request.correlationId, ingestors.toMap, status.intValue(), replyTo)
+    context.parent ! report
     context.stop(self)
   }
 }
 
 object IngestionSupervisor {
-
   def props(request: HydraRequest, timeout: FiniteDuration, ingestorRegistry: ActorRef): Props =
     Props(classOf[IngestionSupervisor], request, timeout, ingestorRegistry)
 }

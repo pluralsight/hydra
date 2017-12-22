@@ -78,7 +78,7 @@ class IngestionErrorHandlerSpec extends TestKit(ActorSystem("hydra-test")) with 
 
   def toGenericRecord(err: HydraIngestionError): GenericRecordBuilder = {
     new GenericRecordBuilder(schema)
-      .set("ingestor", err.ingestor).set("destination", "topic").set("errorMessage", err.error.getMessage)
+      .set("ingestor", err.ingestor).set("destination", "topic").set("errorMessage", err.cause.getMessage)
       .set("payload", err.request.payload)
       .set("metadata", err.request.metadata.asJava)
   }

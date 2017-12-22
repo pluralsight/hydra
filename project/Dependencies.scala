@@ -42,10 +42,12 @@ object Dependencies {
 
     val scalaz = "org.scalaz" %% "scalaz-core" % scalazVersion
 
+    val embeddedKafka = "net.manub" %% "scalatest-embedded-kafka" % "0.14.0"
+
     val kafka = Seq(
       "org.apache.kafka" %% "kafka" % kafkaVersion,
       "org.apache.kafka" % "kafka-clients" % kafkaVersion,
-      "net.manub" %% "scalatest-embedded-kafka" % "0.14.0" % "test")
+      embeddedKafka % "test")
 
     val confluent = Seq("io.confluent" % "kafka-schema-registry-client" % confluentVersion,
       "io.confluent" % "kafka-avro-serializer" % confluentVersion).map(_.excludeAll(
@@ -130,7 +132,8 @@ object Dependencies {
 
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
-  val coreDeps = akka ++ baseDeps ++ Seq(guavacache, reflections, serviceContainer) ++ confluent ++ constructR
+  val coreDeps = akka ++ baseDeps ++
+    Seq(guavacache, reflections, serviceContainer) ++ confluent ++ constructR
 
   val ingestDeps = coreDeps
 
@@ -140,7 +143,8 @@ object Dependencies {
 
   val kafkaDeps = coreDeps ++ Seq(akkaKafkaStream, jsonLenses) ++ kafka
 
-  val sandboxDeps = kafkaDeps ++ sqlDeps ++ Seq("com.h2database" % "h2" % "1.4.196")
+  val sandboxDeps = kafkaDeps ++ sqlDeps ++
+    Seq("com.h2database" % "h2" % "1.4.196") ++ Seq(embeddedKafka)
 
   val overrides = Set(logging, typesafeConfig, joda)
 }

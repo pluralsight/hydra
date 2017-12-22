@@ -24,7 +24,7 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
 
       expectMsgPF() {
         case i: IngestorError =>
-          i.error shouldBe a[ActorInitializationException]
+          i.cause shouldBe a[ActorInitializationException]
       }
 
       system.actorOf(Props(classOf[TestIngestor], true, false)) ! "hello"
@@ -37,11 +37,11 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
       ct ! "hello"
       expectMsgPF(max = 5.seconds) {
         case i: IngestorError =>
-          i.error shouldBe a[ActorInitializationException]
-          i.error.asInstanceOf[ActorInitializationException].getActor.path shouldBe ct.path
+          i.cause shouldBe a[ActorInitializationException]
+          i.cause.asInstanceOf[ActorInitializationException].getActor.path shouldBe ct.path
           ActorInitializationException
-            .unapply(i.error.asInstanceOf[ActorInitializationException]) shouldBe Some(ct,
-            i.error.getMessage, i.error.getCause)
+            .unapply(i.cause.asInstanceOf[ActorInitializationException]) shouldBe Some(ct,
+            i.cause.getMessage, i.cause.getCause)
       }
     }
 
@@ -73,7 +73,7 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
       ing ! RecordNotProduced(TestRecord("test-topic", Some("1"), "test"), new IllegalArgumentException, sup.ref)
       sup.expectMsgPF() {
         case i: IngestorError =>
-          i.error shouldBe a[IllegalArgumentException]
+          i.cause shouldBe a[IllegalArgumentException]
       }
 
       ing ! RecordAccepted(sup.ref)

@@ -32,7 +32,7 @@ class IngestionRequestHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
         override def failWith(error: Throwable): Unit = this.error = error
       }
       system.actorOf(IngestionRequestHandler.props(req, Props(classOf[DummySupervisor],
-        req.withCorrelationId(2L)), ctx))
+        req.withCorrelationId(2L)), 3.seconds, ctx))
       eventually {
         ctx.completed should not be null
       }
@@ -53,7 +53,7 @@ class IngestionRequestHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
         override def failWith(error: Throwable): Unit = this.error = error
       }
       system.actorOf(IngestionRequestHandler.props(req.withCorrelationId(12344),
-        Props(classOf[DummySupervisor], req.withCorrelationId(12344)), ctx))
+        Props(classOf[DummySupervisor], req.withCorrelationId(12344)), 3.seconds, ctx))
       eventually {
         ctx.completed should not be null
       }
@@ -74,7 +74,8 @@ class IngestionRequestHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
         override def failWith(error: Throwable): Unit = this.error = error
       }
       system.actorOf(IngestionRequestHandler
-        .props(req.withCorrelationId(1L), Props(classOf[DummySupervisor], req.withCorrelationId(1L)), ctx))
+        .props(req.withCorrelationId(1L), Props(classOf[DummySupervisor], req.withCorrelationId(1L)),
+          3.seconds, ctx))
       Thread.sleep(1000)
       eventually {
         ctx.error should not be null

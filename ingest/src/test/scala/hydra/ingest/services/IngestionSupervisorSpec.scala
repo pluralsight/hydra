@@ -6,13 +6,14 @@ import hydra.common.util.ActorUtils
 import hydra.core.ingest._
 import hydra.core.protocol._
 import hydra.core.transport.AckStrategy
-import hydra.ingest.ingestors.IngestorInfo
+import hydra.ingest.ingestors.{IngestionCallback, IngestorInfo}
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.{TestRecordFactory, TimeoutRecord}
 import org.joda.time.DateTime
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
+
 /**
   * Created by alexsilva on 3/9/17.
   */
@@ -22,7 +23,7 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
   override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10 seconds)
 
   var ingestor: TestProbe = _
-  var registryProbe: TestProbe = _
+  var registry: TestProbe = _
 
   def ingestorInfo = IngestorInfo(ActorUtils.actorName(ingestor.ref),
     "global", ingestor.ref.path, DateTime.now)
@@ -31,7 +32,7 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
 
   override def afterEach(): Unit = {
     system.stop(ingestor.ref)
-    system.stop(registryProbe.ref)
+    system.stop(registry.ref)
 
   }
 
@@ -59,8 +60,8 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
         TestActor.KeepRunning
     })
 
-    registryProbe = TestProbe()
-    registryProbe.setAutoPilot((sender: ActorRef, msg: Any) => msg match {
+    registry = TestProbe()
+    registry.setAutoPilot((sender: ActorRef, msg: Any) => msg match {
       case FindByName(name) =>
         val msg = if (name == ActorUtils.actorName(ingestor.ref)) LookupResult(Seq(ingestorInfo)) else LookupResult(Seq.empty)
         sender ! msg
@@ -87,6 +88,17 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
   def ingestorRequest = publishRequest
     .withMetadata(RequestParams.HYDRA_INGESTOR_PARAM -> ActorUtils.actorName(ingestor.ref))
 
+  val probe = TestProbe()
+
+  val callback = new IngestionCallback {
+    override def onCompletion(report: IngestionReport): Unit = {
+      probe.ref ! report
+    }
+
+    override def onError(system: ActorSystem, err: HydraError): Unit = {
+      probe.ref ! err
+    }
+  }
 
   describe("When supervising an ingestion") {
     it("broadcasts a request") {
@@ -105,14 +117,14 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
       val parent = TestProbe()
       val req = publishRequest
         .withMetadata(RequestParams.HYDRA_INGESTOR_PARAM -> ActorUtils.actorName(ingestor.ref))
-      parent.childActorOf(IngestionSupervisor.props(req, 1.second, registryProbe.ref), "sup")
-      registryProbe.expectMsgType[FindByName]
+      parent.childActorOf(IngestionSupervisor.props(req, 1.second, registry.ref), "sup")
+      registry.expectMsgType[FindByName]
       ingestor.expectMsg(Publish(ingestorRequest))
     }
 
     it("follows the ingestion protocol") {
       val parent = TestProbe()
-      val sup = parent.childActorOf(IngestionSupervisor.props(ingestorRequest, 1.second, registryProbe.ref), "sup")
+      val sup = parent.childActorOf(IngestionSupervisor.props(ingestorRequest, 1.second, registry.ref), "sup")
       ingestor.expectMsg(Publish(ingestorRequest))
       ingestor.expectMsg(Validate(ingestorRequest))
       ingestor.expectMsg(Ingest(TestRecordFactory.build(ingestorRequest).get, AckStrategy.NoAck))
@@ -123,16 +135,16 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
     }
 
     it("sends a Publish to the ingestor") {
-      system.actorOf(IngestionSupervisor.props(ingestorRequest, 1.second, registryProbe.ref))
-      registryProbe.expectMsgType[FindByName]
+      system.actorOf(IngestionSupervisor.props(ingestorRequest, 1.second, registry.ref))
+      registry.expectMsgType[FindByName]
       ingestor.expectMsgType[Publish]
     }
 
     it("reports invalid requests") {
       val parent = TestProbe()
       val req = ingestorRequest.withMetadata("invalid" -> "true")
-      parent.childActorOf(IngestionSupervisor.props(req, 1.second, registryProbe.ref), "sup")
-      registryProbe.expectMsg(FindByName(ActorUtils.actorName(ingestor.ref)))
+      parent.childActorOf(IngestionSupervisor.props(req, 1.second, registry.ref), "sup")
+      registry.expectMsg(FindByName(ActorUtils.actorName(ingestor.ref)))
       ingestor.expectMsg(Publish(req))
       parent.expectMsgPF() {
         case i: IngestionReport =>
@@ -143,8 +155,8 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
     it("times out") {
       val parent = TestProbe()
       val req = ingestorRequest.withMetadata("timeout" -> "true")
-      val sup = parent.childActorOf(IngestionSupervisor.props(req, 500.millisecond, registryProbe.ref), "sup")
-      registryProbe.expectMsg(FindByName(ActorUtils.actorName(ingestor.ref)))
+      val sup = parent.childActorOf(IngestionSupervisor.props(req, 500.millisecond, registry.ref), "sup")
+      registry.expectMsg(FindByName(ActorUtils.actorName(ingestor.ref)))
       ingestor.expectMsg(Publish(req))
       ingestor.expectMsg(Validate(req))
       ingestor.expectMsg(Ingest(TestRecordFactory.build(req).get, AckStrategy.NoAck))
@@ -157,8 +169,8 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
     it("completes with 404 when all ingestors ignore request") {
       val parent = TestProbe()
       val req = ingestorRequest.withMetadata("ignore" -> "true")
-      parent.childActorOf(IngestionSupervisor.props(req, 500.millisecond, registryProbe.ref), "sup")
-      registryProbe.expectMsg(FindByName(ActorUtils.actorName(ingestor.ref)))
+      parent.childActorOf(IngestionSupervisor.props(req, 500.millisecond, registry.ref), "sup")
+      registry.expectMsg(FindByName(ActorUtils.actorName(ingestor.ref)))
       ingestor.expectMsg(Publish(req))
       parent.expectMsgPF() {
         case i: IngestionReport =>
@@ -169,7 +181,7 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
     it("completes with a 404 with unknown ingestors") {
       val parent = TestProbe()
       parent.childActorOf(IngestionSupervisor.props(ingestorRequest
-        .withMetadata(RequestParams.HYDRA_INGESTOR_PARAM -> "unknown"), 1.second, registryProbe.ref), "sup")
+        .withMetadata(RequestParams.HYDRA_INGESTOR_PARAM -> "unknown"), 1.second, registry.ref), "sup")
 
       parent.expectMsgPF() {
         case i: IngestionReport =>
@@ -181,7 +193,7 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
     it("completes with a 400 when ingestors error out") {
       val req = ingestorRequest.withMetadata("error" -> "true")
       val parent = TestProbe()
-      parent.childActorOf(IngestionSupervisor.props(req, 1.second, registryProbe.ref), "sup")
+      parent.childActorOf(IngestionSupervisor.props(req, 1.second, registry.ref), "sup")
 
       parent.expectMsgPF() {
         case i: IngestionReport =>

@@ -48,7 +48,7 @@ class IngestionRequestHandler(request: HydraRequest, ingestionSupervisorProps: P
 
     case ReceiveTimeout => complete(errorWith(StatusCodes.custom(StatusCodes.RequestTimeout.intValue, s"No transport joined in ${timeout}.")))
 
-    case e: HydraError => fail(e.error)
+    case e: HydraError => fail(e.cause)
 
     case _ => complete(errorWith(StatusCodes.BadRequest))
   }
@@ -78,16 +78,8 @@ class IngestionRequestHandler(request: HydraRequest, ingestionSupervisorProps: P
 
 object IngestionRequestHandler extends ConfigSupport {
 
-  import configs.syntax._
-
-  val ingestionTimeout = applicationConfig.get[FiniteDuration]("ingestion.timeout").valueOrElse(3.seconds)
-
-  def props(request: HydraRequest, registry: ActorRef, ctx: ImperativeRequestContext) = {
-    val p = IngestionSupervisor.props(request, ingestionTimeout, registry)
-    Props(classOf[IngestionRequestHandler], request, p, ctx, ingestionTimeout)
-  }
-
-  def props(request: HydraRequest, supervisorProps: Props, ctx: ImperativeRequestContext) = {
-    Props(classOf[IngestionRequestHandler], request, supervisorProps, ctx, ingestionTimeout)
+  def props(request: HydraRequest, supervisorProps: Props, timeout: FiniteDuration,
+            ctx: ImperativeRequestContext) = {
+    Props(classOf[IngestionRequestHandler], request, supervisorProps, ctx, timeout)
   }
 }

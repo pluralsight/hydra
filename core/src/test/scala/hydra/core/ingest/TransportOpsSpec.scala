@@ -39,7 +39,7 @@ class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers with F
       t ! "hello"
       expectMsgPF() {
         case i: IngestorError =>
-          i.error shouldBe a[ActorInitializationException]
+          i.cause shouldBe a[ActorInitializationException]
       }
     }
 

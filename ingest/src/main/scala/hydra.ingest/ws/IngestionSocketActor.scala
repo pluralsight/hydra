@@ -73,7 +73,7 @@ class IngestionSocketActor extends Actor with LoggingAdapter with HydraIngestorR
     case report: IngestionReport =>
       flowActor ! IngestionOutgoingMessage(report)
 
-    case e: HydraError => flowActor ! SimpleOutgoingMessage(StatusCodes.InternalServerError.intValue, e.error.getMessage)
+    case e: HydraError => flowActor ! SimpleOutgoingMessage(StatusCodes.InternalServerError.intValue, e.cause.getMessage)
   }
 }
 
