@@ -3,7 +3,6 @@ package hydra.ingest.services
 import akka.actor.Props
 import hydra.common.util.ActorUtils
 import hydra.core.bootstrap.ServiceProvider
-import hydra.ingest.cluster.HydraRequestPublisher
 
 /**
   * Created by alexsilva on 3/29/17.
