@@ -7,5 +7,4 @@ import hydra.core.protocol.{HydraMessage, IngestorStatus}
   */
 case class IngestionReport(correlationId: String,
                            ingestors: Map[String, IngestorStatus],
-                           statusCode: Int,
-                           replyTo: Option[String] = None) extends HydraMessage
+                           statusCode: Int) extends HydraMessage

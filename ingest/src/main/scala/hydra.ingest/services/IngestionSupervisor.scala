@@ -21,16 +21,14 @@ import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import hydra.common.util.ActorUtils
 import hydra.core.ingest._
 import hydra.core.protocol._
-import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
+import hydra.ingest.ingestors.IngestorInfo
 import org.joda.time.DateTime
 
 import scala.collection.mutable
 import scala.concurrent.duration._
 
-
-class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration,
-                          registry: ActorRef) extends Actor
-  with ActorLogging {
+class IngestionSupervisor(request: HydraRequest, requestor: ActorRef, info: Seq[IngestorInfo],
+                 timeout: FiniteDuration) extends Actor with ActorLogging {
 
   context.setReceiveTimeout(timeout)
 
@@ -38,36 +36,9 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration,
 
   private val ingestors: mutable.Map[String, IngestorStatus] = new mutable.HashMap
 
-  private val targetIngestor = request.metadataValue(RequestParams.HYDRA_INGESTOR_PARAM)
+  info.foreach(i => context.actorSelection(i.path) ! Publish(request))
 
-  override def preStart(): Unit = {
-    targetIngestor match {
-      case Some(ingestor) => registry ! FindByName(ingestor)
-      case None => registry ! FindAll
-    }
-  }
-
-  override def receive = waitingForIngestors
-
-
-  def waitingForIngestors: Receive = timeOut orElse {
-    case LookupResult(Nil) =>
-      val errorCode = targetIngestor
-        .map(i => StatusCodes.custom(404, s"No ingestor named $i was found in the registry."))
-        .getOrElse(StatusCodes.BadRequest)
-
-      stop(errorCode)
-
-    case LookupResult(ings) =>
-      context.become(ingesting)
-
-      ings.foreach { i =>
-        ingestors.put(i.name, RequestPublished)
-        context.actorSelection(i.path) ! Publish(request)
-      }
-  }
-
-  def ingesting: Receive = timeOut orElse {
+  override def receive: Receive = timeOut orElse {
     case Join =>
       ingestors.update(ActorUtils.actorName(sender), IngestorJoined)
       sender ! Validate(request)
@@ -101,6 +72,7 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration,
   }
 
   def timeOut: Receive = {
+
     case ReceiveTimeout =>
       log.error(s"Ingestion timed out for $request")
       timeoutIngestors()
@@ -124,14 +96,15 @@ class IngestionSupervisor(request: HydraRequest, timeout: FiniteDuration,
   }
 
   private def stop(status: StatusCode): Unit = {
-    val replyTo = request.metadata.find(_._1.equalsIgnoreCase(RequestParams.REPLY_TO)).map(_._2)
-    val report = IngestionReport(request.correlationId, ingestors.toMap, status.intValue(), replyTo)
-    context.parent ! report
+    val report = IngestionReport(request.correlationId, ingestors.toMap, status.intValue())
+    requestor ! report
     context.stop(self)
   }
 }
 
 object IngestionSupervisor {
-  def props(request: HydraRequest, timeout: FiniteDuration, ingestorRegistry: ActorRef): Props =
-    Props(classOf[IngestionSupervisor], request, timeout, ingestorRegistry)
+  def props(request: HydraRequest, requestor: ActorRef, ingestors: Seq[IngestorInfo],
+            timeout: FiniteDuration): Props = {
+    Props(classOf[IngestionSupervisor], request, requestor, ingestors, timeout)
+  }
 }

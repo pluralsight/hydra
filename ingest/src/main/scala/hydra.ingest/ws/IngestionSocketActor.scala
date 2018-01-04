@@ -7,18 +7,19 @@ package hydra.ingest.ws
 import akka.actor.{Actor, ActorRef}
 import akka.http.scaladsl.model.StatusCodes
 import akka.util.Timeout
+import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.ingest
 import hydra.core.ingest.IngestionReport
 import hydra.core.protocol.HydraError
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
-import hydra.ingest.bootstrap.HydraIngestorRegistry
-import hydra.ingest.services.IngestionSupervisor
+import hydra.ingest.bootstrap.HydraIngestorRegistryClient
+import hydra.ingest.services.DefaultIngestionHandler
 import hydra.ingest.ws.IngestionSocketActor._
 
 import scala.concurrent.duration._
 
-class IngestionSocketActor extends Actor with LoggingAdapter with HydraIngestorRegistry {
+class IngestionSocketActor extends Actor with LoggingAdapter with ConfigSupport {
 
   implicit val system = context.system
 
@@ -29,6 +30,11 @@ class IngestionSocketActor extends Actor with LoggingAdapter with HydraIngestorR
   implicit val akkaTimeout = Timeout(timeout)
 
   private var session: SocketSession = _
+
+  private lazy val registry = context.
+    actorSelection(HydraIngestorRegistryClient.registryPath(applicationConfig)).resolveOne()
+
+  private implicit val ec = context.dispatcher
 
   override def preStart(): Unit = {
     session = new SocketSession()
@@ -67,13 +73,16 @@ class IngestionSocketActor extends Actor with LoggingAdapter with HydraIngestorR
 
   def ingesting: Receive = {
     case IncomingMessage(IngestPattern(correlationId, payload)) =>
-      val request = session.buildRequest(Option(correlationId), payload)
-      ingestorRegistry.map(r => context.actorOf(IngestionSupervisor.props(request, timeout, r)))(context.dispatcher)
+      registry.foreach { r =>
+        val request = session.buildRequest(Option(correlationId), payload)
+        context.actorOf(DefaultIngestionHandler.props(request, r, self))
+      }
 
     case report: IngestionReport =>
       flowActor ! IngestionOutgoingMessage(report)
 
-    case e: HydraError => flowActor ! SimpleOutgoingMessage(StatusCodes.InternalServerError.intValue, e.cause.getMessage)
+    case e: HydraError =>
+      flowActor ! SimpleOutgoingMessage(StatusCodes.InternalServerError.intValue, e.cause.getMessage)
   }
 }
 

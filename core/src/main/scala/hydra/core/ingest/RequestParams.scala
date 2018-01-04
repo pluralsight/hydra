@@ -78,11 +78,6 @@ object RequestParams {
   val RELAXED = "relaxed"
 
   /**
-    * If present, specifies the Akka actor address to send ingestion results to.
-    */
-  val REPLY_TO = "reply-to"
-
-  /**
     * Determines when clients receive an ingestion completed response.
     *
     * Actual behavior is up each ingestor, but as a general rule:

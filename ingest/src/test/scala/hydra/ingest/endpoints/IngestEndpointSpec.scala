@@ -13,6 +13,7 @@ import org.joda.time.DateTime
 import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.concurrent.duration._
+
 /**
   * Created by alexsilva on 5/12/17.
   */
@@ -24,6 +25,7 @@ class IngestEndpointSpec extends Matchers with WordSpecLike with ScalatestRouteT
   val registry = TestActorRef(new Actor {
     override def receive = {
       case FindByName(name) if name == "tester" => sender ! LookupResult(Seq(ingestorInfo))
+      case FindByName(name) if name == "error" => throw new IllegalArgumentException("RAR")
       case FindByName(_) => sender ! LookupResult(Seq.empty)
       case FindAll => sender ! LookupResult(Seq(ingestorInfo))
     }

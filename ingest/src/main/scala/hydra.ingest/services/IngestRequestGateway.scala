@@ -18,12 +18,11 @@ package hydra.ingest.services
 
 import akka.actor.SupervisorStrategy.Stop
 import akka.actor.{OneForOneStrategy, _}
-import configs.syntax._
+import akka.util.Timeout
 import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.HydraRequest
 import hydra.ingest.marshallers.HydraIngestJsonSupport
 import hydra.ingest.services.IngestRequestGateway.InitiateHttpRequest
-import hydra.ingest.services.IngestionRequestHandler.applicationConfig
 
 import scala.concurrent.duration._
 
@@ -32,28 +31,30 @@ import scala.concurrent.duration._
   * All this actor does is forward the requests to an instance of the IngestRequestHandler actor.
   *
   */
-class IngestRequestGateway extends Actor with HydraIngestJsonSupport {
+class IngestRequestGateway(registryPath: String) extends Actor with HydraIngestJsonSupport {
 
-  val ingestionTimeout = applicationConfig.get[FiniteDuration]("ingestion.timeout")
-    .valueOrElse(3.seconds)
+  private lazy val registry = context.actorSelection(registryPath).resolveOne()(Timeout(10.seconds))
 
   override def receive = {
-    case InitiateHttpRequest(request, timeout, registry, ctx) =>
-      val p = IngestionSupervisor.props(request, timeout, registry)
-      context.actorOf(IngestionRequestHandler.props(request, p, timeout, ctx))
+    case InitiateHttpRequest(request, timeout, ctx) =>
+      implicit val ec = context.dispatcher
+      val fs = sender
+      registry.map(r =>
+        context.actorOf(HttpIngestionHandler.props(request, timeout, ctx, r)))
+        .recover { case e: Exception => fs ! e }
   }
 
   override val supervisorStrategy =
     OneForOneStrategy() {
-      case _ => {
-        Stop
-      }
+      case _ => Stop //stop ingestion IngestionRequestHandler always
     }
 }
 
 object IngestRequestGateway {
 
-  case class InitiateHttpRequest(request: HydraRequest, timeout: FiniteDuration, registry: ActorRef,
+  case class InitiateHttpRequest(request: HydraRequest, timeout: FiniteDuration,
                                  ctx: ImperativeRequestContext)
+
+  def props(registryPath: String) = Props(classOf[IngestRequestGateway], registryPath)
 
 }

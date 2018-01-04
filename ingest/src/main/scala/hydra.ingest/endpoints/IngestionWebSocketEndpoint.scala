@@ -40,7 +40,8 @@ class IngestionWebSocketEndpoint(implicit system: ActorSystem, implicit val e: E
   extends RoutedEndpoints with LoggingAdapter with HydraIngestJsonSupport with HydraDirectives {
 
   //visible for testing
-  private[endpoints] val enabled = applicationConfig.get[Boolean]("ingest.websocket.enabled").valueOrElse(false)
+  private[endpoints] val enabled = applicationConfig.get[Boolean]("ingest.websocket.enabled")
+    .valueOrElse(false)
 
   private val socketFactory = IngestSocketFactory.createSocket(system)
 

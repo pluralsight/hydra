@@ -1,11 +1,15 @@
 package hydra.ingest.services
 
-import akka.actor.{Actor, ActorSystem, Props}
+import akka.actor.{Actor, ActorInitializationException, ActorSystem}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.testkit.{ImplicitSender, TestKit}
+import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import hydra.core.http.{HydraDirectives, ImperativeRequestContext}
-import hydra.core.ingest.{HydraRequest, IngestionReport}
+import hydra.core.ingest.{HydraRequest, IngestionReport, RequestParams}
 import hydra.core.protocol._
+import hydra.ingest.ingestors.IngestorInfo
+import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
+import hydra.ingest.test.TestRecordFactory
+import org.joda.time.DateTime
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
@@ -14,12 +18,38 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 3/9/17.
   */
-class IngestionRequestHandlerSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike
+class HttpIngestionHandlerSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike
   with ImplicitSender with BeforeAndAfterAll with HydraDirectives with Eventually {
 
   override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10 seconds)
 
-  val req = HydraRequest("123", "test payload")
+  val ingestor = TestActorRef(new Actor {
+    override def receive = {
+      case Publish(_) => sender ! Join
+      case Validate(r) =>
+        if (r.correlationId == "400") {
+          sender ! InvalidRequest(new IllegalArgumentException)
+        }
+        else {
+          sender ! ValidRequest(TestRecordFactory.build(r).get)
+        }
+      case Ingest(r, _) => sender ! IngestorCompleted
+    }
+  }, "test_ingestor")
+
+
+  val ingestorInfo = IngestorInfo("test_ingestor", "test", ingestor.path, DateTime.now)
+
+  val registry = TestActorRef(new Actor {
+    override def receive = {
+      case FindByName("invalid_ingestor") =>
+        sender ! LookupResult(Seq(IngestorInfo("invalid_ingestor", "test", null, DateTime.now)))
+      case FindByName("tester") =>
+        sender ! LookupResult(Seq(ingestorInfo))
+      case FindAll =>
+        sender ! LookupResult(Seq(ingestorInfo))
+    }
+  }, "ingestor_registry")
 
   describe("When starting an HTTP ingestion") {
     it("completes the request with 400") {
@@ -31,14 +61,15 @@ class IngestionRequestHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
 
         override def failWith(error: Throwable): Unit = this.error = error
       }
-      system.actorOf(IngestionRequestHandler.props(req, Props(classOf[DummySupervisor],
-        req.withCorrelationId("2")), 3.seconds, ctx))
+      val req = HydraRequest("400", "test payload")
+
+      system.actorOf(HttpIngestionHandler.props(req, 3.seconds, ctx, registry))
       eventually {
         ctx.completed should not be null
       }
       ctx.completed.value.asInstanceOf[(_, _)]._2 match {
-        case IngestionReport(c, i, statusCode, _) =>
-          c shouldBe "123"
+        case IngestionReport(c, i, statusCode) =>
+          c shouldBe "400"
           statusCode shouldBe 400
       }
     }
@@ -52,13 +83,13 @@ class IngestionRequestHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
 
         override def failWith(error: Throwable): Unit = this.error = error
       }
-      system.actorOf(IngestionRequestHandler.props(req.withCorrelationId("a44"),
-        Props(classOf[DummySupervisor], req.withCorrelationId("a44")), 3.seconds, ctx))
+      val req = HydraRequest("a44", "test payload")
+      system.actorOf(HttpIngestionHandler.props(req, 3.seconds, ctx, registry))
       eventually {
         ctx.completed should not be null
       }
       ctx.completed.value.asInstanceOf[(_, _)]._2 match {
-        case IngestionReport(c, _, statusCode, _) =>
+        case IngestionReport(c, _, statusCode) =>
           c shouldBe "a44"
           statusCode shouldBe 200
       }
@@ -73,37 +104,14 @@ class IngestionRequestHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
 
         override def failWith(error: Throwable): Unit = this.error = error
       }
-      system.actorOf(IngestionRequestHandler
-        .props(req.withCorrelationId("1"), Props(classOf[DummySupervisor], req.withCorrelationId("1")),
-          3.seconds, ctx))
-      Thread.sleep(1000)
+
+      val req = HydraRequest("500", "error")
+        .withMetadata(RequestParams.HYDRA_INGESTOR_PARAM -> "invalid_ingestor")
+      system.actorOf(HttpIngestionHandler.props(req, 3.seconds, ctx, registry))
       eventually {
         ctx.error should not be null
       }
-      ctx.error shouldBe an[IllegalArgumentException]
+      ctx.error shouldBe an[ActorInitializationException]
     }
-  }
-}
-
-private class DummySupervisor(r: HydraRequest) extends Actor {
-
-  val req = HydraRequest("123", "test payload")
-
-  if (r.correlationId == "1") {
-    context.parent ! HydraIngestionError("dummy_ingestor", new IllegalArgumentException, r)
-  }
-  else if (r.correlationId == "2") {
-    //matches the _ in RequestHandler
-    context.parent ! "Something else"
-  }
-  else {
-    val i = IngestionReport(r.correlationId, Map.empty, 200)
-    context.parent ! i
-  }
-
-  override def receive = {
-    case Publish(_) =>
-    case Validate(_) => context.parent ! ValidRequest
-    case Ingest(r, _) => context.parent ! HydraIngestionError("dummy_ingestor", new IllegalArgumentException, req)
   }
 }

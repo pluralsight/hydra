@@ -16,7 +16,8 @@ import scala.concurrent.duration._
 class IngestorRegistrySpec extends TestKit(ActorSystem("hydra")) with Matchers
   with FunSpecLike with ImplicitSender with Eventually with BeforeAndAfterAll {
 
-  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10 seconds)
+  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true,
+    duration = 10 seconds)
 
   val registry = system.actorOf(Props[IngestorRegistry], "registry")
 
