@@ -1,4 +1,4 @@
-package hydra.ingest.ws
+package hydra.ingest.services
 
 /**
   * Created by alexsilva on 3/10/17.
@@ -14,8 +14,7 @@ import hydra.core.ingest.IngestionReport
 import hydra.core.protocol.HydraError
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
-import hydra.ingest.services.DefaultIngestionHandler
-import hydra.ingest.ws.IngestionSocketActor._
+import hydra.ingest.services.IngestionSocketActor._
 
 import scala.concurrent.duration._
 

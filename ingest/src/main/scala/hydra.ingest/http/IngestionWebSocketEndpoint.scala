@@ -26,7 +26,7 @@ import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
 import hydra.core.marshallers.GenericServiceResponse
-import hydra.ingest.ws._
+import hydra.ingest.services.{IngestSocketFactory, IngestionOutgoingMessage, SimpleOutgoingMessage}
 import spray.json._
 
 import scala.concurrent.ExecutionContext
@@ -39,7 +39,7 @@ class IngestionWebSocketEndpoint(implicit system: ActorSystem, implicit val e: E
   extends RoutedEndpoints with LoggingAdapter with HydraIngestJsonSupport with HydraDirectives {
 
   //visible for testing
-  private[endpoints] val enabled = applicationConfig.get[Boolean]("ingest.websocket.enabled")
+  private[http] val enabled = applicationConfig.get[Boolean]("ingest.websocket.enabled")
     .valueOrElse(false)
 
   private val socketFactory = IngestSocketFactory.createSocket(system)
@@ -57,7 +57,7 @@ class IngestionWebSocketEndpoint(implicit system: ActorSystem, implicit val e: E
     }
 
 
-  private[endpoints] def ingestSocketFlow(): Flow[Message, Message, Any] = {
+  private[http] def ingestSocketFlow(): Flow[Message, Message, Any] = {
     Flow[Message].collect {
       case TextMessage.Strict(txt) => txt
     }.via(socketFactory.ingestFlow())

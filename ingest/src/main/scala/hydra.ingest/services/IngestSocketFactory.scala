@@ -1,4 +1,4 @@
-package hydra.ingest.ws
+package hydra.ingest.services
 
 import akka.actor.{ActorRef, ActorRefFactory, Props}
 import akka.stream.OverflowStrategy
