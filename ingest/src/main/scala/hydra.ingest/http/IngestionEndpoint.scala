@@ -14,7 +14,7 @@
  *
  */
 
-package hydra.ingest.endpoints
+package hydra.ingest.http
 
 import akka.actor._
 import akka.http.scaladsl.model.HttpRequest
@@ -27,7 +27,7 @@ import hydra.core.http.HydraDirectives
 import hydra.core.ingest.{CorrelationIdBuilder, RequestParams}
 import hydra.core.marshallers.HydraJsonSupport
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
-import hydra.ingest.services.IngestRequestGateway
+import hydra.ingest.services.IngestionHandlerGateway
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{FiniteDuration, _}
@@ -42,8 +42,11 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: Execut
 
   implicit val mat = ActorMaterializer()
 
+  //for performance reasons, we give this endpoint its own instance of the gateway
   private val registryPath = HydraIngestorRegistryClient.registryPath(applicationConfig)
-  private val requestHandler = system.actorOf(IngestRequestGateway.props(registryPath))
+
+  private val requestHandler = system.actorOf(IngestionHandlerGateway.props(registryPath),
+    "ingestion_Http_handler_gateway")
 
   private val ingestTimeout = applicationConfig.get[FiniteDuration]("ingest.timeout")
     .valueOrElse(3.seconds)
@@ -73,7 +76,7 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: Execut
         val request = ingestor
           .map(i => req.withMetadata(RequestParams.HYDRA_INGESTOR_PARAM -> i)).getOrElse(req)
         imperativelyComplete { ctx =>
-          requestHandler ! IngestRequestGateway.InitiateHttpRequest(request, ingestTimeout, ctx)
+          requestHandler ! IngestionHandlerGateway.InitiateHttpRequest(request, ingestTimeout, ctx)
         }
       }
     }

@@ -21,7 +21,7 @@ import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import hydra.common.util.ActorUtils
 import hydra.core.ingest._
 import hydra.core.protocol._
-import hydra.ingest.ingestors.IngestorInfo
+import hydra.ingest.IngestorInfo
 import org.joda.time.DateTime
 
 import scala.collection.mutable

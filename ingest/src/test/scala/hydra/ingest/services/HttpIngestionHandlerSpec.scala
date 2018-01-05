@@ -6,7 +6,7 @@ import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import hydra.core.http.{HydraDirectives, ImperativeRequestContext}
 import hydra.core.ingest.{HydraRequest, IngestionReport, RequestParams}
 import hydra.core.protocol._
-import hydra.ingest.ingestors.IngestorInfo
+import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.TestRecordFactory
 import org.joda.time.DateTime

@@ -5,7 +5,7 @@ import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.ConfigFactory
 import hydra.common.util.ActorUtils
 import hydra.core.bootstrap.ReflectionsWrapper
-import hydra.ingest.ingestors.IngestorInfo
+import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestorRegistry
 import hydra.ingest.services.IngestorRegistry.RegisterWithClass
 import hydra.ingest.test.TestIngestor

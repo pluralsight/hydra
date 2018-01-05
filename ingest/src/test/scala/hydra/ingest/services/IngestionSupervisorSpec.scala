@@ -6,7 +6,7 @@ import hydra.common.util.ActorUtils
 import hydra.core.ingest._
 import hydra.core.protocol._
 import hydra.core.transport.AckStrategy
-import hydra.ingest.ingestors.IngestorInfo
+import hydra.ingest.IngestorInfo
 import hydra.ingest.test.{TestRecordFactory, TimeoutRecord}
 import org.joda.time.DateTime
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FunSpecLike, Matchers}

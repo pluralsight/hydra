@@ -1,10 +1,10 @@
-package hydra.ingest.marshallers
+package hydra.ingest.http
 
 import akka.actor.ActorPath
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import hydra.core.ingest.IngestionReport
 import hydra.core.protocol.{IngestorCompleted, IngestorError, IngestorStatus, InvalidRequest}
-import hydra.ingest.ingestors.IngestorInfo
+import hydra.ingest.IngestorInfo
 import org.joda.time.DateTime
 import org.scalatest.{FunSpecLike, Matchers}
 

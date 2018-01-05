@@ -14,7 +14,7 @@
  *
  */
 
-package hydra.ingest.endpoints
+package hydra.ingest.http
 
 import akka.actor._
 import akka.http.scaladsl.server.Route
@@ -26,7 +26,6 @@ import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
-import hydra.ingest.marshallers.HydraIngestJsonSupport
 import hydra.ingest.services.IngestorRegistry.{FindAll, LookupResult}
 
 import scala.concurrent.ExecutionContext

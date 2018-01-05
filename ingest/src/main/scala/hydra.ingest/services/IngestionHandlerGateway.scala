@@ -18,11 +18,12 @@ package hydra.ingest.services
 
 import akka.actor.SupervisorStrategy.Stop
 import akka.actor.{OneForOneStrategy, _}
+import akka.cluster.pubsub.DistributedPubSub
+import akka.cluster.pubsub.DistributedPubSubMediator.Subscribe
 import akka.util.Timeout
 import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.HydraRequest
-import hydra.ingest.marshallers.HydraIngestJsonSupport
-import hydra.ingest.services.IngestRequestGateway.InitiateHttpRequest
+import hydra.ingest.services.IngestionHandlerGateway.{InitiateHttpRequest, InitiateRequest}
 
 import scala.concurrent.duration._
 
@@ -31,18 +32,40 @@ import scala.concurrent.duration._
   * All this actor does is forward the requests to an instance of the IngestRequestHandler actor.
   *
   */
-class IngestRequestGateway(registryPath: String) extends Actor with HydraIngestJsonSupport {
+class IngestionHandlerGateway(registryPath: String) extends Actor with ActorLogging {
 
   private lazy val registry = context.actorSelection(registryPath).resolveOne()(Timeout(10.seconds))
 
+  private implicit val ec = context.dispatcher
+
   override def receive = {
-    case InitiateHttpRequest(request, timeout, ctx) =>
-      implicit val ec = context.dispatcher
+    case InitiateRequest(request, timeout) =>
       val fs = sender
-      registry.map(r =>
-        context.actorOf(HttpIngestionHandler.props(request, timeout, ctx, r)))
-        .recover { case e: Exception => fs ! e }
+      ingest(r => DefaultIngestionHandler.props(request, r, fs, timeout), fs)
+
+    case InitiateHttpRequest(request, timeout, ctx) =>
+      val fs = sender
+      ingest(r => HttpIngestionHandler.props(request, timeout, ctx, r), fs)
   }
+
+  private def ingest(props: (ActorRef) => Props, requestor: ActorRef) = {
+    registry.map(r => context.actorOf(props(r))).recover { case e: Exception => requestor ! e }
+  }
+
+
+  /**
+    * Only in clustered environments.
+    */
+  override def preStart():Unit = {
+    val isClustered = context.system.settings.ProviderClass == "akka.cluster.ClusterActorRefProvider"
+    if (isClustered) {
+      log.debug("Initialized DistributedPubSub for {}", IngestionHandlerGateway.TopicName)
+      val mediator = DistributedPubSub(context.system).mediator
+      mediator ! Subscribe(IngestionHandlerGateway.TopicName,
+        Some(IngestionHandlerGateway.GroupName), self)
+    }
+  }
+
 
   override val supervisorStrategy =
     OneForOneStrategy() {
@@ -50,11 +73,17 @@ class IngestRequestGateway(registryPath: String) extends Actor with HydraIngestJ
     }
 }
 
-object IngestRequestGateway {
+object IngestionHandlerGateway {
+
+  val TopicName = "hydra-ingest"
+
+  val GroupName = "ingestion-handlers"
 
   case class InitiateHttpRequest(request: HydraRequest, timeout: FiniteDuration,
                                  ctx: ImperativeRequestContext)
 
-  def props(registryPath: String) = Props(classOf[IngestRequestGateway], registryPath)
+  case class InitiateRequest(request: HydraRequest, timeout: FiniteDuration)
+
+  def props(registryPath: String) = Props(classOf[IngestionHandlerGateway], registryPath)
 
 }

@@ -10,6 +10,7 @@ class IngestionActorsSpec extends Matchers with FlatSpecLike with BeforeAndAfter
 
   "The ingestion actors sequence" should "contain all actors" in {
     IngestionActors.services.map(_._1) shouldBe Seq(
+      ActorUtils.actorName[IngestionHandlerGateway],
       ActorUtils.actorName[TransportRegistrar],
       ActorUtils.actorName[IngestorRegistry],
       ActorUtils.actorName[IngestorRegistrar])

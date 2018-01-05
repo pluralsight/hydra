@@ -14,7 +14,7 @@
  *
  */
 
-package hydra.ingest.endpoints
+package hydra.ingest.http
 
 import akka.actor._
 import akka.http.scaladsl.model.StatusCodes
@@ -26,7 +26,6 @@ import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
 import hydra.core.marshallers.GenericServiceResponse
-import hydra.ingest.marshallers.HydraIngestJsonSupport
 import hydra.ingest.ws._
 import spray.json._
 

@@ -5,7 +5,7 @@ import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import hydra.common.util.ActorUtils
 import hydra.core.ingest.{HydraRequest, IngestionReport, RequestParams}
 import hydra.core.protocol._
-import hydra.ingest.ingestors.IngestorInfo
+import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.{TestRecordFactory, TimeoutRecord}
 import org.joda.time.DateTime

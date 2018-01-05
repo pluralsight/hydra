@@ -14,12 +14,12 @@
  *
  */
 
-package hydra.ingest.marshallers
+package hydra.ingest.http
 
 import hydra.core.ingest.IngestionReport
 import hydra.core.marshallers.HydraJsonSupport
 import hydra.core.protocol.IngestorStatus
-import hydra.ingest.ingestors.IngestorInfo
+import hydra.ingest.IngestorInfo
 
 
 /**

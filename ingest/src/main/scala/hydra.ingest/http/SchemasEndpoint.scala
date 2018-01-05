@@ -14,9 +14,9 @@
  *
  */
 
-package hydra.ingest.endpoints
+package hydra.ingest.http
 
-import akka.actor.{ActorRefFactory, ActorSystem}
+import akka.actor.ActorSystem
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.server.{ExceptionHandler, Route}

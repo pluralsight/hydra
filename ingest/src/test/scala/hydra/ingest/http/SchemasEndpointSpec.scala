@@ -1,4 +1,4 @@
-package hydra.ingest.endpoints
+package hydra.ingest.http
 
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.testkit.TestKit

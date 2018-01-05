@@ -1,4 +1,4 @@
-package hydra.ingest.ingestors
+package hydra.ingest
 
 import akka.actor.ActorPath
 import hydra.core.protocol.HydraMessage

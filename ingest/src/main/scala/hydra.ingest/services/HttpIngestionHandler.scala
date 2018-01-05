@@ -19,7 +19,7 @@ package hydra.ingest.services
 import akka.actor._
 import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.{HydraRequest, IngestionReport}
-import hydra.ingest.marshallers.HydraIngestJsonSupport
+import hydra.ingest.http.HydraIngestJsonSupport
 
 import scala.concurrent.duration._
 

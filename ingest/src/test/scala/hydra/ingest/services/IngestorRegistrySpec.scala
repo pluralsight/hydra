@@ -3,7 +3,7 @@ package hydra.ingest.services
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{Actor, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
-import hydra.ingest.ingestors.IngestorInfo
+import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestorRegistry._
 import hydra.ingest.test.TestIngestor
 import org.scalatest.concurrent.Eventually
