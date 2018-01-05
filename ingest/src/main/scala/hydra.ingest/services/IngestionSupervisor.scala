@@ -28,7 +28,7 @@ import scala.collection.mutable
 import scala.concurrent.duration._
 
 class IngestionSupervisor(request: HydraRequest, requestor: ActorRef, info: Seq[IngestorInfo],
-                 timeout: FiniteDuration) extends Actor with ActorLogging {
+                          timeout: FiniteDuration) extends Actor with ActorLogging {
 
   context.setReceiveTimeout(timeout)
 
@@ -36,7 +36,10 @@ class IngestionSupervisor(request: HydraRequest, requestor: ActorRef, info: Seq[
 
   private val ingestors: mutable.Map[String, IngestorStatus] = new mutable.HashMap
 
-  info.foreach(i => context.actorSelection(i.path) ! Publish(request))
+  info.foreach { i =>
+    ingestors.update(i.name, RequestPublished)
+    context.actorSelection(i.path) ! Publish(request)
+  }
 
   override def receive: Receive = timeOut orElse {
     case Join =>
