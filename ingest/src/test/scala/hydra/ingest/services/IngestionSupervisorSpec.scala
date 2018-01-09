@@ -42,6 +42,7 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
     }
 
     ingestor = TestProbe("ingestor")
+
     ingestor.setAutoPilot((sender: ActorRef, msg: Any) => msg match {
       case Publish(req) =>
         sender.tell(getPublishMsg(req), ingestor.ref)
@@ -62,7 +63,8 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
   def ingestorRequest = publishRequest
     .withMetadata(RequestParams.HYDRA_INGESTOR_PARAM -> ActorUtils.actorName(ingestor.ref))
 
-  def ingestors = Seq(IngestorInfo("test_ingestor", "test", ingestor.ref.path, DateTime.now()))
+  def ingestors = Seq(IngestorInfo(ActorUtils.actorName(ingestor.ref),
+    "test", ingestor.ref.path, DateTime.now()))
 
   describe("When supervising an ingestion") {
 
