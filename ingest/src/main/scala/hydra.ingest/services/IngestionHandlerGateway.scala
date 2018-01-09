@@ -21,9 +21,7 @@ import akka.actor.{OneForOneStrategy, _}
 import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.Subscribe
 import akka.util.Timeout
-import hydra.core.http.ImperativeRequestContext
-import hydra.core.ingest.HydraRequest
-import hydra.ingest.services.IngestionHandlerGateway.{InitiateHttpRequest, InitiateRequest}
+import hydra.core.protocol.{InitiateHttpRequest, InitiateRequest}
 
 import scala.concurrent.duration._
 
@@ -78,11 +76,6 @@ object IngestionHandlerGateway {
   val TopicName = "hydra-ingest"
 
   val GroupName = "ingestion-handlers"
-
-  case class InitiateHttpRequest(request: HydraRequest, timeout: FiniteDuration,
-                                 ctx: ImperativeRequestContext)
-
-  case class InitiateRequest(request: HydraRequest, timeout: FiniteDuration)
 
   def props(registryPath: String) = Props(classOf[IngestionHandlerGateway], registryPath)
 

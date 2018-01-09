@@ -26,6 +26,7 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
 import hydra.core.ingest.{CorrelationIdBuilder, RequestParams}
 import hydra.core.marshallers.HydraJsonSupport
+import hydra.core.protocol.InitiateHttpRequest
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestionHandlerGateway
 
@@ -76,7 +77,7 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: Execut
         val request = ingestor
           .map(i => req.withMetadata(RequestParams.HYDRA_INGESTOR_PARAM -> i)).getOrElse(req)
         imperativelyComplete { ctx =>
-          requestHandler ! IngestionHandlerGateway.InitiateHttpRequest(request, ingestTimeout, ctx)
+          requestHandler ! InitiateHttpRequest(request, ingestTimeout, ctx)
         }
       }
     }

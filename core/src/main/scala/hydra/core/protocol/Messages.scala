@@ -2,9 +2,12 @@ package hydra.core.protocol
 
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.HydraRequest
 import hydra.core.transport.{AckStrategy, HydraRecord, RecordMetadata}
 import org.joda.time.DateTime
+
+import scala.concurrent.duration.FiniteDuration
 
 /**
   * Created by alexsilva on 2/22/17.
@@ -128,6 +131,12 @@ case object IngestorCompleted extends IngestorStatus {
   override val completed = true
   val statusCode = StatusCodes.OK
 }
+
+//Initiate ingestion messages
+case class InitiateHttpRequest(request: HydraRequest, timeout: FiniteDuration,
+                               ctx: ImperativeRequestContext)
+
+case class InitiateRequest(request: HydraRequest, timeout: FiniteDuration)
 
 
 

@@ -58,7 +58,7 @@ class IngestionHandlerGatewayClusterSpec extends TestKit(ActorSystem("hydra",
     val topic = IngestionHandlerGateway.TopicName
     val request = ingest.HydraRequest("123", "payload")
     val msg = akka.cluster.pubsub.DistributedPubSubMediator.Publish(topic,
-      IngestionHandlerGateway.InitiateRequest(request, 1.second), true)
+      InitiateRequest(request, 1.second), true)
     mediator ! msg
 
     expectMsgPF() {

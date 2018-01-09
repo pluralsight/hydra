@@ -41,10 +41,12 @@ class DefaultIngestionHandler(val request: HydraRequest,
 
   override def complete(report: IngestionReport): Unit = {
     requestor ! report
+    context.stop(self)
   }
 
   override def fail(e: Throwable): Unit = {
     requestor ! HydraApplicationError(e)
+    context.stop(self)
   }
 }
 
