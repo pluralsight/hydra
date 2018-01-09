@@ -37,8 +37,8 @@ class IngestionHandlerGateway(registryPath: String) extends Actor with ActorLogg
   private implicit val ec = context.dispatcher
 
   override def receive = {
-    case InitiateRequest(request, timeout) =>
-      val fs = sender
+    case InitiateRequest(request, timeout, requestorOpt) =>
+      val fs = requestorOpt getOrElse sender
       ingest(r => DefaultIngestionHandler.props(request, r, fs, timeout), fs)
 
     case InitiateHttpRequest(request, timeout, ctx) =>
@@ -54,7 +54,7 @@ class IngestionHandlerGateway(registryPath: String) extends Actor with ActorLogg
   /**
     * Only in clustered environments.
     */
-  override def preStart():Unit = {
+  override def preStart(): Unit = {
     val isClustered = context.system.settings.ProviderClass == "akka.cluster.ClusterActorRefProvider"
     if (isClustered) {
       log.debug("Initialized DistributedPubSub for {}", IngestionHandlerGateway.TopicName)

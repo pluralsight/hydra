@@ -2,7 +2,7 @@ package hydra.ingest.services
 
 import akka.actor.{Actor, ActorSystem}
 import akka.cluster.pubsub.DistributedPubSub
-import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
+import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import hydra.core.ingest
 import hydra.core.ingest.IngestionReport
@@ -57,11 +57,12 @@ class IngestionHandlerGatewayClusterSpec extends TestKit(ActorSystem("hydra",
   "The IngestionHandlerGateway when part of a cluster" should "receive published messages" in {
     val topic = IngestionHandlerGateway.TopicName
     val request = ingest.HydraRequest("123", "payload")
+    val requestor = TestProbe()
     val msg = akka.cluster.pubsub.DistributedPubSubMediator.Publish(topic,
-      InitiateRequest(request, 1.second), true)
+      InitiateRequest(request, 1.second, Some(requestor.ref)), true)
     mediator ! msg
 
-    expectMsgPF() {
+    requestor.expectMsgPF() {
       case IngestionReport(c, _, statusCode) =>
         c shouldBe "123"
         statusCode shouldBe 200

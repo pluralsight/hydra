@@ -19,7 +19,7 @@ trait HydraError extends HydraMessage {
 
 }
 
-case class HydraApplicationError(cause:Throwable) extends HydraError
+case class HydraApplicationError(cause: Throwable) extends HydraError
 
 case class IngestionError(cause: Throwable) extends HydraError
 
@@ -136,7 +136,8 @@ case object IngestorCompleted extends IngestorStatus {
 case class InitiateHttpRequest(request: HydraRequest, timeout: FiniteDuration,
                                ctx: ImperativeRequestContext)
 
-case class InitiateRequest(request: HydraRequest, timeout: FiniteDuration)
+case class InitiateRequest(request: HydraRequest, timeout: FiniteDuration,
+                           requestor: Option[ActorRef] = None)
 
 
 
