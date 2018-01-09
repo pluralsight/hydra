@@ -35,7 +35,7 @@ class IngestionErrorHandlerSpec extends TestKit(ActorSystem("hydra-test")) with 
 
   val schema = new Schema.Parser().parse(Source.fromResource("schemas/HydraIngestError.avsc").mkString)
 
-  val request = HydraRequest(123, "someString", Map(HYDRA_KAFKA_TOPIC_PARAM -> "topic"))
+  val request = HydraRequest("123", "someString", Map(HYDRA_KAFKA_TOPIC_PARAM -> "topic"))
 
   describe("When using the kafka ingestion error handler") {
     it("builds an avro record") {
@@ -78,7 +78,7 @@ class IngestionErrorHandlerSpec extends TestKit(ActorSystem("hydra-test")) with 
 
   def toGenericRecord(err: HydraIngestionError): GenericRecordBuilder = {
     new GenericRecordBuilder(schema)
-      .set("ingestor", err.ingestor).set("destination", "topic").set("errorMessage", err.error.getMessage)
+      .set("ingestor", err.ingestor).set("destination", "topic").set("errorMessage", err.cause.getMessage)
       .set("payload", err.request.payload)
       .set("metadata", err.request.metadata.asJava)
   }

@@ -21,7 +21,7 @@ object Dependencies {
   val akkaKafkaStreamVersion = "0.14"
   val scalazVersion = "7.2.9"
   val scalaMockVersion = "3.5.0"
-  val serviceContainerVersion = "2.0.6"
+  val serviceContainerVersion = "2.0.7"
   val scalaCacheVersion = "0.9.3"
   val postgresVersion = "9.4.1209"
   val commonsDbcpVersion = "1.4"
@@ -42,10 +42,12 @@ object Dependencies {
 
     val scalaz = "org.scalaz" %% "scalaz-core" % scalazVersion
 
+    val embeddedKafka = "net.manub" %% "scalatest-embedded-kafka" % "0.14.0"
+
     val kafka = Seq(
       "org.apache.kafka" %% "kafka" % kafkaVersion,
       "org.apache.kafka" % "kafka-clients" % kafkaVersion,
-      "net.manub" %% "scalatest-embedded-kafka" % "0.14.0" % "test")
+      embeddedKafka % "test")
 
     val confluent = Seq("io.confluent" % "kafka-schema-registry-client" % confluentVersion,
       "io.confluent" % "kafka-avro-serializer" % confluentVersion).map(_.excludeAll(
@@ -60,6 +62,7 @@ object Dependencies {
 
     val akka = Seq("com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
+      "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
       "com.github.romix.akka" %% "akka-kryo-serialization" % akkaKryoVersion,
@@ -129,7 +132,8 @@ object Dependencies {
 
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
-  val coreDeps = akka ++ baseDeps ++ Seq(guavacache, reflections, serviceContainer) ++ confluent ++ constructR
+  val coreDeps = akka ++ baseDeps ++
+    Seq(guavacache, reflections, serviceContainer) ++ confluent ++ constructR
 
   val ingestDeps = coreDeps
 
@@ -139,7 +143,8 @@ object Dependencies {
 
   val kafkaDeps = coreDeps ++ Seq(akkaKafkaStream, jsonLenses) ++ kafka
 
-  val sandboxDeps = kafkaDeps ++ sqlDeps ++ Seq("com.h2database" % "h2" % "1.4.196")
+  val sandboxDeps = kafkaDeps ++ sqlDeps ++
+    Seq("com.h2database" % "h2" % "1.4.196") ++ Seq(embeddedKafka)
 
   val overrides = Set(logging, typesafeConfig, joda)
 }

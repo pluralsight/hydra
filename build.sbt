@@ -2,12 +2,12 @@ import sbt.Resolver
 
 val JDK = "1.8"
 val buildNumber = scala.util.Properties.envOrNone("version").map(v => "." + v).getOrElse("")
-val hydraVersion = "0.10.0" + buildNumber
+val hydraVersion = "0.10.2" + buildNumber
 
 lazy val defaultSettings = Seq(
   organization := "pluralsight",
   version := hydraVersion,
-  scalaVersion := "2.12.2",
+  scalaVersion := "2.12.3",
   description := "Hydra",
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
   excludeDependencies += "org.slf4j" % "slf4j-log4j12",

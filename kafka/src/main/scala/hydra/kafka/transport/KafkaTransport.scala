@@ -76,13 +76,14 @@ object KafkaTransport extends KafkaConfigSupport {
 
   case class RecordProduceError(deliveryId: Long, record: KafkaRecord[_, _], error: Throwable)
 
+  //TODO: Refactor to use only one Props taking a config
   def props(producersConfig: Map[String, Config]): Props = Props(classOf[KafkaTransport], producersConfig)
 
   /**
     * Method to comply with TransportRegistrar that looks for a method in the companion object called props
     * that takes a config param.
     *
-    * @param cfg - We are not using this (this is the applicationConfig)
+    * @param cfg - We are not using this (this is the rootConfig)
     * @return
     */
   def props(cfg: Config): Props = Props(classOf[KafkaTransport], kafkaProducerFormats)

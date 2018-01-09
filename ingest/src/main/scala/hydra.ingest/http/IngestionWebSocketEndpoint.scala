@@ -14,7 +14,7 @@
  *
  */
 
-package hydra.ingest.endpoints
+package hydra.ingest.http
 
 import akka.actor._
 import akka.http.scaladsl.model.StatusCodes
@@ -26,22 +26,23 @@ import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
 import hydra.core.marshallers.GenericServiceResponse
-import hydra.ingest.marshallers.HydraIngestJsonSupport
-import hydra.ingest.ws._
+import hydra.ingest.services.{IngestSocketFactory, IngestionOutgoingMessage, SimpleOutgoingMessage}
 import spray.json._
 
+import scala.concurrent.ExecutionContext
 import scala.util.Failure
 
 /**
   * Created by alexsilva on 12/22/15.
   */
-class IngestionWebSocketEndpoint(implicit val system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
+class IngestionWebSocketEndpoint(implicit system: ActorSystem, implicit val e: ExecutionContext)
   extends RoutedEndpoints with LoggingAdapter with HydraIngestJsonSupport with HydraDirectives {
 
   //visible for testing
-  private[endpoints] val enabled = applicationConfig.get[Boolean]("ingest.websocket.enabled").valueOrElse(false)
+  private[http] val enabled = applicationConfig.get[Boolean]("ingest.websocket.enabled")
+    .valueOrElse(false)
 
-  private val socketFactory = IngestSocketFactory.createSocket(actorRefFactory)
+  private val socketFactory = IngestSocketFactory.createSocket(system)
 
   implicit val simpleOutgoingMessageFormat = jsonFormat2(SimpleOutgoingMessage)
 
@@ -56,7 +57,7 @@ class IngestionWebSocketEndpoint(implicit val system: ActorSystem, implicit val 
     }
 
 
-  private[endpoints] def ingestSocketFlow(): Flow[Message, Message, Any] = {
+  private[http] def ingestSocketFlow(): Flow[Message, Message, Any] = {
     Flow[Message].collect {
       case TextMessage.Strict(txt) => txt
     }.via(socketFactory.ingestFlow())
@@ -71,6 +72,6 @@ class IngestionWebSocketEndpoint(implicit val system: ActorSystem, implicit val 
       .watchTermination()((_, f) => f.onComplete {
         case Failure(cause) => log.error(s"WS stream failed with $cause")
         case _ => //ignore
-      }(actorRefFactory.dispatcher))
+      }(e))
 
 }

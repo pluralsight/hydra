@@ -5,8 +5,8 @@ import configs.syntax._
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.common.util.ActorUtils
+import hydra.ingest.IngestorInfo
 import hydra.ingest.bootstrap.ClasspathHydraComponentLoader
-import hydra.ingest.ingestors.IngestorInfo
 import hydra.ingest.services.IngestorRegistrar.UnregisterAll
 import hydra.ingest.services.IngestorRegistry.{RegisterWithClass, Unregister, Unregistered}
 

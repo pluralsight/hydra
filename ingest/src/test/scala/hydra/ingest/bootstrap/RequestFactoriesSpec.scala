@@ -20,7 +20,7 @@ class RequestFactoriesSpec extends TestKit(ActorSystem("test")) with Matchers wi
   describe("The RequestFactories") {
     it("build a Hydra request from an HTTP request") {
       val hr = HttpRequest(entity = "test")
-      val hydraReq = createRequest(1, hr)
+      val hydraReq = createRequest("1", hr)
       whenReady(hydraReq) { r =>
         r.payload shouldBe "test"
       }

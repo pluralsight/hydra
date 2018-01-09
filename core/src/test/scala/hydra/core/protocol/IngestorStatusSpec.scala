@@ -26,7 +26,7 @@ class IngestorStatusSpec extends Matchers with FlatSpecLike {
   }
 
   it should "create an invalid request from a string" in {
-    new InvalidRequest("error!").error shouldBe a[IllegalArgumentException]
-    new InvalidRequest("error!").error.getMessage shouldBe "error!"
+    new InvalidRequest("error!").cause shouldBe a[IllegalArgumentException]
+    new InvalidRequest("error!").cause.getMessage shouldBe "error!"
   }
 }

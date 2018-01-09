@@ -23,31 +23,31 @@ class JdbcIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers 
 
   describe("When using the jdbc ingestor") {
     it("Joins") {
-      val request = HydraRequest(123, "someString", Map(JdbcRecordFactory.DB_PROFILE_PARAM -> "testdb"))
+      val request = HydraRequest("123", "someString", Map(JdbcRecordFactory.DB_PROFILE_PARAM -> "testdb"))
       ingestor ! Publish(request)
       expectMsg(Join)
     }
 
     it("Ignores") {
-      val request = HydraRequest(123, "someString")
+      val request = HydraRequest("123", "someString")
       ingestor ! Publish(request)
       expectMsg(Ignore)
     }
 
     it("validates") {
-      val r = HydraRequest(123, "someString").withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc",
+      val r = HydraRequest("123", "someString").withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc",
         JdbcRecordFactory.TABLE_PARAM -> "table")
       ingestor ! Validate(r)
       expectMsgType[InvalidRequest]
 
-      val request = HydraRequest(123,"""{"id":1, "name":"test", "rank" : 1}""")
+      val request = HydraRequest("123","""{"id":1, "name":"test", "rank" : 1}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc",
           JdbcRecordFactory.TABLE_PARAM -> "table", JdbcRecordFactory.DB_PROFILE_PARAM -> "profile")
 
       ingestor ! Validate(request)
       expectMsgType[InvalidRequest]
 
-      val r2 = HydraRequest(123,"""{"id":1, "name":"test", "rank" : 1}""")
+      val r2 = HydraRequest("123","""{"id":1, "name":"test", "rank" : 1}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc",
           JdbcRecordFactory.TABLE_PARAM -> "table", JdbcRecordFactory.DB_PROFILE_PARAM -> "test-dsprofile")
       ingestor ! Validate(r2)

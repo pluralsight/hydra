@@ -14,12 +14,12 @@
  *
  */
 
-package hydra.ingest.marshallers
+package hydra.ingest.http
 
 import hydra.core.ingest.IngestionReport
 import hydra.core.marshallers.HydraJsonSupport
 import hydra.core.protocol.IngestorStatus
-import hydra.ingest.ingestors.IngestorInfo
+import hydra.ingest.IngestorInfo
 
 
 /**
@@ -53,7 +53,7 @@ trait HydraIngestJsonSupport extends HydraJsonSupport {
 
       val ingestors = obj.ingestors.map(h => h._1 -> writeState(h._2))
       val response = Map(
-        "correlationId" -> JsNumber(obj.correlationId),
+        "correlationId" -> JsString(obj.correlationId),
         "ingestors" -> JsObject(ingestors)
       )
 

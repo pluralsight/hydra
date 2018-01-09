@@ -50,7 +50,9 @@ object TransportRegistrar extends LoggingAdapter {
       //todo: add to registry
       maybeProps.map { props =>
         log.debug(s"Initializing transport actor $name")
-        fact.actorOf(TransportSupervisor.props(name, props), name)
+        val transport = fact.actorOf(TransportSupervisor.props(name, props), name)
+        log.debug(s"Initialized transport $name at ${transport.path}")
+        transport
       }.recover {
         case e: Exception =>
           log.error(s"Unable to instantiate transport $name: ${e.getMessage}")

@@ -14,9 +14,9 @@
  *
  */
 
-package hydra.ingest.endpoints
+package hydra.ingest.http
 
-import akka.actor.{ActorRefFactory, ActorSystem}
+import akka.actor.ActorSystem
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
@@ -32,18 +32,18 @@ import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientExcept
 import org.apache.avro.Schema.Parser
 import org.apache.avro.SchemaParseException
 
+import scala.concurrent.ExecutionContext
+
 
 /**
   * A wrapper around Confluent's schema registry that facilitates schema registration and retrieval.
   *
   * Created by alexsilva on 2/13/16.
   */
-class SchemasEndpoint(implicit system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
+class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionContext)
   extends RoutedEndpoints with ConfigSupport with LoggingAdapter with HydraJsonSupport with CorsSupport {
 
   implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
-
-  implicit val ec = system.dispatcher
 
   private val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
 

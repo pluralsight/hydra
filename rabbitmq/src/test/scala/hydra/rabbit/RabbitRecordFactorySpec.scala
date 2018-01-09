@@ -22,14 +22,14 @@ import org.scalatest.{FunSpecLike, Matchers}
 class RabbitRecordFactorySpec extends Matchers with FunSpecLike {
   describe("The Rabbit record factory") {
     it("throws an error if no exchange or queue metadata provided") {
-      val request = HydraRequest(123,"{'name': 'test'}")
+      val request = HydraRequest("123", "{'name': 'test'}")
       intercept[IllegalArgumentException] {
         RabbitRecordFactory.build(request).get
       }
     }
 
     it("throws an error if both exchange and queue metadata provided") {
-      val request = HydraRequest(123,"{'name': 'test'}").withMetadata(
+      val request = HydraRequest("123", "{'name': 'test'}").withMetadata(
         RabbitRecord.HYDRA_RABBIT_EXCHANGE -> "test.exchange", RabbitRecord.HYDRA_RABBIT_QUEUE -> "test.queue")
       intercept[IllegalArgumentException] {
         RabbitRecordFactory.build(request).get
@@ -37,7 +37,7 @@ class RabbitRecordFactorySpec extends Matchers with FunSpecLike {
     }
 
     it("builds a record with the exchange") {
-      val request = HydraRequest(123,"{'name': 'test'}").withMetadata(
+      val request = HydraRequest("123", "{'name': 'test'}").withMetadata(
         RabbitRecord.HYDRA_RABBIT_EXCHANGE -> "test.exchange")
       val rec = RabbitRecordFactory.build(request).get
       rec.destination shouldBe "test.exchange"
@@ -46,7 +46,7 @@ class RabbitRecordFactorySpec extends Matchers with FunSpecLike {
     }
 
     it("builds a record with the queue") {
-      val request = HydraRequest(123,"{'name': 'test'}").withMetadata(
+      val request = HydraRequest("123", "{'name': 'test'}").withMetadata(
         RabbitRecord.HYDRA_RABBIT_QUEUE -> "test.queue")
       val rec = RabbitRecordFactory.build(request).get
       rec.destination shouldBe "test.queue"

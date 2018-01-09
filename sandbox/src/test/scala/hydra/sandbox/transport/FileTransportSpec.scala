@@ -25,7 +25,8 @@ class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with 
 
   val files = Map("hydra.transports.file.destinations.test" -> Files.createTempFile("hydra", "test").toFile)
 
-  val transport = system.actorOf(FileTransport.props(ConfigFactory.parseMap(files.mapValues(_.getAbsolutePath).asJava)))
+  val transport = system.actorOf(FileTransport.props(ConfigFactory
+    .parseMap(files.mapValues(_.getAbsolutePath).asJava)))
 
   val supervisor = TestProbe().ref
 

@@ -43,7 +43,7 @@ class IngestionErrorHandler extends Actor with ConfigSupport with DefaultJsonPro
   }
 
   private[ingestors] def buildPayload(err: HydraIngestionError): AvroRecord = {
-    val schema: Option[String] = err.error match {
+    val schema: Option[String] = err.cause match {
       case e: JsonToAvroConversionException => Some(e.getSchema.toString)
       case e: JsonToAvroConversionExceptionWithMetadata => Some(e.res.location)
       case e: Exception => None
@@ -51,7 +51,7 @@ class IngestionErrorHandler extends Actor with ConfigSupport with DefaultJsonPro
 
     val topic = err.request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM)
 
-    val errorInfo = HydraIngestionErrorInfo(err.ingestor, topic, err.error.getMessage,
+    val errorInfo = HydraIngestionErrorInfo(err.ingestor, topic, err.cause.getMessage,
       err.request.metadata, schema, err.request.payload).toJson.compactPrint
 
     AvroRecord(errorTopic, errorSchema, topic, errorInfo)

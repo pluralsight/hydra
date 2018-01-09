@@ -16,7 +16,7 @@ import hydra.kafka.consumer.KafkaConsumerProxy.{ListTopics, ListTopicsResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import org.apache.kafka.common.PartitionInfo
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scalacache._
 import scalacache.guava.GuavaCache
@@ -26,13 +26,11 @@ import scalacache.guava.GuavaCache
   *
   * Created by alexsilva on 3/18/17.
   */
-class TopicMetadataEndpoint(implicit val system: ActorSystem, implicit val actorRefFactory: ActorRefFactory)
+class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val e: ExecutionContext)
   extends RoutedEndpoints with LoggingAdapter with HydraDirectives with HydraKafkaJsonSupport
     with CorsSupport {
 
   private implicit val cache = ScalaCache(GuavaCache())
-
-  implicit val ec = actorRefFactory.dispatcher
 
   private val showSystemTopics = applicationConfig
     .get[Boolean]("transports.kafka.show-system-topics").valueOrElse(false)
@@ -40,7 +38,7 @@ class TopicMetadataEndpoint(implicit val system: ActorSystem, implicit val actor
   private val consumerPath = applicationConfig.get[String]("actors.kafka.consumer_proxy.path")
     .valueOrElse(s"/user/service/${ActorUtils.actorName(classOf[KafkaConsumerProxy])}")
 
-  private val consumerProxy = actorRefFactory.actorSelection(consumerPath)
+  private val consumerProxy = system.actorSelection(consumerPath)
 
   private val filterSystemTopics = (t: String) => (t.startsWith("_") && showSystemTopics) || !t.startsWith("_")
 

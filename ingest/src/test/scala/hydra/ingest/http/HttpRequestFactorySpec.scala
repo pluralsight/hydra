@@ -30,16 +30,16 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
         headers = Seq(RawHeader("hydra", "awesome"),
           RawHeader(RequestParams.HYDRA_VALIDATION_STRATEGY, "relaxed"),
           RawHeader(RequestParams.HYDRA_DELIVERY_STRATEGY, "at-least-once"),
-          RawHeader(RequestParams.HYDRA_ACK_STRATEGY, "transport")),
+          RawHeader(RequestParams.HYDRA_ACK_STRATEGY, "replicated")),
         uri = "/test",
         entity = HttpEntity(MediaTypes.`application/json`, json))
-      val req = new HttpRequestFactory().createRequest(123, httpRequest)
+      val req = new HttpRequestFactory().createRequest("123", httpRequest)
       whenReady(req) { req =>
         req.payload shouldBe json
-        req.correlationId shouldBe 123
+        req.correlationId shouldBe "123"
         req.metadataValue("hydra") shouldBe Some("awesome")
         req.validationStrategy shouldBe ValidationStrategy.Relaxed
-        req.ackStrategy shouldBe AckStrategy.TransportAck
+        req.ackStrategy shouldBe AckStrategy.Replicated
       }
     }
 
@@ -51,10 +51,10 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
         headers = Seq(RawHeader("hydra", "awesome")),
         uri = "/test",
         entity = HttpEntity(MediaTypes.`application/json`, json))
-      val req = new HttpRequestFactory().createRequest(123, httpRequest)
+      val req = new HttpRequestFactory().createRequest("123", httpRequest)
       whenReady(req) { req =>
         req.payload shouldBe json
-        req.correlationId shouldBe 123
+        req.correlationId shouldBe "123"
         req.metadataValue("hydra") shouldBe Some("awesome")
         req.validationStrategy shouldBe ValidationStrategy.Strict
         req.ackStrategy shouldBe AckStrategy.NoAck

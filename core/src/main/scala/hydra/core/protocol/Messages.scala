@@ -2,9 +2,12 @@ package hydra.core.protocol
 
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.HydraRequest
 import hydra.core.transport.{AckStrategy, HydraRecord, RecordMetadata}
 import org.joda.time.DateTime
+
+import scala.concurrent.duration.FiniteDuration
 
 /**
   * Created by alexsilva on 2/22/17.
@@ -12,13 +15,13 @@ import org.joda.time.DateTime
 trait HydraMessage
 
 trait HydraError extends HydraMessage {
-  def error: Throwable
+  def cause: Throwable
 
 }
 
-case class HydraApplicationError(error:Throwable) extends HydraError
+case class HydraApplicationError(cause: Throwable) extends HydraError
 
-case class IngestionError(error: Throwable) extends HydraError
+case class IngestionError(cause: Throwable) extends HydraError
 
 case class Validate(req: HydraRequest) extends HydraMessage
 
@@ -70,7 +73,7 @@ case class RecordNotProduced[K, V](record: HydraRecord[K, V], error: Throwable,
                                    supervisor: ActorRef) extends HydraMessage
 
 //todo:rename this class
-case class HydraIngestionError(ingestor: String, error: Throwable,
+case class HydraIngestionError(ingestor: String, cause: Throwable,
                                request: HydraRequest, time: DateTime = DateTime.now) extends HydraError
 
 
@@ -100,17 +103,17 @@ case object RequestPublished extends IngestorStatus {
   val statusCode = StatusCodes.Created
 }
 
-case class IngestorError(error: Throwable) extends IngestorStatus with HydraError {
+case class IngestorError(cause: Throwable) extends IngestorStatus with HydraError {
   override val completed = true
-  override val message = Option(error.getMessage).getOrElse("")
+  override val message = Option(cause.getMessage).getOrElse("")
   val statusCode = StatusCodes.ServiceUnavailable
 }
 
-case class InvalidRequest(error: Throwable) extends IngestorStatus with HydraError with MessageValidationResult {
+case class InvalidRequest(cause: Throwable) extends IngestorStatus with HydraError with MessageValidationResult {
   def this(msg: String) = this(new IllegalArgumentException(msg))
 
   override val completed = true
-  override val message = Option(error.getMessage).getOrElse("")
+  override val message = Option(cause.getMessage).getOrElse("")
   val statusCode = StatusCodes.BadRequest
 }
 
@@ -128,6 +131,13 @@ case object IngestorCompleted extends IngestorStatus {
   override val completed = true
   val statusCode = StatusCodes.OK
 }
+
+//Initiate ingestion messages
+case class InitiateHttpRequest(request: HydraRequest, timeout: FiniteDuration,
+                               ctx: ImperativeRequestContext)
+
+case class InitiateRequest(request: HydraRequest, timeout: FiniteDuration,
+                           requestor: Option[ActorRef] = None)
 
 
 

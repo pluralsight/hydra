@@ -8,7 +8,7 @@ import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import hydra.common.config.ConfigSupport
 import hydra.core.protocol._
 import hydra.core.test.TestRecord
-import hydra.core.transport.AckStrategy.{LocalAck, NoAck, TransportAck}
+import hydra.core.transport.AckStrategy.{Persisted, NoAck, Replicated}
 import hydra.core.transport.TransportSupervisor.{Confirm, Deliver, TransportError}
 import org.iq80.leveldb.util.FileUtils
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
@@ -54,7 +54,7 @@ class TransportSupervisorSpec extends TestKit(ActorSystem("test")) with Matchers
 
     it("handles LocalAck produces") {
       val rec = TestRecord("OK", Some("1"), "test")
-      transportManager ! Produce(rec, supervisor.ref, LocalAck)
+      transportManager ! Produce(rec, supervisor.ref, Persisted)
       transport.expectMsgPF() {
         case Deliver(r, id, ack) =>
           r shouldBe rec
@@ -73,7 +73,7 @@ class TransportSupervisorSpec extends TestKit(ActorSystem("test")) with Matchers
 
     it("handles TransportAck produces") {
       val rec = TestRecord("OK", Some("1"), "test")
-      transportManager ! Produce(rec, supervisor.ref, TransportAck)
+      transportManager ! Produce(rec, supervisor.ref, Replicated)
       transport.expectMsgPF() {
         case Deliver(r, deliveryId, callback) =>
           r shouldBe rec

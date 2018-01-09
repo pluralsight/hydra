@@ -3,7 +3,7 @@ package hydra.ingest.services
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{Actor, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
-import hydra.ingest.ingestors.IngestorInfo
+import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestorRegistry._
 import hydra.ingest.test.TestIngestor
 import org.scalatest.concurrent.Eventually
@@ -16,7 +16,8 @@ import scala.concurrent.duration._
 class IngestorRegistrySpec extends TestKit(ActorSystem("hydra")) with Matchers
   with FunSpecLike with ImplicitSender with Eventually with BeforeAndAfterAll {
 
-  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10 seconds)
+  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true,
+    duration = 10 seconds)
 
   val registry = system.actorOf(Props[IngestorRegistry], "registry")
 

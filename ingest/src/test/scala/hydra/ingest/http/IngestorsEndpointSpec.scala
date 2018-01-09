@@ -1,11 +1,10 @@
-package hydra.ingest.endpoints
+package hydra.ingest.http
 
 import akka.actor.Actor
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.testkit.{TestActorRef, TestKit, TestProbe}
 import hydra.common.util.ActorUtils
-import hydra.ingest.ingestors.IngestorInfo
-import hydra.ingest.marshallers.HydraIngestJsonSupport
+import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import org.joda.time.DateTime
 import org.scalatest.{Matchers, WordSpecLike}

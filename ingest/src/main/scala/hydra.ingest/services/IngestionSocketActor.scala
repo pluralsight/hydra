@@ -1,4 +1,4 @@
-package hydra.ingest.ws
+package hydra.ingest.services
 
 /**
   * Created by alexsilva on 3/10/17.
@@ -7,18 +7,18 @@ package hydra.ingest.ws
 import akka.actor.{Actor, ActorRef}
 import akka.http.scaladsl.model.StatusCodes
 import akka.util.Timeout
+import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.ingest
 import hydra.core.ingest.IngestionReport
 import hydra.core.protocol.HydraError
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
-import hydra.ingest.bootstrap.HydraIngestorRegistry
-import hydra.ingest.services.IngestionSupervisor
-import hydra.ingest.ws.IngestionSocketActor._
+import hydra.ingest.bootstrap.HydraIngestorRegistryClient
+import hydra.ingest.services.IngestionSocketActor._
 
 import scala.concurrent.duration._
 
-class IngestionSocketActor extends Actor with LoggingAdapter with HydraIngestorRegistry {
+class IngestionSocketActor extends Actor with LoggingAdapter with ConfigSupport {
 
   implicit val system = context.system
 
@@ -29,6 +29,11 @@ class IngestionSocketActor extends Actor with LoggingAdapter with HydraIngestorR
   implicit val akkaTimeout = Timeout(timeout)
 
   private var session: SocketSession = _
+
+  private lazy val registry = context.
+    actorSelection(HydraIngestorRegistryClient.registryPath(applicationConfig)).resolveOne()
+
+  private implicit val ec = context.dispatcher
 
   override def preStart(): Unit = {
     session = new SocketSession()
@@ -67,13 +72,16 @@ class IngestionSocketActor extends Actor with LoggingAdapter with HydraIngestorR
 
   def ingesting: Receive = {
     case IncomingMessage(IngestPattern(correlationId, payload)) =>
-      val request = session.buildRequest(Option(correlationId).map(_.toLong), payload)
-      ingestorRegistry.map(r => context.actorOf(IngestionSupervisor.props(request, timeout, r)))(context.dispatcher)
+      registry.foreach { r =>
+        val request = session.buildRequest(Option(correlationId), payload)
+        context.actorOf(DefaultIngestionHandler.props(request, r, self))
+      }
 
     case report: IngestionReport =>
       flowActor ! IngestionOutgoingMessage(report)
 
-    case e: HydraError => flowActor ! SimpleOutgoingMessage(StatusCodes.InternalServerError.intValue, e.error.getMessage)
+    case e: HydraError =>
+      flowActor ! SimpleOutgoingMessage(StatusCodes.InternalServerError.intValue, e.cause.getMessage)
   }
 }
 
@@ -88,7 +96,7 @@ case class SocketSession(metadata: Map[String, String] = Map.empty) {
   def withMetadata(meta: (String, String)*) =
     copy(metadata = this.metadata ++ meta.map(m => m._1 -> m._2))
 
-  def buildRequest(correlationId: Option[Long], payload: String) = {
+  def buildRequest(correlationId: Option[String], payload: String) = {
     import hydra.core.ingest.RequestParams._
 
     val vs = metadata.find(_._1.equalsIgnoreCase(HYDRA_VALIDATION_STRATEGY))
@@ -97,7 +105,7 @@ case class SocketSession(metadata: Map[String, String] = Map.empty) {
     val as = metadata.find(_._1.equalsIgnoreCase(HYDRA_ACK_STRATEGY))
       .map(h => AckStrategy(h._2)).getOrElse(AckStrategy.NoAck)
 
-    ingest.HydraRequest(correlationId.getOrElse(0), payload, metadata,
+    ingest.HydraRequest(correlationId.getOrElse("0"), payload, metadata,
       validationStrategy = vs, ackStrategy = as)
   }
 }

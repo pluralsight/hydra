@@ -23,7 +23,7 @@ import hydra.common.config.ActorConfigSupport
 import hydra.common.util.ActorUtils
 import hydra.core.ingest.{HydraRequest, Ingestor}
 import hydra.core.protocol.HydraMessage
-import hydra.ingest.ingestors.IngestorInfo
+import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestorRegistry._
 import org.joda.time.DateTime
 

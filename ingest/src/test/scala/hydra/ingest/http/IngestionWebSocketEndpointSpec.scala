@@ -1,14 +1,15 @@
-package hydra.ingest.endpoints
+package hydra.ingest.http
 
 import akka.actor.Actor
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
 import akka.testkit.{TestActorRef, TestKit}
 import hydra.core.protocol._
-import hydra.ingest.test.TestRecordFactory
-import hydra.ingest.ingestors.IngestorInfo
+import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
+import hydra.ingest.test.TestRecordFactory
 import org.joda.time.DateTime
 import org.scalatest.{Matchers, WordSpecLike}
+
 import scala.concurrent.duration._
 
 /**
@@ -79,13 +80,13 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
 
 
         wsClient.sendMessage("""{"name":"test","value":"test"}""")
-        wsClient.expectMessage("""{"correlationId":0,"ingestors":{"test_ingestor":{"code":200,"message":"OK"}}}""")
+        wsClient.expectMessage("""{"correlationId":"0","ingestors":{"test_ingestor":{"code":200,"message":"OK"}}}""")
 
         wsClient.sendMessage("""-i 122 {"name":"test","value":"test"}""")
-        wsClient.expectMessage("""{"correlationId":122,"ingestors":{"test_ingestor":{"code":200,"message":"OK"}}}""")
+        wsClient.expectMessage("""{"correlationId":"122","ingestors":{"test_ingestor":{"code":200,"message":"OK"}}}""")
 
         wsClient.sendMessage("error")
-        wsClient.expectMessage("""{"correlationId":0,"ingestors":{"test_ingestor":{"code":503,"message":""}}}""")
+        wsClient.expectMessage("""{"correlationId":"0","ingestors":{"test_ingestor":{"code":503,"message":""}}}""")
 
         wsClient.sendCompletion()
         wsClient.expectCompletion()
@@ -103,7 +104,7 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
         wsClient.expectMessage("""{"status":200,"message":"OK[HYDRA-DELIVERY-STRATEGY=at-most-once]"}""")
 
         wsClient.sendMessage("""-i 122 {"name":"test","value":"test"}""")
-        wsClient.expectMessage("""{"correlationId":122,"ingestors":{"test_ingestor":{"code":200,"message":"OK"}}}""")
+        wsClient.expectMessage("""{"correlationId":"122","ingestors":{"test_ingestor":{"code":200,"message":"OK"}}}""")
 
         wsClient.sendCompletion()
         wsClient.expectCompletion()

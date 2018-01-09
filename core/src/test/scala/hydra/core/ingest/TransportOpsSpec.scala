@@ -39,12 +39,12 @@ class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers with F
       t ! "hello"
       expectMsgPF() {
         case i: IngestorError =>
-          i.error shouldBe a[ActorInitializationException]
+          i.cause shouldBe a[ActorInitializationException]
       }
     }
 
     it("transports a record") {
-      val req = HydraRequest(123, "test-produce")
+      val req = HydraRequest("123", "test-produce")
       val t = system.actorOf(Props(classOf[TestTransportIngestor], supervisor.ref))
       t ! req
       tm.expectMsg(Produce(TestRecordFactory.build(req).get, self, NoAck))
