@@ -32,8 +32,9 @@ object FileRecordFactory extends RecordFactory[String, String] with ConfigSuppor
 
   import configs.syntax._
 
-  private val destinations = toMap(applicationConfig.getOrElse[Config]("transports.file.destinations",
-    ConfigFactory.empty).value)
+
+  private val destinations = ConfigSupport.toMap(applicationConfig
+    .getOrElse[Config]("transports.file.destinations", ConfigFactory.empty).value)
 
   override def build(r: HydraRequest): Try[HydraRecord[String, String]] = {
     val file = r.metadataValue("hydra-file-stream").get

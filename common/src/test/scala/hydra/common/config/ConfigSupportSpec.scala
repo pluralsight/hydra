@@ -2,7 +2,7 @@ package hydra.common.config
 
 import com.typesafe.config.{ConfigException, ConfigFactory}
 import org.scalatest.{FunSpecLike, Matchers}
-
+import ConfigSupport._
 import scala.collection.JavaConverters._
 
 /**
@@ -41,7 +41,7 @@ class ConfigSupportSpec extends Matchers with FunSpecLike with ConfigSupport {
         "test.boolean" -> false
       )
 
-      toMap(ConfigFactory.parseMap(map.asJava)) shouldBe map
+      ConfigFactory.parseMap(map.asJava).toMap shouldBe map
 
     }
 
@@ -52,7 +52,7 @@ class ConfigSupportSpec extends Matchers with FunSpecLike with ConfigSupport {
         "test.boolean" -> false
       )
 
-      toMap(ConfigFactory.parseMap(map.asJava).root()) shouldBe map
+      ConfigSupport.toMap(ConfigFactory.parseMap(map.asJava).root()) shouldBe map
 
     }
 

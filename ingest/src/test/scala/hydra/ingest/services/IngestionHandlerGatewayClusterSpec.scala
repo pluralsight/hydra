@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorSystem}
 import akka.cluster.pubsub.DistributedPubSub
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
-import hydra.core.ingest
+import hydra.core.{Settings, ingest}
 import hydra.core.ingest.IngestionReport
 import hydra.core.protocol._
 import hydra.ingest.IngestorInfo
@@ -55,7 +55,7 @@ class IngestionHandlerGatewayClusterSpec extends TestKit(ActorSystem("hydra",
     interval = Span(1, Seconds))
 
   "The IngestionHandlerGateway when part of a cluster" should "receive published messages" in {
-    val topic = IngestionHandlerGateway.TopicName
+    val topic = Settings.IngestTopicName
     val request = ingest.HydraRequest("123", "payload")
     val requestor = TestProbe()
     val msg = akka.cluster.pubsub.DistributedPubSubMediator.Publish(topic,

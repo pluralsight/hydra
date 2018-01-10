@@ -21,6 +21,7 @@ import akka.actor.{OneForOneStrategy, _}
 import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.Subscribe
 import akka.util.Timeout
+import hydra.core.Settings
 import hydra.core.protocol.{InitiateHttpRequest, InitiateRequest}
 
 import scala.concurrent.duration._
@@ -57,10 +58,9 @@ class IngestionHandlerGateway(registryPath: String) extends Actor with ActorLogg
   override def preStart(): Unit = {
     val isClustered = context.system.settings.ProviderClass == "akka.cluster.ClusterActorRefProvider"
     if (isClustered) {
-      log.debug("Initialized DistributedPubSub for {}", IngestionHandlerGateway.TopicName)
+      log.debug("Initialized DistributedPubSub for {}", Settings.IngestTopicName)
       val mediator = DistributedPubSub(context.system).mediator
-      mediator ! Subscribe(IngestionHandlerGateway.TopicName,
-        Some(IngestionHandlerGateway.GroupName), self)
+      mediator ! Subscribe(Settings.IngestTopicName, Some(IngestionHandlerGateway.GroupName), self)
     }
   }
 
@@ -72,8 +72,6 @@ class IngestionHandlerGateway(registryPath: String) extends Actor with ActorLogg
 }
 
 object IngestionHandlerGateway {
-
-  val TopicName = "hydra-ingest"
 
   val GroupName = "ingestion-handlers"
 
