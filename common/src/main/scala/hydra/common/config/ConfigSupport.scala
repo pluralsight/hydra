@@ -44,23 +44,26 @@ trait ConfigSupport extends ConfigComponent {
 
   val applicationConfig: Config = rootConfig.getConfig(applicationName)
 
+  def loadExternalConfig(c: Config): Config = {
+    c.getOrElse[String]("application.config.location", s"/etc/hydra/$applicationName.conf")
+      .map(f => ConfigFactory.parseFile(new java.io.File(f)))
+      .valueOrThrow(err => err.configException)
+  }
+}
+
+object ConfigSupport {
+
   import scala.collection.JavaConverters._
 
-  def toMap(cfg: ConfigObject): Map[String, Object] = {
+  implicit def toMap(cfg: ConfigObject): Map[String, Object] = {
     cfg.toConfig.entrySet().asScala.map({ entry =>
       entry.getKey -> entry.getValue.unwrapped()
     })(collection.breakOut)
   }
 
-  def toMap(cfg: Config): Map[String, Object] = {
+  implicit def toMap(cfg: Config): Map[String, Object] = {
     cfg.entrySet().asScala.map({ entry =>
       entry.getKey -> entry.getValue.unwrapped()
     })(collection.breakOut)
-  }
-
-  def loadExternalConfig(c: Config): Config = {
-    c.getOrElse[String]("application.config.location", s"/etc/hydra/$applicationName.conf")
-      .map(f => ConfigFactory.parseFile(new java.io.File(f)))
-      .valueOrThrow(err => err.configException)
   }
 }

@@ -87,7 +87,7 @@ trait KafkaConfigSupport extends ConfigSupport {
         val cfgObj = c.asInstanceOf[ConfigObject].toConfig
         val config = overrideProps.withFallback(kafkaConsumerFormats(topicFormat)).withFallback(cfgObj).atKey("kafka")
         val props = new Properties()
-        props.putAll(toMap(config.getObject("kafka")).asJava)
+        props.putAll(ConfigSupport.toMap(config.getObject("kafka")).asJava)
         props
       }
       case None => new Properties()

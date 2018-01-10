@@ -49,7 +49,7 @@ class JdbcTransport extends Transport with ConfigSupport with LoggingAdapter {
     applicationConfig.getOrElse[Config]("transports.jdbc.profiles", ConfigFactory.empty).map { cfg =>
       cfg.root().entrySet().asScala.foreach { e =>
         val props = new Properties
-        props.putAll(toMap(e.getValue.asInstanceOf[ConfigObject].toConfig).asJava)
+        props.putAll(ConfigSupport.toMap(e.getValue.asInstanceOf[ConfigObject].toConfig).asJava)
         dbProfiles.put(e.getKey, new DbProfile(e.getKey, props))
       }
     }
