@@ -15,8 +15,8 @@ class ClusterWatcher extends Actor {
 
   private[akka] var nodes = Set.empty[Member]
 
-  //for testing
-  def getNodes: Seq[Member] =nodes.toSeq
+  //for testing only
+  def getNodes: Seq[Member] = nodes.toSeq
 
 
   override def receive = {
@@ -35,7 +35,7 @@ class ClusterWatcher extends Actor {
     case GetNodesByRole(role) =>
       sender ! nodes.filter(_.hasRole(role)).map(_.address).toList
 
-    case _: MemberEvent ⇒ // ignore
+    case _: MemberEvent => // ignore
   }
 }
 
