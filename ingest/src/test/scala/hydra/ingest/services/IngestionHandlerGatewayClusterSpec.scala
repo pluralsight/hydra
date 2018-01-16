@@ -46,7 +46,6 @@ class IngestionHandlerGatewayClusterSpec extends TestKit(ActorSystem("hydra",
     }
   }, "ingestor_registry")
 
-
   val props = IngestionHandlerGateway.props(registry.path.toString)
 
   val gateway = system.actorOf(props)
