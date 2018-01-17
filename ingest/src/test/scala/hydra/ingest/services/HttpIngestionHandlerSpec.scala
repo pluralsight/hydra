@@ -2,6 +2,7 @@ package hydra.ingest.services
 
 import akka.actor.{Actor, ActorInitializationException, ActorSystem}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
+import akka.pattern.pipe
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import hydra.core.http.{HydraDirectives, ImperativeRequestContext}
 import hydra.core.ingest.{HydraRequest, IngestionReport, RequestParams}
@@ -13,6 +14,7 @@ import org.joda.time.DateTime
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 /**
@@ -31,7 +33,8 @@ class HttpIngestionHandlerSpec extends TestKit(ActorSystem("hydra")) with Matche
           sender ! InvalidRequest(new IllegalArgumentException)
         }
         else {
-          sender ! ValidRequest(TestRecordFactory.build(r).get)
+          val s = sender()
+          pipe(TestRecordFactory.build(r).map(ValidRequest(_))) to s
         }
       case Ingest(r, _) => sender ! IngestorCompleted
     }

@@ -18,35 +18,44 @@ package hydra.avro.resource
 import hydra.avro.registry.{RegistrySchemaResource, SchemaRegistryException}
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.slf4j.LoggerFactory
-import org.springframework.core.io.DefaultResourceLoader
+import org.springframework.core.io.ClassPathResource
 
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
-import scala.util.{Failure, Try}
 import scalacache._
 import scalacache.guava.GuavaCache
 
 /**
   * Created by alexsilva on 1/20/17.
   */
-class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient, suffix: String = "-value")
-  extends DefaultResourceLoader {
+
+/**
+  * We only support two location prefix: classpath and registry (or no prefix, which defaults
+  * to registry.)
+  *
+  * @param registryUrl
+  * @param registry
+  * @param suffix
+  */
+class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
+                           suffix: String = "-value") {
 
   import SchemaResourceLoader._
 
   implicit val cache = ScalaCache(GuavaCache())
 
-  override def getResource(location: String): SchemaResource = {
+  def retrieveSchema(location: String)(implicit ec: ExecutionContext): Future[SchemaResource] = {
     require(location ne null)
     val parts = location.split("\\:")
     parts match {
-      case Array(prefix, location) if prefix == REGISTRY_URL_PREFIX => retrieveSchema(location).get
-      case Array(prefix, location) => GenericSchemaResource(super.getResource(location))
-      case Array(subject) => retrieveSchema(subject).get
+      case Array(prefix, location) if prefix == REGISTRY_URL_PREFIX => fetchSchema(location)
+      case Array(prefix, location) => Future(GenericSchemaResource(new ClassPathResource(location)))
+      case Array(subject) => fetchSchema(subject)
       case _ => throw new IllegalArgumentException(s"Unable to parse location $location")
     }
   }
 
-  private def retrieveSchema(subject: String) = {
+  private def fetchSchema(subject: String)(implicit ec: ExecutionContext) = {
     val parts = subject.split("\\#")
     parts match {
       case Array(subject, version) => loadFromCache(subject.withSuffix, version)
@@ -54,30 +63,33 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient, 
     }
   }
 
-  private def getLatestSchema(subject: String): Try[RegistrySchemaResource] = {
-    sync.cachingWithTTL(subject)(5.minutes) {
-      Try(registry.getLatestSchemaMetadata(subject))
+  private def getLatestSchema(subject: String)
+                             (implicit ec: ExecutionContext): Future[RegistrySchemaResource] = {
+    cachingWithTTL(subject)(5.minutes) {
+      Future(registry.getLatestSchemaMetadata(subject))
         .map(md => registry.getByID(md.getId) -> md)
         .map(schema => RegistrySchemaResource(registryUrl, subject, schema._2.getId, schema._2.getVersion, schema._1))
         .recoverWith {
-          case e: Exception => Failure(SchemaRegistryException(e, subject))
+          case e: Exception => Future.failed(SchemaRegistryException(e, subject))
         }
     }
   }
 
-  private def loadFromCache(subject: String, version: String): Try[RegistrySchemaResource] = {
-    sync.cachingWithTTL(subject, version)(5.minutes) {
+  private def loadFromCache(subject: String, version: String)
+                           (implicit ec: ExecutionContext): Future[RegistrySchemaResource] = {
+    cachingWithTTL(subject, version)(5.minutes) {
       loadFromRegistry(subject, version)
     }
   }
 
-  private def loadFromRegistry(subject: String, version: String): Try[RegistrySchemaResource] = {
+  private def loadFromRegistry(subject: String, version: String)
+                              (implicit ec: ExecutionContext): Future[RegistrySchemaResource] = {
     log.debug(s"Loading schema $subject, version $version from schema registry $registryUrl.")
-    Try(version.toInt).map(v => registry.getSchemaMetadata(subject, v))
+    Future(version.toInt).map(v => registry.getSchemaMetadata(subject, v))
       .map(m => registry.getByID(m.getId) -> m)
       .map(schema => RegistrySchemaResource(registryUrl, subject, schema._2.getId(), version.toInt, schema._1))
       .recoverWith {
-        case e: Exception => Failure(SchemaRegistryException(e, subject))
+        case e: Exception => Future.failed(SchemaRegistryException(e, subject))
       }
   }
 

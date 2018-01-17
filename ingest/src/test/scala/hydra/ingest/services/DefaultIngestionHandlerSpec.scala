@@ -1,6 +1,7 @@
 package hydra.ingest.services
 
 import akka.actor.{Actor, ActorInitializationException, ActorSystem}
+import akka.pattern.pipe
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import hydra.common.util.ActorUtils
 import hydra.core.ingest.{HydraRequest, IngestionReport, RequestParams}
@@ -11,6 +12,8 @@ import hydra.ingest.test.{TestRecordFactory, TimeoutRecord}
 import org.joda.time.DateTime
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+
+import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
   * Created by alexsilva on 3/9/17.
@@ -23,7 +26,9 @@ class DefaultIngestionHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
   val ingestor = TestActorRef(new Actor {
     override def receive = {
       case Publish(_) => sender ! Join
-      case Validate(r) => sender ! ValidRequest(TestRecordFactory.build(r).get)
+      case Validate(r) =>
+        val s = sender()
+        pipe(TestRecordFactory.build(r).map(ValidRequest(_))) to s
       case Ingest(rec, _) =>
         val timeout = rec.isInstanceOf[TimeoutRecord]
         sender ! (if (!timeout) IngestorCompleted)

@@ -7,14 +7,20 @@ import hydra.core.ingest.HydraRequest
 import hydra.core.protocol._
 import hydra.core.transport.AckStrategy
 import hydra.sandbox.transport.FileRecord
-import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 class FileIngestorSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with Matchers with FunSpecLike
-  with ImplicitSender with ConfigSupport with BeforeAndAfterAll with Eventually {
+  with ImplicitSender
+  with ConfigSupport
+  with BeforeAndAfterAll
+  with Eventually
+  with ScalaFutures {
+
   val transportProbe = TestProbe()
 
   val fileProducer = system.actorOf(Props(new ForwardActor(transportProbe.ref)), "file_producer")
@@ -42,8 +48,7 @@ class FileIngestorSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with M
     it("validates") {
       val hr = HydraRequest("0", "test").withMetadata("hydra-file-stream" -> "test")
       ingestor ! Validate(hr)
-      expectMsg(ValidRequest(FileRecordFactory.build(hr).get))
-
+      whenReady(FileRecordFactory.build(hr)) { r => expectMsg(ValidRequest(r)) }
       val hr1 = HydraRequest("0", "test").withMetadata("hydra-file-stream" -> "unknown")
       ingestor ! Validate(hr1)
       expectMsgPF() {
@@ -62,8 +67,11 @@ class FileIngestorSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with M
 
     it("transports") {
       val hr = HydraRequest("0", "test").withMetadata("hydra-file-stream" -> "test")
-      ingestor ! Ingest(FileRecordFactory.build(hr).get, AckStrategy.NoAck)
-      transportProbe.expectMsg(10.seconds, Produce(FileRecord("test", "test"), self, AckStrategy.NoAck))
+      whenReady(FileRecordFactory.build(hr)) { r =>
+        ingestor ! Ingest(r, AckStrategy.NoAck)
+        transportProbe.expectMsg(10.seconds, Produce(FileRecord("test", "test"),
+          self, AckStrategy.NoAck))
+      }
     }
   }
 }

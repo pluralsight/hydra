@@ -19,43 +19,46 @@ import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.databind.ObjectMapper
 import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_KEY_PARAM}
 import hydra.core.ingest.{HydraRequest, InvalidRequestException}
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FunSpecLike, Matchers}
+
+import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
   * Created by alexsilva on 1/11/17.
   */
-class JsonRecordFactorySpec extends Matchers with FunSpecLike {
+class JsonRecordFactorySpec extends Matchers
+  with FunSpecLike
+  with ScalaFutures {
 
   describe("When using the JsonRecordFactory") {
     it("handles invalid json") {
       val request = HydraRequest("123","""{"name":test"}""")
       val rec = JsonRecordFactory.build(request)
-      val ex = rec.failed.get
-      ex shouldBe a[JsonParseException]
+      whenReady(rec.failed)(_ shouldBe a[JsonParseException])
     }
 
     it("handles valid json") {
       val request = HydraRequest("123","""{"name":"test"}""").withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = JsonRecordFactory.build(request)
       val node = new ObjectMapper().reader().readTree("""{"name":"test"}""")
-      rec.get shouldBe JsonRecord("test-topic", None, node)
+      whenReady(rec)(_ shouldBe JsonRecord("test-topic", None, node))
     }
 
     it("builds") {
       val request = HydraRequest("123", """{"name":"test"}""")
         .withMetadata(HYDRA_RECORD_KEY_PARAM -> "{$.name}")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      val msg = JsonRecordFactory.build(request).get
-      msg.destination shouldBe "test-topic"
-      msg.key shouldBe Some("test")
-      msg.payload shouldBe new ObjectMapper().reader().readTree("""{"name":"test"}""")
+      whenReady(JsonRecordFactory.build(request)) { msg =>
+        msg.destination shouldBe "test-topic"
+        msg.key shouldBe Some("test")
+        msg.payload shouldBe new ObjectMapper().reader().readTree("""{"name":"test"}""")
+      }
     }
 
     it("throws an error if no topic is in the request") {
       val request = HydraRequest("123","""{"name":"test"}""")
-      intercept[InvalidRequestException] {
-        JsonRecordFactory.build(request).get
-      }
+      whenReady(JsonRecordFactory.build(request).failed)(_ shouldBe a[InvalidRequestException])
     }
   }
 }

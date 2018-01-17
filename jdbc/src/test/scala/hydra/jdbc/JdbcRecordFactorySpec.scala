@@ -6,11 +6,13 @@ import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_SCHEMA_PARAM
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FunSpecLike, Matchers}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.io.Source
 
-class JdbcRecordFactorySpec extends Matchers with FunSpecLike {
+class JdbcRecordFactorySpec extends Matchers with FunSpecLike with ScalaFutures {
   val schemaPK = new Schema.Parser().parse(Source.fromResource("schemaPK.avsc").mkString)
   val schema = new Schema.Parser().parse(Source.fromResource("schema.avsc").mkString)
 
@@ -33,41 +35,36 @@ class JdbcRecordFactorySpec extends Matchers with FunSpecLike {
 
     it("throws an error if no schema is in the request metadata") {
       val req = HydraRequest("1", "test")
-      intercept[IllegalArgumentException] {
-        JdbcRecordFactory.build(req).get
-      }
+      whenReady(JdbcRecordFactory.build(req).failed)(_ shouldBe an[IllegalArgumentException])
     }
 
     it("throws an error if payload does not comply to schema") {
       val request = HydraRequest("123","""{"name":"test"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
-      intercept[JsonToAvroConversionExceptionWithMetadata] {
-        JdbcRecordFactory.build(request).get
-      }
+      whenReady(JdbcRecordFactory.build(request)
+        .failed)(_ shouldBe a[JsonToAvroConversionExceptionWithMetadata])
     }
 
     it("throws an error if payload if validation is strict") {
       val request = HydraRequest("123","""{"id":1, "field":2, "name":"test"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
-      intercept[JsonToAvroConversionExceptionWithMetadata] {
-        JdbcRecordFactory.build(request).get
-      }
+      whenReady(JdbcRecordFactory.build(request)
+        .failed)(_ shouldBe a[JsonToAvroConversionExceptionWithMetadata])
     }
 
     it("Uses the schema as the table name") {
       val request = HydraRequest("123","""{"id":1, "name":"test", "rank" : 1}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc", JdbcRecordFactory.DB_PROFILE_PARAM -> "table")
 
-      JdbcRecordFactory.build(request).get.destination shouldBe schema.getName
+      whenReady(JdbcRecordFactory.build(request))(_.destination shouldBe schema.getName)
 
     }
 
     it("throws an error if no db profile is present in the request") {
       val request = HydraRequest("123","""{"id":1, "name":"test", "rank" : 1}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc", JdbcRecordFactory.TABLE_PARAM -> "table")
-      intercept[IllegalArgumentException] {
-        JdbcRecordFactory.build(request).get
-      }
+      whenReady(JdbcRecordFactory.build(request)
+        .failed)(_ shouldBe an[IllegalArgumentException])
     }
 
     it("builds a record without a PK") {
@@ -75,20 +72,22 @@ class JdbcRecordFactorySpec extends Matchers with FunSpecLike {
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc",
           JdbcRecordFactory.TABLE_PARAM -> "table", JdbcRecordFactory.DB_PROFILE_PARAM -> "table")
 
-      val rec = JdbcRecordFactory.build(request).get
-      rec.destination shouldBe "table"
-      rec.key shouldBe Some(Seq.empty)
-      rec.payload shouldBe new JsonConverter[GenericRecord](schema).convert("""{"id":1, "name":"test", "rank" : 1}""")
+      whenReady(JdbcRecordFactory.build(request)) { rec =>
+        rec.destination shouldBe "table"
+        rec.key shouldBe Some(Seq.empty)
+        rec.payload shouldBe new JsonConverter[GenericRecord](schema).convert("""{"id":1, "name":"test", "rank" : 1}""")
+      }
     }
 
     it("builds a record with a PK") {
       val request = HydraRequest("123","""{"id":1, "name":"test", "rank" : 1}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schemaPK.avsc", JdbcRecordFactory.DB_PROFILE_PARAM -> "table")
 
-      val rec = JdbcRecordFactory.build(request).get
-      rec.destination shouldBe schemaPK.getName
-      rec.key shouldBe Some(Seq(schemaPK.getField("id")))
-      rec.payload shouldBe new JsonConverter[GenericRecord](schemaPK).convert("""{"id":1, "name":"test", "rank" : 1}""")
+      whenReady(JdbcRecordFactory.build(request)) { rec =>
+        rec.destination shouldBe schemaPK.getName
+        rec.key shouldBe Some(Seq(schemaPK.getField("id")))
+        rec.payload shouldBe new JsonConverter[GenericRecord](schemaPK).convert("""{"id":1, "name":"test", "rank" : 1}""")
+      }
     }
   }
 }

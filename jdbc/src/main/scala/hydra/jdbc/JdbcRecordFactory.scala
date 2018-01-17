@@ -13,7 +13,7 @@ import org.apache.avro.Schema
 import org.apache.avro.Schema.Field
 import org.apache.avro.generic.GenericRecord
 
-import scala.util.Try
+import scala.concurrent.{ExecutionContext, Future}
 
 object JdbcRecordFactory extends RecordFactory[Seq[Field], GenericRecord] with ConfigSupport {
 
@@ -25,20 +25,21 @@ object JdbcRecordFactory extends RecordFactory[Seq[Field], GenericRecord] with C
 
   val DB_PROFILE_PARAM = "hydra-db-profile"
 
-  lazy val schemaResourceLoader = new SchemaResourceLoader(schemaRegistry.registryUrl, schemaRegistry.registryClient)
+  lazy val schemaResourceLoader = new SchemaResourceLoader(schemaRegistry.registryUrl,
+    schemaRegistry.registryClient)
 
-  override def build(request: HydraRequest): Try[JdbcRecord] = {
-    val schemaResource: Try[SchemaResource] = Try {
+  override def build(request: HydraRequest)(implicit ec: ExecutionContext): Future[JdbcRecord] = {
+    val schemaResource: Future[SchemaResource] = {
       val subject = request.metadataValue(HYDRA_SCHEMA_PARAM)
         .getOrElse(throw new IllegalArgumentException(s"A schema name is required [${HYDRA_SCHEMA_PARAM}]."))
-      schemaResourceLoader.getResource(subject)
+      schemaResourceLoader.retrieveSchema(subject)
     }
 
     schemaResource.flatMap { s =>
       val converter = new JsonConverter[GenericRecord](s.schema, request.validationStrategy == Strict)
-      Try(converter.convert(request.payload))
+      Future(converter.convert(request.payload))
         .flatMap(rec => buildRecord(request, rec, s.schema))
-        .recoverWith { case ex => throw schemaResource.map(r => AvroUtils.improveException(ex, r)).getOrElse(ex) }
+        .recoverWith { case ex => Future.failed(AvroUtils.improveException(ex, s)) }
     }
   }
 
@@ -49,8 +50,9 @@ object JdbcRecordFactory extends RecordFactory[Seq[Field], GenericRecord] with C
     }
   }
 
-  private def buildRecord(request: HydraRequest, record: GenericRecord, schema: Schema): Try[JdbcRecord] = {
-    Try {
+  private def buildRecord(request: HydraRequest, record: GenericRecord, schema: Schema)
+                         (implicit ec: ExecutionContext): Future[JdbcRecord] = {
+    Future {
       val table = request.metadataValue(TABLE_PARAM).getOrElse(schema.getName)
 
       val dbProfile = request.metadataValue(DB_PROFILE_PARAM)

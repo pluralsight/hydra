@@ -4,6 +4,9 @@ import akka.actor.{Actor, OneForOneStrategy, SupervisorStrategy}
 import hydra.core.akka.InitializingActor
 import hydra.core.protocol._
 import hydra.core.transport.RecordFactory
+import akka.pattern.pipe
+
+import scala.concurrent.Future
 
 /**
   * Created by alexsilva on 12/1/15.
@@ -11,7 +14,7 @@ import hydra.core.transport.RecordFactory
 
 trait Ingestor extends InitializingActor {
 
-  //override def initTimeout = 2.seconds
+  private implicit val ec = context.dispatcher
 
   def recordFactory: RecordFactory[_, _]
 
@@ -21,7 +24,8 @@ trait Ingestor extends InitializingActor {
       sender ! Ignore
 
     case Validate(request) =>
-      sender ! validate(request)
+      val supervisor = sender
+      pipe(validate(request)) to supervisor
 
     case RecordProduced(_, sup) =>
       sup ! IngestorCompleted
@@ -33,9 +37,9 @@ trait Ingestor extends InitializingActor {
       supervisor ! IngestorError(error)
   }
 
-  def validate(request: HydraRequest): MessageValidationResult = {
+  def validate(request: HydraRequest): Future[MessageValidationResult] = {
     recordFactory.build(request).map(ValidRequest(_))
-      .recover { case e => InvalidRequest(e) }.get
+      .recover { case e => InvalidRequest(e) }
   }
 
   override def initializationError(ex: Throwable): Receive = {

@@ -21,12 +21,13 @@ import hydra.core.ingest.HydraRequest
 import hydra.core.transport.{HydraRecord, RecordFactory, RecordMetadata}
 import hydra.rabbit.RabbitRecord.{DESTINATION_TYPE_EXCHANGE, DESTINATION_TYPE_QUEUE, HYDRA_RABBIT_EXCHANGE, HYDRA_RABBIT_QUEUE}
 
-import scala.util.Try
+import scala.concurrent.{ExecutionContext, Future}
 
 object RabbitRecordFactory extends RecordFactory[String, String] with ConfigSupport {
-  override def build(request: HydraRequest): Try[RabbitRecord] = {
-    val props = Seq(request.metadataValue(HYDRA_RABBIT_EXCHANGE), request.metadataValue(HYDRA_RABBIT_QUEUE)).flatten
-    Try {
+  override def build(request: HydraRequest)(implicit ec: ExecutionContext): Future[RabbitRecord] = {
+    val props = Seq(request.metadataValue(HYDRA_RABBIT_EXCHANGE),
+      request.metadataValue(HYDRA_RABBIT_QUEUE)).flatten
+    Future {
       require(props.length == 1, "A single parameter for exchange or queue is required")
       val destination = request.metadataValue(HYDRA_RABBIT_EXCHANGE) match {
         case Some(exchange) => (exchange, DESTINATION_TYPE_EXCHANGE)

@@ -9,15 +9,23 @@ import hydra.core.transport.AckStrategy
 import hydra.ingest.IngestorInfo
 import hydra.ingest.test.{TestRecordFactory, TimeoutRecord}
 import org.joda.time.DateTime
+import akka.pattern.pipe
+import org.scalatest.concurrent.ScalaFutures
+
+import scala.concurrent.ExecutionContext.Implicits.global
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FunSpecLike, Matchers}
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
   * Created by alexsilva on 3/9/17.
   */
 class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike
-  with ImplicitSender with BeforeAndAfterAll with BeforeAndAfterEach {
+  with ImplicitSender
+  with BeforeAndAfterAll
+  with BeforeAndAfterEach
+  with ScalaFutures {
 
   override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10 seconds)
 
@@ -48,8 +56,13 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
         sender.tell(getPublishMsg(req), ingestor.ref)
         TestActor.KeepRunning
       case Validate(req) =>
-        val reply = if (req.metadataValueEquals("invalid", "true")) InvalidRequest(except) else ValidRequest(TestRecordFactory.build(req).get)
-        sender.tell(reply, ingestor.ref)
+        val s = sender
+        val reply = if (req.metadataValueEquals("invalid", "true")) {
+          Future.successful(InvalidRequest(except))
+        } else {
+          TestRecordFactory.build(req).map(ValidRequest(_))
+        }
+        pipe(reply).to(s, ingestor.ref)
         TestActor.KeepRunning
       case Ingest(rec, _) =>
         val timeout = rec.isInstanceOf[TimeoutRecord]
@@ -74,7 +87,9 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
         requestor.ref, ingestors, 1.second), "sup")
       ingestor.expectMsg(Publish(ingestorRequest))
       ingestor.expectMsg(Validate(ingestorRequest))
-      ingestor.expectMsg(Ingest(TestRecordFactory.build(ingestorRequest).get, AckStrategy.NoAck))
+      whenReady(TestRecordFactory.build(ingestorRequest))(r =>
+        ingestor.expectMsg(Ingest(r, AckStrategy.NoAck)))
+
       requestor.expectMsgPF() {
         case i: IngestionReport =>
           i.statusCode shouldBe 200
@@ -107,7 +122,8 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
       system.actorOf(IngestionSupervisor.props(req, self, ingestors, 1.second), "sup")
       ingestor.expectMsg(Publish(req))
       ingestor.expectMsg(Validate(req))
-      ingestor.expectMsg(Ingest(TestRecordFactory.build(req).get, AckStrategy.NoAck))
+      whenReady(TestRecordFactory.build(ingestorRequest))(r =>
+        ingestor.expectMsg(Ingest(r, AckStrategy.NoAck)))
       expectMsgPF() {
         case i: IngestionReport =>
           i.statusCode shouldBe 408

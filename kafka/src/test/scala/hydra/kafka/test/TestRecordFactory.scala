@@ -3,16 +3,16 @@ package hydra.kafka.test
 import hydra.core.ingest.HydraRequest
 import hydra.core.transport.{HydraRecord, RecordFactory}
 
-import scala.util.Success
+import scala.concurrent.{ExecutionContext, Future}
 
 object TestRecordFactory extends RecordFactory[String, String] {
-  override def build(r: HydraRequest) = {
+  override def build(r: HydraRequest)(implicit ec:ExecutionContext) = {
     val timeout = r.metadataValueEquals("timeout", "true")
     if (timeout) {
-      Success(TimeoutRecord("test-topic", Some(r.correlationId.toString), r.payload))
+      Future.successful(TimeoutRecord("test-topic", Some(r.correlationId.toString), r.payload))
     }
     else {
-      Success(TestRecord("test-topic", Some(r.correlationId.toString), r.payload))
+      Future.successful(TestRecord("test-topic", Some(r.correlationId.toString), r.payload))
     }
   }
 }

@@ -23,14 +23,18 @@ import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_FO
 import hydra.core.protocol.InvalidRequest
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecordBuilder
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FunSpecLike, Matchers}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.io.Source
 
 /**
   * Created by alexsilva on 1/11/17.
   */
-class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
+class KafkaRecordFactoriesSpec extends Matchers
+  with FunSpecLike
+  with ScalaFutures {
 
   describe("When using KafkaRecordFactories") {
     it("handles avro") {
@@ -42,7 +46,7 @@ class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
       val avroSchema = new Schema.Parser().parse(Source.fromResource("schema.avsc").mkString)
       val genericRecord = new GenericRecordBuilder(avroSchema).set("name", "test").set("rank", 10).build()
 
-      record.get shouldBe AvroRecord("test-topic", avroSchema, None, genericRecord)
+      whenReady(record)(_ shouldBe AvroRecord("test-topic", avroSchema, None, genericRecord))
     }
 
     it("handles json") {
@@ -52,7 +56,8 @@ class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "json")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = KafkaRecordFactories.build(request)
-      record.get shouldBe JsonRecord("test-topic", None, new ObjectMapper().reader().readTree(json))
+      whenReady(record)(_ shouldBe JsonRecord("test-topic", None,
+        new ObjectMapper().reader().readTree(json)))
     }
 
     it("handles strings") {
@@ -62,23 +67,23 @@ class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "string")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = KafkaRecordFactories.build(request)
-      record.get shouldBe StringRecord("test-topic", None, json)
+      whenReady(record)(_ shouldBe StringRecord("test-topic", None, json))
     }
 
     it("validates json records") {
       val request = HydraRequest("123","""{"name":"test"}""")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "json")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      val validation = KafkaRecordFactories.build(request)
-      validation.get shouldBe a[JsonRecord]
+      val record = KafkaRecordFactories.build(request)
+      whenReady(record)(_ shouldBe a[JsonRecord])
     }
 
     it("validates string records") {
       val request = HydraRequest("123","""{"name":"test"}""")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "string")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      val validation = KafkaRecordFactories.build(request)
-      validation.get shouldBe a[StringRecord]
+      val record = KafkaRecordFactories.build(request)
+      whenReady(record)(_ shouldBe a[StringRecord])
     }
 
     it("validates avro records") {
@@ -88,8 +93,8 @@ class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
       val request = HydraRequest("123", json)
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      val validation = AvroRecordFactory.build(request)
-      validation.get shouldBe a[AvroRecord]
+      val record = AvroRecordFactory.build(request)
+      whenReady(record)(_ shouldBe a[AvroRecord])
     }
 
     it("invalidates unknown formats") {
@@ -97,7 +102,7 @@ class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "unknown-format")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val validation = KafkaRecordFactories.build(request)
-      validation shouldBe InvalidRequest(_: IllegalArgumentException)
+      whenReady(validation)(ex => ex shouldBe InvalidRequest(_: IllegalArgumentException))
     }
 
 
@@ -107,9 +112,7 @@ class KafkaRecordFactoriesSpec extends Matchers with FunSpecLike {
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "unknown")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      intercept[IllegalArgumentException] {
-        KafkaRecordFactories.build(request).get
-      }
+      whenReady(KafkaRecordFactories.build(request))(_ shouldBe an[IllegalArgumentException])
     }
   }
 }

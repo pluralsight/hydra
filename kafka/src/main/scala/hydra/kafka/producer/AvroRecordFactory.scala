@@ -17,7 +17,7 @@ package hydra.kafka.producer
 
 import com.pluralsight.hydra.avro.JsonConverter
 import hydra.avro.registry.ConfluentSchemaRegistry
-import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
+import hydra.avro.resource.SchemaResourceLoader
 import hydra.avro.util.AvroUtils
 import hydra.common.config.ConfigSupport
 import hydra.core.ingest.{HydraRequest, RequestParams}
@@ -25,6 +25,7 @@ import hydra.core.transport.ValidationStrategy.Strict
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
 
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 /**
@@ -37,18 +38,18 @@ object AvroRecordFactory extends KafkaRecordFactory[String, GenericRecord] with 
   lazy val schemaResourceLoader = new SchemaResourceLoader(schemaRegistry.registryUrl, schemaRegistry.registryClient)
 
 
-  override def build(request: HydraRequest): Try[AvroRecord] = {
-    val schemaResource: Try[SchemaResource] = Try(schemaResourceLoader.getResource(getSubject(request)))
-    schemaResource.flatMap { s =>
+  override def build(request: HydraRequest)(implicit ec: ExecutionContext): Future[AvroRecord] = {
+    val schemaResource = schemaResourceLoader.retrieveSchema(getSubject(request))
+    schemaResource.map { s =>
       val strict = request.validationStrategy == Strict
       val converter = new JsonConverter[GenericRecord](s.schema, strict)
       Try(converter.convert(request.payload))
         .map(rec => buildRecord(request, rec, s.schema))
-        .recover { case ex => throw schemaResource.map(r => AvroUtils.improveException(ex, r)).getOrElse(ex) }
+        .recover { case ex => throw AvroUtils.improveException(ex, s) }.get
     }
   }
 
-  private def buildRecord(request: HydraRequest, rec: GenericRecord, schema: Schema) = {
+  private def buildRecord(request: HydraRequest, rec: GenericRecord, schema: Schema): AvroRecord = {
     AvroRecord(getTopic(request), schema, getKey(request), rec)
   }
 

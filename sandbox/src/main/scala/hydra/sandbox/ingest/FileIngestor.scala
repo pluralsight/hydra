@@ -7,7 +7,7 @@ import hydra.core.protocol._
 import hydra.core.transport.{HydraRecord, RecordFactory}
 import hydra.sandbox.transport.FileRecord
 
-import scala.util.{Failure, Success, Try}
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * A simple example transport that writes all requests to a log, as configured by the application.
@@ -32,13 +32,15 @@ object FileRecordFactory extends RecordFactory[String, String] with ConfigSuppor
 
   import configs.syntax._
 
+  private type REC = HydraRecord[String, String]
 
   private val destinations = ConfigSupport.toMap(applicationConfig
     .getOrElse[Config]("transports.file.destinations", ConfigFactory.empty).value)
 
-  override def build(r: HydraRequest): Try[HydraRecord[String, String]] = {
+  override def build(r: HydraRequest)(implicit ec: ExecutionContext): Future[REC] = {
     val file = r.metadataValue("hydra-file-stream").get
-    destinations.get(file).map(_ => Success(FileRecord(r.metadataValue("hydra-file-stream").get, r.payload)))
-      .getOrElse(Failure(new IllegalArgumentException(s"No file stream with id $file was configured.")))
+    destinations.get(file)
+      .map(_ => Future.successful(FileRecord(r.metadataValue("hydra-file-stream").get, r.payload)))
+      .getOrElse(Future.failed(new IllegalArgumentException(s"No file stream with id $file was configured.")))
   }
 }

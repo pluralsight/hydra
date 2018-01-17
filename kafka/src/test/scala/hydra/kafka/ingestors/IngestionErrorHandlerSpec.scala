@@ -13,6 +13,7 @@ import hydra.core.protocol.HydraIngestionError
 import hydra.core.transport.TransportSupervisor.Deliver
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecordBuilder
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 import org.springframework.core.io.ClassPathResource
 
@@ -24,7 +25,10 @@ import scala.io.Source
   * Created by alexsilva on 11/18/16.
   */
 class IngestionErrorHandlerSpec extends TestKit(ActorSystem("hydra-test")) with Matchers with FunSpecLike
-  with ImplicitSender with ConfigSupport with BeforeAndAfterAll {
+  with ImplicitSender
+  with ConfigSupport
+  with BeforeAndAfterAll
+  with ScalaFutures {
 
   val probe = TestProbe()
 
@@ -40,19 +44,21 @@ class IngestionErrorHandlerSpec extends TestKit(ActorSystem("hydra-test")) with 
   describe("When using the kafka ingestion error handler") {
     it("builds an avro record") {
       val err = HydraIngestionError("test", new IllegalArgumentException("test-exception"), request)
-      val record = handlerRef.underlyingActor.buildPayload(err)
-      record.key shouldBe Some("topic")
-      record.payload shouldBe toGenericRecord(err).build()
-      record.destination shouldBe "__hydra_ingest_errors"
+      whenReady(handlerRef.underlyingActor.buildPayload(err)) { record =>
+        record.key shouldBe Some("topic")
+        record.payload shouldBe toGenericRecord(err).build()
+        record.destination shouldBe "__hydra_ingest_errors"
+      }
     }
 
     it("includes the schema if available from the exception") {
       val err = HydraIngestionError("test", new JsonToAvroConversionException("test-exception", "field", schema),
         request)
-      val record = handlerRef.underlyingActor.buildPayload(err)
-      record.key shouldBe Some("topic")
-      record.payload shouldBe toGenericRecord(err).set("schema", schema.toString).build()
-      record.destination shouldBe "__hydra_ingest_errors"
+      whenReady(handlerRef.underlyingActor.buildPayload(err)) { record =>
+        record.key shouldBe Some("topic")
+        record.payload shouldBe toGenericRecord(err).set("schema", schema.toString).build()
+        record.destination shouldBe "__hydra_ingest_errors"
+      }
     }
 
     it("includes the schema metadata if available from the exception") {
@@ -60,16 +66,17 @@ class IngestionErrorHandlerSpec extends TestKit(ActorSystem("hydra-test")) with 
       val res = new GenericSchemaResource(new ClassPathResource("schemas/HydraIngestError.avsc"))
       val except = new JsonToAvroConversionExceptionWithMetadata(cause, res)
       val err = HydraIngestionError("test", except, request)
-      val record = handlerRef.underlyingActor.buildPayload(err)
-      record.key shouldBe Some("topic")
-      record.payload shouldBe toGenericRecord(err).set("schema", "HydraIngestError.avsc").build()
-      record.destination shouldBe "__hydra_ingest_errors"
+      whenReady(handlerRef.underlyingActor.buildPayload(err)) { record =>
+        record.key shouldBe Some("topic")
+        record.payload shouldBe toGenericRecord(err).set("schema", "HydraIngestError.avsc").build()
+        record.destination shouldBe "__hydra_ingest_errors"
+      }
     }
 
     it("publishes to Kafka") {
       val err = HydraIngestionError("test", new JsonToAvroConversionException("test", "field", schema), request)
       handlerRef ! err
-      probe.expectMsgType[Deliver[_,_]](10.seconds)
+      probe.expectMsgType[Deliver[_, _]](10.seconds)
     }
 
   }

@@ -16,14 +16,17 @@ import hydra.kafka.test.TestRecordFactory
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Parser
 import org.apache.avro.generic.GenericRecordBuilder
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
   * Created by alexsilva on 11/18/16.
   */
 class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers with FunSpecLike
-  with ImplicitSender with ConfigSupport with BeforeAndAfterAll {
+  with ImplicitSender with ConfigSupport with BeforeAndAfterAll
+  with ScalaFutures {
 
   override def afterAll = TestKit.shutdownActorSystem(system)
 
@@ -82,8 +85,10 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
         """{"first":"Roar","last":"King"}""",
         Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema")
       )
-      kafkaIngestor ! Ingest(TestRecordFactory.build(request).get, NoAck)
-      probe.expectMsg(Produce(TestRecordFactory.build(request).get, self, NoAck))
+      whenReady(TestRecordFactory.build(request)) { record =>
+        kafkaIngestor ! Ingest(record, NoAck)
+        probe.expectMsg(Produce(record, self, NoAck))
+      }
     }
   }
 
