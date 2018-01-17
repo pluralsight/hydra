@@ -22,9 +22,10 @@ import hydra.avro.registry.SchemaRegistryException
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
 import org.apache.avro.Schema.Parser
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
-import scala.concurrent.ExecutionContext.Implicits.global
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.io.Source
 
 /**
@@ -35,8 +36,13 @@ class SchemaResourceLoaderSpec extends Matchers
   with BeforeAndAfterAll
   with ScalaFutures {
 
+  implicit override val patienceConfig =
+    PatienceConfig(timeout = scaled(Span(1, Seconds)), interval = scaled(Span(10, Millis)))
+
+
   val client = new MockSchemaRegistryClient
-  val testSchema = Thread.currentThread().getContextClassLoader.getResource("schema.avsc").getFile
+  val testSchema = Thread.currentThread().getContextClassLoader
+    .getResource("resource-loader-spec.avsc").getFile
 
   override def beforeAll() = {
     client.register("test-value", new Parser().parse(new File(testSchema)))
@@ -48,7 +54,7 @@ class SchemaResourceLoaderSpec extends Matchers
       val res = loader.retrieveSchema("registry:test-value")
       whenReady(res) { schema =>
         schema.exists() shouldBe true
-        schema.getURL shouldBe new URL("http://mock/ids/1")
+        schema.getURL shouldBe new URL("http://mock/schemas/ids/1")
         schema.isReadable shouldBe true
         new Parser().parse(Source.fromInputStream(schema.getInputStream).mkString) shouldBe
           new Parser().parse(Source.fromFile(testSchema).mkString)
@@ -60,7 +66,7 @@ class SchemaResourceLoaderSpec extends Matchers
       val res = loader.retrieveSchema("registry:test-value#1")
       whenReady(res) { schema =>
         schema.exists() shouldBe true
-        schema.getURL shouldBe new URL("http://mock/ids/1")
+        schema.getURL shouldBe new URL("http://mock/schemas/ids/1")
         schema.isReadable shouldBe true
         new Parser().parse(Source.fromInputStream(schema.getInputStream).mkString) shouldBe
           new Parser().parse(Source.fromFile(testSchema).mkString)
@@ -77,7 +83,7 @@ class SchemaResourceLoaderSpec extends Matchers
       val loader = new SchemaResourceLoader("http://mock", client)
       whenReady(loader.retrieveSchema("test-value#1")) { res =>
         res.exists() shouldBe true
-        res.getURL shouldBe new URL("http://mock/ids/1")
+        res.getURL shouldBe new URL("http://mock/schemas/ids/1")
         res.isReadable shouldBe true
         new Parser().parse(Source.fromInputStream(res.getInputStream).mkString) shouldBe
           new Parser().parse(Source.fromFile(testSchema).mkString)
@@ -86,7 +92,7 @@ class SchemaResourceLoaderSpec extends Matchers
 
     it("understands classpath resources") {
       val loader = new SchemaResourceLoader("http://mock", client)
-      whenReady(loader.retrieveSchema("classpath:schema.avsc")) { res =>
+      whenReady(loader.retrieveSchema("classpath:resource-loader-spec.avsc")) { res =>
         res.exists() shouldBe true
         res.isReadable shouldBe true
         new Parser().parse(Source.fromInputStream(res.getInputStream).mkString) shouldBe
@@ -105,7 +111,7 @@ class SchemaResourceLoaderSpec extends Matchers
       val loader = new SchemaResourceLoader("http://mock", client)
       whenReady(loader.retrieveSchema("test#1")) { res =>
         res.exists() shouldBe true
-        res.getURL shouldBe new URL("http://mock/ids/1")
+        res.getURL shouldBe new URL("http://mock/schemas/ids/1")
         res.isReadable shouldBe true
         new Parser().parse(Source.fromInputStream(res.getInputStream).mkString) shouldBe
           new Parser().parse(Source.fromFile(testSchema).mkString)

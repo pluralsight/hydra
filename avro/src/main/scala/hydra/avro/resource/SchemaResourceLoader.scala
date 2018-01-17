@@ -18,10 +18,10 @@ package hydra.avro.resource
 import hydra.avro.registry.{RegistrySchemaResource, SchemaRegistryException}
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.slf4j.LoggerFactory
-import org.springframework.core.io.ClassPathResource
+import org.springframework.core.io.DefaultResourceLoader
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 import scalacache._
 import scalacache.guava.GuavaCache
 
@@ -44,12 +44,15 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
 
   implicit val cache = ScalaCache(GuavaCache())
 
+  private val loader = new DefaultResourceLoader()
+
   def retrieveSchema(location: String)(implicit ec: ExecutionContext): Future[SchemaResource] = {
     require(location ne null)
+
     val parts = location.split("\\:")
     parts match {
       case Array(prefix, location) if prefix == REGISTRY_URL_PREFIX => fetchSchema(location)
-      case Array(prefix, location) => Future(GenericSchemaResource(new ClassPathResource(location)))
+      case Array(prefix, location) => Future(GenericSchemaResource(loader.getResource(location)))
       case Array(subject) => fetchSchema(subject)
       case _ => throw new IllegalArgumentException(s"Unable to parse location $location")
     }

@@ -11,6 +11,7 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike with BeforeAndAfterAll
   with ImplicitSender {
@@ -47,6 +48,14 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
 
     it("handle errors by restarting") {
       system.actorOf(Props(classOf[TestIngestor], true, false)) ! "error"
+    }
+
+    it("allows for custom validation") {
+      val ing = system.actorOf(Props(classOf[TestIngestor], true, false))
+      ing ! Validate(HydraRequest("1", "test").withMetadata("invalid" -> "true"))
+      expectMsgType[InvalidRequest]
+      ing ! Validate(HydraRequest("1", "test"))
+      expectMsg(ValidRequest(TestRecord("test-topic", Some("1"), "test")))
     }
 
     it("calls the default init method") {
@@ -121,5 +130,9 @@ class TestIngestor(completeInit: Boolean, delayInit: Boolean) extends Ingestor {
   ingest {
     case "hello" => sender ! "hi!"
     case "error" => throw new RuntimeException("ERROR!")
+  }
+
+  override def validateRequest(request: HydraRequest): Try[HydraRequest] = {
+    if (request.hasMetadata("invalid")) Failure(new IllegalArgumentException) else Success(request)
   }
 }

@@ -33,8 +33,7 @@ class HttpIngestionHandlerSpec extends TestKit(ActorSystem("hydra")) with Matche
           sender ! InvalidRequest(new IllegalArgumentException)
         }
         else {
-          val s = sender()
-          pipe(TestRecordFactory.build(r).map(ValidRequest(_))) to s
+          TestRecordFactory.build(r).map(ValidRequest(_)) pipeTo sender
         }
       case Ingest(r, _) => sender ! IngestorCompleted
     }

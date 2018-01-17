@@ -29,21 +29,25 @@ object JdbcRecordFactory extends RecordFactory[Seq[Field], GenericRecord] with C
     schemaRegistry.registryClient)
 
   override def build(request: HydraRequest)(implicit ec: ExecutionContext): Future[JdbcRecord] = {
-    val schemaResource: Future[SchemaResource] = {
-      val subject = request.metadataValue(HYDRA_SCHEMA_PARAM)
-        .getOrElse(throw new IllegalArgumentException(s"A schema name is required [${HYDRA_SCHEMA_PARAM}]."))
-      schemaResourceLoader.retrieveSchema(subject)
+
+    val schemaResource: Future[SchemaResource] = request.metadataValue(HYDRA_SCHEMA_PARAM) match {
+      case Some(subject) => schemaResourceLoader.retrieveSchema(subject)
+      case None => Future.failed(new
+          IllegalArgumentException(s"A schema name is required [${HYDRA_SCHEMA_PARAM}]."))
     }
 
     schemaResource.flatMap { s =>
-      val converter = new JsonConverter[GenericRecord](s.schema, request.validationStrategy == Strict)
+      val converter = new JsonConverter[GenericRecord](s.schema,
+        request.validationStrategy == Strict)
       Future(converter.convert(request.payload))
         .flatMap(rec => buildRecord(request, rec, s.schema))
         .recoverWith { case ex => Future.failed(AvroUtils.improveException(ex, s)) }
     }
   }
 
-  private[jdbc] def pk(request: HydraRequest, schema: Schema): Seq[Field] = {
+  private[jdbc] def pk(request: HydraRequest, schema: Schema): Seq[Field]
+
+  = {
     request.metadataValue(PRIMARY_KEY_PARAM).map(_.split(",")) match {
       case Some(ids) => ids.map(AvroUtils.getField(_, schema))
       case None => AvroUtils.getPrimaryKeys(schema)
@@ -51,7 +55,9 @@ object JdbcRecordFactory extends RecordFactory[Seq[Field], GenericRecord] with C
   }
 
   private def buildRecord(request: HydraRequest, record: GenericRecord, schema: Schema)
-                         (implicit ec: ExecutionContext): Future[JdbcRecord] = {
+                         (implicit ec: ExecutionContext): Future[JdbcRecord]
+
+  = {
     Future {
       val table = request.metadataValue(TABLE_PARAM).getOrElse(schema.getName)
 
@@ -72,4 +78,4 @@ object JdbcRecordFactory extends RecordFactory[Seq[Field], GenericRecord] with C
 case class JdbcRecord(destination: String, key: Option[Seq[Field]], payload: GenericRecord, dbProfile: String)
   extends HydraRecord[Seq[Field], GenericRecord]
 
-case class JdbcRecordMetadata(table:String, timestamp: Long = System.currentTimeMillis) extends RecordMetadata
+case class JdbcRecordMetadata(table: String, timestamp: Long = System.currentTimeMillis) extends RecordMetadata

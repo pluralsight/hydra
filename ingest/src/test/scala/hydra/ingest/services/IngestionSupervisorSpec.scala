@@ -62,7 +62,7 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
         } else {
           TestRecordFactory.build(req).map(ValidRequest(_))
         }
-        pipe(reply).to(s, ingestor.ref)
+        reply.pipeTo(s)(ingestor.ref)
         TestActor.KeepRunning
       case Ingest(rec, _) =>
         val timeout = rec.isInstanceOf[TimeoutRecord]
@@ -122,7 +122,7 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
       system.actorOf(IngestionSupervisor.props(req, self, ingestors, 1.second), "sup")
       ingestor.expectMsg(Publish(req))
       ingestor.expectMsg(Validate(req))
-      whenReady(TestRecordFactory.build(ingestorRequest))(r =>
+      whenReady(TestRecordFactory.build(req))(r =>
         ingestor.expectMsg(Ingest(r, AckStrategy.NoAck)))
       expectMsgPF() {
         case i: IngestionReport =>

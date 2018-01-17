@@ -21,6 +21,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FunSpecLike, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 
 /**
   * Created by alexsilva on 1/11/17.
@@ -29,6 +30,10 @@ class StringRecordFactorySpec extends Matchers
   with FunSpecLike
   with ScalaFutures {
 
+  override implicit val patienceConfig = PatienceConfig(
+    timeout = scaled(1000 millis),
+    interval = scaled(100 millis)
+  )
   describe("When using the StringRecordFactory") {
 
     it("handles valid strings") {
@@ -50,7 +55,7 @@ class StringRecordFactorySpec extends Matchers
 
     it("throws an error if no topic is in the request") {
       val request = HydraRequest("123","""{"name":test"}""")
-      whenReady(StringRecordFactory.build(request))(_ shouldBe an[InvalidRequestException])
+      whenReady(StringRecordFactory.build(request).failed)(_ shouldBe an[InvalidRequestException])
     }
   }
 }

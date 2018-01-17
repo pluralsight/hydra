@@ -10,7 +10,9 @@ import hydra.core.transport.AckStrategy.NoAck
 import hydra.core.transport.HydraRecord
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
-class JdbcIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers with FunSpecLike with ImplicitSender
+class JdbcIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
+  with FunSpecLike
+  with ImplicitSender
   with BeforeAndAfterAll {
 
   val ingestor = system.actorOf(Props[JdbcIngestor])
@@ -35,20 +37,20 @@ class JdbcIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers 
     }
 
     it("validates") {
-      val r = HydraRequest("123", "someString").withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc",
+      val r = HydraRequest("123", "someString").withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:jdbc-test.avsc",
         JdbcRecordFactory.TABLE_PARAM -> "table")
       ingestor ! Validate(r)
       expectMsgType[InvalidRequest]
 
       val request = HydraRequest("123","""{"id":1, "name":"test", "rank" : 1}""")
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc",
+        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:jdbc-test.avsc",
           JdbcRecordFactory.TABLE_PARAM -> "table", JdbcRecordFactory.DB_PROFILE_PARAM -> "profile")
 
       ingestor ! Validate(request)
       expectMsgType[InvalidRequest]
 
       val r2 = HydraRequest("123","""{"id":1, "name":"test", "rank" : 1}""")
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc",
+        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:jdbc-test.avsc",
           JdbcRecordFactory.TABLE_PARAM -> "table", JdbcRecordFactory.DB_PROFILE_PARAM -> "test-dsprofile")
       ingestor ! Validate(r2)
       expectMsgPF() {

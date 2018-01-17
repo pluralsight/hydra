@@ -28,6 +28,7 @@ import org.scalatest.{FunSpecLike, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.io.Source
+import scala.concurrent.duration._
 
 /**
   * Created by alexsilva on 1/11/17.
@@ -36,14 +37,19 @@ class KafkaRecordFactoriesSpec extends Matchers
   with FunSpecLike
   with ScalaFutures {
 
+  override implicit val patienceConfig = PatienceConfig(
+    timeout = scaled(200 millis),
+    interval = scaled(100 millis)
+  )
+
   describe("When using KafkaRecordFactories") {
     it("handles avro") {
       val json = """{"name":"test", "rank":10}"""
       val request = HydraRequest("123", json)
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
+        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:kafka-factories-test.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = KafkaRecordFactories.build(request)
-      val avroSchema = new Schema.Parser().parse(Source.fromResource("schema.avsc").mkString)
+      val avroSchema = new Schema.Parser().parse(Source.fromResource("kafka-factories-test.avsc").mkString)
       val genericRecord = new GenericRecordBuilder(avroSchema).set("name", "test").set("rank", 10).build()
 
       whenReady(record)(_ shouldBe AvroRecord("test-topic", avroSchema, None, genericRecord))
@@ -52,7 +58,7 @@ class KafkaRecordFactoriesSpec extends Matchers
     it("handles json") {
       val json = """{"name":"test", "rank":10}"""
       val request = HydraRequest("123", json)
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
+        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:kafka-factories-test.avsc")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "json")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = KafkaRecordFactories.build(request)
@@ -63,7 +69,7 @@ class KafkaRecordFactoriesSpec extends Matchers
     it("handles strings") {
       val json = """{"name":"test", "rank":10}"""
       val request = HydraRequest("123", json)
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
+        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:kafka-factories-test.avsc")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "string")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = KafkaRecordFactories.build(request)
@@ -87,11 +93,11 @@ class KafkaRecordFactoriesSpec extends Matchers
     }
 
     it("validates avro records") {
-      val schema = Thread.currentThread().getContextClassLoader.getResource("schema.avsc").getFile
+      val schema = Thread.currentThread().getContextClassLoader.getResource("kafka-factories-test.avsc").getFile
       val avroSchema = new Schema.Parser().parse(new File(schema))
       val json = """{"name":"test", "rank":10}"""
       val request = HydraRequest("123", json)
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
+        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:kafka-factories-test.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = AvroRecordFactory.build(request)
       whenReady(record)(_ shouldBe a[AvroRecord])
@@ -101,18 +107,17 @@ class KafkaRecordFactoriesSpec extends Matchers
       val request = HydraRequest("123","""{"name":"test"}""")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "unknown-format")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      val validation = KafkaRecordFactories.build(request)
-      whenReady(validation)(ex => ex shouldBe InvalidRequest(_: IllegalArgumentException))
+      val rec = KafkaRecordFactories.build(request)
+      whenReady(rec.failed)(ex => ex shouldBe InvalidRequest(_: IllegalArgumentException))
     }
-
 
     it("throws error with unknown formats") {
       val json = """{"name":"test", "rank":10}"""
       val request = HydraRequest("123", json)
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schema.avsc")
+        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:kafka-factories-test.avsc")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "unknown")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      whenReady(KafkaRecordFactories.build(request))(_ shouldBe an[IllegalArgumentException])
+      whenReady(KafkaRecordFactories.build(request).failed)(_ shouldBe an[IllegalArgumentException])
     }
   }
 }

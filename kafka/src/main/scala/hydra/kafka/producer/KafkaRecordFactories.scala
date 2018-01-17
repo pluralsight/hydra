@@ -26,7 +26,10 @@ object KafkaRecordFactories extends RecordFactory[Any, Any] {
 
   override def build(request: HydraRequest)
                     (implicit ec: ExecutionContext): Future[HydraRecord[_, _]] = {
-    factoryFor(request).map(_.build(request)).get
+    factoryFor(request) match {
+      case Success(factory) => factory.build(request)
+      case Failure(ex) => Future.failed(ex)
+    }
   }
 }
 

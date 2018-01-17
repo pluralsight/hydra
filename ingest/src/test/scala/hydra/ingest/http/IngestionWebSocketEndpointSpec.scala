@@ -28,8 +28,7 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
     override def receive = {
       case Publish(_) => sender ! Join
       case Validate(r) =>
-        val s = sender()
-        pipe(TestRecordFactory.build(r).map(ValidRequest(_))) to s
+        TestRecordFactory.build(r).map(ValidRequest(_)) pipeTo sender
       case Ingest(req, _) if req.payload == "error" => sender ! IngestorError(new IllegalArgumentException)
       case Ingest(_, _) => sender ! IngestorCompleted
     }

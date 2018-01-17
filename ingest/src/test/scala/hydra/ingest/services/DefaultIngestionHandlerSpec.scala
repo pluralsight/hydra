@@ -27,8 +27,7 @@ class DefaultIngestionHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
     override def receive = {
       case Publish(_) => sender ! Join
       case Validate(r) =>
-        val s = sender()
-        pipe(TestRecordFactory.build(r).map(ValidRequest(_))) to s
+        TestRecordFactory.build(r).map(ValidRequest(_)) pipeTo sender
       case Ingest(rec, _) =>
         val timeout = rec.isInstanceOf[TimeoutRecord]
         sender ! (if (!timeout) IngestorCompleted)

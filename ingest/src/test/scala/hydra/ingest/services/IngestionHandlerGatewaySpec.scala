@@ -29,8 +29,7 @@ class IngestionHandlerGatewaySpec extends TestKit(ActorSystem("hydra")) with Mat
     override def receive = {
       case Publish(_) => sender ! Join
       case Validate(r) =>
-        val s = sender
-        pipe(TestRecordFactory.build(r).map(ValidRequest(_))) to s
+        TestRecordFactory.build(r).map(ValidRequest(_)) pipeTo sender
       case Ingest(r, _) => sender ! IngestorCompleted
     }
   }, "test_ingestor")
@@ -45,7 +44,6 @@ class IngestionHandlerGatewaySpec extends TestKit(ActorSystem("hydra")) with Mat
         sender ! LookupResult(Seq(ingestorInfo))
     }
   }, "ingestor_registry")
-
 
   val props = IngestionHandlerGateway.props(registry.path.toString)
 

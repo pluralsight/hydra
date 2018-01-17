@@ -32,14 +32,23 @@ class JsonRecordFactorySpec extends Matchers
   with ScalaFutures {
 
   describe("When using the JsonRecordFactory") {
+
+    it("errors with no topic on the request") {
+      val request = HydraRequest("123","""{"name":test"}""")
+      val rec = JsonRecordFactory.build(request)
+      whenReady(rec.failed)(_ shouldBe an[InvalidRequestException])
+    }
+
     it("handles invalid json") {
       val request = HydraRequest("123","""{"name":test"}""")
+        .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = JsonRecordFactory.build(request)
       whenReady(rec.failed)(_ shouldBe a[JsonParseException])
     }
 
     it("handles valid json") {
-      val request = HydraRequest("123","""{"name":"test"}""").withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
+      val request = HydraRequest("123","""{"name":"test"}""")
+        .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = JsonRecordFactory.build(request)
       val node = new ObjectMapper().reader().readTree("""{"name":"test"}""")
       whenReady(rec)(_ shouldBe JsonRecord("test-topic", None, node))

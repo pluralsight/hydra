@@ -32,8 +32,7 @@ class IngestionHandlerGatewayClusterSpec extends TestKit(ActorSystem("hydra",
     override def receive = {
       case Publish(_) => sender ! Join
       case Validate(r) =>
-        val s = sender
-        pipe(TestRecordFactory.build(r).map(ValidRequest(_))) to s
+        TestRecordFactory.build(r).map(ValidRequest(_)) pipeTo sender
       case Ingest(r, _) => sender ! IngestorCompleted
     }
   }, "test_ingestor")

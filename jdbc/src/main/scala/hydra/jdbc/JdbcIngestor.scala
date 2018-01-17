@@ -1,26 +1,26 @@
 package hydra.jdbc
 
 import com.typesafe.config.Config
-import hydra.core.ingest.{Ingestor, TransportOps}
-import hydra.core.protocol._
 import configs.syntax._
+import hydra.core.ingest.{HydraRequest, Ingestor, TransportOps}
+import hydra.core.protocol._
+
+import scala.util.Try
 
 class JdbcIngestor extends Ingestor with TransportOps {
   override def recordFactory = JdbcRecordFactory
 
+  override def validateRequest(request: HydraRequest): Try[HydraRequest] = {
+    Try {
+      val profile = request.metadataValue(JdbcRecordFactory.DB_PROFILE_PARAM).get
+      applicationConfig.get[Config](s"transports.jdbc.profiles.$profile").map(_ => request)
+        .valueOrThrow(_ => new IllegalArgumentException(s"No db profile named '$profile' found."))
+    }
+  }
+
   ingest {
     case Publish(request) =>
-      sender ! (if (request.metadataValue(JdbcRecordFactory.DB_PROFILE_PARAM).isDefined) Join else Ignore)
-
-    case Validate(request) =>
-      val validation = request.metadataValue(JdbcRecordFactory.DB_PROFILE_PARAM) match {
-        case None => InvalidRequest(new IllegalArgumentException("A db profile name must be supplied."))
-        case Some(profile) =>
-          applicationConfig.get[Config](s"transports.jdbc.profiles.$profile").map(_ => validate(request))
-            .valueOrElse(InvalidRequest(new IllegalArgumentException(s"No db profile named '$profile' found.")))
-      }
-
-      sender ! validation
+      sender ! (if (request.hasMetadata(JdbcRecordFactory.DB_PROFILE_PARAM)) Join else Ignore)
 
     case Ingest(record, ackStrategy) => transport(record, ackStrategy)
   }
