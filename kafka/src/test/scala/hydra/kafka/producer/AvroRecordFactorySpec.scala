@@ -50,6 +50,7 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike with ScalaFutures 
       val rec = AvroRecordFactory.build(request)
       whenReady(rec.failed) { e =>
         val ex = e.asInstanceOf[JsonToAvroConversionExceptionWithMetadata]
+        ex.getMessage should not be null
         ex.cause shouldBe an[RequiredFieldMissingException]
       }
     }

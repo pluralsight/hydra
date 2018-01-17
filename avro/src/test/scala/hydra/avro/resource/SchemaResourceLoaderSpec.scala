@@ -76,7 +76,10 @@ class SchemaResourceLoaderSpec extends Matchers
     it("errors if can't find a schema with a specific version") {
       val loader = new SchemaResourceLoader("http://mock", client)
       whenReady(loader.retrieveSchema("registry:test-value#2")
-        .failed)(_ shouldBe a[SchemaRegistryException])
+        .failed) { error =>
+        error shouldBe a[SchemaRegistryException]
+        error.getMessage should not be null
+      }
     }
 
     it("defaults to registry resources") {

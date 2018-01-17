@@ -1,5 +1,10 @@
 package hydra.avro.util
 
+import java.io.InputStream
+
+import com.pluralsight.hydra.avro.RequiredFieldMissingException
+import hydra.avro.JsonToAvroConversionExceptionWithMetadata
+import hydra.avro.resource.SchemaResource
 import hydra.avro.util.AvroUtils.SeenPair
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Field
@@ -367,6 +372,54 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
       AvroUtils.SEEN_EQUALS.get().contains(SeenPair(schema1.hashCode(), schema2.hashCode())) shouldBe true
 
       AvroUtils.areEqual(schema1, schema2) shouldBe true
+
+    }
+
+    it("improves exception") {
+      val schema =
+        """
+          |{
+          |	"type": "record",
+          |	"name": "User",
+          |	"namespace": "hydra",
+          |	"fields": [
+          |		{
+          |			"name": "testEnum",
+          |			"type": {
+          |            "type": "enum",
+          |            "name": "test_type",
+          |            "symbols": ["test1", "test2"]
+          |        }
+          |		}
+          |	]
+          |}
+        """.stripMargin
+
+      val tschema = new Schema.Parser().parse(schema)
+      val resource = new SchemaResource() {
+        override def schema: Schema = tschema
+
+        override def location: String = "test"
+
+        override def id: Int = 1
+
+        override def version: Int = 1
+
+        override def getDescription: String = "test"
+
+        override def getInputStream: InputStream = null
+      }
+
+      AvroUtils.improveException(new IllegalArgumentException(""),
+        resource) shouldBe an[IllegalArgumentException]
+
+      val ex = new RequiredFieldMissingException("testEnum", tschema)
+      val improved = AvroUtils.improveException(ex, resource)
+      improved shouldBe an[JsonToAvroConversionExceptionWithMetadata]
+      val iex = improved.asInstanceOf[JsonToAvroConversionExceptionWithMetadata]
+      iex.getMessage should not be null
+      iex.cause shouldBe a[RequiredFieldMissingException]
+      iex.res shouldBe resource
 
     }
   }
