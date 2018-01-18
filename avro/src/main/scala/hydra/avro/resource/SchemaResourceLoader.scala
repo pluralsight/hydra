@@ -15,6 +15,8 @@
 
 package hydra.avro.resource
 
+import java.net.ConnectException
+
 import hydra.avro.registry.{RegistrySchemaResource, SchemaRegistryException}
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.slf4j.LoggerFactory
@@ -68,11 +70,12 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
 
   private def getLatestSchema(subject: String)
                              (implicit ec: ExecutionContext): Future[RegistrySchemaResource] = {
-     cachingWithTTL(subject)(5.minutes) {
+    cachingWithTTL(subject)(5.minutes) {
       Future(registry.getLatestSchemaMetadata(subject))
         .map(md => registry.getByID(md.getId) -> md)
         .map(schema => RegistrySchemaResource(registryUrl, subject, schema._2.getId, schema._2.getVersion, schema._1))
         .recoverWith {
+          case e: ConnectException => Future.failed(e)
           case e: Exception => Future.failed(SchemaRegistryException(e, subject))
         }
     }

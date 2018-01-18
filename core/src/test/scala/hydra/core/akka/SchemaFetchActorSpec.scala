@@ -1,12 +1,13 @@
 package hydra.core.akka
 
 import java.io.File
+import java.net.ConnectException
 
 import akka.actor.ActorSystem
 import akka.actor.Status.Failure
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
-import hydra.avro.registry.{ConfluentSchemaRegistry, SchemaRegistryException}
+import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.core.akka.SchemaFetchActor.{FetchSchema, SchemaFetchResponse}
 import hydra.core.protocol.HydraApplicationError
 import org.apache.avro.Schema.Parser
@@ -60,7 +61,7 @@ class SchemaFetchActorSpec extends TestKit(ActorSystem("hydra"))
     fetcher ! FetchSchema("test")
     listener.expectMsgType[HydraApplicationError]
     expectMsgPF() {
-      case Failure(ex) => ex shouldBe a[SchemaRegistryException]
+      case Failure(ex) => ex shouldBe a[ConnectException]
     }
   }
 
