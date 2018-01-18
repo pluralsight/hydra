@@ -3,13 +3,14 @@ package hydra.core.akka
 import akka.actor.{Actor, Props}
 import akka.pattern.{CircuitBreaker, pipe}
 import com.typesafe.config.Config
-import hydra.avro.registry.ConfluentSchemaRegistry
+import hydra.avro.registry.{ConfluentSchemaRegistry, SchemaRegistryException}
 import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
 import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaFetchActor.{FetchSchema, SchemaFetchResponse}
 import hydra.core.protocol.HydraApplicationError
 
 import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 /**
   * This actor serves as an proxy between the handler registry
@@ -24,6 +25,12 @@ class SchemaFetchActor(config: Config, settings: Option[CircuitBreakerSettings])
 
   val breakerSettings = settings getOrElse new CircuitBreakerSettings(config)
 
+  private val registryFailure: Try[SchemaFetchResponse] => Boolean = {
+    case Success(_) => false
+    case Failure(ex) if ex.isInstanceOf[SchemaRegistryException] => false
+    case Failure(_) => true
+  }
+
   private val breaker = CircuitBreaker(
     context.system.scheduler,
     maxFailures = breakerSettings.maxFailures,
@@ -33,13 +40,12 @@ class SchemaFetchActor(config: Config, settings: Option[CircuitBreakerSettings])
 
   val registry = ConfluentSchemaRegistry.forConfig(config)
 
-  val loader = new SchemaResourceLoader(registry.registryUrl,
-    registry.registryClient)
+  val loader = new SchemaResourceLoader(registry.registryUrl, registry.registryClient)
 
   override def receive = {
     case FetchSchema(location) =>
-      breaker.withCircuitBreaker(loader.
-        retrieveSchema(location).map(SchemaFetchResponse(_))) pipeTo sender
+      val futureResource = loader.retrieveSchema(location).map(SchemaFetchResponse(_))
+      breaker.withCircuitBreaker(futureResource, registryFailure) pipeTo sender
   }
 
   private def notifyOnOpen() = {

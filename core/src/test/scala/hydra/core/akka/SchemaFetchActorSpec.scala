@@ -73,6 +73,13 @@ class SchemaFetchActorSpec extends TestKit(ActorSystem("hydra"))
 
     val fetcher = system.actorOf(SchemaFetchActor.props(cfg, Some(settings)))
     fetcher.tell(FetchSchema("unknown"), probe.ref)
+    probe.expectMsgType[Failure]
+    fetcher.tell(FetchSchema("unknown"), probe.ref)
+    probe.expectMsgType[Failure]
+    fetcher.tell(FetchSchema("unknown"), probe.ref)
+    probe.expectMsgType[Failure]
+    fetcher.tell(FetchSchema("unknown"), probe.ref)
+    probe.expectMsgType[Failure]
     listener.expectNoMessage(3.seconds)
   }
 
