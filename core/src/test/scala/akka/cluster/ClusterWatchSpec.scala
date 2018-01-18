@@ -65,6 +65,7 @@ class ClusterWatchSpec extends TestKit(ActorSystem("hydra",
     val a = address
     val members = SortedSet(new Member(a, 2, MemberStatus.Up, Set("dc-test", "role1")))
     listener ! CurrentClusterState(members)
+    awaitCond(listener.underlyingActor.getNodes.length == 1, max = 5.seconds)
     listener.tell(GetNodes, probe.ref)
     probe.expectMsgPF() {
       case n1 :: Nil =>
@@ -76,7 +77,7 @@ class ClusterWatchSpec extends TestKit(ActorSystem("hydra",
     val probe = TestProbe()
     listener.tell(MemberWeaklyUp(new Member(address, 4, MemberStatus.WeaklyUp,
       Set("dc-test", "test"))), probe.ref)
-    probe.expectNoMessage(remainingOrDefault)
+    probe.expectNoMessage(1.second)
   }
 
   it should "remove members to list" in {
