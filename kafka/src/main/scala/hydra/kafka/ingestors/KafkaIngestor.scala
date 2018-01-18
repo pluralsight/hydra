@@ -16,7 +16,6 @@
 
 package hydra.kafka.ingestors
 
-import hydra.core.akka.SchemaFetchActor
 import hydra.core.ingest.Ingestor
 import hydra.core.ingest.RequestParams._
 import hydra.core.protocol._
@@ -28,8 +27,6 @@ import hydra.kafka.producer.{KafkaProducerSupport, KafkaRecordFactories}
   *
   */
 class KafkaIngestor extends Ingestor with KafkaProducerSupport {
-
-  private val schemaFetchActor = context.actorOf(SchemaFetchActor.props(applicationConfig))
 
   override val recordFactory = new KafkaRecordFactories(schemaFetchActor)
 

@@ -21,7 +21,7 @@ class ClusterWatchSpec extends TestKit(ActorSystem("hydra",
 
 
   var longUid = 0L
-  
+
   def host = {
     longUid += 1
     s"member-$longUid"

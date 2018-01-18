@@ -18,7 +18,7 @@ class JdbcRecordFactorySpec extends Matchers with FunSpecLike with ScalaFutures 
   val schema = new Schema.Parser().parse(Source.fromResource("jdbc-test.avsc").mkString)
 
   override implicit val patienceConfig = PatienceConfig(
-    timeout = scaled(1000 millis),
+    timeout = scaled(2000 millis),
     interval = scaled(100 millis)
   )
 
