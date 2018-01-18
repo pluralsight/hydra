@@ -27,7 +27,7 @@ class HttpIngestionHandlerSpec extends TestKit(ActorSystem("hydra")) with Matche
     timeout = scaled(1000 millis),
     interval = scaled(100 millis)
   )
-  
+
   override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true,
     duration = 10 seconds)
 
