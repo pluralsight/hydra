@@ -50,7 +50,7 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: Execut
     "ingestion_Http_handler_gateway")
 
   private val ingestTimeout = applicationConfig.get[FiniteDuration]("ingest.timeout")
-    .valueOrElse(3.seconds)
+    .valueOrElse(500 millis)
 
   override val route: Route =
     post {

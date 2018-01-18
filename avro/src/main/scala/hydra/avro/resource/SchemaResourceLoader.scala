@@ -30,7 +30,7 @@ import scalacache.guava.GuavaCache
   */
 
 /**
-  * We only support two location prefix: classpath and registry (or no prefix, which defaults
+  * We only support two location prefixes: classpath and registry (or no prefix, which defaults
   * to registry.)
   *
   * @param registryUrl
@@ -68,7 +68,7 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
 
   private def getLatestSchema(subject: String)
                              (implicit ec: ExecutionContext): Future[RegistrySchemaResource] = {
-    cachingWithTTL(subject)(5.minutes) {
+     cachingWithTTL(subject)(5.minutes) {
       Future(registry.getLatestSchemaMetadata(subject))
         .map(md => registry.getByID(md.getId) -> md)
         .map(schema => RegistrySchemaResource(registryUrl, subject, schema._2.getId, schema._2.getVersion, schema._1))

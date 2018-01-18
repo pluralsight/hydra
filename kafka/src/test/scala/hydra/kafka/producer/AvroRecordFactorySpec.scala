@@ -15,16 +15,20 @@
 
 package hydra.kafka.producer
 
-import java.io.File
+import java.io.{File, InputStream}
 
+import akka.actor.{Actor, ActorSystem, Props}
+import akka.testkit.TestKit
 import com.pluralsight.hydra.avro.{InvalidDataTypeException, JsonConverter, RequiredFieldMissingException, UndefinedFieldsException}
 import hydra.avro.JsonToAvroConversionExceptionWithMetadata
+import hydra.avro.resource.SchemaResource
+import hydra.core.akka.SchemaFetchActor.{FetchSchema, SchemaFetchResponse}
 import hydra.core.ingest.RequestParams._
 import hydra.core.ingest.{HydraRequest, InvalidRequestException}
 import org.apache.avro.Schema
 import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -33,9 +37,37 @@ import scala.io.Source
 /**
   * Created by alexsilva on 1/11/17.
   */
-class AvroRecordFactorySpec extends Matchers with FunSpecLike with ScalaFutures {
+class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
+  with Matchers
+  with FunSpecLike
+  with ScalaFutures
+  with BeforeAndAfterAll {
 
-  val schema = Thread.currentThread().getContextClassLoader.getResource("avro-factory-test.avsc").getFile
+  val testSchema = Thread.currentThread()
+    .getContextClassLoader.getResource("avro-factory-test.avsc").getFile
+
+  val schemaResource = new SchemaResource {
+    override def schema: Schema = new Schema.Parser().parse(new File(testSchema))
+
+    override def id: Int = 1
+
+    override def version: Int = 1
+
+    override def location: String = "location"
+
+    override def getDescription: String = "description"
+
+    override def getInputStream: InputStream = null //not testing this
+  }
+  val loader = system.actorOf(Props(new Actor() {
+    override def receive: Receive = {
+      case FetchSchema(schema) => sender ! SchemaFetchResponse(schemaResource)
+    }
+  }))
+
+  val factory = new AvroRecordFactory(loader)
+
+  override def afterAll = TestKit.shutdownActorSystem(system)
 
   override implicit val patienceConfig = PatienceConfig(
     timeout = scaled(1000 millis),
@@ -47,7 +79,7 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike with ScalaFutures 
       val request = HydraRequest("123","""{"name":"test"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:avro-factory-test.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      val rec = AvroRecordFactory.build(request)
+      val rec = factory.build(request)
       whenReady(rec.failed) { e =>
         val ex = e.asInstanceOf[JsonToAvroConversionExceptionWithMetadata]
         ex.getMessage should not be null
@@ -60,7 +92,7 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike with ScalaFutures 
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:avro-factory-test.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
         .withMetadata(HYDRA_VALIDATION_STRATEGY -> "strict")
-      val rec = KafkaRecordFactories.build(request)
+      val rec = new KafkaRecordFactories(loader).build(request)
       whenReady(rec.failed) { e =>
         val ex = e.asInstanceOf[JsonToAvroConversionExceptionWithMetadata]
         ex.cause shouldBe an[UndefinedFieldsException]
@@ -72,7 +104,7 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike with ScalaFutures 
       val request = HydraRequest("123","""{"name":"test", "rank":"booyah"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:avro-factory-test.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      val rec = AvroRecordFactory.build(request)
+      val rec = factory.build(request)
       whenReady(rec.failed) { e =>
         val ex = e.asInstanceOf[JsonToAvroConversionExceptionWithMetadata]
         ex.cause shouldBe an[InvalidDataTypeException]
@@ -80,12 +112,12 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike with ScalaFutures 
     }
 
     it("builds keyless messages") {
-      val avroSchema = new Schema.Parser().parse(new File(schema))
+      val avroSchema = new Schema.Parser().parse(new File(testSchema))
       val json = """{"name":"test", "rank":10}"""
       val request = HydraRequest("123", json)
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:avro-factory-test.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      whenReady(AvroRecordFactory.build(request)) { msg =>
+      whenReady(factory.build(request)) { msg =>
         msg.destination shouldBe "test-topic"
         msg.key shouldBe None
         msg.schema shouldBe avroSchema
@@ -96,13 +128,13 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike with ScalaFutures 
     }
 
     it("builds keyed messages") {
-      val avroSchema = new Schema.Parser().parse(new File(schema))
+      val avroSchema = new Schema.Parser().parse(new File(testSchema))
       val json = """{"name":"test", "rank":10}"""
       val request = HydraRequest("123", json)
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:avro-factory-test.avsc")
         .withMetadata(HYDRA_RECORD_KEY_PARAM -> "{$.name}")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      whenReady(AvroRecordFactory.build(request)) { msg =>
+      whenReady(factory.build(request)) { msg =>
         msg.destination shouldBe "test-topic"
         msg.schema shouldBe avroSchema
         msg.payload.get("name") shouldBe "test"
@@ -116,18 +148,18 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike with ScalaFutures 
       val request = HydraRequest("123","""{"name":"test", "rank":10}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:avro-factory-test.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      AvroRecordFactory.getTopicAndSchemaSubject(request).get._2 shouldBe "classpath:avro-factory-test.avsc"
+      factory.getTopicAndSchemaSubject(request).get._2 shouldBe "classpath:avro-factory-test.avsc"
     }
 
     it("defaults to target as the subject") {
       val request = HydraRequest("123","""{"name":"test", "rank":10}""")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      AvroRecordFactory.getTopicAndSchemaSubject(request).get._2 shouldBe "test-topic"
+      factory.getTopicAndSchemaSubject(request).get._2 shouldBe "test-topic"
     }
 
     it("throws an error if no topic is in the request") {
       val request = HydraRequest("123","""{"name":test"}""")
-      whenReady(AvroRecordFactory.build(request).failed)(_ shouldBe an[InvalidRequestException])
+      whenReady(factory.build(request).failed)(_ shouldBe an[InvalidRequestException])
     }
 
     //validation
@@ -135,7 +167,7 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike with ScalaFutures 
       val r = HydraRequest("1","""{"name":"test"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:avro-factory-test.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      val rec = AvroRecordFactory.build(r)
+      val rec = factory.build(r)
       whenReady(rec.failed)(_ shouldBe a[JsonToAvroConversionExceptionWithMetadata])
     }
 
@@ -143,7 +175,7 @@ class AvroRecordFactorySpec extends Matchers with FunSpecLike with ScalaFutures 
       val r = HydraRequest("1","""{"name":"test","rank":10}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:avro-factory-test.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      whenReady(AvroRecordFactory.build(r)) { rec =>
+      whenReady(factory.build(r)) { rec =>
         val avroSchema = new Schema.Parser()
           .parse(Source.fromResource("avro-factory-test.avsc").mkString)
         val genericRecord = new GenericRecordBuilder(avroSchema)

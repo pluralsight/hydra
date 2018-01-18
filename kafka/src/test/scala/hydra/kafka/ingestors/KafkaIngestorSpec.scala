@@ -92,6 +92,9 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
     }
   }
 
+  val loader = TestProbe()
+  val avroRecordFactory = new AvroRecordFactory(loader.ref)
+
 
   it("is invalid if it can't find the schema") {
     val request = HydraRequest("213",
@@ -108,7 +111,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
       Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema")
     )
     kafkaIngestor ! Validate(request)
-    AvroRecordFactory.getTopicAndSchemaSubject(request).get._2 shouldBe "test-schema"
+    avroRecordFactory.getTopicAndSchemaSubject(request).get._2 shouldBe "test-schema"
     expectMsg(ValidRequest(ar))
   }
 
@@ -117,7 +120,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
       json,
       Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "just-a-topic", HYDRA_SCHEMA_PARAM -> "test-schema")
     )
-    AvroRecordFactory.getTopicAndSchemaSubject(request).get._2 shouldBe "test-schema"
+    avroRecordFactory.getTopicAndSchemaSubject(request).get._2 shouldBe "test-schema"
     kafkaIngestor ! Validate(request)
     val ar = AvroRecord("just-a-topic", avroSchema, None, record)
     expectMsg(ValidRequest(ar))

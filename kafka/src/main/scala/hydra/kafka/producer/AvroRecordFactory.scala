@@ -15,31 +15,40 @@
 
 package hydra.kafka.producer
 
+import akka.actor.ActorRef
+import akka.pattern.ask
+import akka.util
 import com.pluralsight.hydra.avro.JsonConverter
 import hydra.avro.registry.ConfluentSchemaRegistry
-import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
+import hydra.avro.resource.SchemaResource
 import hydra.avro.util.AvroUtils
 import hydra.common.config.ConfigSupport
+import hydra.core.akka.SchemaFetchActor.{FetchSchema, SchemaFetchResponse}
 import hydra.core.ingest.HydraRequest
 import hydra.core.transport.ValidationStrategy.Strict
 import org.apache.avro.generic.GenericRecord
 
+import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * Created by alexsilva on 1/11/17.
   */
-object AvroRecordFactory extends KafkaRecordFactory[String, GenericRecord] with ConfigSupport {
+class AvroRecordFactory(schemaResourceLoader: ActorRef)
+  extends KafkaRecordFactory[String, GenericRecord] with ConfigSupport {
 
   val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
 
-  lazy val schemaResourceLoader = new SchemaResourceLoader(schemaRegistry.registryUrl,
-    schemaRegistry.registryClient)
+  //  lazy val schemaResourceLoader = new SchemaResourceLoader(schemaRegistry.registryUrl,
+  //    schemaRegistry.registryClient)
+
+  //todo: config-driven
+  private implicit val timeout = util.Timeout(3.seconds)
 
   override def build(request: HydraRequest)(implicit ec: ExecutionContext): Future[AvroRecord] = {
     for {
       (topic, subject) <- Future.fromTry(getTopicAndSchemaSubject(request))
-      res <- schemaResourceLoader.retrieveSchema(subject)
+      res <- (schemaResourceLoader ? FetchSchema(subject)).mapTo[SchemaFetchResponse].map(_.schema) //schemaResourceLoader.retrieveSchema(subject)
       record <- convert(res, request)
     } yield AvroRecord(topic, res.schema, getKey(request), record)
   }
@@ -51,7 +60,6 @@ object AvroRecordFactory extends KafkaRecordFactory[String, GenericRecord] with 
     Future(converter.convert(request.payload))
       .recover { case ex => throw AvroUtils.improveException(ex, resource) }
   }
-
 }
 
 
