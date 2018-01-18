@@ -1,6 +1,6 @@
 package akka.cluster
 
-import akka.actor.{ActorSystem, Address, Props}
+import akka.actor.{ActorSystem, Address, PoisonPill, Props}
 import akka.cluster.ClusterEvent.{CurrentClusterState, MemberRemoved, MemberUp, MemberWeaklyUp}
 import akka.testkit.{TestActorRef, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
@@ -10,34 +10,38 @@ import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FlatSpecLike, Match
 
 import scala.collection.immutable.SortedSet
 import scala.concurrent.duration._
-import scala.util.Random
 
 class ClusterWatchSpec extends TestKit(ActorSystem("hydra",
   config = ConfigFactory.parseString("akka.actor.provider=cluster")
-    .withFallback(ConfigFactory.load()))) with Matchers with FlatSpecLike
-  with BeforeAndAfterAll with BeforeAndAfterEach {
+    .withFallback(ConfigFactory.load())))
+  with Matchers
+  with FlatSpecLike
+  with BeforeAndAfterAll
+  with BeforeAndAfterEach {
 
-  def host = Random.alphanumeric.dropWhile(_.isDigit) take 10 mkString
 
-  def address = UniqueAddress(Address("akka", "hydra", host, 1234), Math.abs(Random.nextLong))
+  var longUid = 0L
+  
+  def host = {
+    longUid += 1
+    s"member-$longUid"
+  }
 
-  var listener: TestActorRef[ClusterWatcher] = _
+  def address = UniqueAddress(Address("akka.tcp", "hydra", host, 1234), longUid)
+
+  override def beforeAll = {
+    //need to shut this down so it stops send events that have no members
+    system.actorSelection("akka://hydra/system/cluster/core/publisher") ! PoisonPill
+  }
 
   override def afterAll = {
     TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
   }
 
-  override def beforeEach = {
-    listener = TestActorRef[ClusterWatcher](Props[ClusterWatcher])
-  }
-
-  override def afterEach = {
-    system.stop(listener)
-  }
-
   "The ClusterWatchSpec" should "add members to list" in {
     val probe = TestProbe()
     val a = address
+    val listener = TestActorRef[ClusterWatcher](Props[ClusterWatcher])
     listener ! MemberUp(new Member(a, 1, MemberStatus.Up, Set("dc-test", "test")))
     awaitCond(!listener.underlyingActor.getNodes.isEmpty)
     listener.tell(GetNodes, probe.ref)
@@ -48,9 +52,11 @@ class ClusterWatchSpec extends TestKit(ActorSystem("hydra",
   }
 
   it should "list members by role" in {
+    val listener = TestActorRef[ClusterWatcher](Props[ClusterWatcher])
     val probe = TestProbe()
     val address2 = address
-    listener ! MemberUp(new Member(address, 2, MemberStatus.Up, Set("dc-test", "role1")))
+    val address1 = address
+    listener ! MemberUp(new Member(address1, 2, MemberStatus.Up, Set("dc-test", "role1")))
     listener ! MemberUp(new Member(address2, 3, MemberStatus.Up, Set("dc-test", "role2")))
     awaitCond(listener.underlyingActor.getNodes.length == 2, max = 5.seconds)
     listener.tell(GetNodesByRole("role2"), probe.ref)
@@ -63,9 +69,10 @@ class ClusterWatchSpec extends TestKit(ActorSystem("hydra",
   it should "accept cluster state messages" in {
     val probe = TestProbe()
     val a = address
-    val members = SortedSet(new Member(a, 2, MemberStatus.Up, Set("dc-test", "role1")))
+    val listener = TestActorRef[ClusterWatcher](Props[ClusterWatcher])
+    val members = SortedSet(new Member(a, 4, MemberStatus.Up, Set("dc-test", "role1")))
     listener ! CurrentClusterState(members)
-    awaitCond(listener.underlyingActor.getNodes.length == 1, max = 5.seconds)
+    awaitCond(listener.underlyingActor.getNodes.length == 1, max = 15.seconds)
     listener.tell(GetNodes, probe.ref)
     probe.expectMsgPF() {
       case n1 :: Nil =>
@@ -75,15 +82,18 @@ class ClusterWatchSpec extends TestKit(ActorSystem("hydra",
 
   it should "ignore MemberWeaklyUp events" in {
     val probe = TestProbe()
-    listener.tell(MemberWeaklyUp(new Member(address, 4, MemberStatus.WeaklyUp,
+    val listener = TestActorRef[ClusterWatcher](Props[ClusterWatcher])
+
+    listener.tell(MemberWeaklyUp(new Member(address, 5, MemberStatus.WeaklyUp,
       Set("dc-test", "test"))), probe.ref)
     probe.expectNoMessage(1.second)
   }
 
-  it should "remove members to list" in {
+  it should "remove members from list" in {
     val probe = TestProbe()
     val addr = address
-    listener ! MemberUp(new Member(addr, 4, MemberStatus.Up, Set("dc-test", "test")))
+    val listener = TestActorRef[ClusterWatcher](Props[ClusterWatcher])
+    listener ! MemberUp(new Member(addr, 6, MemberStatus.Up, Set("dc-test", "test")))
     awaitCond(listener.underlyingActor.getNodes.length == 1, max = 5.seconds)
 
     listener.tell(GetNodes, probe.ref)
@@ -92,12 +102,11 @@ class ClusterWatchSpec extends TestKit(ActorSystem("hydra",
         n.asInstanceOf[Address].system shouldBe "hydra"
     }
 
-    listener ! MemberRemoved(new Member(addr, 4, MemberStatus.Removed, Set("dc-test")),
+    listener ! MemberRemoved(new Member(addr, 7, MemberStatus.Removed, Set("dc-test")),
       MemberStatus.Up)
     awaitCond(listener.underlyingActor.getNodes.isEmpty, max = 5.seconds)
 
     listener.tell(GetNodes, probe.ref)
     probe.expectMsg(Nil)
-
   }
 }
