@@ -13,8 +13,9 @@ import hydra.ingest.test.TestRecordFactory
 import org.joda.time.DateTime
 import org.scalatest._
 import org.scalatest.concurrent.Eventually
+import akka.pattern.pipe
 import org.scalatest.time.{Seconds, Span}
-
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 class IngestionHandlerGatewayClusterSpec extends TestKit(ActorSystem("hydra",
@@ -30,7 +31,8 @@ class IngestionHandlerGatewayClusterSpec extends TestKit(ActorSystem("hydra",
   val ingestor = TestActorRef(new Actor {
     override def receive = {
       case Publish(_) => sender ! Join
-      case Validate(r) => sender ! ValidRequest(TestRecordFactory.build(r).get)
+      case Validate(r) =>
+        TestRecordFactory.build(r).map(ValidRequest(_)) pipeTo sender
       case Ingest(r, _) => sender ! IngestorCompleted
     }
   }, "test_ingestor")

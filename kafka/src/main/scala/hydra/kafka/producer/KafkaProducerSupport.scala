@@ -16,6 +16,7 @@
 
 package hydra.kafka.producer
 
+import hydra.core.akka.SchemaFetchActor
 import hydra.core.ingest.{Ingestor, TransportOps}
 
 /**
@@ -26,5 +27,7 @@ import hydra.core.ingest.{Ingestor, TransportOps}
 trait KafkaProducerSupport extends TransportOps {
   this: Ingestor =>
 
-  override def transportName:String = "kafka"
+  override def transportName: String = "kafka"
+
+  val schemaFetchActor = context.actorOf(SchemaFetchActor.props(applicationConfig))
 }

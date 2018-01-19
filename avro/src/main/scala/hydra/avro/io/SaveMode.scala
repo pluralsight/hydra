@@ -10,6 +10,7 @@ package hydra.avro.io
   */
   * Created by alexsilva on 7/11/17.
   */
+// $COVERAGE-OFF$
 object SaveMode extends Enumeration {
   type SaveMode = Value
 
@@ -49,3 +50,4 @@ object SaveMode extends Enumeration {
     */
   Ignore = Value
 }
+// $COVERAGE-ON$

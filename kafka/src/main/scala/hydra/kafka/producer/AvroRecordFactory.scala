@@ -15,47 +15,48 @@
 
 package hydra.kafka.producer
 
+import akka.actor.ActorRef
+import akka.pattern.ask
+import akka.util
 import com.pluralsight.hydra.avro.JsonConverter
 import hydra.avro.registry.ConfluentSchemaRegistry
-import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
+import hydra.avro.resource.SchemaResource
 import hydra.avro.util.AvroUtils
 import hydra.common.config.ConfigSupport
-import hydra.core.ingest.{HydraRequest, RequestParams}
+import hydra.core.akka.SchemaFetchActor.{FetchSchema, SchemaFetchResponse}
+import hydra.core.ingest.HydraRequest
 import hydra.core.transport.ValidationStrategy.Strict
-import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
 
-import scala.util.Try
+import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * Created by alexsilva on 1/11/17.
   */
-object AvroRecordFactory extends KafkaRecordFactory[String, GenericRecord] with ConfigSupport {
+class AvroRecordFactory(schemaResourceLoader: ActorRef)
+  extends KafkaRecordFactory[String, GenericRecord] with ConfigSupport {
 
   val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
 
-  lazy val schemaResourceLoader = new SchemaResourceLoader(schemaRegistry.registryUrl, schemaRegistry.registryClient)
+  //todo: config-driven
+  private implicit val timeout = util.Timeout(3.seconds)
 
-
-  override def build(request: HydraRequest): Try[AvroRecord] = {
-    val schemaResource: Try[SchemaResource] = Try(schemaResourceLoader.getResource(getSubject(request)))
-    schemaResource.flatMap { s =>
-      val strict = request.validationStrategy == Strict
-      val converter = new JsonConverter[GenericRecord](s.schema, strict)
-      Try(converter.convert(request.payload))
-        .map(rec => buildRecord(request, rec, s.schema))
-        .recover { case ex => throw schemaResource.map(r => AvroUtils.improveException(ex, r)).getOrElse(ex) }
-    }
+  override def build(request: HydraRequest)(implicit ec: ExecutionContext): Future[AvroRecord] = {
+    for {
+      (topic, subject) <- Future.fromTry(getTopicAndSchemaSubject(request))
+      res <- (schemaResourceLoader ? FetchSchema(subject)).mapTo[SchemaFetchResponse].map(_.schema) //schemaResourceLoader.retrieveSchema(subject)
+      record <- convert(res, request)
+    } yield AvroRecord(topic, res.schema, getKey(request), record)
   }
 
-  private def buildRecord(request: HydraRequest, rec: GenericRecord, schema: Schema) = {
-    AvroRecord(getTopic(request), schema, getKey(request), rec)
+  private def convert(resource: SchemaResource, request: HydraRequest)
+                     (implicit ec: ExecutionContext): Future[GenericRecord] = {
+    val converter = new JsonConverter[GenericRecord](resource.schema,
+      request.validationStrategy == Strict)
+    Future(converter.convert(request.payload))
+      .recover { case ex => throw AvroUtils.improveException(ex, resource) }
   }
-
-  def getSubject(request: HydraRequest): String = {
-    request.metadataValue(RequestParams.HYDRA_SCHEMA_PARAM).getOrElse(getTopic(request))
-  }
-
 }
 
 

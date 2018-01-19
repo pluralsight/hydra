@@ -9,7 +9,7 @@ import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult
 import hydra.ingest.test.TestRecordFactory
 import org.joda.time.DateTime
 import org.scalatest.{Matchers, WordSpecLike}
-
+import akka.pattern.pipe
 import scala.concurrent.duration._
 
 /**
@@ -27,7 +27,8 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
   val ingestor = TestActorRef(new Actor {
     override def receive = {
       case Publish(_) => sender ! Join
-      case Validate(r) => sender ! ValidRequest(TestRecordFactory.build(r).get)
+      case Validate(r) =>
+        TestRecordFactory.build(r).map(ValidRequest(_)) pipeTo sender
       case Ingest(req, _) if req.payload == "error" => sender ! IngestorError(new IllegalArgumentException)
       case Ingest(_, _) => sender ! IngestorCompleted
     }

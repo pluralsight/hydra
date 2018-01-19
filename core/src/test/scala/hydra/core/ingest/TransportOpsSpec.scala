@@ -8,15 +8,21 @@ import hydra.core.akka.ActorInitializationException
 import hydra.core.protocol.{IngestorError, Produce}
 import hydra.core.test.TestRecordFactory
 import hydra.core.transport.AckStrategy.NoAck
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 /**
   * Created by alexsilva on 3/22/17.
   */
-class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike
-  with BeforeAndAfterAll with ImplicitSender {
+class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers
+  with FunSpecLike
+  with BeforeAndAfterAll
+  with ImplicitSender
+  with ScalaFutures {
 
   override def afterAll() = TestKit.shutdownActorSystem(system)
 
@@ -47,7 +53,7 @@ class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers with F
       val req = HydraRequest("123", "test-produce")
       val t = system.actorOf(Props(classOf[TestTransportIngestor], supervisor.ref))
       t ! req
-      tm.expectMsg(Produce(TestRecordFactory.build(req).get, self, NoAck))
+      whenReady(TestRecordFactory.build(req))(r => tm.expectMsg(Produce(r, self, NoAck)))
     }
   }
 }
@@ -59,7 +65,9 @@ class TestTransportIngestor(supervisor: ActorRef) extends Ingestor with Transpor
 
   ingest {
     case "hello" => sender ! "hi!"
-    case req: HydraRequest => transport(TestRecordFactory.build(req).get, NoAck)
+    case req: HydraRequest =>
+      val record = Await.result(TestRecordFactory.build(req), 3.seconds)
+      transport(record, NoAck)
   }
 
   override def transportName = "test-transport"

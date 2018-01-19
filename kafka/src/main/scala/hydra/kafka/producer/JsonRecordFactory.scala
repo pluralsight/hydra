@@ -18,7 +18,7 @@ package hydra.kafka.producer
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import hydra.core.ingest.HydraRequest
 
-import scala.util.Try
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * Created by alexsilva on 1/11/17.
@@ -27,13 +27,18 @@ object JsonRecordFactory extends KafkaRecordFactory[String, JsonNode] {
 
   val mapper = new ObjectMapper()
 
-  override def build(request: HydraRequest): Try[KafkaRecord[String, JsonNode]] = {
+  override def build(request: HydraRequest)
+                    (implicit ec: ExecutionContext): Future[KafkaRecord[String, JsonNode]] = {
     //TODO: Strict validation with a json schema
-    parseJson(request.payload)
-      .map(n => JsonRecord(getTopic(request), getKey(request), n))
+    for {
+      topic <- Future.fromTry(getTopic(request))
+      payload <- parseJson(request.payload)
+    } yield JsonRecord(topic, getKey(request), payload)
+
   }
 
-  private def parseJson(json: String): Try[JsonNode] = Try(mapper.reader().readTree(json))
+  private def parseJson(json: String)
+                       (implicit ec: ExecutionContext) = Future(mapper.reader().readTree(json))
 
 }
 

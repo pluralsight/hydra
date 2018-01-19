@@ -12,7 +12,7 @@ import org.apache.avro.Schema
 case class RegistrySchemaResource(registryUrl: String, subject: String, id: Int, version: Int, schema: Schema)
   extends SchemaResource {
 
-    val location = s"$registryUrl/ids/$id"
+    val location = s"$registryUrl/schemas/ids/$id"
 
     override val getDescription: String = s"Schema with subject $subject, version $version loaded " +
       s"from the schema registry at $registryUrl."

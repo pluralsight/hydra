@@ -17,13 +17,12 @@ package hydra.core.transport
 
 import hydra.core.ingest.HydraRequest
 
-import scala.util.Try
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * Created by alexsilva on 1/11/17.
   */
 trait RecordFactory[K, V] {
-
-  def build(request: HydraRequest): Try[HydraRecord[K, V]]
+  def build(request: HydraRequest)(implicit ec: ExecutionContext): Future[HydraRecord[K, V]]
 }
 

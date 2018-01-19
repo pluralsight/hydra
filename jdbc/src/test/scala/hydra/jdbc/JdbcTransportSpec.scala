@@ -17,7 +17,7 @@ class JdbcTransportSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
 
   val probe = TestProbe()
 
-  val schema = new Schema.Parser().parse(Source.fromResource("schema.avsc").mkString)
+  val schema = new Schema.Parser().parse(Source.fromResource("jdbc-test.avsc").mkString)
 
   val jdbcTransport = TestActorRef[JdbcTransport](Props[JdbcTransport], "jdbc_transport")
 

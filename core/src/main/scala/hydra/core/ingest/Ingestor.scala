@@ -1,9 +1,13 @@
 package hydra.core.ingest
 
 import akka.actor.{Actor, OneForOneStrategy, SupervisorStrategy}
+import akka.pattern.pipe
 import hydra.core.akka.InitializingActor
 import hydra.core.protocol._
 import hydra.core.transport.RecordFactory
+
+import scala.concurrent.Future
+import scala.util.{Success, Try}
 
 /**
   * Created by alexsilva on 12/1/15.
@@ -11,7 +15,7 @@ import hydra.core.transport.RecordFactory
 
 trait Ingestor extends InitializingActor {
 
-  //override def initTimeout = 2.seconds
+  private implicit val ec = context.dispatcher
 
   def recordFactory: RecordFactory[_, _]
 
@@ -21,7 +25,7 @@ trait Ingestor extends InitializingActor {
       sender ! Ignore
 
     case Validate(request) =>
-      sender ! validate(request)
+      doValidate(request) pipeTo sender
 
     case RecordProduced(_, sup) =>
       sup ! IngestorCompleted
@@ -33,9 +37,18 @@ trait Ingestor extends InitializingActor {
       supervisor ! IngestorError(error)
   }
 
-  def validate(request: HydraRequest): MessageValidationResult = {
-    recordFactory.build(request).map(ValidRequest(_))
-      .recover { case e => InvalidRequest(e) }.get
+  /**
+    * To be overriden by ingestors needing extra validation
+    *
+    * @param request
+    * @return
+    */
+  def validateRequest(request: HydraRequest): Try[HydraRequest] = Success(request)
+
+  final def doValidate(request: HydraRequest): Future[MessageValidationResult] = {
+    Future.fromTry(validateRequest(request))
+      .flatMap[MessageValidationResult](r => recordFactory.build(r).map(ValidRequest(_)))
+      .recover { case e => InvalidRequest(e) }
   }
 
   override def initializationError(ex: Throwable): Receive = {

@@ -12,6 +12,9 @@ import hydra.core.protocol.HydraIngestionError
 import hydra.core.transport.TransportSupervisor.Deliver
 import hydra.kafka.producer.AvroRecord
 import spray.json.DefaultJsonProtocol
+import akka.pattern.pipe
+
+import scala.concurrent.Future
 
 /**
   * A base error handler that sends a summary of ingestion errors  to a deadleter topic in Kafka.
@@ -21,6 +24,8 @@ import spray.json.DefaultJsonProtocol
 class IngestionErrorHandler extends Actor with ConfigSupport with DefaultJsonProtocol {
 
   import spray.json._
+
+  private implicit val ec = context.dispatcher
 
   private implicit val hydraIngestionErrorInfoFormat = jsonFormat6(HydraIngestionErrorInfo)
 
@@ -34,15 +39,16 @@ class IngestionErrorHandler extends Actor with ConfigSupport with DefaultJsonPro
       .valueOrElse("classpath:schemas/HydraIngestError.avsc")
     val registry = ConfluentSchemaRegistry.forConfig(applicationConfig)
     val loader = new SchemaResourceLoader(registry.registryUrl, registry.registryClient)
-    loader.getResource(name).schema
+    loader.retrieveSchema(name).map(_.schema)
   }
 
 
   override def receive: Receive = {
-    case error: HydraIngestionError => kafkaTransport ! Deliver(buildPayload(error))
+    case error: HydraIngestionError =>
+      pipe(buildPayload(error).map(Deliver(_))) to kafkaTransport
   }
 
-  private[ingestors] def buildPayload(err: HydraIngestionError): AvroRecord = {
+  private[ingestors] def buildPayload(err: HydraIngestionError): Future[AvroRecord] = {
     val schema: Option[String] = err.cause match {
       case e: JsonToAvroConversionException => Some(e.getSchema.toString)
       case e: JsonToAvroConversionExceptionWithMetadata => Some(e.res.location)
@@ -54,7 +60,7 @@ class IngestionErrorHandler extends Actor with ConfigSupport with DefaultJsonPro
     val errorInfo = HydraIngestionErrorInfo(err.ingestor, topic, err.cause.getMessage,
       err.request.metadata, schema, err.request.payload).toJson.compactPrint
 
-    AvroRecord(errorTopic, errorSchema, topic, errorInfo)
+    errorSchema.map(s => AvroRecord(errorTopic, s, topic, errorInfo))
   }
 }
 

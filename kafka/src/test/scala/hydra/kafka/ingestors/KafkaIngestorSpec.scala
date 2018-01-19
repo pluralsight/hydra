@@ -16,14 +16,17 @@ import hydra.kafka.test.TestRecordFactory
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Parser
 import org.apache.avro.generic.GenericRecordBuilder
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
   * Created by alexsilva on 11/18/16.
   */
 class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers with FunSpecLike
-  with ImplicitSender with ConfigSupport with BeforeAndAfterAll {
+  with ImplicitSender with ConfigSupport with BeforeAndAfterAll
+  with ScalaFutures {
 
   override def afterAll = TestKit.shutdownActorSystem(system)
 
@@ -82,10 +85,15 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
         """{"first":"Roar","last":"King"}""",
         Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema")
       )
-      kafkaIngestor ! Ingest(TestRecordFactory.build(request).get, NoAck)
-      probe.expectMsg(Produce(TestRecordFactory.build(request).get, self, NoAck))
+      whenReady(TestRecordFactory.build(request)) { record =>
+        kafkaIngestor ! Ingest(record, NoAck)
+        probe.expectMsg(Produce(record, self, NoAck))
+      }
     }
   }
+
+  val loader = TestProbe()
+  val avroRecordFactory = new AvroRecordFactory(loader.ref)
 
 
   it("is invalid if it can't find the schema") {
@@ -103,7 +111,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
       Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema")
     )
     kafkaIngestor ! Validate(request)
-    AvroRecordFactory.getSubject(request) shouldBe "test-schema"
+    avroRecordFactory.getTopicAndSchemaSubject(request).get._2 shouldBe "test-schema"
     expectMsg(ValidRequest(ar))
   }
 
@@ -112,7 +120,7 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
       json,
       Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "just-a-topic", HYDRA_SCHEMA_PARAM -> "test-schema")
     )
-    AvroRecordFactory.getSubject(request) shouldBe "test-schema"
+    avroRecordFactory.getTopicAndSchemaSubject(request).get._2 shouldBe "test-schema"
     kafkaIngestor ! Validate(request)
     val ar = AvroRecord("just-a-topic", avroSchema, None, record)
     expectMsg(ValidRequest(ar))

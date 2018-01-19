@@ -2,6 +2,7 @@ package hydra.ingest.services
 
 import akka.actor.{Actor, ActorInitializationException, ActorSystem}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
+import akka.pattern.pipe
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import hydra.core.http.{HydraDirectives, ImperativeRequestContext}
 import hydra.core.ingest.{HydraRequest, IngestionReport, RequestParams}
@@ -13,6 +14,7 @@ import org.joda.time.DateTime
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 /**
@@ -21,7 +23,13 @@ import scala.concurrent.duration._
 class HttpIngestionHandlerSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike
   with ImplicitSender with BeforeAndAfterAll with HydraDirectives with Eventually {
 
-  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10 seconds)
+  override implicit val patienceConfig = PatienceConfig(
+    timeout = scaled(1000 millis),
+    interval = scaled(100 millis)
+  )
+
+  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true,
+    duration = 10 seconds)
 
   val ingestor = TestActorRef(new Actor {
     override def receive = {
@@ -31,7 +39,7 @@ class HttpIngestionHandlerSpec extends TestKit(ActorSystem("hydra")) with Matche
           sender ! InvalidRequest(new IllegalArgumentException)
         }
         else {
-          sender ! ValidRequest(TestRecordFactory.build(r).get)
+          TestRecordFactory.build(r).map(ValidRequest(_)) pipeTo sender
         }
       case Ingest(r, _) => sender ! IngestorCompleted
     }

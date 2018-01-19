@@ -3,6 +3,7 @@ package hydra.ingest.services
 import akka.actor.SupervisorStrategy.Stop
 import akka.actor.{Actor, ActorSystem}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
+import akka.pattern.pipe
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.{HydraRequest, IngestionReport}
@@ -15,6 +16,7 @@ import org.scalatest._
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.{Seconds, Span}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 class IngestionHandlerGatewaySpec extends TestKit(ActorSystem("hydra")) with Matchers with FlatSpecLike
@@ -26,7 +28,8 @@ class IngestionHandlerGatewaySpec extends TestKit(ActorSystem("hydra")) with Mat
   val ingestor = TestActorRef(new Actor {
     override def receive = {
       case Publish(_) => sender ! Join
-      case Validate(r) => sender ! ValidRequest(TestRecordFactory.build(r).get)
+      case Validate(r) =>
+        TestRecordFactory.build(r).map(ValidRequest(_)) pipeTo sender
       case Ingest(r, _) => sender ! IngestorCompleted
     }
   }, "test_ingestor")
@@ -41,7 +44,6 @@ class IngestionHandlerGatewaySpec extends TestKit(ActorSystem("hydra")) with Mat
         sender ! LookupResult(Seq(ingestorInfo))
     }
   }, "ingestor_registry")
-
 
   val props = IngestionHandlerGateway.props(registry.path.toString)
 

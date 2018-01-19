@@ -4,8 +4,8 @@ import hydra.core.ingest.{HydraRequest, Ingestor}
 import hydra.core.protocol._
 import hydra.core.transport.{RecordFactory, StringRecord}
 
-import scala.util.Success
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * A simple example transport that writes requests with a certain attribute to a log.
@@ -17,7 +17,8 @@ class LoggingIngestor extends Ingestor {
   override def initTimeout = 2.seconds
 
   override val recordFactory = new RecordFactory[String, String] {
-    override def build(request: HydraRequest) = Success(StringRecord("", None, request.payload))
+    override def build(request: HydraRequest)(implicit ec: ExecutionContext) =
+      Future.successful(StringRecord("", None, request.payload))
   }
   ingest {
     case Publish(request) =>

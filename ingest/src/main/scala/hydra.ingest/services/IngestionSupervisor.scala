@@ -13,7 +13,6 @@
  *  limitations under the License.
  *
  */
-
 package hydra.ingest.services
 
 import akka.actor._

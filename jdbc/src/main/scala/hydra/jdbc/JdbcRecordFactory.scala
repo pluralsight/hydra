@@ -1,46 +1,70 @@
 package hydra.jdbc
 
+import akka.actor.ActorRef
+import akka.pattern.ask
+import akka.util
 import com.pluralsight.hydra.avro.JsonConverter
-import hydra.avro.registry.ConfluentSchemaRegistry
-import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
+import hydra.avro.resource.SchemaResource
 import hydra.avro.util.AvroUtils
 import hydra.common.config.ConfigSupport
-import hydra.core.ingest.HydraRequest
+import hydra.core.akka.SchemaFetchActor.{FetchSchema, SchemaFetchResponse}
 import hydra.core.ingest.RequestParams.HYDRA_SCHEMA_PARAM
+import hydra.core.ingest.{HydraRequest, InvalidRequestException}
 import hydra.core.transport.ValidationStrategy.Strict
 import hydra.core.transport.{HydraRecord, RecordFactory, RecordMetadata}
+import hydra.jdbc.JdbcRecordFactory.{DB_PROFILE_PARAM, TABLE_PARAM}
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Field
 import org.apache.avro.generic.GenericRecord
 
-import scala.util.Try
+import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success, Try}
 
-object JdbcRecordFactory extends RecordFactory[Seq[Field], GenericRecord] with ConfigSupport {
+class JdbcRecordFactory(schemaResourceLoader: ActorRef) extends RecordFactory[Seq[Field], GenericRecord]
+  with ConfigSupport {
 
-  val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
+  //todo: config-driven
+  private implicit val timeout = util.Timeout(3.seconds)
 
+  override def build(request: HydraRequest)(implicit ec: ExecutionContext): Future[JdbcRecord] = {
+    for {
+      subject <- Future.fromTry(JdbcRecordFactory.getSchemaName(request))
+      res <- (schemaResourceLoader ? FetchSchema(subject)).mapTo[SchemaFetchResponse].map(_.schema)
+      avro <- convert(res, request)
+      record <- buildRecord(request, avro, res.schema)
+    } yield record
+
+  }
+
+  private def convert(resource: SchemaResource, request: HydraRequest)
+                     (implicit ec: ExecutionContext): Future[GenericRecord] = {
+    val converter = new JsonConverter[GenericRecord](resource.schema,
+      request.validationStrategy == Strict)
+    Future(converter.convert(request.payload))
+      .recover { case ex => throw AvroUtils.improveException(ex, resource) }
+  }
+
+  private def buildRecord(request: HydraRequest, record: GenericRecord, schema: Schema)
+                         (implicit ec: ExecutionContext): Future[JdbcRecord] = {
+    Future {
+      val table = request.metadataValue(TABLE_PARAM).getOrElse(schema.getName)
+
+      val dbProfile = request.metadataValue(DB_PROFILE_PARAM)
+        .getOrElse(throw new IllegalArgumentException(s"A db profile name is required ${DB_PROFILE_PARAM}]."))
+
+      JdbcRecord(table, Some(JdbcRecordFactory.pk(request, schema)), record, dbProfile)
+    }
+  }
+}
+
+object JdbcRecordFactory {
   val PRIMARY_KEY_PARAM = "hydra-db-primary-key"
 
   val TABLE_PARAM = "hydra-dtable"
 
   val DB_PROFILE_PARAM = "hydra-db-profile"
 
-  lazy val schemaResourceLoader = new SchemaResourceLoader(schemaRegistry.registryUrl, schemaRegistry.registryClient)
-
-  override def build(request: HydraRequest): Try[JdbcRecord] = {
-    val schemaResource: Try[SchemaResource] = Try {
-      val subject = request.metadataValue(HYDRA_SCHEMA_PARAM)
-        .getOrElse(throw new IllegalArgumentException(s"A schema name is required [${HYDRA_SCHEMA_PARAM}]."))
-      schemaResourceLoader.getResource(subject)
-    }
-
-    schemaResource.flatMap { s =>
-      val converter = new JsonConverter[GenericRecord](s.schema, request.validationStrategy == Strict)
-      Try(converter.convert(request.payload))
-        .flatMap(rec => buildRecord(request, rec, s.schema))
-        .recoverWith { case ex => throw schemaResource.map(r => AvroUtils.improveException(ex, r)).getOrElse(ex) }
-    }
-  }
 
   private[jdbc] def pk(request: HydraRequest, schema: Schema): Seq[Field] = {
     request.metadataValue(PRIMARY_KEY_PARAM).map(_.split(",")) match {
@@ -49,15 +73,10 @@ object JdbcRecordFactory extends RecordFactory[Seq[Field], GenericRecord] with C
     }
   }
 
-  private def buildRecord(request: HydraRequest, record: GenericRecord, schema: Schema): Try[JdbcRecord] = {
-    Try {
-      val table = request.metadataValue(TABLE_PARAM).getOrElse(schema.getName)
-
-      val dbProfile = request.metadataValue(DB_PROFILE_PARAM)
-        .getOrElse(throw new IllegalArgumentException(s"A db profile name is required ${DB_PROFILE_PARAM}]."))
-
-      JdbcRecord(table, Some(pk(request, schema)), record, dbProfile)
-    }
+  private[jdbc] def getSchemaName(request: HydraRequest): Try[String] = {
+    request.metadataValue(HYDRA_SCHEMA_PARAM).map(Success(_))
+      .getOrElse(Failure(InvalidRequestException(s"A schema name is required [${HYDRA_SCHEMA_PARAM}].",
+        request)))
   }
 }
 
@@ -70,4 +89,4 @@ object JdbcRecordFactory extends RecordFactory[Seq[Field], GenericRecord] with C
 case class JdbcRecord(destination: String, key: Option[Seq[Field]], payload: GenericRecord, dbProfile: String)
   extends HydraRecord[Seq[Field], GenericRecord]
 
-case class JdbcRecordMetadata(table:String, timestamp: Long = System.currentTimeMillis) extends RecordMetadata
+case class JdbcRecordMetadata(table: String, timestamp: Long = System.currentTimeMillis) extends RecordMetadata
