@@ -2,13 +2,17 @@ package hydra.jdbc
 
 import com.typesafe.config.Config
 import configs.syntax._
+import hydra.core.akka.SchemaFetchActor
 import hydra.core.ingest.{HydraRequest, Ingestor, TransportOps}
 import hydra.core.protocol._
 
 import scala.util.Try
 
 class JdbcIngestor extends Ingestor with TransportOps {
-  override def recordFactory = JdbcRecordFactory
+
+  private val schemaFetchActor = context.actorOf(SchemaFetchActor.props(applicationConfig))
+
+  override def recordFactory = new JdbcRecordFactory(schemaFetchActor)
 
   override def validateRequest(request: HydraRequest): Try[HydraRequest] = {
     Try {

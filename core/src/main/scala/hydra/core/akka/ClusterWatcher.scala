@@ -46,3 +46,4 @@ object ClusterWatcher {
   case class GetNodesByRole(role: String)
 
 }
+

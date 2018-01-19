@@ -39,9 +39,6 @@ class AvroRecordFactory(schemaResourceLoader: ActorRef)
 
   val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
 
-  //  lazy val schemaResourceLoader = new SchemaResourceLoader(schemaRegistry.registryUrl,
-  //    schemaRegistry.registryClient)
-
   //todo: config-driven
   private implicit val timeout = util.Timeout(3.seconds)
 
