@@ -17,8 +17,9 @@ package hydra.kafka.producer
 
 import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.databind.ObjectMapper
+import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_KEY_PARAM}
-import hydra.core.ingest.{HydraRequest, InvalidRequestException}
+import hydra.core.protocol.MissingMetadataException
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FunSpecLike, Matchers}
 
@@ -36,7 +37,7 @@ class JsonRecordFactorySpec extends Matchers
     it("errors with no topic on the request") {
       val request = HydraRequest("123","""{"name":test"}""")
       val rec = JsonRecordFactory.build(request)
-      whenReady(rec.failed)(_ shouldBe an[InvalidRequestException])
+      whenReady(rec.failed)(_ shouldBe an[MissingMetadataException])
     }
 
     it("handles invalid json") {
@@ -67,7 +68,7 @@ class JsonRecordFactorySpec extends Matchers
 
     it("throws an error if no topic is in the request") {
       val request = HydraRequest("123","""{"name":"test"}""")
-      whenReady(JsonRecordFactory.build(request).failed)(_ shouldBe a[InvalidRequestException])
+      whenReady(JsonRecordFactory.build(request).failed)(_ shouldBe a[MissingMetadataException])
     }
   }
 }

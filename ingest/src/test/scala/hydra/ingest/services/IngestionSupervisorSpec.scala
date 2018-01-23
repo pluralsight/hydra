@@ -36,6 +36,10 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
 
   val except = new IllegalArgumentException
 
+  val listener = TestProbe()
+
+  system.eventStream.subscribe(listener.ref, classOf[IngestionTimedOut])
+
   override def afterEach(): Unit = {
     system.stop(ingestor.ref)
   }
@@ -124,6 +128,13 @@ class IngestionSupervisorSpec extends TestKit(ActorSystem("hydra")) with Matcher
       ingestor.expectMsg(Validate(req))
       whenReady(TestRecordFactory.build(req))(r =>
         ingestor.expectMsg(Ingest(r, AckStrategy.NoAck)))
+      listener.expectMsgPF() {
+        case IngestionTimedOut(request, time, duration, ingestors) =>
+          request shouldBe req
+          time.getMillis should be < DateTime.now().getMillis
+          duration shouldBe 1.second
+          ingestors.substring(0, 8) shouldBe "ingestor"
+      }
       expectMsgPF() {
         case i: IngestionReport =>
           i.statusCode shouldBe 408

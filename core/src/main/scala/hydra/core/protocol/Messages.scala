@@ -21,8 +21,6 @@ trait HydraError extends HydraMessage {
 
 case class HydraApplicationError(cause: Throwable) extends HydraError
 
-case class IngestionError(cause: Throwable) extends HydraError
-
 case class Validate(req: HydraRequest) extends HydraMessage
 
 trait MessageValidationResult extends HydraMessage
@@ -35,6 +33,51 @@ case object Join extends HydraMessage
 
 case object Ignore extends HydraMessage
 
+trait IngestionError extends HydraError {
+  val request: HydraRequest
+  val time: DateTime
+  val statusCode: Int
+  val ingestor: String
+}
+
+case class GenericIngestionError(ingestor: String,
+                                 cause: Throwable,
+                                 request: HydraRequest,
+                                 statusCode: Int,
+                                 time: DateTime = DateTime.now) extends IngestionError
+
+/**
+  * Event emitted into the ActorSystem
+  * event stream by the ingestion supervisor when an ingestion times out.
+  *
+  * @param request
+  * @param time
+  * @param timeout
+  */
+case class IngestionTimedOut(request: HydraRequest, time: DateTime,
+                             timeout: FiniteDuration, ingestor: String) extends IngestionError {
+  val statusCode: Int = 408
+  val cause = new IngestionTimedOutException("Ingestion timed out.", timeout)
+}
+
+case class IngestionTimedOutException(msg: String, timeout: FiniteDuration)
+  extends RuntimeException(msg)
+
+
+case class InvalidRequestError(ingestor: String,
+                               request: HydraRequest,
+                               time: DateTime, cause: Throwable) extends IngestionError {
+  val statusCode: Int = 400
+}
+
+
+case class IngestorUnavailable(ingestor: String,
+                               cause: Throwable,
+                               request: HydraRequest,
+                               time: DateTime = DateTime.now) extends IngestionError {
+  override val statusCode: Int = 503
+}
+
 /**
   *
   * @param record
@@ -43,7 +86,8 @@ case object Ignore extends HydraMessage
   * @tparam K
   * @tparam V
   */
-case class Produce[K, V](record: HydraRecord[K, V], supervisor: ActorRef, ack: AckStrategy) extends HydraMessage
+case class Produce[K, V](record: HydraRecord[K, V], supervisor: ActorRef, ack: AckStrategy)
+  extends HydraMessage
 
 /**
   * Signals the record was accepted by a transport for production, but it hasn't been necessarily saved yet.
@@ -71,11 +115,6 @@ case class RecordProduced(md: RecordMetadata, supervisor: ActorRef) extends Hydr
 
 case class RecordNotProduced[K, V](record: HydraRecord[K, V], error: Throwable,
                                    supervisor: ActorRef) extends HydraMessage
-
-//todo:rename this class
-case class HydraIngestionError(ingestor: String, cause: Throwable,
-                               request: HydraRequest, time: DateTime = DateTime.now) extends HydraError
-
 
 sealed trait IngestorStatus extends HydraMessage with Product {
   val name: String = productPrefix
@@ -139,5 +178,7 @@ case class InitiateHttpRequest(request: HydraRequest, timeout: FiniteDuration,
 case class InitiateRequest(request: HydraRequest, timeout: FiniteDuration,
                            requestor: Option[ActorRef] = None)
 
+
+case class MissingMetadataException(name: String, msg: String) extends RuntimeException(msg)
 
 

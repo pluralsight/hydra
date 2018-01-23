@@ -1,7 +1,8 @@
 package hydra.kafka.producer
 
-import hydra.core.ingest.{HydraRequest, InvalidRequestException, RequestParams}
+import hydra.core.ingest.{HydraRequest, RequestParams}
 import hydra.core.ingest.RequestParams._
+import hydra.core.protocol.MissingMetadataException
 import hydra.core.transport.RecordFactory
 import hydra.kafka.producer.KafkaRecordFactory.KeyInterpreter
 
@@ -21,8 +22,8 @@ trait KafkaRecordFactory[K, V] extends RecordFactory[K, V] {
 
   def getTopic(request: HydraRequest): Try[String] = {
     request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM).map(Success(_))
-      .getOrElse(Failure(InvalidRequestException("No kafka topic present in the request.",
-        request)))
+      .getOrElse(Failure(MissingMetadataException(HYDRA_KAFKA_TOPIC_PARAM,
+        "No kafka topic present in the request.")))
   }
 
   /**
@@ -40,8 +41,8 @@ trait KafkaRecordFactory[K, V] extends RecordFactory[K, V] {
     val subject = request.metadataValue(RequestParams.HYDRA_SCHEMA_PARAM)
     request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM) match {
       case Some(topic) => Success(topic -> subject.getOrElse(topic))
-      case None => Failure(InvalidRequestException("No kafka topic present in the request.",
-        request))
+      case None => Failure(MissingMetadataException(HYDRA_KAFKA_TOPIC_PARAM,
+        "No kafka topic present in the request."))
     }
   }
 }
