@@ -33,18 +33,18 @@ case object Join extends HydraMessage
 
 case object Ignore extends HydraMessage
 
-trait IngestionError {
+trait IngestionError extends HydraError {
   val request: HydraRequest
   val time: DateTime
   val statusCode: Int
-  val cause: Throwable
+  val ingestor: String
 }
 
 case class GenericIngestionError(ingestor: String,
                                  cause: Throwable,
                                  request: HydraRequest,
                                  statusCode: Int,
-                                 time: DateTime = DateTime.now) extends HydraError with IngestionError
+                                 time: DateTime = DateTime.now) extends IngestionError
 
 /**
   * Event emitted into the ActorSystem
@@ -54,8 +54,8 @@ case class GenericIngestionError(ingestor: String,
   * @param time
   * @param timeout
   */
-case class IngestionTimedOut(request: HydraRequest, time: DateTime, timeout: FiniteDuration)
-  extends IngestionError {
+case class IngestionTimedOut(request: HydraRequest, time: DateTime,
+                             timeout: FiniteDuration, ingestor: String) extends IngestionError {
   val statusCode: Int = 408
   val cause = new IngestionTimedOutException("Ingestion timed out.", timeout)
 }
@@ -64,8 +64,9 @@ case class IngestionTimedOutException(msg: String, timeout: FiniteDuration)
   extends RuntimeException(msg)
 
 
-case class InvalidRequestError(request: HydraRequest, time: DateTime, cause: Throwable)
-  extends IngestionError {
+case class InvalidRequestError(ingestor: String,
+                               request: HydraRequest,
+                               time: DateTime, cause: Throwable) extends IngestionError {
   val statusCode: Int = 400
 }
 

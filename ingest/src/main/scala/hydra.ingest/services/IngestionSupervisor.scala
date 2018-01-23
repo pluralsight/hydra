@@ -53,7 +53,8 @@ class IngestionSupervisor(request: HydraRequest, requestor: ActorRef, info: Seq[
       sender ! Ingest(record, request.ackStrategy)
 
     case i: InvalidRequest =>
-      context.system.eventStream.publish(InvalidRequestError(request, start, i.cause))
+      context.system.eventStream.publish(
+        InvalidRequestError(ActorUtils.actorName(sender), request, start, i.cause))
       updateStatus(sender, i)
 
     case IngestorCompleted =>
@@ -78,7 +79,8 @@ class IngestionSupervisor(request: HydraRequest, requestor: ActorRef, info: Seq[
 
     case ReceiveTimeout =>
       log.error(s"Ingestion timed out for $request")
-      context.system.eventStream.publish(IngestionTimedOut(request, start, timeout))
+      context.system.eventStream.publish(IngestionTimedOut(request, start, timeout,
+        ingestors.keys.mkString(",")))
       timeoutIngestors()
       stop(StatusCodes.custom(408, s"No ingestors completed the request in ${timeout}."))
   }
