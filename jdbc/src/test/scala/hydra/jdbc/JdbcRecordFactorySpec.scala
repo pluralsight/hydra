@@ -8,8 +8,9 @@ import com.pluralsight.hydra.avro.JsonConverter
 import hydra.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.avro.resource.SchemaResource
 import hydra.core.akka.SchemaFetchActor.{FetchSchema, SchemaFetchResponse}
+import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_SCHEMA_PARAM
-import hydra.core.ingest.{HydraRequest, InvalidRequestException}
+import hydra.core.protocol.MissingMetadataException
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
 import org.scalatest.concurrent.ScalaFutures
@@ -75,7 +76,7 @@ class JdbcRecordFactorySpec extends TestKit(ActorSystem("hydra"))
 
     it("throws an error if no schema is in the request metadata") {
       val req = HydraRequest("1", "test")
-      whenReady(factory.build(req).failed)(_ shouldBe an[InvalidRequestException])
+      whenReady(factory.build(req).failed)(_ shouldBe an[MissingMetadataException])
     }
 
     it("throws an error if payload does not comply to schema") {
@@ -104,7 +105,7 @@ class JdbcRecordFactorySpec extends TestKit(ActorSystem("hydra"))
       val request = HydraRequest("123","""{"id":1, "name":"test", "rank" : 1}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:jdbc-test.avsc", JdbcRecordFactory.TABLE_PARAM -> "table")
       whenReady(factory.build(request)
-        .failed)(_ shouldBe an[IllegalArgumentException])
+        .failed)(_ shouldBe an[MissingMetadataException])
     }
 
     it("builds a record without a PK") {

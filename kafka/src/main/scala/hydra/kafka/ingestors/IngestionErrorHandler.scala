@@ -1,6 +1,7 @@
 package hydra.kafka.ingestors
 
 import akka.actor.Actor
+import akka.pattern.pipe
 import com.pluralsight.hydra.avro.JsonToAvroConversionException
 import configs.syntax._
 import hydra.avro.JsonToAvroConversionExceptionWithMetadata
@@ -8,11 +9,10 @@ import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.avro.resource.SchemaResourceLoader
 import hydra.common.config.ConfigSupport
 import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
-import hydra.core.protocol.HydraIngestionError
+import hydra.core.protocol.GenericIngestionError
 import hydra.core.transport.TransportSupervisor.Deliver
 import hydra.kafka.producer.AvroRecord
 import spray.json.DefaultJsonProtocol
-import akka.pattern.pipe
 
 import scala.concurrent.Future
 
@@ -44,11 +44,11 @@ class IngestionErrorHandler extends Actor with ConfigSupport with DefaultJsonPro
 
 
   override def receive: Receive = {
-    case error: HydraIngestionError =>
+    case error: GenericIngestionError =>
       pipe(buildPayload(error).map(Deliver(_))) to kafkaTransport
   }
 
-  private[ingestors] def buildPayload(err: HydraIngestionError): Future[AvroRecord] = {
+  private[ingestors] def buildPayload(err: GenericIngestionError): Future[AvroRecord] = {
     val schema: Option[String] = err.cause match {
       case e: JsonToAvroConversionException => Some(e.getSchema.toString)
       case e: JsonToAvroConversionExceptionWithMetadata => Some(e.res.location)

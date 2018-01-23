@@ -51,17 +51,17 @@ trait Ingestor extends InitializingActor {
       .recover { case e => InvalidRequest(e) }
   }
 
+
+
   override def initializationError(ex: Throwable): Receive = {
     case Publish(req) =>
       sender ! IngestorError(ex)
-      ingestionError(HydraIngestionError(thisActorName, ex, req))
+      context.system.eventStream.publish(IngestorUnavailable(thisActorName, ex, req))
     case _ =>
       sender ! IngestorError(ex)
   }
 
   def ingest(next: Actor.Receive) = compose(next)
-
-  def ingestionError(error: HydraIngestionError): Unit = context.system.eventStream.publish(error)
 
   override val supervisorStrategy = OneForOneStrategy() { case _ => SupervisorStrategy.Restart }
 }

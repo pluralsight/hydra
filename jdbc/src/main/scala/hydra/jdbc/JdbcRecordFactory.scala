@@ -8,8 +8,9 @@ import hydra.avro.resource.SchemaResource
 import hydra.avro.util.AvroUtils
 import hydra.common.config.ConfigSupport
 import hydra.core.akka.SchemaFetchActor.{FetchSchema, SchemaFetchResponse}
+import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_SCHEMA_PARAM
-import hydra.core.ingest.{HydraRequest, InvalidRequestException}
+import hydra.core.protocol.MissingMetadataException
 import hydra.core.transport.ValidationStrategy.Strict
 import hydra.core.transport.{HydraRecord, RecordFactory, RecordMetadata}
 import hydra.jdbc.JdbcRecordFactory.{DB_PROFILE_PARAM, TABLE_PARAM}
@@ -51,7 +52,8 @@ class JdbcRecordFactory(schemaResourceLoader: ActorRef) extends RecordFactory[Se
       val table = request.metadataValue(TABLE_PARAM).getOrElse(schema.getName)
 
       val dbProfile = request.metadataValue(DB_PROFILE_PARAM)
-        .getOrElse(throw new IllegalArgumentException(s"A db profile name is required ${DB_PROFILE_PARAM}]."))
+        .getOrElse(throw MissingMetadataException(DB_PROFILE_PARAM,
+          s"A db profile name is required ${DB_PROFILE_PARAM}]."))
 
       JdbcRecord(table, Some(JdbcRecordFactory.pk(request, schema)), record, dbProfile)
     }
@@ -75,8 +77,8 @@ object JdbcRecordFactory {
 
   private[jdbc] def getSchemaName(request: HydraRequest): Try[String] = {
     request.metadataValue(HYDRA_SCHEMA_PARAM).map(Success(_))
-      .getOrElse(Failure(InvalidRequestException(s"A schema name is required [${HYDRA_SCHEMA_PARAM}].",
-        request)))
+      .getOrElse(Failure(MissingMetadataException(HYDRA_SCHEMA_PARAM,
+        s"A schema name is required [${HYDRA_SCHEMA_PARAM}].")))
   }
 }
 

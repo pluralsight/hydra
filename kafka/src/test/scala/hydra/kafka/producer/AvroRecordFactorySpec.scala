@@ -23,8 +23,9 @@ import com.pluralsight.hydra.avro.{InvalidDataTypeException, JsonConverter, Requ
 import hydra.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.avro.resource.SchemaResource
 import hydra.core.akka.SchemaFetchActor.{FetchSchema, SchemaFetchResponse}
+import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams._
-import hydra.core.ingest.{HydraRequest, InvalidRequestException}
+import hydra.core.protocol.MissingMetadataException
 import org.apache.avro.Schema
 import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
 import org.scalatest.concurrent.ScalaFutures
@@ -159,7 +160,7 @@ class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
 
     it("throws an error if no topic is in the request") {
       val request = HydraRequest("123","""{"name":test"}""")
-      whenReady(factory.build(request).failed)(_ shouldBe an[InvalidRequestException])
+      whenReady(factory.build(request).failed)(_ shouldBe an[MissingMetadataException])
     }
 
     //validation
