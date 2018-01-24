@@ -63,3 +63,6 @@ build.properties
 *.log
 /api/.idea/
 !/kafka/src/main/scala/hydra/kafka/endpoints/StreamingTopicsEndpoint.scala
+
+# dot-env
+.env
