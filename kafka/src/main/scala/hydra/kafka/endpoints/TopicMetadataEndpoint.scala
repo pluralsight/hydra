@@ -1,6 +1,6 @@
 package hydra.kafka.endpoints
 
-import akka.actor.{ActorRefFactory, ActorSystem}
+import akka.actor.ActorSystem
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.ExceptionHandler
@@ -16,10 +16,11 @@ import hydra.kafka.consumer.KafkaConsumerProxy.{ListTopics, ListTopicsResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import org.apache.kafka.common.PartitionInfo
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 import scalacache._
 import scalacache.guava.GuavaCache
+import scalacache.modes.scalaFuture._
 
 /**
   * A cluster metadata endpoint implemented exclusively with akka streams.
@@ -30,7 +31,7 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val e: Execut
   extends RoutedEndpoints with LoggingAdapter with HydraDirectives with HydraKafkaJsonSupport
     with CorsSupport {
 
-  private implicit val cache = ScalaCache(GuavaCache())
+  private implicit val cache = GuavaCache[Map[String, Seq[PartitionInfo]]]
 
   private val showSystemTopics = applicationConfig
     .get[Boolean]("transports.kafka.show-system-topics").valueOrElse(false)
@@ -66,7 +67,7 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val e: Execut
 
   private def topics: Future[Map[String, Seq[PartitionInfo]]] = {
     implicit val timeout = Timeout(5 seconds)
-    cachingWithTTL("topics")(30.seconds) {
+    cachingF("topics")(ttl=Some(30.seconds)) {
       import akka.pattern.ask
       (consumerProxy ? ListTopics).mapTo[ListTopicsResponse].map { response =>
         response.topics.filter(t => filterSystemTopics(t._1)).map { case (k, v) => k -> v.toList }
