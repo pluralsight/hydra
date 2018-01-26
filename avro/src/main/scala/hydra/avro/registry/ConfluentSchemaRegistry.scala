@@ -27,9 +27,10 @@ class ConfluentSchemaRegistry(val registryClient: SchemaRegistryClient, val regi
 object ConfluentSchemaRegistry {
 
   import configs.syntax._
+  import scalacache.modes.sync._
   import scalacache._
 
-  private[this] implicit val scalaCache = ScalaCache(GuavaCache())
+  private[this] implicit val guavaCache = GuavaCache[ConfluentSchemaRegistry]
 
   val mockRegistry = new MockSchemaRegistryClient()
 
@@ -43,7 +44,7 @@ object ConfluentSchemaRegistry {
   def forConfig(path: String, config: Config = ConfigFactory.load()): ConfluentSchemaRegistry = {
     val usedConfig = if (path.isEmpty) config else config.getConfig(path)
     val url = registryUrl(usedConfig)
-    sync.caching(url) {
+    sync.caching(url)(ttl = None) {
       val identityMapCapacity = config.get[Int]("schema.registry.map.capacity").valueOrElse(1000)
       val client = if (url == "mock") mockRegistry else new CachedSchemaRegistryClient(url, identityMapCapacity)
       new ConfluentSchemaRegistry(client, url)

@@ -42,6 +42,7 @@ class SchemaFetchActor(config: Config, settings: Option[CircuitBreakerSettings])
 
   val loader = new SchemaResourceLoader(registry.registryUrl, registry.registryClient)
 
+  //TODO: Add RegisterSchema() message
   override def receive = {
     case FetchSchema(location) =>
       val futureResource = loader.retrieveSchema(location).map(SchemaFetchResponse(_))
