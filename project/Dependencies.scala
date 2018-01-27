@@ -8,7 +8,7 @@ object Dependencies {
   val slf4jVersion = "1.7.29"
   val log4jVersion = "2.7"
   val kxbmapConfigVersion = "0.4.4"
-  val typesafeConfigVersion = "1.3.1"
+  val typesafeConfigVersion = "1.3.2"
   val avroVersion = "1.8.1"
   val springVersion = "4.2.2.RELEASE"
   val jodaTimeVersion = "2.9.9"
