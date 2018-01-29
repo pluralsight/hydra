@@ -29,7 +29,6 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
         HttpMethods.POST,
         headers = Seq(RawHeader("hydra", "awesome"),
           RawHeader(RequestParams.HYDRA_VALIDATION_STRATEGY, "relaxed"),
-          RawHeader(RequestParams.HYDRA_DELIVERY_STRATEGY, "at-least-once"),
           RawHeader(RequestParams.HYDRA_ACK_STRATEGY, "replicated")),
         uri = "/test",
         entity = HttpEntity(MediaTypes.`application/json`, json))

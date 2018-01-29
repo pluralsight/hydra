@@ -54,12 +54,6 @@ object RequestParams {
   val HYDRA_RECORD_FORMAT_PARAM = "hydra-record-format"
 
   /**
-    * Specifies the delivery strategy. The options are AtMostOnce (default) or AtLeastOnce, which will retry using
-    * the at-least-once logic defined within Akka Persistence.
-    */
-  val HYDRA_DELIVERY_STRATEGY = "hydra-delivery-strategy"
-
-  /**
     * Defines how Avro messages should be validated.
     *
     * If set to `strict` (default), any incoming payload with fields that are not present in the schema will be rejected as invalid.
