@@ -4,14 +4,17 @@ import akka.actor.ActorSystem
 import akka.testkit.TestKit
 import com.typesafe.config.ConfigFactory
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
 class ConnectorSettingSpec extends TestKit(ActorSystem("test"))
   with Matchers
-  with FlatSpecLike {
+  with FlatSpecLike
+  with BeforeAndAfterAll {
 
+  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
+  
   "ConnectorSettings" should "read from configuration" in {
     val config = ConfigFactory.parseString(
       """

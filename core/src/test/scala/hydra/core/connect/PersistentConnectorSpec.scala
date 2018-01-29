@@ -11,7 +11,7 @@ import hydra.core.connect.PersistentConnector.{GetUnconfirmedCount, UnconfirmedC
 import hydra.core.ingest.{HydraRequest, IngestionReport}
 import hydra.core.protocol.{IngestorCompleted, IngestorTimeout, InitiateRequest}
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
@@ -22,7 +22,8 @@ class PersistentConnectorSpec extends TestKit(ActorSystem("hydra",
   with Matchers
   with FlatSpecLike
   with Eventually
-  with ImplicitSender {
+  with ImplicitSender
+with BeforeAndAfterAll {
 
   override implicit val patienceConfig = PatienceConfig(
     timeout = scaled(2000 millis),
@@ -33,6 +34,7 @@ class PersistentConnectorSpec extends TestKit(ActorSystem("hydra",
   val ingestorProbe = TestProbe("ingestor")
   mediator ! Subscribe(Settings.IngestTopicName, Some("test"), ingestorProbe.ref)
 
+  override def afterAll = TestKit.shutdownActorSystem(system,verifySystemShutdown = true)
 
   def connectorRef(name: String): ActorRef = system.actorOf(Props(new PersistentConnector {
     override val id: String = name

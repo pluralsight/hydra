@@ -37,6 +37,8 @@ class ConnectorSpec extends TestKit(ActorSystem("hydra",
       |
       """.stripMargin)
 
+  override def afterAll = TestKit.shutdownActorSystem(system,verifySystemShutdown = true)
+
   val connector = TestActorRef[Connector](Props(new Connector {
     override val id: String = "test"
 
