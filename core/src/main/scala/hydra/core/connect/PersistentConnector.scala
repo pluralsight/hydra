@@ -35,6 +35,8 @@ trait PersistentConnector extends Connector with PersistentActor with AtLeastOnc
     case RequestReceived(r) => deliver(publisher.path) { id =>
       publishRequest(r.withCorrelationId(id.toString))
     }
-    case RequestConfirmed(id) => confirmDelivery(id)
+    case RequestConfirmed(id) =>
+      log.debug("CONFIRMED " + id)
+      confirmDelivery(id)
   }
 }

@@ -9,6 +9,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import hydra.core.Settings
 import hydra.core.ingest.{HydraRequest, IngestionReport}
 import hydra.core.protocol.{IngestorCompleted, IngestorTimeout, InitiateRequest}
+import org.scalatest.concurrent.Eventually
 import org.scalatest.{FlatSpecLike, Matchers}
 
 import scala.collection.mutable.ListBuffer
@@ -18,7 +19,13 @@ class PersistentConnectorSpec extends TestKit(ActorSystem("hydra",
   config = ConfigFactory.parseString("akka.actor.provider=cluster")
     .withFallback(ConfigFactory.load())))
   with Matchers
-  with FlatSpecLike {
+  with FlatSpecLike
+  with Eventually {
+
+  override implicit val patienceConfig = PatienceConfig(
+    timeout = scaled(2000 millis),
+    interval = scaled(100 millis)
+  )
 
   val mediator = DistributedPubSub(system).mediator
   val ingestor = TestProbe("ingestor")
@@ -39,7 +46,8 @@ class PersistentConnectorSpec extends TestKit(ActorSystem("hydra",
         r.correlationId should not be "123" //should be provided by akka now
     }
 
-    connector ! IngestionReport("123", Map.empty, 200) //remove from journal
+    connector ! IngestionReport("123", Map.empty, 200)
+    system.stop(connector)
   }
 
   it should "publish UnconfirmedWarning messages to the event stream" in {
@@ -57,6 +65,7 @@ class PersistentConnectorSpec extends TestKit(ActorSystem("hydra",
         statusCode shouldBe 503
     }
     system.eventStream.unsubscribe(listener.ref)
+    system.stop(connector)
   }
 
   it should "trigger UnconfirmedWarning in the absence of ingestion reports" in {
@@ -76,6 +85,7 @@ class PersistentConnectorSpec extends TestKit(ActorSystem("hydra",
         statusCode shouldBe 503
     }
     system.eventStream.unsubscribe(listener.ref)
+    system.stop(c)
   }
 
   it should "confirm delivery" in {
@@ -86,11 +96,18 @@ class PersistentConnectorSpec extends TestKit(ActorSystem("hydra",
       override def config: Config = ConfigFactory.empty()
     }), "tc")
 
-    testConnector ! HydraRequest("confirm", "test")
-    awaitCond(testConnector.underlyingActor.numberOfUnconfirmed == 1,
-      max = 10 seconds, interval = 1 second)
-    testConnector ! IngestionReport("confirm", Map("test" -> IngestorCompleted), 200)
-    awaitCond(testConnector.underlyingActor.numberOfUnconfirmed == 0)
+    eventually {
+      testConnector ! HydraRequest("1234", "test")
+      testConnector.underlyingActor.numberOfUnconfirmed should be > 1
+    }
+
+    val unconfirmed = testConnector.underlyingActor.numberOfUnconfirmed
+
+    eventually {
+      testConnector ! IngestionReport("1234", Map("test" -> IngestorCompleted), 200)
+      testConnector.underlyingActor.numberOfUnconfirmed shouldBe unconfirmed - 1
+    }
+    system.stop(testConnector)
   }
 
   it should "publish errors to the stream" in {
@@ -111,5 +128,6 @@ class PersistentConnectorSpec extends TestKit(ActorSystem("hydra",
         msg shouldBe "Request Timeout"
     }
     system.eventStream.unsubscribe(listener.ref)
+    system.stop(testConnector)
   }
 }
