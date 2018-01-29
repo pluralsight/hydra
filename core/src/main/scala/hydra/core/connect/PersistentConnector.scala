@@ -2,6 +2,7 @@ package hydra.core.connect
 
 import akka.persistence.AtLeastOnceDelivery.UnconfirmedWarning
 import akka.persistence.{AtLeastOnceDelivery, PersistentActor}
+import hydra.core.connect.PersistentConnector.{GetUnconfirmedCount, UnconfirmedCount}
 import hydra.core.ingest.{HydraRequest, IngestionReport}
 import hydra.core.protocol.HydraMessage
 
@@ -15,11 +16,13 @@ trait PersistentConnector extends Connector with PersistentActor with AtLeastOnc
   override def persistenceId: String = id
 
   override def receiveCommand: Receive = {
-    case req: HydraRequest =>  persist(RequestReceived(req))(updateState)
+    case req: HydraRequest => persist(RequestReceived(req))(updateState)
 
     case IngestionReport(id, _, 200) ⇒ persist(RequestConfirmed(id.toLong))(updateState)
 
     case r: IngestionReport => onIngestionError(r)
+
+    case GetUnconfirmedCount => sender ! UnconfirmedCount(numberOfUnconfirmed)
 
     case UnconfirmedWarning(deliveries) =>
       val msg = s"There are ${deliveries.size} unconfirmed messages from connector $id."
@@ -35,8 +38,14 @@ trait PersistentConnector extends Connector with PersistentActor with AtLeastOnc
     case RequestReceived(r) => deliver(publisher.path) { id =>
       publishRequest(r.withCorrelationId(id.toString))
     }
-    case RequestConfirmed(id) =>
-      log.debug("CONFIRMED " + id)
-      confirmDelivery(id)
+    case RequestConfirmed(id) => confirmDelivery(id)
   }
+}
+
+object PersistentConnector {
+
+  case object GetUnconfirmedCount
+
+  case class UnconfirmedCount(count:Long)
+
 }

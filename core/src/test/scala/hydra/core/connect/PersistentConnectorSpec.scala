@@ -4,9 +4,10 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.Subscribe
 import akka.persistence.AtLeastOnceDelivery.{UnconfirmedDelivery, UnconfirmedWarning}
-import akka.testkit.{TestActorRef, TestKit, TestProbe}
+import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.{Config, ConfigFactory}
 import hydra.core.Settings
+import hydra.core.connect.PersistentConnector.{GetUnconfirmedCount, UnconfirmedCount}
 import hydra.core.ingest.{HydraRequest, IngestionReport}
 import hydra.core.protocol.{IngestorCompleted, IngestorTimeout, InitiateRequest}
 import org.scalatest.concurrent.Eventually
@@ -20,7 +21,8 @@ class PersistentConnectorSpec extends TestKit(ActorSystem("hydra",
     .withFallback(ConfigFactory.load())))
   with Matchers
   with FlatSpecLike
-  with Eventually {
+  with Eventually
+  with ImplicitSender {
 
   override implicit val patienceConfig = PatienceConfig(
     timeout = scaled(2000 millis),
@@ -28,8 +30,8 @@ class PersistentConnectorSpec extends TestKit(ActorSystem("hydra",
   )
 
   val mediator = DistributedPubSub(system).mediator
-  val ingestor = TestProbe("ingestor")
-  mediator ! Subscribe(Settings.IngestTopicName, Some("test"), ingestor.ref)
+  val ingestorProbe = TestProbe("ingestor")
+  mediator ! Subscribe(Settings.IngestTopicName, Some("test"), ingestorProbe.ref)
 
 
   def connectorRef(name: String): ActorRef = system.actorOf(Props(new PersistentConnector {
@@ -41,7 +43,7 @@ class PersistentConnectorSpec extends TestKit(ActorSystem("hydra",
   "A PersistentConnector" should "persist HydraRequests" in {
     val connector = connectorRef("persist")
     connector ! HydraRequest("123", "test")
-    ingestor.expectMsgPF() {
+    ingestorProbe.expectMsgPF() {
       case InitiateRequest(r, _, _) =>
         r.correlationId should not be "123" //should be provided by akka now
     }
@@ -56,7 +58,7 @@ class PersistentConnectorSpec extends TestKit(ActorSystem("hydra",
     system.eventStream.subscribe(listener.ref, classOf[HydraConnectIngestError])
     val req = HydraRequest("123", "test")
     var msgs = new ListBuffer[UnconfirmedDelivery]()
-    for (i <- 1 to 15) msgs += UnconfirmedDelivery(i, ingestor.ref.path, req)
+    for (i <- 1 to 15) msgs += UnconfirmedDelivery(i, ingestorProbe.ref.path, req)
     connector ! UnconfirmedWarning(msgs.toList)
     listener.expectMsgPF() {
       case HydraConnectIngestError(source, connectorId, statusCode, _) =>
@@ -89,29 +91,32 @@ class PersistentConnectorSpec extends TestKit(ActorSystem("hydra",
   }
 
   it should "confirm delivery" in {
-
-    val testConnector = TestActorRef[PersistentConnector](Props(new PersistentConnector {
+    val testConnector = system.actorOf(Props(new PersistentConnector {
       override val id: String = "test-confirm"
 
       override def config: Config = ConfigFactory.empty()
     }), "tc")
 
+    testConnector ! HydraRequest("1234", "test")
+
+    testConnector ! GetUnconfirmedCount
+
     eventually {
-      testConnector ! HydraRequest("1234", "test")
-      testConnector.underlyingActor.numberOfUnconfirmed should be > 1
+      expectMsg(UnconfirmedCount(1))
+      testConnector ! GetUnconfirmedCount
     }
-
-    val unconfirmed = testConnector.underlyingActor.numberOfUnconfirmed
-
+    //we use one here because we know this will be the persistence delivery id.
+    testConnector ! IngestionReport("1", Map("test" -> IngestorCompleted), 200)
+    testConnector ! GetUnconfirmedCount
     eventually {
-      testConnector ! IngestionReport("1234", Map("test" -> IngestorCompleted), 200)
-      testConnector.underlyingActor.numberOfUnconfirmed shouldBe unconfirmed - 1
+      expectMsg(UnconfirmedCount(0))
+      testConnector ! GetUnconfirmedCount
     }
     system.stop(testConnector)
   }
 
   it should "publish errors to the stream" in {
-    val testConnector = TestActorRef[PersistentConnector](Props(new PersistentConnector {
+    val testConnector = system.actorOf(Props(new PersistentConnector {
       override val id: String = "publish"
 
       override def config: Config = ConfigFactory.empty()
