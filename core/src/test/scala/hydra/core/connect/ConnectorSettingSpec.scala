@@ -14,7 +14,7 @@ class ConnectorSettingSpec extends TestKit(ActorSystem("test"))
   with BeforeAndAfterAll {
 
   override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
-  
+
   "ConnectorSettings" should "read from configuration" in {
     val config = ConfigFactory.parseString(
       """

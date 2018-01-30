@@ -8,7 +8,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import hydra.core.Settings
 import hydra.core.ingest.{HydraRequest, IngestionReport}
 import hydra.core.protocol.{IngestorCompleted, IngestorTimeout, InitiateRequest}
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
@@ -16,7 +16,8 @@ class ConnectorSpec extends TestKit(ActorSystem("hydra",
   config = ConfigFactory.parseString("akka.actor.provider=cluster")
     .withFallback(ConfigFactory.load())))
   with Matchers
-  with FlatSpecLike {
+  with FlatSpecLike
+  with BeforeAndAfterAll {
 
   val mediator = DistributedPubSub(system).mediator
   val ingestor = TestProbe("ingestor")
@@ -37,7 +38,7 @@ class ConnectorSpec extends TestKit(ActorSystem("hydra",
       |
       """.stripMargin)
 
-  override def afterAll = TestKit.shutdownActorSystem(system,verifySystemShutdown = true)
+  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 
   val connector = TestActorRef[Connector](Props(new Connector {
     override val id: String = "test"
