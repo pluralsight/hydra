@@ -16,30 +16,33 @@
 
 package hydra.ingest.http
 
+import akka.pattern.{ ask }
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.Location
-import akka.http.scaladsl.server.{ExceptionHandler, Route}
+import akka.http.scaladsl.server.{ ExceptionHandler, Route }
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.CorsSupport
-import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
+import hydra.core.marshallers.{ GenericServiceResponse, HydraJsonSupport }
 import io.confluent.kafka.schemaregistry.client.SchemaMetadata
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.Schema.Parser
 import org.apache.avro.SchemaParseException
-
+import hydra.core.akka.SchemaFetchActor._
+import hydra.core.akka.SchemaFetchActor
 import scala.concurrent.ExecutionContext
-
+import scala.concurrent.duration._
+import akka.util.Timeout
 
 /**
-  * A wrapper around Confluent's schema registry that facilitates schema registration and retrieval.
-  *
-  * Created by alexsilva on 2/13/16.
-  */
+ * A wrapper around Confluent's schema registry that facilitates schema registration and retrieval.
+ *
+ * Created by alexsilva on 2/13/16.
+ */
 class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionContext)
   extends RoutedEndpoints with ConfigSupport with LoggingAdapter with HydraJsonSupport with CorsSupport {
 
@@ -47,6 +50,8 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
 
   //TODO: Don't use this, user the SchemaFetchActor instead
   private val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
+
+  private val schemaFetchActor = system.actorOf(SchemaFetchActor.props(applicationConfig))
 
   private val client = schemaRegistry.registryClient
 
@@ -78,14 +83,16 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
           post {
             entity(as[String]) { json =>
               extractRequest { request =>
-                //move all of this to SchemaFetchActor
+                implicit val timeout = Timeout(3.seconds)
                 val schema = new Parser().parse(json)
+                //TODO: validate schema name
                 val name = schema.getNamespace() + "." + schema.getName()
                 log.debug(s"Registering schema $name: $json")
-                val id = client.register(name + prefix, schema)
-                //
-                respondWithHeader(Location(request.uri.copy(path = request.uri.path / name))) {
-                  complete(Created, SchemasEndpointResponse(id, 1, json))
+
+                onSuccess((schemaFetchActor ? RegisterSchema(name + prefix, schema)).mapTo[Int]) { id =>
+                  respondWithHeader(Location(request.uri.copy(path = request.uri.path / name))) {
+                    complete(Created, SchemasEndpointResponse(id, 1, json))
+                  }
                 }
               }
             }
@@ -93,7 +100,6 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
       }
     }
   }
-
 
   val excptHandler = ExceptionHandler {
     case e: RestClientException if (e.getErrorCode == 40401) =>
@@ -108,7 +114,8 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
     case e: Exception =>
       extractUri { uri =>
         log.warn(s"Request to $uri could not be handled normally")
-        complete(BadRequest,
+        complete(
+          BadRequest,
           GenericServiceResponse(400, s"Unable to complete request for ${uri.path.tail} : ${e.getMessage}"))
       }
   }

@@ -1,23 +1,25 @@
 package hydra.core.akka
 
-import akka.actor.{Actor, Props}
-import akka.pattern.{CircuitBreaker, pipe}
+import akka.actor.{ Actor, Props }
+import akka.pattern.{ CircuitBreaker, pipe }
 import com.typesafe.config.Config
-import hydra.avro.registry.{ConfluentSchemaRegistry, SchemaRegistryException}
-import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
+import hydra.avro.registry.{ ConfluentSchemaRegistry, SchemaRegistryException }
+import hydra.avro.resource.{ SchemaResource, SchemaResourceLoader }
 import hydra.common.logging.LoggingAdapter
-import hydra.core.akka.SchemaFetchActor.{FetchSchema, SchemaFetchResponse}
+import hydra.core.akka.SchemaFetchActor.{ FetchSchema, RegisterSchema, SchemaFetchResponse }
 import hydra.core.protocol.HydraApplicationError
+import org.apache.avro.Schema
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
+import scala.util.{ Failure, Success, Try }
 
 /**
-  * This actor serves as an proxy between the handler registry
-  * and the application.
-  *
-  * Created by alexsilva on 12/5/16.
-  */
+ * This actor serves as an proxy between the handler registry
+ * and the application.
+ *
+ * Created by alexsilva on 12/5/16.
+ */
 class SchemaFetchActor(config: Config, settings: Option[CircuitBreakerSettings]) extends Actor
   with LoggingAdapter {
 
@@ -42,11 +44,16 @@ class SchemaFetchActor(config: Config, settings: Option[CircuitBreakerSettings])
 
   val loader = new SchemaResourceLoader(registry.registryUrl, registry.registryClient)
 
-  //TODO: Add RegisterSchema() message
+  //val futureSchemaId: Future[RegistryClientResponse] = registryClient.register("subject", "schema")
+
   override def receive = {
     case FetchSchema(location) =>
       val futureResource = loader.retrieveSchema(location).map(SchemaFetchResponse(_))
       breaker.withCircuitBreaker(futureResource, registryFailure) pipeTo sender
+    case RegisterSchema(subject, schema) => {
+      val id = registry.registryClient.register(subject, schema)
+      breaker.withCircuitBreaker(Future(id)) pipeTo sender
+    }
   }
 
   private def notifyOnOpen() = {
@@ -70,6 +77,7 @@ class CircuitBreakerSettings(config: Config) {
 object SchemaFetchActor {
 
   case class FetchSchema(location: String)
+  case class RegisterSchema(subject: String, schema: Schema)
 
   case class SchemaFetchResponse(schema: SchemaResource)
 
@@ -77,4 +85,3 @@ object SchemaFetchActor {
     classOf[SchemaFetchActor], config, settings)
 
 }
-
