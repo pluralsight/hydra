@@ -26,6 +26,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scalacache._
 import scalacache.guava.GuavaCache
+import scalacache.modes.scalaFuture._
 
 /**
   * Created by alexsilva on 1/20/17.
@@ -44,7 +45,7 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
 
   import SchemaResourceLoader._
 
-  implicit val cache = ScalaCache(GuavaCache())
+  implicit val cache = GuavaCache[SchemaResource]
 
   private val loader = new DefaultResourceLoader()
 
@@ -69,21 +70,22 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
   }
 
   private def getLatestSchema(subject: String)
-                             (implicit ec: ExecutionContext): Future[RegistrySchemaResource] = {
-    cachingWithTTL(subject)(5.minutes) {
+                             (implicit ec: ExecutionContext): Future[SchemaResource] = {
+    cachingF(subject)(ttl = Some(5.minutes)) {
       Future(registry.getLatestSchemaMetadata(subject))
         .map(md => registry.getByID(md.getId) -> md)
         .map(schema => RegistrySchemaResource(registryUrl, subject, schema._2.getId, schema._2.getVersion, schema._1))
         .recoverWith {
-          case e: ConnectException => Future.failed(e)
-          case e: Exception => Future.failed(SchemaRegistryException(e, subject))
+          case e: ConnectException => throw e
+          case e: Exception => throw new SchemaRegistryException(e, subject)
         }
     }
   }
 
   private def loadFromCache(subject: String, version: String)
-                           (implicit ec: ExecutionContext): Future[RegistrySchemaResource] = {
-    cachingWithTTL(subject, version)(5.minutes) {
+                           (implicit ec: ExecutionContext): Future[SchemaResource] = {
+
+    cachingF(subject, version)(ttl = Some(5.minutes)) { //we don't need a TTL here
       loadFromRegistry(subject, version)
     }
   }
@@ -95,7 +97,8 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
       .map(m => registry.getByID(m.getId) -> m)
       .map(schema => RegistrySchemaResource(registryUrl, subject, schema._2.getId(), version.toInt, schema._1))
       .recoverWith {
-        case e: Exception => Future.failed(SchemaRegistryException(e, subject))
+        case e: ConnectException => throw e
+        case e: Exception => throw new SchemaRegistryException(e, subject)
       }
   }
 

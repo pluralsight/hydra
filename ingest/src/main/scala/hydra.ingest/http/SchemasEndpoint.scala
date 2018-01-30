@@ -45,6 +45,7 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
 
   implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
 
+  //TODO: Don't use this, user the SchemaFetchActor instead
   private val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
 
   private val client = schemaRegistry.registryClient
@@ -77,10 +78,12 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
           post {
             entity(as[String]) { json =>
               extractRequest { request =>
+                //move all of this to SchemaFetchActor
                 val schema = new Parser().parse(json)
                 val name = schema.getNamespace() + "." + schema.getName()
                 log.debug(s"Registering schema $name: $json")
                 val id = client.register(name + prefix, schema)
+                //
                 respondWithHeader(Location(request.uri.copy(path = request.uri.path / name))) {
                   complete(Created, SchemasEndpointResponse(id, 1, json))
                 }
