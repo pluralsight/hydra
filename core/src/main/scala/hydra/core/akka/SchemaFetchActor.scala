@@ -6,9 +6,10 @@ import com.typesafe.config.Config
 import hydra.avro.registry.{ ConfluentSchemaRegistry, SchemaRegistryException }
 import hydra.avro.resource.{ SchemaResource, SchemaResourceLoader }
 import hydra.common.logging.LoggingAdapter
-import hydra.core.akka.SchemaFetchActor.{ FetchSchema, RegisterSchema, SchemaFetchResponse }
+import hydra.core.akka.SchemaFetchActor.{ FetchSchema, RegisterSchema, SchemaFetchResponse, RegisteredSchema }
 import hydra.core.protocol.HydraApplicationError
 import org.apache.avro.Schema
+import io.confluent.kafka.schemaregistry.client.SchemaMetadata
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -44,16 +45,20 @@ class SchemaFetchActor(config: Config, settings: Option[CircuitBreakerSettings])
 
   val loader = new SchemaResourceLoader(registry.registryUrl, registry.registryClient)
 
-  //val futureSchemaId: Future[RegistryClientResponse] = registryClient.register("subject", "schema")
+  def traceResult[T](message: String, result: T) = {
+    log.trace(message, result)
+    result
+  }
 
   override def receive = {
     case FetchSchema(location) =>
       val futureResource = loader.retrieveSchema(location).map(SchemaFetchResponse(_))
       breaker.withCircuitBreaker(futureResource, registryFailure) pipeTo sender
-    case RegisterSchema(subject, schema) => {
-      val id = registry.registryClient.register(subject, schema)
-      breaker.withCircuitBreaker(Future(id)) pipeTo sender
-    }
+    case RegisterSchema(subject: String, schema: Schema) =>
+      val name = schema.getNamespace() + "." + schema.getName()
+      val schemaId = registry.registryClient.register(subject, schema)
+      val schemaMetadata = registry.registryClient.getLatestSchemaMetadata(subject)
+      sender ! RegisteredSchema(name, schemaMetadata.getId, schemaMetadata.getVersion, schemaMetadata.getSchema)
   }
 
   private def notifyOnOpen() = {
@@ -78,6 +83,7 @@ object SchemaFetchActor {
 
   case class FetchSchema(location: String)
   case class RegisterSchema(subject: String, schema: Schema)
+  case class RegisteredSchema(name: String, id: Int, version: Int, schema: String)
 
   case class SchemaFetchResponse(schema: SchemaResource)
 

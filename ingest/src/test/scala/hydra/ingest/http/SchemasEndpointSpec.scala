@@ -6,16 +6,19 @@ import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.core.marshallers.HydraJsonSupport
 import org.apache.avro.Schema
-import org.scalatest.{Matchers, WordSpecLike}
+import org.scalatest.{ Matchers, WordSpecLike }
 
 import scala.concurrent.duration._
 import scala.io.Source
 
 /**
-  * Created by alexsilva on 5/12/17.
-  */
-class SchemasEndpointSpec extends Matchers with WordSpecLike with ScalatestRouteTest
-  with HydraJsonSupport with ConfigSupport {
+ * Created by alexsilva on 5/12/17.
+ */
+class SchemasEndpointSpec extends Matchers
+  with WordSpecLike
+  with ScalatestRouteTest
+  with HydraJsonSupport
+  with ConfigSupport {
 
   val schemasRoute = new SchemasEndpoint().route
   implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)

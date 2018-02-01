@@ -48,14 +48,12 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
 
   implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
 
+  private[hydra] val prefix = "-value"
   //TODO: Don't use this, user the SchemaFetchActor instead
   private val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
-
   private val schemaFetchActor = system.actorOf(SchemaFetchActor.props(applicationConfig))
-
+  private val schemasEndpointFacade = new SchemasEndpointFacade(schemaFetchActor, prefix)
   private val client = schemaRegistry.registryClient
-
-  private[hydra] val prefix = "-value"
 
   override def route: Route = cors(settings) {
     pathPrefix("schemas") {
@@ -80,23 +78,21 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
             complete(OK, SchemasEndpointResponse(meta.getId, meta.getVersion, meta.getSchema))
           }
         } ~
-          post {
-            entity(as[String]) { json =>
-              extractRequest { request =>
-                implicit val timeout = Timeout(3.seconds)
-                val schema = new Parser().parse(json)
-                //TODO: validate schema name
-                val name = schema.getNamespace() + "." + schema.getName()
-                log.debug(s"Registering schema $name: $json")
+          post { registerNewSchema }
+      }
+    }
+  }
 
-                onSuccess((schemaFetchActor ? RegisterSchema(name + prefix, schema)).mapTo[Int]) { id =>
-                  respondWithHeader(Location(request.uri.copy(path = request.uri.path / name))) {
-                    complete(Created, SchemasEndpointResponse(id, 1, json))
-                  }
-                }
-              }
-            }
+  def registerNewSchema = {
+    entity(as[String]) { json =>
+      extractRequest { request =>
+        implicit val timeout = Timeout(3.seconds)
+
+        onSuccess(schemasEndpointFacade.registerSchema(json)) { registeredSchema =>
+          respondWithHeader(Location(request.uri.copy(path = request.uri.path / registeredSchema.name))) {
+            complete(Created, SchemasEndpointResponse(registeredSchema))
           }
+        }
       }
     }
   }
@@ -126,4 +122,26 @@ case class SchemasEndpointResponse(id: Int, version: Int, schema: String)
 object SchemasEndpointResponse {
   def apply(meta: SchemaMetadata): SchemasEndpointResponse =
     SchemasEndpointResponse(meta.getId, meta.getVersion, meta.getSchema)
+  def apply(registeredSchema: RegisteredSchema): SchemasEndpointResponse =
+    SchemasEndpointResponse(registeredSchema.id, registeredSchema.version, registeredSchema.schema)
+}
+
+import akka.actor.ActorRef
+class SchemasEndpointFacade(schemaFetchActor: ActorRef, schemaNameSuffix: String) extends LoggingAdapter {
+  import scala.concurrent.Future
+  import org.apache.avro.Schema
+  import akka.actor.ActorRef
+  import org.apache.avro.Schema.Parser
+  import hydra.core.akka.SchemaFetchActor._
+  import akka.util.Timeout
+  import io.confluent.kafka.schemaregistry.client.SchemaMetadata
+
+  def registerSchema(schemaJson: String)(implicit ec: ExecutionContext, timeout: Timeout): Future[RegisteredSchema] = {
+    val schema = new Parser().parse(schemaJson)
+    //TODO: validate schema name
+    val name = schema.getNamespace() + "." + schema.getName()
+    val subject = name + schemaNameSuffix
+    log.debug(s"Registering schema $name: $schemaJson")
+    (schemaFetchActor ? RegisterSchema(subject, schema)).mapTo[RegisteredSchema]
+  }
 }
