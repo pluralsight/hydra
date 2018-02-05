@@ -15,28 +15,29 @@
 
 package hydra.kafka.producer
 
-import java.io.{File, InputStream}
+import java.io.{ File, InputStream }
 
-import akka.actor.{Actor, ActorSystem, Props}
+import akka.actor.{ Actor, ActorSystem, Props }
 import akka.testkit.TestKit
 import com.fasterxml.jackson.databind.ObjectMapper
 import hydra.avro.resource.SchemaResource
-import hydra.core.akka.SchemaFetchActor.{FetchSchema, SchemaFetchResponse}
-import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_FORMAT_PARAM, HYDRA_SCHEMA_PARAM}
-import hydra.core.ingest.{HydraRequest, RequestParams}
+import hydra.core.akka.SchemaRegistryActor.{ FetchSchema, SchemaFetchResponse }
+import hydra.core.ingest.HydraRequest
+import hydra.core.ingest.RequestParams.{ HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_FORMAT_PARAM, HYDRA_SCHEMA_PARAM }
+import hydra.core.ingest.{ HydraRequest, RequestParams }
 import hydra.core.protocol.InvalidRequest
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecordBuilder
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.{ BeforeAndAfterAll, FunSpecLike, Matchers }
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.io.Source
 
 /**
-  * Created by alexsilva on 1/11/17.
-  */
+ * Created by alexsilva on 1/11/17.
+ */
 class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
   with Matchers
   with FunSpecLike
@@ -45,8 +46,7 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
 
   override implicit val patienceConfig = PatienceConfig(
     timeout = scaled(500 millis),
-    interval = scaled(100 millis)
-  )
+    interval = scaled(100 millis))
 
   val schemaResource = new SchemaResource {
 
@@ -90,7 +90,8 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
 
     it("handles delete records") {
       val request = HydraRequest("123", null)
-        .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic",
+        .withMetadata(
+          HYDRA_KAFKA_TOPIC_PARAM -> "test-topic",
           RequestParams.HYDRA_RECORD_KEY_PARAM -> "123")
       val record = factories.build(request)
       whenReady(record)(_ shouldBe DeleteTombstoneRecord("test-topic", Some("123")))
@@ -118,7 +119,7 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
     }
 
     it("validates json records") {
-      val request = HydraRequest("123","""{"name":"test"}""")
+      val request = HydraRequest("123", """{"name":"test"}""")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "json")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = factories.build(request)
@@ -126,7 +127,7 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
     }
 
     it("validates string records") {
-      val request = HydraRequest("123","""{"name":"test"}""")
+      val request = HydraRequest("123", """{"name":"test"}""")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "string")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = factories.build(request)
@@ -145,7 +146,7 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
     }
 
     it("invalidates unknown formats") {
-      val request = HydraRequest("123","""{"name":"test"}""")
+      val request = HydraRequest("123", """{"name":"test"}""")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "unknown-format")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = factories.build(request)

@@ -23,7 +23,7 @@ import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.avro.resource.SchemaResource
 import hydra.avro.util.AvroUtils
 import hydra.common.config.ConfigSupport
-import hydra.core.akka.SchemaFetchActor.{FetchSchema, SchemaFetchResponse}
+import hydra.core.akka.SchemaRegistryActor.{FetchSchema, SchemaFetchResponse}
 import hydra.core.ingest.HydraRequest
 import hydra.core.transport.ValidationStrategy.Strict
 import org.apache.avro.generic.GenericRecord

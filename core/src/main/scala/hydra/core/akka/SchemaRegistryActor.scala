@@ -6,7 +6,7 @@ import com.typesafe.config.Config
 import hydra.avro.registry.{ ConfluentSchemaRegistry, SchemaRegistryException }
 import hydra.avro.resource.{ SchemaResource, SchemaResourceLoader }
 import hydra.common.logging.LoggingAdapter
-import hydra.core.akka.SchemaFetchActor.{ FetchSchema, RegisterSchema, SchemaFetchResponse, RegisteredSchema }
+import hydra.core.akka.SchemaRegistryActor.{ FetchSchema, RegisterSchema, SchemaFetchResponse, RegisteredSchema }
 import hydra.core.protocol.HydraApplicationError
 import org.apache.avro.Schema
 import io.confluent.kafka.schemaregistry.client.SchemaMetadata
@@ -21,7 +21,7 @@ import scala.util.{ Failure, Success, Try }
  *
  * Created by alexsilva on 12/5/16.
  */
-class SchemaFetchActor(config: Config, settings: Option[CircuitBreakerSettings]) extends Actor
+class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSettings]) extends Actor
   with LoggingAdapter {
 
   import context.dispatcher
@@ -79,7 +79,7 @@ class CircuitBreakerSettings(config: Config) {
     .valueOrElse(30 seconds)
 }
 
-object SchemaFetchActor {
+object SchemaRegistryActor {
 
   case class FetchSchema(location: String)
   case class RegisterSchema(subject: String, schema: Schema)
@@ -88,6 +88,6 @@ object SchemaFetchActor {
   case class SchemaFetchResponse(schema: SchemaResource)
 
   def props(config: Config, settings: Option[CircuitBreakerSettings] = None): Props = Props(
-    classOf[SchemaFetchActor], config, settings)
+    classOf[SchemaRegistryActor], config, settings)
 
 }

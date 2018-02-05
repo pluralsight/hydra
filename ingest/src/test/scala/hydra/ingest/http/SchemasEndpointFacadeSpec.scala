@@ -6,7 +6,7 @@ import scala.concurrent.duration._
 import akka.actor.ActorSystem
 import akka.testkit.{ TestKit, TestProbe }
 import akka.util.Timeout
-import hydra.core.akka.SchemaFetchActor.RegisterSchema
+import hydra.core.akka.SchemaRegistryActor.RegisterSchema
 import org.apache.avro.SchemaParseException
 import org.scalatest.WordSpecLike
 
@@ -55,7 +55,7 @@ class SchemasEndpointFacadeSpec extends TestKit(ActorSystem("SchemasEndpointFaca
       }
     }
 
-    "send RegisterSchema message to SchemaFetchActor if schema is valid" in {
+    "send RegisterSchema message to SchemaRegistryActor if schema is valid" in {
       val (schemaRegistryActor, subject) = fixture()
       subject.registerSchema(validSchema)
       schemaRegistryActor.expectMsgType[RegisterSchema]

@@ -16,18 +16,18 @@
 
 package hydra.kafka.producer
 
-import hydra.core.akka.SchemaFetchActor
-import hydra.core.ingest.{Ingestor, TransportOps}
+import hydra.core.akka.SchemaRegistryActor
+import hydra.core.ingest.{ Ingestor, TransportOps }
 
 /**
-  * Mix this trait in to get a KafkaProducerActor automatically looked up.
-  *
-  * Created by alexsilva on 12/29/15.
-  */
+ * Mix this trait in to get a KafkaProducerActor automatically looked up.
+ *
+ * Created by alexsilva on 12/29/15.
+ */
 trait KafkaProducerSupport extends TransportOps {
   this: Ingestor =>
 
   override def transportName: String = "kafka"
 
-  val schemaFetchActor = context.actorOf(SchemaFetchActor.props(applicationConfig))
+  val schemaRegistryActor = context.actorOf(SchemaRegistryActor.props(applicationConfig))
 }

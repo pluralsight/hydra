@@ -22,7 +22,7 @@ import akka.testkit.TestKit
 import com.pluralsight.hydra.avro.{InvalidDataTypeException, JsonConverter, RequiredFieldMissingException, UndefinedFieldsException}
 import hydra.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.avro.resource.SchemaResource
-import hydra.core.akka.SchemaFetchActor.{FetchSchema, SchemaFetchResponse}
+import hydra.core.akka.SchemaRegistryActor.{FetchSchema, SchemaFetchResponse}
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams._
 import hydra.core.protocol.MissingMetadataException

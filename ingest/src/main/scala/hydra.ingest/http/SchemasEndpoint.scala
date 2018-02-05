@@ -29,8 +29,8 @@ import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
-import hydra.core.akka.SchemaFetchActor
-import hydra.core.akka.SchemaFetchActor._
+import hydra.core.akka.SchemaRegistryActor
+import hydra.core.akka.SchemaRegistryActor._
 import hydra.core.http.CorsSupport
 import hydra.core.marshallers.{ GenericServiceResponse, HydraJsonSupport }
 import io.confluent.kafka.schemaregistry.client.SchemaMetadata
@@ -48,10 +48,10 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
   implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
 
   private[hydra] val prefix = "-value"
-  //TODO: Don't use this, user the SchemaFetchActor instead
+  //TODO: Don't use this, user the SchemaRegistryActor instead
   private val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
-  private val schemaFetchActor = system.actorOf(SchemaFetchActor.props(applicationConfig))
-  private val schemasEndpointFacade = new SchemasEndpointFacade(schemaFetchActor, prefix)
+  private val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(applicationConfig))
+  private val schemasEndpointFacade = new SchemasEndpointFacade(schemaRegistryActor, prefix)
   private val client = schemaRegistry.registryClient
 
   override def route: Route = cors(settings) {

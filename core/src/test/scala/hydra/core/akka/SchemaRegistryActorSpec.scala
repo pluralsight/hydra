@@ -8,7 +8,7 @@ import akka.actor.Status.Failure
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import hydra.avro.registry.ConfluentSchemaRegistry
-import hydra.core.akka.SchemaFetchActor.{FetchSchema, SchemaFetchResponse}
+import hydra.core.akka.SchemaRegistryActor.{FetchSchema, SchemaFetchResponse}
 import hydra.core.protocol.HydraApplicationError
 import org.apache.avro.Schema.Parser
 import org.scalatest.concurrent.Eventually
@@ -19,7 +19,7 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 3/9/17.
   */
-class SchemaFetchActorSpec extends TestKit(ActorSystem("hydra"))
+class SchemaRegistryActorSpec extends TestKit(ActorSystem("hydra"))
   with Matchers
   with FlatSpecLike
   with ImplicitSender
@@ -55,7 +55,7 @@ class SchemaFetchActorSpec extends TestKit(ActorSystem("hydra"))
 
 
   "The schema fetcher" should "open the circuit breaker" in {
-    val fetcher = system.actorOf(SchemaFetchActor.props(config, Some(settings)))
+    val fetcher = system.actorOf(SchemaRegistryActor.props(config, Some(settings)))
     fetcher ! FetchSchema("test")
     fetcher ! FetchSchema("test")
     fetcher ! FetchSchema("test")
@@ -72,7 +72,7 @@ class SchemaFetchActorSpec extends TestKit(ActorSystem("hydra"))
         |schema.registry.url = mock
       """.stripMargin)
 
-    val fetcher = system.actorOf(SchemaFetchActor.props(cfg, Some(settings)))
+    val fetcher = system.actorOf(SchemaRegistryActor.props(cfg, Some(settings)))
     fetcher.tell(FetchSchema("unknown"), probe.ref)
     probe.expectMsgType[Failure]
     fetcher.tell(FetchSchema("unknown"), probe.ref)
@@ -91,7 +91,7 @@ class SchemaFetchActorSpec extends TestKit(ActorSystem("hydra"))
         |schema.registry.url = mock
       """.stripMargin)
 
-    val fetcher = system.actorOf(SchemaFetchActor.props(cfg, Some(settings)))
+    val fetcher = system.actorOf(SchemaRegistryActor.props(cfg, Some(settings)))
     fetcher.tell(FetchSchema("hydra.test.Tester"), probe.ref)
     probe.expectMsgPF() {
       case SchemaFetchResponse(resource) =>

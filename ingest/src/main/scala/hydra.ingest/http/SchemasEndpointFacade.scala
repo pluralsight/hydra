@@ -6,13 +6,13 @@ import akka.actor.ActorRef
 import akka.pattern.ask
 import akka.util.Timeout
 import hydra.common.logging.LoggingAdapter
-import hydra.core.akka.SchemaFetchActor.{ RegisterSchema, RegisteredSchema }
+import hydra.core.akka.SchemaRegistryActor.{ RegisterSchema, RegisteredSchema }
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Parser
 import org.apache.avro.SchemaParseException
 
 //TODO(BAP):  once all routes are using the facade, bring the schemaNameSuffix into here
-class SchemasEndpointFacade(schemaFetchActor: ActorRef, schemaNameSuffix: String) extends LoggingAdapter {
+class SchemasEndpointFacade(schemaRegistryActor: ActorRef, schemaNameSuffix: String) extends LoggingAdapter {
 
   val validSchemaNameRegex = "^[a-zA-Z0-9]*$".r
   val schemaParser = new Schema.Parser()
@@ -30,6 +30,6 @@ class SchemasEndpointFacade(schemaFetchActor: ActorRef, schemaNameSuffix: String
     val subject = name + schemaNameSuffix
 
     log.debug(s"Registering schema $name: $schemaJson")
-    (schemaFetchActor ? RegisterSchema(subject, schema)).mapTo[RegisteredSchema]
+    (schemaRegistryActor ? RegisterSchema(subject, schema)).mapTo[RegisteredSchema]
   }
 }

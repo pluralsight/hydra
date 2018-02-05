@@ -2,19 +2,19 @@ package hydra.jdbc
 
 import java.io.InputStream
 
-import akka.actor.{Actor, ActorSystem, Props}
+import akka.actor.{ Actor, ActorSystem, Props }
 import akka.testkit.TestKit
 import com.pluralsight.hydra.avro.JsonConverter
 import hydra.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.avro.resource.SchemaResource
-import hydra.core.akka.SchemaFetchActor.{FetchSchema, SchemaFetchResponse}
+import hydra.core.akka.SchemaRegistryActor.{ FetchSchema, SchemaFetchResponse }
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_SCHEMA_PARAM
 import hydra.core.protocol.MissingMetadataException
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.{ FunSpecLike, Matchers }
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -30,8 +30,7 @@ class JdbcRecordFactorySpec extends TestKit(ActorSystem("hydra"))
 
   override implicit val patienceConfig = PatienceConfig(
     timeout = scaled(2000 millis),
-    interval = scaled(100 millis)
-  )
+    interval = scaled(100 millis))
 
   def schemaResource(schemaToUse: Schema) = new SchemaResource {
     override def schema: Schema = schemaToUse
@@ -80,21 +79,21 @@ class JdbcRecordFactorySpec extends TestKit(ActorSystem("hydra"))
     }
 
     it("throws an error if payload does not comply to schema") {
-      val request = HydraRequest("123","""{"name":"test"}""")
+      val request = HydraRequest("123", """{"name":"test"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:jdbc-test.avsc")
       whenReady(factory.build(request)
         .failed)(_ shouldBe a[JsonToAvroConversionExceptionWithMetadata])
     }
 
     it("throws an error if payload if validation is strict") {
-      val request = HydraRequest("123","""{"id":1, "field":2, "name":"test"}""")
+      val request = HydraRequest("123", """{"id":1, "field":2, "name":"test"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:jdbc-test.avsc")
       whenReady(factory.build(request)
         .failed)(_ shouldBe a[JsonToAvroConversionExceptionWithMetadata])
     }
 
     it("Uses the schema as the table name") {
-      val request = HydraRequest("123","""{"id":1, "name":"test", "rank" : 1}""")
+      val request = HydraRequest("123", """{"id":1, "name":"test", "rank" : 1}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:jdbc-test.avsc", JdbcRecordFactory.DB_PROFILE_PARAM -> "table")
 
       whenReady(factory.build(request))(_.destination shouldBe schemaNPK.getName)
@@ -102,15 +101,16 @@ class JdbcRecordFactorySpec extends TestKit(ActorSystem("hydra"))
     }
 
     it("throws an error if no db profile is present in the request") {
-      val request = HydraRequest("123","""{"id":1, "name":"test", "rank" : 1}""")
+      val request = HydraRequest("123", """{"id":1, "name":"test", "rank" : 1}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:jdbc-test.avsc", JdbcRecordFactory.TABLE_PARAM -> "table")
       whenReady(factory.build(request)
         .failed)(_ shouldBe an[MissingMetadataException])
     }
 
     it("builds a record without a PK") {
-      val request = HydraRequest("123","""{"id":1, "name":"test", "rank" : 1}""")
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:jdbc-test.avsc",
+      val request = HydraRequest("123", """{"id":1, "name":"test", "rank" : 1}""")
+        .withMetadata(
+          HYDRA_SCHEMA_PARAM -> "classpath:jdbc-test.avsc",
           JdbcRecordFactory.TABLE_PARAM -> "table", JdbcRecordFactory.DB_PROFILE_PARAM -> "table")
 
       whenReady(factory.build(request)) { rec =>
@@ -121,7 +121,7 @@ class JdbcRecordFactorySpec extends TestKit(ActorSystem("hydra"))
     }
 
     it("builds a record with a PK") {
-      val request = HydraRequest("123","""{"id":1, "name":"test", "rank" : 1}""")
+      val request = HydraRequest("123", """{"id":1, "name":"test", "rank" : 1}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:schemaPK.avsc", JdbcRecordFactory.DB_PROFILE_PARAM -> "table")
 
       whenReady(factory.build(request)) { rec =>
