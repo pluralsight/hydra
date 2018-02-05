@@ -16,27 +16,26 @@
 
 package hydra.ingest.http
 
-import akka.pattern.{ ask }
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
+
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.server.{ ExceptionHandler, Route }
+import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
+import hydra.core.akka.SchemaFetchActor
+import hydra.core.akka.SchemaFetchActor._
 import hydra.core.http.CorsSupport
 import hydra.core.marshallers.{ GenericServiceResponse, HydraJsonSupport }
 import io.confluent.kafka.schemaregistry.client.SchemaMetadata
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
-import org.apache.avro.Schema.Parser
 import org.apache.avro.SchemaParseException
-import hydra.core.akka.SchemaFetchActor._
-import hydra.core.akka.SchemaFetchActor
-import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
-import akka.util.Timeout
 
 /**
  * A wrapper around Confluent's schema registry that facilitates schema registration and retrieval.
@@ -124,24 +123,4 @@ object SchemasEndpointResponse {
     SchemasEndpointResponse(meta.getId, meta.getVersion, meta.getSchema)
   def apply(registeredSchema: RegisteredSchema): SchemasEndpointResponse =
     SchemasEndpointResponse(registeredSchema.id, registeredSchema.version, registeredSchema.schema)
-}
-
-import akka.actor.ActorRef
-class SchemasEndpointFacade(schemaFetchActor: ActorRef, schemaNameSuffix: String) extends LoggingAdapter {
-  import scala.concurrent.Future
-  import org.apache.avro.Schema
-  import akka.actor.ActorRef
-  import org.apache.avro.Schema.Parser
-  import hydra.core.akka.SchemaFetchActor._
-  import akka.util.Timeout
-  import io.confluent.kafka.schemaregistry.client.SchemaMetadata
-
-  def registerSchema(schemaJson: String)(implicit ec: ExecutionContext, timeout: Timeout): Future[RegisteredSchema] = {
-    val schema = new Parser().parse(schemaJson)
-    //TODO: validate schema name
-    val name = schema.getNamespace() + "." + schema.getName()
-    val subject = name + schemaNameSuffix
-    log.debug(s"Registering schema $name: $schemaJson")
-    (schemaFetchActor ? RegisterSchema(subject, schema)).mapTo[RegisteredSchema]
-  }
 }
