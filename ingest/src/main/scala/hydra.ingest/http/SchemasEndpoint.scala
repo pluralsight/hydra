@@ -51,7 +51,7 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
   //TODO: Don't use this, user the SchemaRegistryActor instead
   private val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
   private val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(applicationConfig))
-  private val schemasEndpointFacade = new SchemasEndpointFacade(schemaRegistryActor, prefix)
+  private val schemasEndpointFacade = new SchemasEndpointFacade(schemaRegistryActor)
   private val client = schemaRegistry.registryClient
 
   override def route: Route = cors(settings) {

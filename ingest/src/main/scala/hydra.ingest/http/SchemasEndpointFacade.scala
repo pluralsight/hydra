@@ -12,10 +12,11 @@ import org.apache.avro.Schema.Parser
 import org.apache.avro.SchemaParseException
 
 //TODO(BAP):  once all routes are using the facade, bring the schemaNameSuffix into here
-class SchemasEndpointFacade(schemaRegistryActor: ActorRef, schemaNameSuffix: String) extends LoggingAdapter {
+class SchemasEndpointFacade(schemaRegistryActor: ActorRef) extends LoggingAdapter {
 
   val validSchemaNameRegex = "^[a-zA-Z0-9]*$".r
   val schemaParser = new Schema.Parser()
+  val schemaNameSuffix = "-value"
 
   def isValidSchemaName(schemaName: String) = {
     validSchemaNameRegex.pattern.matcher(schemaName).matches
