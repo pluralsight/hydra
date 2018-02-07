@@ -30,7 +30,6 @@ import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
-import hydra.core.akka.SchemaRegistryActor._
 import hydra.core.http.CorsSupport
 import hydra.core.marshallers.{ GenericServiceResponse, HydraJsonSupport }
 import io.confluent.kafka.schemaregistry.client.SchemaMetadata
@@ -46,6 +45,7 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
   extends RoutedEndpoints with ConfigSupport with LoggingAdapter with HydraJsonSupport with CorsSupport {
 
   implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
+  implicit val timeout = Timeout(3.seconds)
 
   private[hydra] val prefix = "-value"
   //TODO: Don't use this, user the SchemaRegistryActor instead
@@ -59,7 +59,7 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
       handleExceptions(excptHandler) {
         get {
           pathEndOrSingleSlash {
-            onSuccess(schemaRegistry.getAllSubjects()) { subjects =>
+            onSuccess(schemasEndpointFacade.getAllSubjects()) { subjects =>
               complete(OK, subjects)
             }
           } ~ path(Segment) { subject =>
@@ -85,8 +85,6 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
   def registerNewSchema = {
     entity(as[String]) { json =>
       extractRequest { request =>
-        implicit val timeout = Timeout(3.seconds)
-
         onSuccess(schemasEndpointFacade.registerSchema(json)) { registeredSchema =>
           respondWithHeader(Location(request.uri.copy(path = request.uri.path / registeredSchema.name))) {
             complete(Created, SchemasEndpointResponse(registeredSchema))
@@ -121,6 +119,6 @@ case class SchemasEndpointResponse(id: Int, version: Int, schema: String)
 object SchemasEndpointResponse {
   def apply(meta: SchemaMetadata): SchemasEndpointResponse =
     SchemasEndpointResponse(meta.getId, meta.getVersion, meta.getSchema)
-  def apply(registeredSchema: RegisteredSchema): SchemasEndpointResponse =
+  def apply(registeredSchema: SchemaRegistryActor.RegisterSchemaResponse): SchemasEndpointResponse =
     SchemasEndpointResponse(registeredSchema.id, registeredSchema.version, registeredSchema.schema)
 }

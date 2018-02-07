@@ -6,7 +6,7 @@ import akka.actor.ActorRef
 import akka.pattern.ask
 import akka.util.Timeout
 import hydra.common.logging.LoggingAdapter
-import hydra.core.akka.SchemaRegistryActor.{ RegisterSchema, RegisteredSchema }
+import hydra.core.akka.SchemaRegistryActor
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Parser
 import org.apache.avro.SchemaParseException
@@ -22,7 +22,7 @@ class SchemasEndpointFacade(schemaRegistryActor: ActorRef) extends LoggingAdapte
     validSchemaNameRegex.pattern.matcher(schemaName).matches
   }
 
-  def registerSchema(schemaJson: String)(implicit ec: ExecutionContext, timeout: Timeout): Future[RegisteredSchema] = {
+  def registerSchema(schemaJson: String)(implicit ec: ExecutionContext, timeout: Timeout): Future[SchemaRegistryActor.RegisterSchemaResponse] = {
     val schema = schemaParser.parse(schemaJson)
     if (!isValidSchemaName(schema.getName()))
       throw new SchemaParseException("Schema name may only contain letters and numbers.")
@@ -31,6 +31,15 @@ class SchemasEndpointFacade(schemaRegistryActor: ActorRef) extends LoggingAdapte
     val subject = name + schemaNameSuffix
 
     log.debug(s"Registering schema $name: $schemaJson")
-    (schemaRegistryActor ? RegisterSchema(subject, schema)).mapTo[RegisteredSchema]
+    (schemaRegistryActor ? SchemaRegistryActor.RegisterSchemaRequest(subject, schema))
+      .mapTo[SchemaRegistryActor.RegisterSchemaResponse]
+  }
+
+  def getAllSubjects()(implicit ec: ExecutionContext, timeout: Timeout): Future[List[String]] = {
+    (schemaRegistryActor ? SchemaRegistryActor.FetchSubjectsRequest)
+      .mapTo[SchemaRegistryActor.FetchSubjectsResponse]
+      .map { subjectsResponse =>
+        subjectsResponse.subjects
+      }
   }
 }

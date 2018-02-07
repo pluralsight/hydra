@@ -6,7 +6,6 @@ import com.typesafe.config.Config
 import hydra.avro.registry.{ ConfluentSchemaRegistry, SchemaRegistryException }
 import hydra.avro.resource.{ SchemaResource, SchemaResourceLoader }
 import hydra.common.logging.LoggingAdapter
-import hydra.core.akka.SchemaRegistryActor.{ FetchSchema, RegisterSchema, SchemaFetchResponse, RegisteredSchema }
 import hydra.core.protocol.HydraApplicationError
 import org.apache.avro.Schema
 import io.confluent.kafka.schemaregistry.client.SchemaMetadata
@@ -14,6 +13,7 @@ import io.confluent.kafka.schemaregistry.client.SchemaMetadata
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{ Failure, Success, Try }
+import collection.JavaConverters._
 
 /**
  * This actor serves as an proxy between the handler registry
@@ -25,10 +25,12 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
   with LoggingAdapter {
 
   import context.dispatcher
+  import SchemaRegistryActor._
 
   val breakerSettings = settings getOrElse new CircuitBreakerSettings(config)
+  val schemaSuffix = "-value"
 
-  private val registryFailure: Try[SchemaFetchResponse] => Boolean = {
+  private val registryFailure: Try[FetchSchemaResponse] => Boolean = {
     case Success(_) => false
     case Failure(ex) if ex.isInstanceOf[SchemaRegistryException] => false
     case Failure(_) => true
@@ -51,14 +53,24 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
   }
 
   override def receive = {
-    case FetchSchema(location) =>
-      val futureResource = loader.retrieveSchema(location).map(SchemaFetchResponse(_))
+    case FetchSchemaRequest(location) =>
+      val futureResource = loader.retrieveSchema(location).map(FetchSchemaResponse(_))
       breaker.withCircuitBreaker(futureResource, registryFailure) pipeTo sender
-    case RegisterSchema(subject: String, schema: Schema) =>
+
+    case RegisterSchemaRequest(subject: String, schema: Schema) =>
       val name = schema.getNamespace() + "." + schema.getName()
       val schemaId = registry.registryClient.register(subject, schema)
       val schemaMetadata = registry.registryClient.getLatestSchemaMetadata(subject)
-      sender ! RegisteredSchema(name, schemaMetadata.getId, schemaMetadata.getVersion, schemaMetadata.getSchema)
+      sender ! RegisterSchemaResponse(name, schemaMetadata.getId, schemaMetadata.getVersion, schemaMetadata.getSchema)
+
+    case FetchSubjectsRequest =>
+      val allSubjects = registry.registryClient.getAllSubjects.asScala.map { subject =>
+        subject.dropRight(schemaSuffix.length)
+      }
+      log.error(s"***** subjects: $allSubjects")
+
+      sender ! FetchSubjectsResponse(allSubjects.toList)
+
   }
 
   private def notifyOnOpen() = {
@@ -81,11 +93,14 @@ class CircuitBreakerSettings(config: Config) {
 
 object SchemaRegistryActor {
 
-  case class FetchSchema(location: String)
-  case class RegisterSchema(subject: String, schema: Schema)
-  case class RegisteredSchema(name: String, id: Int, version: Int, schema: String)
+  case class FetchSchemaRequest(location: String)
+  case class FetchSchemaResponse(schema: SchemaResource)
 
-  case class SchemaFetchResponse(schema: SchemaResource)
+  case class FetchSubjectsRequest()
+  case class FetchSubjectsResponse(subjects: List[String])
+
+  case class RegisterSchemaRequest(subject: String, schema: Schema)
+  case class RegisterSchemaResponse(name: String, id: Int, version: Int, schema: String)
 
   def props(config: Config, settings: Option[CircuitBreakerSettings] = None): Props = Props(
     classOf[SchemaRegistryActor], config, settings)
