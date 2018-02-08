@@ -5,20 +5,20 @@ import java.net.ConnectException
 
 import akka.actor.ActorSystem
 import akka.actor.Status.Failure
-import akka.testkit.{ImplicitSender, TestKit, TestProbe}
+import akka.testkit.{ ImplicitSender, TestKit, TestProbe }
 import com.typesafe.config.ConfigFactory
 import hydra.avro.registry.ConfluentSchemaRegistry
-import hydra.core.akka.SchemaRegistryActor.{FetchSchema, SchemaFetchResponse}
+import hydra.core.akka.SchemaRegistryActor.{ FetchSchemaRequest, FetchSchemaResponse }
 import hydra.core.protocol.HydraApplicationError
 import org.apache.avro.Schema.Parser
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+import org.scalatest.{ BeforeAndAfterAll, FlatSpecLike, Matchers }
 
 import scala.concurrent.duration._
 
 /**
-  * Created by alexsilva on 3/9/17.
-  */
+ * Created by alexsilva on 3/9/17.
+ */
 class SchemaRegistryActorSpec extends TestKit(ActorSystem("hydra"))
   with Matchers
   with FlatSpecLike
@@ -53,12 +53,11 @@ class SchemaRegistryActorSpec extends TestKit(ActorSystem("hydra"))
       |schema.registry.url = "http://localhost:0101"
     """.stripMargin)
 
-
   "The schema fetcher" should "open the circuit breaker" in {
     val fetcher = system.actorOf(SchemaRegistryActor.props(config, Some(settings)))
-    fetcher ! FetchSchema("test")
-    fetcher ! FetchSchema("test")
-    fetcher ! FetchSchema("test")
+    fetcher ! FetchSchemaRequest("test")
+    fetcher ! FetchSchemaRequest("test")
+    fetcher ! FetchSchemaRequest("test")
     listener.expectMsgType[HydraApplicationError]
     expectMsgPF() {
       case Failure(ex) => ex shouldBe a[ConnectException]
@@ -73,13 +72,13 @@ class SchemaRegistryActorSpec extends TestKit(ActorSystem("hydra"))
       """.stripMargin)
 
     val fetcher = system.actorOf(SchemaRegistryActor.props(cfg, Some(settings)))
-    fetcher.tell(FetchSchema("unknown"), probe.ref)
+    fetcher.tell(FetchSchemaRequest("unknown"), probe.ref)
     probe.expectMsgType[Failure]
-    fetcher.tell(FetchSchema("unknown"), probe.ref)
+    fetcher.tell(FetchSchemaRequest("unknown"), probe.ref)
     probe.expectMsgType[Failure]
-    fetcher.tell(FetchSchema("unknown"), probe.ref)
+    fetcher.tell(FetchSchemaRequest("unknown"), probe.ref)
     probe.expectMsgType[Failure]
-    fetcher.tell(FetchSchema("unknown"), probe.ref)
+    fetcher.tell(FetchSchemaRequest("unknown"), probe.ref)
     probe.expectMsgType[Failure]
     listener.expectNoMessage(3.seconds)
   }
@@ -92,9 +91,9 @@ class SchemaRegistryActorSpec extends TestKit(ActorSystem("hydra"))
       """.stripMargin)
 
     val fetcher = system.actorOf(SchemaRegistryActor.props(cfg, Some(settings)))
-    fetcher.tell(FetchSchema("hydra.test.Tester"), probe.ref)
+    fetcher.tell(FetchSchemaRequest("hydra.test.Tester"), probe.ref)
     probe.expectMsgPF() {
-      case SchemaFetchResponse(resource) =>
+      case FetchSchemaResponse(resource) =>
         resource.schema shouldBe new Parser().parse(new File(testSchema))
     }
     listener.expectNoMessage(3.seconds)

@@ -7,7 +7,7 @@ import akka.testkit.TestKit
 import com.pluralsight.hydra.avro.JsonConverter
 import hydra.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.avro.resource.SchemaResource
-import hydra.core.akka.SchemaRegistryActor.{ FetchSchema, SchemaFetchResponse }
+import hydra.core.akka.SchemaRegistryActor.{ FetchSchemaRequest, FetchSchemaResponse }
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_SCHEMA_PARAM
 import hydra.core.protocol.MissingMetadataException
@@ -48,9 +48,9 @@ class JdbcRecordFactorySpec extends TestKit(ActorSystem("hydra"))
 
   val loader = system.actorOf(Props(new Actor() {
     override def receive: Receive = {
-      case FetchSchema(schema) =>
+      case FetchSchemaRequest(schema) =>
         val schemaToUse = if (schema == "classpath:schemaPK.avsc") schemaPK else schemaNPK
-        sender ! SchemaFetchResponse(schemaResource(schemaToUse))
+        sender ! FetchSchemaResponse(schemaResource(schemaToUse))
     }
   }))
 

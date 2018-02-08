@@ -7,7 +7,7 @@ import com.pluralsight.hydra.avro.JsonConverter
 import hydra.avro.resource.SchemaResource
 import hydra.avro.util.{AvroUtils, SchemaWrapper}
 import hydra.common.config.ConfigSupport
-import hydra.core.akka.SchemaRegistryActor.{ FetchSchema, SchemaFetchResponse }
+import hydra.core.akka.SchemaRegistryActor.{ FetchSchemaRequest, FetchSchemaResponse }
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_SCHEMA_PARAM
 import hydra.core.protocol.MissingMetadataException
@@ -31,7 +31,7 @@ class JdbcRecordFactory(schemaResourceLoader: ActorRef) extends RecordFactory[Se
   override def build(request: HydraRequest)(implicit ec: ExecutionContext): Future[JdbcRecord] = {
     for {
       subject <- Future.fromTry(JdbcRecordFactory.getSchemaName(request))
-      res <- (schemaResourceLoader ? FetchSchema(subject)).mapTo[SchemaFetchResponse].map(_.schema)
+      res <- (schemaResourceLoader ? FetchSchemaRequest(subject)).mapTo[FetchSchemaResponse].map(_.schema)
       avro <- convert(res, request)
       record <- buildRecord(request, avro, res.schema)
     } yield record

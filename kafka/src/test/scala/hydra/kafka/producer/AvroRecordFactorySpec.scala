@@ -15,29 +15,29 @@
 
 package hydra.kafka.producer
 
-import java.io.{File, InputStream}
+import java.io.{ File, InputStream }
 
-import akka.actor.{Actor, ActorSystem, Props}
+import akka.actor.{ Actor, ActorSystem, Props }
 import akka.testkit.TestKit
-import com.pluralsight.hydra.avro.{InvalidDataTypeException, JsonConverter, RequiredFieldMissingException, UndefinedFieldsException}
+import com.pluralsight.hydra.avro.{ InvalidDataTypeException, JsonConverter, RequiredFieldMissingException, UndefinedFieldsException }
 import hydra.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.avro.resource.SchemaResource
-import hydra.core.akka.SchemaRegistryActor.{FetchSchema, SchemaFetchResponse}
+import hydra.core.akka.SchemaRegistryActor.{ FetchSchemaRequest, FetchSchemaResponse }
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams._
 import hydra.core.protocol.MissingMetadataException
 import org.apache.avro.Schema
-import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
+import org.apache.avro.generic.{ GenericRecord, GenericRecordBuilder }
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.{ BeforeAndAfterAll, FunSpecLike, Matchers }
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.io.Source
 
 /**
-  * Created by alexsilva on 1/11/17.
-  */
+ * Created by alexsilva on 1/11/17.
+ */
 class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
   with Matchers
   with FunSpecLike
@@ -62,7 +62,7 @@ class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
   }
   val loader = system.actorOf(Props(new Actor() {
     override def receive: Receive = {
-      case FetchSchema(schema) => sender ! SchemaFetchResponse(schemaResource)
+      case FetchSchemaRequest(schema) => sender ! FetchSchemaResponse(schemaResource)
     }
   }))
 
@@ -72,12 +72,11 @@ class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
 
   override implicit val patienceConfig = PatienceConfig(
     timeout = scaled(1000 millis),
-    interval = scaled(100 millis)
-  )
+    interval = scaled(100 millis))
 
   describe("When performing validation") {
     it("handles Avro default value errors") {
-      val request = HydraRequest("123","""{"name":"test"}""")
+      val request = HydraRequest("123", """{"name":"test"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:avro-factory-test.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = factory.build(request)
@@ -89,7 +88,7 @@ class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
     }
 
     it("handles fields not defined in the schema") {
-      val request = HydraRequest("123","""{"name":"test","rank":1,"new-field":"new"}""")
+      val request = HydraRequest("123", """{"name":"test","rank":1,"new-field":"new"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:avro-factory-test.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
         .withMetadata(HYDRA_VALIDATION_STRATEGY -> "strict")
@@ -102,7 +101,7 @@ class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
     }
 
     it("handles Avro datatype errors") {
-      val request = HydraRequest("123","""{"name":"test", "rank":"booyah"}""")
+      val request = HydraRequest("123", """{"name":"test", "rank":"booyah"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:avro-factory-test.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = factory.build(request)
@@ -146,26 +145,26 @@ class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
     }
 
     it("has the right subject when a schema is specified") {
-      val request = HydraRequest("123","""{"name":"test", "rank":10}""")
+      val request = HydraRequest("123", """{"name":"test", "rank":10}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:avro-factory-test.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       factory.getTopicAndSchemaSubject(request).get._2 shouldBe "classpath:avro-factory-test.avsc"
     }
 
     it("defaults to target as the subject") {
-      val request = HydraRequest("123","""{"name":"test", "rank":10}""")
+      val request = HydraRequest("123", """{"name":"test", "rank":10}""")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       factory.getTopicAndSchemaSubject(request).get._2 shouldBe "test-topic"
     }
 
     it("throws an error if no topic is in the request") {
-      val request = HydraRequest("123","""{"name":test"}""")
+      val request = HydraRequest("123", """{"name":test"}""")
       whenReady(factory.build(request).failed)(_ shouldBe an[MissingMetadataException])
     }
 
     //validation
     it("returns invalid for payloads that do not conform to the schema") {
-      val r = HydraRequest("1","""{"name":"test"}""")
+      val r = HydraRequest("1", """{"name":"test"}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:avro-factory-test.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = factory.build(r)
@@ -173,7 +172,7 @@ class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
     }
 
     it("validates good avro payloads") {
-      val r = HydraRequest("1","""{"name":"test","rank":10}""")
+      val r = HydraRequest("1", """{"name":"test","rank":10}""")
         .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:avro-factory-test.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       whenReady(factory.build(r)) { rec =>

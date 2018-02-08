@@ -21,10 +21,16 @@ import akka.actor.{ Actor, ActorSystem, Props }
 import akka.testkit.TestKit
 import com.fasterxml.jackson.databind.ObjectMapper
 import hydra.avro.resource.SchemaResource
+<<<<<<< HEAD
 import hydra.core.akka.SchemaRegistryActor.{ FetchSchema, SchemaFetchResponse }
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.{ HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_FORMAT_PARAM, HYDRA_SCHEMA_PARAM }
 import hydra.core.ingest.{ HydraRequest, RequestParams }
+=======
+import hydra.core.akka.SchemaRegistryActor.{ FetchSchemaRequest, FetchSchemaResponse }
+import hydra.core.ingest.HydraRequest
+import hydra.core.ingest.RequestParams.{ HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_FORMAT_PARAM, HYDRA_SCHEMA_PARAM }
+>>>>>>> add get subjects to schema registry actor...
 import hydra.core.protocol.InvalidRequest
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecordBuilder
@@ -45,7 +51,11 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
   with BeforeAndAfterAll {
 
   override implicit val patienceConfig = PatienceConfig(
+<<<<<<< HEAD
     timeout = scaled(500 millis),
+=======
+    timeout = scaled(200 millis),
+>>>>>>> add get subjects to schema registry actor...
     interval = scaled(100 millis))
 
   val schemaResource = new SchemaResource {
@@ -67,7 +77,7 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
   }
   val loader = system.actorOf(Props(new Actor() {
     override def receive: Receive = {
-      case FetchSchema(_) => sender ! SchemaFetchResponse(schemaResource)
+      case FetchSchemaRequest(_) => sender ! FetchSchemaResponse(schemaResource)
     }
   }))
 
