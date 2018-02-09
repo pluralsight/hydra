@@ -120,4 +120,20 @@ class SchemaRegistryActorSpec extends TestKit(ActorSystem("hydra"))
     breakerSettings.callTimeout shouldBe 5.seconds
   }
 
+  "addSchemaSuffix" should "add schema suffix if it does not exist" in {
+    val subjectWithoutSuffix = "test.namespace-value.Test"
+    val subjectWithSuffix = "test.namespace-value.Test-value"
+
+    SchemaRegistryActor.addSchemaSuffix(subjectWithoutSuffix) shouldEqual subjectWithSuffix
+    SchemaRegistryActor.addSchemaSuffix(subjectWithSuffix) shouldEqual subjectWithSuffix
+  }
+
+  "removeSchemaSuffix" should "remove the schema suffix if it exists" in {
+    val subjectWithoutSuffix = "test.namespace-value.Test"
+    val subjectWithSuffix = "test.namespace-value.Test-value"
+
+    SchemaRegistryActor.removeSchemaSuffix(subjectWithoutSuffix) shouldEqual subjectWithoutSuffix
+    SchemaRegistryActor.removeSchemaSuffix(subjectWithSuffix) shouldEqual subjectWithoutSuffix
+  }
+
 }

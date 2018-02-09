@@ -28,9 +28,8 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
   import SchemaRegistryActor._
 
   val breakerSettings = settings getOrElse new CircuitBreakerSettings(config)
-  val schemaSuffix = "-value"
 
-  private val registryFailure: Try[FetchSchemaResponse] => Boolean = {
+  private val registryFailure: Try[SchemaRegistryResponse] => Boolean = {
     case Success(_) => false
     case Failure(ex) if ex.isInstanceOf[SchemaRegistryException] => false
     case Failure(_) => true
@@ -65,12 +64,14 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
 
     case FetchSubjectsRequest =>
       val allSubjects = registry.registryClient.getAllSubjects.asScala.map { subject =>
-        subject.dropRight(schemaSuffix.length)
+        removeSchemaSuffix(subject)
       }
-      log.error(s"***** subjects: $allSubjects")
-
       sender ! FetchSubjectsResponse(allSubjects.toList)
 
+    case FetchSchemaMetadataRequest(subject) =>
+      val futureResource = Future(registry.registryClient.getLatestSchemaMetadata(addSchemaSuffix(subject)))
+        .map(FetchSchemaMetadataResponse(_))
+      breaker.withCircuitBreaker(futureResource, registryFailure) pipeTo sender
   }
 
   private def notifyOnOpen() = {
@@ -93,16 +94,34 @@ class CircuitBreakerSettings(config: Config) {
 
 object SchemaRegistryActor {
 
-  case class FetchSchemaRequest(location: String)
-  case class FetchSchemaResponse(schema: SchemaResource)
+  sealed trait SchemaRegistryRequest
+  sealed trait SchemaRegistryResponse
 
-  case class FetchSubjectsRequest()
-  case class FetchSubjectsResponse(subjects: List[String])
+  case class FetchSchemaRequest(location: String) extends SchemaRegistryRequest
+  case class FetchSchemaResponse(schema: SchemaResource) extends SchemaRegistryResponse
 
-  case class RegisterSchemaRequest(subject: String, schema: Schema)
-  case class RegisterSchemaResponse(name: String, id: Int, version: Int, schema: String)
+  case class FetchSchemaMetadataRequest(subject: String) extends SchemaRegistryRequest
+  case class FetchSchemaMetadataResponse(schemaMetadata: SchemaMetadata) extends SchemaRegistryResponse
+
+  case class FetchSubjectsRequest() extends SchemaRegistryRequest
+  case class FetchSubjectsResponse(subjects: List[String]) extends SchemaRegistryResponse
+
+  case class RegisterSchemaRequest(subject: String, schema: Schema) extends SchemaRegistryRequest
+  case class RegisterSchemaResponse(name: String, id: Int, version: Int, schema: String) extends SchemaRegistryResponse
 
   def props(config: Config, settings: Option[CircuitBreakerSettings] = None): Props = Props(
     classOf[SchemaRegistryActor], config, settings)
 
+  val schemaSuffix = "-value"
+  val hasSuffix = ".*-value$".r
+
+  def addSchemaSuffix(subject: String): String = subject match {
+    case hasSuffix() => subject
+    case _ => subject + schemaSuffix
+  }
+
+  def removeSchemaSuffix(subject: String): String = subject match {
+    case hasSuffix() => subject.dropRight(schemaSuffix.length)
+    case _ => subject
+  }
 }

@@ -10,6 +10,7 @@ import hydra.core.akka.SchemaRegistryActor
 import org.apache.avro.{ Schema, SchemaParseException }
 import org.scalatest.{ Matchers, WordSpecLike }
 import org.scalatest.concurrent.ScalaFutures
+import io.confluent.kafka.schemaregistry.client.SchemaMetadata
 
 class SchemasEndpointFacadeSpec extends TestKit(ActorSystem("SchemasEndpointFacadeSpec"))
   with WordSpecLike
@@ -85,7 +86,29 @@ class SchemasEndpointFacadeSpec extends TestKit(ActorSystem("SchemasEndpointFaca
       whenReady(getAllSubjectsRequest) { allSubjects =>
         allSubjects shouldEqual expectedSubjects
       }
-
     }
+
+    // "get latest schema metadata" in {
+    //   val (schemaRegistryActorStub, subject) = fixture()
+    //   val expectedSubject = "subect.namespace.Name"
+    //   val expectedId = 7
+    //   val expectedVersion = 4
+    //   val expectedSchema = "{ \"name\": \"Name\" }"
+    //   val expectedMetadata = SchemaMetadata(expectedId, expectedVersion, expectedSchema)
+
+    //   val getAllSubjectsRequest = subject.getLatestSchemaMetadata(expectedSubject)
+
+    //   schemaRegistryActorStub.expectMsgPF() {
+    //     case SchemaRegistryActor.FetchLatestSchemaMetadata(subject) =>
+    //       subject shouldEqual expectedSubject
+    //   }
+
+    //   schemaRegistryActorStub.reply(SchemaRegistryActor.FetchSubjectsResponse(expectedSubjects))
+
+    //   whenReady(getAllSubjectsRequest) { allSubjects =>
+    //     allSubjects shouldEqual expectedSubjects
+    //   }
+
+    // }
   }
 }

@@ -24,12 +24,14 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.server.{ ExceptionHandler, Route }
 import akka.util.Timeout
+import akka.pattern.{ ask }
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
+import hydra.core.akka.SchemaRegistryActor.{ FetchSchemaMetadataRequest, FetchSchemaMetadataResponse }
 import hydra.core.http.CorsSupport
 import hydra.core.marshallers.{ GenericServiceResponse, HydraJsonSupport }
 import io.confluent.kafka.schemaregistry.client.SchemaMetadata
@@ -63,9 +65,13 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
               complete(OK, subjects)
             }
           } ~ path(Segment) { subject =>
-            parameters('schema ?) { schemaOnly =>
-              val meta = client.getLatestSchemaMetadata(subject + prefix)
-              schemaOnly.map(_ => complete(OK, meta.getSchema)).getOrElse(complete(OK, SchemasEndpointResponse(meta)))
+            parameters('schema ?) { schemaOnly: Option[String] =>
+              //TODO: make field selection more generic, i.e. /<subject>?fields=schema
+              onSuccess((schemaRegistryActor ? FetchSchemaMetadataRequest(subject)).mapTo[FetchSchemaMetadataResponse]) { response =>
+                val metadata = response.schemaMetadata
+                schemaOnly.map(_ => complete(OK, metadata.getSchema))
+                  .getOrElse(complete(OK, SchemasEndpointResponse(metadata)))
+              }
             }
           } ~ path(Segment / "versions") { subject =>
             val schemaMeta = client.getLatestSchemaMetadata(subject + prefix)
