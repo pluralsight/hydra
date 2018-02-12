@@ -78,6 +78,11 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
       val futureResource = Future(registry.registryClient.getLatestSchemaMetadata(addSchemaSuffix(subject)))
         .map(FetchSchemaMetadataResponse(_))
       breaker.withCircuitBreaker(futureResource, registryFailure) pipeTo sender
+
+    case FetchSchemaVersionRequest(subject, version) =>
+      val futureResource = Future(registry.registryClient.getSchemaMetadata(addSchemaSuffix(subject), version))
+        .map(FetchSchemaVersionResponse(_))
+      breaker.withCircuitBreaker(futureResource, registryFailure) pipeTo sender
   }
 
   private def notifyOnOpen() = {
@@ -110,10 +115,13 @@ object SchemaRegistryActor {
   case class FetchSchemaMetadataResponse(schemaMetadata: SchemaMetadata) extends SchemaRegistryResponse
 
   case class FetchSubjectsRequest() extends SchemaRegistryRequest
-  case class FetchSubjectsResponse(subjects: List[String]) extends SchemaRegistryResponse
+  case class FetchSubjectsResponse(subjects: Iterable[String]) extends SchemaRegistryResponse
 
   case class FetchAllSchemaVersionsRequest(subject: String) extends SchemaRegistryRequest
-  case class FetchAllSchemaVersionsResponse(versions: IndexedSeq[SchemaMetadata]) extends SchemaRegistryResponse
+  case class FetchAllSchemaVersionsResponse(versions: Iterable[SchemaMetadata]) extends SchemaRegistryResponse
+
+  case class FetchSchemaVersionRequest(subject: String, version: Int) extends SchemaRegistryRequest
+  case class FetchSchemaVersionResponse(schemaMetadata: SchemaMetadata) extends SchemaRegistryResponse
 
   case class RegisterSchemaRequest(subject: String, schema: Schema) extends SchemaRegistryRequest
   case class RegisterSchemaResponse(name: String, id: Int, version: Int, schema: String) extends SchemaRegistryResponse

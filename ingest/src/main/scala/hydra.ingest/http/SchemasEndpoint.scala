@@ -35,7 +35,10 @@ import hydra.core.akka.SchemaRegistryActor.{
   FetchSchemaMetadataRequest,
   FetchSchemaMetadataResponse,
   FetchAllSchemaVersionsRequest,
-  FetchAllSchemaVersionsResponse }
+  FetchAllSchemaVersionsResponse,
+  FetchSchemaVersionRequest,
+  FetchSchemaVersionResponse,
+}
 import hydra.core.http.CorsSupport
 import hydra.core.marshallers.{ GenericServiceResponse, HydraJsonSupport }
 import io.confluent.kafka.schemaregistry.client.SchemaMetadata
@@ -82,8 +85,9 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
               complete(OK, response.versions.map(SchemasEndpointResponse(_)))
             }
           } ~ path(Segment / "versions" / IntNumber) { (subject, version) =>
-            val meta = client.getSchemaMetadata(subject + prefix, version)
-            complete(OK, SchemasEndpointResponse(meta.getId, meta.getVersion, meta.getSchema))
+            onSuccess((schemaRegistryActor ? FetchSchemaVersionRequest(subject, version)).mapTo[FetchSchemaVersionResponse]) { response =>
+              complete(OK, SchemasEndpointResponse(response.schemaMetadata))
+            }
           }
         } ~
           post { registerNewSchema }

@@ -35,7 +35,7 @@ class SchemasEndpointFacade(schemaRegistryActor: ActorRef) extends LoggingAdapte
       .mapTo[SchemaRegistryActor.RegisterSchemaResponse]
   }
 
-  def getAllSubjects()(implicit ec: ExecutionContext, timeout: Timeout): Future[List[String]] = {
+  def getAllSubjects()(implicit ec: ExecutionContext, timeout: Timeout): Future[Iterable[String]] = {
     (schemaRegistryActor ? SchemaRegistryActor.FetchSubjectsRequest)
       .mapTo[SchemaRegistryActor.FetchSubjectsResponse]
       .map { subjectsResponse =>
