@@ -31,7 +31,11 @@ import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
-import hydra.core.akka.SchemaRegistryActor.{ FetchSchemaMetadataRequest, FetchSchemaMetadataResponse }
+import hydra.core.akka.SchemaRegistryActor.{
+  FetchSchemaMetadataRequest,
+  FetchSchemaMetadataResponse,
+  FetchAllSchemaVersionsRequest,
+  FetchAllSchemaVersionsResponse }
 import hydra.core.http.CorsSupport
 import hydra.core.marshallers.{ GenericServiceResponse, HydraJsonSupport }
 import io.confluent.kafka.schemaregistry.client.SchemaMetadata
@@ -74,10 +78,9 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
               }
             }
           } ~ path(Segment / "versions") { subject =>
-            val schemaMeta = client.getLatestSchemaMetadata(subject + prefix)
-            val v = schemaMeta.getVersion
-            val versions = (1 to v) map (vs => SchemasEndpointResponse(client.getSchemaMetadata(subject + prefix, vs)))
-            complete(OK, versions)
+            onSuccess((schemaRegistryActor ? FetchAllSchemaVersionsRequest(subject)).mapTo[FetchAllSchemaVersionsResponse]) { response =>
+              complete(OK, response.versions.map(SchemasEndpointResponse(_)))
+            }
           } ~ path(Segment / "versions" / IntNumber) { (subject, version) =>
             val meta = client.getSchemaMetadata(subject + prefix, version)
             complete(OK, SchemasEndpointResponse(meta.getId, meta.getVersion, meta.getSchema))

@@ -62,6 +62,12 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
       val schemaMetadata = registry.registryClient.getLatestSchemaMetadata(subject)
       sender ! RegisterSchemaResponse(name, schemaMetadata.getId, schemaMetadata.getVersion, schemaMetadata.getSchema)
 
+    case FetchAllSchemaVersionsRequest(subject:String) =>
+      val schemaMeta = registry.registryClient.getLatestSchemaMetadata(addSchemaSuffix(subject))
+      val v = schemaMeta.getVersion
+      val versions = (1 to v) map (version => registry.registryClient.getSchemaMetadata(addSchemaSuffix(subject), version))
+      sender ! FetchAllSchemaVersionsResponse(versions)
+
     case FetchSubjectsRequest =>
       val allSubjects = registry.registryClient.getAllSubjects.asScala.map { subject =>
         removeSchemaSuffix(subject)
@@ -105,6 +111,9 @@ object SchemaRegistryActor {
 
   case class FetchSubjectsRequest() extends SchemaRegistryRequest
   case class FetchSubjectsResponse(subjects: List[String]) extends SchemaRegistryResponse
+
+  case class FetchAllSchemaVersionsRequest(subject: String) extends SchemaRegistryRequest
+  case class FetchAllSchemaVersionsResponse(versions: IndexedSeq[SchemaMetadata]) extends SchemaRegistryResponse
 
   case class RegisterSchemaRequest(subject: String, schema: Schema) extends SchemaRegistryRequest
   case class RegisterSchemaResponse(name: String, id: Int, version: Int, schema: String) extends SchemaRegistryResponse
