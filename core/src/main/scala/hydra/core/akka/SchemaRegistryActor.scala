@@ -67,32 +67,43 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
         registeredSchema <- Try(registry.registryClient.getByID(schemaId))
         version <- Try(registry.registryClient.getVersion(subject, schema))
         metadata <- Try(registry.registryClient.getSchemaMetadata(subject, version))
-      } yield RegisterSchemaResponse(registeredSchema.getFullName, metadata.getId,metadata.getVersion,metadata.getSchema)
+      } yield RegisterSchemaResponse(registeredSchema.getFullName, metadata.getId, metadata.getVersion, metadata.getSchema)
 
       breaker.withCircuitBreaker(Future.fromTry(metadataRequest), registryFailure) pipeTo sender
     }
 
-    case FetchAllSchemaVersionsRequest(subject:String) =>
-      val schemaMeta = registry.registryClient.getLatestSchemaMetadata(addSchemaSuffix(subject))
-      val v = schemaMeta.getVersion
-      val versions = (1 to v) map (version => registry.registryClient.getSchemaMetadata(addSchemaSuffix(subject), version))
-      sender ! FetchAllSchemaVersionsResponse(versions)
+    case FetchAllSchemaVersionsRequest(subject: String) => {
+      val allVersionsRequest = for {
+        metadata <- Try(registry.registryClient.getLatestSchemaMetadata(addSchemaSuffix(subject)))
+        allVersions <- Try {
+          (1 to metadata.getVersion).map { versionNumber =>
+            registry.registryClient.getSchemaMetadata(addSchemaSuffix(subject), versionNumber)
+          }
+        }
+      } yield FetchAllSchemaVersionsResponse(allVersions)
+      breaker.withCircuitBreaker(Future.fromTry(allVersionsRequest), registryFailure) pipeTo sender
+    }
 
-    case FetchSubjectsRequest =>
-      val allSubjects = registry.registryClient.getAllSubjects.asScala.map { subject =>
-        removeSchemaSuffix(subject)
+    case FetchSubjectsRequest => {
+
+      val allSubjectsRequest = Try {
+        val subjects = registry.registryClient.getAllSubjects.asScala.map { subject =>
+          removeSchemaSuffix(subject)
+        }
+        FetchSubjectsResponse(subjects)
       }
-      sender ! FetchSubjectsResponse(allSubjects.toList)
+      breaker.withCircuitBreaker(Future.fromTry(allSubjectsRequest), registryFailure) pipeTo sender
+    }
 
     case FetchSchemaMetadataRequest(subject) =>
-      val futureResource = Future(registry.registryClient.getLatestSchemaMetadata(addSchemaSuffix(subject)))
+      val metadataRequest = Try(registry.registryClient.getLatestSchemaMetadata(addSchemaSuffix(subject)))
         .map(FetchSchemaMetadataResponse(_))
-      breaker.withCircuitBreaker(futureResource, registryFailure) pipeTo sender
+      breaker.withCircuitBreaker(Future.fromTry(metadataRequest), registryFailure) pipeTo sender
 
     case FetchSchemaVersionRequest(subject, version) =>
-      val futureResource = Future(registry.registryClient.getSchemaMetadata(addSchemaSuffix(subject), version))
+      val metadataRequest = Try(registry.registryClient.getSchemaMetadata(addSchemaSuffix(subject), version))
         .map(FetchSchemaVersionResponse(_))
-      breaker.withCircuitBreaker(futureResource, registryFailure) pipeTo sender
+      breaker.withCircuitBreaker(Future.fromTry(metadataRequest), registryFailure) pipeTo sender
   }
 
   private def notifyOnOpen() = {
@@ -144,8 +155,7 @@ object SchemaRegistryActor {
   val schemaSuffix = "-value"
   val hasSuffix = ".*-value$".r
 
-
-  def validateSchemaName(schemaName: String): Boolean  = {
+  def validateSchemaName(schemaName: String): Boolean = {
     if (isValidSchemaName(schemaName)) {
       return true
     } else {
@@ -153,11 +163,9 @@ object SchemaRegistryActor {
     }
   }
 
-
   def isValidSchemaName(schemaName: String) = {
     validSchemaNameRegex.pattern.matcher(schemaName).matches
   }
-
 
   def addSchemaSuffix(subject: String): String = subject match {
     case hasSuffix() => subject
