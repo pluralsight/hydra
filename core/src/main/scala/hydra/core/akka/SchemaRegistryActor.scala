@@ -1,20 +1,19 @@
 package hydra.core.akka
 
-import akka.actor.{ Actor, Props }
-import akka.pattern.{ CircuitBreaker, pipe }
-import com.typesafe.config.Config
-import hydra.avro.registry.{ ConfluentSchemaRegistry, SchemaRegistryException }
-import hydra.avro.resource.{ SchemaResource, SchemaResourceLoader }
-import hydra.common.logging.LoggingAdapter
-import hydra.core.protocol.HydraApplicationError
-import org.apache.avro.Schema
-import io.confluent.kafka.schemaregistry.client.SchemaMetadata
-import org.apache.avro.SchemaParseException
-
+import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{ Failure, Success, Try }
-import collection.JavaConverters._
+import scala.util.{Failure, Success, Try}
+
+import akka.actor.{Actor, Props}
+import akka.pattern.{CircuitBreaker, pipe}
+import com.typesafe.config.Config
+import hydra.avro.registry.{ConfluentSchemaRegistry, SchemaRegistryException}
+import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
+import hydra.common.logging.LoggingAdapter
+import hydra.core.protocol.HydraApplicationError
+import io.confluent.kafka.schemaregistry.client.SchemaMetadata
+import org.apache.avro.{Schema, SchemaParseException}
 
 /**
  * This actor serves as an proxy between the handler registry
@@ -85,7 +84,6 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
     }
 
     case FetchSubjectsRequest => {
-
       val allSubjectsRequest = Try {
         val subjects = registry.registryClient.getAllSubjects.asScala.map { subject =>
           removeSchemaSuffix(subject)

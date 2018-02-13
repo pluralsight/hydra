@@ -18,21 +18,21 @@ package hydra.ingest.http
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.Location
-import akka.http.scaladsl.server.{ExceptionHandler, Route}
-import akka.util.Timeout
+import akka.http.scaladsl.server.{ ExceptionHandler, Route }
 import akka.pattern.ask
+import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
-import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.akka.SchemaRegistryActor._
 import hydra.core.http.CorsSupport
-import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
+import hydra.core.marshallers.{ GenericServiceResponse, HydraJsonSupport }
 import io.confluent.kafka.schemaregistry.client.SchemaMetadata
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.SchemaParseException
