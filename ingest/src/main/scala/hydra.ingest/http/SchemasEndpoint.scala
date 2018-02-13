@@ -18,29 +18,21 @@ package hydra.ingest.http
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.Location
-import akka.http.scaladsl.server.{ ExceptionHandler, Route }
+import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.util.Timeout
-import akka.pattern.{ ask }
+import akka.pattern.ask
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
-import hydra.core.akka.SchemaRegistryActor.{
-  FetchSchemaMetadataRequest,
-  FetchSchemaMetadataResponse,
-  FetchAllSchemaVersionsRequest,
-  FetchAllSchemaVersionsResponse,
-  FetchSchemaVersionRequest,
-  FetchSchemaVersionResponse,
-}
+import hydra.core.akka.SchemaRegistryActor._
 import hydra.core.http.CorsSupport
-import hydra.core.marshallers.{ GenericServiceResponse, HydraJsonSupport }
+import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
 import io.confluent.kafka.schemaregistry.client.SchemaMetadata
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.SchemaParseException
@@ -56,20 +48,15 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
   implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
   implicit val timeout = Timeout(3.seconds)
 
-  private[hydra] val prefix = "-value"
-  //TODO: Don't use this, user the SchemaRegistryActor instead
-  private val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
   private val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(applicationConfig))
-  private val schemasEndpointFacade = new SchemasEndpointFacade(schemaRegistryActor)
-  private val client = schemaRegistry.registryClient
 
   override def route: Route = cors(settings) {
     pathPrefix("schemas") {
       handleExceptions(excptHandler) {
         get {
           pathEndOrSingleSlash {
-            onSuccess(schemasEndpointFacade.getAllSubjects()) { subjects =>
-              complete(OK, subjects)
+            onSuccess((schemaRegistryActor ? FetchSubjectsRequest).mapTo[FetchSubjectsResponse]) { response =>
+              complete(OK, response.subjects)
             }
           } ~ path(Segment) { subject =>
             parameters('schema ?) { schemaOnly: Option[String] =>
@@ -98,7 +85,7 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
   def registerNewSchema = {
     entity(as[String]) { json =>
       extractRequest { request =>
-        onSuccess(schemasEndpointFacade.registerSchema(json)) { registeredSchema =>
+        onSuccess((schemaRegistryActor ? RegisterSchemaRequest(json)).mapTo[RegisterSchemaResponse]) { registeredSchema =>
           respondWithHeader(Location(request.uri.copy(path = request.uri.path / registeredSchema.name))) {
             complete(Created, SchemasEndpointResponse(registeredSchema))
           }

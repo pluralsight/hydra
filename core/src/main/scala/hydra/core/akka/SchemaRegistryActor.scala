@@ -9,6 +9,7 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol.HydraApplicationError
 import org.apache.avro.Schema
 import io.confluent.kafka.schemaregistry.client.SchemaMetadata
+import org.apache.avro.SchemaParseException
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -43,24 +44,33 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
     .onOpen(notifyOnOpen())
 
   val registry = ConfluentSchemaRegistry.forConfig(config)
+  val schemaParser = new Schema.Parser()
 
   val loader = new SchemaResourceLoader(registry.registryUrl, registry.registryClient)
 
-  def traceResult[T](message: String, result: T) = {
-    log.trace(message, result)
-    result
-  }
+  def getSubject(schema: Schema): String = addSchemaSuffix(schema.getFullName)
 
   override def receive = {
     case FetchSchemaRequest(location) =>
       val futureResource = loader.retrieveSchema(location).map(FetchSchemaResponse(_))
       breaker.withCircuitBreaker(futureResource, registryFailure) pipeTo sender
 
-    case RegisterSchemaRequest(subject: String, schema: Schema) =>
-      val name = schema.getNamespace() + "." + schema.getName()
-      val schemaId = registry.registryClient.register(subject, schema)
-      val schemaMetadata = registry.registryClient.getLatestSchemaMetadata(subject)
-      sender ! RegisterSchemaResponse(name, schemaMetadata.getId, schemaMetadata.getVersion, schemaMetadata.getSchema)
+    case RegisterSchemaRequest(json: String) => {
+      val metadataRequest = for {
+        schema <- Try(schemaParser.parse(json))
+        _ <- Try(validateSchemaName(schema.getName()))
+        subject <- Try(getSubject(schema))
+        schemaId <- Try {
+          log.debug(s"Registering schema ${schema.getFullName}: $json")
+          registry.registryClient.register(subject, schema)
+        }
+        registeredSchema <- Try(registry.registryClient.getByID(schemaId))
+        version <- Try(registry.registryClient.getVersion(subject, schema))
+        metadata <- Try(registry.registryClient.getSchemaMetadata(subject, version))
+      } yield RegisterSchemaResponse(registeredSchema.getFullName, metadata.getId,metadata.getVersion,metadata.getSchema)
+
+      breaker.withCircuitBreaker(Future.fromTry(metadataRequest), registryFailure) pipeTo sender
+    }
 
     case FetchAllSchemaVersionsRequest(subject:String) =>
       val schemaMeta = registry.registryClient.getLatestSchemaMetadata(addSchemaSuffix(subject))
@@ -105,6 +115,9 @@ class CircuitBreakerSettings(config: Config) {
 
 object SchemaRegistryActor {
 
+  def props(config: Config, settings: Option[CircuitBreakerSettings] = None): Props = Props(
+    classOf[SchemaRegistryActor], config, settings)
+
   sealed trait SchemaRegistryRequest
   sealed trait SchemaRegistryResponse
 
@@ -123,14 +136,28 @@ object SchemaRegistryActor {
   case class FetchSchemaVersionRequest(subject: String, version: Int) extends SchemaRegistryRequest
   case class FetchSchemaVersionResponse(schemaMetadata: SchemaMetadata) extends SchemaRegistryResponse
 
-  case class RegisterSchemaRequest(subject: String, schema: Schema) extends SchemaRegistryRequest
+  case class RegisterSchemaRequest(json: String) extends SchemaRegistryRequest
   case class RegisterSchemaResponse(name: String, id: Int, version: Int, schema: String) extends SchemaRegistryResponse
 
-  def props(config: Config, settings: Option[CircuitBreakerSettings] = None): Props = Props(
-    classOf[SchemaRegistryActor], config, settings)
-
+  val validSchemaNameRegex = "^[a-zA-Z0-9]*$".r
+  val schemaParser = new Schema.Parser()
   val schemaSuffix = "-value"
   val hasSuffix = ".*-value$".r
+
+
+  def validateSchemaName(schemaName: String): Boolean  = {
+    if (isValidSchemaName(schemaName)) {
+      return true
+    } else {
+      throw new SchemaParseException("Schema name may only contain letters and numbers.")
+    }
+  }
+
+
+  def isValidSchemaName(schemaName: String) = {
+    validSchemaNameRegex.pattern.matcher(schemaName).matches
+  }
+
 
   def addSchemaSuffix(subject: String): String = subject match {
     case hasSuffix() => subject
