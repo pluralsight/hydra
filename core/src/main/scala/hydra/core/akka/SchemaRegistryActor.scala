@@ -54,7 +54,7 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
       val futureResource = loader.retrieveSchema(location).map(FetchSchemaResponse(_))
       breaker.withCircuitBreaker(futureResource, registryFailure) pipeTo sender
 
-    case RegisterSchemaRequest(json: String) => {
+    case RegisterSchemaRequest(json: String) =>
       val metadataRequest = for {
         schema <- Try(schemaParser.parse(json))
         _ <- Try(validateSchemaName(schema.getName()))
@@ -67,11 +67,9 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
         version <- Try(registry.registryClient.getVersion(subject, schema))
         metadata <- Try(registry.registryClient.getSchemaMetadata(subject, version))
       } yield RegisterSchemaResponse(registeredSchema.getFullName, metadata.getId, metadata.getVersion, metadata.getSchema)
-
       breaker.withCircuitBreaker(Future.fromTry(metadataRequest), registryFailure) pipeTo sender
-    }
 
-    case FetchAllSchemaVersionsRequest(subject: String) => {
+    case FetchAllSchemaVersionsRequest(subject: String) =>
       val allVersionsRequest = for {
         metadata <- Try(registry.registryClient.getLatestSchemaMetadata(addSchemaSuffix(subject)))
         allVersions <- Try {
@@ -81,9 +79,8 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
         }
       } yield FetchAllSchemaVersionsResponse(allVersions)
       breaker.withCircuitBreaker(Future.fromTry(allVersionsRequest), registryFailure) pipeTo sender
-    }
 
-    case FetchSubjectsRequest => {
+    case FetchSubjectsRequest =>
       val allSubjectsRequest = Try {
         val subjects = registry.registryClient.getAllSubjects.asScala.map { subject =>
           removeSchemaSuffix(subject)
@@ -91,7 +88,6 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
         FetchSubjectsResponse(subjects)
       }
       breaker.withCircuitBreaker(Future.fromTry(allSubjectsRequest), registryFailure) pipeTo sender
-    }
 
     case FetchSchemaMetadataRequest(subject) =>
       val metadataRequest = Try(registry.registryClient.getLatestSchemaMetadata(addSchemaSuffix(subject)))
