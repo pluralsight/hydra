@@ -1,7 +1,7 @@
 package hydra.kafka.producer
 
 import akka.actor.ActorRef
-import hydra.core.ingest.HydraRequest
+import hydra.core.ingest.{HydraRequest, RequestParams}
 import hydra.core.ingest.RequestParams.HYDRA_RECORD_FORMAT_PARAM
 import hydra.core.transport.{HydraRecord, RecordFactory}
 
@@ -13,17 +13,28 @@ import scala.util.{Failure, Success, Try}
   *
   * Created by alexsilva on 2/23/17.
   */
-class KafkaRecordFactories(schemaLoader:ActorRef) extends RecordFactory[Any, Any] {
+class KafkaRecordFactories(schemaLoader: ActorRef) extends RecordFactory[Any, Any] {
 
   private val avroRecordFactory = new AvroRecordFactory(schemaLoader)
 
   def factoryFor(request: HydraRequest): Try[KafkaRecordFactory[_, _]] = {
-    request.metadataValue(HYDRA_RECORD_FORMAT_PARAM) match {
-      case Some(value) if (value.equalsIgnoreCase("string")) => Success(StringRecordFactory)
-      case Some(value) if (value.equalsIgnoreCase("json")) => Success(JsonRecordFactory)
-      case Some(value) if (value.equalsIgnoreCase("avro")) => Success(avroRecordFactory)
-      case Some(value) => Failure(new IllegalArgumentException(s"'$value' is not a valid format."))
-      case _ => Success(avroRecordFactory)
+    deleteOrElse(request) {
+      request.metadataValue(HYDRA_RECORD_FORMAT_PARAM) match {
+        case Some(value) if (value.equalsIgnoreCase("string")) => StringRecordFactory
+        case Some(value) if (value.equalsIgnoreCase("json")) => JsonRecordFactory
+        case Some(value) if (value.equalsIgnoreCase("avro")) => avroRecordFactory
+        case Some(value) => throw new IllegalArgumentException(s"'$value' is not a valid format.")
+        case _ => avroRecordFactory
+      }
+    }
+  }
+
+  private def deleteOrElse(r: HydraRequest)
+                          (orElse: => KafkaRecordFactory[_, _]): Try[KafkaRecordFactory[_, _]] = {
+    Try {
+      r.metadataValue(RequestParams.HYDRA_DELETE_DIRECTIVE)
+        .map(_ => DeleteTombstoneRecordFactory)
+        .getOrElse(orElse)
     }
   }
 

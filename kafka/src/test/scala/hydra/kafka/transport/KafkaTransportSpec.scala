@@ -6,7 +6,7 @@ import com.typesafe.config.ConfigFactory
 import hydra.core.transport.TransportSupervisor.Deliver
 import hydra.core.transport.{RecordMetadata, TransportCallback}
 import hydra.kafka.config.KafkaConfigSupport
-import hydra.kafka.producer.{JsonRecord, StringRecord}
+import hydra.kafka.producer.{DeleteTombstoneRecord, JsonRecord, StringRecord}
 import hydra.kafka.transport.KafkaProducerProxy.ProducerInitializationError
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
@@ -71,6 +71,14 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers wit
       transport ! Deliver(rec, 1, ack)
       ingestor.expectMsg(max = 10.seconds, "DONE")
     }
+
+    it("handles delete records") {
+      val ack: TransportCallback = (d: Long, m: Option[RecordMetadata], e: Option[Throwable]) => ingestor.ref ! "DONE"
+      val rec = DeleteTombstoneRecord("transport_test", Some("key"))
+      transport ! Deliver(rec, 1, ack)
+      ingestor.expectMsg(max = 10.seconds, "DONE")
+    }
+
 
     it("publishes errors to the stream") {
       val rec = StringRecord("unknown_topic", Some("key"), "payload")

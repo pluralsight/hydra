@@ -22,7 +22,7 @@ import akka.testkit.TestKit
 import com.fasterxml.jackson.databind.ObjectMapper
 import hydra.avro.resource.SchemaResource
 import hydra.core.akka.SchemaFetchActor.{FetchSchema, SchemaFetchResponse}
-import hydra.core.ingest.HydraRequest
+import hydra.core.ingest.{HydraRequest, RequestParams}
 import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_FORMAT_PARAM, HYDRA_SCHEMA_PARAM}
 import hydra.core.protocol.InvalidRequest
 import org.apache.avro.Schema
@@ -72,9 +72,9 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
   }))
 
   val factories = new KafkaRecordFactories(loader)
-  
+
   override def afterAll = TestKit.shutdownActorSystem(system)
-  
+
   describe("When using KafkaRecordFactories") {
     it("handles avro") {
       val json = """{"name":"test", "rank":10}"""
@@ -86,6 +86,15 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
       val genericRecord = new GenericRecordBuilder(avroSchema).set("name", "test").set("rank", 10).build()
 
       whenReady(record)(_ shouldBe AvroRecord("test-topic", avroSchema, None, genericRecord))
+    }
+
+    it("handles delete records") {
+      val request = HydraRequest("123", "test")
+        .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic",
+          RequestParams.HYDRA_DELETE_DIRECTIVE -> "true",
+          RequestParams.HYDRA_RECORD_KEY_PARAM -> "123")
+      val record = factories.build(request)
+      whenReady(record)(_ shouldBe DeleteTombstoneRecord("test-topic", Some("123")))
     }
 
     it("handles json") {

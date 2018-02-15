@@ -10,7 +10,7 @@ import org.apache.avro.generic.GenericRecord
 trait RecordWriter {
 
   /**
-    * Writes a record to the underlying store.
+    * Schedules the writing of a record to the underlying store.
     *
     * The Unit return type means the actual semantics of this method may vary;
     * for instance, on implementation using record batches, any errors/exceptions will not be reported
@@ -19,6 +19,13 @@ trait RecordWriter {
     * @param record
     */
   def add(record: GenericRecord): Unit
+
+  /**
+    * Immediately writes a single record to the underlying record store.
+    *
+    * @param record
+    */
+  def writeOne(record: GenericRecord)
 
   /**
     * Flushes any cache/record batch to the underlying store.
