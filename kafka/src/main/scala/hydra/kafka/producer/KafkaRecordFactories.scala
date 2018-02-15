@@ -1,7 +1,7 @@
 package hydra.kafka.producer
 
 import akka.actor.ActorRef
-import hydra.core.ingest.{HydraRequest, RequestParams}
+import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_RECORD_FORMAT_PARAM
 import hydra.core.transport.{HydraRecord, RecordFactory}
 
@@ -32,9 +32,9 @@ class KafkaRecordFactories(schemaLoader: ActorRef) extends RecordFactory[Any, An
   private def deleteOrElse(r: HydraRequest)
                           (orElse: => KafkaRecordFactory[_, _]): Try[KafkaRecordFactory[_, _]] = {
     Try {
-      r.metadataValue(RequestParams.HYDRA_DELETE_DIRECTIVE)
-        .map(_ => DeleteTombstoneRecordFactory)
-        .getOrElse(orElse)
+      Option(r.payload)
+        .map(_ => orElse)
+        .getOrElse(DeleteTombstoneRecordFactory)
     }
   }
 

@@ -92,6 +92,13 @@ abstract class JdbcDialect extends Serializable {
     s"INSERT INTO $table ($cols) VALUES (${parameterize(columns).mkString(",")})"
   }
 
+  def deleteStatement(table: String, keys: Seq[Field], dbs: DbSyntax): String = {
+    //guard against some rogue caller trying to delete the entire table
+    assert(!keys.isEmpty, "Whoa! At least one primary key is required.")
+    val colTuples = keys.map(f => s"${dbs.format(f.name)} = ?")
+    s"DELETE FROM $table WHERE ${colTuples.mkString(" AND ")}"
+  }
+
   /**
     * Returns the upsert statment for this dialect.
     * Optional operation; default implementation throws a UnsupportedOperationException

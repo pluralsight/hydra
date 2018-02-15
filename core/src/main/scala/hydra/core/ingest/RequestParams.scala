@@ -35,15 +35,6 @@ object RequestParams {
   val HYDRA_SCHEMA_PARAM = "hydra-schema"
 
   /**
-    * Requests annotated with this metadata param should be handled as delete request.
-    *
-    * We use this instead of a null payload because the payload may have information that
-    * assists in the delete.
-    *
-    */
-  val HYDRA_DELETE_DIRECTIVE = "hydra-x-delete"
-
-  /**
     * The underlying topic this message should be sent to.
     * Required when using the Kafka ingestor.
     */

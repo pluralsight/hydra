@@ -1,6 +1,6 @@
 package hydra.ingest.http
 
-import akka.http.scaladsl.model.HttpRequest
+import akka.http.scaladsl.model.{HttpMethods, HttpRequest}
 import akka.http.scaladsl.server.directives.CodingDirectives
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.Materializer
@@ -19,15 +19,16 @@ class HttpRequestFactory extends RequestFactory[HttpRequest] with CodingDirectiv
                             (implicit mat: Materializer): Future[HydraRequest] = {
     implicit val ec = mat.executionContext
 
-    val vs = request.headers.find(_.lowercaseName() == HYDRA_VALIDATION_STRATEGY)
+    lazy val vs = request.headers.find(_.lowercaseName() == HYDRA_VALIDATION_STRATEGY)
       .map(h => ValidationStrategy(h.value())).getOrElse(ValidationStrategy.Strict)
 
-    val as = request.headers.find(_.lowercaseName() == HYDRA_ACK_STRATEGY)
+    lazy val as = request.headers.find(_.lowercaseName() == HYDRA_ACK_STRATEGY)
       .map(h => AckStrategy(h.value())).getOrElse(AckStrategy.NoAck)
 
     Unmarshal(request.entity).to[String].map { payload =>
+      val dPayload = if (request.method == HttpMethods.DELETE && payload.isEmpty) null else payload
       val metadata: Map[String, String] = request.headers.map(h => h.name.toLowerCase -> h.value).toMap
-      HydraRequest(correlationId, payload, metadata, validationStrategy = vs, ackStrategy = as)
+      HydraRequest(correlationId, dPayload, metadata, validationStrategy = vs, ackStrategy = as)
     }
   }
 }
