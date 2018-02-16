@@ -15,21 +15,21 @@
 
 package hydra.kafka.producer
 
+import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.duration._
+
 import akka.actor.ActorRef
 import akka.pattern.ask
 import akka.util
 import com.pluralsight.hydra.avro.JsonConverter
 import hydra.avro.registry.ConfluentSchemaRegistry
-import hydra.avro.resource.SchemaResource
 import hydra.avro.util.AvroUtils
 import hydra.common.config.ConfigSupport
 import hydra.core.akka.SchemaRegistryActor.{ FetchSchemaRequest, FetchSchemaResponse }
 import hydra.core.ingest.HydraRequest
 import hydra.core.transport.ValidationStrategy.Strict
+import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
-
-import scala.concurrent.duration._
-import scala.concurrent.{ ExecutionContext, Future }
 
 /**
  * Created by alexsilva on 1/11/17.
@@ -45,17 +45,16 @@ class AvroRecordFactory(schemaResourceLoader: ActorRef)
   override def build(request: HydraRequest)(implicit ec: ExecutionContext): Future[AvroRecord] = {
     for {
       (topic, subject) <- Future.fromTry(getTopicAndSchemaSubject(request))
-      res <- (schemaResourceLoader ? FetchSchemaRequest(subject)).mapTo[FetchSchemaResponse].map(_.schema) //schemaResourceLoader.retrieveSchema(subject)
-      record <- convert(res, request)
-    } yield AvroRecord(topic, res.schema, getKey(request), record)
+      schema <- (schemaResourceLoader ? FetchSchemaRequest(subject)).mapTo[FetchSchemaResponse].map(_.schema)
+      record <- convert(schema, request)
+    } yield AvroRecord(topic, schema, getKey(request), record)
   }
 
-  private def convert(resource: SchemaResource, request: HydraRequest)(implicit ec: ExecutionContext): Future[GenericRecord] = {
+  private def convert(schema: Schema, request: HydraRequest)(implicit ec: ExecutionContext): Future[GenericRecord] = {
     val converter = new JsonConverter[GenericRecord](
-      resource.schema,
+      schema,
       request.validationStrategy == Strict)
     Future(converter.convert(request.payload))
-      .recover { case ex => throw AvroUtils.improveException(ex, resource) }
+      .recover { case ex => throw AvroUtils.improveException(ex, schema) }
   }
 }
-

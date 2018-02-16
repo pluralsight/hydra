@@ -93,8 +93,8 @@ class SchemaRegistryActorSpec extends TestKit(ActorSystem("hydra"))
     val fetcher = system.actorOf(SchemaRegistryActor.props(cfg, Some(settings)))
     fetcher.tell(FetchSchemaRequest("hydra.test.Tester"), probe.ref)
     probe.expectMsgPF() {
-      case FetchSchemaResponse(resource) =>
-        resource.schema shouldBe new Parser().parse(new File(testSchema))
+      case FetchSchemaResponse(schema) =>
+        schema shouldBe new Parser().parse(new File(testSchema))
     }
     listener.expectNoMessage(3.seconds)
   }

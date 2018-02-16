@@ -3,17 +3,17 @@ package hydra.core.akka
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
+import scala.util.{ Failure, Success, Try }
 
-import akka.actor.{Actor, Props}
-import akka.pattern.{CircuitBreaker, pipe}
+import akka.actor.{ Actor, Props }
+import akka.pattern.{ CircuitBreaker, pipe }
 import com.typesafe.config.Config
-import hydra.avro.registry.{ConfluentSchemaRegistry, SchemaRegistryException}
-import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
+import hydra.avro.registry.{ ConfluentSchemaRegistry, SchemaRegistryException }
+import hydra.avro.resource.{ SchemaResourceLoader }
 import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol.HydraApplicationError
 import io.confluent.kafka.schemaregistry.client.SchemaMetadata
-import org.apache.avro.{Schema, SchemaParseException}
+import org.apache.avro.{ Schema, SchemaParseException }
 
 /**
  * This actor serves as an proxy between the handler registry
@@ -43,7 +43,6 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
     .onOpen(notifyOnOpen())
 
   val registry = ConfluentSchemaRegistry.forConfig(config)
-  val schemaParser = new Schema.Parser()
 
   val loader = new SchemaResourceLoader(registry.registryUrl, registry.registryClient)
 
@@ -51,10 +50,12 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
 
   override def receive = {
     case FetchSchemaRequest(location) =>
-      val futureResource = loader.retrieveSchema(location).map(FetchSchemaResponse(_))
+      val schemaParser = new Schema.Parser()
+      val futureResource = loader.retrieveSchema(location).map(md => FetchSchemaResponse(schemaParser.parse(md.getSchema)))
       breaker.withCircuitBreaker(futureResource, registryFailure) pipeTo sender
 
     case RegisterSchemaRequest(json: String) =>
+      val schemaParser = new Schema.Parser()
       val metadataRequest = for {
         schema <- Try(schemaParser.parse(json))
         _ <- Try(validateSchemaName(schema.getName()))
@@ -127,7 +128,7 @@ object SchemaRegistryActor {
   sealed trait SchemaRegistryResponse
 
   case class FetchSchemaRequest(location: String) extends SchemaRegistryRequest
-  case class FetchSchemaResponse(schema: SchemaResource) extends SchemaRegistryResponse
+  case class FetchSchemaResponse(schema: Schema) extends SchemaRegistryResponse
 
   case class FetchSchemaMetadataRequest(subject: String) extends SchemaRegistryRequest
   case class FetchSchemaMetadataResponse(schemaMetadata: SchemaMetadata) extends SchemaRegistryResponse

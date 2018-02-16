@@ -17,51 +17,51 @@ package hydra.avro.resource
 
 import java.net.ConnectException
 
-import hydra.avro.registry.{RegistrySchemaResource, SchemaRegistryException}
+import hydra.avro.registry.{ SchemaRegistryException }
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.slf4j.LoggerFactory
-import org.springframework.core.io.DefaultResourceLoader
 
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ ExecutionContext, Future }
 import scalacache._
 import scalacache.guava.GuavaCache
 import scalacache.modes.scalaFuture._
+import io.confluent.kafka.schemaregistry.client.SchemaMetadata
 
 /**
-  * Created by alexsilva on 1/20/17.
-  */
+ * Created by alexsilva on 1/20/17.
+ */
 
 /**
-  * We only support two location prefixes: classpath and registry (or no prefix, which defaults
-  * to registry.)
-  *
-  * @param registryUrl
-  * @param registry
-  * @param suffix
-  */
+ * We only support two location prefixes: classpath and registry (or no prefix, which defaults
+ * to registry.)
+ *
+ * @param registryUrl
+ * @param registry
+ * @param suffix
+ */
 class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
-                           suffix: String = "-value") {
+  suffix: String = "-value") {
 
   import SchemaResourceLoader._
 
-  implicit val cache = GuavaCache[SchemaResource]
+  implicit val cache = GuavaCache[SchemaMetadata]
 
-  private val loader = new DefaultResourceLoader()
-
-  def retrieveSchema(location: String)(implicit ec: ExecutionContext): Future[SchemaResource] = {
+  def retrieveSchema(location: String)(implicit ec: ExecutionContext): Future[SchemaMetadata] = {
     require(location ne null)
+
+    println(s"retrieveSchema($location)")
 
     val parts = location.split("\\:")
     parts match {
-      case Array(prefix, location) if prefix == REGISTRY_URL_PREFIX => fetchSchema(location)
-      case Array(prefix, location) => Future(GenericSchemaResource(loader.getResource(location)))
+      case Array(prefix, subject) => fetchSchema(subject)
       case Array(subject) => fetchSchema(subject)
       case _ => throw new IllegalArgumentException(s"Unable to parse location $location")
     }
   }
 
   private def fetchSchema(subject: String)(implicit ec: ExecutionContext) = {
+    println(s"fetchSchema($subject)")
     val parts = subject.split("\\#")
     parts match {
       case Array(subject, version) => loadFromCache(subject.withSuffix, version)
@@ -69,12 +69,10 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
     }
   }
 
-  private def getLatestSchema(subject: String)
-                             (implicit ec: ExecutionContext): Future[SchemaResource] = {
+  private def getLatestSchema(subject: String)(implicit ec: ExecutionContext): Future[SchemaMetadata] = {
+    println(s"getLatestSchema($subject)")
     cachingF(subject)(ttl = Some(5.minutes)) {
       Future(registry.getLatestSchemaMetadata(subject))
-        .map(md => registry.getByID(md.getId) -> md)
-        .map(schema => RegistrySchemaResource(registryUrl, subject, schema._2.getId, schema._2.getVersion, schema._1))
         .recoverWith {
           case e: ConnectException => throw e
           case e: Exception => throw new SchemaRegistryException(e, subject)
@@ -82,37 +80,36 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
     }
   }
 
-  private def loadFromCache(subject: String, version: String)
-                           (implicit ec: ExecutionContext): Future[SchemaResource] = {
-
-    cachingF(subject, version)(ttl = Some(5.minutes)) { //we don't need a TTL here
+  private def loadFromCache(subject: String, version: String)(implicit ec: ExecutionContext): Future[SchemaMetadata] = {
+    println(s"loadFromCache($subject, $version)")
+    cachingF(subject, version)(ttl = None) {
       loadFromRegistry(subject, version)
     }
   }
 
-  private def loadFromRegistry(subject: String, version: String)
-                              (implicit ec: ExecutionContext): Future[RegistrySchemaResource] = {
+  private def loadFromRegistry(subject: String, version: String)(implicit ec: ExecutionContext): Future[SchemaMetadata] = {
+    println(s"loadFromRegistry($subject, $version)")
     log.debug(s"Loading schema $subject, version $version from schema registry $registryUrl.")
     Future(version.toInt).map(v => registry.getSchemaMetadata(subject, v))
-      .map(m => registry.getByID(m.getId) -> m)
-      .map(schema => RegistrySchemaResource(registryUrl, subject, schema._2.getId(), version.toInt, schema._1))
+      .map(m => {
+        registry.getByID(m.getId) //this is what will throw if the schema does not exist
+        m
+      })
       .recoverWith {
         case e: ConnectException => throw e
         case e: Exception => throw new SchemaRegistryException(e, subject)
       }
   }
 
-  private implicit class AddSuffix(location: String) {
-    def withSuffix = if (location.endsWith(suffix)) location else location + suffix
+  private implicit class AddSuffix(subject: String) {
+    def withSuffix = {
+      println(s"withSuffix($subject)")
+      if (subject.endsWith(suffix)) subject else subject + suffix
+    }
   }
 
 }
 
 object SchemaResourceLoader {
-
-  val REGISTRY_URL_PREFIX = "registry"
-
   val log = LoggerFactory.getLogger(getClass)
-
 }
-

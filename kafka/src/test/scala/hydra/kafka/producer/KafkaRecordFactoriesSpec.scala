@@ -20,6 +20,7 @@ import java.io.{ File, InputStream }
 import akka.actor.{ Actor, ActorSystem, Props }
 import akka.testkit.TestKit
 import com.fasterxml.jackson.databind.ObjectMapper
+<<<<<<< HEAD
 import hydra.avro.resource.SchemaResource
 <<<<<<< HEAD
 import hydra.core.akka.SchemaRegistryActor.{ FetchSchema, SchemaFetchResponse }
@@ -27,6 +28,8 @@ import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.{ HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_FORMAT_PARAM, HYDRA_SCHEMA_PARAM }
 import hydra.core.ingest.{ HydraRequest, RequestParams }
 =======
+=======
+>>>>>>> remove classpath functionality for schema registry actor
 import hydra.core.akka.SchemaRegistryActor.{ FetchSchemaRequest, FetchSchemaResponse }
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.{ HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_FORMAT_PARAM, HYDRA_SCHEMA_PARAM }
@@ -58,26 +61,12 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
 >>>>>>> add get subjects to schema registry actor...
     interval = scaled(100 millis))
 
-  val schemaResource = new SchemaResource {
+  val testSchema = new Schema.Parser().parse(Source.fromResource("avro-factory-test.avsc").mkString)
+  val avroSchema = new Schema.Parser().parse(Source.fromResource("kafka-factories-test.avsc").mkString)
 
-    val testSchema = Thread.currentThread()
-      .getContextClassLoader.getResource("avro-factory-test.avsc").getFile
-
-    override def schema: Schema = new Schema.Parser().parse(new File(testSchema))
-
-    override def id: Int = 1
-
-    override def version: Int = 1
-
-    override def location: String = "location"
-
-    override def getDescription: String = "description"
-
-    override def getInputStream: InputStream = null //not testing this
-  }
   val loader = system.actorOf(Props(new Actor() {
     override def receive: Receive = {
-      case FetchSchemaRequest(_) => sender ! FetchSchemaResponse(schemaResource)
+      case FetchSchemaRequest(_) => sender ! FetchSchemaResponse(testSchema)
     }
   }))
 
@@ -89,10 +78,9 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
     it("handles avro") {
       val json = """{"name":"test", "rank":10}"""
       val request = HydraRequest("123", json)
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:kafka-factories-test.avsc")
+        .withMetadata(HYDRA_SCHEMA_PARAM -> "kafka-factories-test")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = factories.build(request)
-      val avroSchema = new Schema.Parser().parse(Source.fromResource("kafka-factories-test.avsc").mkString)
       val genericRecord = new GenericRecordBuilder(avroSchema).set("name", "test").set("rank", 10).build()
 
       whenReady(record)(_ shouldBe AvroRecord("test-topic", avroSchema, None, genericRecord))
@@ -110,7 +98,7 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
     it("handles json") {
       val json = """{"name":"test", "rank":10}"""
       val request = HydraRequest("123", json)
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:kafka-factories-test.avsc")
+        .withMetadata(HYDRA_SCHEMA_PARAM -> "kafka-factories-test")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "json")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = factories.build(request)
@@ -121,7 +109,7 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
     it("handles strings") {
       val json = """{"name":"test", "rank":10}"""
       val request = HydraRequest("123", json)
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:kafka-factories-test.avsc")
+        .withMetadata(HYDRA_SCHEMA_PARAM -> "kafka-factories-test")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "string")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = factories.build(request)
@@ -145,11 +133,9 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
     }
 
     it("validates avro records") {
-      val schema = Thread.currentThread().getContextClassLoader.getResource("kafka-factories-test.avsc").getFile
-      val avroSchema = new Schema.Parser().parse(new File(schema))
       val json = """{"name":"test", "rank":10}"""
       val request = HydraRequest("123", json)
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:kafka-factories-test.avsc")
+        .withMetadata(HYDRA_SCHEMA_PARAM -> "kafka-factories-test")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = new AvroRecordFactory(loader).build(request)
       whenReady(record)(_ shouldBe a[AvroRecord])
@@ -166,7 +152,7 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
     it("throws error with unknown formats") {
       val json = """{"name":"test", "rank":10}"""
       val request = HydraRequest("123", json)
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:kafka-factories-test.avsc")
+        .withMetadata(HYDRA_SCHEMA_PARAM -> "kafka-factories-test")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "unknown")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       whenReady(factories.build(request).failed)(_ shouldBe an[IllegalArgumentException])

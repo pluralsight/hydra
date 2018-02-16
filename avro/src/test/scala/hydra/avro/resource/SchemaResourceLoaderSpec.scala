@@ -22,15 +22,15 @@ import hydra.avro.registry.SchemaRegistryException
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
 import org.apache.avro.Schema.Parser
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.time.{Millis, Seconds, Span}
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
-
+import org.scalatest.time.{ Millis, Seconds, Span }
+import org.scalatest.{ BeforeAndAfterAll, FunSpecLike, Matchers }
+import org.apache.avro.Schema
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.io.Source
 
 /**
-  * Created by alexsilva on 1/20/17.
-  */
+ * Created by alexsilva on 1/20/17.
+ */
 class SchemaResourceLoaderSpec extends Matchers
   with FunSpecLike
   with BeforeAndAfterAll
@@ -39,87 +39,62 @@ class SchemaResourceLoaderSpec extends Matchers
   implicit override val patienceConfig =
     PatienceConfig(timeout = scaled(Span(1, Seconds)), interval = scaled(Span(10, Millis)))
 
+  val schemaParser = new Schema.Parser()
+  val testSchema = schemaParser.parse(Source.fromResource("resource-loader-spec.avsc").mkString)
 
-  val client = new MockSchemaRegistryClient
-  val testSchema = Thread.currentThread().getContextClassLoader
-    .getResource("resource-loader-spec.avsc").getFile
-
-  override def beforeAll() = {
-    client.register("test-value", new Parser().parse(new File(testSchema)))
+  def fixture() = {
+    val client = new MockSchemaRegistryClient
+    client.register("test-value", testSchema)
+    new SchemaResourceLoader("http://mock", client)
   }
 
   describe("When loading schemas from the registry") {
-    it("creates a resource based on latest version") {
-      val loader = new SchemaResourceLoader("http://mock", client)
+    println(s"testSchema: ${testSchema.toString}")
+    it("returns the latest version of the schema") {
+      val loader = fixture()
       val res = loader.retrieveSchema("registry:test-value")
-      whenReady(res) { schema =>
-        schema.exists() shouldBe true
-        schema.getURL shouldBe new URL("http://mock/schemas/ids/1")
-        schema.isReadable shouldBe true
-        new Parser().parse(Source.fromInputStream(schema.getInputStream).mkString) shouldBe
-          new Parser().parse(Source.fromFile(testSchema).mkString)
+      whenReady(res) { schemaMetadata =>
+        println(s"**** schemaMetadata: $schemaMetadata")
+        new Schema.Parser().parse(schemaMetadata.getSchema) shouldBe testSchema
       }
     }
 
     it("loads a schema with an explicit version") {
-      val loader = new SchemaResourceLoader("http://mock", client)
+      val loader = fixture()
       val res = loader.retrieveSchema("registry:test-value#1")
-      whenReady(res) { schema =>
-        schema.exists() shouldBe true
-        schema.getURL shouldBe new URL("http://mock/schemas/ids/1")
-        schema.isReadable shouldBe true
-        new Parser().parse(Source.fromInputStream(schema.getInputStream).mkString) shouldBe
-          new Parser().parse(Source.fromFile(testSchema).mkString)
+      whenReady(res) { schemaMetadata =>
+        new Schema.Parser().parse(schemaMetadata.getSchema) shouldBe testSchema
       }
     }
 
     it("errors if can't find a schema with a specific version") {
-      val loader = new SchemaResourceLoader("http://mock", client)
-      whenReady(loader.retrieveSchema("registry:test-value#2")
-        .failed) { error =>
+      val loader = fixture()
+      val res = loader.retrieveSchema("registry:test-value#2").failed
+      whenReady(res) { error =>
         error shouldBe a[SchemaRegistryException]
         error.getMessage should not be null
       }
     }
 
     it("defaults to registry resources") {
-      val loader = new SchemaResourceLoader("http://mock", client)
-      whenReady(loader.retrieveSchema("test-value#1")) { res =>
-        res.exists() shouldBe true
-        res.getURL shouldBe new URL("http://mock/schemas/ids/1")
-        res.isReadable shouldBe true
-        new Parser().parse(Source.fromInputStream(res.getInputStream).mkString) shouldBe
-          new Parser().parse(Source.fromFile(testSchema).mkString)
+      val loader = fixture()
+      val res = loader.retrieveSchema("test-value#1")
+      whenReady(res) { schemaMetadata =>
+        new Schema.Parser().parse(schemaMetadata.getSchema) shouldBe testSchema
       }
     }
-
-    it("understands classpath resources") {
-      val loader = new SchemaResourceLoader("http://mock", client)
-      whenReady(loader.retrieveSchema("classpath:resource-loader-spec.avsc")) { res =>
-        res.exists() shouldBe true
-        res.isReadable shouldBe true
-        new Parser().parse(Source.fromInputStream(res.getInputStream).mkString) shouldBe
-          new Parser().parse(Source.fromFile(testSchema).mkString)
-      }
-    }
-
 
     it("errors when subject is not known") {
-      val loader = new SchemaResourceLoader("http://mock", client)
-      whenReady(loader.retrieveSchema("registry:tester")
-        .failed)(_ shouldBe a[SchemaRegistryException])
+      val loader = fixture()
+      whenReady(loader.retrieveSchema("registry:tester").failed)(_ shouldBe a[SchemaRegistryException])
     }
 
     it("adds the suffix") {
-      val loader = new SchemaResourceLoader("http://mock", client)
-      whenReady(loader.retrieveSchema("test#1")) { res =>
-        res.exists() shouldBe true
-        res.getURL shouldBe new URL("http://mock/schemas/ids/1")
-        res.isReadable shouldBe true
-        new Parser().parse(Source.fromInputStream(res.getInputStream).mkString) shouldBe
-          new Parser().parse(Source.fromFile(testSchema).mkString)
+      val loader = fixture()
+      val res = loader.retrieveSchema("test#1")
+      whenReady(res) { schema =>
+        new Schema.Parser().parse(schema.getSchema) shouldBe testSchema
       }
     }
   }
-
 }
