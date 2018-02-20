@@ -81,7 +81,7 @@ class JdbcRecordWriter(val dataSource: HikariDataSource,
   override def batch(operation: Operation): Unit = {
     operation match {
       case Upsert(record) => add(record)
-      case Delete(schema, fields) => throw new UnsupportedOperationException("Not supported")
+      case Delete(schema, fields) => //TODO: implement delete
     }
   }
 
