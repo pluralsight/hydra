@@ -19,7 +19,7 @@ class TestIngestor extends Ingestor {
       sender ! Join
 
     case Ingest(request, _) =>
-      log.info(request.payload.toString)
+      log.info(Option(request.payload).getOrElse("<<EMPTY PAYLOAD>>").toString)
       sender ! IngestorCompleted
   }
 }

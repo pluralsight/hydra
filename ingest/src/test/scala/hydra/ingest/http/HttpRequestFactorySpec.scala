@@ -19,7 +19,7 @@ import scala.concurrent.duration._
 class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with FunSpecLike
   with ScalaFutures with BeforeAndAfterAll {
 
-  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true,duration=10 seconds)
+  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10 seconds)
 
   describe("When build a HydraRequest from HTTP") {
     it("builds") {
@@ -39,6 +39,30 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
         req.metadataValue("hydra") shouldBe Some("awesome")
         req.validationStrategy shouldBe ValidationStrategy.Relaxed
         req.ackStrategy shouldBe AckStrategy.Replicated
+      }
+    }
+
+    it("builds a DELETE request") {
+      implicit val mat = ActorMaterializer()
+      val httpRequest = HttpRequest(
+        HttpMethods.DELETE,
+        uri = "/test",
+        entity = HttpEntity.Empty)
+      val req = new HttpRequestFactory().createRequest("123", httpRequest)
+      whenReady(req) {
+        req => req.payload shouldBe null
+      }
+    }
+
+    it("does not modify empty payloads for non-DELETE requests") {
+      implicit val mat = ActorMaterializer()
+      val httpRequest = HttpRequest(
+        HttpMethods.POST,
+        uri = "/test",
+        entity = HttpEntity.Empty)
+      val req = new HttpRequestFactory().createRequest("123", httpRequest)
+      whenReady(req) {
+        req => req.payload shouldBe ""
       }
     }
 

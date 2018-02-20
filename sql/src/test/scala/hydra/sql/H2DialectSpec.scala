@@ -2,6 +2,7 @@ package hydra.sql
 
 import java.sql.JDBCType._
 
+import hydra.avro.util.SchemaWrapper
 import org.apache.avro.Schema
 import org.scalatest.{FunSpecLike, Matchers}
 
@@ -51,7 +52,8 @@ class H2DialectSpec extends Matchers with FunSpecLike {
 
     it("returns upserts") {
       val upsert = "merge into table (\"id\",\"username\",\"active\") key(\"id\") values (?,?,?);"
-      H2Dialect.upsert("table", avro, UnderscoreSyntax) shouldBe upsert
+      H2Dialect.upsert("table",
+        SchemaWrapper.from(avro), UnderscoreSyntax) shouldBe upsert
     }
 
     it("Creates the correct alter table statements") {

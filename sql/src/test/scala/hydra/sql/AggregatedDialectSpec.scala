@@ -2,6 +2,7 @@ package hydra.sql
 
 import java.sql.JDBCType._
 
+import hydra.avro.util.SchemaWrapper
 import org.apache.avro.Schema
 import org.scalatest.{FunSpecLike, Matchers}
 
@@ -97,7 +98,7 @@ class AggregatedDialectSpec extends Matchers with FunSpecLike {
 
     it("builds upserts") {
 
-      val schema = new Schema.Parser().parse(
+      val schema = SchemaWrapper.from(new Schema.Parser().parse(
         """
           |{
           |	"type": "record",
@@ -119,14 +120,12 @@ class AggregatedDialectSpec extends Matchers with FunSpecLike {
           |		}
           |	]
           |}
-        """.stripMargin)
+        """.stripMargin))
 
 
       val dialect = new AggregatedDialect(List(PostgresDialect, new JdbcDialect() {
         override def canHandle(url: String): Boolean = url.startsWith("jdbc:postgresql")
       }))
-
-      println(dialect.buildUpsert("table", schema, UnderscoreSyntax))
 
       val upsert =
         """insert into table ("id","username","active") values (?,?,?)

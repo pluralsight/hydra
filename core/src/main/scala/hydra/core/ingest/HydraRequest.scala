@@ -4,6 +4,8 @@ import hydra.core.transport.ValidationStrategy.Strict
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 
 /**
+  * We are mimicking Kafka's design of having a null payload be a marker for deletion.
+  *
   * Created by alexsilva on 12/3/16.
   */
 case class HydraRequest(correlationId: String = CorrelationIdBuilder.generate(),

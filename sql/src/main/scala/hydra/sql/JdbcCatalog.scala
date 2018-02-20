@@ -21,9 +21,10 @@ import java.sql._
 import java.util.Objects
 import javax.sql.DataSource
 
+import hydra.avro.util.SchemaWrapper
 import hydra.common.util.TryWith
+import org.apache.avro.AvroRuntimeException
 import org.apache.avro.Schema.Field
-import org.apache.avro.{AvroRuntimeException, Schema}
 import org.slf4j.LoggerFactory
 
 import scala.util.{Failure, Success, Try}
@@ -104,9 +105,8 @@ class JdbcCatalog(ds: DataSource, dbSyntax: DbSyntax, dialect: JdbcDialect) exte
     }
   }
 
-  def findMissingFields(schema: Schema, columns: Seq[DbColumn]): Seq[Field] = {
-    import scala.collection.JavaConverters._
-    val fields = schema.getFields.asScala.map(f => dbSyntax.format(f.name) -> f).toMap
+  def findMissingFields(schema: SchemaWrapper, columns: Seq[DbColumn]): Seq[Field] = {
+    val fields = schema.getFields.map(f => dbSyntax.format(f.name) -> f).toMap
     val cols = columns.map(_.name).toSet
     val missing = fields -- cols
     missing.values.toSeq

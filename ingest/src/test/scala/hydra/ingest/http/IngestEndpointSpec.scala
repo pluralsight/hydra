@@ -1,11 +1,13 @@
 package hydra.ingest.http
 
 import akka.actor.{Actor, Props}
+import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{HttpMethods, StatusCodes}
-import akka.http.scaladsl.server.{MethodRejection, RequestEntityExpectedRejection}
+import akka.http.scaladsl.server.{MethodRejection, MissingHeaderRejection, RequestEntityExpectedRejection}
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.{TestActorRef, TestKit}
 import hydra.common.util.ActorUtils
+import hydra.core.ingest.RequestParams
 import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.TestIngestor
@@ -42,7 +44,8 @@ class IngestEndpointSpec extends Matchers with WordSpecLike with ScalatestRouteT
 
     "rejects a GET request" in {
       Get("/ingest") ~> ingestRoute ~> check {
-        rejection shouldEqual MethodRejection(HttpMethods.POST)
+        rejections should contain allElementsOf (Seq(MethodRejection(HttpMethods.POST),
+          MethodRejection(HttpMethods.DELETE)))
       }
     }
 
@@ -52,15 +55,30 @@ class IngestEndpointSpec extends Matchers with WordSpecLike with ScalatestRouteT
       }
     }
 
+    "initiates a delete request" in {
+      val key = RawHeader(RequestParams.HYDRA_RECORD_KEY_PARAM, "test")
+      Delete("/ingest").withHeaders(key) ~> ingestRoute ~> check {
+        response.status.intValue() shouldBe 200 //todo: should we support a 204?
+      }
+    }
+
+    "rejects a delete request without a key" in {
+      Delete("/ingest") ~> ingestRoute ~> check {
+        rejection shouldEqual MissingHeaderRejection("hydra-record-key")
+      }
+    }
+
     "publishes to a target ingestor" in {
-      val request = Post("/ingest/tester", "payload")
+      val ingestor = RawHeader(RequestParams.HYDRA_INGESTOR_PARAM, "tester")
+      val request = Post("/ingest", "payload").withHeaders(ingestor)
       request ~> ingestRoute ~> check {
         status shouldBe StatusCodes.OK
       }
     }
 
     "returns 404 if unknown ingestor" in {
-      val request = Post("/ingest/unknown", "payload")
+      val ingestor = RawHeader(RequestParams.HYDRA_INGESTOR_PARAM, "unknown")
+      val request = Post("/ingest", "payload").withHeaders(ingestor)
       request ~> ingestRoute ~> check {
         status shouldBe StatusCodes.NotFound
       }

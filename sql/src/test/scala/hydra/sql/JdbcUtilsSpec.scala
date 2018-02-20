@@ -3,6 +3,7 @@ package hydra.sql
 import java.sql.JDBCType
 import java.sql.JDBCType._
 
+import hydra.avro.util.SchemaWrapper
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Type
 import org.scalatest.{FunSpecLike, Matchers}
@@ -280,7 +281,7 @@ class JdbcUtilsSpec extends Matchers with FunSpecLike {
         "\"passwordHash\" BYTE NOT NULL,\"signupTimestamp\" TIMESTAMP NOT NULL,\"scoreLong\" BIGINT NOT NULL," +
         "\"signupDate\" DATE NOT NULL,\"justANumber\" INTEGER NOT NULL,\"testUnion\" TEXT "
 
-      JdbcUtils.schemaString(avro, NoopDialect) shouldBe columns
+      JdbcUtils.schemaString(SchemaWrapper.from(avro), NoopDialect) shouldBe columns
     }
 
     it("Generates the correct ddl statement") {
@@ -314,7 +315,7 @@ class JdbcUtilsSpec extends Matchers with FunSpecLike {
 
       val avro = new Schema.Parser().parse(schema)
 
-      val stmt = JdbcUtils.schemaString(avro, PostgresDialect)
+      val stmt = JdbcUtils.schemaString(SchemaWrapper.from((avro)), PostgresDialect)
       stmt shouldBe "\"id\" INTEGER NOT NULL,\"username\" TEXT NOT NULL,\"testEnum\" TEXT NOT NULL,CONSTRAINT User_PK PRIMARY KEY (\"id\")"
     }
 
@@ -352,7 +353,7 @@ class JdbcUtilsSpec extends Matchers with FunSpecLike {
         """.stripMargin
 
       val avro = new Schema.Parser().parse(schema)
-      val stmt = JdbcUtils.schemaString(avro, PostgresDialect)
+      val stmt = JdbcUtils.schemaString(SchemaWrapper.from((avro)), PostgresDialect)
       stmt shouldBe "\"id1\" INTEGER NOT NULL,\"id2\" INTEGER NOT NULL,\"username\" TEXT NOT NULL," +
         "\"testEnum\" TEXT NOT NULL,CONSTRAINT User_PK PRIMARY KEY (\"id1\",\"id2\")"
     }

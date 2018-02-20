@@ -18,7 +18,7 @@ package hydra.ingest.http
 
 import akka.actor._
 import akka.http.scaladsl.model.HttpRequest
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.{Rejection, Route}
 import akka.stream.ActorMaterializer
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
@@ -53,33 +53,31 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: Execut
     .valueOrElse(500 millis)
 
   override val route: Route =
-    post {
-      requestEntityPresent {
-        pathPrefix("ingest") {
-          parameter("correlationId" ?) { correlationId =>
-            pathEndOrSingleSlash {
-              publishRequest(correlationId.getOrElse(cId))
-            } ~ path(Segment) { ingestor =>
-              publishRequest(correlationId.getOrElse(cId), Some(ingestor))
-            }
+    pathPrefix("ingest") {
+      pathEndOrSingleSlash {
+        post {
+          requestEntityPresent {
+            publishRequest
           }
-        }
+        } ~ deleteRequest
       }
     }
 
+  private def deleteRequest = delete {
+    headerValueByName(RequestParams.HYDRA_RECORD_KEY_PARAM)(_ => publishRequest)
+  }
 
   private def cId = CorrelationIdBuilder.generate()
 
-  def publishRequest(correlationId: String, ingestor: Option[String] = None) = {
-    extractRequestContext { ctx =>
-      val reqFuture = createRequest[HttpRequest](correlationId, ctx.request)
-      onSuccess(reqFuture) { req =>
-        val request = ingestor
-          .map(i => req.withMetadata(RequestParams.HYDRA_INGESTOR_PARAM -> i)).getOrElse(req)
+  private def publishRequest = parameter("correlationId" ?) { cIdOpt =>
+    extractRequest { req =>
+      onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>
         imperativelyComplete { ctx =>
-          requestHandler ! InitiateHttpRequest(request, ingestTimeout, ctx)
+          requestHandler ! InitiateHttpRequest(hydraRequest, ingestTimeout, ctx)
         }
       }
     }
   }
 }
+
+case object DeleteDirectiveNotAllowedRejection extends Rejection

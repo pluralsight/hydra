@@ -5,6 +5,7 @@ import java.util.Properties
 
 import com.typesafe.config.ConfigFactory
 import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
+import hydra.avro.util.SchemaWrapper
 import org.apache.avro.{AvroRuntimeException, Schema}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
@@ -45,7 +46,7 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
       |	]
       |}""".stripMargin
 
-  val schema = new Schema.Parser().parse(schemaStr)
+  val schema = SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
 
   override def beforeAll() = {
     store.createOrAlterTable(Table("test_table", schema))
@@ -107,7 +108,7 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
 
 
     it("throws exception when trying to alter a table adding an optional field with no default value") {
-      val newSchema = new Schema.Parser().parse(
+      val newSchema = SchemaWrapper.from(new Schema.Parser().parse(
         """
           |{
           |	"type": "record",
@@ -127,7 +128,7 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
           |			"type": ["null", "string"]
           |		}
           |	]
-          |}""".stripMargin)
+          |}""".stripMargin))
 
       intercept[AvroRuntimeException] {
         store.createOrAlterTable(Table("test_table", newSchema))
@@ -135,7 +136,7 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
     }
 
     it("alters a table") {
-      val newSchema = new Schema.Parser().parse(
+      val newSchema = SchemaWrapper.from(new Schema.Parser().parse(
         """
           |{
           |	"type": "record",
@@ -156,7 +157,7 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
           |     "default":"test"
           |		}
           |	]
-          |}""".stripMargin)
+          |}""".stripMargin))
 
       val dbTable = store.createOrAlterTable(Table("test_table", newSchema))
 
@@ -168,7 +169,7 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
     }
 
     it("finds the missing fields for a schema") {
-      val sc = new Schema.Parser().parse(
+      val sc = SchemaWrapper.from(new Schema.Parser().parse(
         """
           |{
           |	"type": "record",
@@ -187,7 +188,7 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
           |			"type": "string"
           |		}
           |	]
-          |}""".stripMargin)
+          |}""".stripMargin))
 
       val cols = List(
         DbColumn("id", JDBCType.INTEGER, false, Some("")),
@@ -195,7 +196,7 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
 
       val catalog = new JdbcCatalog(ds, UnderscoreSyntax, PostgresDialect)
 
-      catalog.findMissingFields(sc, cols) shouldBe Seq(sc.getField("lastName"))
+      catalog.findMissingFields(sc, cols) shouldBe Seq(sc.schema.getField("lastName"))
     }
   }
 }

@@ -7,12 +7,11 @@ import java.time.{LocalDate, ZoneId}
 
 import com.google.common.collect.Lists
 import com.pluralsight.hydra.sql.MockArray
+import hydra.avro.util.SchemaWrapper
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericData
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FunSpecLike, Matchers}
-
-import scala.collection.JavaConverters._
 
 
 /**
@@ -111,7 +110,7 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       |}
     """.stripMargin
 
-  val schema = new Schema.Parser().parse(schemaStr)
+  val schema = SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
 
   val valueSetter = new AvroValueSetter(schema, PostgresDialect)
   describe("The AvroValueSetter") {
@@ -144,7 +143,8 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       (mockedStmt.setBytes _).expects(15, *) //todo: how to verify the contents of an array in scala mock?
       (mockedStmt.addBatch _).expects()
 
-      val record = new GenericData.Record(schema)
+      val avroSchema = schema.schema
+      val record = new GenericData.Record(avroSchema)
       record.put("id", 1)
       record.put("username", "alex")
       record.put("rate", 0.2d)
@@ -153,11 +153,11 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       record.put("scored", 2.5d)
       record.put("signupTimestamp", ts)
       record.put("signupDate", 1234)
-      record.put("friends", new GenericData.Array[String](schema.getField("friends").schema(), friends))
+      record.put("friends", new GenericData.Array[String](avroSchema.getField("friends").schema(), friends))
       record.put("testUnion", "test")
       record.put("testNullUnion", null)
       record.put("testEnum", "test1")
-      val address = new GenericData.Record(schema.getField("address").schema)
+      val address = new GenericData.Record(avroSchema.getField("address").schema)
       address.put("street", "happy drive")
       record.put("address", address)
       record.put("bigNumber", 12342134223L)
@@ -167,7 +167,7 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
 
     it("gets insert fields from the dialect") {
       val binder = new AvroValueSetter(schema, PostgresDialect)
-      binder.fieldTypes shouldBe schema.getFields.asScala
+      binder.fieldTypes shouldBe schema.getFields
         .map(f => f -> JdbcUtils.getJdbcType(f.schema(), PostgresDialect)).toMap
 
     }
@@ -192,7 +192,7 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
           |	]
           |}""".stripMargin
 
-      val sch = new Schema.Parser().parse(schemaStr)
+      val sch = SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
       val binder = new AvroValueSetter(sch, PostgresDialect)
       binder.fieldTypes shouldBe PostgresDialect.upsertFields(sch)
         .map(f => f -> JdbcUtils.getJdbcType(f.schema(), PostgresDialect)).toMap

@@ -5,7 +5,7 @@ import akka.pattern.ask
 import akka.util
 import com.pluralsight.hydra.avro.JsonConverter
 import hydra.avro.resource.SchemaResource
-import hydra.avro.util.AvroUtils
+import hydra.avro.util.{AvroUtils, SchemaWrapper}
 import hydra.common.config.ConfigSupport
 import hydra.core.akka.SchemaFetchActor.{FetchSchema, SchemaFetchResponse}
 import hydra.core.ingest.HydraRequest
@@ -71,7 +71,7 @@ object JdbcRecordFactory {
   private[jdbc] def pk(request: HydraRequest, schema: Schema): Seq[Field] = {
     request.metadataValue(PRIMARY_KEY_PARAM).map(_.split(",")) match {
       case Some(ids) => ids.map(AvroUtils.getField(_, schema))
-      case None => AvroUtils.getPrimaryKeys(schema)
+      case None => SchemaWrapper.from(schema).primaryKeys //todo: cache this?
     }
   }
 

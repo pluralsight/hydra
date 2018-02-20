@@ -1,5 +1,6 @@
 package hydra.sql
 
+import hydra.avro.util.SchemaWrapper
 import org.apache.avro.Schema
 import org.scalatest.{FunSpecLike, Matchers}
 
@@ -15,7 +16,8 @@ class NoOpDialectSpec extends Matchers with FunSpecLike {
 
     it("does not upsert") {
       intercept[UnsupportedOperationException] {
-        NoopDialect.buildUpsert("table", Schema.create(Schema.Type.NULL), UnderscoreSyntax)
+        NoopDialect.buildUpsert("table",
+          SchemaWrapper.from(Schema.create(Schema.Type.NULL)), UnderscoreSyntax)
       }
     }
 

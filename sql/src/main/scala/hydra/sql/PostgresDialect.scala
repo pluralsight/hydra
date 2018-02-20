@@ -2,7 +2,7 @@ package hydra.sql
 
 import java.sql.JDBCType
 
-import hydra.avro.util.AvroUtils
+import hydra.avro.util.SchemaWrapper
 import org.apache.avro.LogicalTypes.Decimal
 import org.apache.avro.Schema.Type.{BYTES, UNION}
 import org.apache.avro.Schema.{Field, Type}
@@ -47,21 +47,18 @@ private[sql] object PostgresDialect extends JdbcDialect {
     }
   }
 
-  override def upsertFields(schema: Schema): Seq[Field] = {
-    import scala.collection.JavaConverters._
-    val fields = schema.getFields.asScala
-    val idFields = AvroUtils.getPrimaryKeys(schema)
+  override def upsertFields(schema: SchemaWrapper): Seq[Field] = {
+    val fields = schema.getFields
+    val idFields = schema.primaryKeys
     val updateSchema = if (idFields.isEmpty) Seq.empty else fields -- idFields
     fields ++ updateSchema ++ idFields
   }
 
-  override def buildUpsert(table: String, schema: Schema, dbs: DbSyntax): String = {
-    import scala.collection.JavaConverters._
-
+  override def buildUpsert(table: String, schema: SchemaWrapper, dbs: DbSyntax): String = {
     def formatColName(col: Field) = quoteIdentifier(dbs.format(col.name()))
 
-    val idFields = AvroUtils.getPrimaryKeys(schema)
-    val fields = schema.getFields.asScala
+    val idFields = schema.primaryKeys
+    val fields = schema.getFields
     val columns = fields.map(formatColName).mkString(",")
     val placeholders = parameterize(fields)
     val updateSchema = fields -- idFields

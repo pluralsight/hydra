@@ -1,5 +1,6 @@
 package hydra.sql
 
+import hydra.avro.util.SchemaWrapper
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Field
 
@@ -85,11 +86,17 @@ abstract class JdbcDialect extends Serializable {
     * A default implementation for insert statements
     *
     */
-  def insertStatement(table: String, schema: Schema, dbs: DbSyntax): String = {
-    import scala.collection.JavaConverters._
-    val columns = schema.getFields.asScala
+  def insertStatement(table: String, schema: SchemaWrapper, dbs: DbSyntax): String = {
+    val columns = schema.getFields
     val cols = columns.map(c => quoteIdentifier(dbs.format(c.name))).mkString(",")
     s"INSERT INTO $table ($cols) VALUES (${parameterize(columns).mkString(",")})"
+  }
+
+  def deleteStatement(table: String, keys: Seq[Field], dbs: DbSyntax): String = {
+    //guard against some rogue caller trying to delete the entire table
+    assert(!keys.isEmpty, "Whoa! At least one primary key is required.")
+    val colTuples = keys.map(f => s"${dbs.format(f.name)} = ?")
+    s"DELETE FROM $table WHERE ${colTuples.mkString(" AND ")}"
   }
 
   /**
@@ -97,7 +104,7 @@ abstract class JdbcDialect extends Serializable {
     * Optional operation; default implementation throws a UnsupportedOperationException
     */
   @throws[UnsupportedOperationException]
-  def buildUpsert(table: String, schema: Schema, dbs: DbSyntax): String = {
+  def buildUpsert(table: String, schema: SchemaWrapper, dbs: DbSyntax): String = {
     throw new UnsupportedOperationException("Upserts are not supported by this dialect.")
   }
 
@@ -108,17 +115,23 @@ abstract class JdbcDialect extends Serializable {
     * Optional operation; default implementation throws a UnsupportedOperationException
     */
   @throws[UnsupportedOperationException]
-  def upsertFields(schema: Schema): Seq[Field] = {
+  def upsertFields(schemaWrapper: SchemaWrapper): Seq[Field] = {
     throw new UnsupportedOperationException("Upserts are not supported by this dialect.")
   }
 
   /**
     * Convenience method that calls the underlying buildUpsertStatement method if the id exists.
-    * It will add a "keys" property to the schema if the ids passed are not empty.
+    *
+    * @param table  The Table name
+    * @param schema An avro schema with an optional "hydra.key" property defined
+    * @param dbs    The db syntax to use
     */
-  def upsert(table: String, schema: Schema, dbs: DbSyntax): String = {
-    Option(schema.getProp("hydra.key")).map(_ => buildUpsert(table, schema, dbs))
-      .getOrElse(insertStatement(table, schema, dbs))
+  def upsert(table: String, schema: SchemaWrapper, dbs: DbSyntax): String = {
+    if (schema.primaryKeys.isEmpty) {
+      insertStatement(table, schema, dbs)
+    } else {
+      buildUpsert(table, schema, dbs)
+    }
   }
 
   protected def parameterize(fields: Seq[Schema.Field]): Seq[String] = {
@@ -182,7 +195,7 @@ object JdbcDialects {
 private object NoopDialect extends JdbcDialect {
   override def canHandle(url: String): Boolean = true
 
-  override def buildUpsert(table: String, schema: Schema, dbs: DbSyntax): String = {
+  override def buildUpsert(table: String, schema: SchemaWrapper, dbs: DbSyntax): String = {
     throw new UnsupportedOperationException("Not supported.")
   }
 }

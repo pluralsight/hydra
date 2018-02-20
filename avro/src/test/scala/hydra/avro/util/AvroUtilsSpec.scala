@@ -7,7 +7,6 @@ import hydra.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.avro.resource.SchemaResource
 import hydra.avro.util.AvroUtils.SeenPair
 import org.apache.avro.Schema
-import org.apache.avro.Schema.Field
 import org.scalatest.{FunSpecLike, Matchers}
 
 /**
@@ -53,112 +52,6 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
       }
     }
 
-    it("throws exception if primary key doesn't exist") {
-      val schema =
-        """
-          |{
-          |	"type": "record",
-          |	"name": "User",
-          |	"namespace": "hydra",
-          | "hydra.key": "name",
-          |	"fields": [{
-          |			"name": "id",
-          |			"type": "int",
-          |			"doc": "doc"
-          |		},
-          |		{
-          |			"name": "username",
-          |			"type": ["null", "string"]
-          |		}
-          |	]
-          |}""".stripMargin
-
-      val avro = new Schema.Parser().parse(schema)
-
-      intercept[IllegalArgumentException] {
-        AvroUtils.getPrimaryKeys(avro) shouldBe None
-      }
-    }
-
-    it("returns a single primary key") {
-      val schema =
-        """
-          |{
-          |	"type": "record",
-          |	"name": "User",
-          |	"namespace": "hydra",
-          | "hydra.key": "id",
-          |	"fields": [{
-          |			"name": "id",
-          |			"type": "int",
-          |			"doc": "doc"
-          |		},
-          |		{
-          |			"name": "username",
-          |			"type": ["null", "string"]
-          |		}
-          |	]
-          |}""".stripMargin
-
-      val avro = new Schema.Parser().parse(schema)
-
-      AvroUtils.getPrimaryKeys(avro) shouldBe Seq(avro.getField("id"))
-    }
-
-    it("allows primary keys to be supplied") {
-      val schema =
-        """
-          |{
-          |	"type": "record",
-          |	"name": "User",
-          |	"namespace": "hydra",
-          |	"fields": [{
-          |			"name": "id",
-          |			"type": "int",
-          |			"doc": "doc"
-          |		},
-          |		{
-          |			"name": "username",
-          |			"type": ["null", "string"]
-          |		}
-          |	]
-          |}""".stripMargin
-
-      val avro = new Schema.Parser().parse(schema)
-
-      AvroUtils.getPrimaryKeys(avro) shouldBe Seq.empty[Field]
-    }
-
-    it("returns a composite primary key") {
-      val schema =
-        """
-          |{
-          |	"type": "record",
-          |	"name": "User",
-          |	"namespace": "hydra",
-          | "hydra.key": "id1,id2",
-          |	"fields": [{
-          |			"name": "id1",
-          |			"type": "int",
-          |			"doc": "doc"
-          |		},
-          |  {
-          |			"name": "id2",
-          |			"type": "int",
-          |			"doc": "doc"
-          |		},
-          |		{
-          |			"name": "username",
-          |			"type": ["null", "string"]
-          |		}
-          |	]
-          |}""".stripMargin
-
-      val avro = new Schema.Parser().parse(schema)
-
-      AvroUtils.getPrimaryKeys(avro) shouldBe Seq(avro.getField("id1"), avro.getField("id2"))
-
-    }
 
     it("tests for equality ignoring props") {
       val schema1 = new Schema.Parser().parse(
