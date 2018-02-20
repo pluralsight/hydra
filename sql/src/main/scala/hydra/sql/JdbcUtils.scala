@@ -2,10 +2,10 @@ package hydra.sql
 
 import java.sql.{Connection, JDBCType}
 
-import hydra.avro.util.AvroUtils
+import hydra.avro.util.SchemaWrapper
 import org.apache.avro.LogicalTypes.Decimal
-import org.apache.avro.Schema.{Field, Type}
 import org.apache.avro.Schema.Type._
+import org.apache.avro.Schema.{Field, Type}
 import org.apache.avro.{LogicalTypes, Schema}
 import org.slf4j.LoggerFactory
 
@@ -82,7 +82,7 @@ private[sql] object JdbcUtils {
   /**
     * Creates a table with a given schema.
     */
-  def createTable(schema: Schema,
+  def createTable(schema: SchemaWrapper,
                   dialect: JdbcDialect,
                   table: String,
                   createTableOptions: String,
@@ -127,14 +127,16 @@ private[sql] object JdbcUtils {
     }.isSuccess
   }
 
-  def schemaString(schema: Schema, dialect: JdbcDialect, dbSyntax: DbSyntax = NoOpSyntax): String = {
-    val schemaStr = schema.getFields.asScala.map { field =>
+  def schemaString(schema: SchemaWrapper, dialect: JdbcDialect,
+                   dbSyntax: DbSyntax = NoOpSyntax): String = {
+    val schemaStr = schema.getFields.map { field =>
       val name = dialect.quoteIdentifier(dbSyntax.format(field.name))
       val typ = getJdbcType(field.schema(), dialect).databaseTypeDefinition
       val nullable = if (isNullableUnion(field.schema())) "" else "NOT NULL"
       s"$name $typ $nullable"
     }
-    val pkSeq = AvroUtils.getPrimaryKeys(schema).map(f => dialect.quoteIdentifier(dbSyntax.format(f.name())))
+    val pkSeq = schema.primaryKeys
+      .map(f => dialect.quoteIdentifier(dbSyntax.format(f.name())))
     val pkStmt = if (!pkSeq.isEmpty) s",CONSTRAINT ${schema.getName}_PK PRIMARY KEY (${pkSeq.mkString(",")})" else ""
     val ddl = s"${schemaStr.mkString(",")}${pkStmt}"
     ddl

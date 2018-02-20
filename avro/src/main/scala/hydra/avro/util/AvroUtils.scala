@@ -57,22 +57,6 @@ object AvroUtils {
       .getOrElse(throw new IllegalArgumentException(s"Field $name is not in schema."))
   }
 
-  /**
-    * Returns the primary keys (if any) defined for that schema.
-    *
-    * Primary keys are defined by adding a property named "key" to the avro record,
-    * which can contain a single field name
-    * or a comma delimmited list of field names (for composite primary keys.)
-    *
-    * @param schema
-    * @return An empty sequence if no primary key(s) are defined.
-    */
-  def getPrimaryKeys(schema: Schema): Seq[Field] = {
-    Option(schema.getProp("hydra.key")).map(_.split(",")) match {
-      case Some(ids) => ids.map(getField(_, schema))
-      case None => Seq.empty
-    }
-  }
 
   /**
     * A "ligher" equals that looks a fields and names primarily.

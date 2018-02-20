@@ -4,7 +4,8 @@ import java.util.Properties
 
 import com.typesafe.config.ConfigFactory
 import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
-import hydra.avro.io.SaveMode
+import hydra.avro.io.{Delete, SaveMode, Upsert}
+import hydra.avro.util.SchemaWrapper
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericData
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
@@ -12,7 +13,10 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 /**
   * Created by alexsilva on 5/4/17.
   */
-class JdbcRecordWriterSpec extends Matchers with FunSpecLike with BeforeAndAfterAll with JdbcHelper {
+class JdbcRecordWriterSpec extends Matchers
+  with FunSpecLike
+  with BeforeAndAfterAll
+  with JdbcHelper {
 
   import scala.collection.JavaConverters._
 
@@ -34,7 +38,7 @@ class JdbcRecordWriterSpec extends Matchers with FunSpecLike with BeforeAndAfter
       |	]
       |}""".stripMargin
 
-  val schema = new Schema.Parser().parse(schemaStr)
+  val schema = SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
 
   val cfg = ConfigFactory.load().getConfig("db-cfg")
 
@@ -46,7 +50,7 @@ class JdbcRecordWriterSpec extends Matchers with FunSpecLike with BeforeAndAfter
 
   private val ds = new HikariDataSource(hikariConfig)
 
-  val record = new GenericData.Record(schema)
+  val record = new GenericData.Record(schema.schema)
   record.put("id", 1)
   record.put("username", "alex")
 
@@ -71,7 +75,7 @@ class JdbcRecordWriterSpec extends Matchers with FunSpecLike with BeforeAndAfter
           |}""".stripMargin
 
       catalog.createOrAlterTable(Table("tester", schema))
-      val s = new Schema.Parser().parse(schemaStr)
+      val s = SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
       intercept[AnalysisException] {
         new JdbcRecordWriter(ds, s, SaveMode.ErrorIfExists, H2Dialect)
       }
@@ -96,13 +100,13 @@ class JdbcRecordWriterSpec extends Matchers with FunSpecLike with BeforeAndAfter
           |}""".stripMargin
 
       val s = new Schema.Parser().parse(schemaStr)
-      new JdbcRecordWriter(ds, s, SaveMode.Append, H2Dialect).close()
+      new JdbcRecordWriter(ds, SchemaWrapper.from(s), SaveMode.Append, H2Dialect).close()
       catalog.tableExists(TableIdentifier("tester")) shouldBe true
     }
 
     it("writes") {
       val writer = new JdbcRecordWriter(ds, schema, dialect = H2Dialect, batchSize = 1)
-      writer.add(record)
+      writer.batch(Upsert(record))
       writer.flush()
       withConnection(ds.getConnection) { c =>
         val stmt = c.createStatement()
@@ -134,8 +138,10 @@ class JdbcRecordWriterSpec extends Matchers with FunSpecLike with BeforeAndAfter
           |}""".stripMargin
 
 
-      val writer = new JdbcRecordWriter(ds, new Schema.Parser().parse(schemaStr), batchSize = 2, dialect = H2Dialect)
-      writer.add(record)
+      val writer = new JdbcRecordWriter(ds,
+        SchemaWrapper.from(new Schema.Parser().parse(schemaStr)),
+        batchSize = 2, dialect = H2Dialect)
+      writer.batch(Upsert(record))
 
       withConnection(ds.getConnection) { c =>
         val stmt = c.createStatement()
@@ -178,9 +184,11 @@ class JdbcRecordWriterSpec extends Matchers with FunSpecLike with BeforeAndAfter
       srecord.put("id", 1)
       srecord.put("username", "alex")
 
-      val writer = new JdbcRecordWriter(ds, new Schema.Parser().parse(schemaStr), batchSize = 2, dialect = H2Dialect)
+      val writer = new JdbcRecordWriter(ds,
+        SchemaWrapper.from(new Schema.Parser().parse(schemaStr)),
+        batchSize = 2, dialect = H2Dialect)
 
-      writer.writeOne(srecord)
+      writer.execute(Upsert(srecord))
 
       withConnection(ds.getConnection) { c =>
         val stmt = c.createStatement()
@@ -225,7 +233,7 @@ class JdbcRecordWriterSpec extends Matchers with FunSpecLike with BeforeAndAfter
         stmt.close()
       }
 
-      writer.writeOne(newRecord)
+      writer.execute(Upsert(newRecord))
 
       withConnection(ds.getConnection) { c =>
         val stmt = c.createStatement()
@@ -258,8 +266,10 @@ class JdbcRecordWriterSpec extends Matchers with FunSpecLike with BeforeAndAfter
           |}""".stripMargin
 
 
-      val writer = new JdbcRecordWriter(ds, new Schema.Parser().parse(schemaStr), batchSize = 2, dialect = H2Dialect)
-      writer.add(record)
+      val writer = new JdbcRecordWriter(ds,
+        SchemaWrapper.from(new Schema.Parser().parse(schemaStr)),
+        batchSize = 2, dialect = H2Dialect)
+      writer.batch(Upsert(record))
 
       withConnection(ds.getConnection) { c =>
         val stmt = c.createStatement()
@@ -276,5 +286,30 @@ class JdbcRecordWriterSpec extends Matchers with FunSpecLike with BeforeAndAfter
         Seq(rs.getInt(1), rs.getString(2)) shouldBe Seq(1, "alex")
       }
     }
+  }
+
+  it("fails on deletes") {
+    val schemaStr =
+      """
+        |{
+        |	"type": "record",
+        |	"name": "DeleteTest",
+        |	"namespace": "hydra",
+        |	"fields": [{
+        |			"name": "id",
+        |			"type": "int",
+        |			"doc": "doc"
+        |		},
+        |		{
+        |			"name": "username",
+        |			"type": ["null", "string"]
+        |		}
+        |	]
+        |}""".stripMargin
+
+
+    val writer = new JdbcRecordWriter(ds,
+      SchemaWrapper.from(new Schema.Parser().parse(schemaStr)), batchSize = 2, dialect = H2Dialect)
+    writer.batch(Delete(new Schema.Parser().parse(schemaStr), Map.empty))
   }
 }

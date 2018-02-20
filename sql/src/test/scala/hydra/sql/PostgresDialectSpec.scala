@@ -3,6 +3,7 @@ package hydra.sql
 import java.sql.JDBCType
 import java.sql.JDBCType._
 
+import hydra.avro.util.SchemaWrapper
 import org.apache.avro.Schema
 import org.scalatest.{FunSpecLike, Matchers}
 
@@ -10,6 +11,9 @@ import org.scalatest.{FunSpecLike, Matchers}
   * Created by alexsilva on 5/4/17.
   */
 class PostgresDialectSpec extends Matchers with FunSpecLike {
+
+  implicit def fromSchema(schema:Schema):SchemaWrapper = SchemaWrapper.from(schema)
+  
   val schema =
     """
       |{

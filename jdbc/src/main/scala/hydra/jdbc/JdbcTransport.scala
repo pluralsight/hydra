@@ -4,12 +4,13 @@ import java.util.Properties
 
 import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
 import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
-import hydra.avro.io.SaveMode
+import hydra.avro.io.{SaveMode, Upsert}
 import hydra.common.config.ConfigSupport
 import hydra.core.transport.Transport
 import hydra.core.transport.TransportSupervisor.Deliver
 import hydra.sql.{JdbcDialects, JdbcRecordWriter, TableIdentifier}
 import configs.syntax._
+import hydra.avro.util.SchemaWrapper
 import hydra.common.logging.LoggingAdapter
 import hydra.common.util.TryWith
 
@@ -27,7 +28,7 @@ class JdbcTransport extends Transport with ConfigSupport with LoggingAdapter {
     case Deliver(record: JdbcRecord, deliveryId, callback) =>
       Try {
         val writer = getOrUpdateWriter(dbProfiles(record.dbProfile), record)
-        writer.writeOne(record.payload)
+        writer.execute(Upsert(record.payload))
         callback.onCompletion(deliveryId, Some(JdbcRecordMetadata(record.destination)), None)
       }.recover {
         case e: Exception =>
@@ -39,7 +40,8 @@ class JdbcTransport extends Transport with ConfigSupport with LoggingAdapter {
     //TODO: Make the writer constructor params configurable. Should we support batching?
     val schema = rec.payload.getSchema
     val key = s"${db.name}|${schema.getFullName}"
-    writers.getOrElseUpdate(key, new JdbcRecordWriter(db.ds, schema, SaveMode.Append,
+    writers.getOrElseUpdate(key, new JdbcRecordWriter(db.ds,
+      SchemaWrapper.from(schema, rec.key.getOrElse(Seq.empty)), SaveMode.Append,
       JdbcDialects.get(JdbcTransport.getUrl(db)), batchSize = -1,
       tableIdentifier = Some(TableIdentifier(rec.destination))))
   }

@@ -6,24 +6,23 @@ import java.sql.{PreparedStatement, Timestamp}
 import java.time.{LocalDate, ZoneId}
 
 import com.google.common.collect.Lists
+import hydra.avro.util.SchemaWrapper
 import hydra.sql.JdbcUtils.{getJdbcType, isLogicalType}
-import hydra.avro.util.AvroUtils
 import org.apache.avro.LogicalTypes.Decimal
 import org.apache.avro.Schema.Field
 import org.apache.avro.Schema.Type.LONG
 import org.apache.avro.generic.{GenericData, GenericRecord}
 import org.apache.avro.{AvroRuntimeException, LogicalTypes, Schema}
-import scala.collection.JavaConverters._
 
 /**
   * Created by alexsilva on 7/12/17.
   */
 //scalastyle:off
-private[sql] class AvroValueSetter(schema: Schema, dialect: JdbcDialect) {
+private[sql] class AvroValueSetter(schema: SchemaWrapper, dialect: JdbcDialect) {
 
-  private val pk = AvroUtils.getPrimaryKeys(schema)
+  private val pk = schema.primaryKeys
 
-  private val fields = if (pk.isEmpty) schema.getFields.asScala else dialect.upsertFields(schema)
+  private val fields = if (pk.isEmpty) schema.getFields else dialect.upsertFields(schema)
 
   val fieldTypes: Map[Field, JdbcType] = fields.map { field =>
     field -> getJdbcType(field.schema(), dialect)
