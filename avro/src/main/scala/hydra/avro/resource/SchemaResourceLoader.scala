@@ -49,9 +49,6 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
 
   def retrieveSchema(location: String)(implicit ec: ExecutionContext): Future[SchemaMetadata] = {
     require(location ne null)
-
-    println(s"retrieveSchema($location)")
-
     val parts = location.split("\\:")
     parts match {
       case Array(prefix, subject) => fetchSchema(subject)
@@ -61,7 +58,6 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
   }
 
   private def fetchSchema(subject: String)(implicit ec: ExecutionContext) = {
-    println(s"fetchSchema($subject)")
     val parts = subject.split("\\#")
     parts match {
       case Array(subject, version) => loadFromCache(subject.withSuffix, version)
@@ -70,7 +66,6 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
   }
 
   private def getLatestSchema(subject: String)(implicit ec: ExecutionContext): Future[SchemaMetadata] = {
-    println(s"getLatestSchema($subject)")
     cachingF(subject)(ttl = Some(5.minutes)) {
       Future(registry.getLatestSchemaMetadata(subject))
         .recoverWith {
@@ -81,14 +76,12 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
   }
 
   private def loadFromCache(subject: String, version: String)(implicit ec: ExecutionContext): Future[SchemaMetadata] = {
-    println(s"loadFromCache($subject, $version)")
     cachingF(subject, version)(ttl = None) {
       loadFromRegistry(subject, version)
     }
   }
 
   private def loadFromRegistry(subject: String, version: String)(implicit ec: ExecutionContext): Future[SchemaMetadata] = {
-    println(s"loadFromRegistry($subject, $version)")
     log.debug(s"Loading schema $subject, version $version from schema registry $registryUrl.")
     Future(version.toInt).map(v => registry.getSchemaMetadata(subject, v))
       .map(m => {
@@ -103,7 +96,6 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
 
   private implicit class AddSuffix(subject: String) {
     def withSuffix = {
-      println(s"withSuffix($subject)")
       if (subject.endsWith(suffix)) subject else subject + suffix
     }
   }
