@@ -45,7 +45,8 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
 
   import SchemaResourceLoader._
 
-  implicit val cache = GuavaCache[SchemaMetadata]
+  private implicit val cache = GuavaCache[SchemaMetadata]
+  private val defaultCacheTtl = Some(5.minutes)
 
   def retrieveSchema(location: String)(implicit ec: ExecutionContext): Future[SchemaMetadata] = {
     require(location ne null)
@@ -55,6 +56,10 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
       case Array(subject) => fetchSchema(subject)
       case _ => throw new IllegalArgumentException(s"Unable to parse location $location")
     }
+  }
+
+  def loadSchemaIntoCache(subject: String, metadata: SchemaMetadata)(implicit ec: ExecutionContext) = {
+    put(subject.withSuffix)(metadata, ttl = Some(5.minutes))
   }
 
   private def fetchSchema(subject: String)(implicit ec: ExecutionContext) = {
