@@ -59,7 +59,7 @@ class ConnectorSpec extends TestKit(ActorSystem("hydra",
   it should "publish errors to the stream" in {
     connector ! IngestionReport("123", Map("test" -> IngestorTimeout), 408)
     listener.expectMsgPF() {
-      case HydraConnectIngestError(id, source, statusCode, msg) =>
+      case HydraConnectIngestError(id, source, statusCode, msg, _) =>
         statusCode shouldBe 408
         id shouldBe "test"
         source shouldBe "test"
