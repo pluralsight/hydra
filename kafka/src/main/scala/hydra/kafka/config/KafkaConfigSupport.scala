@@ -20,7 +20,6 @@ import java.util.Properties
 import com.typesafe.config._
 import configs.syntax._
 import hydra.common.config.ConfigSupport
-import hydra.common.logging.LoggingAdapter
 
 import scala.collection.JavaConverters._
 
@@ -96,7 +95,7 @@ trait KafkaConfigSupport extends ConfigSupport {
   }
 }
 
-object KafkaConfigSupport extends ConfigSupport with LoggingAdapter {
+object KafkaConfigSupport extends ConfigSupport {
 
   val schemaRegistryUrl = applicationConfig.getString("schema.registry.url")
 
