@@ -2,8 +2,11 @@ package hydra.sql
 
 import java.sql.JDBCType
 
+import hydra.avro.io.RecordWriter.Operation
 import hydra.avro.util.SchemaWrapper
 import org.apache.avro.Schema
+import org.apache.avro.Schema.Field
+import org.apache.avro.generic.GenericRecord
 
 /**
   * Created by alexsilva on 7/11/17.
@@ -18,3 +21,10 @@ case class DbTable(name: String, columns: Seq[DbColumn], description: Option[Str
 
 case class DbColumn(name: String, jdbcType: JDBCType, nullable: Boolean, description: Option[String])
 
+
+//The supported operations
+case class Upsert(record: GenericRecord) extends Operation {
+  val schema = record.getSchema
+}
+
+case class Delete(schema: Schema, keys: Map[Field, AnyRef]) extends Operation

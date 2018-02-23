@@ -175,7 +175,15 @@ case object IngestorCompleted extends IngestorStatus {
 case class InitiateHttpRequest(request: HydraRequest, timeout: FiniteDuration,
                                ctx: ImperativeRequestContext)
 
+/**
+  *
+  * @param request
+  * @param timeout
+  * @param clientId Requests with a clientId are guaranteed to go to the same Transport instance
+  * @param requestor
+  */
 case class InitiateRequest(request: HydraRequest, timeout: FiniteDuration,
+                           clientId: Option[String] = None,
                            requestor: Option[ActorRef] = None)
 
 

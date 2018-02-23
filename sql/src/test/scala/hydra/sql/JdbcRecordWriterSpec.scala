@@ -4,10 +4,10 @@ import java.util.Properties
 
 import com.typesafe.config.ConfigFactory
 import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
-import hydra.avro.io.{Delete, SaveMode, Upsert}
+import hydra.avro.io.SaveMode
 import hydra.avro.util.SchemaWrapper
 import org.apache.avro.Schema
-import org.apache.avro.generic.GenericData
+import org.apache.avro.generic.{GenericData, GenericRecordBuilder}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 /**
@@ -58,7 +58,7 @@ class JdbcRecordWriterSpec extends Matchers
 
   override def afterAll() = ds.close()
 
-  describe("The AvroWriter") {
+  describe("The JdbcRecordWriter") {
 
     it("responds correctly it table already exists") {
       val schemaStr =
@@ -106,7 +106,7 @@ class JdbcRecordWriterSpec extends Matchers
 
     it("writes") {
       val writer = new JdbcRecordWriter(ds, schema, dialect = H2Dialect, batchSize = 1)
-      writer.batch(Upsert(record))
+      writer.addBatch(Upsert(record))
       writer.flush()
       withConnection(ds.getConnection) { c =>
         val stmt = c.createStatement()
@@ -138,10 +138,12 @@ class JdbcRecordWriterSpec extends Matchers
           |}""".stripMargin
 
 
-      val writer = new JdbcRecordWriter(ds,
-        SchemaWrapper.from(new Schema.Parser().parse(schemaStr)),
+      val sch = new Schema.Parser().parse(schemaStr)
+      val writer = new JdbcRecordWriter(ds, SchemaWrapper.from(sch),
         batchSize = 2, dialect = H2Dialect)
-      writer.batch(Upsert(record))
+
+      val rec = new GenericRecordBuilder(sch)
+      writer.addBatch(Upsert(rec.set("id", "1").set("username", "alex").build()))
 
       withConnection(ds.getConnection) { c =>
         val stmt = c.createStatement()
@@ -265,11 +267,12 @@ class JdbcRecordWriterSpec extends Matchers
           |	]
           |}""".stripMargin
 
+      val sch = new Schema.Parser().parse(schemaStr)
 
-      val writer = new JdbcRecordWriter(ds,
-        SchemaWrapper.from(new Schema.Parser().parse(schemaStr)),
+      val writer = new JdbcRecordWriter(ds, SchemaWrapper.from(sch),
         batchSize = 2, dialect = H2Dialect)
-      writer.batch(Upsert(record))
+      val rec = new GenericRecordBuilder(sch)
+      writer.addBatch(Upsert(rec.set("id", "1").set("username", "alex").build()))
 
       withConnection(ds.getConnection) { c =>
         val stmt = c.createStatement()
@@ -286,30 +289,72 @@ class JdbcRecordWriterSpec extends Matchers
         Seq(rs.getInt(1), rs.getString(2)) shouldBe Seq(1, "alex")
       }
     }
-  }
 
-  it("fails on deletes") {
-    val schemaStr =
-      """
-        |{
-        |	"type": "record",
-        |	"name": "DeleteTest",
-        |	"namespace": "hydra",
-        |	"fields": [{
-        |			"name": "id",
-        |			"type": "int",
-        |			"doc": "doc"
-        |		},
-        |		{
-        |			"name": "username",
-        |			"type": ["null", "string"]
-        |		}
-        |	]
-        |}""".stripMargin
+    it("fails if updating an existing writer with a different schema name") {
+      val schemaStr =
+        """
+          |{
+          |	"type": "record",
+          |	"name": "Test1",
+          |	"namespace": "hydra",
+          |	"fields": [{
+          |			"name": "id",
+          |			"type": "int"
+          |		}
+          |	]
+          |}""".stripMargin
+
+      val sch = new Schema.Parser().parse(schemaStr)
+
+      val writer = new JdbcRecordWriter(ds, SchemaWrapper.from(sch),
+        batchSize = -1, dialect = H2Dialect)
+
+      writer.addBatch(Upsert(new GenericRecordBuilder(sch).set("id", 1).build()))
+
+      val newSchemaStr =
+        """
+          |{
+          |	"type": "record",
+          |	"name": "Test1New",
+          |	"namespace": "hydra",
+          |	"fields": [{
+          |			"name": "id",
+          |			"type": "int"
+          |		}
+          |	]
+          |}""".stripMargin
+
+      val schN = new Schema.Parser().parse(newSchemaStr)
+      intercept[IllegalArgumentException] {
+        writer.addBatch(Upsert(new GenericRecordBuilder(schN).set("id", 1).build()))
+      }
+
+      writer.close()
+    }
+
+    it("fails on deletes") {
+      val schemaStr =
+        """
+          |{
+          |	"type": "record",
+          |	"name": "DeleteTest",
+          |	"namespace": "hydra",
+          |	"fields": [{
+          |			"name": "id",
+          |			"type": "int",
+          |			"doc": "doc"
+          |		},
+          |		{
+          |			"name": "username",
+          |			"type": ["null", "string"]
+          |		}
+          |	]
+          |}""".stripMargin
 
 
-    val writer = new JdbcRecordWriter(ds,
-      SchemaWrapper.from(new Schema.Parser().parse(schemaStr)), batchSize = 2, dialect = H2Dialect)
-    writer.batch(Delete(new Schema.Parser().parse(schemaStr), Map.empty))
+      val writer = new JdbcRecordWriter(ds,
+        SchemaWrapper.from(new Schema.Parser().parse(schemaStr)), batchSize = 2, dialect = H2Dialect)
+      writer.addBatch(Delete(new Schema.Parser().parse(schemaStr), Map.empty))
+    }
   }
 }

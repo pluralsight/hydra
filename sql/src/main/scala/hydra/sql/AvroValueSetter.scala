@@ -6,6 +6,7 @@ import java.sql.{PreparedStatement, Timestamp}
 import java.time.{LocalDate, ZoneId}
 
 import com.google.common.collect.Lists
+import hydra.avro.io.RecordWriter.Operation
 import hydra.avro.util.SchemaWrapper
 import hydra.sql.JdbcUtils.{getJdbcType, isLogicalType}
 import org.apache.avro.LogicalTypes.Decimal
@@ -28,7 +29,23 @@ private[sql] class AvroValueSetter(schema: SchemaWrapper, dialect: JdbcDialect) 
     field -> getJdbcType(field.schema(), dialect)
   }.toMap
 
-  def bind(record: GenericRecord, stmt: PreparedStatement) = {
+  def bind(operation: Operation, stmt: PreparedStatement): Unit = {
+    operation match {
+      case Upsert(record) => bind(record, stmt)
+      case Delete(schema, fields) => bind(fields, stmt)
+    }
+  }
+
+  def bind(fields: Map[Field, AnyRef], stmt: PreparedStatement): Unit = {
+    fields.zipWithIndex.foreach {
+      case (f, idx) =>
+        setFieldValue(f._2, fieldTypes(f._1), f._1.schema(), stmt, idx + 1)
+    }
+
+    stmt.addBatch()
+  }
+
+  def bind(record: GenericRecord, stmt: PreparedStatement): Unit = {
     fields.zipWithIndex.foreach {
       case (f, idx) =>
         setFieldValue(record.get(f.name()), fieldTypes(f), f.schema(), stmt, idx + 1)

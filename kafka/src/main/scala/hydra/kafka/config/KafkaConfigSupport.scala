@@ -20,6 +20,7 @@ import java.util.Properties
 import com.typesafe.config._
 import configs.syntax._
 import hydra.common.config.ConfigSupport
+import hydra.common.logging.LoggingAdapter
 
 import scala.collection.JavaConverters._
 
@@ -95,11 +96,27 @@ trait KafkaConfigSupport extends ConfigSupport {
   }
 }
 
-object KafkaConfigSupport extends ConfigSupport {
+object KafkaConfigSupport extends ConfigSupport with LoggingAdapter {
 
   val schemaRegistryUrl = applicationConfig.getString("schema.registry.url")
 
   private val schemaRegistryConfig = ConfigFactory.parseString(s"""schema.registry.url="$schemaRegistryUrl"""")
+
+  lazy val configClients: Map[String, Map[String, String]] = clients(applicationConfig)
+
+  def clients(config: Config): Map[String, Map[String, String]] = {
+    val producerDefaults = config.get[Config]("kafka.producer")
+      .valueOrElse(ConfigFactory.empty)
+      .withFallback(schemaRegistryConfig)
+
+    val clients = config.get[Config]("kafka.clients").valueOrElse(ConfigFactory.empty)
+    clients.root().asScala.map { case (clientId, config) =>
+      val clientIdCfg = ConfigFactory.parseString(s"client.id=$clientId")
+      val clientCfg = config.withFallback(clientIdCfg).withFallback(producerDefaults)
+      clientId -> ConfigSupport.toMap(clientIdCfg
+        .withFallback(clientCfg)).mapValues(_.toString)
+    }.toMap
+  }
 
   def loadConsumerFormats(cfg: Config): Map[String, Config] = {
     val formats = cfg.getObject("kafka.formats").entrySet.asScala.toSeq
