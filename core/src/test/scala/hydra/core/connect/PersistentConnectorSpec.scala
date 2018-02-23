@@ -63,7 +63,7 @@ with BeforeAndAfterAll {
     for (i <- 1 to 15) msgs += UnconfirmedDelivery(i, ingestorProbe.ref.path, req)
     connector ! UnconfirmedWarning(msgs.toList)
     listener.expectMsgPF() {
-      case HydraConnectIngestError(source, connectorId, statusCode, _) =>
+      case HydraConnectIngestError(source, connectorId, statusCode, _, _) =>
         source shouldBe "tester"
         connectorId shouldBe "tester"
         statusCode shouldBe 503
@@ -83,7 +83,7 @@ with BeforeAndAfterAll {
     system.eventStream.subscribe(listener.ref, classOf[HydraConnectIngestError])
     for (i <- 1 to 55) c ! HydraRequest(i.toString, "test")
     listener.expectMsgPF(10 seconds) {
-      case HydraConnectIngestError(source, connectorId, statusCode, _) =>
+      case HydraConnectIngestError(source, connectorId, statusCode, _, _) =>
         source shouldBe "unconfirmed-test"
         connectorId shouldBe "unconfirmed-test"
         statusCode shouldBe 503
@@ -128,7 +128,7 @@ with BeforeAndAfterAll {
     system.eventStream.subscribe(listener.ref, classOf[HydraConnectIngestError])
     testConnector ! IngestionReport("123", Map("test" -> IngestorTimeout), 408)
     listener.expectMsgPF() {
-      case HydraConnectIngestError(id, source, statusCode, msg) =>
+      case HydraConnectIngestError(id, source, statusCode, msg, _) =>
         statusCode shouldBe 408
         id shouldBe "publish"
         source shouldBe "test"
