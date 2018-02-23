@@ -90,6 +90,8 @@ object RequestParams {
     */
   val HYDRA_ACK_STRATEGY = "hydra-ack"
 
+  val HydraClientId = "hydra-client-id"
+
 
   /**
     * The amount of time, in milliseconds, to wait before a timeout error is returned to the client.

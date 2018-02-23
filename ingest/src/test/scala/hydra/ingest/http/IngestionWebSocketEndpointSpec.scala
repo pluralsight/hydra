@@ -103,6 +103,8 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
 
         wsClient.sendMessage("-c SET hydra-delivery-strategy = at-most-once")
         wsClient.expectMessage("""{"status":200,"message":"OK[HYDRA-DELIVERY-STRATEGY=at-most-once]"}""")
+        wsClient.sendMessage("-c SET hydra-client-id = test-client")
+        wsClient.expectMessage("""{"status":200,"message":"OK[HYDRA-CLIENT-ID=test-client]"}""")
 
         wsClient.sendMessage("""-i 122 {"name":"test","value":"test"}""")
         wsClient.expectMessage("""{"correlationId":"122","ingestors":{"test_ingestor":{"code":200,"message":"OK"}}}""")
