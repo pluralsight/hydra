@@ -105,7 +105,9 @@ case class SocketSession(metadata: Map[String, String] = Map.empty) {
     val as = metadata.find(_._1.equalsIgnoreCase(HYDRA_ACK_STRATEGY))
       .map(h => AckStrategy(h._2)).getOrElse(AckStrategy.NoAck)
 
-    ingest.HydraRequest(correlationId.getOrElse("0"), payload, metadata,
-      validationStrategy = vs, ackStrategy = as)
+    lazy val clientId = metadata.find(_._1.toLowerCase() == HydraClientId)
+      .map(_._2.toLowerCase)
+
+    ingest.HydraRequest(correlationId.getOrElse("0"), payload, clientId, metadata,vs, as)
   }
 }

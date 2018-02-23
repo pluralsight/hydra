@@ -29,6 +29,7 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
         HttpMethods.POST,
         headers = Seq(RawHeader("hydra", "awesome"),
           RawHeader(RequestParams.HYDRA_VALIDATION_STRATEGY, "relaxed"),
+          RawHeader(RequestParams.HydraClientId, "test-client"),
           RawHeader(RequestParams.HYDRA_ACK_STRATEGY, "replicated")),
         uri = "/test",
         entity = HttpEntity(MediaTypes.`application/json`, json))
@@ -37,6 +38,7 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
         req.payload shouldBe json
         req.correlationId shouldBe "123"
         req.metadataValue("hydra") shouldBe Some("awesome")
+        req.clientId shouldBe Some("test-client")
         req.validationStrategy shouldBe ValidationStrategy.Relaxed
         req.ackStrategy shouldBe AckStrategy.Replicated
       }

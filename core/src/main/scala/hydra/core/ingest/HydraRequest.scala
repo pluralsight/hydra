@@ -10,6 +10,7 @@ import hydra.core.transport.{AckStrategy, ValidationStrategy}
   */
 case class HydraRequest(correlationId: String = CorrelationIdBuilder.generate(),
                         payload: String,
+                        clientId: Option[String] = None,
                         metadata: Map[String, String] = Map.empty,
                         validationStrategy: ValidationStrategy = Strict,
                         ackStrategy: AckStrategy = AckStrategy.NoAck) {

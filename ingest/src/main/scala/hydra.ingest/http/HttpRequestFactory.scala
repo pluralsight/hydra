@@ -25,10 +25,13 @@ class HttpRequestFactory extends RequestFactory[HttpRequest] with CodingDirectiv
     lazy val as = request.headers.find(_.lowercaseName() == HYDRA_ACK_STRATEGY)
       .map(h => AckStrategy(h.value())).getOrElse(AckStrategy.NoAck)
 
+    lazy val clientId = request.headers.find(_.lowercaseName() == HydraClientId)
+      .map(_.value().toLowerCase)
+
     Unmarshal(request.entity).to[String].map { payload =>
       val dPayload = if (request.method == HttpMethods.DELETE && payload.isEmpty) null else payload
       val metadata: Map[String, String] = request.headers.map(h => h.name.toLowerCase -> h.value).toMap
-      HydraRequest(correlationId, dPayload, metadata, validationStrategy = vs, ackStrategy = as)
+      HydraRequest(correlationId, dPayload, clientId, metadata, vs, as)
     }
   }
 }

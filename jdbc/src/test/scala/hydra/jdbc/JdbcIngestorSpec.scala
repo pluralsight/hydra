@@ -25,7 +25,8 @@ class JdbcIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
 
   describe("When using the jdbc ingestor") {
     it("Joins") {
-      val request = HydraRequest("123", "someString", Map(JdbcRecordFactory.DB_PROFILE_PARAM -> "testdb"))
+      val request = HydraRequest("123", "someString", None,
+        Map(JdbcRecordFactory.DB_PROFILE_PARAM -> "testdb"))
       ingestor ! Publish(request)
       expectMsg(Join)
     }
