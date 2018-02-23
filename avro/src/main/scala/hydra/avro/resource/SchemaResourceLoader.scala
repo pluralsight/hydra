@@ -58,8 +58,13 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
     }
   }
 
+  def retrieveSchema(subject: String, version: Int)(implicit ec: ExecutionContext): Future[SchemaMetadata] = {
+    loadFromCache(subject.withSuffix, version.toString)
+  }
+
   def loadSchemaIntoCache(subject: String, metadata: SchemaMetadata)(implicit ec: ExecutionContext) = {
     put(subject.withSuffix)(metadata, ttl = Some(5.minutes))
+    put(subject.withSuffix, metadata.getVersion)(metadata, ttl = None)
   }
 
   private def fetchSchema(subject: String)(implicit ec: ExecutionContext) = {

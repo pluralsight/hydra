@@ -19,7 +19,7 @@ import java.io.File
 import java.net.URL
 
 import hydra.avro.registry.SchemaRegistryException
-import io.confluent.kafka.schemaregistry.client.{MockSchemaRegistryClient, SchemaMetadata}
+import io.confluent.kafka.schemaregistry.client.{ MockSchemaRegistryClient, SchemaMetadata }
 import org.apache.avro.Schema.Parser
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{ Millis, Seconds, Span }
@@ -103,8 +103,19 @@ class SchemaResourceLoaderSpec extends Matchers
       val loader = new SchemaResourceLoader("http://localhost:48223", client)
       val expectedSchemaMetadata = new SchemaMetadata(1, 1, testSchema.toString)
       loader.loadSchemaIntoCache("test", expectedSchemaMetadata)
-      val res = loader.retrieveSchema("test-value")
-      whenReady(res) { schemaMetadata  =>
+      val res = loader.retrieveSchema("test")
+      whenReady(res) { schemaMetadata =>
+        new Schema.Parser().parse(schemaMetadata.getSchema) shouldBe testSchema
+      }
+    }
+
+    it("can get a schema by subject and version") {
+      val client = new MockSchemaRegistryClient
+      val loader = new SchemaResourceLoader("http://localhost:48223", client)
+      val expectedSchemaMetadata = new SchemaMetadata(1, 1, testSchema.toString)
+      loader.loadSchemaIntoCache("test", expectedSchemaMetadata)
+      val res = loader.retrieveSchema("test", 1)
+      whenReady(res) { schemaMetadata =>
         new Schema.Parser().parse(schemaMetadata.getSchema) shouldBe testSchema
       }
     }
