@@ -1,10 +1,9 @@
 package hydra.avro.io
 
+import hydra.avro.io.RecordWriter.Operation
 import hydra.avro.io.SaveMode.SaveMode
 import hydra.avro.util.SchemaWrapper
 import org.apache.avro.Schema
-import org.apache.avro.Schema.Field
-import org.apache.avro.generic.GenericRecord
 
 /**
   * Created by alexsilva on 7/16/17.
@@ -12,17 +11,15 @@ import org.apache.avro.generic.GenericRecord
 trait RecordWriter {
 
   /**
-    * Schedules the writing of a record to the underlying store.
+    * Adds an operation to the current batch.
     *
     * The Unit return type means the actual semantics of this method may vary;
-    * for instance, on implementation using record batches, any errors/exceptions will not be reported
-    * until the batch is executed
-    *
-    * It may also be executed immediately if the batch size is set to 1.
+    * for instance, on implementation using batches, any errors/exceptions will not be reported
+    * until the batch is executed.
     *
     * @param operation
     */
-  def batch(operation: Operation): Unit
+  def addBatch(operation: Operation): Unit
 
   /**
     * Immediately writes a single record to the underlying record store.
@@ -54,11 +51,14 @@ trait RecordWriter {
     * @return The save mode for this writer. Used when the writer is being initialized.
     */
   def mode: SaveMode
+}
+
+object RecordWriter {
+
+  trait Operation {
+    def schema: Schema
+  }
 
 }
 
-sealed trait Operation
 
-case class Upsert(record: GenericRecord) extends Operation
-
-case class Delete(schema: Schema, keys: Map[Field, AnyRef]) extends Operation
