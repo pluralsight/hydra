@@ -60,4 +60,5 @@ case class RequestReceived(request: HydraRequest) extends HydraMessage
 case class RequestConfirmed(deliveryId: Long) extends HydraMessage
 
 case class HydraConnectIngestError(connectorId: String, source: String,
-                                   statusCode: Int, msg: String) extends HydraMessage
+                                   statusCode: Int, msg: String,
+                                   metadata: Map[String, String] = Map()) extends HydraMessage
