@@ -23,7 +23,7 @@ import scala.io.Source
 /**
  * Created by alexsilva on 11/18/16.
  */
-class IngestionErrorHandlerSpec extends TestKit(ActorSystem("hydra-test")) with Matchers with FunSpecLike
+class IngestionErrorHandlerSpec extends TestKit(ActorSystem("ingestion-error-handler-spec")) with Matchers with FunSpecLike
   with ImplicitSender
   with ConfigSupport
   with BeforeAndAfterAll

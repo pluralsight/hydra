@@ -3,17 +3,18 @@ package hydra.core.akka
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{ Failure, Success, Try }
-
-import akka.actor.{ Actor, Props }
-import akka.pattern.{ CircuitBreaker, pipe }
+import scala.util.{Failure, Success, Try}
+import akka.actor.{Actor, Props}
+import akka.cluster.pubsub.DistributedPubSub
+import akka.cluster.pubsub.DistributedPubSubMediator.{Publish, Subscribe}
+import akka.pattern.{CircuitBreaker, pipe}
 import com.typesafe.config.Config
-import hydra.avro.registry.{ ConfluentSchemaRegistry, SchemaRegistryException }
-import hydra.avro.resource.{ SchemaResourceLoader }
+import hydra.avro.registry.{ConfluentSchemaRegistry, SchemaRegistryException}
+import hydra.avro.resource.SchemaResourceLoader
 import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol.HydraApplicationError
 import io.confluent.kafka.schemaregistry.client.SchemaMetadata
-import org.apache.avro.{ Schema, SchemaParseException }
+import org.apache.avro.{Schema, SchemaParseException}
 
 /**
  * This actor serves as an proxy between the handler registry
@@ -45,6 +46,8 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
   val registry = ConfluentSchemaRegistry.forConfig(config)
 
   val loader = new SchemaResourceLoader(registry.registryUrl, registry.registryClient)
+  val mediator = DistributedPubSub(context.system).mediator
+  mediator ! Subscribe(SchemaRegisteredTopic, self)
 
   def getSubject(schema: Schema): String = addSchemaSuffix(schema.getFullName)
 
@@ -55,20 +58,17 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
       breaker.withCircuitBreaker(futureResource, registryFailure) pipeTo sender
 
     case RegisterSchemaRequest(json: String) =>
-      val schemaParser = new Schema.Parser()
-      val metadataRequest = for {
-        schema <- Try(schemaParser.parse(json))
-        _ <- Try(validateSchemaName(schema.getName()))
-        subject <- Try(getSubject(schema))
-        schemaId <- Try {
-          log.debug(s"Registering schema ${schema.getFullName}: $json")
-          registry.registryClient.register(subject, schema)
-        }
-        registeredSchema <- Try(registry.registryClient.getByID(schemaId))
-        version <- Try(registry.registryClient.getVersion(subject, schema))
-        metadata <- Try(registry.registryClient.getSchemaMetadata(subject, version))
-      } yield RegisterSchemaResponse(registeredSchema.getFullName, metadata.getId, metadata.getVersion, metadata.getSchema)
-      breaker.withCircuitBreaker(Future.fromTry(metadataRequest), registryFailure) pipeTo sender
+      val tryRegisterSchema = tryHandleRegisterSchema(json)
+      val registerSchemaRequest: Future[RegisterSchemaResponse] = breaker.withCircuitBreaker(Future.fromTry(tryRegisterSchema), registryFailure)// pipeTo sender
+      registerSchemaRequest.map { registerSchemaResponse =>
+        mediator ! Publish(SchemaRegisteredTopic,
+          SchemaRegistered(registerSchemaResponse.name,
+            new SchemaMetadata(registerSchemaResponse.id, registerSchemaResponse.version, registerSchemaResponse.schema)))
+        registerSchemaResponse
+      } pipeTo sender
+
+    case SchemaRegistered(subject, schemaMetadata) =>
+      loader.loadSchemaIntoCache(subject, schemaMetadata) pipeTo sender
 
     case FetchAllSchemaVersionsRequest(subject: String) =>
       val allVersionsRequest = for {
@@ -99,6 +99,22 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
       val metadataRequest = Try(registry.registryClient.getSchemaMetadata(addSchemaSuffix(subject), version))
         .map(FetchSchemaVersionResponse(_))
       breaker.withCircuitBreaker(Future.fromTry(metadataRequest), registryFailure) pipeTo sender
+  }
+
+  private def tryHandleRegisterSchema(json:String) = {
+    val schemaParser = new Schema.Parser()
+    for {
+      schema <- Try(schemaParser.parse(json))
+      _ <- Try(validateSchemaName(schema.getName()))
+      subject <- Try(getSubject(schema))
+      schemaId <- Try {
+        log.debug(s"Registering schema ${schema.getFullName}: $json")
+        registry.registryClient.register(subject, schema)
+      }
+      registeredSchema <- Try(registry.registryClient.getByID(schemaId))
+      version <- Try(registry.registryClient.getVersion(subject, schema))
+      metadata <- Try(registry.registryClient.getSchemaMetadata(subject, version))
+    } yield RegisterSchemaResponse(registeredSchema.getFullName, metadata.getId, metadata.getVersion, metadata.getSchema)
   }
 
   private def notifyOnOpen() = {
@@ -144,6 +160,10 @@ object SchemaRegistryActor {
 
   case class RegisterSchemaRequest(json: String) extends SchemaRegistryRequest
   case class RegisterSchemaResponse(name: String, id: Int, version: Int, schema: String) extends SchemaRegistryResponse
+
+  case class SchemaRegistered(subject: String, schema: SchemaMetadata)
+
+  val SchemaRegisteredTopic = "hydra.core.akka.SchemaRegistryActor.SchemaRegistered"
 
   val validSchemaNameRegex = "^[a-zA-Z0-9]*$".r
   val schemaParser = new Schema.Parser()

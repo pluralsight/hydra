@@ -63,13 +63,13 @@ class SchemasEndpointSpec extends Matchers
       }
     }
 
-    "returns only the schema" in {
+    "return only the schema" in {
       Get("/schemas/hydra.test.Tester?schema") ~> schemasRoute ~> check {
         new Schema.Parser().parse(responseAs[String]) shouldBe schemaEvolved
       }
     }
 
-    "returns 404 if schema doesn't exist" in {
+    "return 404 if schema doesn't exist" in {
       Get("/schemas/tester") ~> schemasRoute ~> check {
         response.status.intValue() should be >= 400 //have to do this bc the mock registry returns an IOException
       }

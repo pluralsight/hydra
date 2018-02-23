@@ -1,21 +1,25 @@
 package hydra.jdbc
 
-import akka.actor.{ ActorSystem, Props }
+import akka.actor.{ActorSystem, Props}
 import akka.testkit.TestActors.ForwardActor
-import akka.testkit.{ ImplicitSender, TestKit, TestProbe }
+import akka.testkit.{ImplicitSender, TestKit, TestProbe}
+import com.typesafe.config.ConfigFactory
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_SCHEMA_PARAM
 import hydra.core.protocol._
 import hydra.core.transport.AckStrategy.NoAck
 import hydra.core.transport.HydraRecord
-import org.scalatest.{ BeforeAndAfterAll, FunSpecLike, Matchers }
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
+
 import scala.io.Source
 import org.apache.avro.Schema
 import hydra.common.config.ConfigSupport
 import hydra.avro.registry.ConfluentSchemaRegistry
 
-class JdbcIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
+class JdbcIngestorSpec
+  extends TestKit(ActorSystem("jdbc-ingestor-spec", config = ConfigFactory.parseString("akka.actor.provider=cluster")))
+  with Matchers
   with FunSpecLike
   with ImplicitSender
   with ConfigSupport

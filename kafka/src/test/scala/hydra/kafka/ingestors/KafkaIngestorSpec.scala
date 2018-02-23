@@ -4,6 +4,7 @@ import akka.actor.{ActorSystem, Props}
 import akka.testkit.TestActors.ForwardActor
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.typesafe.config.ConfigFactory
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.core.ingest.HydraRequest
@@ -24,8 +25,13 @@ import scala.concurrent.ExecutionContext.Implicits.global
 /**
   * Created by alexsilva on 11/18/16.
   */
-class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers with FunSpecLike
-  with ImplicitSender with ConfigSupport with BeforeAndAfterAll
+class KafkaIngestorSpec
+  extends TestKit(ActorSystem("kafka-ingestor-spec", config = ConfigFactory.parseString("akka.actor.provider=cluster")))
+  with Matchers
+  with FunSpecLike
+  with ImplicitSender
+  with ConfigSupport
+  with BeforeAndAfterAll
   with ScalaFutures {
 
   override def afterAll = TestKit.shutdownActorSystem(system)
