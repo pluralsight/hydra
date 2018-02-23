@@ -16,21 +16,22 @@
 package hydra.kafka.config
 
 import com.typesafe.config.ConfigFactory
+import hydra.common.config.ConfigSupport
 import io.confluent.kafka.serializers.{KafkaAvroDeserializer, KafkaAvroSerializer}
 import org.scalatest.{FunSpecLike, Matchers}
 
 import scala.collection.JavaConverters._
 
 /**
- * Created by alexsilva on 9/7/16.
- */
+  * Created by alexsilva on 9/7/16.
+  */
 class KafkaConfigSupportSpec extends Matchers with FunSpecLike with KafkaConfigSupport {
 
   describe("When using the provided reference.conf") {
     it("Should have two message types") {
       val m = applicationConfig.getObject("kafka.formats")
       m.entrySet().size() shouldBe 2
-      m.asScala.map(_._1) should contain allOf ("string", "avro")
+      m.asScala.map(_._1) should contain allOf("string", "avro")
     }
 
     it("Should return an empty config for an unknown type") {
@@ -209,6 +210,50 @@ class KafkaConfigSupportSpec extends Matchers with FunSpecLike with KafkaConfigS
     it("Should return the default string config for unknown topics") {
       val c = topicConsumerConfigs("unknown")
       c shouldBe kafkaConsumerFormats("string")
+    }
+  }
+
+  describe("When loading clients from configuration") {
+
+    it("should load from a provided config") {
+      val config = ConfigFactory.parseString(
+        """
+          |kafka {
+          |  producer {
+          |    bootstrap.servers = localhost
+          |  }
+          |  clients {
+          |    tester {
+          |      value.serializer = org.apache.kafka.common.serialization.StringSerializer
+          |      key.serializer = org.apache.kafka.common.serialization.StringSerializer
+          |      test.name = test
+          |    }
+          |
+          |    tester1 {
+          |      value.serializer = org.apache.kafka.common.serialization.StringSerializer
+          |      key.serializer = org.apache.kafka.common.serialization.StringSerializer
+          |      test.name = test1
+          |    }
+          |  }
+          |}
+        """.stripMargin
+      )
+
+
+      val clients = KafkaConfigSupport.clients(config)
+      clients("tester") should contain allElementsOf (
+        ConfigSupport.toMap(config.getConfig("kafka.clients.tester")
+          .withFallback(ConfigFactory.parseString("client.id=tester"))
+          .withFallback(config.getConfig("kafka.producer"))).mapValues(_.toString))
+
+      clients("tester1") should contain allElementsOf (
+        ConfigSupport.toMap(config.getConfig("kafka.clients.tester1")
+          .withFallback(ConfigFactory.parseString("client.id=tester1"))
+          .withFallback(config.getConfig("kafka.producer"))).mapValues(_.toString))
+    }
+
+    it("Loads clients from reference.conf") {
+      KafkaConfigSupport.configClients.get("tester-cfg").isDefined shouldBe true
     }
   }
 }

@@ -38,7 +38,7 @@ class IngestionHandlerGateway(registryPath: String) extends Actor with ActorLogg
   private implicit val ec = context.dispatcher
 
   override def receive = {
-    case InitiateRequest(request, timeout, requestorOpt) =>
+    case InitiateRequest(request, timeout, clientId, requestorOpt) =>
       val fs = requestorOpt getOrElse sender
       ingest(r => DefaultIngestionHandler.props(request, r, fs, timeout), fs)
 
@@ -76,5 +76,4 @@ object IngestionHandlerGateway {
   val GroupName = "ingestion-handlers"
 
   def props(registryPath: String) = Props(classOf[IngestionHandlerGateway], registryPath)
-
 }
