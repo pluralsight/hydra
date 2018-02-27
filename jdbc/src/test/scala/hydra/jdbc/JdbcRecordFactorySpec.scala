@@ -13,7 +13,7 @@ import hydra.core.protocol.MissingMetadataException
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{ FunSpecLike, Matchers }
+import org.scalatest.{ FunSpecLike, Matchers, BeforeAndAfterAll }
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -22,10 +22,13 @@ import scala.io.Source
 class JdbcRecordFactorySpec extends TestKit(ActorSystem("hydra"))
   with Matchers
   with FunSpecLike
-  with ScalaFutures {
+  with ScalaFutures
+  with BeforeAndAfterAll {
 
   val schemaPK = new Schema.Parser().parse(Source.fromResource("schemaPK.avsc").mkString)
   val schemaNPK = new Schema.Parser().parse(Source.fromResource("jdbc-test.avsc").mkString)
+
+  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 
   override implicit val patienceConfig = PatienceConfig(
     timeout = scaled(2000 millis),

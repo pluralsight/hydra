@@ -6,12 +6,8 @@ import com.pluralsight.hydra.avro.RequiredFieldMissingException
 import hydra.avro.JsonToAvroConversionExceptionWithMetadata
 import hydra.avro.util.AvroUtils.SeenPair
 import org.apache.avro.Schema
-<<<<<<< HEAD
-import org.scalatest.{FunSpecLike, Matchers}
-=======
 import org.apache.avro.Schema.Field
 import org.scalatest.{ FunSpecLike, Matchers }
->>>>>>> remove classpath functionality for schema registry actor
 
 /**
  * Created by alexsilva on 7/6/17.
@@ -54,7 +50,6 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
         AvroUtils.getField("unknown", avro)
       }
     }
-
 
     it("tests for equality ignoring props") {
       val schema1 = new Schema.Parser().parse(

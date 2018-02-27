@@ -55,8 +55,6 @@ object AvroUtils {
       .getOrElse(throw new IllegalArgumentException(s"Field $name is not in schema."))
   }
 
-<<<<<<< HEAD
-=======
   /**
    * Returns the primary keys (if any) defined for that schema.
    *
@@ -73,7 +71,6 @@ object AvroUtils {
       case None => Seq.empty
     }
   }
->>>>>>> remove classpath functionality for schema registry actor
 
   /**
    * A "ligher" equals that looks a fields and names primarily.

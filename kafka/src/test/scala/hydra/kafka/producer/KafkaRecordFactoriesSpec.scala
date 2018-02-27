@@ -15,34 +15,21 @@
 
 package hydra.kafka.producer
 
-import java.io.{ File, InputStream }
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.io.Source
 
 import akka.actor.{ Actor, ActorSystem, Props }
 import akka.testkit.TestKit
 import com.fasterxml.jackson.databind.ObjectMapper
-<<<<<<< HEAD
-import hydra.avro.resource.SchemaResource
-<<<<<<< HEAD
-import hydra.core.akka.SchemaRegistryActor.{ FetchSchema, SchemaFetchResponse }
-import hydra.core.ingest.HydraRequest
-import hydra.core.ingest.RequestParams.{ HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_FORMAT_PARAM, HYDRA_SCHEMA_PARAM }
-import hydra.core.ingest.{ HydraRequest, RequestParams }
-=======
-=======
->>>>>>> remove classpath functionality for schema registry actor
 import hydra.core.akka.SchemaRegistryActor.{ FetchSchemaRequest, FetchSchemaResponse }
-import hydra.core.ingest.HydraRequest
+import hydra.core.ingest.{ HydraRequest, RequestParams }
 import hydra.core.ingest.RequestParams.{ HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_FORMAT_PARAM, HYDRA_SCHEMA_PARAM }
->>>>>>> add get subjects to schema registry actor...
 import hydra.core.protocol.InvalidRequest
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecordBuilder
-import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{ BeforeAndAfterAll, FunSpecLike, Matchers }
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.io.Source
+import org.scalatest.concurrent.ScalaFutures
 
 /**
  * Created by alexsilva on 1/11/17.
@@ -54,11 +41,7 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
   with BeforeAndAfterAll {
 
   override implicit val patienceConfig = PatienceConfig(
-<<<<<<< HEAD
-    timeout = scaled(500 millis),
-=======
     timeout = scaled(200 millis),
->>>>>>> add get subjects to schema registry actor...
     interval = scaled(100 millis))
 
   val testSchema = new Schema.Parser().parse(Source.fromResource("avro-factory-test.avsc").mkString)
