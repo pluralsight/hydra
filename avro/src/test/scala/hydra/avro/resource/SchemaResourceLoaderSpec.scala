@@ -49,12 +49,10 @@ class SchemaResourceLoaderSpec extends Matchers
   }
 
   describe("When loading schemas from the registry") {
-    println(s"testSchema: ${testSchema.toString}")
     it("returns the latest version of the schema") {
       val loader = fixture()
       val res = loader.retrieveSchema("registry:test-value")
       whenReady(res) { schemaMetadata =>
-        println(s"**** schemaMetadata: $schemaMetadata")
         new Schema.Parser().parse(schemaMetadata.getSchema) shouldBe testSchema
       }
     }

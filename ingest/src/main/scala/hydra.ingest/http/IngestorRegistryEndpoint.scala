@@ -26,14 +26,14 @@ import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
-import hydra.ingest.services.IngestorRegistry.{FindAll, LookupResult}
+import hydra.ingest.services.IngestorRegistry.{ FindAll, LookupResult }
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.{FiniteDuration, _}
+import scala.concurrent.duration.{ FiniteDuration, _ }
 
 /**
-  * Created by alexsilva on 12/22/15.
-  */
+ * Created by alexsilva on 12/22/15.
+ */
 class IngestorRegistryEndpoint(implicit val system: ActorSystem, implicit val e: ExecutionContext)
   extends RoutedEndpoints with LoggingAdapter with HydraIngestJsonSupport with HydraDirectives with ConfigSupport {
 
@@ -41,8 +41,6 @@ class IngestorRegistryEndpoint(implicit val system: ActorSystem, implicit val e:
     .get[FiniteDuration]("ingest.service-lookup.timeout").valueOrElse(5.seconds)
 
   lazy val registry = HydraIngestorRegistryClient(applicationConfig).registry
-
-  println(registry)
 
   private implicit val timeout = Timeout(registryLookupTimeout)
 
