@@ -3,18 +3,18 @@ package hydra.core.akka
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
-import akka.actor.{Actor, Props}
+import scala.util.{ Failure, Success, Try }
+import akka.actor.{ Actor, Props }
 import akka.cluster.pubsub.DistributedPubSub
-import akka.cluster.pubsub.DistributedPubSubMediator.{Publish, Subscribe}
-import akka.pattern.{CircuitBreaker, pipe}
+import akka.cluster.pubsub.DistributedPubSubMediator.{ Publish, Subscribe }
+import akka.pattern.{ CircuitBreaker, pipe }
 import com.typesafe.config.Config
-import hydra.avro.registry.{ConfluentSchemaRegistry, SchemaRegistryException}
+import hydra.avro.registry.{ ConfluentSchemaRegistry, SchemaRegistryException }
 import hydra.avro.resource.SchemaResourceLoader
 import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol.HydraApplicationError
 import io.confluent.kafka.schemaregistry.client.SchemaMetadata
-import org.apache.avro.{Schema, SchemaParseException}
+import org.apache.avro.{ Schema, SchemaParseException }
 
 /**
  * This actor serves as an proxy between the handler registry
@@ -59,10 +59,12 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
 
     case RegisterSchemaRequest(json: String) =>
       val tryRegisterSchema = tryHandleRegisterSchema(json)
-      val registerSchemaRequest: Future[RegisterSchemaResponse] = breaker.withCircuitBreaker(Future.fromTry(tryRegisterSchema), registryFailure)// pipeTo sender
+      val registerSchemaRequest: Future[RegisterSchemaResponse] = breaker.withCircuitBreaker(Future.fromTry(tryRegisterSchema), registryFailure)
       registerSchemaRequest.map { registerSchemaResponse =>
-        mediator ! Publish(SchemaRegisteredTopic,
-          SchemaRegistered(registerSchemaResponse.name,
+        mediator ! Publish(
+          SchemaRegisteredTopic,
+          SchemaRegistered(
+            registerSchemaResponse.name,
             new SchemaMetadata(registerSchemaResponse.id, registerSchemaResponse.version, registerSchemaResponse.schema)))
         registerSchemaResponse
       } pipeTo sender
@@ -72,14 +74,13 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
 
     case FetchAllSchemaVersionsRequest(subject: String) =>
       val allVersionsRequest = for {
-        metadata <- Try(registry.registryClient.getLatestSchemaMetadata(addSchemaSuffix(subject)))
-        allVersions <- Try {
-          (1 to metadata.getVersion).map { versionNumber =>
-            registry.registryClient.getSchemaMetadata(addSchemaSuffix(subject), versionNumber)
-          }
-        }
+        metadata <- loader.retrieveSchema(addSchemaSuffix(subject))
+        allVersions <- Future.sequence((1 to metadata.getVersion).map { versionNumber =>
+          loader.retrieveSchema(subject, versionNumber)
+        })
       } yield FetchAllSchemaVersionsResponse(allVersions)
-      breaker.withCircuitBreaker(Future.fromTry(allVersionsRequest), registryFailure) pipeTo sender
+
+      breaker.withCircuitBreaker(allVersionsRequest, registryFailure) pipeTo sender
 
     case FetchSubjectsRequest =>
       val allSubjectsRequest = Try {
@@ -91,17 +92,17 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
       breaker.withCircuitBreaker(Future.fromTry(allSubjectsRequest), registryFailure) pipeTo sender
 
     case FetchSchemaMetadataRequest(subject) =>
-      val metadataRequest = Try(registry.registryClient.getLatestSchemaMetadata(addSchemaSuffix(subject)))
+      val metadataRequest = loader.retrieveSchema(subject)
         .map(FetchSchemaMetadataResponse(_))
-      breaker.withCircuitBreaker(Future.fromTry(metadataRequest), registryFailure) pipeTo sender
+      breaker.withCircuitBreaker(metadataRequest, registryFailure) pipeTo sender
 
     case FetchSchemaVersionRequest(subject, version) =>
-      val metadataRequest = Try(registry.registryClient.getSchemaMetadata(addSchemaSuffix(subject), version))
+      val metadataRequest = loader.retrieveSchema(subject, version)
         .map(FetchSchemaVersionResponse(_))
-      breaker.withCircuitBreaker(Future.fromTry(metadataRequest), registryFailure) pipeTo sender
+      breaker.withCircuitBreaker(metadataRequest, registryFailure) pipeTo sender
   }
 
-  private def tryHandleRegisterSchema(json:String) = {
+  private def tryHandleRegisterSchema(json: String) = {
     val schemaParser = new Schema.Parser()
     for {
       schema <- Try(schemaParser.parse(json))
