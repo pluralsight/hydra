@@ -11,6 +11,8 @@ class KryoInit extends LoggingAdapter {
     log.debug("Initializing Kryo...")
     kryo.addDefaultSerializer(classOf[scala.Enumeration#Value], classOf[EnumerationSerializer])
     kryo.addDefaultSerializer(classOf[mutable.HashMap[_, _]], classOf[ScalaMutableMapSerializer])
-    kryo.addDefaultSerializer(classOf[Map[_, _]], classOf[ScalaImmutableAbstractMapSerializer])
+    kryo.addDefaultSerializer(classOf[scala.collection.immutable.Map[_, _]],
+      classOf[ScalaImmutableAbstractMapSerializer])
+    kryo.register(classOf[immutable.Map[_, _]], new ScalaImmutableAbstractMapSerializer(), 820)
   }
 }

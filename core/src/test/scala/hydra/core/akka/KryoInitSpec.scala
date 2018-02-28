@@ -14,8 +14,8 @@ class KryoInitSpec extends Matchers with FlatSpecLike {
     new KryoInit().customize(kryo)
     kryo.getDefaultSerializer(classOf[scala.Enumeration#Value]) shouldBe an[EnumerationSerializer]
     kryo.getDefaultSerializer(classOf[collection.immutable.Map[_, _]]) shouldBe a[ScalaImmutableAbstractMapSerializer]
-    kryo.getDefaultSerializer(classOf[scala.collection.Map[_, _]]) shouldBe a[ScalaImmutableAbstractMapSerializer]
-    kryo.getDefaultSerializer(classOf[scala.collection.mutable.HashMap[_, _]]) shouldBe a[ScalaMutableMapSerializer]
+    kryo.getDefaultSerializer(classOf[collection.immutable.Map[_, _]]) shouldBe a[ScalaImmutableAbstractMapSerializer]
+    kryo.getDefaultSerializer(classOf[collection.mutable.HashMap[_, _]]) shouldBe a[ScalaMutableMapSerializer]
   }
 
   it should "serialize immutable maps" in {
@@ -48,4 +48,3 @@ class KryoInitSpec extends Matchers with FlatSpecLike {
   }
 
 }
-
