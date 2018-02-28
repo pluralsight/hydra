@@ -7,6 +7,7 @@ import com.romix.akka.serialization.kryo.KryoSerializer
 import hydra.core.protocol.InitiateRequest
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+
 import scala.concurrent.duration._
 
 /**
@@ -74,11 +75,10 @@ class HydraRequestSpec extends TestKit(ActorSystem("hydra"))
 
     it("should be serializable with Kryo") {
       val serialization = SerializationExtension(system)
-      val hr = HydraRequest("123", metadata = Map("test" -> "value"), payload = "test")
+      val hr = HydraRequest("123", metadata = Map("test" -> "value", "test1" -> "value1"),
+        payload = "test")
 
       serialization.findSerializerFor(hr).getClass shouldBe classOf[KryoSerializer]
-      serialization.findSerializerFor(hr)
-        .asInstanceOf[KryoSerializer].resolveSubclasses shouldBe true
       //round trip
       val serialized = serialization.serialize(hr)
       serialized.isSuccess shouldBe true
