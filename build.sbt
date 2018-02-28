@@ -25,7 +25,6 @@ lazy val defaultSettings = Seq(
   resolvers += "jitpack" at "https://jitpack.io",
   resolvers += Resolver.bintrayRepo("hseeberger", "maven"),
   ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet,
-  ensimeScalaVersion in ThisBuild := scalaVersion.value,
   parallelExecution in sbt.Test := false
 )
 
