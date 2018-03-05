@@ -101,7 +101,7 @@ class SchemaRegistryActorSpec
     schemaRegistryActor.tell(FetchSchemaRequest("hydra.test.Tester"), probe.ref)
     probe.expectMsgPF() {
       case FetchSchemaResponse(schema) =>
-        schema shouldBe testSchema
+        schema shouldBe SchemaResource(1, 1, testSchema)
     }
     listener.expectNoMessage(3.seconds)
   }
@@ -172,7 +172,7 @@ class SchemaRegistryActorSpec
     senderProbe.expectMsgPF() {
       case FetchSchemaResponse(actualSchema) =>
         actualSchema shouldBe testSchema
-      case _ => fail("Should have received a FetchSchemaResponse")
+      case x => println(x);fail("Should have received a FetchSchemaResponse")
     }
   }
 
