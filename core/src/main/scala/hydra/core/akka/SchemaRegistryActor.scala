@@ -58,13 +58,15 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
 
     case RegisterSchemaRequest(json: String) =>
       val tryRegisterSchema = tryHandleRegisterSchema(json)
-      val registerSchemaRequest: Future[RegisterSchemaResponse] = breaker.withCircuitBreaker(Future.fromTry(tryRegisterSchema), registryFailure)
-      registerSchemaRequest.map { registerSchemaResponse =>
-        mediator ! Publish(
-          SchemaRegisteredTopic,
-          SchemaRegistered(registerSchemaResponse.schemaResource)
-        )
-      } pipeTo sender
+      val registerSchemaRequest: Future[RegisterSchemaResponse] = breaker
+        .withCircuitBreaker(Future.fromTry(tryRegisterSchema), registryFailure)
+
+      registerSchemaRequest.foreach { registerSchemaResponse =>
+        val registeredResponse = SchemaRegistered(registerSchemaResponse.schemaResource)
+        mediator ! Publish(SchemaRegisteredTopic, registeredResponse)
+      }
+
+      pipe(registerSchemaRequest) to sender
 
     case SchemaRegistered(schemaResource) =>
       loader.loadSchemaIntoCache(schemaResource) pipeTo sender
