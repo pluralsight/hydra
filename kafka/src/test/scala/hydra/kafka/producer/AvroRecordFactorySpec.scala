@@ -15,20 +15,19 @@
 
 package hydra.kafka.producer
 
-import java.io.{ File, InputStream }
-
-import akka.actor.{ Actor, ActorSystem, Props }
+import akka.actor.{Actor, ActorSystem, Props}
 import akka.testkit.TestKit
-import com.pluralsight.hydra.avro.{ InvalidDataTypeException, JsonConverter, RequiredFieldMissingException, UndefinedFieldsException }
-import hydra.avro.JsonToAvroConversionExceptionWithMetadata
-import hydra.core.akka.SchemaRegistryActor.{ FetchSchemaRequest, FetchSchemaResponse }
+import com.pluralsight.hydra.avro.{InvalidDataTypeException, JsonConverter, RequiredFieldMissingException, UndefinedFieldsException}
+import hydra.avro.registry.JsonToAvroConversionExceptionWithMetadata
+import hydra.avro.resource.SchemaResource
+import hydra.core.akka.SchemaRegistryActor.{FetchSchemaRequest, FetchSchemaResponse}
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams._
 import hydra.core.protocol.MissingMetadataException
 import org.apache.avro.Schema
-import org.apache.avro.generic.{ GenericRecord, GenericRecordBuilder }
+import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{ BeforeAndAfterAll, FunSpecLike, Matchers }
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -47,7 +46,7 @@ class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
 
   val loader = system.actorOf(Props(new Actor() {
     override def receive: Receive = {
-      case FetchSchemaRequest(schema) => sender ! FetchSchemaResponse(testSchema)
+      case FetchSchemaRequest(schema) => sender ! FetchSchemaResponse(SchemaResource(1,1,testSchema))
     }
   }))
 

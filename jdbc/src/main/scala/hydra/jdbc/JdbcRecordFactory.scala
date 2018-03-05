@@ -4,22 +4,23 @@ import akka.actor.ActorRef
 import akka.pattern.ask
 import akka.util
 import com.pluralsight.hydra.avro.JsonConverter
-import hydra.avro.util.{ AvroUtils, SchemaWrapper }
+import hydra.avro.resource.SchemaResource
+import hydra.avro.util.{AvroUtils, SchemaWrapper}
 import hydra.common.config.ConfigSupport
-import hydra.core.akka.SchemaRegistryActor.{ FetchSchemaRequest, FetchSchemaResponse }
+import hydra.core.akka.SchemaRegistryActor.{FetchSchemaRequest, FetchSchemaResponse}
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_SCHEMA_PARAM
 import hydra.core.protocol.MissingMetadataException
 import hydra.core.transport.ValidationStrategy.Strict
-import hydra.core.transport.{ HydraRecord, RecordFactory, RecordMetadata }
-import hydra.jdbc.JdbcRecordFactory.{ DB_PROFILE_PARAM, TABLE_PARAM }
+import hydra.core.transport.{HydraRecord, RecordFactory, RecordMetadata}
+import hydra.jdbc.JdbcRecordFactory.{DB_PROFILE_PARAM, TABLE_PARAM}
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Field
 import org.apache.avro.generic.GenericRecord
 
 import scala.concurrent.duration._
-import scala.concurrent.{ ExecutionContext, Future }
-import scala.util.{ Failure, Success, Try }
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success, Try}
 
 class JdbcRecordFactory(schemaResourceLoader: ActorRef) extends RecordFactory[Seq[Field], GenericRecord]
   with ConfigSupport {
@@ -30,19 +31,19 @@ class JdbcRecordFactory(schemaResourceLoader: ActorRef) extends RecordFactory[Se
   override def build(request: HydraRequest)(implicit ec: ExecutionContext): Future[JdbcRecord] = {
     for {
       subject <- Future.fromTry(JdbcRecordFactory.getSchemaName(request))
-      schema <- (schemaResourceLoader ? FetchSchemaRequest(subject)).mapTo[FetchSchemaResponse].map(_.schema)
+      schema <- (schemaResourceLoader ? FetchSchemaRequest(subject)).mapTo[FetchSchemaResponse].map(_.schemaResource)
       avro <- convert(schema, request)
-      record <- buildRecord(request, avro, schema)
+      record <- buildRecord(request, avro, schema.schema)
     } yield record
 
   }
 
-  private def convert(schema: Schema, request: HydraRequest)(implicit ec: ExecutionContext): Future[GenericRecord] = {
+  private def convert(schemaResource: SchemaResource, request: HydraRequest)(implicit ec: ExecutionContext): Future[GenericRecord] = {
     val converter = new JsonConverter[GenericRecord](
-      schema,
+      schemaResource.schema,
       request.validationStrategy == Strict)
     Future(converter.convert(request.payload))
-      .recover { case ex => throw AvroUtils.improveException(ex, schema) }
+      .recover { case ex => throw AvroUtils.improveException(ex, schemaResource) }
   }
 
   private def buildRecord(request: HydraRequest, record: GenericRecord, schema: Schema)(implicit ec: ExecutionContext): Future[JdbcRecord] = {

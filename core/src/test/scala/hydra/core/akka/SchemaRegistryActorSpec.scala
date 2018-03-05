@@ -2,35 +2,35 @@ package hydra.core.akka
 
 import java.net.ConnectException
 
-import scala.concurrent.duration._
-import scala.io.Source
-
 import akka.actor.ActorSystem
 import akka.actor.Status.Failure
-import akka.cluster.pubsub.{DistributedPubSub, DistributedPubSubMediator}
+import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.Subscribe
 import akka.pattern.ask
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import hydra.avro.registry.ConfluentSchemaRegistry
+import hydra.avro.resource.SchemaResource
 import hydra.core.akka.SchemaRegistryActor._
 import hydra.core.protocol.HydraApplicationError
-import io.confluent.kafka.schemaregistry.client.SchemaMetadata
 import org.apache.avro.Schema.Parser
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import org.scalatest.concurrent.Eventually
+import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+
+import scala.concurrent.duration._
+import scala.io.Source
 
 /**
- * Created by alexsilva on 3/9/17.
- */
+  * Created by alexsilva on 3/9/17.
+  */
 class SchemaRegistryActorSpec
   extends TestKit(ActorSystem("SchemaRegistryActorSpec", config = ConfigFactory.parseString("akka.actor.provider=cluster")))
-  with Matchers
-  with FlatSpecLike
-  with ImplicitSender
-  with Eventually
-  with BeforeAndAfterAll {
+    with Matchers
+    with FlatSpecLike
+    with ImplicitSender
+    with Eventually
+    with BeforeAndAfterAll {
 
   implicit val timeout = Timeout(3.seconds)
 
@@ -111,11 +111,11 @@ class SchemaRegistryActorSpec
 
     schemaRegistryActor.tell(RegisterSchemaRequest(testSchemaString), probe.ref)
     probe.expectMsgPF() {
-      case RegisterSchemaResponse(name, id, version, schema) =>
-        name shouldBe "hydra.test.Tester"
-        id should be > 0
-        version should be > 0
-        new Parser().parse(schema) shouldBe new Parser().parse(testSchemaString)
+      case RegisterSchemaResponse(schemaResource) =>
+        schemaResource.schema.getFullName shouldBe "hydra.test.Tester"
+        schemaResource.id should be > 0
+        schemaResource.version should be > 0
+        schemaResource.schema shouldBe testSchema
     }
   }
 
@@ -129,8 +129,8 @@ class SchemaRegistryActorSpec
     schemaRegistryActor.tell(RegisterSchemaRequest(testSchemaString), probe.ref)
 
     mediatorListener.expectMsgPF() {
-      case SchemaRegistered(subject, metadata) =>
-        new Parser().parse(metadata.getSchema) shouldBe new Parser().parse(testSchemaString)
+      case SchemaRegistered(schemaResource) =>
+        schemaResource.schema shouldBe testSchema
       case _ =>
         fail("Expected SchemaRegistered message through mediator")
     }
@@ -162,8 +162,8 @@ class SchemaRegistryActorSpec
     val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(config, Some(settings)))
     val senderProbe = TestProbe()
 
-    val expectedMetadata = new SchemaMetadata(1, 1, testSchemaString)
-    schemaRegistryActor.tell(SchemaRegistered("my-topic", expectedMetadata), senderProbe.ref)
+    val expectedResource = SchemaResource(1, 1, testSchema)
+    schemaRegistryActor.tell(SchemaRegistered(expectedResource), senderProbe.ref)
     senderProbe.expectMsgPF() {
       case _ => {}
     }
@@ -215,7 +215,8 @@ class SchemaRegistryActorSpec
 }
 
 object SchemaRegistryActorSpec {
-  val config = """
+  val config =
+    """
     akka {
       loglevel = "WARNING"
       actor {

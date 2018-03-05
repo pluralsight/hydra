@@ -1,19 +1,18 @@
 package hydra.jdbc
 
-import java.io.InputStream
-
-import akka.actor.{ Actor, ActorSystem, Props }
+import akka.actor.{Actor, ActorSystem, Props}
 import akka.testkit.TestKit
 import com.pluralsight.hydra.avro.JsonConverter
-import hydra.avro.JsonToAvroConversionExceptionWithMetadata
-import hydra.core.akka.SchemaRegistryActor.{ FetchSchemaRequest, FetchSchemaResponse }
+import hydra.avro.registry.JsonToAvroConversionExceptionWithMetadata
+import hydra.avro.resource.SchemaResource
+import hydra.core.akka.SchemaRegistryActor.{FetchSchemaRequest, FetchSchemaResponse}
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_SCHEMA_PARAM
 import hydra.core.protocol.MissingMetadataException
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{ FunSpecLike, Matchers, BeforeAndAfterAll }
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -41,7 +40,7 @@ class JdbcRecordFactorySpec extends TestKit(ActorSystem("hydra"))
           case "schemaPK" => schemaPK
           case "jdbc-test" => schemaNPK
         }
-        sender ! FetchSchemaResponse(schemaToUse)
+        sender ! FetchSchemaResponse(SchemaResource(1,1,schemaToUse))
     }
   }))
 

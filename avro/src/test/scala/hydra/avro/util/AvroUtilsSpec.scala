@@ -1,17 +1,15 @@
 package hydra.avro.util
 
-import java.io.InputStream
-
 import com.pluralsight.hydra.avro.RequiredFieldMissingException
-import hydra.avro.JsonToAvroConversionExceptionWithMetadata
+import hydra.avro.registry.JsonToAvroConversionExceptionWithMetadata
+import hydra.avro.resource.SchemaResource
 import hydra.avro.util.AvroUtils.SeenPair
 import org.apache.avro.Schema
-import org.apache.avro.Schema.Field
-import org.scalatest.{ FunSpecLike, Matchers }
+import org.scalatest.{FunSpecLike, Matchers}
 
 /**
- * Created by alexsilva on 7/6/17.
- */
+  * Created by alexsilva on 7/6/17.
+  */
 class AvroUtilsSpec extends Matchers with FunSpecLike {
 
   describe("When using AvroUtils") {
@@ -284,18 +282,20 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
 
       val tschema = new Schema.Parser().parse(schema)
 
+      val metadata = SchemaResource(1, 1, tschema)
+
       AvroUtils.improveException(
         new IllegalArgumentException(""),
-        tschema) shouldBe an[IllegalArgumentException]
+        metadata) shouldBe an[IllegalArgumentException]
 
       val ex = new RequiredFieldMissingException("testEnum", tschema)
-      val improved = AvroUtils.improveException(ex, tschema)
+      val improved = AvroUtils.improveException(ex, metadata)
       improved shouldBe an[JsonToAvroConversionExceptionWithMetadata]
       val iex = improved.asInstanceOf[JsonToAvroConversionExceptionWithMetadata]
       iex.getMessage should not be null
       iex.cause shouldBe a[RequiredFieldMissingException]
-      iex.res shouldBe tschema
-
+      iex.metadata shouldBe metadata
+      iex.location shouldBe "localhost/schemas/ids/1"
     }
   }
 }

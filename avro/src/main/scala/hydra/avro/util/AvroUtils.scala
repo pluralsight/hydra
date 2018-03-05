@@ -16,15 +16,16 @@
 package hydra.avro.util
 
 import com.pluralsight.hydra.avro.JsonToAvroConversionException
-import hydra.avro.JsonToAvroConversionExceptionWithMetadata
+import hydra.avro.registry.JsonToAvroConversionExceptionWithMetadata
+import hydra.avro.resource.SchemaResource
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Field
 
 import scala.collection.mutable
 
 /**
- * Created by alexsilva on 12/7/15.
- */
+  * Created by alexsilva on 12/7/15.
+  */
 object AvroUtils {
 
   import scala.collection.JavaConverters._
@@ -38,11 +39,11 @@ object AvroUtils {
   private[avro] val NO_HASHCODE = Integer.MIN_VALUE
 
   /**
-   * Valid fields in Avro need to start with a number, an underscore or a letter.  This function checks the
-   * field name and replaces the first character with an underscore if it is not valid.
-   *
-   * @param name
-   */
+    * Valid fields in Avro need to start with a number, an underscore or a letter.  This function checks the
+    * field name and replaces the first character with an underscore if it is not valid.
+    *
+    * @param name
+    */
   def cleanName(name: String) = {
     pattern findFirstIn name match {
       case Some(str) => "_" + name.substring(1)
@@ -56,15 +57,15 @@ object AvroUtils {
   }
 
   /**
-   * Returns the primary keys (if any) defined for that schema.
-   *
-   * Primary keys are defined by adding a property named "key" to the avro record,
-   * which can contain a single field name
-   * or a comma delimmited list of field names (for composite primary keys.)
-   *
-   * @param schema
-   * @return An empty sequence if no primary key(s) are defined.
-   */
+    * Returns the primary keys (if any) defined for that schema.
+    *
+    * Primary keys are defined by adding a property named "key" to the avro record,
+    * which can contain a single field name
+    * or a comma delimmited list of field names (for composite primary keys.)
+    *
+    * @param schema
+    * @return An empty sequence if no primary key(s) are defined.
+    */
   def getPrimaryKeys(schema: Schema): Seq[Field] = {
     Option(schema.getProp("hydra.key")).map(_.split(",")) match {
       case Some(ids) => ids.map(getField(_, schema))
@@ -73,13 +74,13 @@ object AvroUtils {
   }
 
   /**
-   * A "ligher" equals that looks a fields and names primarily.
-   * Similar to record schema.compare, but without taking properties into consideration, since
-   * we are using properties for primary keys.
-   *
-   * @param one
-   * @param other
-   */
+    * A "ligher" equals that looks a fields and names primarily.
+    * Similar to record schema.compare, but without taking properties into consideration, since
+    * we are using properties for primary keys.
+    *
+    * @param one
+    * @param other
+    */
   def areEqual(one: Schema, other: Schema): Boolean = {
     val seen = SEEN_EQUALS.get
     val here = SeenPair(one.hashCode(), other.hashCode())
@@ -95,14 +96,14 @@ object AvroUtils {
     equals
   }
 
-  def improveException(ex: Throwable, schema: Schema) = {
+  def improveException(ex: Throwable, schema: SchemaResource) = {
     ex match {
       case e: JsonToAvroConversionException => JsonToAvroConversionExceptionWithMetadata(e, schema)
       case e: Exception => e
     }
   }
 
-  private[avro] case class SeenPair private (s1: Int, s2: Int) {
+  private[avro] case class SeenPair private(s1: Int, s2: Int) {
     override def equals(o: Any): Boolean =
       (this.s1 == o.asInstanceOf[SeenPair].s1) && (this.s2 == o.asInstanceOf[SeenPair].s2)
 

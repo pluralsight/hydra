@@ -1,32 +1,32 @@
 package hydra.core.akka
 
+import akka.actor.{Actor, Props}
+import akka.cluster.pubsub.DistributedPubSub
+import akka.cluster.pubsub.DistributedPubSubMediator.{Publish, Subscribe}
+import akka.pattern.{CircuitBreaker, pipe}
+import com.typesafe.config.Config
+import hydra.avro.registry.{ConfluentSchemaRegistry, SchemaRegistryException}
+import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
+import hydra.common.logging.LoggingAdapter
+import hydra.core.protocol.HydraApplicationError
+import org.apache.avro.{Schema, SchemaParseException}
+
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{ Failure, Success, Try }
-import akka.actor.{ Actor, Props }
-import akka.cluster.pubsub.DistributedPubSub
-import akka.cluster.pubsub.DistributedPubSubMediator.{ Publish, Subscribe }
-import akka.pattern.{ CircuitBreaker, pipe }
-import com.typesafe.config.Config
-import hydra.avro.registry.{ ConfluentSchemaRegistry, SchemaRegistryException }
-import hydra.avro.resource.SchemaResourceLoader
-import hydra.common.logging.LoggingAdapter
-import hydra.core.protocol.HydraApplicationError
-import io.confluent.kafka.schemaregistry.client.SchemaMetadata
-import org.apache.avro.{ Schema, SchemaParseException }
+import scala.util.{Failure, Success, Try}
 
 /**
- * This actor serves as an proxy between the handler registry
- * and the application.
- *
- * Created by alexsilva on 12/5/16.
- */
+  * This actor serves as an proxy between the handler registry
+  * and the application.
+  *
+  * Created by alexsilva on 12/5/16.
+  */
 class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSettings]) extends Actor
   with LoggingAdapter {
 
-  import context.dispatcher
   import SchemaRegistryActor._
+  import context.dispatcher
 
   val breakerSettings = settings getOrElse new CircuitBreakerSettings(config)
 
@@ -53,8 +53,7 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
 
   override def receive = {
     case FetchSchemaRequest(location) =>
-      val schemaParser = new Schema.Parser()
-      val futureResource = loader.retrieveSchema(location).map(md => FetchSchemaResponse(schemaParser.parse(md.getSchema)))
+      val futureResource = loader.retrieveSchema(location).map(resource => FetchSchemaResponse(resource))
       breaker.withCircuitBreaker(futureResource, registryFailure) pipeTo sender
 
     case RegisterSchemaRequest(json: String) =>
@@ -63,19 +62,17 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
       registerSchemaRequest.map { registerSchemaResponse =>
         mediator ! Publish(
           SchemaRegisteredTopic,
-          SchemaRegistered(
-            registerSchemaResponse.name,
-            new SchemaMetadata(registerSchemaResponse.id, registerSchemaResponse.version, registerSchemaResponse.schema)))
-        registerSchemaResponse
+          SchemaRegistered(registerSchemaResponse.schemaResource)
+        )
       } pipeTo sender
 
-    case SchemaRegistered(subject, schemaMetadata) =>
-      loader.loadSchemaIntoCache(subject, schemaMetadata) pipeTo sender
+    case SchemaRegistered(schemaResource) =>
+      loader.loadSchemaIntoCache(schemaResource) pipeTo sender
 
     case FetchAllSchemaVersionsRequest(subject: String) =>
       val allVersionsRequest = for {
-        metadata <- loader.retrieveSchema(addSchemaSuffix(subject))
-        allVersions <- Future.sequence((1 to metadata.getVersion).map { versionNumber =>
+        resource <- loader.retrieveSchema(addSchemaSuffix(subject))
+        allVersions <- Future.sequence((1 to resource.version).map { versionNumber =>
           loader.retrieveSchema(subject, versionNumber)
         })
       } yield FetchAllSchemaVersionsResponse(allVersions)
@@ -102,20 +99,19 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
       breaker.withCircuitBreaker(metadataRequest, registryFailure) pipeTo sender
   }
 
-  private def tryHandleRegisterSchema(json: String) = {
+  private def tryHandleRegisterSchema(json: String): Try[RegisterSchemaResponse] = {
     val schemaParser = new Schema.Parser()
-    for {
-      schema <- Try(schemaParser.parse(json))
-      _ <- Try(validateSchemaName(schema.getName()))
-      subject <- Try(getSubject(schema))
-      schemaId <- Try {
-        log.debug(s"Registering schema ${schema.getFullName}: $json")
-        registry.registryClient.register(subject, schema)
+    Try {
+      val schema = schemaParser.parse(json)
+      if (!isValidSchemaName(schema.getName)) {
+        throw new SchemaParseException("Schema name may only contain letters and numbers.")
       }
-      registeredSchema <- Try(registry.registryClient.getByID(schemaId))
-      version <- Try(registry.registryClient.getVersion(subject, schema))
-      metadata <- Try(registry.registryClient.getSchemaMetadata(subject, version))
-    } yield RegisterSchemaResponse(registeredSchema.getFullName, metadata.getId, metadata.getVersion, metadata.getSchema)
+      val subject = getSubject(schema)
+      log.debug(s"Registering schema ${schema.getFullName}: $json")
+      val schemaId = registry.registryClient.register(subject, schema)
+      val version = registry.registryClient.getVersion(subject, schema)
+      RegisterSchemaResponse(SchemaResource(schemaId, version, schema))
+    }
   }
 
   private def notifyOnOpen() = {
@@ -142,27 +138,34 @@ object SchemaRegistryActor {
     classOf[SchemaRegistryActor], config, settings)
 
   sealed trait SchemaRegistryRequest
+
   sealed trait SchemaRegistryResponse
 
   case class FetchSchemaRequest(location: String) extends SchemaRegistryRequest
-  case class FetchSchemaResponse(schema: Schema) extends SchemaRegistryResponse
+
+  case class FetchSchemaResponse(schemaResource: SchemaResource) extends SchemaRegistryResponse
 
   case class FetchSchemaMetadataRequest(subject: String) extends SchemaRegistryRequest
-  case class FetchSchemaMetadataResponse(schemaMetadata: SchemaMetadata) extends SchemaRegistryResponse
+
+  case class FetchSchemaMetadataResponse(schemaResource: SchemaResource) extends SchemaRegistryResponse
 
   case class FetchSubjectsRequest() extends SchemaRegistryRequest
+
   case class FetchSubjectsResponse(subjects: Iterable[String]) extends SchemaRegistryResponse
 
   case class FetchAllSchemaVersionsRequest(subject: String) extends SchemaRegistryRequest
-  case class FetchAllSchemaVersionsResponse(versions: Iterable[SchemaMetadata]) extends SchemaRegistryResponse
+
+  case class FetchAllSchemaVersionsResponse(versions: Iterable[SchemaResource]) extends SchemaRegistryResponse
 
   case class FetchSchemaVersionRequest(subject: String, version: Int) extends SchemaRegistryRequest
-  case class FetchSchemaVersionResponse(schemaMetadata: SchemaMetadata) extends SchemaRegistryResponse
+
+  case class FetchSchemaVersionResponse(schemaResource: SchemaResource) extends SchemaRegistryResponse
 
   case class RegisterSchemaRequest(json: String) extends SchemaRegistryRequest
-  case class RegisterSchemaResponse(name: String, id: Int, version: Int, schema: String) extends SchemaRegistryResponse
 
-  case class SchemaRegistered(subject: String, schema: SchemaMetadata)
+  case class RegisterSchemaResponse(schemaResource: SchemaResource) extends SchemaRegistryResponse
+
+  case class SchemaRegistered(schemaResource: SchemaResource)
 
   val SchemaRegisteredTopic = "hydra.core.akka.SchemaRegistryActor.SchemaRegistered"
 
@@ -171,15 +174,11 @@ object SchemaRegistryActor {
   val schemaSuffix = "-value"
   val hasSuffix = ".*-value$".r
 
-  def validateSchemaName(schemaName: String): Boolean = {
-    if (isValidSchemaName(schemaName)) {
-      return true
-    } else {
-      throw new SchemaParseException("Schema name may only contain letters and numbers.")
-    }
+  def validateSchemaName(schemaName: String): Try[Boolean] = {
+    if (isValidSchemaName(schemaName)) Success(true) else Failure(new SchemaParseException("Schema name may only contain letters and numbers."))
   }
 
-  def isValidSchemaName(schemaName: String) = {
+  def isValidSchemaName(schemaName: String): Boolean = {
     validSchemaNameRegex.pattern.matcher(schemaName).matches
   }
 

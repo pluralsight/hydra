@@ -16,32 +16,32 @@
 
 package hydra.ingest.http
 
-import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.Location
-import akka.http.scaladsl.server.{ ExceptionHandler, Route }
+import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.pattern.ask
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
+import hydra.avro.resource.SchemaResource
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.akka.SchemaRegistryActor._
 import hydra.core.http.CorsSupport
-import hydra.core.marshallers.{ GenericServiceResponse, HydraJsonSupport }
-import io.confluent.kafka.schemaregistry.client.SchemaMetadata
+import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.SchemaParseException
 
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
+
 /**
- * A wrapper around Confluent's schema registry that facilitates schema registration and retrieval.
- *
- * Created by alexsilva on 2/13/16.
- */
+  * A wrapper around Confluent's schema registry that facilitates schema registration and retrieval.
+  *
+  * Created by alexsilva on 2/13/16.
+  */
 class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionContext)
   extends RoutedEndpoints with ConfigSupport with LoggingAdapter with HydraJsonSupport with CorsSupport {
 
@@ -62,9 +62,9 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
             parameters('schema ?) { schemaOnly: Option[String] =>
               //TODO: make field selection more generic, i.e. /<subject>?fields=schema
               onSuccess((schemaRegistryActor ? FetchSchemaMetadataRequest(subject)).mapTo[FetchSchemaMetadataResponse]) { response =>
-                val metadata = response.schemaMetadata
-                schemaOnly.map(_ => complete(OK, metadata.getSchema))
-                  .getOrElse(complete(OK, SchemasEndpointResponse(metadata)))
+                val schemaResource = response.schemaResource
+                schemaOnly.map(_ => complete(OK, schemaResource.schema.toString))
+                  .getOrElse(complete(OK, SchemasEndpointResponse(schemaResource)))
               }
             }
           } ~ path(Segment / "versions") { subject =>
@@ -73,11 +73,13 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
             }
           } ~ path(Segment / "versions" / IntNumber) { (subject, version) =>
             onSuccess((schemaRegistryActor ? FetchSchemaVersionRequest(subject, version)).mapTo[FetchSchemaVersionResponse]) { response =>
-              complete(OK, SchemasEndpointResponse(response.schemaMetadata))
+              complete(OK, SchemasEndpointResponse(response.schemaResource))
             }
           }
         } ~
-          post { registerNewSchema }
+          post {
+            registerNewSchema
+          }
       }
     }
   }
@@ -86,7 +88,7 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
     entity(as[String]) { json =>
       extractRequest { request =>
         onSuccess((schemaRegistryActor ? RegisterSchemaRequest(json)).mapTo[RegisterSchemaResponse]) { registeredSchema =>
-          respondWithHeader(Location(request.uri.copy(path = request.uri.path / registeredSchema.name))) {
+          respondWithHeader(Location(request.uri.copy(path = request.uri.path / registeredSchema.schemaResource.schema.getFullName))) {
             complete(Created, SchemasEndpointResponse(registeredSchema))
           }
         }
@@ -117,8 +119,11 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
 case class SchemasEndpointResponse(id: Int, version: Int, schema: String)
 
 object SchemasEndpointResponse {
-  def apply(meta: SchemaMetadata): SchemasEndpointResponse =
-    SchemasEndpointResponse(meta.getId, meta.getVersion, meta.getSchema)
-  def apply(registeredSchema: SchemaRegistryActor.RegisterSchemaResponse): SchemasEndpointResponse =
-    SchemasEndpointResponse(registeredSchema.id, registeredSchema.version, registeredSchema.schema)
+  def apply(resource: SchemaResource): SchemasEndpointResponse =
+    SchemasEndpointResponse(resource.id, resource.version, resource.schema.toString)
+
+  def apply(registeredSchema: SchemaRegistryActor.RegisterSchemaResponse): SchemasEndpointResponse = {
+    val resource = registeredSchema.schemaResource
+    SchemasEndpointResponse(resource.id, resource.version, resource.schema.toString)
+  }
 }

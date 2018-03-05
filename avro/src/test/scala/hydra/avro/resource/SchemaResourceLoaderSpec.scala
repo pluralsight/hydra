@@ -15,22 +15,19 @@
 
 package hydra.avro.resource
 
-import java.io.File
-import java.net.URL
-
 import hydra.avro.registry.SchemaRegistryException
-import io.confluent.kafka.schemaregistry.client.{ MockSchemaRegistryClient, SchemaMetadata }
-import org.apache.avro.Schema.Parser
-import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.time.{ Millis, Seconds, Span }
-import org.scalatest.{ BeforeAndAfterAll, FunSpecLike, Matchers }
+import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
 import org.apache.avro.Schema
+import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.time.{Millis, Seconds, Span}
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.io.Source
 
 /**
- * Created by alexsilva on 1/20/17.
- */
+  * Created by alexsilva on 1/20/17.
+  */
 class SchemaResourceLoaderSpec extends Matchers
   with FunSpecLike
   with BeforeAndAfterAll
@@ -45,6 +42,8 @@ class SchemaResourceLoaderSpec extends Matchers
   def fixture() = {
     val client = new MockSchemaRegistryClient
     client.register("test-value", testSchema)
+    println("subject=" + client.getAllSubjects)
+
     new SchemaResourceLoader("http://mock", client)
   }
 
@@ -53,7 +52,7 @@ class SchemaResourceLoaderSpec extends Matchers
       val loader = fixture()
       val res = loader.retrieveSchema("registry:test-value")
       whenReady(res) { schemaMetadata =>
-        new Schema.Parser().parse(schemaMetadata.getSchema) shouldBe testSchema
+        schemaMetadata.schema shouldBe testSchema
       }
     }
 
@@ -61,7 +60,7 @@ class SchemaResourceLoaderSpec extends Matchers
       val loader = fixture()
       val res = loader.retrieveSchema("registry:test-value#1")
       whenReady(res) { schemaMetadata =>
-        new Schema.Parser().parse(schemaMetadata.getSchema) shouldBe testSchema
+        schemaMetadata.schema shouldBe testSchema
       }
     }
 
@@ -78,7 +77,7 @@ class SchemaResourceLoaderSpec extends Matchers
       val loader = fixture()
       val res = loader.retrieveSchema("test-value#1")
       whenReady(res) { schemaMetadata =>
-        new Schema.Parser().parse(schemaMetadata.getSchema) shouldBe testSchema
+        schemaMetadata.schema shouldBe testSchema
       }
     }
 
@@ -91,30 +90,31 @@ class SchemaResourceLoaderSpec extends Matchers
       val loader = fixture()
       val res = loader.retrieveSchema("test#1")
       whenReady(res) { schema =>
-        new Schema.Parser().parse(schema.getSchema) shouldBe testSchema
+        schema.schema shouldBe testSchema
       }
     }
 
-    it("can add a schema to the cache") {
+    it("loads a previously cached schema from the cache") {
       //create a client that if called will blow up
       val client = new MockSchemaRegistryClient
       val loader = new SchemaResourceLoader("http://localhost:48223", client)
-      val expectedSchemaMetadata = new SchemaMetadata(1, 1, testSchema.toString)
-      loader.loadSchemaIntoCache("test", expectedSchemaMetadata)
-      val res = loader.retrieveSchema("test")
-      whenReady(res) { schemaMetadata =>
-        new Schema.Parser().parse(schemaMetadata.getSchema) shouldBe testSchema
+      val expectedSchemaResource = SchemaResource(1, 1, testSchema)
+      whenReady(loader.loadSchemaIntoCache(expectedSchemaResource)) { _ =>
+        val res = loader.retrieveSchema("hydra.test.Tester")
+        whenReady(res) { schemaMetadata =>
+          schemaMetadata.schema shouldBe testSchema
+        }
       }
     }
 
     it("can get a schema by subject and version") {
       val client = new MockSchemaRegistryClient
       val loader = new SchemaResourceLoader("http://localhost:48223", client)
-      val expectedSchemaMetadata = new SchemaMetadata(1, 1, testSchema.toString)
-      loader.loadSchemaIntoCache("test", expectedSchemaMetadata)
+      val expectedSchemaResource = SchemaResource(1, 1, testSchema)
+      loader.loadSchemaIntoCache(expectedSchemaResource)
       val res = loader.retrieveSchema("test", 1)
       whenReady(res) { schemaMetadata =>
-        new Schema.Parser().parse(schemaMetadata.getSchema) shouldBe testSchema
+        schemaMetadata.schema shouldBe testSchema
       }
     }
   }

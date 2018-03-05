@@ -1,20 +1,18 @@
 package hydra.kafka.ingestors
 
-import scala.concurrent.Future
-
 import akka.actor.Actor
-import akka.pattern.pipe
 import com.pluralsight.hydra.avro.JsonToAvroConversionException
 import configs.syntax._
-import hydra.avro.JsonToAvroConversionExceptionWithMetadata
+import hydra.avro.registry.JsonToAvroConversionExceptionWithMetadata
 import hydra.common.config.ConfigSupport
 import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
 import hydra.core.protocol.GenericIngestionError
 import hydra.core.transport.TransportSupervisor.Deliver
 import hydra.kafka.producer.AvroRecord
-import spray.json.DefaultJsonProtocol
-import scala.io.Source
 import org.apache.avro.Schema
+import spray.json.DefaultJsonProtocol
+
+import scala.io.Source
 
 /**
  * A base error handler that sends a summary of ingestion errors  to a deadleter topic in Kafka.
@@ -44,7 +42,7 @@ class IngestionErrorHandler extends Actor with ConfigSupport with DefaultJsonPro
   private[ingestors] def buildPayload(err: GenericIngestionError): AvroRecord = {
     val schema: Option[String] = err.cause match {
       case e: JsonToAvroConversionException => Some(e.getSchema.toString)
-      case e: JsonToAvroConversionExceptionWithMetadata => Some(e.res.getFullName)
+      case e: JsonToAvroConversionExceptionWithMetadata => Some(e.location)
       case e: Exception => None
     }
 

@@ -15,21 +15,22 @@
 
 package hydra.kafka.producer
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.io.Source
-
-import akka.actor.{ Actor, ActorSystem, Props }
+import akka.actor.{Actor, ActorSystem, Props}
 import akka.testkit.TestKit
 import com.fasterxml.jackson.databind.ObjectMapper
-import hydra.core.akka.SchemaRegistryActor.{ FetchSchemaRequest, FetchSchemaResponse }
-import hydra.core.ingest.{ HydraRequest, RequestParams }
-import hydra.core.ingest.RequestParams.{ HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_FORMAT_PARAM, HYDRA_SCHEMA_PARAM }
+import hydra.avro.resource.SchemaResource
+import hydra.core.akka.SchemaRegistryActor.{FetchSchemaRequest, FetchSchemaResponse}
+import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_FORMAT_PARAM, HYDRA_SCHEMA_PARAM}
+import hydra.core.ingest.{HydraRequest, RequestParams}
 import hydra.core.protocol.InvalidRequest
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecordBuilder
-import org.scalatest.{ BeforeAndAfterAll, FunSpecLike, Matchers }
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.io.Source
 
 /**
  * Created by alexsilva on 1/11/17.
@@ -49,7 +50,7 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
 
   val loader = system.actorOf(Props(new Actor() {
     override def receive: Receive = {
-      case FetchSchemaRequest(_) => sender ! FetchSchemaResponse(testSchema)
+      case FetchSchemaRequest(_) => sender ! FetchSchemaResponse(SchemaResource(1,1,testSchema))
     }
   }))
 
