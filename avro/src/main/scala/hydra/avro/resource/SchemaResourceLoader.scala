@@ -57,8 +57,7 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
     val parts = subject.split("\\#")
     parts match {
       case Array(subject, version) => loadFromCache(subject.withSuffix, version)
-      case Array(subject) =>
-        getLatestSchema(subject.withSuffix)
+      case Array(subject) => getLatestSchema(subject.withSuffix)
     }
   }
 
