@@ -50,7 +50,7 @@ class SchemaResourceLoaderSpec extends Matchers
   describe("When loading schemas from the registry") {
     it("returns the latest version of the schema") {
       val loader = fixture()
-      val res = loader.retrieveSchema("registry:test-value")
+      val res = loader.retrieveSchema("test-value")
       whenReady(res) { schemaMetadata =>
         schemaMetadata.schema shouldBe testSchema
       }
@@ -58,7 +58,7 @@ class SchemaResourceLoaderSpec extends Matchers
 
     it("loads a schema with an explicit version") {
       val loader = fixture()
-      val res = loader.retrieveSchema("registry:test-value#1")
+      val res = loader.retrieveSchema("test-value#1")
       whenReady(res) { schemaMetadata =>
         schemaMetadata.schema shouldBe testSchema
       }
@@ -112,7 +112,7 @@ class SchemaResourceLoaderSpec extends Matchers
       val loader = new SchemaResourceLoader("http://localhost:48223", client)
       val expectedSchemaResource = SchemaResource(1, 1, testSchema)
       loader.loadSchemaIntoCache(expectedSchemaResource)
-      val res = loader.retrieveSchema("test", 1)
+      val res = loader.retrieveSchema("hydra.test.Tester", 1)
       whenReady(res) { schemaMetadata =>
         schemaMetadata.schema shouldBe testSchema
       }

@@ -1,24 +1,31 @@
 package hydra.ingest.http
 
+import akka.actor.ActorSystem
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.testkit.TestKit
+import com.typesafe.config.ConfigFactory
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.core.marshallers.HydraJsonSupport
 import org.apache.avro.Schema
-import org.scalatest.{ Matchers, WordSpecLike }
+import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.concurrent.duration._
 import scala.io.Source
 
 /**
- * Created by alexsilva on 5/12/17.
- */
+  * Created by alexsilva on 5/12/17.
+  */
 class SchemasEndpointSpec extends Matchers
   with WordSpecLike
   with ScalatestRouteTest
   with HydraJsonSupport
   with ConfigSupport {
+
+  override def createActorSystem(): ActorSystem =
+    ActorSystem(actorSystemNameFrom(getClass),
+      ConfigFactory.parseString("akka.actor.provider=cluster").withFallback(ConfigFactory.load()))
+
 
   val schemasRoute = new SchemasEndpoint().route
   implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
