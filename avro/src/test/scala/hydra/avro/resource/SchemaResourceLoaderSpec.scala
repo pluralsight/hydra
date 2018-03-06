@@ -19,15 +19,15 @@ import hydra.avro.registry.SchemaRegistryException
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
 import org.apache.avro.Schema
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.time.{Millis, Seconds, Span}
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.time.{ Millis, Seconds, Span }
+import org.scalatest.{ BeforeAndAfterAll, FunSpecLike, Matchers }
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.io.Source
 
 /**
-  * Created by alexsilva on 1/20/17.
-  */
+ * Created by alexsilva on 1/20/17.
+ */
 class SchemaResourceLoaderSpec extends Matchers
   with FunSpecLike
   with BeforeAndAfterAll
@@ -38,11 +38,11 @@ class SchemaResourceLoaderSpec extends Matchers
 
   val schemaParser = new Schema.Parser()
   val testSchema = schemaParser.parse(Source.fromResource("resource-loader-spec.avsc").mkString)
+  val subject = testSchema.getFullName
 
   def fixture() = {
     val client = new MockSchemaRegistryClient
-    client.register("test-value", testSchema)
-    println("subject=" + client.getAllSubjects)
+    client.register(s"${testSchema.getFullName}-value", testSchema)
 
     new SchemaResourceLoader("http://mock", client)
   }
@@ -50,7 +50,7 @@ class SchemaResourceLoaderSpec extends Matchers
   describe("When loading schemas from the registry") {
     it("returns the latest version of the schema") {
       val loader = fixture()
-      val res = loader.retrieveSchema("test-value")
+      val res = loader.retrieveSchema(subject)
       whenReady(res) { schemaMetadata =>
         schemaMetadata.schema shouldBe testSchema
       }
@@ -58,7 +58,7 @@ class SchemaResourceLoaderSpec extends Matchers
 
     it("loads a schema with an explicit version") {
       val loader = fixture()
-      val res = loader.retrieveSchema("test-value#1")
+      val res = loader.retrieveSchema(s"${subject}#1")
       whenReady(res) { schemaMetadata =>
         schemaMetadata.schema shouldBe testSchema
       }
@@ -66,32 +66,16 @@ class SchemaResourceLoaderSpec extends Matchers
 
     it("errors if can't find a schema with a specific version") {
       val loader = fixture()
-      val res = loader.retrieveSchema("registry:test-value#2").failed
+      val res = loader.retrieveSchema(s"${subject}#2").failed
       whenReady(res) { error =>
         error shouldBe a[SchemaRegistryException]
         error.getMessage should not be null
       }
     }
 
-    it("defaults to registry resources") {
-      val loader = fixture()
-      val res = loader.retrieveSchema("test-value#1")
-      whenReady(res) { schemaMetadata =>
-        schemaMetadata.schema shouldBe testSchema
-      }
-    }
-
     it("errors when subject is not known") {
       val loader = fixture()
       whenReady(loader.retrieveSchema("registry:tester").failed)(_ shouldBe a[SchemaRegistryException])
-    }
-
-    it("adds the suffix") {
-      val loader = fixture()
-      val res = loader.retrieveSchema("test#1")
-      whenReady(res) { schema =>
-        schema.schema shouldBe testSchema
-      }
     }
 
     it("loads a previously cached schema from the cache") {
@@ -112,9 +96,9 @@ class SchemaResourceLoaderSpec extends Matchers
       val loader = new SchemaResourceLoader("http://localhost:48223", client)
       val expectedSchemaResource = SchemaResource(1, 1, testSchema)
       loader.loadSchemaIntoCache(expectedSchemaResource)
-      val res = loader.retrieveSchema("hydra.test.Tester", 1)
-      whenReady(res) { schemaMetadata =>
-        schemaMetadata.schema shouldBe testSchema
+      val res = loader.retrieveSchema(testSchema.getFullName, 1)
+      whenReady(res) { schemaResource =>
+        schemaResource.schema shouldBe testSchema
       }
     }
   }
