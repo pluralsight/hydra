@@ -12,7 +12,7 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.io.Source
 
-class JdbcTransportSpec extends TestKit(ActorSystem("hydra-test")) with Matchers with FunSpecLike
+class JdbcTransportSpec extends TestKit(ActorSystem("jdbc-transpport-spec")) with Matchers with FunSpecLike
   with ImplicitSender with BeforeAndAfterAll {
 
   val probe = TestProbe()

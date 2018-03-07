@@ -66,7 +66,7 @@ lazy val common = Project(
 lazy val core = Project(
   id = "core",
   base = file("core")
-).dependsOn(common, avro)
+).dependsOn(avro)
   .settings(moduleSettings, name := "hydra-core", libraryDependencies ++= Dependencies.coreDeps)
 
 
@@ -78,7 +78,8 @@ lazy val kafka = Project(
 lazy val avro = Project(
   id = "avro",
   base = file("avro")
-).settings(moduleSettings, name := "hydra-avro", libraryDependencies ++= Dependencies.avroDeps)
+).dependsOn(common)
+  .settings(moduleSettings, name := "hydra-avro", libraryDependencies ++= Dependencies.avroDeps)
 
 lazy val sql = Project(
   id = "sql",

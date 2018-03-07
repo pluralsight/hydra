@@ -16,7 +16,7 @@
 package hydra.avro.util
 
 import com.pluralsight.hydra.avro.JsonToAvroConversionException
-import hydra.avro.JsonToAvroConversionExceptionWithMetadata
+import hydra.avro.registry.JsonToAvroConversionExceptionWithMetadata
 import hydra.avro.resource.SchemaResource
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Field
@@ -31,7 +31,6 @@ object AvroUtils {
   import scala.collection.JavaConverters._
 
   val pattern = "^(?!\\d|[a-zA-Z]|_)".r
-
 
   private[avro] val SEEN_EQUALS = new ThreadLocal[mutable.Set[SeenPair]]() {
     override protected def initialValue = new mutable.HashSet[SeenPair]()
@@ -57,6 +56,22 @@ object AvroUtils {
       .getOrElse(throw new IllegalArgumentException(s"Field $name is not in schema."))
   }
 
+  /**
+    * Returns the primary keys (if any) defined for that schema.
+    *
+    * Primary keys are defined by adding a property named "key" to the avro record,
+    * which can contain a single field name
+    * or a comma delimmited list of field names (for composite primary keys.)
+    *
+    * @param schema
+    * @return An empty sequence if no primary key(s) are defined.
+    */
+  def getPrimaryKeys(schema: Schema): Seq[Field] = {
+    Option(schema.getProp("hydra.key")).map(_.split(",")) match {
+      case Some(ids) => ids.map(getField(_, schema))
+      case None => Seq.empty
+    }
+  }
 
   /**
     * A "ligher" equals that looks a fields and names primarily.
@@ -81,10 +96,9 @@ object AvroUtils {
     equals
   }
 
-
-  def improveException(ex: Throwable, schemaResource: SchemaResource) = {
+  def improveException(ex: Throwable, schema: SchemaResource) = {
     ex match {
-      case e: JsonToAvroConversionException => JsonToAvroConversionExceptionWithMetadata(e, schemaResource)
+      case e: JsonToAvroConversionException => JsonToAvroConversionExceptionWithMetadata(e, schema)
       case e: Exception => e
     }
   }

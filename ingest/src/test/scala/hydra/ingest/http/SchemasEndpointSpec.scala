@@ -1,7 +1,9 @@
 package hydra.ingest.http
 
+import akka.actor.ActorSystem
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.testkit.TestKit
+import com.typesafe.config.ConfigFactory
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.core.marshallers.HydraJsonSupport
@@ -14,8 +16,16 @@ import scala.io.Source
 /**
   * Created by alexsilva on 5/12/17.
   */
-class SchemasEndpointSpec extends Matchers with WordSpecLike with ScalatestRouteTest
-  with HydraJsonSupport with ConfigSupport {
+class SchemasEndpointSpec extends Matchers
+  with WordSpecLike
+  with ScalatestRouteTest
+  with HydraJsonSupport
+  with ConfigSupport {
+
+  override def createActorSystem(): ActorSystem =
+    ActorSystem(actorSystemNameFrom(getClass),
+      ConfigFactory.parseString("akka.actor.provider=cluster").withFallback(ConfigFactory.load()))
+
 
   val schemasRoute = new SchemasEndpoint().route
   implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
@@ -23,9 +33,25 @@ class SchemasEndpointSpec extends Matchers with WordSpecLike with ScalatestRoute
   private val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
 
   val schema = new Schema.Parser().parse(Source.fromResource("schema.avsc").mkString)
-  schemaRegistry.registryClient.register("hydra.test.Tester-value", schema)
 
   val schemaEvolved = new Schema.Parser().parse(Source.fromResource("schema2.avsc").mkString)
+
+  override def beforeAll = {
+    super.beforeAll()
+    Post("/schemas", schema.toString) ~> schemasRoute ~> check {
+      response.status.intValue() shouldBe 201
+      val r = responseAs[SchemasEndpointResponse]
+      new Schema.Parser().parse(r.schema) shouldBe schema
+      r.version shouldBe 1
+    }
+
+    Post("/schemas", schemaEvolved.toString) ~> schemasRoute ~> check {
+      response.status.intValue() shouldBe 201
+      val r = responseAs[SchemasEndpointResponse]
+      new Schema.Parser().parse(r.schema) shouldBe schemaEvolved
+      r.version shouldBe 2
+    }
+  }
 
   override def afterAll = {
     super.afterAll()
@@ -43,15 +69,13 @@ class SchemasEndpointSpec extends Matchers with WordSpecLike with ScalatestRoute
     "returns a single schema by name" in {
       Get("/schemas/hydra.test.Tester") ~> schemasRoute ~> check {
         val rep = responseAs[SchemasEndpointResponse]
-        rep.id shouldBe 1
-        rep.version shouldBe 1
-        new Schema.Parser().parse(rep.schema) shouldBe schema
+        rep.id shouldBe 2
+        rep.version shouldBe 2
+        new Schema.Parser().parse(rep.schema) shouldBe schemaEvolved
       }
     }
 
     "evolves a schema" in {
-      schemaRegistry.registryClient.register("hydra.test.Tester-value", schemaEvolved)
-
       Get("/schemas/hydra.test.Tester") ~> schemasRoute ~> check {
         val rep = responseAs[SchemasEndpointResponse]
         rep.id shouldBe 2
@@ -60,25 +84,15 @@ class SchemasEndpointSpec extends Matchers with WordSpecLike with ScalatestRoute
       }
     }
 
-    "returns only the schema" in {
+    "return only the schema" in {
       Get("/schemas/hydra.test.Tester?schema") ~> schemasRoute ~> check {
         new Schema.Parser().parse(responseAs[String]) shouldBe schemaEvolved
       }
     }
 
-    "returns 404 if schema doesn't exist" in {
+    "return 404 if schema doesn't exist" in {
       Get("/schemas/tester") ~> schemasRoute ~> check {
         response.status.intValue() should be >= 400 //have to do this bc the mock registry returns an IOException
-      }
-    }
-
-    "posts a schema" in {
-      val newSchema = new Schema.Parser().parse(Source.fromResource("schema-new.avsc").mkString)
-      Post("/schemas", newSchema.toString) ~> schemasRoute ~> check {
-        response.status.intValue() shouldBe 201
-        val r = responseAs[SchemasEndpointResponse]
-        new Schema.Parser().parse(r.schema) shouldBe newSchema
-        r.version shouldBe 1
       }
     }
 
@@ -90,9 +104,9 @@ class SchemasEndpointSpec extends Matchers with WordSpecLike with ScalatestRoute
     }
 
     "gets a specific schema version" in {
-      Get("/schemas/hydra.test.Tester/versions/2") ~> schemasRoute ~> check {
+      Get("/schemas/hydra.test.Tester/versions/1") ~> schemasRoute ~> check {
         val r = responseAs[SchemasEndpointResponse]
-        new Schema.Parser().parse(r.schema) shouldBe schemaEvolved
+        new Schema.Parser().parse(r.schema) shouldBe schema
       }
     }
 

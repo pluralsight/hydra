@@ -7,7 +7,7 @@ import com.pluralsight.hydra.avro.JsonConverter
 import hydra.avro.resource.SchemaResource
 import hydra.avro.util.{AvroUtils, SchemaWrapper}
 import hydra.common.config.ConfigSupport
-import hydra.core.akka.SchemaFetchActor.{FetchSchema, SchemaFetchResponse}
+import hydra.core.akka.SchemaRegistryActor.{FetchSchemaRequest, FetchSchemaResponse}
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_SCHEMA_PARAM
 import hydra.core.protocol.MissingMetadataException
@@ -31,28 +31,28 @@ class JdbcRecordFactory(schemaResourceLoader: ActorRef) extends RecordFactory[Se
   override def build(request: HydraRequest)(implicit ec: ExecutionContext): Future[JdbcRecord] = {
     for {
       subject <- Future.fromTry(JdbcRecordFactory.getSchemaName(request))
-      res <- (schemaResourceLoader ? FetchSchema(subject)).mapTo[SchemaFetchResponse].map(_.schema)
-      avro <- convert(res, request)
-      record <- buildRecord(request, avro, res.schema)
+      schema <- (schemaResourceLoader ? FetchSchemaRequest(subject)).mapTo[FetchSchemaResponse].map(_.schemaResource)
+      avro <- convert(schema, request)
+      record <- buildRecord(request, avro, schema.schema)
     } yield record
 
   }
 
-  private def convert(resource: SchemaResource, request: HydraRequest)
-                     (implicit ec: ExecutionContext): Future[GenericRecord] = {
-    val converter = new JsonConverter[GenericRecord](resource.schema,
+  private def convert(schemaResource: SchemaResource, request: HydraRequest)(implicit ec: ExecutionContext): Future[GenericRecord] = {
+    val converter = new JsonConverter[GenericRecord](
+      schemaResource.schema,
       request.validationStrategy == Strict)
     Future(converter.convert(request.payload))
-      .recover { case ex => throw AvroUtils.improveException(ex, resource) }
+      .recover { case ex => throw AvroUtils.improveException(ex, schemaResource) }
   }
 
-  private def buildRecord(request: HydraRequest, record: GenericRecord, schema: Schema)
-                         (implicit ec: ExecutionContext): Future[JdbcRecord] = {
+  private def buildRecord(request: HydraRequest, record: GenericRecord, schema: Schema)(implicit ec: ExecutionContext): Future[JdbcRecord] = {
     Future {
       val table = request.metadataValue(TABLE_PARAM).getOrElse(schema.getName)
 
       val dbProfile = request.metadataValue(DB_PROFILE_PARAM)
-        .getOrElse(throw MissingMetadataException(DB_PROFILE_PARAM,
+        .getOrElse(throw MissingMetadataException(
+          DB_PROFILE_PARAM,
           s"A db profile name is required ${DB_PROFILE_PARAM}]."))
 
       JdbcRecord(table, Some(JdbcRecordFactory.pk(request, schema)), record, dbProfile)
@@ -67,7 +67,6 @@ object JdbcRecordFactory {
 
   val DB_PROFILE_PARAM = "hydra-db-profile"
 
-
   private[jdbc] def pk(request: HydraRequest, schema: Schema): Seq[Field] = {
     request.metadataValue(PRIMARY_KEY_PARAM).map(_.split(",")) match {
       case Some(ids) => ids.map(AvroUtils.getField(_, schema))
@@ -77,17 +76,18 @@ object JdbcRecordFactory {
 
   private[jdbc] def getSchemaName(request: HydraRequest): Try[String] = {
     request.metadataValue(HYDRA_SCHEMA_PARAM).map(Success(_))
-      .getOrElse(Failure(MissingMetadataException(HYDRA_SCHEMA_PARAM,
+      .getOrElse(Failure(MissingMetadataException(
+        HYDRA_SCHEMA_PARAM,
         s"A schema name is required [${HYDRA_SCHEMA_PARAM}].")))
   }
 }
 
 /**
-  *
-  * @param destination The Table name
-  * @param key         The name of the primary key for the table (optional)
-  * @param payload     The avro record representing a row in the table.
-  */
+ *
+ * @param destination The Table name
+ * @param key         The name of the primary key for the table (optional)
+ * @param payload     The avro record representing a row in the table.
+ */
 case class JdbcRecord(destination: String, key: Option[Seq[Field]], payload: GenericRecord, dbProfile: String)
   extends HydraRecord[Seq[Field], GenericRecord]
 
