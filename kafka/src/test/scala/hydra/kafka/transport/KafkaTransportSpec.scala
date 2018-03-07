@@ -54,8 +54,8 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers wit
     }
 
     it("has the right producers") {
-      transport.underlyingActor.producers.size shouldBe 2
-      transport.underlyingActor.producers.keys should contain allOf("avro", "string")
+      transport.underlyingActor.producers.size shouldBe 3
+      transport.underlyingActor.producers.keys should contain allOf("avro", "string", "json")
     }
 
     it("errors if no proxy can be found for the format") {

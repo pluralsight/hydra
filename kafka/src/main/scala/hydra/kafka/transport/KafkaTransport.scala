@@ -68,7 +68,7 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Transport {
 
   override def preStart(): Unit = {
     producersConfig
-      .foreach { case (f, c) => producers += f -> context.actorOf(KafkaProducerProxy.props(f, c), f) }
+      .foreach { case (f, c) => producers += f -> context.actorOf(KafkaProducerProxy.props(f,rootConfig), f) }
   }
 }
 

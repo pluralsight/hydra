@@ -3,18 +3,16 @@ package hydra.kafka.transport
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
+import hydra.common.config.ConfigSupport
 import hydra.core.protocol.{RecordNotProduced, RecordProduced}
 import hydra.core.transport
 import hydra.core.transport.{HydraRecord, NoCallback, TransportCallback}
-import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{JsonRecord, KafkaRecordMetadata, StringRecord}
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.clients.producer.RecordMetadata
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.config.ConfigException
-import org.apache.kafka.common.errors.TimeoutException
 import org.scalatest._
 
 import scala.concurrent.duration._
@@ -22,15 +20,19 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 12/5/16.
   */
-class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike with ImplicitSender
-  with BeforeAndAfterAll with KafkaConfigSupport {
+class KafkaProducerProxySpec extends TestKit(ActorSystem("KafkaProducerProxySpec"))
+  with Matchers
+  with FunSpecLike
+  with ImplicitSender
+  with BeforeAndAfterAll
+  with ConfigSupport {
 
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
     customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
 
   private val parent = TestProbe()
 
-  private val kafkaProducer = parent.childActorOf(KafkaProducerProxy.props("string", kafkaProducerFormats("string")))
+  private def kafkaProducer = parent.childActorOf(KafkaProducerProxy.props("string", rootConfig))
 
   implicit private val ex = system.dispatcher
 
@@ -90,18 +92,18 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
     }
 
     it("acks the produce error") {
-      val record = StringRecord("unknown", Some("key"), "test-error-payload")
+      val record = StringRecord(null, Some("key"), "test-error-payload")
       kafkaProducer ! ProduceToKafka(123, record, callback(record))
-      parent.expectMsgPF(15.seconds) {
+      parent.expectMsgPF() {
         case err: RecordProduceError =>
           err.deliveryId shouldBe 123
           err.record shouldBe record
-          err.error shouldBe a[TimeoutException]
+          err.error shouldBe a[IllegalArgumentException]
       }
 
       ingestor.expectMsgPF() {
         case RecordNotProduced(r, err, sup) =>
-          err shouldBe a[TimeoutException]
+          err shouldBe a[IllegalArgumentException]
           r shouldBe record
           sup shouldBe supervisor.ref
       }
@@ -132,11 +134,11 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("hydra")) with Matchers
           | client.id = "hydra.avro"
         """.stripMargin)
       val probe = TestProbe()
-      val act = probe.childActorOf(KafkaProducerProxy.props("json", cfg))
+      val act = probe.childActorOf(KafkaProducerProxy.props("json", rootConfig))
       val record = JsonRecord("kafka_producer_spec", Some("key"), """{"name":"alex"}""")
       act ! ProduceToKafka(0, record, callback(record))
       probe.expectMsgPF(10.seconds) {
-        case ProducerInitializationError("json", ex) => ex shouldBe a[ConfigException]
+        case ProducerInitializationError("json", ex) => ex shouldBe an[IllegalArgumentException]
       }
     }
 

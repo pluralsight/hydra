@@ -3,14 +3,13 @@ package hydra.kafka.transport
 import java.util.concurrent.TimeUnit
 
 import akka.actor.{Actor, Props, Stash}
-import akka.kafka.ProducerSettings
 import com.typesafe.config.Config
-import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol._
 import hydra.core.transport.TransportCallback
 import hydra.kafka.config.KafkaConfigSupport
-import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata, HydraKafkaCallback}
+import hydra.kafka.producer.{HydraKafkaCallback, KafkaRecord, KafkaRecordMetadata}
+import hydra.kafka.streams.Producers
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
 import org.apache.kafka.clients.producer.{Callback, KafkaProducer}
@@ -20,8 +19,8 @@ import scala.util.{Failure, Success, Try}
 /**
   * Created by alexsilva on 10/7/16.
   */
-class KafkaProducerProxy(format: String, producerConfig: Config)
-  extends Actor with ConfigSupport with LoggingAdapter with Stash {
+class KafkaProducerProxy(id: String, config: Config)
+  extends Actor with LoggingAdapter with Stash {
 
   private[transport] var producer: KafkaProducer[Any, Any] = _
 
@@ -60,37 +59,32 @@ class KafkaProducerProxy(format: String, producerConfig: Config)
       callback.onCompletion(deliveryId, None, Some(err))
 
     case _ =>
-      context.parent ! ProducerInitializationError(format, err)
+      context.parent ! ProducerInitializationError(id, err)
   }
 
   override def preStart(): Unit = {
-    createProducer(producerConfig) match {
+    createProducer() match {
       case Success(prod) =>
-        log.debug(s"Initialized producer with settings $producerConfig")
+        log.debug(s"Initialized producer with client id $id")
         producer = prod
         context.become(producing)
         unstashAll()
       case Failure(ex) =>
-        log.error(s"Unable to initialize producer with format $format.", ex)
+        log.error(s"Unable to initialize producer with client id $id.", ex)
         context.become(notInitialized(ex))
         unstashAll()
-        context.parent ! ProducerInitializationError(format, ex)
+        context.parent ! ProducerInitializationError(id, ex)
     }
   }
 
-  private def createProducer(producerConfig: Config): Try[KafkaProducer[Any, Any]] = {
-    Try {
-      val akkaConfigs = rootConfig.getConfig("akka.kafka.producer")
-      val configs = akkaConfigs.withFallback(producerConfig.atKey("kafka-clients"))
-      ProducerSettings[Any, Any](configs, None, None).createKafkaProducer()
-    }
-  }
+  private def createProducer(): Try[KafkaProducer[Any, Any]] =
+    Try(Producers.producerSettings(id, config).createKafkaProducer())
 
   private def closeProducer(): Try[Unit] = {
     Try {
-      if (producer != null) {
-        producer.flush()
-        producer.close(5000, TimeUnit.MILLISECONDS)
+      Option(producer).foreach { p =>
+        p.flush()
+        p.close(5000, TimeUnit.MILLISECONDS)
       }
     }
   }
@@ -104,9 +98,9 @@ object KafkaProducerProxy extends KafkaConfigSupport {
   case class ProduceToKafka(deliveryId: Long, kr: KafkaRecord[_, _],
                             callback: TransportCallback) extends HydraMessage
 
-  case class ProducerInitializationError(format: String, ex: Throwable)
+  case class ProducerInitializationError(id: String, ex: Throwable)
 
-  def props(format: String, producerConfig: Config): Props = Props(classOf[KafkaProducerProxy], format, producerConfig)
+  def props(id: String, cfg: Config): Props = Props(classOf[KafkaProducerProxy], id, cfg)
 
 
 }
