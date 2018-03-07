@@ -27,7 +27,7 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
-class RabbitIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers with FunSpecLike with ImplicitSender
+class RabbitIngestorSpec extends TestKit(ActorSystem("rabbit-ingestor-spec")) with Matchers with FunSpecLike with ImplicitSender
   with BeforeAndAfterAll {
 
   val ingestor = system.actorOf(Props[RabbitIngestor])

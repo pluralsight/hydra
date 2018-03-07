@@ -20,20 +20,22 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
+import akka.pattern.ask
+import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
-import hydra.avro.registry.ConfluentSchemaRegistry
+import hydra.avro.resource.SchemaResource
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
+import hydra.core.akka.SchemaRegistryActor
+import hydra.core.akka.SchemaRegistryActor._
 import hydra.core.http.CorsSupport
 import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
-import io.confluent.kafka.schemaregistry.client.SchemaMetadata
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
-import org.apache.avro.Schema.Parser
 import org.apache.avro.SchemaParseException
 
 import scala.concurrent.ExecutionContext
-
+import scala.concurrent.duration._
 
 /**
   * A wrapper around Confluent's schema registry that facilitates schema registration and retrieval.
@@ -44,53 +46,55 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
   extends RoutedEndpoints with ConfigSupport with LoggingAdapter with HydraJsonSupport with CorsSupport {
 
   implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
+  implicit val timeout = Timeout(3.seconds)
 
-  private val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
-
-  private val client = schemaRegistry.registryClient
-
-  private[hydra] val prefix = "-value"
+  private val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(applicationConfig))
 
   override def route: Route = cors(settings) {
     pathPrefix("schemas") {
       handleExceptions(excptHandler) {
         get {
           pathEndOrSingleSlash {
-            onSuccess(schemaRegistry.getAllSubjects()) { subjects =>
-              complete(OK, subjects)
+            onSuccess((schemaRegistryActor ? FetchSubjectsRequest).mapTo[FetchSubjectsResponse]) { response =>
+              complete(OK, response.subjects)
             }
           } ~ path(Segment) { subject =>
-            parameters('schema ?) { schemaOnly =>
-              val meta = client.getLatestSchemaMetadata(subject + prefix)
-              schemaOnly.map(_ => complete(OK, meta.getSchema)).getOrElse(complete(OK, SchemasEndpointResponse(meta)))
+            parameters('schema ?) { schemaOnly: Option[String] =>
+              //TODO: make field selection more generic, i.e. /<subject>?fields=schema
+              onSuccess((schemaRegistryActor ? FetchSchemaMetadataRequest(subject)).mapTo[FetchSchemaMetadataResponse]) { response =>
+                val schemaResource = response.schemaResource
+                schemaOnly.map(_ => complete(OK, schemaResource.schema.toString))
+                  .getOrElse(complete(OK, SchemasEndpointResponse(schemaResource)))
+              }
             }
           } ~ path(Segment / "versions") { subject =>
-            val schemaMeta = client.getLatestSchemaMetadata(subject + prefix)
-            val v = schemaMeta.getVersion
-            val versions = (1 to v) map (vs => SchemasEndpointResponse(client.getSchemaMetadata(subject + prefix, vs)))
-            complete(OK, versions)
+            onSuccess((schemaRegistryActor ? FetchAllSchemaVersionsRequest(subject)).mapTo[FetchAllSchemaVersionsResponse]) { response =>
+              complete(OK, response.versions.map(SchemasEndpointResponse(_)))
+            }
           } ~ path(Segment / "versions" / IntNumber) { (subject, version) =>
-            val meta = client.getSchemaMetadata(subject + prefix, version)
-            complete(OK, SchemasEndpointResponse(meta.getId, meta.getVersion, meta.getSchema))
+            onSuccess((schemaRegistryActor ? FetchSchemaVersionRequest(subject, version)).mapTo[FetchSchemaVersionResponse]) { response =>
+              complete(OK, SchemasEndpointResponse(response.schemaResource))
+            }
           }
         } ~
           post {
-            entity(as[String]) { json =>
-              extractRequest { request =>
-                val schema = new Parser().parse(json)
-                val name = schema.getNamespace() + "." + schema.getName()
-                log.debug(s"Registering schema $name: $json")
-                val id = client.register(name + prefix, schema)
-                respondWithHeader(Location(request.uri.copy(path = request.uri.path / name))) {
-                  complete(Created, SchemasEndpointResponse(id, 1, json))
-                }
-              }
-            }
+            registerNewSchema
           }
       }
     }
   }
 
+  def registerNewSchema = {
+    entity(as[String]) { json =>
+      extractRequest { request =>
+        onSuccess((schemaRegistryActor ? RegisterSchemaRequest(json)).mapTo[RegisterSchemaResponse]) { registeredSchema =>
+          respondWithHeader(Location(request.uri.copy(path = request.uri.path / registeredSchema.schemaResource.schema.getFullName))) {
+            complete(Created, SchemasEndpointResponse(registeredSchema))
+          }
+        }
+      }
+    }
+  }
 
   val excptHandler = ExceptionHandler {
     case e: RestClientException if (e.getErrorCode == 40401) =>
@@ -105,7 +109,8 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
     case e: Exception =>
       extractUri { uri =>
         log.warn(s"Request to $uri could not be handled normally")
-        complete(BadRequest,
+        complete(
+          BadRequest,
           GenericServiceResponse(400, s"Unable to complete request for ${uri.path.tail} : ${e.getMessage}"))
       }
   }
@@ -114,6 +119,11 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
 case class SchemasEndpointResponse(id: Int, version: Int, schema: String)
 
 object SchemasEndpointResponse {
-  def apply(meta: SchemaMetadata): SchemasEndpointResponse =
-    SchemasEndpointResponse(meta.getId, meta.getVersion, meta.getSchema)
+  def apply(resource: SchemaResource): SchemasEndpointResponse =
+    SchemasEndpointResponse(resource.id, resource.version, resource.schema.toString)
+
+  def apply(registeredSchema: SchemaRegistryActor.RegisterSchemaResponse): SchemasEndpointResponse = {
+    val resource = registeredSchema.schemaResource
+    SchemasEndpointResponse(resource.id, resource.version, resource.schema.toString)
+  }
 }

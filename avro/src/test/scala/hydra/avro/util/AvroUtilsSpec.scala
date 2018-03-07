@@ -1,9 +1,7 @@
 package hydra.avro.util
 
-import java.io.InputStream
-
 import com.pluralsight.hydra.avro.RequiredFieldMissingException
-import hydra.avro.JsonToAvroConversionExceptionWithMetadata
+import hydra.avro.registry.JsonToAvroConversionExceptionWithMetadata
 import hydra.avro.resource.SchemaResource
 import hydra.avro.util.AvroUtils.SeenPair
 import org.apache.avro.Schema
@@ -43,7 +41,6 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
           |}
         """.stripMargin
 
-
       val avro = new Schema.Parser().parse(schema)
 
       AvroUtils.getField("testEnum", avro) shouldBe avro.getField("testEnum")
@@ -51,7 +48,6 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
         AvroUtils.getField("unknown", avro)
       }
     }
-
 
     it("tests for equality ignoring props") {
       val schema1 = new Schema.Parser().parse(
@@ -100,7 +96,6 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
           |		}
           |	]
           |}""".stripMargin)
-
 
       AvroUtils.areEqual(schema1, schema2) shouldBe true
     }
@@ -153,7 +148,6 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
           |	]
           |}""".stripMargin)
 
-
       AvroUtils.areEqual(schema1, schema2) shouldBe false
 
     }
@@ -187,7 +181,6 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
           |		}
           |	]
           |}""".stripMargin)
-
 
       AvroUtils.areEqual(schema1, schema2) shouldBe true
 
@@ -226,7 +219,6 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
           |		}
           |	]
           |}""".stripMargin)
-
 
       AvroUtils.areEqual(schema1, schema2) shouldBe false
 
@@ -289,31 +281,21 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
         """.stripMargin
 
       val tschema = new Schema.Parser().parse(schema)
-      val resource = new SchemaResource() {
-        override def schema: Schema = tschema
 
-        override def location: String = "test"
+      val metadata = SchemaResource(1, 1, tschema)
 
-        override def id: Int = 1
-
-        override def version: Int = 1
-
-        override def getDescription: String = "test"
-
-        override def getInputStream: InputStream = null
-      }
-
-      AvroUtils.improveException(new IllegalArgumentException(""),
-        resource) shouldBe an[IllegalArgumentException]
+      AvroUtils.improveException(
+        new IllegalArgumentException(""),
+        metadata) shouldBe an[IllegalArgumentException]
 
       val ex = new RequiredFieldMissingException("testEnum", tschema)
-      val improved = AvroUtils.improveException(ex, resource)
+      val improved = AvroUtils.improveException(ex, metadata)
       improved shouldBe an[JsonToAvroConversionExceptionWithMetadata]
       val iex = improved.asInstanceOf[JsonToAvroConversionExceptionWithMetadata]
       iex.getMessage should not be null
       iex.cause shouldBe a[RequiredFieldMissingException]
-      iex.res shouldBe resource
-
+      iex.metadata shouldBe metadata
+      iex.location shouldBe "localhost/schemas/ids/1"
     }
   }
 }

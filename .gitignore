@@ -66,3 +66,7 @@ build.properties
 
 # dot-env
 .env
+
+#ensime http://ensime.github.io/
+.ensime
+.ensime_cache

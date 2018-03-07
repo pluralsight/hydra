@@ -25,7 +25,7 @@ import hydra.core.transport.TransportSupervisor.Deliver
 import hydra.core.transport.{RecordMetadata, TransportCallback}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
-class RabbitTransportSpec extends TestKit(ActorSystem("hydra-test")) with Matchers with FunSpecLike
+class RabbitTransportSpec extends TestKit(ActorSystem("rabbit-transport-spec")) with Matchers with FunSpecLike
   with ImplicitSender with BeforeAndAfterAll with ConfigSupport {
 
   val probe = TestProbe()

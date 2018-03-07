@@ -1,9 +1,10 @@
 package hydra.kafka.ingestors
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.{ ActorSystem, Props }
 import akka.testkit.TestActors.ForwardActor
-import akka.testkit.{ImplicitSender, TestKit, TestProbe}
+import akka.testkit.{ ImplicitSender, TestKit, TestProbe }
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.typesafe.config.ConfigFactory
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.core.ingest.HydraRequest
@@ -11,21 +12,26 @@ import hydra.core.ingest.RequestParams._
 import hydra.core.protocol._
 import hydra.core.transport.AckStrategy.NoAck
 import hydra.kafka.producer
-import hydra.kafka.producer.{AvroRecord, AvroRecordFactory, JsonRecord}
+import hydra.kafka.producer.{ AvroRecord, AvroRecordFactory, JsonRecord }
 import hydra.kafka.test.TestRecordFactory
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Parser
 import org.apache.avro.generic.GenericRecordBuilder
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.{ BeforeAndAfterAll, FunSpecLike, Matchers }
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
-  * Created by alexsilva on 11/18/16.
-  */
-class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers with FunSpecLike
-  with ImplicitSender with ConfigSupport with BeforeAndAfterAll
+ * Created by alexsilva on 11/18/16.
+ */
+class KafkaIngestorSpec
+  extends TestKit(ActorSystem("kafka-ingestor-spec", config = ConfigFactory.parseString("akka.actor.provider=cluster")))
+  with Matchers
+  with FunSpecLike
+  with ImplicitSender
+  with ConfigSupport
+  with BeforeAndAfterAll
   with ScalaFutures {
 
   override def afterAll = TestKit.shutdownActorSystem(system)
@@ -63,28 +69,28 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
 
   describe("when using the KafkaIngestor") {
     it("joins") {
-      val request = HydraRequest("123",
+      val request = HydraRequest(
+        "123",
         "someString", None,
-        Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "topic")
-      )
+        Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "topic"))
       kafkaIngestor ! Publish(request)
       expectMsg(Join)
     }
 
     it("is invalid when there is no topic") {
-      val request = HydraRequest("123",
+      val request = HydraRequest(
+        "123",
         "someString", None,
-        Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_RECORD_FORMAT_PARAM -> "json")
-      )
+        Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_RECORD_FORMAT_PARAM -> "json"))
       kafkaIngestor ! Validate(request)
       expectMsgType[InvalidRequest]
     }
 
     it("ingests") {
-      val request = HydraRequest("123",
+      val request = HydraRequest(
+        "123",
         """{"first":"Roar","last":"King"}""", None,
-        Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema")
-      )
+        Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema"))
       whenReady(TestRecordFactory.build(request)) { record =>
         kafkaIngestor ! Ingest(record, NoAck)
         probe.expectMsg(Produce(record, self, NoAck))
@@ -95,31 +101,30 @@ class KafkaIngestorSpec extends TestKit(ActorSystem("hydra-test")) with Matchers
   val loader = TestProbe()
   val avroRecordFactory = new AvroRecordFactory(loader.ref)
 
-
   it("is invalid if it can't find the schema") {
-    val request = HydraRequest("213",
+    val request = HydraRequest(
+      "213",
       "someString", None,
-      Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "avro-topic")
-    )
+      Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "avro-topic"))
     kafkaIngestor ! Validate(request)
     expectMsgType[InvalidRequest]
   }
 
   it("is valid with no schema if the topic can be resolved to a string") {
-    val request = HydraRequest("123",
+    val request = HydraRequest(
+      "123",
       json, None,
-      Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema")
-    )
+      Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema"))
     kafkaIngestor ! Validate(request)
     avroRecordFactory.getTopicAndSchemaSubject(request).get._2 shouldBe "test-schema"
     expectMsg(ValidRequest(ar))
   }
 
   it("is valid when a schema name overrides the topic name") {
-    val request = HydraRequest("123",
+    val request = HydraRequest(
+      "123",
       json, None,
-      Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "just-a-topic", HYDRA_SCHEMA_PARAM -> "test-schema")
-    )
+      Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "just-a-topic", HYDRA_SCHEMA_PARAM -> "test-schema"))
     avroRecordFactory.getTopicAndSchemaSubject(request).get._2 shouldBe "test-schema"
     kafkaIngestor ! Validate(request)
     val ar = AvroRecord("just-a-topic", avroSchema, None, record)
