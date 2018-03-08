@@ -3,13 +3,11 @@ package hydra.kafka.transport
 import java.util.concurrent.TimeUnit
 
 import akka.actor.{Actor, Props, Stash}
-import com.typesafe.config.Config
+import akka.kafka.ProducerSettings
 import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol._
 import hydra.core.transport.TransportCallback
-import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{HydraKafkaCallback, KafkaRecord, KafkaRecordMetadata}
-import hydra.kafka.streams.Producers
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
 import org.apache.kafka.clients.producer.{Callback, KafkaProducer}
@@ -19,10 +17,10 @@ import scala.util.{Failure, Success, Try}
 /**
   * Created by alexsilva on 10/7/16.
   */
-class KafkaProducerProxy(id: String, config: Config)
+class KafkaProducerProxy[K,V](id: String, settings:ProducerSettings[K,V])
   extends Actor with LoggingAdapter with Stash {
 
-  private[transport] var producer: KafkaProducer[Any, Any] = _
+  private[transport] var producer: KafkaProducer[K, V] = _
 
   implicit val ec = context.dispatcher
 
@@ -35,7 +33,7 @@ class KafkaProducerProxy(id: String, config: Config)
   }
 
   private def producing: Receive = {
-    case ProduceToKafka(deliveryId, kr: KafkaRecord[Any, Any], ackCallback) =>
+    case ProduceToKafka(deliveryId, kr: KafkaRecord[K, V], ackCallback) =>
       val cb = new HydraKafkaCallback(deliveryId, kr, selfSel, ackCallback)
       produce(kr, cb)
 
@@ -46,7 +44,7 @@ class KafkaProducerProxy(id: String, config: Config)
       context.parent ! err
   }
 
-  private def produce(r: KafkaRecord[Any, Any], callback: Callback) = {
+  private def produce(r: KafkaRecord[K, V], callback: Callback) = {
     Try(producer.send(r, callback)).recover {
       case e: Exception =>
         callback.onCompletion(null, e)
@@ -77,8 +75,8 @@ class KafkaProducerProxy(id: String, config: Config)
     }
   }
 
-  private def createProducer(): Try[KafkaProducer[Any, Any]] =
-    Try(Producers.producerSettings(id, config).createKafkaProducer())
+  private def createProducer(): Try[KafkaProducer[K, V]] =
+    Try(settings.createKafkaProducer())
 
   private def closeProducer(): Try[Unit] = {
     Try {
@@ -93,15 +91,15 @@ class KafkaProducerProxy(id: String, config: Config)
 }
 
 
-object KafkaProducerProxy extends KafkaConfigSupport {
+object KafkaProducerProxy {
 
   case class ProduceToKafka(deliveryId: Long, kr: KafkaRecord[_, _],
                             callback: TransportCallback) extends HydraMessage
 
   case class ProducerInitializationError(id: String, ex: Throwable)
 
-  def props(id: String, cfg: Config): Props = Props(classOf[KafkaProducerProxy], id, cfg)
-
+  def props[K,V](id: String, settings: ProducerSettings[K,V]): Props =
+    Props(classOf[KafkaProducerProxy[K,V]], id, settings)
 
 }
 

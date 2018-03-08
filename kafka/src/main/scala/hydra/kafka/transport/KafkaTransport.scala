@@ -18,13 +18,14 @@ package hydra.kafka.transport
 
 import akka.actor.SupervisorStrategy._
 import akka.actor._
+import akka.kafka.ProducerSettings
 import com.typesafe.config.Config
 import hydra.core.transport.Transport
 import hydra.core.transport.TransportSupervisor.Deliver
-import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata}
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
+import hydra.kafka.util.KafkaUtils
 
 import scala.concurrent.duration.Duration
 import scala.language.existentials
@@ -32,13 +33,11 @@ import scala.language.existentials
 /**
   * Created by alexsilva on 10/28/15.
   */
-class KafkaTransport(producersConfig: Map[String, Config]) extends Transport {
+class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) extends Transport {
 
   private type KR = KafkaRecord[_, _]
 
   private[kafka] lazy val metrics = KafkaMetrics(applicationConfig)(context.system)
-
-  private[kafka] val producers = new scala.collection.mutable.HashMap[String, ActorRef]()
 
   override def receive: Receive = {
     case Deliver(kr: KafkaRecord[_, _], deliveryId, ack) =>
@@ -52,10 +51,10 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Transport {
   }
 
 
-  private def withProducer(format: String)(success: (ActorRef) => Unit)(fail: (Option[Throwable]) => Unit) = {
-    producers.get(format) match {
+  private def withProducer(id: String)(success: (ActorRef) => Unit)(fail: (Option[Throwable]) => Unit) = {
+    context.child(id) match {
       case Some(producer) => success(producer)
-      case None => fail(Some(new IllegalArgumentException(s"No Kafka producer for $format records found.")))
+      case None => fail(Some(new IllegalArgumentException(s"No Kafka producer named $id found.")))
     }
   }
 
@@ -67,17 +66,15 @@ class KafkaTransport(producersConfig: Map[String, Config]) extends Transport {
 
 
   override def preStart(): Unit = {
-    producersConfig
-      .foreach { case (f, c) => producers += f -> context.actorOf(KafkaProducerProxy.props(f,rootConfig), f) }
+    producerSettings.foreach { case (id, s) =>
+      context.actorOf(KafkaProducerProxy.props(id, s), id)
+    }
   }
 }
 
-object KafkaTransport extends KafkaConfigSupport {
+object KafkaTransport {
 
   case class RecordProduceError(deliveryId: Long, record: KafkaRecord[_, _], error: Throwable)
-
-  //TODO: Refactor to use only one Props taking a config
-  def props(producersConfig: Map[String, Config]): Props = Props(classOf[KafkaTransport], producersConfig)
 
   /**
     * Method to comply with TransportRegistrar that looks for a method in the companion object called props
@@ -86,7 +83,7 @@ object KafkaTransport extends KafkaConfigSupport {
     * @param cfg - We are not using this (this is the rootConfig)
     * @return
     */
-  def props(cfg: Config): Props = Props(classOf[KafkaTransport], kafkaProducerFormats)
+  def props(cfg: Config): Props = Props(classOf[KafkaTransport], KafkaUtils.producerSettings(cfg))
 
 }
 

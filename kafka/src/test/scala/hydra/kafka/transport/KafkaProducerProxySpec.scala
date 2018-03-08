@@ -2,17 +2,17 @@ package hydra.kafka.transport
 
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
-import com.typesafe.config.ConfigFactory
 import hydra.common.config.ConfigSupport
 import hydra.core.protocol.{RecordNotProduced, RecordProduced}
 import hydra.core.transport
 import hydra.core.transport.{HydraRecord, NoCallback, TransportCallback}
 import hydra.kafka.producer.{JsonRecord, KafkaRecordMetadata, StringRecord}
-import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
+import hydra.kafka.transport.KafkaProducerProxy.ProduceToKafka
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
+import hydra.kafka.util.KafkaUtils
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.clients.producer.RecordMetadata
-import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.{KafkaException, TopicPartition}
 import org.scalatest._
 
 import scala.concurrent.duration._
@@ -32,7 +32,9 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("KafkaProducerProxySpec
 
   private val parent = TestProbe()
 
-  private def kafkaProducer = parent.childActorOf(KafkaProducerProxy.props("string", rootConfig))
+  private val settings = KafkaUtils.producerSettings("string", rootConfig)
+
+  private def kafkaProducer = parent.childActorOf(KafkaProducerProxy.props("string", settings))
 
   implicit private val ex = system.dispatcher
 
@@ -122,26 +124,18 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("KafkaProducerProxySpec
       parent.expectMsg(RecordProduceError(123, record, err))
     }
 
-    it("errors out with invalid producer config") {
-      val cfg = ConfigFactory.parseString(
-        """
-          | acks = "1"
-          | metadata.fetch.timeout.ms = 1000
-          | key.serializer = "org.apache.kafka.common.serialization.StringSerializer"
-          | key.deserializer = "org.apache.kafka.common.serialization.StringDeserializer"
-          | value.serializer = "io.confluent.kafka.serializers.KafkaAvroSerializer"
-          | value.deserializer = "io.confluent.kafka.serializers.KafkaAvroDeserializer"
-          | client.id = "hydra.avro"
-        """.stripMargin)
+    it("errors out with invalid message client id") {
       val probe = TestProbe()
-      val act = probe.childActorOf(KafkaProducerProxy.props("json", rootConfig))
+      val act = probe.childActorOf(KafkaProducerProxy.props("tester",
+        KafkaUtils.producerSettings("tester", rootConfig)))
       val record = JsonRecord("kafka_producer_spec", Some("key"), """{"name":"alex"}""")
       act ! ProduceToKafka(0, record, callback(record))
       probe.expectMsgPF(10.seconds) {
-        case ProducerInitializationError("json", ex) => ex shouldBe an[IllegalArgumentException]
+        case RecordProduceError(0, rec, ex) =>
+          rec shouldBe record
+          ex shouldBe a[KafkaException]
       }
     }
-
   }
 
   private val recordMetadata = {

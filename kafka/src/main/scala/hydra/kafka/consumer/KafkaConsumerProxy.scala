@@ -2,9 +2,8 @@ package hydra.kafka.consumer
 
 import akka.actor.Actor
 import akka.pattern.pipe
-import hydra.kafka.config.KafkaConfigSupport
-import hydra.kafka.util.KafkaUtils._
 import hydra.kafka.consumer.KafkaConsumerProxy._
+import hydra.kafka.util.KafkaUtils
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.common.{PartitionInfo, TopicPartition}
 
@@ -12,15 +11,14 @@ import scala.collection.JavaConverters._
 import scala.collection.immutable.Map
 import scala.concurrent.Future
 
-class KafkaConsumerProxy extends Actor with KafkaConfigSupport {
-  private val defaultSettings = loadConsumerSettings[String, String](kafkaConsumerDefaults, "hydra")
+class KafkaConsumerProxy extends Actor {
 
   private var _defaultConsumer: KafkaConsumer[String, String] = _
 
   private implicit val ec = context.dispatcher
 
   override def preStart(): Unit = {
-    _defaultConsumer = defaultSettings.createKafkaConsumer()
+    _defaultConsumer = KafkaUtils.stringConsumerSettings.createKafkaConsumer()
   }
 
   override def receive: Receive = {

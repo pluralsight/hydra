@@ -1,10 +1,10 @@
 package hydra.kafka.transport
 
 import akka.actor.ActorSystem
-import akka.kafka.ProducerSettings
 import com.typesafe.config.Config
-import hydra.kafka.config.KafkaConfigSupport
+import hydra.common.config.ConfigSupport
 import hydra.kafka.producer.KafkaRecordMetadata
+import hydra.kafka.util.KafkaUtils
 import org.apache.kafka.clients.producer.ProducerRecord
 import spray.json.DefaultJsonProtocol
 
@@ -16,17 +16,17 @@ object NoOpMetrics extends KafkaMetrics {
   def saveMetrics(record: KafkaRecordMetadata): Unit = {}
 }
 
-class PublishMetrics(topic: String)(implicit system: ActorSystem) extends KafkaMetrics with KafkaConfigSupport
-  with DefaultJsonProtocol {
+class PublishMetrics(topic: String)(implicit system: ActorSystem) extends KafkaMetrics
+  with DefaultJsonProtocol
+  with ConfigSupport {
 
   import spray.json._
 
   private implicit val mdFormat = jsonFormat5(KafkaRecordMetadata.apply)
 
   private val producer = {
-    val akkaConfigs = rootConfig.getConfig("akka.kafka.producer")
-    val configs = akkaConfigs.withFallback(kafkaProducerFormats("string").atKey("kafka-clients"))
-    ProducerSettings[String, String](configs, None, None).withProperty("client.id", "hydra.kafka.metrics")
+    KafkaUtils.producerSettings[String, String]("string", rootConfig)
+      .withProperty("client.id", "hydra.kafka.metrics")
       .createKafkaProducer()
   }
 

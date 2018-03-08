@@ -10,7 +10,8 @@ import hydra.core.transport.TransportSupervisor._
   * Created by alexsilva on 12/1/15.
   */
 
-class TransportSupervisor(id: String, destProps: Props) extends PersistentActor with AtLeastOnceDelivery {
+class TransportSupervisor(id: String, destProps: Props) extends PersistentActor
+  with AtLeastOnceDelivery {
 
   override def persistenceId = id
 
