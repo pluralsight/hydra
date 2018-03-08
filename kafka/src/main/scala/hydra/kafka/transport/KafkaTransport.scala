@@ -70,6 +70,8 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
       context.actorOf(KafkaProducerProxy.props(id, s), id)
     }
   }
+
+  override def postStop(): Unit = metrics.close()
 }
 
 object KafkaTransport {

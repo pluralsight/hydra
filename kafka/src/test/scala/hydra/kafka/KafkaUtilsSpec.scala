@@ -29,7 +29,7 @@ class KafkaUtilsSpec extends WordSpec
       |    }
       |  }
       |}
-      |hydra {
+      |hydra_kafka {
       |   schema.registry.url = "localhost:808"
       |   kafka.producer {
       |     bootstrap.servers="localhost:8092"

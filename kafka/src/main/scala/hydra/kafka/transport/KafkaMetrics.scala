@@ -10,6 +10,8 @@ import spray.json.DefaultJsonProtocol
 
 trait KafkaMetrics {
   def saveMetrics(record: KafkaRecordMetadata): Unit
+
+  def close(): Unit = {}
 }
 
 object NoOpMetrics extends KafkaMetrics {
@@ -34,6 +36,11 @@ class PublishMetrics(topic: String)(implicit system: ActorSystem) extends KafkaM
     val payload = record.toJson.compactPrint
     producer.send(new ProducerRecord(topic, record.topic, payload))
   }
+
+  override def close(): Unit = {
+    producer.close()
+  }
+
 }
 
 object KafkaMetrics {
