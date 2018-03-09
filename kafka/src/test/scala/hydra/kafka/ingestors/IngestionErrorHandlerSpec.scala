@@ -48,7 +48,7 @@ class IngestionErrorHandlerSpec extends TestKit(ActorSystem("ingestion-error-han
       val record = handlerRef.underlyingActor.buildPayload(err)
       record.key shouldBe Some("topic")
       record.payload shouldBe toGenericRecord(err).build()
-      record.destination shouldBe "__hydra_ingest_errors"
+      record.destination shouldBe "_hydra_ingest_errors"
     }
 
     it("includes the schema if available from the exception") {
@@ -58,7 +58,7 @@ class IngestionErrorHandlerSpec extends TestKit(ActorSystem("ingestion-error-han
       val record = handlerRef.underlyingActor.buildPayload(err)
       record.key shouldBe Some("topic")
       record.payload shouldBe toGenericRecord(err).set("schema", schemaResource.schema.toString).build()
-      record.destination shouldBe "__hydra_ingest_errors"
+      record.destination shouldBe "_hydra_ingest_errors"
     }
 
     it("includes the schema metadata if available from the exception") {
@@ -68,7 +68,7 @@ class IngestionErrorHandlerSpec extends TestKit(ActorSystem("ingestion-error-han
       val record = handlerRef.underlyingActor.buildPayload(err)
       record.key shouldBe Some("topic")
       record.payload shouldBe toGenericRecord(err).set("schema", "mock/schemas/ids/1").build()
-      record.destination shouldBe "__hydra_ingest_errors"
+      record.destination shouldBe "_hydra_ingest_errors"
     }
 
     it("publishes to Kafka") {

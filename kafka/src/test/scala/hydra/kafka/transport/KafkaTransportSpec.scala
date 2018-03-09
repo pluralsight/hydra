@@ -3,14 +3,15 @@ package hydra.kafka.transport
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
+import hydra.common.config.ConfigSupport
 import hydra.core.transport.TransportSupervisor.Deliver
 import hydra.core.transport.{RecordMetadata, TransportCallback}
-import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.producer.{DeleteTombstoneRecord, JsonRecord, StringRecord}
 import hydra.kafka.transport.KafkaProducerProxy.ProducerInitializationError
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
-import org.apache.kafka.common.errors.TimeoutException
+import org.apache.kafka.common.KafkaException
+import org.apache.kafka.common.errors.SerializationException
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
@@ -18,12 +19,16 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 12/5/16.
   */
-class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike with ImplicitSender
-  with BeforeAndAfterAll with KafkaConfigSupport {
+class KafkaTransportSpec extends TestKit(ActorSystem("hydra"))
+  with Matchers
+  with FunSpecLike
+  with ImplicitSender
+  with BeforeAndAfterAll
+  with ConfigSupport {
 
   val producerName = StringRecord("transport_test", Some("key"), "payload").formatName
 
-  lazy val transport = TestActorRef[KafkaTransport](KafkaTransport.props(kafkaProducerFormats), "kafka")
+  lazy val transport = TestActorRef[KafkaTransport](KafkaTransport.props(rootConfig), "kafka")
 
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
     customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
@@ -49,19 +54,19 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers wit
 
   describe("When using the KafkaTransport") {
 
-    it("Uses the same kafkaProducerFormats when props is called in the companion object") {
-      KafkaTransport.props(ConfigFactory.empty).args(0) shouldBe kafkaProducerFormats
-    }
-
     it("has the right producers") {
-      transport.underlyingActor.producers.size shouldBe 2
-      transport.underlyingActor.producers.keys should contain allOf("avro", "string")
+      transport.underlyingActor.context.children.size shouldBe 4
+      transport.underlyingActor.context.children.map(_.path.name) should contain allOf
+        ("avro", "string", "json", "tester")
     }
 
-    it("errors if no proxy can be found for the format") {
+    it("errors if no client can be found for the message") {
       val probe = TestProbe()
       val ack: TransportCallback = (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) => probe.ref ! err.get
-      transport ! Deliver(JsonRecord("transport_test", Some("key"), """{"name":"alex"}"""), 1, ack)
+      val rec = new StringRecord("transport_test", Some("key"), """{"name":"alex"}""") {
+        override val formatName: String = "unknown"
+      }
+      transport ! Deliver(rec, 1, ack)
       probe.expectMsgType[IllegalArgumentException]
     }
 
@@ -81,20 +86,47 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra")) with Matchers wit
 
 
     it("publishes errors to the stream") {
-      val rec = StringRecord("unknown_topic", Some("key"), "payload")
+      val rec = JsonRecord("transport_test", Some("key"), """{"name":"alex"}""")
       transport ! Deliver(rec)
-      streamActor.expectMsgPF(max = 15.seconds) { //need max so Kafka times out
+      streamActor.expectMsgPF() {
         case RecordProduceError(deliveryId, r, err) =>
           deliveryId shouldBe -1
           r shouldBe rec
-          err shouldBe a[TimeoutException]
+          err shouldBe a[SerializationException]
       }
     }
 
     it("publishes producer init errors to the stream") {
-      system.actorOf(KafkaTransport.props(Map("frmt" -> ConfigFactory.parseString("format=false"))))
-      streamActor.expectMsgPF() { case ProducerInitializationError("frmt", err) =>
-        err shouldBe a[IllegalArgumentException]
+
+      val cfg = ConfigFactory.parseString(
+        """
+          |akka {
+          |  kafka.producer {
+          |    parallelism = 100
+          |    close-timeout = 60s
+          |    use-dispatcher = test
+          |    kafka-clients {
+          |    }
+          |  }
+          |}
+          |hydra_kafka {
+          |   schema.registry.url = "localhost:808"
+          |   kafka.producer {
+          |     bootstrap.servers="localhost:8092"
+          |     key.serializer = org.apache.kafka.common.serialization.StringSerializer
+          |   }
+          |   kafka.clients {
+          |      test.producer {
+          |       value.serializer = io.confluent.kafka.serializers.KafkaAvroSerializer
+          |      }
+          |   }
+          |}
+          |
+      """.stripMargin)
+
+      system.actorOf(KafkaTransport.props(cfg))
+      streamActor.expectMsgPF() { case ProducerInitializationError("test", err) =>
+        err shouldBe a[KafkaException]
       }
     }
   }

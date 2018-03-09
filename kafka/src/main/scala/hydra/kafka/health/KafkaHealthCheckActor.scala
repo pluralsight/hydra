@@ -59,14 +59,7 @@ class KafkaHealthCheckActor(bootstrapServers: String, healthCheckTopic: String, 
 
 object KafkaHealthCheckActor extends ConfigSupport {
 
-  import configs.syntax._
-
-  def props(bootstrapServers: String, healthCheckTopic: Option[String] = None, interval: Option[FiniteDuration] = None) = {
-    val intv = interval.orElse(applicationConfig.get[FiniteDuration]("kafka.health_check.interval").toOption)
-      .getOrElse(20.seconds)
-    val topic = healthCheckTopic.orElse(applicationConfig.get[String]("kafka.health_check.topic").toOption)
-      .getOrElse("__hydra_health_check")
-
-    Props(classOf[KafkaHealthCheckActor], bootstrapServers, topic, intv)
+  def props(bootstrapServers: String, healthCheckTopic: String, interval: FiniteDuration) = {
+    Props(classOf[KafkaHealthCheckActor], bootstrapServers, healthCheckTopic, interval)
   }
 }
