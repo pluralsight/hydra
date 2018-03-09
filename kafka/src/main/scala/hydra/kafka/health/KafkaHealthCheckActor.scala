@@ -65,7 +65,7 @@ object KafkaHealthCheckActor extends ConfigSupport {
     val intv = interval.orElse(applicationConfig.get[FiniteDuration]("kafka.health_check.interval").toOption)
       .getOrElse(20.seconds)
     val topic = healthCheckTopic.orElse(applicationConfig.get[String]("kafka.health_check.topic").toOption)
-      .getOrElse("__hydra_health_check")
+      .getOrElse("_hydra_health_check")
 
     Props(classOf[KafkaHealthCheckActor], bootstrapServers, topic, intv)
   }

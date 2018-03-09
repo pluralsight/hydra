@@ -28,10 +28,12 @@ class StreamingTopicsEndpoint(implicit s: ActorSystem, implicit val e: Execution
 
   implicit val jsonStreamingSupport = EntityStreamingSupport.json()
 
+  private val kafkaUtils = KafkaUtils()
+
   override val route = path("transports" / "kafka" / "streaming" / Segment) { topicName =>
     get {
       parameters('format.?, 'group.?, 'timeout ? "300s") { (format, groupId, timeout) =>
-        KafkaUtils.topicExists(topicName) match {
+        kafkaUtils.topicExists(topicName) match {
           case Success(e) if e => complete(buildStream(timeout, format, topicName, groupId))
           case Success(e) if !e => complete(404, GenericServiceResponse(404, s"Topic $topicName doesn't exist."))
           case Failure(ex) => ex.printStackTrace; complete(503, GenericServiceResponse(503, ex.getMessage))

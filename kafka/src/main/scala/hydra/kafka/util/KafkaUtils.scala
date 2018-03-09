@@ -18,29 +18,30 @@ import scala.util.Try
 /**
   * Created by alexsilva on 5/17/17.
   */
-object KafkaUtils extends LoggingAdapter with ConfigSupport {
+case class KafkaUtils(zkString:String, client: () => ZkClient) extends LoggingAdapter
+  with ConfigSupport {
 
-  import KafkaConfigSupport._
-
-  private[kafka] var zkUtils = Try(new ZkClient(zkString, 5000)).map(ZkUtils(_, false))
+  private[kafka] var zkUtils = Try(client.apply()).map(ZkUtils(_, false))
 
   private[kafka] def withRunningZookeeper[T](body: ZkUtils => T): Try[T] = {
     if (zkUtils.isFailure) {
       synchronized {
-        zkUtils = Try(new ZkClient(zkString, 5000)).map(ZkUtils(_, false))
+        zkUtils = Try(client.apply()).map(ZkUtils(_, false))
       }
     }
     zkUtils.map(body)
   }
 
+  def topicExists(name: String): Try[Boolean] = withRunningZookeeper(AdminUtils.topicExists(_, name))
+
+  def topicNames(): Try[Seq[String]] = withRunningZookeeper(_.getAllTopics())
+}
+
+object KafkaUtils extends ConfigSupport {
   private val _consumerSettings = consumerSettings(rootConfig)
 
   val stringConsumerSettings: ConsumerSettings[String, String] =
     consumerSettings[String, String]("string", rootConfig)
-
-  def topicExists(name: String): Try[Boolean] = withRunningZookeeper(AdminUtils.topicExists(_, name))
-
-  def topicNames(): Try[Seq[String]] = withRunningZookeeper(_.getAllTopics())
 
   def consumerForClientId[K, V](clientId: String): Option[ConsumerSettings[K, V]] =
     _consumerSettings.get(clientId).asInstanceOf[Option[ConsumerSettings[K, V]]]
@@ -92,4 +93,9 @@ object KafkaUtils extends LoggingAdapter with ConfigSupport {
     val akkaConfig = cfg.getConfig(s"akka.kafka.$tpe")
     clientConfig.atKey("kafka-clients").withFallback(akkaConfig)
   }
+
+  def apply(zkString: String, connectionTimeout: Int = 5000): KafkaUtils =
+    KafkaUtils(zkString, () => new ZkClient(zkString, connectionTimeout))
+
+  def apply(): KafkaUtils = apply(KafkaConfigSupport.zkString)
 }

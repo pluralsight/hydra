@@ -1,11 +1,15 @@
 package hydra.kafka
 
 import com.typesafe.config.ConfigFactory
+import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.util.KafkaUtils
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
+import org.I0Itec.zkclient.ZkClient
+import org.apache.zookeeper.Watcher
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
 
+import scala.collection.JavaConverters._
 
 /**
   * Created by alexsilva on 5/17/17.
@@ -13,9 +17,28 @@ import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
 class KafkaUtilsSpec extends WordSpec
   with BeforeAndAfterAll
   with Matchers
-  with Eventually {
+  with Eventually
+  with EmbeddedKafka {
 
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
+
+  class MockableZK extends ZkClient("localhost:2181", 5000) {
+    override def connect(maxMsToWaitUntilConnected: Long, watcher: Watcher): Unit = {
+
+    }
+
+    override def exists(path: String, watch: Boolean): Boolean = {
+      if (path == "/brokers/topics/unknown") false else true
+    }
+
+
+    override def getChildren(path: String, watch: Boolean) = {
+      Seq("test-kafka-utils").asJava
+    }
+  }
+
+
+  val ku = KafkaUtils("test", () => new MockableZK)
 
   val cfg = ConfigFactory.parseString(
     """
@@ -47,30 +70,22 @@ class KafkaUtilsSpec extends WordSpec
       |
       """.stripMargin)
 
-  override def beforeAll() = {
-    super.beforeAll()
-    EmbeddedKafka.start()
-    EmbeddedKafka.createCustomTopic("test-kafka-utils")
-  }
-
-  override def afterAll() = {
-    super.afterAll()
-    KafkaUtils.zkUtils.foreach(_.close())
-    EmbeddedKafka.stop()
-  }
-
   "Kafka Utils" should {
     "return false for a topic that doesn't exist" in {
-      val exists = KafkaUtils.topicExists("test_123123").get //should be false
+      val exists = ku.topicExists("unknown").get
       assert(!exists)
     }
 
+    "uses the zkString in the config" in {
+      KafkaUtils().zkString shouldBe KafkaConfigSupport.zkString
+    }
+
     "return true for a topic that exists" in {
-      assert(KafkaUtils.topicExists("test-kafka-utils").isSuccess)
+      assert(ku.topicExists("test-kafka-utils").isSuccess)
     }
 
     "return a list of topics" in {
-      KafkaUtils.topicNames().get.indexOf("test-kafka-utils") should be > -1
+      ku.topicNames().get.indexOf("test-kafka-utils") should be > -1
     }
 
     "loads default consumer" in {
