@@ -21,7 +21,7 @@ import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.spingo.op_rabbit.Message
 import com.spingo.op_rabbit.Message._
 import hydra.common.config.ConfigSupport
-import hydra.core.transport.TransportSupervisor.Deliver
+import hydra.core.transport.Transport.Deliver
 import hydra.core.transport.{RecordMetadata, TransportCallback}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 

@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import hydra.core.protocol.{RecordNotProduced, RecordProduced}
 import hydra.core.test.{TestRecord, TestRecordMetadata}
-import hydra.core.transport.TransportSupervisor.{Confirm, TransportError}
+import hydra.core.transport.Transport.{Confirm, TransportError}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 import scala.concurrent.duration._
 

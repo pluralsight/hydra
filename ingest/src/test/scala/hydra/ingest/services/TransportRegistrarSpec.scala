@@ -5,7 +5,7 @@ import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.core.transport.Transport
-import hydra.core.transport.TransportSupervisor.Deliver
+import hydra.core.transport.Transport.Deliver
 import hydra.ingest.services.TransportRegistrar._
 import hydra.ingest.test.TestRecord
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
@@ -55,13 +55,13 @@ class TransportRegistrarSpec extends TestKit(ActorSystem("test")) with Matchers
 }
 
 class ErrorTransport(map: Map[String, String]) extends Transport {
-  override def receive: Receive = {
+  override def transport: Receive = {
     case Deliver(record, deliveryId, callback) => //ignore
   }
 }
 
 class TransportTest(config: Config) extends Transport {
-  override def receive: Receive = {
+  override def transport: Receive = {
     case Deliver(record, deliveryId, callback) =>
       sender ! config.getString("transports.test.message")
   }
@@ -72,7 +72,7 @@ object TransportTest {
 }
 
 class CompanionLessTransportTest extends Transport {
-  override def receive: Receive = {
+  override def transport: Receive = {
     case Deliver(record, deliveryId, callback) => sender ! "HI!"
   }
 }

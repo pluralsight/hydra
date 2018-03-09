@@ -3,14 +3,14 @@ package hydra.core.transport
 import akka.actor.Props
 import akka.persistence.{AtLeastOnceDelivery, PersistentActor}
 import hydra.core.protocol._
-import hydra.core.transport.AckStrategy.{Persisted, NoAck, Replicated}
-import hydra.core.transport.TransportSupervisor._
+import hydra.core.transport.AckStrategy.{NoAck, Persisted, Replicated}
+import hydra.core.transport.TransportSupervisor1.{Confirm, Deliver, DestinationConfirmed, TransportError}
 
 /**
   * Created by alexsilva on 12/1/15.
   */
 
-class TransportSupervisor(id: String, destProps: Props) extends PersistentActor
+class TransportSupervisor1(id: String, destProps: Props) extends PersistentActor
   with AtLeastOnceDelivery {
 
   override def persistenceId = id
@@ -60,7 +60,7 @@ class TransportSupervisor(id: String, destProps: Props) extends PersistentActor
 }
 
 
-object TransportSupervisor {
+object TransportSupervisor1 {
 
   trait TransportMessage extends HydraMessage
 
@@ -73,7 +73,7 @@ object TransportSupervisor {
   case class Deliver[K, V](record: HydraRecord[K, V], deliveryId: Long = -1,
                            callback: TransportCallback = NoCallback) extends TransportMessage
 
-  def props(name: String, destProps: Props): Props = Props(new TransportSupervisor(name, destProps))
+  def props(name: String, destProps: Props): Props = Props(new TransportSupervisor1(name, destProps))
 
 }
 

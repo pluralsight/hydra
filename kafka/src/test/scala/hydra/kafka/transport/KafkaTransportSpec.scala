@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import hydra.common.config.ConfigSupport
-import hydra.core.transport.TransportSupervisor.Deliver
+import hydra.core.transport.Transport.Deliver
 import hydra.core.transport.{RecordMetadata, TransportCallback}
 import hydra.kafka.producer.{DeleteTombstoneRecord, JsonRecord, StringRecord}
 import hydra.kafka.transport.KafkaProducerProxy.ProducerInitializationError

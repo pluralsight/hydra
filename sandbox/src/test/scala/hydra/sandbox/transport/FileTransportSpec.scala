@@ -6,7 +6,7 @@ import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import hydra.core.protocol.{RecordNotProduced, RecordProduced}
-import hydra.core.transport.TransportSupervisor.Deliver
+import hydra.core.transport.Transport.Deliver
 import hydra.core.transport.{HydraRecord, RecordMetadata, TransportCallback}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.{Seconds, Span}

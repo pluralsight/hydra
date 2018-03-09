@@ -23,7 +23,7 @@ import com.spingo.op_rabbit.Message.{Ack, ConfirmResponse, Fail, Nack}
 import com.spingo.op_rabbit._
 import com.typesafe.config.Config
 import hydra.core.transport.Transport
-import hydra.core.transport.TransportSupervisor.Deliver
+import hydra.core.transport.Transport.Deliver
 
 import scala.concurrent.duration._
 
@@ -45,7 +45,7 @@ class RabbitTransport(rabbitControlProps: Props) extends Transport {
     (rabbitControl ? message).mapTo[ConfirmResponse]
   }
 
-  override def receive = {
+  override def transport = {
     case Deliver(r: RabbitRecord, deliveryId, callback) =>
       sendMessage(r).foreach { result =>
         result match {

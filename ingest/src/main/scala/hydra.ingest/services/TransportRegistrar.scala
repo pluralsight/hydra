@@ -8,7 +8,7 @@ import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.common.reflect.ReflectionUtils
 import hydra.common.util.ActorUtils
-import hydra.core.transport.{Transport, TransportSupervisor}
+import hydra.core.transport.Transport
 import hydra.ingest.bootstrap.ClasspathHydraComponentLoader
 import hydra.ingest.services.TransportRegistrar.{GetTransports, GetTransportsResponse}
 
@@ -50,7 +50,7 @@ object TransportRegistrar extends LoggingAdapter {
       //todo: add to registry
       maybeProps.map { props =>
         log.debug(s"Initializing transport actor $name")
-        val transport = fact.actorOf(TransportSupervisor.props(name, props), name)
+        val transport = fact.actorOf(props)
         log.debug(s"Initialized transport $name at ${transport.path}")
         transport
       }.recover {
