@@ -20,7 +20,7 @@ class KafkaHealthCheckSpec extends TestKit(ActorSystem("KafkaHealthCheckSpec"))
 
   implicit override val patienceConfig = PatienceConfig(timeout = Span(12, Seconds),
     interval = Span(5, Millis))
-  
+
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
     customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
 
@@ -40,7 +40,7 @@ class KafkaHealthCheckSpec extends TestKit(ActorSystem("KafkaHealthCheckSpec"))
 
   describe("the Kafka health check") {
     it("publishes an error when it cannot produce to kafka") {
-      val act = TestActorRef[KafkaHealthCheckActor](KafkaHealthCheckActor.props("localhost:1111", interval = Some(1.day)))
+      val act = TestActorRef[KafkaHealthCheckActor](KafkaHealthCheckActor.props("localhost:1111", "_hydra_health_check", 1.day))
       whenReady(act.underlyingActor.checkHealth()) { h =>
         h.name shouldBe "Kafka [localhost:1111]"
         h.state shouldBe HealthState.CRITICAL
@@ -50,7 +50,7 @@ class KafkaHealthCheckSpec extends TestKit(ActorSystem("KafkaHealthCheckSpec"))
     }
 
     it("checks health") {
-      val act = TestActorRef[KafkaHealthCheckActor](KafkaHealthCheckActor.props("localhost:8092"))
+      val act = TestActorRef[KafkaHealthCheckActor](KafkaHealthCheckActor.props("localhost:8092", "_hydra_health_check", 1.day))
       whenReady(act.underlyingActor.checkHealth()) { h =>
         h.name shouldBe "Kafka [localhost:8092]"
         h.state shouldBe HealthState.OK

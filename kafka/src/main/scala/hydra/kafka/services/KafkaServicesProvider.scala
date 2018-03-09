@@ -16,9 +16,12 @@ object KafkaServicesProvider extends ServiceProvider with ConfigSupport {
   val healthCheckTopic = applicationConfig
     .getOrElse[String]("kafka.health-check-topic", "_hydra_health_check").value
 
+  val interval = applicationConfig.getOrElse[FiniteDuration]("kafka.health_check.interval",
+    20.seconds).value
+
+
   override val services = Seq(
     Tuple2(ActorUtils.actorName[KafkaHealthCheckActor],
-      Props(classOf[KafkaHealthCheckActor], KafkaConfigSupport.bootstrapServers,
-        healthCheckTopic, 20.seconds)),
+      KafkaHealthCheckActor.props(KafkaConfigSupport.bootstrapServers, healthCheckTopic, interval)),
     Tuple2(ActorUtils.actorName[KafkaConsumerProxy], Props[KafkaConsumerProxy]))
 }

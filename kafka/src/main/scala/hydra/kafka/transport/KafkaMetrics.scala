@@ -14,9 +14,12 @@ trait KafkaMetrics {
   def close(): Unit = {}
 }
 
+// $COVERAGE-OFF$
 object NoOpMetrics extends KafkaMetrics {
   def saveMetrics(record: KafkaRecordMetadata): Unit = {}
 }
+
+// $COVERAGE-ON$
 
 class PublishMetrics(topic: String)(implicit system: ActorSystem) extends KafkaMetrics
   with DefaultJsonProtocol

@@ -45,16 +45,6 @@ trait ClusterHealthCheck extends RegisteredHealthCheckActor {
 
   def checkHealth(): Future[HealthInfo]
 
-//  protected lazy val producerConfig: Config =
-//    ConfigFactory.parseMap(Map(
-//      "metadata.fetch.timeout.ms" -> (interval.toMillis / 2).toString,
-//      "client.id" -> "hydra.health.check").asJava).withFallback(kafkaProducerFormats("string"))
-//
-//
-//  protected lazy val consumerConfig: Config =
-//    ConfigFactory.parseMap(Map(
-//      "metadata.fetch.timeout.ms" -> (interval.toMillis / 2).toString,
-//      "client.id" -> "hydra.health.check").asJava).withFallback(kafkaConsumerFormats("string"))
 }
 
 
