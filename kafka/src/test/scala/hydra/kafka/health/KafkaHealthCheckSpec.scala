@@ -18,7 +18,9 @@ class KafkaHealthCheckSpec extends TestKit(ActorSystem("KafkaHealthCheckSpec"))
   with Eventually
   with ScalaFutures {
 
-  implicit override val patienceConfig = PatienceConfig(timeout = Span(12, Seconds), interval = Span(5, Millis))
+  implicit override val patienceConfig = PatienceConfig(timeout = Span(12, Seconds),
+    interval = Span(5, Millis))
+  
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
     customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
 
