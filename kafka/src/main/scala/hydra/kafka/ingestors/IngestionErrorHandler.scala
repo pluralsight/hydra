@@ -34,7 +34,8 @@ class IngestionErrorHandler extends Actor with ConfigSupport with DefaultJsonPro
     .actorSelection(applicationConfig.get[String](s"transports.kafka.path")
       .valueOrElse(s"/user/service/kafka_transport"))
 
-  private val errorSchema = new Schema.Parser().parse(Source.fromResource("schemas/HydraIngestError.avsc").mkString)
+  private val errorSchema = new Schema.Parser()
+    .parse(Source.fromResource("schemas/HydraIngestError.avsc").mkString)
 
   override def receive: Receive = {
     case error: GenericIngestionError =>
