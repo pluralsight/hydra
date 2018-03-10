@@ -50,7 +50,6 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
     case p: ProducerInitializationError => context.system.eventStream.publish(p)
   }
 
-
   private def withProducer(id: String)(success: (ActorRef) => Unit)(fail: (Option[Throwable]) => Unit) = {
     context.child(id) match {
       case Some(producer) => success(producer)

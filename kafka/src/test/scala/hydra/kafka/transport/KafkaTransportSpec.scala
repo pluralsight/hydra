@@ -1,7 +1,7 @@
 package hydra.kafka.transport
 
 import akka.actor.ActorSystem
-import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
+import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import hydra.common.config.ConfigSupport
 import hydra.core.transport.Transport.Deliver
@@ -28,7 +28,7 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra"))
 
   val producerName = StringRecord("transport_test", Some("key"), "payload").formatName
 
-  lazy val transport = TestActorRef[KafkaTransport](KafkaTransport.props(rootConfig), "kafka")
+  lazy val transport = system.actorOf(KafkaTransport.props(rootConfig), "kafka")
 
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
     customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
@@ -54,20 +54,15 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra"))
 
   describe("When using the KafkaTransport") {
 
-    it("has the right producers") {
-      transport.underlyingActor.context.children.size shouldBe 4
-      transport.underlyingActor.context.children.map(_.path.name) should contain allOf
-        ("avro", "string", "json", "tester")
-    }
-
     it("errors if no client can be found for the message") {
       val probe = TestProbe()
-      val ack: TransportCallback = (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) => probe.ref ! err.get
+      val ack: TransportCallback = (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) =>
+        probe.ref ! err.get
       val rec = new StringRecord("transport_test", Some("key"), """{"name":"alex"}""") {
         override val formatName: String = "unknown"
       }
       transport ! Deliver(rec, 1, ack)
-      probe.expectMsgType[IllegalArgumentException]
+      probe.expectMsgType[IllegalArgumentException](16.seconds)
     }
 
     it("forwards to the right proxy") {
