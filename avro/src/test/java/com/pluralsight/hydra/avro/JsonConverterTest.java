@@ -58,6 +58,7 @@ public class JsonConverterTest {
 
     Schema.Field fn = sf("fieldN", Type.NULL);
 
+    Schema.Field fbytes = sf("fieldBytes", Type.BYTES);
 
     @Test
     public void testNullFields() throws Exception {
@@ -175,6 +176,13 @@ public class JsonConverterTest {
         JsonConverter jc = new JsonConverter(sr(f1, f2, f3Rec), true);
         String json = "{ \"field1\": 1, \"field2\": [true, true, false], \"field3\": {\"key\": \"value\"}," + " " +
                 "\"extra\": \"test\"}";
+        jc.convert(json);
+    }
+
+    @Test
+    public void testBytes() throws Exception {
+        JsonConverter jc = new JsonConverter(sr(f1, fbytes), true);
+        String json = "{\"field1\": 1729, \"fieldBytes\": \"u00FF\"}";
         jc.convert(json);
     }
 }

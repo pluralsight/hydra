@@ -17,6 +17,7 @@ package com.pluralsight.hydra.avro;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.util.ClassUtil;
+import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -45,7 +46,7 @@ public class JsonConverter<T extends GenericRecord> {
     private static final Logger LOG = LoggerFactory.getLogger(JsonConverter.class);
 
     private static final Set<Type> SUPPORTED_TYPES = ImmutableSet.of(Type.RECORD, Type.ARRAY, Type.MAP, Type.INT,
-            Type.LONG, Type.BOOLEAN, Type.FLOAT, Type.DOUBLE, Type.STRING, Type.ENUM, Type.NULL);
+            Type.LONG, Type.BOOLEAN, Type.FLOAT, Type.DOUBLE, Type.STRING, Type.ENUM, Type.NULL, Type.BYTES);
 
     private final Class<T> typeClass;
 
@@ -187,6 +188,9 @@ public class JsonConverter<T extends GenericRecord> {
                         case STRING:
                             value = defaultValue.asText();
                             break;
+                        case BYTES:
+                            value = new byte[0];
+                            break;
                         case MAP:
                             Map<String, Object> fieldMap = mapper.readValue(defaultValue.asText(), Map.class);
                             Map<String, Object> mvalue = Maps.newHashMap();
@@ -301,6 +305,8 @@ public class JsonConverter<T extends GenericRecord> {
                     mapRes.put(v.getKey(), typeConvert(v.getValue(), name, valueSchema));
                 }
                 return mapRes;
+            case BYTES:
+                return value.toString().getBytes(Charsets.UTF_8);
             default:
                 throw new InvalidDataTypeException(name, value, schema);
         }
