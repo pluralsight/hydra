@@ -18,7 +18,7 @@ package hydra.kafka.producer
 import akka.actor.{ActorSelection, ActorSystem}
 import akka.testkit.{TestKit, TestProbe}
 import hydra.core.protocol.{RecordNotProduced, RecordProduced}
-import hydra.core.transport.TransportSupervisor.{Confirm, TransportError}
+import hydra.core.transport.Transport.{Confirm, TransportError}
 import hydra.core.transport.{HydraRecord, IngestorCallback, TransportCallback}
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
 import org.apache.kafka.clients.producer.RecordMetadata

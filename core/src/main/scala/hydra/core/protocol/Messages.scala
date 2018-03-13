@@ -86,8 +86,9 @@ case class IngestorUnavailable(ingestor: String,
   * @tparam K
   * @tparam V
   */
-case class Produce[K, V](record: HydraRecord[K, V], supervisor: ActorRef, ack: AckStrategy)
-  extends HydraMessage
+case class Produce[K, V](record: HydraRecord[K, V],
+                         supervisor: ActorRef,
+                         ack: AckStrategy) extends HydraMessage
 
 /**
   * Signals the record was accepted by a transport for production, but it hasn't been necessarily saved yet.

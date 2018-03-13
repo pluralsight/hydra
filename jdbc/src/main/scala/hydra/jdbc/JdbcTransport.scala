@@ -7,7 +7,7 @@ import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
 import hydra.avro.io.{SaveMode, Upsert}
 import hydra.common.config.ConfigSupport
 import hydra.core.transport.Transport
-import hydra.core.transport.TransportSupervisor.Deliver
+import hydra.core.transport.Transport.Deliver
 import hydra.sql.{JdbcDialects, JdbcRecordWriter, TableIdentifier}
 import configs.syntax._
 import hydra.avro.util.SchemaWrapper
@@ -24,7 +24,7 @@ class JdbcTransport extends Transport with ConfigSupport with LoggingAdapter {
 
   private val writers = new mutable.HashMap[String, JdbcRecordWriter]()
 
-  override def receive = {
+  override def transport = {
     case Deliver(record: JdbcRecord, deliveryId, callback) =>
       Try {
         val writer = getOrUpdateWriter(dbProfiles(record.dbProfile), record)

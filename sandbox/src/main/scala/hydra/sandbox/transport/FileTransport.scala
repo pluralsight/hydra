@@ -10,7 +10,7 @@ import akka.util.ByteString
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.core.transport.Transport
-import hydra.core.transport.TransportSupervisor.Deliver
+import hydra.core.transport.Transport.Deliver
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -34,7 +34,7 @@ class FileTransport(destinations: Map[String, String]) extends Transport {
     sharedKillSwitch.shutdown()
   }
 
-  override def receive: Receive = {
+  override def transport: Receive = {
     case Deliver(r: FileRecord, deliveryId, callback) =>
       sinks.get(r.destination).map { flow =>
         val f = flow.offer(r.payload)

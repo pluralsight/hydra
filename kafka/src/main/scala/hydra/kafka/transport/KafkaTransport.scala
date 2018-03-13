@@ -21,7 +21,7 @@ import akka.actor._
 import akka.kafka.ProducerSettings
 import com.typesafe.config.Config
 import hydra.core.transport.Transport
-import hydra.core.transport.TransportSupervisor.Deliver
+import hydra.core.transport.Transport.Deliver
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata}
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
@@ -39,7 +39,7 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 
   private[kafka] lazy val metrics = KafkaMetrics(applicationConfig)(context.system)
 
-  override def receive: Receive = {
+  override def transport: Receive = {
     case Deliver(kr: KafkaRecord[_, _], deliveryId, ack) =>
       withProducer(kr.formatName)(_ ! ProduceToKafka(deliveryId, kr, ack))(e => ack.onCompletion(deliveryId, None, e))
 
@@ -49,7 +49,6 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 
     case p: ProducerInitializationError => context.system.eventStream.publish(p)
   }
-
 
   private def withProducer(id: String)(success: (ActorRef) => Unit)(fail: (Option[Throwable]) => Unit) = {
     context.child(id) match {

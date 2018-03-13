@@ -5,7 +5,8 @@ import java.sql.SQLException
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import hydra.common.util.TryWith
-import hydra.core.transport.{HydraRecord, RecordMetadata, TransportCallback, TransportSupervisor}
+import hydra.core.transport.Transport.Deliver
+import hydra.core.transport.{HydraRecord, RecordMetadata, TransportCallback}
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericData
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
@@ -25,6 +26,7 @@ class JdbcTransportSpec extends TestKit(ActorSystem("jdbc-transpport-spec")) wit
     probe.ref ! md.map(_ => "DONE").getOrElse(err.get)
 
   override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
+
   val gr = new GenericData.Record(schema)
   gr.put("id", 1)
   gr.put("name", "alex")
@@ -48,13 +50,13 @@ class JdbcTransportSpec extends TestKit(ActorSystem("jdbc-transpport-spec")) wit
 
     it("reports error if profile can't be found") {
       val record = JdbcRecord("dest", Some(Seq.empty), gr, "dbProfile")
-      jdbcTransport ! TransportSupervisor.Deliver(record, 1, ack)
+      jdbcTransport ! Deliver(record, 1, ack)
       probe.expectMsgType[NoSuchElementException]
     }
 
     it("transports") {
       val record = JdbcRecord("test_transport", Some(Seq.empty), gr, "test-dsprofile")
-      jdbcTransport ! TransportSupervisor.Deliver(record, 1, ack)
+      jdbcTransport ! Deliver(record, 1, ack)
       probe.expectMsg("DONE")
       //check the db too
       TryWith(jdbcTransport.underlyingActor.dbProfiles("test-dsprofile").ds.getConnection()) { c =>
@@ -68,7 +70,7 @@ class JdbcTransportSpec extends TestKit(ActorSystem("jdbc-transpport-spec")) wit
       val jt = TestActorRef[JdbcTransport](Props[JdbcTransport])
       jt.underlyingActor.dbProfiles("test-dsprofile").ds.close()
       val record = JdbcRecord("test_transport", Some(Seq.empty), gr, "test-dsprofile")
-      jt ! TransportSupervisor.Deliver(record, 1, ack)
+      jt ! Deliver(record, 1, ack)
       probe.expectMsgType[SQLException]
       system.stop(jt)
     }

@@ -1,20 +1,21 @@
 package hydra.ingest.services
 
-import akka.actor.{Actor, ActorSystem}
+import akka.actor.{Actor, ActorSystem, Props}
 import akka.cluster.pubsub.DistributedPubSub
-import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
+import akka.pattern.pipe
+import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
-import hydra.core.{Settings, ingest}
 import hydra.core.ingest.IngestionReport
 import hydra.core.protocol._
+import hydra.core.{Settings, ingest}
 import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.TestRecordFactory
 import org.joda.time.DateTime
 import org.scalatest._
 import org.scalatest.concurrent.Eventually
-import akka.pattern.pipe
 import org.scalatest.time.{Seconds, Span}
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
@@ -28,25 +29,25 @@ class IngestionHandlerGatewayClusterSpec extends TestKit(ActorSystem("hydra",
 
   val mediator = DistributedPubSub(system).mediator
 
-  val ingestor = TestActorRef(new Actor {
+  val ingestor = system.actorOf(Props(new Actor {
     override def receive = {
       case Publish(_) => sender ! Join
       case Validate(r) =>
         TestRecordFactory.build(r).map(ValidRequest(_)) pipeTo sender
       case Ingest(r, _) => sender ! IngestorCompleted
     }
-  }, "test_ingestor")
+  }), "test_ingestor")
 
   val ingestorInfo = IngestorInfo("test_ingestor", "test", ingestor.path, DateTime.now)
 
-  val registry = TestActorRef(new Actor {
+  val registry = system.actorOf(Props(new Actor {
     override def receive = {
       case FindByName("tester") =>
         sender ! LookupResult(Seq(ingestorInfo))
       case FindAll =>
         sender ! LookupResult(Seq(ingestorInfo))
     }
-  }, "ingestor_registry")
+  }), "ingestor_registry")
 
   val props = IngestionHandlerGateway.props(registry.path.toString)
 
