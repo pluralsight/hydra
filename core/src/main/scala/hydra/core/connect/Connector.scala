@@ -45,14 +45,15 @@ trait Connector extends Actor with LoggingAdapter {
   }
 
   protected def onIngestionError(r: IngestionReport) = {
-    log.error(s"Received response for request ${r.correlationId} : ${r.statusCode}")
     r.ingestors.foreach {
       case (name, status) if status != IngestorCompleted =>
+        log.error(f"Received failed response for request ${r.correlationId}:" +
+          f"\n\tStatus code -> ${r.statusCode}, Cause -> ${status.message}")
+
         context.system.eventStream
           .publish(HydraConnectIngestError(id, name, status.statusCode.intValue(), status.message))
     }
   }
-
 }
 
 case class RequestReceived(request: HydraRequest) extends HydraMessage
