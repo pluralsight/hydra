@@ -1,40 +1,41 @@
 package hydra.core.connect
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.actor.{ ActorRef, ActorSystem, Props }
 import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.Subscribe
-import akka.persistence.AtLeastOnceDelivery.{UnconfirmedDelivery, UnconfirmedWarning}
-import akka.testkit.{ImplicitSender, TestKit, TestProbe}
-import com.typesafe.config.{Config, ConfigFactory}
+import akka.persistence.AtLeastOnceDelivery.{ UnconfirmedDelivery, UnconfirmedWarning }
+import akka.testkit.{ ImplicitSender, TestKit, TestProbe }
+import com.typesafe.config.{ Config, ConfigFactory }
 import hydra.core.Settings
-import hydra.core.connect.PersistentConnector.{GetUnconfirmedCount, UnconfirmedCount}
-import hydra.core.ingest.{HydraRequest, IngestionReport}
-import hydra.core.protocol.{IngestorCompleted, IngestorTimeout, InitiateRequest}
+import hydra.core.connect.PersistentConnector.{ GetUnconfirmedCount, UnconfirmedCount }
+import hydra.core.ingest.{ HydraRequest, IngestionReport }
+import hydra.core.protocol.{ IngestorCompleted, IngestorTimeout, InitiateRequest, InvalidRequest }
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+import org.scalatest.{ BeforeAndAfterAll, FlatSpecLike, Matchers }
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 
-class PersistentConnectorSpec extends TestKit(ActorSystem("hydra",
-  config = ConfigFactory.parseString("akka.actor.provider=cluster")
+class PersistentConnectorSpec extends TestKit(ActorSystem(
+  "hydra",
+  config = ConfigFactory.parseString("""akka.actor.provider=cluster
+akka.remote.artery.canonical.port=0""")
     .withFallback(ConfigFactory.load())))
   with Matchers
   with FlatSpecLike
   with Eventually
   with ImplicitSender
-with BeforeAndAfterAll {
+  with BeforeAndAfterAll {
 
   override implicit val patienceConfig = PatienceConfig(
     timeout = scaled(2000 millis),
-    interval = scaled(100 millis)
-  )
+    interval = scaled(100 millis))
 
   val mediator = DistributedPubSub(system).mediator
   val ingestorProbe = TestProbe("ingestor")
   mediator ! Subscribe(Settings.IngestTopicName, Some("test"), ingestorProbe.ref)
 
-  override def afterAll = TestKit.shutdownActorSystem(system,verifySystemShutdown = true)
+  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 
   def connectorRef(name: String): ActorRef = system.actorOf(Props(new PersistentConnector {
     override val id: String = name
@@ -113,6 +114,29 @@ with BeforeAndAfterAll {
     eventually {
       expectMsg(UnconfirmedCount(0))
       testConnector ! GetUnconfirmedCount
+    }
+    system.stop(testConnector)
+  }
+
+  it should "should confirm delivery on client error" in {
+    val testConnector = system.actorOf(Props(new PersistentConnector {
+      override val id: String = "test-confirm-client-error"
+
+      override def config: Config = ConfigFactory.empty()
+    }), "tc")
+
+    testConnector ! HydraRequest("1234", "test")
+
+    testConnector ! GetUnconfirmedCount
+
+    eventually {
+      expectMsg(UnconfirmedCount(1))
+    }
+    //we use one here because we know this will be the persistence delivery id.
+    testConnector ! IngestionReport("1", Map("test" -> new InvalidRequest("Bad message")), 400)
+    testConnector ! GetUnconfirmedCount
+    eventually {
+      expectMsg(UnconfirmedCount(0))
     }
     system.stop(testConnector)
   }

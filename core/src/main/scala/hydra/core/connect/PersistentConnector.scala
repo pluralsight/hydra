@@ -1,14 +1,14 @@
 package hydra.core.connect
 
 import akka.persistence.AtLeastOnceDelivery.UnconfirmedWarning
-import akka.persistence.{AtLeastOnceDelivery, PersistentActor}
-import hydra.core.connect.PersistentConnector.{GetUnconfirmedCount, UnconfirmedCount}
-import hydra.core.ingest.{HydraRequest, IngestionReport}
+import akka.persistence.{ AtLeastOnceDelivery, PersistentActor }
+import hydra.core.connect.PersistentConnector.{ GetUnconfirmedCount, UnconfirmedCount }
+import hydra.core.ingest.{ HydraRequest, IngestionReport }
 import hydra.core.protocol.HydraMessage
 
 /**
-  * Created by alexsilva on 12/17/15.
-  */
+ * Created by alexsilva on 12/17/15.
+ */
 trait PersistentConnector extends Connector with PersistentActor with AtLeastOnceDelivery {
 
   override def receive = super.receive orElse receiveCommand
@@ -18,9 +18,14 @@ trait PersistentConnector extends Connector with PersistentActor with AtLeastOnc
   override def receiveCommand: Receive = {
     case req: HydraRequest => persist(RequestReceived(req))(updateState)
 
-    case IngestionReport(id, _, 200) ⇒ persist(RequestConfirmed(id.toLong))(updateState)
+    case IngestionReport(id, _, 200) => persist(RequestConfirmed(id.toLong))(updateState)
 
-    case r: IngestionReport => onIngestionError(r)
+    case r @ IngestionReport(id, _, statusCode) => {
+      onIngestionError(r)
+      if (statusCode < 500 && statusCode >= 400) {
+        confirmDelivery(id.toLong)
+      }
+    }
 
     case GetUnconfirmedCount => sender ! UnconfirmedCount(numberOfUnconfirmed)
 
@@ -28,6 +33,7 @@ trait PersistentConnector extends Connector with PersistentActor with AtLeastOnc
       val msg = s"There are ${deliveries.size} unconfirmed messages from connector $id."
       log.error(msg)
       context.system.eventStream.publish(HydraConnectIngestError(id, id, 503, msg))
+
   }
 
   val receiveRecover: Receive = {
@@ -40,12 +46,13 @@ trait PersistentConnector extends Connector with PersistentActor with AtLeastOnc
     }
     case RequestConfirmed(id) => confirmDelivery(id)
   }
+
 }
 
 object PersistentConnector {
 
   case object GetUnconfirmedCount
 
-  case class UnconfirmedCount(count:Long)
+  case class UnconfirmedCount(count: Long)
 
 }
