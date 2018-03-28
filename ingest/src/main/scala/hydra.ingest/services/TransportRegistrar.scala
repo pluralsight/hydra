@@ -50,7 +50,7 @@ object TransportRegistrar extends LoggingAdapter {
       //todo: add to registry
       maybeProps.map { props =>
         log.debug(s"Initializing transport actor $name")
-        val transport = fact.actorOf(props)
+        val transport = fact.actorOf(props, name)
         log.debug(s"Initialized transport $name at ${transport.path}")
         transport
       }.recover {
