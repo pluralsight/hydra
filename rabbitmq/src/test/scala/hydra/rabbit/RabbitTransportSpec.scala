@@ -17,7 +17,7 @@
 package hydra.rabbit
 
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
-import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
+import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.spingo.op_rabbit.Message
 import com.spingo.op_rabbit.Message._
 import hydra.common.config.ConfigSupport
@@ -26,23 +26,26 @@ import hydra.core.transport.{RecordMetadata, TransportCallback}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 class RabbitTransportSpec extends TestKit(ActorSystem("rabbit-transport-spec")) with Matchers with FunSpecLike
-  with ImplicitSender with BeforeAndAfterAll with ConfigSupport {
+  with ImplicitSender
+  with BeforeAndAfterAll
+  with ConfigSupport {
 
   val probe = TestProbe()
 
   val testRabbitControl = Props[RabbitControlMock]
-  val rabbitTransport = TestActorRef[RabbitTransport](RabbitTransport.props(testRabbitControl), "rabbit_transport")
+
 
   override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 
   describe("When using the RabbitTransport") {
     it("sends valid exchange messages and receive ack") {
+      val rabbitTransport = system.actorOf(RabbitTransport.props(testRabbitControl))
       val rec = RabbitRecord("test.exchange", RabbitRecord.DESTINATION_TYPE_EXCHANGE, "exchange-ack")
       val ack: TransportCallback = (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) => probe.ref ! md.get
-      val m = Deliver(rec,1,ack)
+      val m = Deliver(rec, 1, ack)
       rabbitTransport ! m
       probe.expectMsgPF() {
-        case md:RabbitRecordMetadata =>
+        case md: RabbitRecordMetadata =>
           md.id shouldBe 11
           md.destination shouldBe "test.exchange"
           md.destinationType shouldBe RabbitRecord.DESTINATION_TYPE_EXCHANGE
@@ -50,12 +53,13 @@ class RabbitTransportSpec extends TestKit(ActorSystem("rabbit-transport-spec")) 
     }
 
     it("sends valid queue messages and receive ack") {
+      val rabbitTransport = system.actorOf(RabbitTransport.props(testRabbitControl))
       val rec = RabbitRecord("test.queue", RabbitRecord.DESTINATION_TYPE_QUEUE, "queue-ack")
       val ack: TransportCallback = (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) => probe.ref ! md.get
-      val m = Deliver(rec,1,ack)
+      val m = Deliver(rec, 1, ack)
       rabbitTransport ! m
       probe.expectMsgPF() {
-        case md:RabbitRecordMetadata =>
+        case md: RabbitRecordMetadata =>
           md.id shouldBe 12
           md.destination shouldBe "test.queue"
           md.destinationType shouldBe RabbitRecord.DESTINATION_TYPE_QUEUE
@@ -63,17 +67,19 @@ class RabbitTransportSpec extends TestKit(ActorSystem("rabbit-transport-spec")) 
     }
 
     it("receives error on Fail condition") {
+      val rabbitTransport = system.actorOf(RabbitTransport.props(testRabbitControl))
       val rec = RabbitRecord("test.exchange", RabbitRecord.DESTINATION_TYPE_EXCHANGE, "exchange-Fail")
       val err: TransportCallback = (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) => probe.ref ! err.get
-      val m = Deliver(rec,1,err)
+      val m = Deliver(rec, 1, err)
       rabbitTransport ! m
       probe.expectMsgType[IllegalArgumentException]
     }
 
     it("receives error on Nack condition") {
+      val rabbitTransport = system.actorOf(RabbitTransport.props(testRabbitControl))
       val rec = RabbitRecord("test.exchange", RabbitRecord.DESTINATION_TYPE_EXCHANGE, "exchange-Nack")
       val err: TransportCallback = (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) => probe.ref ! err.get
-      val m = Deliver(rec,1,err)
+      val m = Deliver(rec, 1, err)
       rabbitTransport ! m
       probe.expectMsgType[RabbitProducerException]
     }
@@ -83,13 +89,13 @@ class RabbitTransportSpec extends TestKit(ActorSystem("rabbit-transport-spec")) 
 
 class RabbitControlMock extends Actor with ActorLogging {
   override def receive = {
-    case m: Message if (new String(m.data) =="exchange-ack") =>
+    case m: Message if (new String(m.data) == "exchange-ack") =>
       sender ! Ack(11)
-    case m: Message if (new String(m.data) =="queue-ack") =>
+    case m: Message if (new String(m.data) == "queue-ack") =>
       sender ! Ack(12)
-    case m: Message if (new String(m.data) =="exchange-Fail") =>
+    case m: Message if (new String(m.data) == "exchange-Fail") =>
       sender ! Fail(13, new IllegalArgumentException)
-    case m: Message if (new String(m.data) =="exchange-Nack") =>
+    case m: Message if (new String(m.data) == "exchange-Nack") =>
       sender ! Nack(14)
   }
 }
