@@ -17,7 +17,7 @@ import scala.util.{Failure, Success, Try}
 /**
   * Created by alexsilva on 10/7/16.
   */
-class KafkaProducerProxy[K,V](id: String, settings:ProducerSettings[K,V])
+class KafkaProducerProxy[K, V](id: String, settings: ProducerSettings[K, V])
   extends Actor with LoggingAdapter with Stash {
 
   private[transport] var producer: KafkaProducer[K, V] = _
@@ -47,6 +47,8 @@ class KafkaProducerProxy[K,V](id: String, settings:ProducerSettings[K,V])
   private def produce(r: KafkaRecord[K, V], callback: Callback) = {
     Try(producer.send(r, callback)).recover {
       case e: Exception =>
+        log.error("Kafka Error", e)
+        e.printStackTrace()
         callback.onCompletion(null, e)
     }
   }
@@ -98,8 +100,8 @@ object KafkaProducerProxy {
 
   case class ProducerInitializationError(id: String, ex: Throwable)
 
-  def props[K,V](id: String, settings: ProducerSettings[K,V]): Props =
-    Props(classOf[KafkaProducerProxy[K,V]], id, settings)
+  def props[K, V](id: String, settings: ProducerSettings[K, V]): Props =
+    Props(classOf[KafkaProducerProxy[K, V]], id, settings)
 
 }
 
