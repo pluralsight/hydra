@@ -35,7 +35,7 @@ class MiscSpec extends Matchers with FlatSpecLike {
     err.message shouldBe "error"
 
     val err1 = InvalidRequest(new IllegalArgumentException)
-    err1.message shouldBe ""
+    err1.message shouldBe "Unknown error."
   }
 
   "The InvalidRequestError" should "have correct values" in {

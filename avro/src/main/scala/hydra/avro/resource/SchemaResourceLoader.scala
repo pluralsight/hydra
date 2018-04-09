@@ -46,7 +46,8 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
 
   import SchemaResourceLoader._
 
-  private implicit val cache = GuavaCache[SchemaResource]
+  private implicit val guava = SchemaResourceLoader.cache
+
   private val defaultCacheTtl = Some(5.minutes)
 
   def retrieveSchema(subject: String, version: Int)(implicit ec: ExecutionContext): Future[SchemaResource] = {
@@ -61,7 +62,7 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
     }
   }
 
-  def loadSchemaIntoCache(schemaResource: SchemaResource)(implicit ec: ExecutionContext):Future[SchemaResource] = {
+  def loadSchemaIntoCache(schemaResource: SchemaResource)(implicit ec: ExecutionContext): Future[SchemaResource] = {
     val subject = schemaResource.schema.getFullName.withSuffix
     Future.sequence(Seq(put(subject)(schemaResource, ttl = Some(5.minutes)),
       put(subject, schemaResource.version)(schemaResource, ttl = None)))
@@ -70,7 +71,8 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
 
   private def getLatestSchema(subject: String)(implicit ec: ExecutionContext): Future[SchemaResource] = {
     cachingF(subject)(ttl = Some(5.minutes)) {
-      Future(registry.getLatestSchemaMetadata(subject)).map(toSchemaResource)
+      log.debug(s"Fetching latest $subject schema")
+       Future(registry.getLatestSchemaMetadata(subject)).map(toSchemaResource)
         .recoverWith {
           case e: ConnectException => throw e
           case e: Exception => throw new SchemaRegistryException(e, subject)
@@ -80,6 +82,7 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
 
   private def loadFromCache(subject: String, version: String)(implicit ec: ExecutionContext): Future[SchemaResource] = {
     cachingF(subject, version)(ttl = None) {
+      log.debug(s"Fetching version $version for $subject schema")
       loadFromRegistry(subject, version)
     }
   }
@@ -111,4 +114,5 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
 
 object SchemaResourceLoader {
   val log = LoggerFactory.getLogger(getClass)
+  val cache = GuavaCache[SchemaResource]
 }

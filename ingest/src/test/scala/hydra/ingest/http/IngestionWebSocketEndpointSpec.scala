@@ -87,7 +87,7 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
         wsClient.expectMessage("""{"correlationId":"122","ingestors":{"test_ingestor":{"code":200,"message":"OK"}}}""")
 
         wsClient.sendMessage("error")
-        wsClient.expectMessage("""{"correlationId":"0","ingestors":{"test_ingestor":{"code":503,"message":""}}}""")
+        wsClient.expectMessage("""{"correlationId":"0","ingestors":{"test_ingestor":{"code":503,"message":"Unknown error."}}}""")
 
         wsClient.sendCompletion()
         wsClient.expectCompletion()

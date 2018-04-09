@@ -45,6 +45,8 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
 
   val registry = ConfluentSchemaRegistry.forConfig(config)
 
+  log.debug(s"Creating new SchemaRegistryActor for ${registry.registryUrl}")
+
   val loader = new SchemaResourceLoader(registry.registryUrl, registry.registryClient)
   val mediator = DistributedPubSub(context.system).mediator
   mediator ! Subscribe(SchemaRegisteredTopic, self)

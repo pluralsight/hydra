@@ -2,13 +2,17 @@ package hydra.ingest.http
 
 import akka.actor.ActorPath
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+import hydra.core.HydraException
 import hydra.core.ingest.IngestionReport
 import hydra.core.protocol.{IngestorCompleted, IngestorError, IngestorStatus, InvalidRequest}
 import hydra.ingest.IngestorInfo
 import org.joda.time.DateTime
 import org.scalatest.{FunSpecLike, Matchers}
 
-class HydraIngestJsonSupportSpec extends Matchers with FunSpecLike with HydraIngestJsonSupport with SprayJsonSupport {
+class HydraIngestJsonSupportSpec extends Matchers
+  with FunSpecLike
+  with HydraIngestJsonSupport
+  with SprayJsonSupport {
 
   import spray.json._
 
@@ -26,7 +30,7 @@ class HydraIngestJsonSupportSpec extends Matchers with FunSpecLike with HydraIng
       val st = InvalidRequest(new IllegalArgumentException("error")).asInstanceOf[IngestorStatus]
       val stn = InvalidRequest(new IllegalArgumentException()).asInstanceOf[IngestorStatus]
       st.toJson shouldBe """{"code":400,"message":"error"}""".parseJson
-      stn.toJson shouldBe """{"code":400,"message":""}""".parseJson
+      stn.toJson shouldBe """{"code":400,"message":"Unknown error."}""".parseJson
       intercept[NotImplementedError] {
         """{"code":400,"message":"error"}""".parseJson.convertTo[IngestorStatus]
       }
@@ -35,9 +39,12 @@ class HydraIngestJsonSupportSpec extends Matchers with FunSpecLike with HydraIng
 
     it("converts IngestorError objects with no message") {
       val st = IngestorError(new IllegalArgumentException("error")).asInstanceOf[IngestorStatus]
-      val stn = IngestorError(new IllegalArgumentException()).asInstanceOf[IngestorStatus]
+      val stn = IngestorError(new IllegalArgumentException("")).asInstanceOf[IngestorStatus]
+      val stnCause = IngestorError(new HydraException("hydra", new IllegalArgumentException("underlying")))
+        .asInstanceOf[IngestorStatus]
       st.toJson shouldBe """{"code":503,"message":"error"}""".parseJson
       stn.toJson shouldBe """{"code":503,"message":""}""".parseJson
+      stnCause.toJson shouldBe """{"code":503,"message":"hydra: underlying"}""".parseJson
     }
 
     it("converts IngestionReport objects") {

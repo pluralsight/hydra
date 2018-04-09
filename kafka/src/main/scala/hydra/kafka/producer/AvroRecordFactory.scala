@@ -19,7 +19,6 @@ import akka.actor.ActorRef
 import akka.pattern.ask
 import akka.util
 import com.pluralsight.hydra.avro.JsonConverter
-import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.avro.resource.SchemaResource
 import hydra.avro.util.AvroUtils
 import hydra.common.config.ConfigSupport
@@ -36,8 +35,6 @@ import scala.concurrent.{ExecutionContext, Future}
  */
 class AvroRecordFactory(schemaResourceLoader: ActorRef)
   extends KafkaRecordFactory[String, GenericRecord] with ConfigSupport {
-
-  val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
 
   //todo: config-driven
   private implicit val timeout = util.Timeout(3.seconds)
