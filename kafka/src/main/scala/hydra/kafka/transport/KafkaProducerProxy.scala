@@ -47,7 +47,6 @@ class KafkaProducerProxy[K, V](id: String, settings: ProducerSettings[K, V])
   private def produce(r: KafkaRecord[K, V], callback: Callback) = {
     Try(producer.send(r, callback)).recover {
       case e: Exception =>
-        log.error("Kafka Error", e)
         e.printStackTrace()
         callback.onCompletion(null, e)
     }
