@@ -1,6 +1,8 @@
 package hydra.avro.registry
 
+import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.typesafe.config.{Config, ConfigFactory}
+import hydra.common.logging.LoggingAdapter
 import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, MockSchemaRegistryClient, SchemaMetadata, SchemaRegistryClient}
 
 import scala.collection.JavaConverters._
@@ -10,7 +12,7 @@ import scalacache.guava.GuavaCache
 /**
   * Created by alexsilva on 7/6/17.
   */
-class ConfluentSchemaRegistry(val registryClient: SchemaRegistryClient, val registryUrl: String)
+case class ConfluentSchemaRegistry(registryClient: SchemaRegistryClient, registryUrl: String)
   extends SchemaRegistryComponent {
 
   def getAllSubjects()(implicit ec: ExecutionContext): Future[Seq[String]] =
@@ -24,11 +26,24 @@ class ConfluentSchemaRegistry(val registryClient: SchemaRegistryClient, val regi
   }
 }
 
-object ConfluentSchemaRegistry {
+object ConfluentSchemaRegistry extends LoggingAdapter {
 
   import configs.syntax._
-  import scalacache.modes.sync._
-  import scalacache._
+
+  private val cachedClients = CacheBuilder.newBuilder()
+    .build(
+      new CacheLoader[String, ConfluentSchemaRegistry] {
+        def load(url: String): ConfluentSchemaRegistry = {
+          log.debug(s"Creating new schema registry client for $url")
+          val client = if (url == "mock") {
+            mockRegistry
+          } else {
+            new CachedSchemaRegistryClient(url, 1000)
+          }
+          ConfluentSchemaRegistry(client, url)
+        }
+      }
+    )
 
   private[this] implicit val guavaCache = GuavaCache[ConfluentSchemaRegistry]
 
@@ -43,11 +58,8 @@ object ConfluentSchemaRegistry {
 
   def forConfig(path: String, config: Config = ConfigFactory.load()): ConfluentSchemaRegistry = {
     val usedConfig = if (path.isEmpty) config else config.getConfig(path)
-    val url = registryUrl(usedConfig)
-    sync.caching(url)(ttl = None) {
-      val identityMapCapacity = config.get[Int]("schema.registry.map.capacity").valueOrElse(1000)
-      val client = if (url == "mock") mockRegistry else new CachedSchemaRegistryClient(url, identityMapCapacity)
-      new ConfluentSchemaRegistry(client, url)
-    }
+    cachedClients.get(registryUrl(usedConfig))
   }
 }
+
+

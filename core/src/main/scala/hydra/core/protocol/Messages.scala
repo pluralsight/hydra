@@ -145,12 +145,15 @@ case object RequestPublished extends IngestorStatus {
 
 case class IngestorError(cause: Throwable) extends IngestorStatus with HydraError {
   override val completed = true
-  override val message = Option(cause.getCause).getOrElse(cause).getMessage
+   val rootError = Option(cause.getMessage).getOrElse("Unknown error.")
+  override val message = Option(cause.getCause).map(e => s"$rootError: ${e.getMessage}")
+    .getOrElse(rootError)
   val statusCode = StatusCodes.ServiceUnavailable
 }
 
 case class InvalidRequest(cause: Throwable) extends IngestorStatus with HydraError with MessageValidationResult {
   def this(msg: String) = this(new IllegalArgumentException(msg))
+
   override val completed = true
   override val message = Option(cause.getMessage).getOrElse("Unknown error.")
   val statusCode = StatusCodes.BadRequest
