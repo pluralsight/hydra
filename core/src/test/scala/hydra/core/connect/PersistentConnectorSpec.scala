@@ -33,7 +33,7 @@ akka.remote.artery.canonical.port=0""")
 
   val mediator = DistributedPubSub(system).mediator
   val ingestorProbe = TestProbe("ingestor")
-  mediator ! Subscribe(Settings.IngestTopicName, Some("test"), ingestorProbe.ref)
+  mediator ! Subscribe(Settings.HydraSettings.IngestTopicName, Some("test"), ingestorProbe.ref)
 
   override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 
