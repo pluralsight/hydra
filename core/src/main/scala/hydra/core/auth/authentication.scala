@@ -25,25 +25,18 @@ trait HydraAuthenticator {
 
   val challenge = HttpChallenge("Hydra", Some("Hydra"))
 
-  def auth(creds: HttpCredentials): Boolean
-
-  def allowIfNoCreds(): Boolean = false
+  def auth(credentials: Option[HttpCredentials]): Option[String]
 
   def authenticate(credentials: Option[HttpCredentials])
                   (implicit ec: ExecutionContext): Future[AuthenticationResult[String]] = {
     Future {
-      credentials match {
-        case Some(creds) if auth(creds) => Right(creds.scheme())
-        case _ => if (allowIfNoCreds) Right("Anonymous") else Left(challenge)
-      }
+      auth(credentials).map(Right(_)).getOrElse(Left(challenge))
     }
   }
 }
 
 class NoSecurityAuthenticator extends HydraAuthenticator {
-  override def auth(creds: HttpCredentials): Boolean = {
-    true
+  override def auth(creds: Option[HttpCredentials]): Option[String] = {
+    Some("Anonymous")
   }
-
-  override def allowIfNoCreds(): Boolean = true
 }

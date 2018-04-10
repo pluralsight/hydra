@@ -17,8 +17,8 @@ class AuthenticationDirectiveSpec extends Matchers
 
   override val ec = scala.concurrent.ExecutionContext.Implicits.global
 
-  def route(allowIfNoCreds: Boolean) = {
-    val authenticator = new TestAuthenticator(allowIfNoCreds)
+  def route = {
+    val authenticator = new TestAuthenticator()
     val route = Route.seal {
       path("secured") {
         authenticateWith(authenticator) { user =>
@@ -29,17 +29,8 @@ class AuthenticationDirectiveSpec extends Matchers
     route
   }
 
-  "The directive" should "deny auth when no creds are passed" in {
-    Get("/secured") ~> route(false) ~> check {
-      status shouldEqual StatusCodes.Unauthorized
-      responseAs[String] shouldEqual
-        "The resource requires authentication, which was not supplied with the request"
-      header[`WWW-Authenticate`].get.challenges.head shouldEqual HttpChallenge("Hydra", Some("Hydra"))
-    }
-  }
-
   it should "allow auth when no creds are passed if configured that way" in {
-    Get("/secured") ~> route(true) ~> check {
+    Get("/secured") ~> route ~> check {
       status shouldEqual StatusCodes.OK
       responseAs[String] shouldEqual "Anonymous"
     }
@@ -47,15 +38,15 @@ class AuthenticationDirectiveSpec extends Matchers
 
   it should "return a 200" in {
     val validCredentials = BasicHttpCredentials("John", "p4ssw0rd")
-    Get("/secured") ~> addCredentials(validCredentials) ~> route(false) ~> check {
+    Get("/secured") ~> addCredentials(validCredentials) ~> route ~> check {
       status shouldEqual StatusCodes.OK
-      responseAs[String] shouldEqual "Basic"
+      responseAs[String] shouldEqual "John"
     }
   }
 
   it should "return a 401" in {
     val badCredentials = BasicHttpCredentials("unknown", "p4ssw0rd")
-    Get("/secured") ~> addCredentials(badCredentials) ~> route(false) ~> check {
+    Get("/secured") ~> addCredentials(badCredentials) ~> route ~> check {
       status shouldEqual StatusCodes.Unauthorized
     }
   }
@@ -75,11 +66,14 @@ class AuthenticationDirectiveSpec extends Matchers
     }
   }
 
-  class TestAuthenticator(override val allowIfNoCreds: Boolean) extends HydraAuthenticator {
-    override def auth(creds: HttpCredentials): Boolean = {
-      val c = creds.asInstanceOf[BasicHttpCredentials]
-      c.username == "John"
+  class TestAuthenticator extends HydraAuthenticator {
+    override def auth(creds: Option[HttpCredentials]): Option[String] = {
+      creds match {
+        case Some(c) =>
+          val c1 = c.asInstanceOf[BasicHttpCredentials]
+          if (c1.username == "John") Some("John") else None
+        case None => Some("Anonymous")
+      }
     }
   }
-
 }

@@ -49,7 +49,6 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
   private val filterSystemTopics = (t: String) => (t.startsWith("_") && showSystemTopics) || !t.startsWith("_")
 
   override val route = cors(settings) {
-
     pathPrefix("transports" / "kafka") {
       handleExceptions(exceptionHandler) {
         authenticate { _ =>

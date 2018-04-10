@@ -10,13 +10,14 @@ class AuthenticationSpec extends Matchers
   with ScalaFutures {
 
   "The Authenticator" should "delegate auth" in {
-    val authenticator = new TestHydraAuthenticator()
+    val authenticator = new TestAuthenticator()
+
     whenReady(authenticator.authenticate(Some(new BasicHttpCredentials("test", "")))) { r =>
       r shouldBe Left(authenticator.challenge)
     }
 
     whenReady(authenticator.authenticate(Some(new BasicHttpCredentials("nice-user", "")))) { r =>
-      r shouldBe Right("Basic")
+      r shouldBe Right("nice-user")
     }
 
     whenReady(authenticator.authenticate(None)) { r =>
@@ -24,14 +25,18 @@ class AuthenticationSpec extends Matchers
     }
   }
   "The NoSecurityAuthenticator" should "always return true" in {
-    new NoSecurityAuthenticator().auth(new BasicHttpCredentials("test", "test")) shouldBe true
-    new NoSecurityAuthenticator().auth(new OAuth2BearerToken("test")) shouldBe true
+    new NoSecurityAuthenticator().auth(Some(new BasicHttpCredentials("test", "test"))) shouldBe Some("Anonymous")
+    new NoSecurityAuthenticator().auth(Some(new OAuth2BearerToken("test"))) shouldBe Some("Anonymous")
   }
-  
-  class TestHydraAuthenticator extends HydraAuthenticator {
-    override def auth(creds: HttpCredentials): Boolean = {
-      val c = creds.asInstanceOf[BasicHttpCredentials]
-      c.username == "nice-user"
+
+  class TestAuthenticator extends HydraAuthenticator {
+    override def auth(creds: Option[HttpCredentials]): Option[String] = {
+      creds match {
+        case Some(c) =>
+          val c1 = c.asInstanceOf[BasicHttpCredentials]
+          if (c1.username == "nice-user") Some("nice-user") else None
+        case None => None
+      }
     }
   }
 
