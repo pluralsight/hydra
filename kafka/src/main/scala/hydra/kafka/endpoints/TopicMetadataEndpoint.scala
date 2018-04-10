@@ -10,6 +10,7 @@ import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.common.util.ActorUtils
+import hydra.core.auth.AuthenticationDirectives
 import hydra.core.http.{CorsSupport, HydraDirectives, NotFoundException}
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{ListTopics, ListTopicsResponse}
@@ -27,9 +28,13 @@ import scalacache.modes.scalaFuture._
   *
   * Created by alexsilva on 3/18/17.
   */
-class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val e: ExecutionContext)
-  extends RoutedEndpoints with LoggingAdapter with HydraDirectives with HydraKafkaJsonSupport
-    with CorsSupport {
+class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: ExecutionContext)
+  extends RoutedEndpoints
+    with LoggingAdapter
+    with HydraDirectives
+    with HydraKafkaJsonSupport
+    with CorsSupport
+    with AuthenticationDirectives {
 
   private implicit val cache = GuavaCache[Map[String, Seq[PartitionInfo]]]
 
@@ -47,17 +52,19 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val e: Execut
 
     pathPrefix("transports" / "kafka") {
       handleExceptions(exceptionHandler) {
-        get {
-          path("topics") {
-            parameters('names ?) { n =>
-              n match {
-                case Some(_) => complete(topics.map(_.keys))
-                case None => complete(topics)
+        authenticate { _ =>
+          get {
+            path("topics") {
+              parameters('names ?) { n =>
+                n match {
+                  case Some(_) => complete(topics.map(_.keys))
+                  case None => complete(topics)
+                }
               }
-            }
-          } ~ path("topics" / Segment) { name =>
-            onSuccess(topics) { topics =>
-              topics.get(name).map(complete(_)).getOrElse(failWith(new NotFoundException(s"Topic $name not found.")))
+            } ~ path("topics" / Segment) { name =>
+              onSuccess(topics) { topics =>
+                topics.get(name).map(complete(_)).getOrElse(failWith(new NotFoundException(s"Topic $name not found.")))
+              }
             }
           }
         }
@@ -67,7 +74,7 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val e: Execut
 
   private def topics: Future[Map[String, Seq[PartitionInfo]]] = {
     implicit val timeout = Timeout(5 seconds)
-    cachingF("topics")(ttl=Some(30.seconds)) {
+    cachingF("topics")(ttl = Some(30.seconds)) {
       import akka.pattern.ask
       (consumerProxy ? ListTopics).mapTo[ListTopicsResponse].map { response =>
         response.topics.filter(t => filterSystemTopics(t._1)).map { case (k, v) => k -> v.toList }

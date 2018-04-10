@@ -41,7 +41,7 @@ trait Connector extends Actor with LoggingAdapter {
   }
 
   protected def publishRequest(request: HydraRequest): Publish = {
-    Publish(Settings.IngestTopicName, InitiateRequest(request, settings.requestTimeout), true)
+    Publish(Settings.HydraSettings.IngestTopicName, InitiateRequest(request, settings.requestTimeout), true)
   }
 
   protected def onIngestionError(r: IngestionReport) = {

@@ -21,7 +21,7 @@ class ConnectorSpec extends TestKit(ActorSystem("hydra",
 
   val mediator = DistributedPubSub(system).mediator
   val ingestor = TestProbe("ingestor")
-  mediator ! Subscribe(Settings.IngestTopicName, Some("test"), ingestor.ref)
+  mediator ! Subscribe(Settings.HydraSettings.IngestTopicName, Some("test"), ingestor.ref)
   val listener = TestProbe("listener")
   system.eventStream.subscribe(listener.ref, classOf[HydraConnectIngestError])
 

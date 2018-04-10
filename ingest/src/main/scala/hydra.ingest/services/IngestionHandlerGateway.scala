@@ -58,9 +58,10 @@ class IngestionHandlerGateway(registryPath: String) extends Actor with ActorLogg
   override def preStart(): Unit = {
     val isClustered = context.system.settings.ProviderClass == "akka.cluster.ClusterActorRefProvider"
     if (isClustered) {
-      log.debug("Initialized DistributedPubSub for {}", Settings.IngestTopicName)
+      log.debug("Initialized DistributedPubSub for {}", Settings.HydraSettings.IngestTopicName)
       val mediator = DistributedPubSub(context.system).mediator
-      mediator ! Subscribe(Settings.IngestTopicName, Some(IngestionHandlerGateway.GroupName), self)
+      mediator ! Subscribe(Settings.HydraSettings.IngestTopicName,
+        Some(IngestionHandlerGateway.GroupName), self)
     }
   }
 
