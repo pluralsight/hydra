@@ -54,13 +54,13 @@ class AuthenticationDirectiveSpec extends Matchers
   }
 
   it should "return a 401" in {
-    val validCredentials = BasicHttpCredentials("unknown", "p4ssw0rd")
-    Get("/secured") ~> addCredentials(validCredentials) ~> route(false) ~> check {
+    val badCredentials = BasicHttpCredentials("unknown", "p4ssw0rd")
+    Get("/secured") ~> addCredentials(badCredentials) ~> route(false) ~> check {
       status shouldEqual StatusCodes.Unauthorized
     }
   }
 
-  it should "user the configured authenticator" in {
+  it should "use the configured authenticator" in {
     val route = Route.seal {
       path("secured") {
         authenticate { user =>
