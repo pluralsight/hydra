@@ -27,12 +27,7 @@ class AuthenticationSpec extends Matchers
     new NoSecurityAuthenticator().auth(new BasicHttpCredentials("test", "test")) shouldBe true
     new NoSecurityAuthenticator().auth(new OAuth2BearerToken("test")) shouldBe true
   }
-
-  "The Hydra Auth" should "return true for now" in {
-    new TestHydraAuthenticator().auth(new BasicHttpCredentials("test", "test")) shouldBe true
-    new TestHydraAuthenticator().auth(new OAuth2BearerToken("test")) shouldBe true
-  }
-
+  
   class TestHydraAuthenticator extends HydraAuthenticator {
     override def auth(creds: HttpCredentials): Boolean = {
       val c = creds.asInstanceOf[BasicHttpCredentials]
