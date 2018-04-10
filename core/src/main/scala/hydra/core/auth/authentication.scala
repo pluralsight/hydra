@@ -40,12 +40,6 @@ trait HydraAuthenticator {
   }
 }
 
-class HydraOAuthAuthenticator extends HydraAuthenticator {
-  def auth(creds: HttpCredentials): Boolean = {
-    true
-  }
-}
-
 class NoSecurityAuthenticator extends HydraAuthenticator {
   override def auth(creds: HttpCredentials): Boolean = {
     true
