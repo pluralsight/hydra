@@ -116,10 +116,10 @@ class SchemaResourceLoaderSpec extends Matchers
       whenReady(loader.retrieveSchema(testSchema.getFullName)) { schemaResource =>
         schemaResource.schema shouldBe testSchema
       }
-      Thread.sleep(500) // force a metadata expire
-
-      whenReady(loader.retrieveSchema(testSchema.getFullName)) { schemaResource =>
-        (schemaResource.schema eq testSchema) shouldBe true
+      eventually {
+        whenReady(loader.retrieveSchema(testSchema.getFullName)) { schemaResource =>
+          (schemaResource.schema eq testSchema) shouldBe true
+        }
       }
     }
 

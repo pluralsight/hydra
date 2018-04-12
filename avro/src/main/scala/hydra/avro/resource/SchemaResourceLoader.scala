@@ -66,7 +66,7 @@ class SchemaResourceLoader(registryUrl: String,
     val subject = schemaResource.schema.getFullName.withSuffix
     Future.sequence {
       Seq(
-        schemaCache.put(schemaResource.id, schemaResource.version)(schemaResource.schema, ttl = None),
+        schemaCache.put(schemaResource.id)(schemaResource.schema, ttl = None),
         put(subject)(schemaResource, ttl = Some(metadataCheckInterval)),
         put(subject, schemaResource.version)(schemaResource, ttl = None))
     }.map(_ => schemaResource)
@@ -76,7 +76,7 @@ class SchemaResourceLoader(registryUrl: String,
     cachingF(subject)(ttl = Some(metadataCheckInterval)) {
       log.debug(s"Fetching latest metadata for $subject")
       Future(registry.getLatestSchemaMetadata(subject)).flatMap { md =>
-        schemaCache.caching(md.getId, md.getVersion)(ttl = None) { //the schema itself is immutable and never expires
+        schemaCache.caching(md.getId)(ttl = None) { //the schema itself is immutable and never expires
           log.debug(s"Caching new schema $subject [version=${md.getVersion} id=${md.getId}]")
           new Schema.Parser().parse(md.getSchema)
         }.map(SchemaResource(md.getId, md.getVersion, _))
