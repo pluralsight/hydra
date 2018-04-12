@@ -64,13 +64,13 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
 
   def loadSchemaIntoCache(schemaResource: SchemaResource)(implicit ec: ExecutionContext): Future[SchemaResource] = {
     val subject = schemaResource.schema.getFullName.withSuffix
-    Future.sequence(Seq(put(subject)(schemaResource, ttl = Some(5.minutes)),
+    Future.sequence(Seq(put(subject)(schemaResource, ttl = Some(1.seconds)),
       put(subject, schemaResource.version)(schemaResource, ttl = None)))
       .map(_ => schemaResource)
   }
 
   private def getLatestSchema(subject: String)(implicit ec: ExecutionContext): Future[SchemaResource] = {
-    cachingF(subject)(ttl = Some(5.minutes)) {
+    cachingF(subject)(ttl = Some(1.seconds)) {
       log.debug(s"Fetching latest $subject schema")
        Future(registry.getLatestSchemaMetadata(subject)).map(toSchemaResource)
         .recoverWith {

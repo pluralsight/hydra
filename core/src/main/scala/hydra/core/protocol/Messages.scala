@@ -44,7 +44,13 @@ case class GenericIngestionError(ingestor: String,
                                  cause: Throwable,
                                  request: HydraRequest,
                                  statusCode: Int,
-                                 time: DateTime = DateTime.now) extends IngestionError
+                                 time: DateTime = DateTime.now) extends IngestionError {
+
+  private val rootError = Option(cause.getMessage).getOrElse("Unknown error.")
+
+  val errorMessage = Option(cause.getCause).map(e => s"$rootError: ${e.getMessage}")
+    .getOrElse(rootError)
+}
 
 /**
   * Event emitted into the ActorSystem
@@ -145,7 +151,7 @@ case object RequestPublished extends IngestorStatus {
 
 case class IngestorError(cause: Throwable) extends IngestorStatus with HydraError {
   override val completed = true
-   val rootError = Option(cause.getMessage).getOrElse("Unknown error.")
+  val rootError = Option(cause.getMessage).getOrElse("Unknown error.")
   override val message = Option(cause.getCause).map(e => s"$rootError: ${e.getMessage}")
     .getOrElse(rootError)
   val statusCode = StatusCodes.ServiceUnavailable

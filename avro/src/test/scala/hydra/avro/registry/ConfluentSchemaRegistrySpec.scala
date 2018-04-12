@@ -19,12 +19,16 @@ import com.typesafe.config.ConfigFactory
 import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, MockSchemaRegistryClient}
 import org.apache.avro.Schema
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers, PrivateMethodTester}
 
 /**
   * Created by alexsilva on 9/16/16.
   */
-class ConfluentSchemaRegistrySpec extends Matchers with FunSpecLike with BeforeAndAfterAll with ScalaFutures {
+class ConfluentSchemaRegistrySpec extends Matchers
+  with FunSpecLike
+  with BeforeAndAfterAll
+  with ScalaFutures
+  with PrivateMethodTester {
 
   private var id = 0
 
@@ -55,8 +59,31 @@ class ConfluentSchemaRegistrySpec extends Matchers with FunSpecLike with BeforeA
 
     it("uses a config path") {
       val c = ConfluentSchemaRegistry
-        .forConfig("hydra", ConfigFactory.parseString("hydra.schema.registry.url=\"http://localhost:9092\""))
+        .forConfig(ConfigFactory.parseString("schema.registry.url=\"http://localhost:9092\""))
       c.registryUrl shouldBe "http://localhost:9092"
+    }
+
+    it("returns the same client from the cache") {
+      val c = ConfluentSchemaRegistry
+        .forConfig(ConfigFactory.parseString("schema.registry.url=\"http://localhost:12345\""))
+
+      val c1 = ConfluentSchemaRegistry
+        .forConfig(ConfigFactory.parseString("schema.registry.url=\"http://localhost:12345\""))
+
+      (c eq c1) shouldBe true
+    }
+
+    it("reads max.schemas.per.subject from config") {
+      val config = ConfigFactory.parseString(
+        """
+          |schema.registry.url="http://localhost:4455"
+          |max.schemas.per.subject=1234
+        """.stripMargin)
+
+      val client = ConfluentSchemaRegistry.forConfig(config).registryClient
+      val field = client.getClass.getDeclaredField("identityMapCapacity")
+      field.setAccessible(true)
+      assert(1234 === field.get(client))
     }
 
     it("returns all subjects") {
@@ -78,13 +105,13 @@ class ConfluentSchemaRegistrySpec extends Matchers with FunSpecLike with BeforeA
     it("throws an error if no config key is found") {
       val config = ConfigFactory.empty
       intercept[IllegalArgumentException] {
-        ConfluentSchemaRegistry.forConfig("", config)
+        ConfluentSchemaRegistry.forConfig(config)
       }
     }
 
     it("returns a cached client when using a url") {
       val config = ConfigFactory.parseString("schema.registry.url=\"http://localhost:9092\"")
-      ConfluentSchemaRegistry.forConfig("", config).registryClient shouldBe a[CachedSchemaRegistryClient]
+      ConfluentSchemaRegistry.forConfig(config).registryClient shouldBe a[CachedSchemaRegistryClient]
       ConfluentSchemaRegistry.registryUrl(config) shouldBe "http://localhost:9092"
     }
   }
