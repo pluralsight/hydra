@@ -7,7 +7,6 @@ import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, Moc
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
-import scalacache.guava.GuavaCache
 
 /**
   * Created by alexsilva on 7/6/17.
@@ -30,35 +29,31 @@ object ConfluentSchemaRegistry extends LoggingAdapter {
 
   import configs.syntax._
 
+  case class SchemaRegistryClientInfo(url: String, schemaRegistryMaxCapacity: Int)
+
   private val cachedClients = CacheBuilder.newBuilder()
     .build(
-      new CacheLoader[String, ConfluentSchemaRegistry] {
-        def load(url: String): ConfluentSchemaRegistry = {
-          log.debug(s"Creating new schema registry client for $url")
-          val client = if (url == "mock") {
+      new CacheLoader[SchemaRegistryClientInfo, ConfluentSchemaRegistry] {
+        def load(info: SchemaRegistryClientInfo): ConfluentSchemaRegistry = {
+          log.debug(s"Creating new schema registry client for ${info.url}")
+          val client = if (info.url == "mock") {
             mockRegistry
           } else {
-            new CachedSchemaRegistryClient(url, 1000)
+            new CachedSchemaRegistryClient(info.url, info.schemaRegistryMaxCapacity)
           }
-          ConfluentSchemaRegistry(client, url)
+          ConfluentSchemaRegistry(client, info.url)
         }
       }
     )
-
-  private[this] implicit val guavaCache = GuavaCache[ConfluentSchemaRegistry]
 
   val mockRegistry = new MockSchemaRegistryClient()
 
   def registryUrl(config: Config) = config.get[String]("schema.registry.url")
     .valueOrThrow(_ => new IllegalArgumentException("A schema registry url is required."))
 
-  def forConfig(config: Config): ConfluentSchemaRegistry = {
-    forConfig("", config)
-  }
-
-  def forConfig(path: String, config: Config = ConfigFactory.load()): ConfluentSchemaRegistry = {
-    val usedConfig = if (path.isEmpty) config else config.getConfig(path)
-    cachedClients.get(registryUrl(usedConfig))
+  def forConfig(config: Config = ConfigFactory.load()): ConfluentSchemaRegistry = {
+    val identityMapCapacity = config.get[Int]("max.schemas.per.subject").valueOrElse(1000)
+    cachedClients.get(SchemaRegistryClientInfo(registryUrl(config), identityMapCapacity))
   }
 }
 

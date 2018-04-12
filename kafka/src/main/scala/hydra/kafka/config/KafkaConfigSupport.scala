@@ -28,6 +28,5 @@ object KafkaConfigSupport extends ConfigSupport {
 
   val bootstrapServers = kafkaConfig.getString("kafka.producer.bootstrap.servers")
 
-  val schemaRegistryUrl = applicationConfig.getString("schema.registry.url")
-
+  val schemaRegistryUrl:String = applicationConfig.getString("schema.registry.url")
 }

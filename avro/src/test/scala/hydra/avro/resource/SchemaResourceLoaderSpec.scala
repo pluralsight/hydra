@@ -17,20 +17,24 @@ package hydra.avro.resource
 
 import hydra.avro.registry.SchemaRegistryException
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
-import org.apache.avro.Schema
-import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.time.{ Millis, Seconds, Span }
-import org.scalatest.{ BeforeAndAfterAll, FunSpecLike, Matchers }
+import org.apache.avro.{Schema, SchemaBuilder}
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import org.scalatest.time.{Millis, Seconds, Span}
+import org.scalatest.{BeforeAndAfterEach, FunSpecLike, Matchers}
 
+import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 import scala.io.Source
+import scalacache.modes.sync._
 
 /**
- * Created by alexsilva on 1/20/17.
- */
+  * Created by alexsilva on 1/20/17.
+  */
 class SchemaResourceLoaderSpec extends Matchers
   with FunSpecLike
-  with BeforeAndAfterAll
+  with BeforeAndAfterEach
+  with Eventually
   with ScalaFutures {
 
   implicit override val patienceConfig =
@@ -39,6 +43,8 @@ class SchemaResourceLoaderSpec extends Matchers
   val schemaParser = new Schema.Parser()
   val testSchema = schemaParser.parse(Source.fromResource("resource-loader-spec.avsc").mkString)
   val subject = testSchema.getFullName
+
+  override def beforeEach = SchemaResourceLoader.schemaCache.removeAll()
 
   def fixture() = {
     val client = new MockSchemaRegistryClient
@@ -101,5 +107,52 @@ class SchemaResourceLoaderSpec extends Matchers
         schemaResource.schema shouldBe testSchema
       }
     }
+
+    it("returns the same underlying schema instance if the registry metadata hasn't changed") {
+      val client = new MockSchemaRegistryClient
+      client.register(testSchema.getFullName + "-value", testSchema)
+      val loader = new SchemaResourceLoader("http://localhost:48223", client,
+        metadataCheckInterval = 5.millis)
+      whenReady(loader.retrieveSchema(testSchema.getFullName)) { schemaResource =>
+        schemaResource.schema shouldBe testSchema
+      }
+      eventually {
+        whenReady(loader.retrieveSchema(testSchema.getFullName)) { schemaResource =>
+          (schemaResource.schema eq testSchema) shouldBe true
+        }
+      }
+    }
+
+    it("updates the underlying schema instance when the registry metadata changes") {
+      val nschema = newSchema(testSchema.getNamespace, "ntest")
+      val client = new MockSchemaRegistryClient
+      client.register(nschema.getFullName + "-value", nschema)
+      val loader = new SchemaResourceLoader("http://localhost:48223", client,
+        metadataCheckInterval = 5.millis)
+      whenReady(loader.retrieveSchema(nschema.getFullName)) { schemaResource =>
+        schemaResource.schema shouldBe nschema
+      }
+
+      //evolve the schema
+      val field = new Schema.Field("new_field", SchemaBuilder.builder().intType(), "NewField", 10)
+      val fields = nschema.getFields.asScala.map { f =>
+        new Schema.Field(f.name(), f.schema(), f.doc(), f.defaultVal())
+      } :+ field
+      val evolvedSchema = Schema.createRecord(nschema.getName(),
+        "evolve", nschema.getNamespace(), false, fields.asJava)
+      client.register(nschema.getFullName + "-value", evolvedSchema)
+      eventually {
+        whenReady(loader.retrieveSchema(nschema.getFullName)) { schemaResource =>
+          (schemaResource.schema eq nschema) shouldBe false
+        }
+      }
+    }
+  }
+
+  private def newSchema(namespace: String, name: String): Schema = {
+    val fields = testSchema.getFields.asScala.map { f =>
+      new Schema.Field(f.name(), f.schema(), f.doc(), f.defaultVal())
+    }
+    Schema.createRecord(name, "evolve", namespace, false, fields.asJava)
   }
 }

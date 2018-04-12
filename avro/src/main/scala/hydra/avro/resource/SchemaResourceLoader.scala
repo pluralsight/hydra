@@ -41,14 +41,14 @@ import scalacache.modes.scalaFuture._
   * @param registry
   * @param suffix
   */
-class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
-                           suffix: String = "-value") {
+class SchemaResourceLoader(registryUrl: String,
+                           registry: SchemaRegistryClient,
+                           suffix: String = "-value",
+                           metadataCheckInterval: FiniteDuration = 1 minute) {
 
   import SchemaResourceLoader._
 
   private implicit val guava = SchemaResourceLoader.cache
-
-  private val defaultCacheTtl = Some(5.minutes)
 
   def retrieveSchema(subject: String, version: Int)(implicit ec: ExecutionContext): Future[SchemaResource] = {
     loadFromCache(subject.withSuffix, version.toString)
@@ -62,21 +62,30 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
     }
   }
 
-  def loadSchemaIntoCache(schemaResource: SchemaResource)(implicit ec: ExecutionContext): Future[SchemaResource] = {
+  def loadSchemaIntoCache(schemaResource: SchemaResource)
+                         (implicit ec: ExecutionContext): Future[SchemaResource] = {
+    require(schemaResource.id > 0, "A schema id is required.")
     val subject = schemaResource.schema.getFullName.withSuffix
-    Future.sequence(Seq(put(subject)(schemaResource, ttl = Some(5.minutes)),
-      put(subject, schemaResource.version)(schemaResource, ttl = None)))
-      .map(_ => schemaResource)
+    Future.sequence {
+      Seq(
+        schemaCache.put(schemaResource.id)(schemaResource.schema, ttl = None),
+        put(subject)(schemaResource, ttl = Some(metadataCheckInterval)),
+        put(subject, schemaResource.version)(schemaResource, ttl = None))
+    }.map(_ => schemaResource)
   }
 
   private def getLatestSchema(subject: String)(implicit ec: ExecutionContext): Future[SchemaResource] = {
-    cachingF(subject)(ttl = Some(5.minutes)) {
-      log.debug(s"Fetching latest $subject schema")
-       Future(registry.getLatestSchemaMetadata(subject)).map(toSchemaResource)
-        .recoverWith {
-          case e: ConnectException => throw e
-          case e: Exception => throw new SchemaRegistryException(e, subject)
-        }
+    cachingF(subject)(ttl = Some(metadataCheckInterval)) {
+      log.debug(s"Fetching latest metadata for $subject")
+      Future(registry.getLatestSchemaMetadata(subject)).flatMap { md =>
+        schemaCache.caching(md.getId)(ttl = None) { //the schema itself is immutable and never expires
+          log.debug(s"Caching new schema $subject [version=${md.getVersion} id=${md.getId}]")
+          new Schema.Parser().parse(md.getSchema)
+        }.map(SchemaResource(md.getId, md.getVersion, _))
+      }.recoverWith {
+        case e: ConnectException => throw e
+        case e: Exception => throw new SchemaRegistryException(e, subject)
+      }
     }
   }
 
@@ -114,5 +123,11 @@ class SchemaResourceLoader(registryUrl: String, registry: SchemaRegistryClient,
 
 object SchemaResourceLoader {
   val log = LoggerFactory.getLogger(getClass)
+
   val cache = GuavaCache[SchemaResource]
+
+  //we need to cache the schemas once and only once, otherwise CachedSchemaRegistryClient used
+  // by Confluent inside the KafkaProducer will eventually break once we return more schemas
+  // than max.schemas.per.subject.
+  val schemaCache = GuavaCache[Schema]
 }
