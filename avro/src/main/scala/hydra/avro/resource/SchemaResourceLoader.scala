@@ -62,7 +62,9 @@ class SchemaResourceLoader(registryUrl: String,
     }
   }
 
-  def loadSchemaIntoCache(schemaResource: SchemaResource)(implicit ec: ExecutionContext): Future[SchemaResource] = {
+  def loadSchemaIntoCache(schemaResource: SchemaResource)
+                         (implicit ec: ExecutionContext): Future[SchemaResource] = {
+    require(schemaResource.id > 0, "A schema id is required.")
     val subject = schemaResource.schema.getFullName.withSuffix
     Future.sequence {
       Seq(
