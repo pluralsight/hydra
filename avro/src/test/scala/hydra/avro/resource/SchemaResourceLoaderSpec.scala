@@ -116,6 +116,9 @@ class SchemaResourceLoaderSpec extends Matchers
       whenReady(loader.retrieveSchema(testSchema.getFullName)) { schemaResource =>
         schemaResource.schema shouldBe testSchema
       }
+
+      Thread.sleep(200)
+
       eventually {
         whenReady(loader.retrieveSchema(testSchema.getFullName)) { schemaResource =>
           (schemaResource.schema eq testSchema) shouldBe true
