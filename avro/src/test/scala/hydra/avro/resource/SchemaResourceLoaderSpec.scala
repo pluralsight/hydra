@@ -125,7 +125,6 @@ class SchemaResourceLoaderSpec extends Matchers
 
     it("updates the underlying schema instance when the registry metadata changes") {
       val nschema = newSchema(testSchema.getNamespace, "ntest")
-      println(nschema.getFullName)
       val client = new MockSchemaRegistryClient
       client.register(nschema.getFullName + "-value", nschema)
       val loader = new SchemaResourceLoader("http://localhost:48223", client,
