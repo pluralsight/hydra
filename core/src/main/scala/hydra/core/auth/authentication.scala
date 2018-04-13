@@ -25,18 +25,20 @@ trait HydraAuthenticator {
 
   val challenge = HttpChallenge("Hydra", Some("Hydra"))
 
-  def auth(credentials: Option[HttpCredentials]): Option[String]
+  def auth(credentials: Option[HttpCredentials]): Future[String]
 
   def authenticate(credentials: Option[HttpCredentials])
                   (implicit ec: ExecutionContext): Future[AuthenticationResult[String]] = {
-    Future {
-      auth(credentials).map(Right(_)).getOrElse(Left(challenge))
-    }
+    auth(credentials)
+      .map(Right(_))
+      .recover {
+        case _: Throwable => Left(challenge)
+      }
   }
 }
 
 class NoSecurityAuthenticator extends HydraAuthenticator {
-  override def auth(creds: Option[HttpCredentials]): Option[String] = {
-    Some("Anonymous")
+  override def auth(creds: Option[HttpCredentials]): Future[String] = {
+    Future.successful("Anonymous")
   }
 }
