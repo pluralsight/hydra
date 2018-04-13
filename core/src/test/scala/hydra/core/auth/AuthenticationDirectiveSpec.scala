@@ -1,12 +1,13 @@
 package hydra.core.auth
 
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.headers.{BasicHttpCredentials, HttpChallenge, HttpCredentials}
+import akka.http.scaladsl.model.headers.{BasicHttpCredentials, HttpCredentials}
 import akka.http.scaladsl.server.{Directives, Route}
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FlatSpecLike, Matchers}
-import akka.http.scaladsl.model.headers._
+
+import scala.concurrent.Future
 
 class AuthenticationDirectiveSpec extends Matchers
   with FlatSpecLike
@@ -67,12 +68,12 @@ class AuthenticationDirectiveSpec extends Matchers
   }
 
   class TestAuthenticator extends HydraAuthenticator {
-    override def auth(creds: Option[HttpCredentials]): Option[String] = {
+    override def auth(creds: Option[HttpCredentials]): Future[String] = {
       creds match {
         case Some(c) =>
           val c1 = c.asInstanceOf[BasicHttpCredentials]
-          if (c1.username == "John") Some("John") else None
-        case None => Some("Anonymous")
+          if (c1.username == "John") Future.successful("John") else Future.failed(new RuntimeException())
+        case None => Future.successful("Anonymous")
       }
     }
   }

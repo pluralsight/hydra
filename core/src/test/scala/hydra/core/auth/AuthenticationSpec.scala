@@ -27,8 +27,12 @@ class AuthenticationSpec extends Matchers
     }
   }
   "The NoSecurityAuthenticator" should "always return true" in {
-    new NoSecurityAuthenticator().auth(Some(new BasicHttpCredentials("test", "test"))) shouldBe Future.successful("Anonymous")
-    new NoSecurityAuthenticator().auth(Some(new OAuth2BearerToken("test"))) shouldBe Future.successful("Anonymous")
+    whenReady(new NoSecurityAuthenticator().auth(Some(new BasicHttpCredentials("test", "test")))) { f =>
+      f shouldBe "Anonymous"
+    }
+    whenReady(new NoSecurityAuthenticator().auth(Some(new OAuth2BearerToken("test")))) { f =>
+      f shouldBe "Anonymous"
+    }
   }
 
   class TestAuthenticator extends HydraAuthenticator {
