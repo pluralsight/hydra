@@ -8,31 +8,31 @@ import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
+import scala.util.Success
 
 
 
-class HydraAuthenticationClient(implicit sys: ActorSystem, ec: ExecutionContext) extends HydraAuthenticator
+abstract class HydraAuthenticationClient(implicit sys: ActorSystem, ec: ExecutionContext) extends HydraAuthenticator
   with LoggingAdapter {
-  override def auth(credentials: Option[HttpCredentials]): Option[String] = {
-    import HydraAuthenticationClient._
-
-    val token = credentials match {
-      case Some(creds) => creds.token
-      case None => ""
-    }
-
-    val response = Http().singleRequest(buildRequest(token))
-
-    var result: Option[String] = None
-
-    response.onComplete {
-      case Success(_) => result = Some("joe")
-      case _ => result = None
-    }
-
-    result
-  }
+//  override def auth(credentials: Option[HttpCredentials]): Future[String] = {
+//    import HydraAuthenticationClient._
+//
+//    val token = credentials match {
+//      case Some(creds) => creds.token
+//      case None => ""
+//    }
+//
+//    val response: Future[HttpResponse] = Http().singleRequest(buildRequest(token))
+//
+//    var result: Option[String] = None
+//
+//    response.onComplete {
+//      case Success(resp) => result = Some(parseResponse(resp))
+//      case _ => result = None
+//    }
+//
+//    result
+//  }
 }
 
 
