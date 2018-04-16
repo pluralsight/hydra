@@ -17,12 +17,12 @@ import kafka.utils.ZkUtils
 import org.I0Itec.zkclient.ZkClient
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.protocol.ApiKeys
-import org.apache.kafka.common.requests.{CreateTopicsRequest, CreateTopicsResponse, RequestHeader, ResponseHeader}
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
+import org.apache.kafka.common.requests.{CreateTopicsRequest, CreateTopicsResponse, RequestHeader, ResponseHeader}
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Map
-import scala.util.{Failure, Random, Try}
+import scala.util.{Random, Try}
 
 /**
   * Created by alexsilva on 5/17/17.
@@ -51,17 +51,13 @@ case class KafkaUtils(zkString: String, client: () => ZkClient) extends LoggingA
 
   def createTopics(topics: Map[String, TopicDetails], timeout: Int): Try[CreateTopicsResponse] = {
     //check for existence first
-    val existsCheck = withRunningZookeeper { zk =>
-      topics.keys.map { topic =>
-        topic -> AdminUtils.topicExists(zk, topic)
-      }.toMap
-    }.collect { case x => x.filter(_._2) }.getOrElse(Map.empty)
-
-    if (existsCheck.headOption.isDefined) {
-      Failure(new IllegalArgumentException(s"Topic ${existsCheck.head._1} already exists."))
-    }
-    else {
-      topics.keys.map(t => t -> topicExists(t)).filter(tp => tp._2.get)
+    withRunningZookeeper { zk =>
+      topics.keys.foreach { topic =>
+        if (AdminUtils.topicExists(zk, topic)) {
+          throw new IllegalArgumentException(s"Topic $topic already exist.")
+        }
+      }
+    }.flatMap { _ => //accounts for topic exists or zookeeper connection error
       val builder = new CreateTopicsRequest.Builder(topics.asJava, timeout, false)
       val broker = Random.shuffle(KafkaConfigSupport.bootstrapServers.split(",").toSeq).head
       createTopicResponse(builder.build(), broker)
