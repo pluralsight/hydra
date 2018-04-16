@@ -1,12 +1,13 @@
 package hydra.sql
 
-import java.sql.BatchUpdateException
+import java.sql.{BatchUpdateException, Connection}
 
 import com.zaxxer.hikari.HikariDataSource
 import hydra.avro.io.SaveMode.SaveMode
 import hydra.avro.io._
 import hydra.avro.util.{AvroUtils, SchemaWrapper}
 import hydra.common.util.TryWith
+import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
 import org.slf4j.LoggerFactory
 
@@ -24,7 +25,7 @@ import scala.util.control.NonFatal
   * may have been provided by the schema.
   *
   * @param dataSource      The datasource to be used
-  * @param schema   The initial schema to use when creating/updating/inserting records.
+  * @param schema          The initial schema to use when creating/updating/inserting operations.
   * @param mode            See [hydra.avro.io.SaveMode]
   * @param dialect         The jdbc dialect to use.
   * @param dbSyntax        THe database syntax to use.
@@ -43,7 +44,7 @@ class JdbcRecordWriter(val dataSource: HikariDataSource,
 
   private val tableId = tableIdentifier.getOrElse(TableIdentifier(schema.getName))
 
-  private val records = new mutable.ArrayBuffer[GenericRecord]()
+  private val operations = new mutable.ArrayBuffer[Operation]()
 
   private var currentSchema = schema
 
@@ -65,9 +66,11 @@ class JdbcRecordWriter(val dataSource: HikariDataSource,
 
   private var valueSetter = new AvroValueSetter(schema, dialect)
 
-  private var upsertStmt = dialect.upsert(dbSyntax.format(name), schema, dbSyntax)
+  private val tableName = dbSyntax.format(name)
 
-  // private val deleteStmt = dialect.deleteStatement(dbSyntax.format(name),, dbSyntax)
+  private var upsertStmt = dialect.upsert(tableName, schema, dbSyntax)
+
+  private val deleteStmt = dialect.deleteStatement(tableName, schema.primaryKeys, dbSyntax)
 
   private var _conn = dataSource.getConnection
 
@@ -80,22 +83,28 @@ class JdbcRecordWriter(val dataSource: HikariDataSource,
 
   override def batch(operation: Operation): Unit = {
     operation match {
-      case Upsert(record) => add(record)
-      case Delete(schema, fields) => //TODO: implement delete
+      case Upsert(record) => addUpsert(record)
+      case d@Delete(_) => addDelete(d)
+
     }
   }
 
-  private def add(record: GenericRecord): Unit = {
+  private def addDelete(delete: Delete): Unit = {
+    operations += delete
+    if (batchSize > 0 && operations.size >= batchSize) flush()
+  }
+
+  private def addUpsert(record: GenericRecord): Unit = {
     if (AvroUtils.areEqual(currentSchema.schema, record.getSchema)) {
-      records += record
-      if (batchSize > 0 && records.size >= batchSize) flush()
+      operations += Upsert(record)
+      if (batchSize > 0 && operations.size >= batchSize) flush()
     }
     else {
-      // Each batch needs to have the same dbInfo, so get the buffered records out, reset state if possible,
+      // Each batch needs to have the same dbInfo, so get the buffered operations out, reset state if possible,
       // add columns and re-attempt the add
       flush()
       updateDb(record)
-      add(record)
+      addUpsert(record)
     }
   }
 
@@ -126,10 +135,17 @@ class JdbcRecordWriter(val dataSource: HikariDataSource,
     }
   }
 
+  private def delete(fields: Map[Schema.Field, AnyRef]): Unit = {
+    TryWith(connection.prepareStatement(deleteStmt)) { pstmt =>
+      valueSetter.bind(currentSchema.schema, fields, pstmt)
+      pstmt.executeUpdate()
+    }.get //todo: error handling
+  }
+
   override def execute(operation: Operation): Unit = {
     operation match {
       case Upsert(record) => upsert(record)
-      case Delete(schema, fields) => throw new UnsupportedOperationException("Not supported")
+      case Delete(fields) => delete(fields)
     }
   }
 
@@ -150,10 +166,12 @@ class JdbcRecordWriter(val dataSource: HikariDataSource,
       if (supportsTransactions) {
         conn.setAutoCommit(false) // Everything in the same db transaction.
       }
-      val pstmt = conn.prepareStatement(upsertStmt)
-      records.foreach(valueSetter.bind(_, pstmt))
+
+      val stmts = doBind(conn, operations)
+
       try {
-        pstmt.executeBatch()
+        stmts._1.executeBatch()
+        stmts._2.executeBatch()
         if (supportsTransactions) {
           conn.commit()
         }
@@ -169,12 +187,24 @@ class JdbcRecordWriter(val dataSource: HikariDataSource,
           conn.rollback()
         }
       }
-      records.clear()
+      operations.clear()
     }
   }
 
   def close(): Unit = {
     flush()
+  }
+
+  private def doBind(conn: Connection, ops: Seq[Operation]) = {
+    val pstmt = conn.prepareStatement(upsertStmt)
+    val dstmt = conn.prepareStatement(deleteStmt) //todo: can we avoid creating this?
+    operations.foreach { op =>
+      op match {
+        case Upsert(record) => valueSetter.bind(record, pstmt)
+        case Delete(fields) => valueSetter.bind(currentSchema.schema, fields, dstmt)
+      }
+    }
+    (pstmt, dstmt)
   }
 }
 

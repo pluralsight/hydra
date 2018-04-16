@@ -169,7 +169,6 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       val binder = new AvroValueSetter(schema, PostgresDialect)
       binder.fieldTypes shouldBe schema.getFields
         .map(f => f -> JdbcUtils.getJdbcType(f.schema(), PostgresDialect)).toMap
-
     }
 
     it("gets upsert fields from the dialect") {
@@ -179,7 +178,7 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
           |	"type": "record",
           |	"name": "FlushTest",
           |	"namespace": "hydra",
-          | "key":"id",
+          | "hydra.key":"id",
           |	"fields": [{
           |			"name": "id",
           |			"type": "int",
@@ -199,5 +198,4 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
 
     }
   }
-
 }

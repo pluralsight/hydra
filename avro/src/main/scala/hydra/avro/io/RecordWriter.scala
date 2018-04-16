@@ -3,7 +3,6 @@ package hydra.avro.io
 import hydra.avro.io.SaveMode.SaveMode
 import hydra.avro.util.SchemaWrapper
 import org.apache.avro.Schema
-import org.apache.avro.Schema.Field
 import org.apache.avro.generic.GenericRecord
 
 /**
@@ -61,4 +60,4 @@ sealed trait Operation
 
 case class Upsert(record: GenericRecord) extends Operation
 
-case class Delete(schema: Schema, keys: Map[Field, AnyRef]) extends Operation
+case class Delete(values: Map[Schema.Field, AnyRef]) extends Operation

@@ -310,6 +310,6 @@ class JdbcRecordWriterSpec extends Matchers
 
     val writer = new JdbcRecordWriter(ds,
       SchemaWrapper.from(new Schema.Parser().parse(schemaStr)), batchSize = 2, dialect = H2Dialect)
-    writer.batch(Delete(new Schema.Parser().parse(schemaStr), Map.empty))
+    writer.batch(Delete(Map.empty))
   }
 }
