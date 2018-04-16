@@ -1,24 +1,33 @@
 package hydra.kafka.util
 
+import java.io.{DataInputStream, DataOutputStream}
+import java.net.Socket
+import java.nio.ByteBuffer
+
 import akka.kafka.{ConsumerSettings, ProducerSettings}
 import com.typesafe.config.{Config, ConfigFactory}
 import configs.syntax._
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
+import hydra.common.util.TryWith
 import hydra.kafka.config.KafkaConfigSupport
+import hydra.kafka.util.KafkaUtils.requestAndReceive
 import kafka.admin.AdminUtils
 import kafka.utils.ZkUtils
 import org.I0Itec.zkclient.ZkClient
 import org.apache.kafka.clients.consumer.ConsumerConfig
+import org.apache.kafka.common.protocol.ApiKeys
+import org.apache.kafka.common.requests.{CreateTopicsRequest, CreateTopicsResponse, RequestHeader, ResponseHeader}
+import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Map
-import scala.util.Try
+import scala.util.{Failure, Random, Try}
 
 /**
   * Created by alexsilva on 5/17/17.
   */
-case class KafkaUtils(zkString:String, client: () => ZkClient) extends LoggingAdapter
+case class KafkaUtils(zkString: String, client: () => ZkClient) extends LoggingAdapter
   with ConfigSupport {
 
   private[kafka] var zkUtils = Try(client.apply()).map(ZkUtils(_, false))
@@ -35,6 +44,47 @@ case class KafkaUtils(zkString:String, client: () => ZkClient) extends LoggingAd
   def topicExists(name: String): Try[Boolean] = withRunningZookeeper(AdminUtils.topicExists(_, name))
 
   def topicNames(): Try[Seq[String]] = withRunningZookeeper(_.getAllTopics())
+
+  def createTopic(topic: String, details: TopicDetails, timeout: Int): Try[CreateTopicsResponse] = {
+    createTopics(Map(topic -> details), timeout)
+  }
+
+  def createTopics(topics: Map[String, TopicDetails], timeout: Int): Try[CreateTopicsResponse] = {
+    //check for existence first
+    val existsCheck = withRunningZookeeper { zk =>
+      topics.keys.map { topic =>
+        topic -> AdminUtils.topicExists(zk, topic)
+      }.toMap
+    }.collect { case x => x.filter(_._2) }.getOrElse(Map.empty)
+
+    if (existsCheck.headOption.isDefined) {
+      Failure(new IllegalArgumentException(s"Topic ${existsCheck.head._1} already exists."))
+    }
+    else {
+      topics.keys.map(t => t -> topicExists(t)).filter(tp => tp._2.get)
+      val builder = new CreateTopicsRequest.Builder(topics.asJava, timeout, false)
+      val broker = Random.shuffle(KafkaConfigSupport.bootstrapServers.split(",").toSeq).head
+      createTopicResponse(builder.build(), broker)
+    }
+  }
+
+  private def createTopicResponse(request: CreateTopicsRequest,
+                                  brokerInfo: String): Try[CreateTopicsResponse] = {
+    val comp = brokerInfo.split(":")
+    require(comp.length == 2, s"$comp is not a valid broker address. Use [host:port].")
+    val address = comp(0)
+    val port = comp(1).toInt
+
+    val header = new RequestHeader(ApiKeys.CREATE_TOPICS.id, 1, brokerInfo, -1)
+    val buffer = ByteBuffer.allocate(header.sizeOf + request.sizeOf)
+    header.writeTo(buffer)
+    request.writeTo(buffer)
+    requestAndReceive(buffer.array, address, port).map { resp =>
+      val respBuffer = ByteBuffer.wrap(resp)
+      ResponseHeader.parse(respBuffer)
+      CreateTopicsResponse.parse(respBuffer)
+    }
+  }
 }
 
 object KafkaUtils extends ConfigSupport {
@@ -92,6 +142,20 @@ object KafkaUtils extends ConfigSupport {
       valueOrElse(ConfigFactory.empty).withFallback(defaults)
     val akkaConfig = cfg.getConfig(s"akka.kafka.$tpe")
     clientConfig.atKey("kafka-clients").withFallback(akkaConfig)
+  }
+
+
+  private[kafka] def requestAndReceive(buffer: Array[Byte], address: String,
+                                       port: Int): Try[Array[Byte]] = {
+    TryWith(new Socket(address, port)) { socket =>
+      val dos = new DataOutputStream(socket.getOutputStream)
+      val dis = new DataInputStream(socket.getInputStream)
+
+      dos.writeInt(buffer.length)
+      dos.write(buffer)
+      dos.flush()
+      new Array[Byte](dis.readInt)
+    }
   }
 
   def apply(zkString: String, connectionTimeout: Int = 5000): KafkaUtils =

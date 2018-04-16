@@ -5,11 +5,13 @@ import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.util.KafkaUtils
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.I0Itec.zkclient.ZkClient
+import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 import org.apache.zookeeper.Watcher
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
 
 import scala.collection.JavaConverters._
+import scala.util.Failure
 
 /**
   * Created by alexsilva on 5/17/17.
@@ -142,6 +144,43 @@ class KafkaUtilsSpec extends WordSpec
         "bootstrap.servers" -> "localhost:8092",
         "client.id" -> "test1",
         "linger.ms" -> "10")
+    }
+
+    "creates a topic" in {
+      withRunningKafka {
+        val configs = Map(
+          "min.insync.replicas" -> "1",
+          "cleanup.policy" -> "compact",
+          "segment.bytes" -> "1048576"
+        )
+        val kafkaUtils = new KafkaUtils("", () => new ZkClient("localhost:3181"))
+        kafkaUtils.topicExists("test.Hydra").get shouldBe false
+        val details = new TopicDetails(1, 1, configs.asJava)
+        val response = kafkaUtils.createTopic("test.Hydra", details, 10)
+
+        val ctr = response.get
+        ctr.errors().asScala shouldBe Map.empty
+
+        kafkaUtils.topicExists("test.Hydra").get shouldBe true
+      }
+    }
+
+    "throws error if topic exists" in {
+      withRunningKafka {
+        val configs = Map(
+          "min.insync.replicas" -> "1",
+          "cleanup.policy" -> "compact",
+          "segment.bytes" -> "1048576"
+        )
+        val kafkaUtils = new KafkaUtils("", () => new ZkClient("localhost:3181"))
+        createCustomTopic("hydra.already.Exists")
+        kafkaUtils.topicExists("hydra.already.Exists").get shouldBe true
+        val details = new TopicDetails(1, 1, configs.asJava)
+        val response = kafkaUtils.createTopic("hydra.already.Exists", details, 10)
+
+        response shouldBe a[Failure[_]]
+      }
+
     }
   }
 }
