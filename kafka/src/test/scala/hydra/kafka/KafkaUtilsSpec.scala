@@ -160,9 +160,9 @@ class KafkaUtilsSpec extends WordSpec
         val response = kafkaUtils.createTopic("test.Hydra", details, 3000)
 
         val ctr = response.get
-        ctr.errors().asScala("test.hydra") shouldBe Errors.NONE
+        ctr.errors().asScala("test.Hydra").error() shouldBe Errors.NONE
 
-        kafkaUtils.topicExists("test.hydra").get shouldBe true
+        kafkaUtils.topicExists("test.Hydra").get shouldBe true
       }
     }
 
