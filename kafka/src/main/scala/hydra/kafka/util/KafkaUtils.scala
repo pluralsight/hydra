@@ -150,7 +150,9 @@ object KafkaUtils extends ConfigSupport {
       dos.writeInt(buffer.length)
       dos.write(buffer)
       dos.flush()
-      new Array[Byte](dis.readInt)
+      val resp = new Array[Byte](dis.readInt)
+      dis.readFully(resp)
+      resp
     }
   }
 

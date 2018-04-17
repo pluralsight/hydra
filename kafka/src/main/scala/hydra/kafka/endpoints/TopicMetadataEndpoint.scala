@@ -19,6 +19,7 @@ import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.util.KafkaUtils
 import org.I0Itec.zkclient.ZkClient
 import org.apache.kafka.common.PartitionInfo
+import org.apache.kafka.common.protocol.Errors
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 import org.apache.kafka.common.requests.CreateTopicsResponse
 
@@ -57,6 +58,8 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
 
   private implicit val errorFormat = jsonFormat1(CreateTopicResponseError)
 
+  implicit val timeout = Timeout(5 seconds)
+
   private lazy val kafkaUtils = new KafkaUtils(KafkaConfigSupport.zkString,
     () => new ZkClient(KafkaConfigSupport.zkString))
 
@@ -86,13 +89,12 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
   private def createTopic = path("topics") {
     post {
       entity(as[CreateTopicReq]) { req =>
-        val details = new TopicDetails(req.partitions, req.replicationFactor, req.configs.asJava)
-        onSuccess(Future.fromTry(kafkaUtils.createTopic(req.topic, details, 10))) { f =>
-          f.errors.asScala.headOption.map { _ =>
-            complete(StatusCodes.BadRequest,
-              fromKafka(f.errors.asScala.toMap))
-          }.getOrElse(
-            complete(StatusCodes.OK, topicInfo(req.topic)))
+        val details = new TopicDetails(req.partitions, req.replicationFactor, req.config.asJava)
+        val to = timeout.duration.toMillis.toInt
+        onSuccess(Future.fromTry(kafkaUtils.createTopic(req.topic, details, to))) { f =>
+          f.errors.asScala.find(_._2.error != Errors.NONE).map { _ =>
+            complete(StatusCodes.BadRequest, fromKafka(f.errors.asScala.toMap))
+          }.getOrElse(complete(StatusCodes.OK, topicInfo(req.topic)))
         }
       }
     }
@@ -104,7 +106,6 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
 
 
   private def topicInfo(name: String): Future[Seq[PartitionInfo]] = {
-    implicit val timeout = Timeout(5 seconds)
     import akka.pattern.ask
     (consumerProxy ? GetPartitionInfo(name)).mapTo[PartitionInfoResponse].map(_.partitionInfo)
 
@@ -131,7 +132,7 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
 case class CreateTopicReq(topic: String,
                           partitions: Int,
                           replicationFactor: Short,
-                          configs: Map[String, String])
+                          config: Map[String, String])
 
 
 case class CreateTopicResponseError(errors: Map[String, String])

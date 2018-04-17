@@ -5,6 +5,7 @@ import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.util.KafkaUtils
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.I0Itec.zkclient.ZkClient
+import org.apache.kafka.common.protocol.Errors
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 import org.apache.zookeeper.Watcher
 import org.scalatest.concurrent.Eventually
@@ -156,12 +157,12 @@ class KafkaUtilsSpec extends WordSpec
         val kafkaUtils = new KafkaUtils("", () => new ZkClient("localhost:3181"))
         kafkaUtils.topicExists("test.Hydra").get shouldBe false
         val details = new TopicDetails(1, 1, configs.asJava)
-        val response = kafkaUtils.createTopic("test.Hydra", details, 10)
+        val response = kafkaUtils.createTopic("test.Hydra", details, 3000)
 
         val ctr = response.get
-        ctr.errors().asScala shouldBe Map.empty
+        ctr.errors().asScala("test.hydra") shouldBe Errors.NONE
 
-        kafkaUtils.topicExists("test.Hydra").get shouldBe true
+        kafkaUtils.topicExists("test.hydra").get shouldBe true
       }
     }
 
@@ -176,7 +177,7 @@ class KafkaUtilsSpec extends WordSpec
         createCustomTopic("hydra.already.Exists")
         kafkaUtils.topicExists("hydra.already.Exists").get shouldBe true
         val details = new TopicDetails(1, 1, configs.asJava)
-        val response = kafkaUtils.createTopic("hydra.already.Exists", details, 10)
+        val response = kafkaUtils.createTopic("hydra.already.Exists", details, 1000)
 
         response shouldBe a[Failure[_]]
       }

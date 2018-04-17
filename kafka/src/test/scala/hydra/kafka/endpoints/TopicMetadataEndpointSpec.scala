@@ -106,5 +106,22 @@ class TopicMetadataEndpointSpec extends Matchers with WordSpecLike with Scalates
         response.status.intValue() shouldBe 400
       }
     }
+
+    "sends back an error response if configs are invalid" in {
+      implicit val timeout = RouteTestTimeout(5.seconds)
+
+      val config = Map(
+        "min.insync.replicas" -> "none",
+        "cleanup.policy" -> "under the carpet",
+        "segment.bytes" -> "i dont know"
+      )
+
+      val entity = CreateTopicReq("test", 1, 1, config)
+      Post("/transports/kafka/topics", entity) ~> route ~> check {
+        response.status.intValue() shouldBe 400
+        val r = responseAs[CreateTopicResponseError]
+        r.errors should contain key ("test")
+      }
+    }
   }
 }
