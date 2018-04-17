@@ -8,7 +8,7 @@ import org.I0Itec.zkclient.ZkClient
 import org.apache.kafka.common.protocol.Errors
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 import org.apache.zookeeper.Watcher
-import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
 
 import scala.collection.JavaConverters._
@@ -21,7 +21,8 @@ class KafkaUtilsSpec extends WordSpec
   with BeforeAndAfterAll
   with Matchers
   with Eventually
-  with EmbeddedKafka {
+  with EmbeddedKafka
+  with ScalaFutures {
 
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
 
@@ -181,7 +182,19 @@ class KafkaUtilsSpec extends WordSpec
 
         response shouldBe a[Failure[_]]
       }
+    }
 
+    "throws error if configs are invalid" in {
+      withRunningKafka {
+        val configs = Map(
+          "min.insync.replicas" -> "1",
+          "cleanup.policy" -> "under the carpet"
+        )
+        val kafkaUtils = new KafkaUtils("", () => new ZkClient("localhost:3181"))
+        val details = new TopicDetails(1, 1, configs.asJava)
+        val r = kafkaUtils.createTopic("InvalidConfig", details, 1000)
+        r.get.errors().asScala("InvalidConfig").error().code() shouldBe Errors.UNKNOWN.code()
+      }
     }
   }
 }
