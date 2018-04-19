@@ -66,7 +66,7 @@ class DriverManagerConnectionProvider private[sql](val connectionUrl: String,
     }
 
     retry(maxConnectionAttempts) {
-      log.debug(s"Attempting to connect to {} p:$password", connectionUrl)
+      log.debug(s"Attempting to connect to {}", connectionUrl)
       connection = DriverManager.getConnection(connectionUrl, username, password)
     }
   }
