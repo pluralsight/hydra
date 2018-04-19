@@ -4,10 +4,11 @@ import java.sql.JDBCType
 import java.util.Properties
 
 import com.typesafe.config.ConfigFactory
-import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
 import hydra.avro.util.SchemaWrapper
 import org.apache.avro.{AvroRuntimeException, Schema}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+
+import scala.concurrent.duration._
 
 /**
   * Created by alexsilva on 7/12/17.
@@ -19,14 +20,13 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
   val cfg = ConfigFactory.load().getConfig("db-cfg")
 
   val properties = new Properties
-
   cfg.entrySet().asScala.foreach(e => properties.setProperty(e.getKey(), cfg.getString(e.getKey())))
 
-  private val hikariConfig = new HikariConfig(properties)
 
-  private val ds = new HikariDataSource(hikariConfig)
+  val provider = new DriverManagerConnectionProvider("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1",
+    "", "", 1, 1.millis)
 
-  val store = new JdbcCatalog(ds, NoOpSyntax, H2Dialect)
+  val store = new JdbcCatalog(provider, NoOpSyntax, H2Dialect)
 
   val schemaStr =
     """
@@ -54,9 +54,8 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
     store.createOrAlterTable(Table("test_table", schema, dbSchema = Some("test_schema")))
   }
 
-  override def afterAll() = {
-    ds.close()
-  }
+  override def afterAll() = provider.connection.close()
+
 
   describe("The jdbc Catalog") {
 
@@ -194,7 +193,7 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
         DbColumn("id", JDBCType.INTEGER, false, Some("")),
         DbColumn("first_name", JDBCType.INTEGER, true, Some("")))
 
-      val catalog = new JdbcCatalog(ds, UnderscoreSyntax, PostgresDialect)
+      val catalog = new JdbcCatalog(provider, UnderscoreSyntax, PostgresDialect)
 
       catalog.findMissingFields(sc, cols) shouldBe Seq(sc.schema.getField("lastName"))
     }

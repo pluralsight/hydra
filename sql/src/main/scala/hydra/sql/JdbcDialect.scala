@@ -175,6 +175,7 @@ object JdbcDialects {
   private[this] var dialects = List[JdbcDialect]()
   registerDialect(PostgresDialect)
   registerDialect(DB2Dialect)
+  registerDialect(H2Dialect)
 
   /**
     * Fetch the JdbcDialect class corresponding to a given database url.

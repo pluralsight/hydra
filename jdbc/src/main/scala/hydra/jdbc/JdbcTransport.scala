@@ -4,19 +4,18 @@ import java.util.Properties
 
 import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
 import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
+import configs.syntax._
 import hydra.avro.io.{SaveMode, Upsert}
+import hydra.avro.util.SchemaWrapper
 import hydra.common.config.ConfigSupport
+import hydra.common.logging.LoggingAdapter
 import hydra.core.transport.Transport
 import hydra.core.transport.Transport.Deliver
-import hydra.sql.{JdbcDialects, JdbcRecordWriter, TableIdentifier}
-import configs.syntax._
-import hydra.avro.util.SchemaWrapper
-import hydra.common.logging.LoggingAdapter
-import hydra.common.util.TryWith
+import hydra.sql.{DataSourceConnectionProvider, JdbcRecordWriter, JdbcWriterSettings, TableIdentifier}
 
-import scala.collection.mutable
-import scala.util.{Success, Try}
 import scala.collection.JavaConverters._
+import scala.collection.mutable
+import scala.util.Try
 
 class JdbcTransport extends Transport with ConfigSupport with LoggingAdapter {
 
@@ -36,13 +35,12 @@ class JdbcTransport extends Transport with ConfigSupport with LoggingAdapter {
       }
   }
 
-  private def getOrUpdateWriter(db: DbProfile, rec: JdbcRecord) = {
+  private[jdbc] def getOrUpdateWriter(db: DbProfile, rec: JdbcRecord) = {
     //TODO: Make the writer constructor params configurable. Should we support batching?
     val schema = rec.payload.getSchema
     val key = s"${db.name}|${schema.getFullName}"
-    writers.getOrElseUpdate(key, new JdbcRecordWriter(db.ds,
+    writers.getOrElseUpdate(key, new JdbcRecordWriter(db.settings, db.provider,
       SchemaWrapper.from(schema, rec.key.getOrElse(Seq.empty)), SaveMode.Append,
-      JdbcDialects.get(JdbcTransport.getUrl(db)), batchSize = -1,
       tableIdentifier = Some(TableIdentifier(rec.destination))))
   }
 
@@ -50,9 +48,12 @@ class JdbcTransport extends Transport with ConfigSupport with LoggingAdapter {
     writers.clear()
     applicationConfig.getOrElse[Config]("transports.jdbc.profiles", ConfigFactory.empty).map { cfg =>
       cfg.root().entrySet().asScala.foreach { e =>
-        val props = new Properties
-        props.putAll(ConfigSupport.toMap(e.getValue.asInstanceOf[ConfigObject].toConfig).asJava)
-        dbProfiles.put(e.getKey, new DbProfile(e.getKey, props))
+        Try {
+          val props = new Properties
+          props.putAll(ConfigSupport.toMap(e.getValue.asInstanceOf[ConfigObject].toConfig).asJava)
+          val settings = JdbcWriterSettings(e.getValue.asInstanceOf[ConfigObject].toConfig)
+          dbProfiles.put(e.getKey, new DbProfile(e.getKey, props, settings))
+        }.recover { case ex => log.error(s"Unable to load db profile ${e.getKey()}.", ex) }
       }
     }
 
@@ -60,31 +61,18 @@ class JdbcTransport extends Transport with ConfigSupport with LoggingAdapter {
   }
 
   override def postStop(): Unit = {
-    writers.foreach(_._2.flush())
+    Try(writers.foreach(_._2.flush()))
     dbProfiles.foreach(_._2.close())
   }
 }
 
-object JdbcTransport {
-  /**
-    * Retrives the connection URL, either from the jdbcUrl property config or by querying the connection metadata.
-    *
-    * @param db
-    * @return
-    */
-  private[jdbc] def getUrl(db: DbProfile): String = {
-    Option(db.ds.getJdbcUrl).map(Success(_)).getOrElse {
-      TryWith(db.ds.getConnection)(_.getMetaData.getURL)
-    }.get
-  }
-}
-
-
-class DbProfile(val name: String, props: Properties) {
+class DbProfile(val name: String, props: Properties, val settings: JdbcWriterSettings) {
 
   private val hcfg = new HikariConfig(props)
 
-  lazy val ds = new HikariDataSource(hcfg)
+  private[jdbc] val ds = new HikariDataSource(hcfg)
+
+  lazy val provider = new DataSourceConnectionProvider(ds)
 
   def close() = ds.close()
 }

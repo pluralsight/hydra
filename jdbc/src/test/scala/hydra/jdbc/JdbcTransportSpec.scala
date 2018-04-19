@@ -13,7 +13,7 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.io.Source
 
-class JdbcTransportSpec extends TestKit(ActorSystem("jdbc-transpport-spec")) with Matchers with FunSpecLike
+class JdbcTransportSpec extends TestKit(ActorSystem("jdbc-transport-spec")) with Matchers with FunSpecLike
   with ImplicitSender with BeforeAndAfterAll {
 
   val probe = TestProbe()
@@ -42,12 +42,6 @@ class JdbcTransportSpec extends TestKit(ActorSystem("jdbc-transpport-spec")) wit
       }
     }
 
-    it("looks up the db profile url") {
-      val profiles = jdbcTransport.underlyingActor.dbProfiles
-      JdbcTransport.getUrl(profiles("test-dsprofile")) shouldBe "jdbc:h2:mem:test_db"
-      JdbcTransport.getUrl(profiles("test-jdbcprofile")) shouldBe "jdbc:h2:mem:test_jdb;DB_CLOSE_DELAY=-1"
-    }
-
     it("reports error if profile can't be found") {
       val record = JdbcRecord("dest", Some(Seq.empty), gr, "dbProfile")
       jdbcTransport ! Deliver(record, 1, ack)
@@ -59,7 +53,9 @@ class JdbcTransportSpec extends TestKit(ActorSystem("jdbc-transpport-spec")) wit
       jdbcTransport ! Deliver(record, 1, ack)
       probe.expectMsg("DONE")
       //check the db too
-      TryWith(jdbcTransport.underlyingActor.dbProfiles("test-dsprofile").ds.getConnection()) { c =>
+      val profile = jdbcTransport.underlyingActor.dbProfiles("test-dsprofile")
+
+      TryWith(profile.ds.getConnection()) { c =>
         val stmt = c.createStatement()
         val rs = stmt.executeQuery("select \"id\",\"name\" from test_transport")
         rs.next() shouldBe true
@@ -68,7 +64,7 @@ class JdbcTransportSpec extends TestKit(ActorSystem("jdbc-transpport-spec")) wit
 
     it("errors if underlying datasource is closed") {
       val jt = TestActorRef[JdbcTransport](Props[JdbcTransport])
-      jt.underlyingActor.dbProfiles("test-dsprofile").ds.close()
+      jt.underlyingActor.dbProfiles("test-dsprofile").close()
       val record = JdbcRecord("test_transport", Some(Seq.empty), gr, "test-dsprofile")
       jt ! Deliver(record, 1, ack)
       probe.expectMsgType[SQLException]

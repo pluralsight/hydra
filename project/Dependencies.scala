@@ -1,3 +1,4 @@
+
 import sbt.{ExclusionRule, _}
 
 
@@ -5,6 +6,8 @@ object Dependencies {
 
   val akkaVersion = "2.5.11"
   val scalaTestVersion = "3.0.4"
+  val easyMockVersion = "3.5" //needed for mocking static java methods
+  val powerMockVersion = "2.0.0-beta.5" //needed for mocking static java methods
   val slf4jVersion = "1.7.29"
   val log4jVersion = "2.7"
   val kxbmapConfigVersion = "0.4.4"
@@ -118,6 +121,12 @@ object Dependencies {
       "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % "test")
 
     val scalaTest = "org.scalatest" %% "scalatest" % scalaTestVersion % "test"
+    val easyMock = "org.easymock" % "easymock" % easyMockVersion % "test"
+    val powerMock = Seq(
+      "org.powermock" % "powermock-api-easymock" % powerMockVersion % "test",
+      "org.powermock" % "powermock-module-junit4" % powerMockVersion % "test"
+    )
+
     val scalaMock = "org.scalamock" %% "scalamock-scalatest-support" % scalaMockVersion % "test"
     val junit = "junit" % "junit" % "4.12" % "test"
 
@@ -127,7 +136,7 @@ object Dependencies {
   import Compile._
   import Test._
 
-  val testDeps = Seq(scalaTest, junit, scalaMock) ++ akkaTest
+  val testDeps = Seq(scalaTest, junit, scalaMock, easyMock) ++ powerMock ++ akkaTest
 
   val baseDeps = akka ++ logging ++ Seq(scalaz, scalaConfigs, avro, spring) ++ joda ++ testDeps
 
