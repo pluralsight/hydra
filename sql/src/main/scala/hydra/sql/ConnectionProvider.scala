@@ -14,6 +14,8 @@ trait ConnectionProvider {
   def connectionUrl: String
 
   def getConnection(): Connection
+
+  def close():Unit
 }
 
 /**
@@ -46,6 +48,8 @@ class DriverManagerConnectionProvider private[sql](val connectionUrl: String,
 
     connection
   }
+
+  override def close(): Unit = closeQuietly()
 
   private def doConnect(): Unit = {
 
@@ -94,4 +98,6 @@ class DataSourceConnectionProvider(ds: HikariDataSource) extends ConnectionProvi
     .getOrElse(ds.getDataSourceProperties.getProperty("url"))
 
   override def getConnection(): Connection = ds.getConnection
+
+  override def close(): Unit = ds.close()
 }
