@@ -1,5 +1,6 @@
 package hydra.sql
 
+import java.sql.SQLException
 import java.util.Properties
 
 import com.typesafe.config.ConfigFactory
@@ -31,6 +32,12 @@ class DataSourceConnectionProviderSpec extends Matchers
     p.getConnection().isValid(1) shouldBe true
   }
 
+  it should "close the connection" in {
+    val p = new DataSourceConnectionProvider(ds)
+    p.close()
+    intercept[SQLException](p.getConnection())
+  }
+
   "The DriverManagerConnectionProvider" should "be configured properly" in {
     val config = ConfigFactory.parseString(
       """
@@ -39,11 +46,6 @@ class DataSourceConnectionProviderSpec extends Matchers
         |connection.password = password
         |connection.max.retries = 20
         |connection.retry.backoff = 10s
-        |
-        |db.syntax = hydra.sql.NoOpSyntax
-        |batch.size = 10
-        |auto.evolve= true
-        |
       """.stripMargin)
 
     val c = DriverManagerConnectionProvider(config)
@@ -52,6 +54,20 @@ class DataSourceConnectionProviderSpec extends Matchers
     c.username shouldBe "test"
     c.retryBackoff.toSeconds shouldBe 10
     c.maxConnectionAttempts shouldBe 20
+    c.close()
+  }
 
+  it should "close the connection" in {
+    val config = ConfigFactory.parseString(
+      """
+        |connection.url = "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1"
+        |connection.max.retries = 2
+        |connection.retry.backoff = 1s
+      """.stripMargin)
+
+    val c = DriverManagerConnectionProvider(config)
+    c.getConnection() should not be null
+    c.close()
+    c.connection.isValid(2) shouldBe false
   }
 }

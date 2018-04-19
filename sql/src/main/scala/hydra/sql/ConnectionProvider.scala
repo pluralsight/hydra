@@ -14,6 +14,8 @@ trait ConnectionProvider {
   def connectionUrl: String
 
   def getConnection(): Connection
+
+  def close():Unit
 }
 
 /**
@@ -47,6 +49,8 @@ class DriverManagerConnectionProvider private[sql](val connectionUrl: String,
     connection
   }
 
+  override def close(): Unit = closeQuietly()
+
   private def doConnect(): Unit = {
 
     @annotation.tailrec
@@ -62,7 +66,7 @@ class DriverManagerConnectionProvider private[sql](val connectionUrl: String,
     }
 
     retry(maxConnectionAttempts) {
-      log.debug(s"Attempting to connect to {} p:$password", connectionUrl)
+      log.debug(s"Attempting to connect to {}", connectionUrl)
       connection = DriverManager.getConnection(connectionUrl, username, password)
     }
   }
@@ -94,4 +98,6 @@ class DataSourceConnectionProvider(ds: HikariDataSource) extends ConnectionProvi
     .getOrElse(ds.getDataSourceProperties.getProperty("url"))
 
   override def getConnection(): Connection = ds.getConnection
+
+  override def close(): Unit = ds.close()
 }
