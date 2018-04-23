@@ -2,11 +2,13 @@ package hydra.sql
 
 import java.sql.BatchUpdateException
 
+import hydra.avro.convert.IsoDate
 import hydra.avro.io.SaveMode.SaveMode
 import hydra.avro.io._
 import hydra.avro.util.{AvroUtils, SchemaWrapper}
 import hydra.common.util.TryWith
 import org.apache.avro.generic.GenericRecord
+import org.apache.avro.{LogicalTypes, Schema}
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
@@ -32,6 +34,10 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
                        val schema: SchemaWrapper,
                        val mode: SaveMode = SaveMode.ErrorIfExists,
                        tableIdentifier: Option[TableIdentifier] = None) extends RecordWriter with JdbcHelper {
+
+  import JdbcRecordWriter._
+
+  logger.debug("Initializing JdbcRecordWriter")
 
   private val batchSize = settings.batchSize
 
@@ -68,7 +74,7 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
   private var upsertStmt = dialect.upsert(syntax.format(name), schema, syntax)
 
   //since changing pks on a table isn't supported, this can be a val
-//  private val deleteStmt = dialect.deleteStatement(syntax.format(name), schema.primaryKeys, syntax)
+  //  private val deleteStmt = dialect.deleteStatement(syntax.format(name), schema.primaryKeys, syntax)
 
   private def connection = connectionProvider.getConnection
 
@@ -172,6 +178,8 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
 }
 
 object JdbcRecordWriter {
+
+  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, (_: Schema) => IsoDate)
 
   val logger = LoggerFactory.getLogger(getClass)
 }
