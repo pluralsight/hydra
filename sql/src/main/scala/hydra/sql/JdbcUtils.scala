@@ -69,7 +69,7 @@ private[sql] object JdbcUtils {
 
 
   def isLogicalType(schema: Schema, name: String) = {
-    Option(schema.getLogicalType).map(_.getName == name) getOrElse (false)
+    Option(schema.getLogicalType).map(_.getName == name) getOrElse false
   }
 
   def getNonNullableUnionType(schema: Schema): Schema = {

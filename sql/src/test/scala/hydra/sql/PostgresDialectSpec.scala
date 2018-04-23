@@ -3,14 +3,17 @@ package hydra.sql
 import java.sql.JDBCType
 import java.sql.JDBCType._
 
+import hydra.avro.convert.IsoDate
 import hydra.avro.util.SchemaWrapper
-import org.apache.avro.Schema
+import org.apache.avro.{LogicalTypes, Schema}
 import org.scalatest.{FunSpecLike, Matchers}
 
 /**
   * Created by alexsilva on 5/4/17.
   */
 class PostgresDialectSpec extends Matchers with FunSpecLike {
+
+  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, (_: Schema) => IsoDate)
 
   implicit def fromSchema(schema:Schema):SchemaWrapper = SchemaWrapper.from(schema)
   
@@ -77,6 +80,13 @@ class PostgresDialectSpec extends Matchers with FunSpecLike {
       |			"name": "testUnion",
       |			"type": ["null", "string"]
       |		},
+      |  {
+      |			"name": "testTS",
+      |			"type": {
+      |				"type": "string",
+      |				"logicalType": "iso-date"
+      |			}
+      |		},
       |		{
       |			"name": "friends",
       |			"type": {
@@ -101,6 +111,7 @@ class PostgresDialectSpec extends Matchers with FunSpecLike {
       PostgresDialect.getJDBCType(avro.getField("testUnion").schema()) shouldBe Some(JdbcType("TEXT", CHAR))
       PostgresDialect.getJDBCType(avro.getField("friends").schema()) shouldBe Some(JdbcType("TEXT[]", ARRAY))
       PostgresDialect.getJDBCType(avro.getField("signupDate").schema()) shouldBe None
+      PostgresDialect.getJDBCType(avro.getField("testTS").schema()).get shouldBe JdbcType("TIMESTAMP", TIMESTAMP)
     }
 
     it("works with record types") {

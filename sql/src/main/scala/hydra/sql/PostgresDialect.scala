@@ -2,7 +2,9 @@ package hydra.sql
 
 import java.sql.JDBCType
 
+import hydra.avro.convert.IsoDate
 import hydra.avro.util.SchemaWrapper
+import hydra.sql.JdbcUtils.isLogicalType
 import org.apache.avro.LogicalTypes.Decimal
 import org.apache.avro.Schema.Type.{BYTES, UNION}
 import org.apache.avro.Schema.{Field, Type}
@@ -18,7 +20,7 @@ private[sql] object PostgresDialect extends JdbcDialect {
   override def canHandle(url: String): Boolean = url.startsWith("jdbc:postgresql")
 
   override def getJDBCType(schema: Schema): Option[JdbcType] = schema.getType match {
-    case Type.STRING => Some(JdbcType("TEXT", JDBCType.CHAR))
+    case Type.STRING => logicalStringTypes(schema)
     case BYTES => bytesType(schema)
     case Type.BOOLEAN => Some(JdbcType("BOOLEAN", JDBCType.BOOLEAN))
     case Type.FLOAT => Some(JdbcType("FLOAT4", JDBCType.FLOAT))
@@ -27,6 +29,14 @@ private[sql] object PostgresDialect extends JdbcDialect {
     case Type.RECORD => Some(JdbcType("JSON", JDBCType.CHAR))
     case Type.ARRAY => getArrayType(schema)
     case _ => None
+  }
+
+  private def logicalStringTypes(schema: Schema) = {
+    if (isLogicalType(schema, IsoDate.IsoDateLogicalTypeName)) {
+      Some(JdbcType("TIMESTAMP", JDBCType.TIMESTAMP))
+    } else {
+      Some(JdbcType("TEXT", JDBCType.CHAR))
+    }
   }
 
   private def getArrayType(schema: Schema) = {
