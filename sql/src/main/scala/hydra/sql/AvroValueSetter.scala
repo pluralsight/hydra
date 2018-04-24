@@ -55,7 +55,7 @@ private[sql] class AvroValueSetter(schema: SchemaWrapper, dialect: JdbcDialect) 
       schema.getType match {
         case Schema.Type.UNION => unionValue(value, jdbcType, schema, pstmt, idx)
         case Schema.Type.ARRAY => arrayValue(value.asInstanceOf[GenericData.Array[AnyRef]], schema, pstmt, idx)
-        case Schema.Type.STRING if isLogicalType(schema, "iso-date") =>
+        case Schema.Type.STRING if isLogicalType(schema, IsoDate.IsoDateLogicalTypeName) =>
           pstmt.setTimestamp(idx,
             new Timestamp(new ISODateConverter()
               .fromCharSequence(value.toString, schema, IsoDate).toInstant.toEpochMilli))

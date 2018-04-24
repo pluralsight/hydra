@@ -114,7 +114,7 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       |			"name": "isoDate",
       |			"type": {
       |				"type": "string",
-      |				"logicalType": "iso-date"
+      |				"logicalType": "iso-datetime"
       |			}
       |		}
       |	]
