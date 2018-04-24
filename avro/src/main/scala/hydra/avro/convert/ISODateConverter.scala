@@ -1,10 +1,20 @@
 package hydra.avro.convert
 
-import java.time.{OffsetDateTime, ZoneId, ZonedDateTime}
+import java.time._
 
+import hydra.common.logging.LoggingAdapter
 import org.apache.avro.{Conversion, LogicalType, Schema}
 
-class ISODateConverter extends Conversion[ZonedDateTime] {
+import scala.util.Try
+
+/**
+  * Converts strings in ISO format to a ZonedDateTime in the UTC time zone.
+  *
+  * If the string is not formatted properly, the EPOCH is returned.
+  */
+class ISODateConverter extends Conversion[ZonedDateTime] with LoggingAdapter {
+
+  private val utc = ZoneOffset.UTC
 
   override def getLogicalTypeName: String = IsoDate.IsoDateLogicalTypeName
 
@@ -12,8 +22,13 @@ class ISODateConverter extends Conversion[ZonedDateTime] {
 
   override def fromCharSequence(value: CharSequence,
                                 schema: Schema, `type`: LogicalType): ZonedDateTime = {
-    val odt = OffsetDateTime.parse(value)
-    odt.toLocalDateTime.atZone(ZoneId.of("UTC"))
+    Try(OffsetDateTime.parse(value).toInstant)
+      .recover {
+        case e: Throwable =>
+          log.error(e.getMessage, e)
+          Instant.EPOCH
+      }.map(_.atZone(utc))
+      .get
   }
 }
 

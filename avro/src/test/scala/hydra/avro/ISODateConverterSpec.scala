@@ -24,6 +24,12 @@ class ISODateConverterSpec extends Matchers with FlatSpecLike {
     dt.getNano shouldBe 693217000
   }
 
+  it should "return the epoch on bad formed dates" in {
+    val c = new ISODateConverter()
+    c.fromCharSequence("2015-07-281",
+      Schema.create(Schema.Type.STRING), IsoDate)
+  }
+
   it should "use the logical type when parsing a schema" in {
 
     LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, (_: Schema) => IsoDate)
