@@ -30,7 +30,6 @@ private object H2Dialect extends JdbcDialect {
     val sql =
       s"""merge into ${table} ($columns) key($pk) values ($placeholders);"""
         .stripMargin
-    println("UPSERT IS " + sql)
     sql
   }
 
