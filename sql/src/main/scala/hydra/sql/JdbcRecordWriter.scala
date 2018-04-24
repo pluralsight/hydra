@@ -164,6 +164,7 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
     catch {
       case e: BatchUpdateException =>
         logger.error("Batch update error", e.getNextException())
+        conn.rollback()
         val recordsInError = handleBatchError(records)
         logger.error(s"The following records could not be replicated to table $name:")
         recordsInError.foreach(r => logger.error(s"${r._1.toString} - [${r._2.getMessage}]"))

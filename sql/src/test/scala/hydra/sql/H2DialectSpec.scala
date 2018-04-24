@@ -50,6 +50,11 @@ class H2DialectSpec extends Matchers with FunSpecLike {
       H2Dialect.getSchemaQuery("table") shouldBe "SELECT * FROM table WHERE 1=0"
     }
 
+    it("returns the correct upsert fields") {
+      H2Dialect.upsertFields(SchemaWrapper.from(avro)) shouldBe Seq(avro.getField("id"),
+        avro.getField("username"), avro.getField("active"))
+    }
+
     it("returns upserts") {
       val upsert = "merge into table (\"id\",\"username\",\"active\") key(\"id\") values (?,?,?);"
       H2Dialect.upsert("table",
