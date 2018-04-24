@@ -7,8 +7,9 @@ import java.time.{LocalDate, ZoneId}
 
 import com.google.common.collect.Lists
 import com.pluralsight.hydra.sql.MockArray
+import hydra.avro.convert.{ISODateConverter, IsoDate}
 import hydra.avro.util.SchemaWrapper
-import org.apache.avro.Schema
+import org.apache.avro.{LogicalTypes, Schema}
 import org.apache.avro.generic.GenericData
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FunSpecLike, Matchers}
@@ -18,6 +19,9 @@ import org.scalatest.{FunSpecLike, Matchers}
   * Created by alexsilva on 5/4/17.
   */
 class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
+
+  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, (_: Schema) => IsoDate)
+
   val schemaStr =
     """
       |{
@@ -105,6 +109,13 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       |  {
       |			"name": "byteField",
       |			"type": "bytes"
+      |		},
+      |  {
+      |			"name": "isoDate",
+      |			"type": {
+      |				"type": "string",
+      |				"logicalType": "iso-date"
+      |			}
       |		}
       |	]
       |}
@@ -119,6 +130,9 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       val ctx = new MathContext(4, RoundingMode.HALF_EVEN)
       val decimal = new java.math.BigDecimal("0.2", ctx).setScale(2)
       val dt = LocalDate.ofEpochDay(1234).atStartOfDay(ZoneId.systemDefault()).toInstant.toEpochMilli
+      val isoDate = new ISODateConverter().fromCharSequence("2015-07-28T19:55:57.693217+00:00",
+        Schema.create(Schema.Type.STRING), IsoDate).toInstant.toEpochMilli
+
       val mockedStmt = mock[PreparedStatement]
 
       val connection = mock[Connection]
@@ -141,6 +155,7 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       (mockedStmt.setString _).expects(13, """{"street": "happy drive"}""")
       (mockedStmt.setLong _).expects(14, 12342134223L)
       (mockedStmt.setBytes _).expects(15, *) //todo: how to verify the contents of an array in scala mock?
+      (mockedStmt.setTimestamp(_: Int, _: Timestamp)).expects(16, new Timestamp(isoDate))
       (mockedStmt.addBatch _).expects()
 
       val avroSchema = schema.schema
@@ -162,6 +177,7 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       record.put("address", address)
       record.put("bigNumber", 12342134223L)
       record.put("byteField", ByteBuffer.wrap("test".getBytes))
+      record.put("isoDate", "2015-07-28T19:55:57.693217+00:00")
       valueSetter.bind(record, mockedStmt)
     }
 

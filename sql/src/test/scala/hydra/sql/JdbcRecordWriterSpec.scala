@@ -3,12 +3,13 @@ package hydra.sql
 import java.util.Properties
 
 import com.typesafe.config.ConfigFactory
-import hydra.avro.io.{Delete, SaveMode, Upsert}
+import hydra.avro.io.{SaveMode, Upsert}
 import hydra.avro.util.SchemaWrapper
 import hydra.common.util.TryWith
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericData
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+
 import scala.concurrent.duration._
 
 /**
@@ -308,7 +309,7 @@ class JdbcRecordWriterSpec extends Matchers
 
       val writer = new JdbcRecordWriter(writerSettings, provider,
         SchemaWrapper.from(new Schema.Parser().parse(schemaStr)))
-      writer.batch(Delete(Map.empty))
+      //writer.batch(Delete(Map.empty))
     }
   }
 }

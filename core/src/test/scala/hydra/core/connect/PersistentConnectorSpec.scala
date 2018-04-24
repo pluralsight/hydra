@@ -123,7 +123,7 @@ akka.remote.artery.canonical.port=0""")
       override val id: String = "test-confirm-client-error"
 
       override def config: Config = ConfigFactory.empty()
-    }), "tc")
+    }), "tc1")
 
     testConnector ! HydraRequest("1234", "test")
 

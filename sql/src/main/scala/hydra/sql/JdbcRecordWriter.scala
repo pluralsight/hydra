@@ -2,11 +2,13 @@ package hydra.sql
 
 import java.sql.BatchUpdateException
 
+import hydra.avro.convert.IsoDate
 import hydra.avro.io.SaveMode.SaveMode
 import hydra.avro.io._
 import hydra.avro.util.{AvroUtils, SchemaWrapper}
 import hydra.common.util.TryWith
 import org.apache.avro.generic.GenericRecord
+import org.apache.avro.{LogicalTypes, Schema}
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
@@ -33,11 +35,17 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
                        val mode: SaveMode = SaveMode.ErrorIfExists,
                        tableIdentifier: Option[TableIdentifier] = None) extends RecordWriter with JdbcHelper {
 
+  import JdbcRecordWriter._
+
+  logger.debug("Initializing JdbcRecordWriter")
+
   private val batchSize = settings.batchSize
+
+  private val syntax = settings.dbSyntax
 
   private val dialect = JdbcDialects.get(connectionProvider.connectionUrl)
 
-  private val store: Catalog = new JdbcCatalog(connectionProvider, settings.dbSyntax, dialect)
+  private val store: Catalog = new JdbcCatalog(connectionProvider, syntax, dialect)
 
   private val tableId = tableIdentifier.getOrElse(TableIdentifier(schema.getName))
 
@@ -59,20 +67,21 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
     }
   }
 
-  private val name = settings.dbSyntax.format(tableObj.name)
+  private val name = syntax.format(tableObj.name)
 
   private var valueSetter = new AvroValueSetter(schema, dialect)
 
-  private var upsertStmt = dialect.upsert(settings.dbSyntax.format(name), schema, settings.dbSyntax)
+  private var upsertStmt = dialect.upsert(syntax.format(name), schema, syntax)
 
-  // private val deleteStmt = dialect.deleteStatement(dbSyntax.format(name),, dbSyntax)
+  //since changing pks on a table isn't supported, this can be a val
+  //  private val deleteStmt = dialect.deleteStatement(syntax.format(name), schema.primaryKeys, syntax)
 
   private def connection = connectionProvider.getConnection
 
   override def batch(operation: Operation): Unit = {
     operation match {
       case Upsert(record) => add(record)
-      case Delete(fields) => //TODO: implement delete
+      case DeleteByKey(fields) => //TODO: implement delete
     }
   }
 
@@ -95,7 +104,7 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
     val wrapper = SchemaWrapper.from(record.getSchema, cpks)
     store.createOrAlterTable(Table(tableId.table, wrapper))
     currentSchema = wrapper
-    upsertStmt = dialect.upsert(settings.dbSyntax.format(name), currentSchema, settings.dbSyntax)
+    upsertStmt = dialect.upsert(syntax.format(name), currentSchema, syntax)
     valueSetter = new AvroValueSetter(currentSchema, dialect)
   }
 
@@ -120,7 +129,7 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
   override def execute(operation: Operation): Unit = {
     operation match {
       case Upsert(record) => upsert(record)
-      case Delete(fields) => throw new UnsupportedOperationException("Not supported")
+      case DeleteByKey(fields) => throw new UnsupportedOperationException("Not supported")
     }
   }
 
@@ -169,6 +178,8 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
 }
 
 object JdbcRecordWriter {
+
+  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, (_: Schema) => IsoDate)
 
   val logger = LoggerFactory.getLogger(getClass)
 }

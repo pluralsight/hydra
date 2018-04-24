@@ -2,8 +2,6 @@ package hydra.avro.io
 
 import hydra.avro.io.SaveMode.SaveMode
 import hydra.avro.util.SchemaWrapper
-import org.apache.avro.Schema
-import org.apache.avro.generic.GenericRecord
 
 /**
   * Created by alexsilva on 7/16/17.
@@ -55,9 +53,3 @@ trait RecordWriter {
   def mode: SaveMode
 
 }
-
-sealed trait Operation
-
-case class Upsert(record: GenericRecord) extends Operation
-
-case class Delete(values: Map[Schema.Field, AnyRef]) extends Operation
