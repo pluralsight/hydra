@@ -5,7 +5,7 @@ import java.util.Properties
 import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
 import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
 import configs.syntax._
-import hydra.avro.io.{SaveMode, Upsert}
+import hydra.avro.io.{DeleteByKey, SaveMode, Upsert}
 import hydra.avro.util.SchemaWrapper
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
@@ -27,7 +27,8 @@ class JdbcTransport extends Transport with ConfigSupport with LoggingAdapter {
     case Deliver(record: JdbcRecord, deliveryId, callback) =>
       Try {
         val writer = getOrUpdateWriter(dbProfiles(record.dbProfile), record)
-        writer.execute(Upsert(record.payload))
+        val op = Option(record.payload).map(p => Upsert(p)).getOrElse(DeleteByKey(record.keyValues))
+        writer.execute(op)
         callback.onCompletion(deliveryId, Some(JdbcRecordMetadata(record.destination)), None)
       }.recover {
         case e: Exception =>
@@ -40,7 +41,7 @@ class JdbcTransport extends Transport with ConfigSupport with LoggingAdapter {
     val schema = rec.payload.getSchema
     val key = s"${db.name}|${schema.getFullName}"
     writers.getOrElseUpdate(key, new JdbcRecordWriter(db.settings, db.provider,
-      SchemaWrapper.from(schema, rec.key.getOrElse(Seq.empty)), SaveMode.Append,
+      SchemaWrapper.from(schema, rec.primaryKeys), SaveMode.Append,
       tableIdentifier = Some(TableIdentifier(rec.destination))))
   }
 
