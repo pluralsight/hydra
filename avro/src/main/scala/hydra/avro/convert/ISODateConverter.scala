@@ -32,12 +32,12 @@ class ISODateConverter extends Conversion[ZonedDateTime] with LoggingAdapter {
   }
 }
 
-object IsoDate extends LogicalType("iso-date") {
-  val IsoDateLogicalTypeName = "iso-date"
+object IsoDate extends LogicalType("iso-datetime") {
+  val IsoDateLogicalTypeName = "iso-datetime"
 
   override def validate(schema: Schema): Unit = {
     if (schema.getType() != Schema.Type.STRING) {
-      throw new IllegalArgumentException("Iso-date can only be used with an underlying string type")
+      throw new IllegalArgumentException("Iso-datetime can only be used with an underlying string type")
     }
   }
 }
