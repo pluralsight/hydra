@@ -1,6 +1,6 @@
 package hydra.avro
 
-import java.time.ZonedDateTime
+import java.time.{Instant, ZoneOffset, ZonedDateTime}
 
 import hydra.avro.convert.{ISODateConverter, IsoDate}
 import org.apache.avro.{LogicalTypes, Schema}
@@ -27,7 +27,7 @@ class ISODateConverterSpec extends Matchers with FlatSpecLike {
   it should "return the epoch on bad formed dates" in {
     val c = new ISODateConverter()
     c.fromCharSequence("2015-07-281",
-      Schema.create(Schema.Type.STRING), IsoDate)
+      Schema.create(Schema.Type.STRING), IsoDate) shouldBe Instant.EPOCH.atZone(ZoneOffset.UTC)
   }
 
   it should "use the logical type when parsing a schema" in {
