@@ -16,7 +16,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 @RunWith(PowerMockRunner.class)
-@PrepareForTest({ConnectionProvider.class, DriverManager.class})
+@PrepareForTest({DriverManagerConnectionProvider.class, DriverManager.class})
 @PowerMockIgnore("javax.management.*")
 public class DriverManagerConnectionProviderTest {
 
@@ -46,6 +46,39 @@ public class DriverManagerConnectionProviderTest {
         }
 
         PowerMock.verifyAll();
+    }
+
+    @Test
+    public void shouldReturnNewConnections() throws SQLException {
+        Connection connection = EasyMock.createMock(Connection.class);
+        Connection nConnection = EasyMock.createMock(Connection.class);
+        int noRetries = 2;
+        ConnectionProvider connectionProvider = new DriverManagerConnectionProvider("test",
+                "test", "test",
+                noRetries, FiniteDuration.apply(1, "ms"));
+
+        EasyMock.expect(DriverManager.getConnection(EasyMock.anyString(),
+                EasyMock.anyString(), EasyMock.anyString()))
+                .andThrow(new SQLException()).times(noRetries - 1).andReturn(connection);
+
+        EasyMock.expect(DriverManager.getConnection(EasyMock.anyString(),
+                EasyMock.anyString(), EasyMock.anyString()))
+                .andThrow(new SQLException()).times(noRetries - 1).andReturn(nConnection);
+
+        PowerMock.replayAll();
+
+        Connection c = connectionProvider.getConnection();
+
+        Assert.assertNotNull(c);
+
+        Connection nc = connectionProvider.getNewConnection();
+
+        Assert.assertNotNull(nc);
+
+        Assert.assertNotEquals(c, nc);
+
+        PowerMock.verifyAll();
+
     }
 
 

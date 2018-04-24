@@ -11,7 +11,7 @@ class ISODateConverterSpec extends Matchers with FlatSpecLike {
   "The ISODateConverter class" should "convert ISO dates" in {
     val c = new ISODateConverter()
     c.getConvertedType shouldBe classOf[ZonedDateTime]
-    c.getLogicalTypeName shouldBe "iso-date"
+    c.getLogicalTypeName shouldBe "iso-datetime"
     val dt = c.fromCharSequence("2015-07-28T19:55:57.693217+00:00",
       Schema.create(Schema.Type.STRING), IsoDate)
 
@@ -45,7 +45,7 @@ class ISODateConverterSpec extends Matchers with FlatSpecLike {
         |      "name": "timestamp",
         |      "type":{
         |        "type": "string",
-        |        "logicalType":"iso-date"
+        |        "logicalType":"iso-datetime"
         |      }
         |    }
         |  ]

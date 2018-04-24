@@ -57,7 +57,8 @@ class DataSourceConnectionProviderSpec extends Matchers
     c.close()
   }
 
-  it should "close the connection" in {
+
+  it should "return a new connection" in {
     val config = ConfigFactory.parseString(
       """
         |connection.url = "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1"
@@ -67,6 +68,7 @@ class DataSourceConnectionProviderSpec extends Matchers
 
     val c = DriverManagerConnectionProvider(config)
     c.getConnection() should not be null
+    c.getNewConnection() should not be null
     c.close()
     c.connection.isValid(2) shouldBe false
   }

@@ -13,9 +13,17 @@ import scala.util.{Failure, Success, Try}
 trait ConnectionProvider {
   def connectionUrl: String
 
+  /**
+    * @return A connection; may be the same connection in case of cached/pooled implementations.
+    */
   def getConnection(): Connection
 
-  def close():Unit
+  /**
+    * @return A new connection; clients _must_ close it.
+    */
+  def getNewConnection():Connection
+
+  def close(): Unit
 }
 
 /**
@@ -51,23 +59,29 @@ class DriverManagerConnectionProvider private[sql](val connectionUrl: String,
 
   override def close(): Unit = closeQuietly()
 
-  private def doConnect(): Unit = {
-
-    @annotation.tailrec
-    def retry[T](n: Int)(fn: => T): T = {
-      Try(fn) match {
-        case Success(x) => x
-        case Failure(e) if n > 1 =>
-          log.info(s"Unable to connect to database. Will retry in $retryBackoff", e)
-          Thread.sleep(retryBackoff.toMillis)
-          retry(n - 1)(fn)
-        case Failure(e) => throw e
-      }
+  @annotation.tailrec
+  private def retry[T](n: Int)(fn: => T): T = {
+    Try(fn) match {
+      case Success(x) => x
+      case Failure(e) if n > 1 =>
+        log.info(s"Unable to connect to database. Will retry in $retryBackoff", e)
+        Thread.sleep(retryBackoff.toMillis)
+        retry(n - 1)(fn)
+      case Failure(e) => throw e
     }
+  }
 
+  private def doConnect(): Unit = {
     retry(maxConnectionAttempts) {
       log.debug(s"Attempting to connect to {}", connectionUrl)
       connection = DriverManager.getConnection(connectionUrl, username, password)
+    }
+  }
+
+  override def getNewConnection(): Connection = {
+    retry(maxConnectionAttempts) {
+      log.debug(s"Attempting to connect to {}", connectionUrl)
+      DriverManager.getConnection(connectionUrl, username, password)
     }
   }
 
@@ -98,6 +112,8 @@ class DataSourceConnectionProvider(ds: HikariDataSource) extends ConnectionProvi
     .getOrElse(ds.getDataSourceProperties.getProperty("url"))
 
   override def getConnection(): Connection = ds.getConnection
+
+  override def getNewConnection(): Connection = getConnection()
 
   override def close(): Unit = ds.close()
 }

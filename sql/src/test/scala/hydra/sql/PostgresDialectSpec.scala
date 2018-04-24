@@ -84,7 +84,7 @@ class PostgresDialectSpec extends Matchers with FunSpecLike {
       |			"name": "testTS",
       |			"type": {
       |				"type": "string",
-      |				"logicalType": "iso-date"
+      |				"logicalType": "iso-datetime"
       |			}
       |		},
       |		{

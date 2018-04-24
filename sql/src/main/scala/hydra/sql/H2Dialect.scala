@@ -4,6 +4,7 @@ import java.sql.JDBCType
 
 import hydra.avro.util.SchemaWrapper
 import org.apache.avro.Schema
+import org.apache.avro.Schema.Field
 import org.apache.avro.Schema.Type._
 
 /**
@@ -31,6 +32,8 @@ private object H2Dialect extends JdbcDialect {
         .stripMargin
     sql
   }
+
+  override def upsertFields(schema: SchemaWrapper): Seq[Field] = schema.getFields
 
   override def alterTableQueries(table: String, missingFields: Seq[Schema.Field], dbs: DbSyntax): Seq[String] = {
     missingFields.map { f =>
