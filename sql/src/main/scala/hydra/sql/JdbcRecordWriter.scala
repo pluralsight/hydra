@@ -26,6 +26,9 @@ import scala.util.{Failure, Try}
   * If the primary keys are provided as a constructor argument, it overrides anything that
   * may have been provided by the schema.
   *
+  * Delete operations happen immediately, even when submitted through the batch operation. This behavior may
+  * affect the performance of systems that process many deletes.
+  *
   * @param settings        The JdbcWriterSettings to be used
   * @param schema          The initial schema to use when creating/updating/inserting records.
   * @param mode            See [hydra.avro.io.SaveMode]
