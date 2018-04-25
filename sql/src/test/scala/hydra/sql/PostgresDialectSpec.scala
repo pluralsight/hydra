@@ -392,10 +392,10 @@ class PostgresDialectSpec extends Matchers with FunSpecLike {
     val singleKey = PostgresDialect.deleteStatement("test_table",
       Seq(schema.getField("id1")), UnderscoreSyntax)
 
-    singleKey shouldBe "DELETE FROM test_table WHERE id1 = ?"
+    singleKey shouldBe """DELETE FROM test_table WHERE "id1" = ?"""
 
     val stmt = PostgresDialect.deleteStatement("test_table",
       Seq(schema.getField("id1"), schema.getField("id2")), UnderscoreSyntax)
-    stmt shouldBe "DELETE FROM test_table WHERE id1 = ? AND id2 = ?"
+    stmt shouldBe """DELETE FROM test_table WHERE "id1" = ? AND "id2" = ?"""
   }
 }

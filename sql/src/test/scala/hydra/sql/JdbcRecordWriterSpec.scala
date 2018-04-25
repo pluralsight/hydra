@@ -3,7 +3,7 @@ package hydra.sql
 import java.util.Properties
 
 import com.typesafe.config.ConfigFactory
-import hydra.avro.io.{SaveMode, Upsert}
+import hydra.avro.io.{DeleteByKey, SaveMode, Upsert}
 import hydra.avro.util.SchemaWrapper
 import hydra.common.util.TryWith
 import org.apache.avro.Schema
@@ -155,7 +155,7 @@ class JdbcRecordWriterSpec extends Matchers
       TryWith(c1.createStatement()) { stmt =>
         val rs = stmt.executeQuery("select \"id\",\"username\" from flush_test")
         rs.next() shouldBe false
-      }
+      }.get
 
       writer.flush()
 
@@ -163,7 +163,7 @@ class JdbcRecordWriterSpec extends Matchers
         val rs = stmt.executeQuery("select \"id\",\"username\" from flush_test")
         rs.next()
         Seq(rs.getInt(1), rs.getString(2)) shouldBe Seq(1, "alex")
-      }
+      }.get
 
       writer.close()
     }
@@ -201,7 +201,7 @@ class JdbcRecordWriterSpec extends Matchers
         rs.next() shouldBe true
         rs.getString(2) shouldBe "alex"
         rs.getInt(1) shouldBe 1
-      }
+      }.get
 
       //test schema update
 
@@ -234,7 +234,7 @@ class JdbcRecordWriterSpec extends Matchers
 
       TryWith(c.createStatement()) { stmt =>
         stmt.executeUpdate("delete from write_single_record")
-      }
+      }.get
       writer.execute(Upsert(newRecord))
 
       TryWith(c.createStatement()) { stmt =>
@@ -243,8 +243,83 @@ class JdbcRecordWriterSpec extends Matchers
         rs.getString(2) shouldBe "alex-new"
         rs.getInt(1) shouldBe 2
         rs.getInt(3) shouldBe 2
+      }.get
+    }
+
+    it("deletes a single record") {
+      val schemaStr =
+        """
+          |{
+          |	"type": "record",
+          |	"name": "DeleteSingleRecord",
+          |	"namespace": "hydra",
+          | "hydra.key": "id",
+          |	"fields": [{
+          |			"name": "id",
+          |			"type": "int",
+          |			"doc": "doc"
+          |		},
+          |		{
+          |			"name": "username",
+          |			"type": ["null", "string"]
+          |		}
+          |	]
+          |}""".stripMargin
+
+      val pschema = new Schema.Parser().parse(schemaStr)
+      val srecord = new GenericData.Record(pschema)
+      srecord.put("id", 1)
+      srecord.put("username", "alex")
+
+      val writer = new JdbcRecordWriter(writerSettings, provider, SchemaWrapper.from(pschema))
+
+      writer.execute(Upsert(srecord))
+      val c = provider.getConnection
+      TryWith(c.createStatement()) { stmt =>
+        val rs = stmt.executeQuery("select \"id\",\"username\" from delete_single_record")
+        rs.next() shouldBe true
+        rs.getString(2) shouldBe "alex"
+        rs.getInt(1) shouldBe 1
+      }.get
+
+      //delete
+      writer.execute(DeleteByKey(Map(pschema.getField("id") -> (1: java.lang.Integer))))
+      TryWith(c.createStatement()) { stmt =>
+        val rs = stmt.executeQuery("select \"id\",\"username\" from delete_single_record")
+        rs.next() shouldBe false
+      }.get
+    }
+
+    it("errors gracefully when trying to delete rows from schemas with no PK") {
+      val schemaStr =
+        """
+          |{
+          |	"type": "record",
+          |	"name": "DeleteError",
+          |	"namespace": "hydra",
+          |	"fields": [{
+          |			"name": "id",
+          |			"type": "int",
+          |			"doc": "doc"
+          |		},
+          |		{
+          |			"name": "username",
+          |			"type": ["null", "string"]
+          |		}
+          |	]
+          |}""".stripMargin
+
+      val pschema = new Schema.Parser().parse(schemaStr)
+      val srecord = new GenericData.Record(pschema)
+      srecord.put("id", 1)
+      srecord.put("username", "alex")
+
+      val writer = new JdbcRecordWriter(writerSettings, provider, SchemaWrapper.from(pschema))
+      intercept[UnsupportedOperationException] {
+        writer.execute(DeleteByKey(Map(pschema.getField("id") -> (1: java.lang.Integer))))
       }
     }
+
 
     it("flushesOnClose") {
 
@@ -275,7 +350,7 @@ class JdbcRecordWriterSpec extends Matchers
       TryWith(c.createStatement()) { stmt =>
         val rs = stmt.executeQuery("select \"id\",\"username\" from flush_on_close")
         rs.next() shouldBe false
-      }
+      }.get
 
       writer.close()
 
@@ -283,7 +358,7 @@ class JdbcRecordWriterSpec extends Matchers
         val rs = stmt.executeQuery("select \"id\",\"username\" from flush_on_close")
         rs.next()
         Seq(rs.getInt(1), rs.getString(2)) shouldBe Seq(1, "alex")
-      }
+      }.get
     }
 
     it("handles errors in batches") {
@@ -318,10 +393,12 @@ class JdbcRecordWriterSpec extends Matchers
       writer.batch(Upsert(goodRecord))
       writer.batch(Upsert(badRecord))
 
+      writer.flush()
+
       val c = provider.getConnection
       TryWith(c.createStatement()) { stmt =>
         val rs = stmt.executeQuery("select \"id\",\"username\" from batch_fail")
-        rs.next() shouldBe false
+        rs.next() shouldBe true
       }.get
 
       writer.close()
@@ -357,6 +434,53 @@ class JdbcRecordWriterSpec extends Matchers
       val writer = new JdbcRecordWriter(writerSettings, provider,
         SchemaWrapper.from(new Schema.Parser().parse(schemaStr)))
       //writer.batch(Delete(Map.empty))
+    }
+
+    it("flushes on delete") {
+      val schemaStr =
+        """
+          |{
+          |	"type": "record",
+          |	"name": "TestFlush",
+          |	"namespace": "hydra",
+          | "hydra.key": "id",
+          |	"fields": [{
+          |			"name": "id",
+          |			"type": "int",
+          |			"doc": "doc"
+          |		},
+          |		{
+          |			"name": "username",
+          |			"type": ["null", "string"]
+          |		}
+          |	]
+          |}""".stripMargin
+
+      val c = provider.getConnection
+
+      val pschema = new Schema.Parser().parse(schemaStr)
+
+      val writer = new JdbcRecordWriter(writerSettings, provider,
+        SchemaWrapper.from(pschema))
+
+      writer.batch(Upsert(record))
+
+      writer.flush()
+
+      TryWith(c.createStatement()) { stmt =>
+        val rs = stmt.executeQuery("select \"id\",\"username\" from test_flush")
+        rs.next() shouldBe true
+      }.get
+
+
+      writer.batch(DeleteByKey(Map(pschema.getField("id") -> (1: java.lang.Integer))))
+
+      writer.close()
+
+      TryWith(c.createStatement()) { stmt =>
+        val rs = stmt.executeQuery("select \"id\",\"username\" from test_flush")
+        rs.next() shouldBe false
+      }.get
     }
   }
 }

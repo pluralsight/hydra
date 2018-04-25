@@ -1,19 +1,20 @@
 package hydra.sql
 
-import java.sql.BatchUpdateException
+import java.sql.{BatchUpdateException, Connection}
 
 import hydra.avro.convert.IsoDate
 import hydra.avro.io.SaveMode.SaveMode
 import hydra.avro.io._
 import hydra.avro.util.{AvroUtils, SchemaWrapper}
 import hydra.common.util.TryWith
+import org.apache.avro.Schema.Field
 import org.apache.avro.generic.GenericRecord
 import org.apache.avro.{LogicalTypes, Schema}
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
-import scala.util.Failure
 import scala.util.control.NonFatal
+import scala.util.{Failure, Try}
 
 
 /**
@@ -24,6 +25,9 @@ import scala.util.control.NonFatal
   *
   * If the primary keys are provided as a constructor argument, it overrides anything that
   * may have been provided by the schema.
+  *
+  * Delete operations happen immediately, even when submitted through the batch operation. This behavior may
+  * affect the performance of systems that process many deletes.
   *
   * @param settings        The JdbcWriterSettings to be used
   * @param schema          The initial schema to use when creating/updating/inserting records.
@@ -50,7 +54,7 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
 
   private val tableId = tableIdentifier.getOrElse(TableIdentifier(schema.getName))
 
-  private val records = new mutable.ArrayBuffer[GenericRecord]()
+  private val operations = new mutable.ArrayBuffer[Operation]()
 
   private var currentSchema = schema
 
@@ -75,29 +79,34 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
   private var upsertStmt = dialect.upsert(syntax.format(name), schema, syntax)
 
   //since changing pks on a table isn't supported, this can be a val
-  private val deleteByPkStmt =
-    schema.primaryKeys.headOption.map(_ => dialect.deleteStatement(syntax.format(name), schema.primaryKeys, syntax))
+  private val deleteStmt =
+    schema.primaryKeys.headOption.map(_ =>
+      dialect.deleteStatement(syntax.format(name), schema.primaryKeys, syntax))
 
   private def connection = connectionProvider.getConnection
 
   override def batch(operation: Operation): Unit = {
     operation match {
-      case Upsert(record) => add(record)
-      case DeleteByKey(fields) => //TODO: implement delete
+      case u@Upsert(_) => add(u)
+      case DeleteByKey(keys) =>
+        flush()
+        delete(keys)
     }
   }
 
-  private def add(record: GenericRecord): Unit = {
-    if (AvroUtils.areEqual(currentSchema.schema, record.getSchema)) {
-      records += record
-      if (batchSize > 0 && records.size >= batchSize) flush()
+  private def maybeFlush() = if (batchSize > 0 && operations.size >= batchSize) flush()
+
+  private def add(op: Upsert): Unit = {
+    if (AvroUtils.areEqual(currentSchema.schema, op.record.getSchema)) {
+      operations += op
+      maybeFlush()
     }
     else {
       // Each batch needs to have the same dbInfo, so get the buffered records out, reset state if possible,
       // add columns and re-attempt the add
       flush()
-      updateDb(record)
-      add(record)
+      updateDb(op.record)
+      add(op)
     }
   }
 
@@ -115,12 +124,12 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
     *
     * @param record
     */
-  private def upsert(record: GenericRecord): Unit = {
+  private def upsert(record: GenericRecord): Try[Unit] = {
     if (AvroUtils.areEqual(currentSchema.schema, record.getSchema)) {
       TryWith(connection.prepareStatement(upsertStmt)) { pstmt =>
         valueSetter.bind(record, pstmt)
         pstmt.executeUpdate()
-      }.get //TODO: better error handling here, we do the get just so that we throw an exception if there is one.
+      } //TODO: better error handling here, we do the get just so that we throw an exception if there is one.
     }
     else {
       updateDb(record)
@@ -128,16 +137,35 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
     }
   }
 
-  override def execute(operation: Operation): Unit = {
-    operation match {
-      case Upsert(record) => upsert(record)
-      case DeleteByKey(fields) => throw new UnsupportedOperationException("Not supported")
+  private def deleteError() =
+    throw new UnsupportedOperationException("Deletes are not possible without a primary key.")
+
+  /**
+    * Convenience method to delete exactly one record from the underlying database.
+    *
+    * @param keys
+    */
+  private def delete(keys: Map[Field, AnyRef]): Try[Unit] = {
+    deleteStmt match {
+      case Some(s) =>
+        TryWith(connection.prepareStatement(s)) { dstmt =>
+          valueSetter.bind(schema.schema, keys, dstmt)
+          dstmt.executeUpdate()
+        } //TODO: better error handling here, we do the get just so that we throw an exception if there is one.
+
+      case None => deleteError()
     }
   }
 
-  def flush(): Unit = synchronized {
-    val conn = connectionProvider.getConnection
-    val supportsTransactions = try {
+  override def execute(operation: Operation): Unit = {
+    operation match {
+      case Upsert(record) => upsert(record)
+      case DeleteByKey(fields) => delete(fields)
+    }
+  }
+
+  def supportsTransactions(conn: Connection): Boolean = {
+    try {
       conn.getMetaData().supportsDataManipulationTransactionsOnly() ||
         conn.getMetaData().supportsDataDefinitionAndDataManipulationTransactions()
 
@@ -146,39 +174,46 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
         JdbcRecordWriter.logger.warn("Exception while detecting transaction support", e)
         true
     }
+  }
+
+  def flush(): Unit = synchronized {
+    val conn = connectionProvider.getConnection
 
     var committed = false
 
-    if (supportsTransactions) {
-      conn.setAutoCommit(false) // Everything in the same db transaction.
+    val supportsTxn = supportsTransactions(conn)
+
+    if (supportsTxn) conn.setAutoCommit(false) // Everything in the same db transaction.
+
+    val upsert = conn.prepareStatement(upsertStmt)
+    lazy val delete = conn.prepareStatement(deleteStmt.get)
+
+    operations.foreach {
+      case Upsert(record) => valueSetter.bind(record, upsert)
+      case DeleteByKey(keys) => valueSetter.bind(schema.schema, keys, delete)
     }
-    val pstmt = conn.prepareStatement(upsertStmt)
-    records.foreach(valueSetter.bind(_, pstmt))
     try {
-      pstmt.executeBatch()
-      if (supportsTransactions) {
-        conn.commit()
-      }
+      upsert.executeBatch()
+      if (supportsTxn) conn.commit()
       committed = true
     }
     catch {
       case e: BatchUpdateException =>
         logger.error("Batch update error", e.getNextException())
         conn.rollback()
-        val recordsInError = handleBatchError(records)
+        val recordsInError = handleBatchError(operations)
+        conn.commit()
         logger.error(s"The following records could not be replicated to table $name:")
         recordsInError.foreach(r => logger.error(s"${r._1.toString} - [${r._2.getMessage}]"))
       case e: Exception =>
         throw e
     }
     finally {
-      if (!committed && supportsTransactions) {
-        conn.rollback()
-      }
+      if (!committed && supportsTxn) conn.rollback()
 
       conn.setAutoCommit(true) //back
     }
-    records.clear()
+    operations.clear()
   }
 
   def close(): Unit = {
@@ -190,15 +225,13 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
     *
     * Returns the generic record(s) that caused the failure.
     */
-  private[sql] def handleBatchError(records: Seq[GenericRecord]): Seq[(GenericRecord, Throwable)] = {
-    records.map { record =>
-      record -> TryWith(connectionProvider.getNewConnection()) { conn =>
-        TryWith(conn.prepareStatement(upsertStmt)) { pstmt =>
-          valueSetter.bind(record, pstmt)
-          logger.debug(s"Trying to insert potentially invalid record $record")
-          pstmt.executeUpdate()
-        }
+  private[sql] def handleBatchError(records: Seq[Operation]): Seq[(Operation, Throwable)] = {
+    operations.map { operation =>
+      val result: Try[Unit] = operation match {
+        case Upsert(record) => upsert(record)
+        case DeleteByKey(keys) => delete(keys)
       }
+      operation -> result
     }.filter(_._2.isFailure).map(x => x._1 -> Failure(x._2.failed.get).exception)
   }
 }

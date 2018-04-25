@@ -83,12 +83,16 @@ object JdbcRecordFactory {
 }
 
 /**
- *
- * @param destination The Table name
- * @param key         The name of the primary key for the table (optional)
- * @param payload     The avro record representing a row in the table.
- */
-case class JdbcRecord(destination: String, key: Option[Seq[Field]], payload: GenericRecord, dbProfile: String)
-  extends HydraRecord[Seq[Field], GenericRecord]
+  *
+  * @param destination The Table name
+  * @param key         The name of the primary key for the table (optional)
+  * @param payload     The avro record representing a row in the table.
+  */
+case class JdbcRecord(destination: String,
+                      key: Option[Seq[Field]], payload: GenericRecord, dbProfile: String)
+  extends HydraRecord[Seq[Field], GenericRecord] {
+  lazy val primaryKeys = key.getOrElse(Seq.empty)
+  lazy val keyValues: Map[Field, AnyRef] = primaryKeys.map(k => k -> payload.get(k.name)).toMap
+}
 
 case class JdbcRecordMetadata(table: String, timestamp: Long = System.currentTimeMillis) extends RecordMetadata
