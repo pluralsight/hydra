@@ -239,21 +239,3 @@ object JdbcRecordWriter {
 
   val logger = LoggerFactory.getLogger(getClass)
 }
-
-/**
-  * Delays init of delete prepared statements until we need it
-  *
-  * @param f
-  * @param option
-  * @tparam A
-  */
-class LazyDelete[A](f: => A, private var option: Option[A] = None) {
-
-  def apply(): A = option match {
-    case Some(a) => a
-    case None => val a = f; option = Some(a); a
-  }
-
-  def toOption: Option[A] = option
-
-}
