@@ -33,7 +33,8 @@ object Dependencies {
   val opRabbitVersion = "2.0.0"
   val constructRVersion = "0.18.1"
   val akkaHTTPCorsVersion = "0.2.2"
-  val akkaKryoVersion = "0.5.1"
+
+  val akkaKryoVersion = "0.5.2"
 
   object Compile {
 
@@ -68,11 +69,12 @@ object Dependencies {
       "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
-      "com.github.romix.akka" %% "akka-kryo-serialization" % akkaKryoVersion,
       "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
       "ch.megard" %% "akka-http-cors" % akkaHTTPCorsVersion,
       "org.iq80.leveldb" % "leveldb" % "0.7",
       "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8")
+
+    val akkaKryo = "com.github.romix.akka" %% "akka-kryo-serialization" % akkaKryoVersion
 
     val akkaKafkaStream = "com.typesafe.akka" %% "akka-stream-kafka" % akkaKafkaStreamVersion
 
@@ -143,7 +145,7 @@ object Dependencies {
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
   val coreDeps = akka ++ baseDeps ++
-    Seq(guavacache, reflections, serviceContainer) ++ confluent ++ constructR
+    Seq(guavacache, reflections, serviceContainer, akkaKryo) ++ confluent ++ constructR
 
   val ingestDeps = coreDeps
 
