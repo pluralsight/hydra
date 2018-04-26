@@ -45,7 +45,7 @@ trait RecordWriter {
     *
     * This control the creation of any underlying data stores, such as tables in a database.
     */
-  def schema: SchemaWrapper
+  def schemaWrapper: SchemaWrapper
 
   /**
     * @return The save mode for this writer. Used when the writer is being initialized.

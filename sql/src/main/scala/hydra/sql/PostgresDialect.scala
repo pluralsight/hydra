@@ -59,7 +59,7 @@ private[sql] object PostgresDialect extends JdbcDialect {
 
   override def upsertFields(schema: SchemaWrapper): Seq[Field] = {
     val fields = schema.getFields
-    val idFields = schema.primaryKeys
+    val idFields = schema.primaryKeys.map(schema.schema.getField)
     val updateSchema = if (idFields.isEmpty) Seq.empty else fields -- idFields
     fields ++ updateSchema ++ idFields
   }
@@ -67,7 +67,7 @@ private[sql] object PostgresDialect extends JdbcDialect {
   override def buildUpsert(table: String, schema: SchemaWrapper, dbs: DbSyntax): String = {
     def formatColName(col: Field) = quoteIdentifier(dbs.format(col.name()))
 
-    val idFields = schema.primaryKeys
+    val idFields = schema.primaryKeys.map(schema.schema.getField)
     val fields = schema.getFields
     val columns = fields.map(formatColName).mkString(",")
     val placeholders = parameterize(fields)

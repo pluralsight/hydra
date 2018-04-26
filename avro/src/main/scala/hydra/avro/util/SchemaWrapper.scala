@@ -18,7 +18,7 @@ import scala.collection.mutable
   * @param schema      The avro schema
   * @param primaryKeys The list of primary keys; Empty if no primary keys.
   */
-case class SchemaWrapper(schema: Schema, primaryKeys: Seq[Field]) {
+case class SchemaWrapper(schema: Schema, primaryKeys: Seq[String]) {
   import scala.collection.JavaConverters._
 
   def getFields: mutable.Buffer[Field] = schema.getFields.asScala
@@ -32,13 +32,13 @@ object SchemaWrapper {
     SchemaWrapper(schema, schemaPKs(schema))
   }
 
-  def from(schema: Schema, primaryKeys: Seq[Field]): SchemaWrapper = {
+  def from(schema: Schema, primaryKeys: Seq[String]): SchemaWrapper = {
     SchemaWrapper(schema, if (primaryKeys.isEmpty) schemaPKs(schema) else primaryKeys)
   }
 
-  private def schemaPKs(schema: Schema): Seq[Field] = {
+  private def schemaPKs(schema: Schema): Seq[String] = {
     Option(schema.getProp("hydra.key")).map(_.split(",")) match {
-      case Some(ids) => ids.map(AvroUtils.getField(_, schema))
+      case Some(ids) => ids
       case None => Seq.empty
     }
   }

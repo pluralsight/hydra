@@ -6,34 +6,7 @@ import org.scalatest.{FlatSpecLike, Matchers}
 
 class SchemaWrapperSpec extends Matchers with FlatSpecLike {
 
-  "The schema wrapper" should "throw exception if primary key doesn't exist" in {
-    val schema =
-      """
-        |{
-        |	"type": "record",
-        |	"name": "User",
-        |	"namespace": "hydra",
-        | "hydra.key": "name",
-        |	"fields": [{
-        |			"name": "id",
-        |			"type": "int",
-        |			"doc": "doc"
-        |		},
-        |		{
-        |			"name": "username",
-        |			"type": ["null", "string"]
-        |		}
-        |	]
-        |}""".stripMargin
-
-    val avro = new Schema.Parser().parse(schema)
-
-    intercept[IllegalArgumentException] {
-      SchemaWrapper.from(avro, Seq.empty).primaryKeys shouldBe None
-    }
-  }
-
-  it should "allow overriding of primary keys via the method argument" in {
+  "The schema wrapper" should "allow overriding of primary keys via the method argument" in {
     val schema =
       """
         |{
@@ -55,8 +28,8 @@ class SchemaWrapperSpec extends Matchers with FlatSpecLike {
 
     val avro = new Schema.Parser().parse(schema)
 
-    SchemaWrapper.from(avro).primaryKeys(0) shouldBe avro.getField("username")
-    SchemaWrapper.from(avro, Seq(avro.getField("id"))).primaryKeys(0) shouldBe avro.getField("id")
+    SchemaWrapper.from(avro).primaryKeys(0) shouldBe "username"
+    SchemaWrapper.from(avro, Seq("id")).primaryKeys(0) shouldBe "id"
 
   }
 
@@ -83,7 +56,7 @@ class SchemaWrapperSpec extends Matchers with FlatSpecLike {
 
     val avro = new Schema.Parser().parse(schema)
 
-    SchemaWrapper.from(avro).primaryKeys shouldBe Seq(avro.getField("id"))
+    SchemaWrapper.from(avro).primaryKeys shouldBe Seq("id")
   }
 
   it should "allow primary keys to be supplied" in {
@@ -137,7 +110,7 @@ class SchemaWrapperSpec extends Matchers with FlatSpecLike {
 
     val avro = new Schema.Parser().parse(schema)
 
-    SchemaWrapper.from(avro).primaryKeys shouldBe Seq(avro.getField("id1"), avro.getField("id2"))
+    SchemaWrapper.from(avro).primaryKeys shouldBe Seq("id1","id2")
 
   }
 

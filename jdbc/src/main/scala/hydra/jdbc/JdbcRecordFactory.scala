@@ -15,14 +15,13 @@ import hydra.core.transport.ValidationStrategy.Strict
 import hydra.core.transport.{HydraRecord, RecordFactory, RecordMetadata}
 import hydra.jdbc.JdbcRecordFactory.{DB_PROFILE_PARAM, TABLE_PARAM}
 import org.apache.avro.Schema
-import org.apache.avro.Schema.Field
 import org.apache.avro.generic.GenericRecord
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
-class JdbcRecordFactory(schemaResourceLoader: ActorRef) extends RecordFactory[Seq[Field], GenericRecord]
+class JdbcRecordFactory(schemaResourceLoader: ActorRef) extends RecordFactory[Seq[String], GenericRecord]
   with ConfigSupport {
 
   //todo: config-driven
@@ -67,9 +66,9 @@ object JdbcRecordFactory {
 
   val DB_PROFILE_PARAM = "hydra-db-profile"
 
-  private[jdbc] def pk(request: HydraRequest, schema: Schema): Seq[Field] = {
+  private[jdbc] def pk(request: HydraRequest, schema: Schema): Seq[String] = {
     request.metadataValue(PRIMARY_KEY_PARAM).map(_.split(",")) match {
-      case Some(ids) => ids.map(AvroUtils.getField(_, schema))
+      case Some(ids) => ids
       case None => SchemaWrapper.from(schema).primaryKeys //todo: cache this?
     }
   }
@@ -89,10 +88,10 @@ object JdbcRecordFactory {
   * @param payload     The avro record representing a row in the table.
   */
 case class JdbcRecord(destination: String,
-                      key: Option[Seq[Field]], payload: GenericRecord, dbProfile: String)
-  extends HydraRecord[Seq[Field], GenericRecord] {
+                      key: Option[Seq[String]], payload: GenericRecord, dbProfile: String)
+  extends HydraRecord[Seq[String], GenericRecord] {
   lazy val primaryKeys = key.getOrElse(Seq.empty)
-  lazy val keyValues: Map[String, AnyRef] = primaryKeys.map(k => k.name -> payload.get(k.name)).toMap
+  lazy val keyValues: Map[String, AnyRef] = primaryKeys.map(k => k -> payload.get(k)).toMap
 }
 
 case class JdbcRecordMetadata(table: String, timestamp: Long = System.currentTimeMillis) extends RecordMetadata
