@@ -52,7 +52,7 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
 
   private val store: Catalog = new JdbcCatalog(connectionProvider, syntax, dialect)
 
-  private val tableId = tableIdentifier.getOrElse(TableIdentifier(schemaWrapper.getName))
+  private val tableId = tableIdentifier.getOrElse(TableIdentifier(JdbcUtils.createTableNameFromSchema(schemaWrapper.schema)))
 
   private val operations = new mutable.ArrayBuffer[Operation]()
 

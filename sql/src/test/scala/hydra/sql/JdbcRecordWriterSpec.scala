@@ -482,5 +482,27 @@ class JdbcRecordWriterSpec extends Matchers
         rs.next() shouldBe false
       }.get
     }
+
+    it("writes to new a versioned table if schema is versioned") {
+      val schemaStrV2 = """{
+                          |  "type": "record",
+                          |  "name": "VersionedTable",
+                          |  "namespace": "hydra.v2",
+                          |  "fields": [{
+                          |    "name": "identifier",
+                          |    "type": "int"
+                          |  },
+                          |  {
+                          |    "name": "name",
+                          |    "type": "string"
+                          |  }]
+                          |}""".stripMargin
+
+      val schemaVersion2 = new Schema.Parser().parse(schemaStrV2)
+
+      new JdbcRecordWriter( writerSettings, provider, SchemaWrapper.from(schemaVersion2), SaveMode.Append).close()
+      catalog.tableExists(TableIdentifier("versioned_table_v2")) shouldBe true
+    }
+
   }
 }

@@ -168,4 +168,18 @@ private[sql] object JdbcUtils {
     dialect.getJDBCType(schema).orElse(getCommonJDBCType(schema)).getOrElse(
       throw new IllegalArgumentException(s"Can't get JDBC type for ${schema.getName}"))
   }
+
+  def createTableNameFromSchema(schema: Schema): String = {
+    val namespace = schema.getNamespace
+    val name = schema.getName
+    val versionMatcher = """.*\.(v\d+)$""".r
+    namespace match {
+      case versionMatcher(version) => {
+        name + version.toUpperCase()
+      }
+      case _ => {
+        name
+      }
+    }
+  }
 }
