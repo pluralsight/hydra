@@ -92,10 +92,10 @@ abstract class JdbcDialect extends Serializable {
     s"INSERT INTO $table ($cols) VALUES (${parameterize(columns).mkString(",")})"
   }
 
-  def deleteStatement(table: String, keys: Seq[Field], dbs: DbSyntax): String = {
+  def deleteStatement(table: String, keys: Seq[String], dbs: DbSyntax): String = {
     //guard against some rogue caller trying to delete the entire table
     assert(!keys.isEmpty, "Whoa! At least one primary key is required.")
-    val colTuples = keys.map(f => s"${quoteIdentifier(dbs.format(f.name))} = ?")
+    val colTuples = keys.map(f => s"${quoteIdentifier(dbs.format(f))} = ?")
     s"DELETE FROM $table WHERE ${colTuples.mkString(" AND ")}"
   }
 

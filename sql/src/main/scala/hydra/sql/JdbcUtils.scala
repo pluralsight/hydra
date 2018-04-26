@@ -136,7 +136,7 @@ private[sql] object JdbcUtils {
       s"$name $typ $nullable"
     }
     val pkSeq = schema.primaryKeys
-      .map(f => dialect.quoteIdentifier(dbSyntax.format(f.name())))
+      .map(f => dialect.quoteIdentifier(dbSyntax.format(f)))
     val pkStmt = if (!pkSeq.isEmpty) s",CONSTRAINT ${schema.getName}_PK PRIMARY KEY (${pkSeq.mkString(",")})" else ""
     val ddl = s"${schemaStr.mkString(",")}${pkStmt}"
     ddl

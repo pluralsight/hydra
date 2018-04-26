@@ -49,18 +49,17 @@ class JdbcRecordFactorySpec extends TestKit(ActorSystem("hydra"))
   describe("The JDBC record factory") {
     it("extracts primary keys if present") {
       val req = HydraRequest("1", "test")
-      JdbcRecordFactory.pk(req, schemaPK) shouldBe Seq(schemaPK.getField("id"))
+      JdbcRecordFactory.pk(req, schemaPK) shouldBe Seq("id")
 
       val req1 = HydraRequest("1", "test")
       JdbcRecordFactory.pk(req1, schemaNPK) shouldBe Seq.empty
 
       val req2 = HydraRequest("1", "test").withMetadata(JdbcRecordFactory.PRIMARY_KEY_PARAM -> "id")
-      JdbcRecordFactory.pk(req2, schemaNPK) shouldBe Seq(schemaNPK.getField("id"))
+      JdbcRecordFactory.pk(req2, schemaNPK) shouldBe Seq("id")
 
       val req3 = HydraRequest("1", "test").withMetadata(JdbcRecordFactory.PRIMARY_KEY_PARAM -> "unknown")
-      intercept[IllegalArgumentException] {
-        JdbcRecordFactory.pk(req3, schemaNPK) shouldBe Seq(schemaNPK.getField("id"))
-      }
+      JdbcRecordFactory.pk(req3, schemaNPK) shouldBe Seq("unknown")
+
     }
 
     it("throws an error if no schema is in the request metadata") {
@@ -116,9 +115,9 @@ class JdbcRecordFactorySpec extends TestKit(ActorSystem("hydra"))
 
       whenReady(factory.build(request)) { rec =>
         rec.destination shouldBe schemaPK.getName
-        rec.primaryKeys shouldBe Seq(schemaPK.getField("id"))
-        rec.keyValues shouldBe Map(schemaPK.getField("id") -> 1)
-        rec.key shouldBe Some(Seq(schemaPK.getField("id")))
+        rec.primaryKeys shouldBe Seq("id")
+        rec.keyValues shouldBe Map("id" -> 1)
+        rec.key shouldBe Some(Seq("id"))
         rec.payload shouldBe new JsonConverter[GenericRecord](schemaPK).convert("""{"id":1, "name":"test", "rank" : 1}""")
       }
     }

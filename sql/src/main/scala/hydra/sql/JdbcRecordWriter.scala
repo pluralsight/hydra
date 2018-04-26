@@ -8,7 +8,6 @@ import hydra.avro.io._
 import hydra.avro.util.{AvroUtils, SchemaWrapper}
 import hydra.common.util.TryWith
 import org.apache.avro.LogicalTypes.LogicalTypeFactory
-import org.apache.avro.Schema.Field
 import org.apache.avro.generic.GenericRecord
 import org.apache.avro.{LogicalType, LogicalTypes, Schema}
 import org.slf4j.LoggerFactory
@@ -31,13 +30,13 @@ import scala.util.{Failure, Try}
   * affect the performance of systems that process many deletes.
   *
   * @param settings        The JdbcWriterSettings to be used
-  * @param schema          The initial schema to use when creating/updating/inserting records.
+  * @param schemaWrapper          The initial schema to use when creating/updating/inserting records.
   * @param mode            See [hydra.avro.io.SaveMode]
   * @param tableIdentifier The table identifier; defaults to using the schema's name if none provided.
   */
 class JdbcRecordWriter(val settings: JdbcWriterSettings,
                        val connectionProvider: ConnectionProvider,
-                       val schema: SchemaWrapper,
+                       val schemaWrapper: SchemaWrapper,
                        val mode: SaveMode = SaveMode.ErrorIfExists,
                        tableIdentifier: Option[TableIdentifier] = None) extends RecordWriter with JdbcHelper {
 
@@ -53,11 +52,11 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
 
   private val store: Catalog = new JdbcCatalog(connectionProvider, syntax, dialect)
 
-  private val tableId = tableIdentifier.getOrElse(TableIdentifier(schema.getName))
+  private val tableId = tableIdentifier.getOrElse(TableIdentifier(schemaWrapper.getName))
 
   private val operations = new mutable.ArrayBuffer[Operation]()
 
-  private var currentSchema = schema
+  private var currentSchema = schemaWrapper
 
   private val tableObj: Table = {
     val tableExists = store.tableExists(tableId)
@@ -65,9 +64,9 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
       case SaveMode.ErrorIfExists if tableExists =>
         throw new AnalysisException(s"Table ${tableId.table} already exists.")
       case SaveMode.Overwrite => //todo: truncate table
-        Table(tableId.table, schema, tableId.database)
+        Table(tableId.table, schemaWrapper, tableId.database)
       case _ =>
-        val table = Table(tableId.table, schema, tableId.database)
+        val table = Table(tableId.table, schemaWrapper, tableId.database)
         store.createOrAlterTable(table)
         table
     }
@@ -75,14 +74,14 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
 
   private val name = syntax.format(tableObj.name)
 
-  private var valueSetter = new AvroValueSetter(schema, dialect)
+  private var valueSetter = new AvroValueSetter(schemaWrapper, dialect)
 
-  private var upsertStmt = dialect.upsert(syntax.format(name), schema, syntax)
+  private var upsertStmt = dialect.upsert(syntax.format(name), schemaWrapper, syntax)
 
   //since changing pks on a table isn't supported, this can be a val
   private val deleteStmt =
-    schema.primaryKeys.headOption.map(_ =>
-      dialect.deleteStatement(syntax.format(name), schema.primaryKeys, syntax))
+    schemaWrapper.primaryKeys.headOption.map(_ =>
+      dialect.deleteStatement(syntax.format(name), schemaWrapper.primaryKeys, syntax))
 
   private def connection = connectionProvider.getConnection
 
@@ -146,11 +145,12 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
     *
     * @param keys
     */
-  private def delete(keys: Map[Field, AnyRef]): Try[Unit] = {
+  private def delete(keys: Map[String, AnyRef]): Try[Unit] = {
     deleteStmt match {
       case Some(s) =>
         TryWith(connection.prepareStatement(s)) { dstmt =>
-          valueSetter.bind(schema.schema, keys, dstmt)
+          val fields = keys.map(v => schemaWrapper.schema.getField(v._1) -> v._2)
+          valueSetter.bind(schemaWrapper.schema, fields, dstmt)
           dstmt.executeUpdate()
         } //TODO: better error handling here, we do the get just so that we throw an exception if there is one.
 
@@ -191,7 +191,9 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
 
     operations.foreach {
       case Upsert(record) => valueSetter.bind(record, upsert)
-      case DeleteByKey(keys) => valueSetter.bind(schema.schema, keys, delete)
+      case DeleteByKey(keys) =>
+        val fields = keys.map(v => schemaWrapper.schema.getField(v._1) -> v._2)
+        valueSetter.bind(schemaWrapper.schema, fields, delete)
     }
     try {
       upsert.executeBatch()
