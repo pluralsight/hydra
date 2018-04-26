@@ -7,9 +7,10 @@ import hydra.avro.io.SaveMode.SaveMode
 import hydra.avro.io._
 import hydra.avro.util.{AvroUtils, SchemaWrapper}
 import hydra.common.util.TryWith
+import org.apache.avro.LogicalTypes.LogicalTypeFactory
 import org.apache.avro.Schema.Field
 import org.apache.avro.generic.GenericRecord
-import org.apache.avro.{LogicalTypes, Schema}
+import org.apache.avro.{LogicalType, LogicalTypes, Schema}
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
@@ -238,7 +239,9 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
 
 object JdbcRecordWriter {
 
-  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, (_: Schema) => IsoDate)
+  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, new LogicalTypeFactory {
+    override def fromSchema(schema: Schema): LogicalType = IsoDate
+  })
 
   val logger = LoggerFactory.getLogger(getClass)
 }

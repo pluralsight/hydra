@@ -62,7 +62,9 @@ lazy val root = Project(
 lazy val common = Project(
   id = "common",
   base = file("common")
-).settings(moduleSettings, name := "hydra-common", libraryDependencies ++= Dependencies.baseDeps)
+).settings(moduleSettings,
+  crossScalaVersions := Seq("2.11.8", "2.12.3"),
+  name := "hydra-common", libraryDependencies ++= Dependencies.baseDeps)
 
 lazy val core = Project(
   id = "core",
@@ -80,18 +82,22 @@ lazy val avro = Project(
   id = "avro",
   base = file("avro")
 ).dependsOn(common)
-  .settings(moduleSettings, name := "hydra-avro", libraryDependencies ++= Dependencies.avroDeps)
+  .settings(moduleSettings,
+    crossScalaVersions := Seq("2.11.8", "2.12.3"),
+    name := "hydra-avro", libraryDependencies ++= Dependencies.avroDeps)
 
 lazy val sql = Project(
   id = "sql",
   base = file("sql")
-).dependsOn(core)
-  .settings(moduleSettings, name := "hydra-sql", libraryDependencies ++= Dependencies.sqlDeps)
+).dependsOn(avro)
+  .settings(moduleSettings,
+    crossScalaVersions := Seq("2.11.8", "2.12.3"),
+    name := "hydra-sql", libraryDependencies ++= Dependencies.sqlDeps)
 
 lazy val jdbc = Project(
   id = "jdbc",
   base = file("jdbc")
-).dependsOn(sql)
+).dependsOn(core, sql)
   .settings(moduleSettings, name := "hydra-jdbc", libraryDependencies ++= Dependencies.sqlDeps)
 
 lazy val rabbitmq = Project(
