@@ -283,7 +283,7 @@ class JdbcRecordWriterSpec extends Matchers
       }.get
 
       //delete
-      writer.execute(DeleteByKey(Map(pschema.getField("id") -> (1: java.lang.Integer))))
+      writer.execute(DeleteByKey(Map("id" -> (1: java.lang.Integer))))
       TryWith(c.createStatement()) { stmt =>
         val rs = stmt.executeQuery("select \"id\",\"username\" from delete_single_record")
         rs.next() shouldBe false
@@ -316,7 +316,7 @@ class JdbcRecordWriterSpec extends Matchers
 
       val writer = new JdbcRecordWriter(writerSettings, provider, SchemaWrapper.from(pschema))
       intercept[UnsupportedOperationException] {
-        writer.execute(DeleteByKey(Map(pschema.getField("id") -> (1: java.lang.Integer))))
+        writer.execute(DeleteByKey(Map("id" -> (1: java.lang.Integer))))
       }
     }
 
@@ -473,7 +473,7 @@ class JdbcRecordWriterSpec extends Matchers
       }.get
 
 
-      writer.batch(DeleteByKey(Map(pschema.getField("id") -> (1: java.lang.Integer))))
+      writer.batch(DeleteByKey(Map("id" -> (1: java.lang.Integer))))
 
       writer.close()
 

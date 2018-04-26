@@ -8,7 +8,6 @@ import hydra.avro.io._
 import hydra.avro.util.{AvroUtils, SchemaWrapper}
 import hydra.common.util.TryWith
 import org.apache.avro.LogicalTypes.LogicalTypeFactory
-import org.apache.avro.Schema.Field
 import org.apache.avro.generic.GenericRecord
 import org.apache.avro.{LogicalType, LogicalTypes, Schema}
 import org.slf4j.LoggerFactory
@@ -146,11 +145,12 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
     *
     * @param keys
     */
-  private def delete(keys: Map[Field, AnyRef]): Try[Unit] = {
+  private def delete(keys: Map[String, AnyRef]): Try[Unit] = {
     deleteStmt match {
       case Some(s) =>
         TryWith(connection.prepareStatement(s)) { dstmt =>
-          valueSetter.bind(schema.schema, keys, dstmt)
+          val fields = keys.map(v => schema.schema.getField(v._1) -> v._2)
+          valueSetter.bind(schema.schema, fields, dstmt)
           dstmt.executeUpdate()
         } //TODO: better error handling here, we do the get just so that we throw an exception if there is one.
 
@@ -191,7 +191,9 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
 
     operations.foreach {
       case Upsert(record) => valueSetter.bind(record, upsert)
-      case DeleteByKey(keys) => valueSetter.bind(schema.schema, keys, delete)
+      case DeleteByKey(keys) =>
+        val fields = keys.map(v => schema.schema.getField(v._1) -> v._2)
+        valueSetter.bind(schema.schema, fields, delete)
     }
     try {
       upsert.executeBatch()

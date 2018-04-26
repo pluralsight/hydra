@@ -117,7 +117,7 @@ class JdbcRecordFactorySpec extends TestKit(ActorSystem("hydra"))
       whenReady(factory.build(request)) { rec =>
         rec.destination shouldBe schemaPK.getName
         rec.primaryKeys shouldBe Seq(schemaPK.getField("id"))
-        rec.keyValues shouldBe Map(schemaPK.getField("id") -> 1)
+        rec.keyValues shouldBe Map("id" -> 1)
         rec.key shouldBe Some(Seq(schemaPK.getField("id")))
         rec.payload shouldBe new JsonConverter[GenericRecord](schemaPK).convert("""{"id":1, "name":"test", "rank" : 1}""")
       }

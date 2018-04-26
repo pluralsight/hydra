@@ -92,7 +92,7 @@ case class JdbcRecord(destination: String,
                       key: Option[Seq[Field]], payload: GenericRecord, dbProfile: String)
   extends HydraRecord[Seq[Field], GenericRecord] {
   lazy val primaryKeys = key.getOrElse(Seq.empty)
-  lazy val keyValues: Map[Field, AnyRef] = primaryKeys.map(k => k -> payload.get(k.name)).toMap
+  lazy val keyValues: Map[String, AnyRef] = primaryKeys.map(k => k.name -> payload.get(k.name)).toMap
 }
 
 case class JdbcRecordMetadata(table: String, timestamp: Long = System.currentTimeMillis) extends RecordMetadata

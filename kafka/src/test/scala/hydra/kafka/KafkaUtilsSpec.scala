@@ -157,7 +157,7 @@ class KafkaUtilsSpec extends WordSpec
         )
         val kafkaUtils = new KafkaUtils("", () => new ZkClient("localhost:3181"))
         kafkaUtils.topicExists("test.Hydra").get shouldBe false
-        val details = new TopicDetails(1, 1, configs.asJava)
+        val details = new TopicDetails(1, 1:Short, configs.asJava)
         val response = kafkaUtils.createTopic("test.Hydra", details, 3000)
 
         val ctr = response.get
