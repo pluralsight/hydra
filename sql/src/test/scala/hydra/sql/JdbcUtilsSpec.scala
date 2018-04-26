@@ -357,5 +357,27 @@ class JdbcUtilsSpec extends Matchers with FunSpecLike {
       stmt shouldBe "\"id1\" INTEGER NOT NULL,\"id2\" INTEGER NOT NULL,\"username\" TEXT NOT NULL," +
         "\"testEnum\" TEXT NOT NULL,CONSTRAINT User_PK PRIMARY KEY (\"id1\",\"id2\")"
     }
+
+    it("Generates the correct table name from a versioned schema") {
+      val schema =
+        """
+          |{
+          |	"type": "record",
+          |	"name": "MyTable",
+          |	"namespace": "hydra.v3",
+          | "hydra.key":"id1,id2",
+          |	"fields": [
+          | {
+          |			"name": "id1",
+          |			"type": "int"
+          |		}
+          |	]
+          |}
+        """.stripMargin
+
+      val avro = new Schema.Parser().parse(schema)
+      val tableName = JdbcUtils.createTableNameFromSchema(avro)
+      tableName shouldBe "MyTableV3"
+    }
   }
 }
