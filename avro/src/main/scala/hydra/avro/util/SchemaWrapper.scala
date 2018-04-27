@@ -19,6 +19,7 @@ import scala.collection.mutable
   * @param primaryKeys The list of primary keys; Empty if no primary keys.
   */
 case class SchemaWrapper(schema: Schema, primaryKeys: Seq[Field]) {
+
   import scala.collection.JavaConverters._
 
   def getFields: mutable.Buffer[Field] = schema.getFields.asScala
@@ -37,7 +38,8 @@ object SchemaWrapper {
   }
 
   private def schemaPKs(schema: Schema): Seq[Field] = {
-    Option(schema.getProp("hydra.key")).map(_.split(",")) match {
+    Option(schema.getProp("hydra.key"))
+      .map(_.replaceAll("\\s", "").split(",")) match {
       case Some(ids) => ids.map(AvroUtils.getField(_, schema))
       case None => Seq.empty
     }
