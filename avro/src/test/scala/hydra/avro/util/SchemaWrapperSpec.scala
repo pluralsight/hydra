@@ -114,4 +114,35 @@ class SchemaWrapperSpec extends Matchers with FlatSpecLike {
 
   }
 
+  it should "strip whitespace from a composite primary key" in {
+    val schema =
+      """
+        |{
+        |	"type": "record",
+        |	"name": "User",
+        |	"namespace": "hydra",
+        | "hydra.key": "id1, id2",
+        |	"fields": [{
+        |			"name": "id1",
+        |			"type": "int",
+        |			"doc": "doc"
+        |		},
+        |  {
+        |			"name": "id2",
+        |			"type": "int",
+        |			"doc": "doc"
+        |		},
+        |		{
+        |			"name": "username",
+        |			"type": ["null", "string"]
+        |		}
+        |	]
+        |}""".stripMargin
+
+    val avro = new Schema.Parser().parse(schema)
+
+    SchemaWrapper.from(avro).primaryKeys shouldBe Seq("id1", "id2")
+
+  }
+
 }

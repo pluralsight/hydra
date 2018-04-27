@@ -37,7 +37,8 @@ object SchemaWrapper {
   }
 
   private def schemaPKs(schema: Schema): Seq[String] = {
-    Option(schema.getProp("hydra.key")).map(_.split(",")) match {
+    Option(schema.getProp("hydra.key"))
+      .map(_.replaceAll("\\s", "").split(",")) match {
       case Some(ids) => ids
       case None => Seq.empty
     }
