@@ -1,6 +1,6 @@
 package hydra.sql
 
-import java.sql.JDBCType
+import java.sql.{DriverManager, JDBCType}
 import java.sql.JDBCType._
 
 import hydra.avro.util.SchemaWrapper
@@ -18,6 +18,8 @@ import scala.concurrent.duration._
 class JdbcUtilsSpec extends Matchers
   with FunSpecLike
   with BeforeAndAfterAll {
+
+  DriverManager.registerDriver(new org.h2.Driver)
 
   val provider = new DriverManagerConnectionProvider("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1",
     "", "", 1, 1.millis)

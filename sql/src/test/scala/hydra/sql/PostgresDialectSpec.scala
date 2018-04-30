@@ -5,7 +5,8 @@ import java.sql.JDBCType._
 
 import hydra.avro.convert.IsoDate
 import hydra.avro.util.SchemaWrapper
-import org.apache.avro.{LogicalTypes, Schema}
+import org.apache.avro.LogicalTypes.LogicalTypeFactory
+import org.apache.avro.{LogicalType, LogicalTypes, Schema}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 /**
@@ -15,7 +16,9 @@ class PostgresDialectSpec extends Matchers
   with FunSpecLike
   with BeforeAndAfterAll {
 
-  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, (_: Schema) => IsoDate)
+  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName,new LogicalTypeFactory {
+    override def fromSchema(schema: Schema): LogicalType = IsoDate
+  })
 
   implicit def fromSchema(schema: Schema): SchemaWrapper = SchemaWrapper.from(schema)
 

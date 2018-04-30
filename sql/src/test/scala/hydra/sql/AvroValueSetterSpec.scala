@@ -9,7 +9,8 @@ import com.google.common.collect.Lists
 import com.pluralsight.hydra.sql.MockArray
 import hydra.avro.convert.{ISODateConverter, IsoDate}
 import hydra.avro.util.SchemaWrapper
-import org.apache.avro.{LogicalTypes, Schema}
+import org.apache.avro.LogicalTypes.LogicalTypeFactory
+import org.apache.avro.{LogicalType, LogicalTypes, Schema}
 import org.apache.avro.generic.GenericData
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FunSpecLike, Matchers}
@@ -20,7 +21,9 @@ import org.scalatest.{FunSpecLike, Matchers}
   */
 class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
 
-  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, (_: Schema) => IsoDate)
+  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName,new LogicalTypeFactory {
+    override def fromSchema(schema: Schema): LogicalType = IsoDate
+  })
 
   val schemaStr =
     """

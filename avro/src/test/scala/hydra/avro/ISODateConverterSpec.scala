@@ -3,10 +3,15 @@ package hydra.avro
 import java.time.{Instant, ZoneOffset, ZonedDateTime}
 
 import hydra.avro.convert.{ISODateConverter, IsoDate}
-import org.apache.avro.{LogicalTypes, Schema}
+import org.apache.avro.LogicalTypes.LogicalTypeFactory
+import org.apache.avro.{LogicalType, LogicalTypes, Schema}
 import org.scalatest.{FlatSpecLike, Matchers}
 
 class ISODateConverterSpec extends Matchers with FlatSpecLike {
+
+  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, new LogicalTypeFactory {
+    override def fromSchema(schema: Schema): LogicalType = IsoDate
+  })
 
   "The ISODateConverter class" should "convert ISO dates" in {
     val c = new ISODateConverter()
@@ -31,8 +36,6 @@ class ISODateConverterSpec extends Matchers with FlatSpecLike {
   }
 
   it should "use the logical type when parsing a schema" in {
-
-    LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, (_: Schema) => IsoDate)
 
     val schemaStr =
       """

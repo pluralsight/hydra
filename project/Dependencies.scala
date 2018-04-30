@@ -1,4 +1,6 @@
 
+import java.sql.DriverManager
+
 import sbt.{ExclusionRule, _}
 
 

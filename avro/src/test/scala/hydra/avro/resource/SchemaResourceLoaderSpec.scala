@@ -21,12 +21,11 @@ import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.{BeforeAndAfterEach, FunSpecLike, Matchers}
+import scalacache.modes.sync._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.io.Source
-import scalacache.modes.sync._
 
 /**
   * Created by alexsilva on 1/20/17.
@@ -41,7 +40,8 @@ class SchemaResourceLoaderSpec extends Matchers
     PatienceConfig(timeout = scaled(Span(1, Seconds)), interval = scaled(Span(10, Millis)))
 
   val schemaParser = new Schema.Parser()
-  val testSchema = schemaParser.parse(Source.fromResource("resource-loader-spec.avsc").mkString)
+  val testSchema = schemaParser.parse(
+    Thread.currentThread().getContextClassLoader.getResourceAsStream("resource-loader-spec.avsc"))
   val subject = testSchema.getFullName
 
   override def beforeEach = SchemaResourceLoader.schemaCache.removeAll()
