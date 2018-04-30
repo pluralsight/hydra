@@ -3,20 +3,16 @@ package hydra.sql
 import hydra.avro.io.SaveMode
 import hydra.avro.io.SaveMode.SaveMode
 import hydra.avro.util.SchemaWrapper
-import hydra.sql.TableCreator._
 
-class TableCreator(provider: ConnectionProvider, dbSyntax: DbSyntax,
-                   dialect: JdbcDialect, parameters: Map[String, String]) {
+class TableCreator(provider: ConnectionProvider, dbSyntax: DbSyntax, dialect: JdbcDialect) {
 
-  private val isTruncate = parameters.getOrElse(JdbcTruncate, "false").toBoolean &&
-    (dialect isCascadingTruncateTable()).contains(false)
 
-  def createOrAlterTable(mode: SaveMode, wrapper: SchemaWrapper): Unit = {
+  def createOrAlterTable(mode: SaveMode, wrapper: SchemaWrapper, isTruncate: Boolean): Table = {
     val tableName = dbSyntax.format(wrapper.schema.getName)
     val conn = provider.getConnection
-    val tableExists = JdbcUtils.tableExists(conn, dialect, tableName)
     val store = new JdbcCatalog(provider, UnderscoreSyntax, dialect)
-    val tableId = TableIdentifier(tableName)
+    val tableId = TableIdentifier(JdbcUtils.createTableNameFromSchema(wrapper.schema))
+    val tableExists = store.tableExists(tableId)
     val table = Table(tableId.table, wrapper, tableId.database)
     if (tableExists) {
       mode match {
@@ -46,6 +42,7 @@ class TableCreator(provider: ConnectionProvider, dbSyntax: DbSyntax,
     } else {
       store.createOrAlterTable(table)
     }
+    table
   }
 }
 

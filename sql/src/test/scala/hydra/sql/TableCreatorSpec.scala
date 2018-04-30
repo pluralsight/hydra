@@ -15,11 +15,9 @@ class TableCreatorSpec extends Matchers
   with FunSpecLike
   with BeforeAndAfterAll
   with JdbcHelper {
-
-
+  
   val provider = new DriverManagerConnectionProvider("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1",
     "", "", 1, 1.millis)
-
 
   override def afterAll() = provider.connection.close()
 
@@ -46,7 +44,7 @@ class TableCreatorSpec extends Matchers
 
       val schema = SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
 
-      new TableCreator(provider, UnderscoreSyntax, H2Dialect, Map.empty).createOrAlterTable(SaveMode.Append, schema)
+      new TableCreator(provider, UnderscoreSyntax, H2Dialect).createOrAlterTable(SaveMode.Append, schema, false)
       TryWith(provider.getConnection().createStatement()) { stmt =>
         val rs = stmt.executeQuery("select \"id\",\"username\" from hydra_new_table")
         rs.next() shouldBe false
@@ -81,7 +79,7 @@ class TableCreatorSpec extends Matchers
 
       val schema = SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
 
-      new TableCreator(provider, UnderscoreSyntax, H2Dialect, Map.empty).createOrAlterTable(SaveMode.Overwrite, schema)
+      new TableCreator(provider, UnderscoreSyntax, H2Dialect).createOrAlterTable(SaveMode.Overwrite, schema, false)
 
       TryWith(provider.getConnection().createStatement()) { stmt =>
         val rs = stmt.executeQuery("select \"id\",\"username\" from hydra_drop")
@@ -89,6 +87,44 @@ class TableCreatorSpec extends Matchers
       }.get
 
     }
+
+    it("truncates that already exists") {
+
+      TryWith(provider.getConnection().createStatement()) { stmt =>
+        val rs = stmt.executeUpdate("CREATE TABLE hydra_truncate (\"id\" INTEGER NOT NULL,\"username\" TEXT ) ")
+        rs shouldBe 0
+        stmt.executeUpdate("""insert into hydra_truncate values(1,'test')""") shouldBe 1
+      }.get
+
+      val schemaStr =
+        """
+          |{
+          |	"type": "record",
+          |	"name": "HydraTruncate",
+          |	"namespace": "hydra",
+          |	"fields": [{
+          |			"name": "id",
+          |			"type": "int",
+          |			"doc": "doc"
+          |		},
+          |		{
+          |			"name": "username",
+          |			"type": ["null", "string"]
+          |		}
+          |	]
+          |}""".stripMargin
+
+      val schema = SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
+
+      new TableCreator(provider, UnderscoreSyntax, H2Dialect).createOrAlterTable(SaveMode.Overwrite, schema, true)
+
+      TryWith(provider.getConnection().createStatement()) { stmt =>
+        val rs = stmt.executeQuery("select \"id\",\"username\" from hydra_drop")
+        rs.next() shouldBe false
+      }.get
+
+    }
+
 
     it("appends to a table") {
       TryWith(provider.getConnection().createStatement()) { stmt =>
@@ -117,7 +153,7 @@ class TableCreatorSpec extends Matchers
 
       val schema = SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
 
-      new TableCreator(provider, UnderscoreSyntax, H2Dialect, Map.empty).createOrAlterTable(SaveMode.Append, schema)
+      new TableCreator(provider, UnderscoreSyntax, H2Dialect).createOrAlterTable(SaveMode.Append, schema, false)
 
       TryWith(provider.getConnection().createStatement()) { stmt =>
         val rs = stmt.executeQuery("select \"id\",\"username\" from hydra_append")
@@ -155,7 +191,7 @@ class TableCreatorSpec extends Matchers
       val schema = SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
 
       intercept[AnalysisException] {
-        new TableCreator(provider, UnderscoreSyntax, H2Dialect, Map.empty).createOrAlterTable(SaveMode.ErrorIfExists, schema)
+        new TableCreator(provider, UnderscoreSyntax, H2Dialect).createOrAlterTable(SaveMode.ErrorIfExists, schema, false)
       }
     }
   }
