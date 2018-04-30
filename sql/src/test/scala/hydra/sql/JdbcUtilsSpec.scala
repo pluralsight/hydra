@@ -4,14 +4,26 @@ import java.sql.JDBCType
 import java.sql.JDBCType._
 
 import hydra.avro.util.SchemaWrapper
+import hydra.common.util.TryWith
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Type
-import org.scalatest.{FunSpecLike, Matchers}
+import org.h2.jdbc.JdbcSQLException
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+
+import scala.concurrent.duration._
 
 /**
   * Created by alexsilva on 5/18/17.
   */
-class JdbcUtilsSpec extends Matchers with FunSpecLike {
+class JdbcUtilsSpec extends Matchers
+  with FunSpecLike
+  with BeforeAndAfterAll {
+
+  val provider = new DriverManagerConnectionProvider("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1",
+    "", "", 1, 1.millis)
+
+
+  override def afterAll() = provider.connection.close()
 
   val schema =
     """
@@ -378,6 +390,19 @@ class JdbcUtilsSpec extends Matchers with FunSpecLike {
       val avro = new Schema.Parser().parse(schema)
       val tableName = JdbcUtils.createTableNameFromSchema(avro)
       tableName shouldBe "MyTableV3"
+    }
+
+    it("Drops a table") {
+      TryWith(provider.getConnection().createStatement()) { stmt =>
+        val rs = stmt.executeUpdate("CREATE TABLE drop_test (\"id\" INTEGER NOT NULL,\"username\" TEXT ) ")
+        rs shouldBe 0
+      }.get
+      JdbcUtils.dropTable(provider.getConnection(), "drop_test")
+      intercept[JdbcSQLException] {
+        TryWith(provider.getConnection().createStatement()) { stmt =>
+          stmt.executeUpdate("""insert into hydra_drop values(1,'test')""") shouldBe 1
+        }.get
+      }
     }
   }
 }

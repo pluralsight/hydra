@@ -127,6 +127,19 @@ private[sql] object JdbcUtils {
     }.isSuccess
   }
 
+  /**
+    * Truncates a table from the JDBC database without side effects.
+    */
+  def truncateTable(conn: Connection, dialect: JdbcDialect, table: String): Unit = {
+    val statement = conn.createStatement
+    try {
+      statement.executeUpdate(dialect.getTruncateQuery(table))
+    } finally {
+      statement.close()
+    }
+  }
+
+
   def schemaString(schema: SchemaWrapper, dialect: JdbcDialect,
                    dbSyntax: DbSyntax = NoOpSyntax): String = {
     val schemaStr = schema.getFields.map { field =>
@@ -174,12 +187,24 @@ private[sql] object JdbcUtils {
     val name = schema.getName
     val versionMatcher = """.*\.(v\d+)$""".r
     namespace match {
-      case versionMatcher(version) => {
+      case versionMatcher(version) =>
         name + version.toUpperCase()
-      }
-      case _ => {
-        name
-      }
+      case _ => name
+
+    }
+  }
+
+  /**
+    * Drops a table from the JDBC database.
+    */
+  def dropTable(conn: Connection, table: String): Unit = {
+    val statement = conn.createStatement
+    try {
+      val sql = s"DROP TABLE $table"
+      logger.debug(sql)
+      statement.executeUpdate(sql)
+    } finally {
+      statement.close()
     }
   }
 }

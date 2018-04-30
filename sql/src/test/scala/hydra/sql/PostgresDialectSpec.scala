@@ -6,12 +6,14 @@ import java.sql.JDBCType._
 import hydra.avro.convert.IsoDate
 import hydra.avro.util.SchemaWrapper
 import org.apache.avro.{LogicalTypes, Schema}
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 /**
   * Created by alexsilva on 5/4/17.
   */
-class PostgresDialectSpec extends Matchers with FunSpecLike {
+class PostgresDialectSpec extends Matchers
+  with FunSpecLike
+  with BeforeAndAfterAll {
 
   LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, (_: Schema) => IsoDate)
 
@@ -100,6 +102,11 @@ class PostgresDialectSpec extends Matchers with FunSpecLike {
 
 
   describe("The postgres dialect") {
+    it("has the right truncate statement") {
+      PostgresDialect.isCascadingTruncateTable() shouldBe Some(true)
+      PostgresDialect.getTruncateQuery("table") shouldBe """TRUNCATE TABLE table"""
+    }
+
     it("converts a schema") {
       val avro = new Schema.Parser().parse(schema)
       PostgresDialect.getJDBCType(avro.getField("username").schema()).get shouldBe JdbcType("TEXT", CHAR)
