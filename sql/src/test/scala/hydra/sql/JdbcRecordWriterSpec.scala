@@ -68,7 +68,7 @@ class JdbcRecordWriterSpec extends Matchers
 
   override def afterAll() = provider.connection.close()
 
-  describe("The AvroWriter") {
+  describe("The JdbcRecordWriter") {
 
     it("responds correctly it table already exists") {
       val schemaStr =

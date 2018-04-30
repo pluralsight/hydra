@@ -7,6 +7,7 @@ import hydra.avro.io.SaveMode.SaveMode
 import hydra.avro.io._
 import hydra.avro.util.{AvroUtils, SchemaWrapper}
 import hydra.common.util.TryWith
+import hydra.sql.TableCreator.JdbcTruncate
 import org.apache.avro.LogicalTypes.LogicalTypeFactory
 import org.apache.avro.generic.GenericRecord
 import org.apache.avro.{LogicalType, LogicalTypes, Schema}
@@ -30,7 +31,7 @@ import scala.util.{Failure, Try}
   * affect the performance of systems that process many deletes.
   *
   * @param settings        The JdbcWriterSettings to be used
-  * @param schemaWrapper          The initial schema to use when creating/updating/inserting records.
+  * @param schemaWrapper   The initial schema to use when creating/updating/inserting records.
   * @param mode            See [hydra.avro.io.SaveMode]
   * @param tableIdentifier The table identifier; defaults to using the schema's name if none provided.
   */
@@ -38,7 +39,9 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
                        val connectionProvider: ConnectionProvider,
                        val schemaWrapper: SchemaWrapper,
                        val mode: SaveMode = SaveMode.ErrorIfExists,
-                       tableIdentifier: Option[TableIdentifier] = None) extends RecordWriter with JdbcHelper {
+                       tableIdentifier: Option[TableIdentifier] = None,
+                       parameters: Map[String, String] = Map.empty) extends RecordWriter
+  with JdbcHelper {
 
   import JdbcRecordWriter._
 
@@ -58,19 +61,11 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
 
   private var currentSchema = schemaWrapper
 
-  private val tableObj: Table = {
-    val tableExists = store.tableExists(tableId)
-    mode match {
-      case SaveMode.ErrorIfExists if tableExists =>
-        throw new AnalysisException(s"Table ${tableId.table} already exists.")
-      case SaveMode.Overwrite => //todo: truncate table
-        Table(tableId.table, schemaWrapper, tableId.database)
-      case _ =>
-        val table = Table(tableId.table, schemaWrapper, tableId.database)
-        store.createOrAlterTable(table)
-        table
-    }
-  }
+  private val isTruncate = parameters.getOrElse(JdbcTruncate, "false").toBoolean &&
+    (dialect isCascadingTruncateTable()).contains(false)
+
+  private val tableObj: Table = new TableCreator(connectionProvider, syntax, dialect)
+    .createOrAlterTable(mode, schemaWrapper, isTruncate)
 
   private val name = syntax.format(tableObj.name)
 

@@ -62,6 +62,15 @@ abstract class JdbcDialect extends Serializable {
   }
 
   /**
+    * The SQL query that should be used to truncate a table. Dialects can override this method to
+    * return a query that is suitable for a particular database. For PostgreSQL, for instance,
+    * a different query is used to prevent "TRUNCATE" affecting other tables.
+    */
+  def getTruncateQuery(table: String): String = {
+    s"TRUNCATE TABLE $table"
+  }
+
+  /**
     * The SQL query that should be used to discover the schema of a table. It only needs to
     * ensure that the result set has the same schema as the table, such as by calling
     * "SELECT * ...". Dialects can override this method to return a query that works best in a
