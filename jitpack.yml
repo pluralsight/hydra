@@ -1,0 +1,3 @@
+install:
+   - sbt +publish
+   
