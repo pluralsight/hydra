@@ -39,7 +39,7 @@ private[sql] object PostgresDialect extends JdbcDialect {
     }
   }
 
-  override def getArrayType(schema: Schema) = {
+  override def getArrayType(schema: Schema): JdbcType = {
     getJDBCType(schema.getElementType).map(_.databaseTypeDefinition)
       .orElse(JdbcUtils.getCommonJDBCType(schema.getElementType).map(_.databaseTypeDefinition))
       .map { typeName =>

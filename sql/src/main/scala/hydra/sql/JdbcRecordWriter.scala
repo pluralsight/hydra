@@ -122,7 +122,6 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
   private def upsert(record: GenericRecord): Try[Unit] = {
     if (AvroUtils.areEqual(currentSchema.schema, record.getSchema)) {
       TryWith(connection.prepareStatement(upsertStmt)) { pstmt =>
-        println(pstmt)
         valueSetter.bind(record, pstmt)
         pstmt.executeUpdate()
       } //TODO: better error handling here, we do the get just so that we throw an exception if there is one.
