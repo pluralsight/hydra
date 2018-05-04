@@ -153,7 +153,7 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
     }
   }
 
-  override def execute(operation: Operation): Unit = {
+  override def execute(operation: Operation): Try[Unit] = {
     operation match {
       case Upsert(record) => upsert(record)
       case DeleteByKey(fields) => delete(fields)

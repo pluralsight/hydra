@@ -17,8 +17,12 @@ private object H2Dialect extends JdbcDialect {
   override def getJDBCType(dt: Schema): Option[JdbcType] = dt.getType match {
     case STRING => Option(JdbcType("CLOB", JDBCType.CLOB))
     case BOOLEAN => Option(JdbcType("CHAR(1)", JDBCType.CHAR))
+    case ARRAY => Option(JdbcType("ARRAY", JDBCType.ARRAY))
     case _ => None
   }
+
+  override def getArrayType(schema: Schema) = Some(JdbcType("ARRAY", java.sql.JDBCType.ARRAY))
+
 
   override def buildUpsert(table: String, schema: SchemaWrapper, dbs: DbSyntax): String = {
 

@@ -156,6 +156,12 @@ abstract class JdbcDialect extends Serializable {
   def alterTableQueries(tableName: String, missingFields: Seq[Field], dbs: DbSyntax): Seq[String] = {
     throw new UnsupportedOperationException("Alter tables are not supported by this dialect.")
   }
+
+  def getArrayType(schema: Schema) = {
+    getJDBCType(schema.getElementType).map(_.databaseTypeDefinition)
+      .orElse(JdbcUtils.getCommonJDBCType(schema.getElementType).map(_.databaseTypeDefinition))
+      .map(typeName => JdbcType(s"$typeName[]", java.sql.JDBCType.ARRAY))
+  }
 }
 
 object JdbcDialects {

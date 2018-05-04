@@ -21,7 +21,7 @@ import org.scalatest.{FunSpecLike, Matchers}
   */
 class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
 
-  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName,new LogicalTypeFactory {
+  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, new LogicalTypeFactory {
     override def fromSchema(schema: Schema): LogicalType = IsoDate
   })
 
@@ -142,7 +142,7 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       val friends = Lists.newArrayList("friend1", "friend2")
       (mockedStmt.getConnection _).expects().returning(connection)
       val mockArray = new MockArray(friends)
-      (connection.createArrayOf(_, _)).expects("CHAR", *).returning(mockArray)
+      (connection.createArrayOf(_, _)).expects("VARCHAR", *).returning(mockArray)
       (mockedStmt.setInt _).expects(1, 1)
       (mockedStmt.setString _).expects(2, "alex")
       (mockedStmt.setBigDecimal _).expects(3, decimal)
@@ -152,7 +152,7 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       (mockedStmt.setTimestamp(_: Int, _: Timestamp)).expects(7, new Timestamp(ts))
       (mockedStmt.setDate(_: Int, _: Date)).expects(8, new Date(dt))
       (mockedStmt.setString _).expects(9, "test")
-      (mockedStmt.setNull(_: Int, _: Int)).expects(10, java.sql.Types.CHAR)
+      (mockedStmt.setNull(_: Int, _: Int)).expects(10, java.sql.Types.VARCHAR)
       (mockedStmt.setArray _).expects(11, mockArray)
       (mockedStmt.setString _).expects(12, "test1")
       (mockedStmt.setString _).expects(13, """{"street": "happy drive"}""")
@@ -214,7 +214,6 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       val binder = new AvroValueSetter(sch, PostgresDialect)
       binder.fieldTypes shouldBe PostgresDialect.upsertFields(sch)
         .map(f => f -> JdbcUtils.getJdbcType(f.schema(), PostgresDialect)).toMap
-
     }
   }
 }

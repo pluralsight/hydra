@@ -137,7 +137,7 @@ class AggregatedDialectSpec extends Matchers with FunSpecLike {
 
     it("converts a schema") {
       val dialect = new AggregatedDialect(List(PostgresDialect, DB2Dialect))
-      dialect.getJDBCType(avro.getField("username").schema()).get shouldBe JdbcType("TEXT", CHAR)
+      dialect.getJDBCType(avro.getField("username").schema()).get shouldBe JdbcType("TEXT", VARCHAR)
 
       dialect.getJDBCType(avro.getField("passwordHash").schema()).get shouldBe JdbcType("BYTEA", BINARY)
 

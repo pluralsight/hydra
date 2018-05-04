@@ -35,11 +35,11 @@ private[sql] object PostgresDialect extends JdbcDialect {
     if (isLogicalType(schema, IsoDate.IsoDateLogicalTypeName)) {
       Some(JdbcType("TIMESTAMP", JDBCType.TIMESTAMP))
     } else {
-      Some(JdbcType("TEXT", JDBCType.CHAR))
+      Some(JdbcType("TEXT", JDBCType.VARCHAR))
     }
   }
 
-  private def getArrayType(schema: Schema) = {
+  override def getArrayType(schema: Schema): Option[JdbcType] = {
     getJDBCType(schema.getElementType).map(_.databaseTypeDefinition)
       .orElse(JdbcUtils.getCommonJDBCType(schema.getElementType).map(_.databaseTypeDefinition))
       .map { typeName =>

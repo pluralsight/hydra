@@ -3,6 +3,8 @@ package hydra.avro.io
 import hydra.avro.io.SaveMode.SaveMode
 import hydra.avro.util.SchemaWrapper
 
+import scala.util.Try
+
 /**
   * Created by alexsilva on 7/16/17.
   */
@@ -26,7 +28,7 @@ trait RecordWriter {
     *
     * @param operation
     */
-  def execute(operation: Operation)
+  def execute(operation: Operation): Try[Unit]
 
   /**
     * Flushes any cache/record batch to the underlying store.
