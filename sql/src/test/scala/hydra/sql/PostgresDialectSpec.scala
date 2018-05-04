@@ -408,4 +408,29 @@ class PostgresDialectSpec extends Matchers
       Seq("id1", "id2"), UnderscoreSyntax)
     stmt shouldBe """DELETE FROM test_table WHERE "id1" = ? AND "id2" = ?"""
   }
+
+  it("returns the correct array type") {
+    val str =
+      """
+        |{
+        |	"type": "record",
+        |	"name": "User",
+        |	"namespace": "hydra",
+        |	"fields": [
+        | {
+        |			"name": "friends",
+        |			"type": {
+        |				"type": "array",
+        |				"items": "string"
+        |			}
+        |		}
+        |	]
+        |}
+      """.stripMargin
+
+    val schema = new Schema.Parser().parse(str)
+
+    val tp = PostgresDialect.getArrayType(schema.getField("friends").schema())
+    tp.get shouldBe JdbcType("TEXT[]", java.sql.JDBCType.ARRAY)
+  }
 }

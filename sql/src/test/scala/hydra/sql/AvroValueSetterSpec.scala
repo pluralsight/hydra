@@ -21,7 +21,7 @@ import org.scalatest.{FunSpecLike, Matchers}
   */
 class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
 
-  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName,new LogicalTypeFactory {
+  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, new LogicalTypeFactory {
     override def fromSchema(schema: Schema): LogicalType = IsoDate
   })
 
@@ -214,7 +214,6 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       val binder = new AvroValueSetter(sch, PostgresDialect)
       binder.fieldTypes shouldBe PostgresDialect.upsertFields(sch)
         .map(f => f -> JdbcUtils.getJdbcType(f.schema(), PostgresDialect)).toMap
-
     }
   }
 }

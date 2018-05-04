@@ -61,6 +61,32 @@ class H2DialectSpec extends Matchers with FunSpecLike {
         SchemaWrapper.from(avro), UnderscoreSyntax) shouldBe upsert
     }
 
+    it("returns the correct array type") {
+      val str =
+        """
+          |{
+          |	"type": "record",
+          |	"name": "User",
+          |	"namespace": "hydra",
+          |	"fields": [
+          | {
+          |			"name": "friends",
+          |			"type": {
+          |				"type": "array",
+          |				"items": "string"
+          |			}
+          |		}
+          |	]
+          |}
+        """.stripMargin
+
+      val schema = new Schema.Parser().parse(str)
+
+      val tp = H2Dialect.getArrayType(schema.getField("friends").schema())
+      tp.get shouldBe JdbcType("ARRAY", java.sql.JDBCType.ARRAY)
+    }
+
+
     it("Creates the correct alter table statements") {
       import scala.collection.JavaConverters._
       val schema = new Schema.Parser().parse(

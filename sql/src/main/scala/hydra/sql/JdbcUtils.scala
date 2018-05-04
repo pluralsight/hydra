@@ -182,6 +182,7 @@ private[sql] object JdbcUtils {
       throw new IllegalArgumentException(s"Can't get JDBC type for ${schema.getName}"))
   }
 
+
   def createTableNameFromSchema(schema: Schema): String = {
     val namespace = schema.getNamespace
     val name = schema.getName
