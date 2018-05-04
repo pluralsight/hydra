@@ -35,7 +35,7 @@ private[sql] object PostgresDialect extends JdbcDialect {
     if (isLogicalType(schema, IsoDate.IsoDateLogicalTypeName)) {
       Some(JdbcType("TIMESTAMP", JDBCType.TIMESTAMP))
     } else {
-      Some(JdbcType("TEXT", JDBCType.CHAR))
+      Some(JdbcType("TEXT", JDBCType.VARCHAR))
     }
   }
 
