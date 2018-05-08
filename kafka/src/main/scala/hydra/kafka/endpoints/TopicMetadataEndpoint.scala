@@ -8,9 +8,9 @@ import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
+import hydra.common.auth.AuthenticationDirectives
 import hydra.common.logging.LoggingAdapter
 import hydra.common.util.ActorUtils
-import hydra.core.auth.AuthenticationDirectives
 import hydra.core.http.{CorsSupport, HydraDirectives, NotFoundException}
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.consumer.KafkaConsumerProxy
@@ -28,6 +28,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scalacache._
 import scalacache.guava.GuavaCache
+
 import scala.collection.JavaConverters._
 import scalacache.modes.scalaFuture._
 

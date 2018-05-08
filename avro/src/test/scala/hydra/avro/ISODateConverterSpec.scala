@@ -26,7 +26,7 @@ class ISODateConverterSpec extends Matchers with FlatSpecLike {
 
   it should "return the epoch on bad formed dates" in {
     val c = new ISODateConverter()
-    c.fromCharSequence("2015-07-281",
+    c.fromCharSequence("2015-07-28",
       Schema.create(Schema.Type.STRING), IsoDate) shouldBe Instant.EPOCH.atZone(ZoneOffset.UTC)
   }
 
