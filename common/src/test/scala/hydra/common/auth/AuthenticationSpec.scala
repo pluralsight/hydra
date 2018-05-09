@@ -5,7 +5,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FlatSpecLike, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits._
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 class AuthenticationSpec extends Matchers
   with FlatSpecLike
@@ -36,7 +36,8 @@ class AuthenticationSpec extends Matchers
   }
 
   class TestAuthenticator extends HydraAuthenticator {
-    override def auth(creds: Option[HttpCredentials]): Future[String] = {
+    override def auth(creds: Option[HttpCredentials])
+                     (implicit ec: ExecutionContext): Future[String] = {
       creds match {
         case Some(c) =>
           val c1 = c.asInstanceOf[BasicHttpCredentials]
