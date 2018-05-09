@@ -1,5 +1,6 @@
 package hydra.common.auth
 
+import akka.actor.ActorSystem
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.{BasicHttpCredentials, HttpCredentials}
 import akka.http.scaladsl.server.{Directives, Route}
@@ -69,7 +70,7 @@ class AuthenticationDirectiveSpec extends Matchers
 
   class TestAuthenticator extends HydraAuthenticator {
     override def auth(creds: Option[HttpCredentials])
-                     (implicit ec: ExecutionContext): Future[String] = {
+                     (implicit s: ActorSystem, ec: ExecutionContext): Future[String] = {
       creds match {
         case Some(c) =>
           val c1 = c.asInstanceOf[BasicHttpCredentials]
@@ -78,4 +79,5 @@ class AuthenticationDirectiveSpec extends Matchers
       }
     }
   }
+
 }

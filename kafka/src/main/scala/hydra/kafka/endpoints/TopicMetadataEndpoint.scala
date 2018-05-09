@@ -1,14 +1,13 @@
 package hydra.kafka.endpoints
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.ExceptionHandler
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
-import hydra.common.auth.AuthenticationDirectives
 import hydra.common.logging.LoggingAdapter
 import hydra.common.util.ActorUtils
 import hydra.core.http.{CorsSupport, HydraDirectives, NotFoundException}
@@ -22,15 +21,14 @@ import org.apache.kafka.common.PartitionInfo
 import org.apache.kafka.common.protocol.Errors
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 import org.apache.kafka.common.requests.CreateTopicsResponse
+import scalacache._
+import scalacache.guava.GuavaCache
+import scalacache.modes.scalaFuture._
 
+import scala.collection.JavaConverters._
 import scala.collection.immutable.Map
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
-import scalacache._
-import scalacache.guava.GuavaCache
-
-import scala.collection.JavaConverters._
-import scalacache.modes.scalaFuture._
 
 /**
   * A cluster metadata endpoint implemented exclusively with akka streams.
@@ -42,8 +40,7 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
     with LoggingAdapter
     with HydraDirectives
     with HydraKafkaJsonSupport
-    with CorsSupport
-    with AuthenticationDirectives {
+    with CorsSupport {
 
   private implicit val cache = GuavaCache[Map[String, Seq[PartitionInfo]]]
 

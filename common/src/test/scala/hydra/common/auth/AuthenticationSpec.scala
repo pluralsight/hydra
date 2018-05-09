@@ -1,13 +1,16 @@
 package hydra.common.auth
 
+import akka.actor.ActorSystem
 import akka.http.scaladsl.model.headers.{BasicHttpCredentials, HttpCredentials, OAuth2BearerToken}
+import akka.testkit.TestKit
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FlatSpecLike, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits._
 import scala.concurrent.{ExecutionContext, Future}
 
-class AuthenticationSpec extends Matchers
+class AuthenticationSpec extends TestKit(ActorSystem("AuthenticationSpec"))
+  with Matchers
   with FlatSpecLike
   with ScalaFutures {
 
@@ -37,7 +40,7 @@ class AuthenticationSpec extends Matchers
 
   class TestAuthenticator extends HydraAuthenticator {
     override def auth(creds: Option[HttpCredentials])
-                     (implicit ec: ExecutionContext): Future[String] = {
+                     (implicit s:ActorSystem, ec: ExecutionContext): Future[String] = {
       creds match {
         case Some(c) =>
           val c1 = c.asInstanceOf[BasicHttpCredentials]

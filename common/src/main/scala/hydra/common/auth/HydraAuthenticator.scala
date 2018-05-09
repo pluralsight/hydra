@@ -1,5 +1,6 @@
 package hydra.common.auth
 
+import akka.actor.ActorSystem
 import akka.http.scaladsl.model.headers.{HttpChallenge, HttpCredentials}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -11,10 +12,10 @@ trait HydraAuthenticator {
   val challenge = HttpChallenge("Hydra", Some("Hydra"))
 
   def auth(credentials: Option[HttpCredentials])
-          (implicit ec: ExecutionContext): Future[String]
+          (implicit system: ActorSystem, ec: ExecutionContext): Future[String]
 
   def authenticate(credentials: Option[HttpCredentials])
-                  (implicit ec: ExecutionContext): Future[AuthenticationResult[String]] = {
+                  (implicit system: ActorSystem, ec: ExecutionContext): Future[AuthenticationResult[String]] = {
     auth(credentials)
       .map(Right(_))
       .recover {
