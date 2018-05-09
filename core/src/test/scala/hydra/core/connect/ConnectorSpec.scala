@@ -5,7 +5,7 @@ import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.Subscribe
 import akka.testkit.{TestActorRef, TestKit, TestProbe}
 import com.typesafe.config.{Config, ConfigFactory}
-import hydra.core.Settings
+import hydra.common.Settings
 import hydra.core.ingest.{HydraRequest, IngestionReport}
 import hydra.core.protocol.{IngestorCompleted, IngestorTimeout, InitiateRequest}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}

@@ -1,4 +1,4 @@
-package hydra.core.auth
+package hydra.common.auth
 
 import akka.http.scaladsl.model.headers.{BasicHttpCredentials, HttpCredentials, OAuth2BearerToken}
 import org.scalatest.concurrent.ScalaFutures

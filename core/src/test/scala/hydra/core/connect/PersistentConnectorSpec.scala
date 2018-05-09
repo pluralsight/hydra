@@ -6,7 +6,7 @@ import akka.cluster.pubsub.DistributedPubSubMediator.Subscribe
 import akka.persistence.AtLeastOnceDelivery.{ UnconfirmedDelivery, UnconfirmedWarning }
 import akka.testkit.{ ImplicitSender, TestKit, TestProbe }
 import com.typesafe.config.{ Config, ConfigFactory }
-import hydra.core.Settings
+import hydra.common.Settings
 import hydra.core.connect.PersistentConnector.{ GetUnconfirmedCount, UnconfirmedCount }
 import hydra.core.ingest.{ HydraRequest, IngestionReport }
 import hydra.core.protocol.{ IngestorCompleted, IngestorTimeout, InitiateRequest, InvalidRequest }
