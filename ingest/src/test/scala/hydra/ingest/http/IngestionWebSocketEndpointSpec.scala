@@ -68,13 +68,16 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
         wsClient.sendMessage("-c SET hydra-kafka-topic = test.Topic")
         wsClient.expectMessage("""{"status":200,"message":"OK[HYDRA-KAFKA-TOPIC=test.Topic]"}""")
         wsClient.sendMessage("-c SET hydra-ack = explicit")
-        wsClient.expectMessage("""{"status":200,"message":"OK[HYDRA-ACK=explicit]"}""")
+        wsClient.expectMessage("""{"status":400,"message":"BAD REQUEST[hydra-ack=explicit] is not a valid ack strategy."}""")
+
+        wsClient.sendMessage("-c SET hydra-ack = replicated")
+        wsClient.expectMessage("""{"status":200,"message":"OK[hydra-ack=replicated]"}""")
 
         wsClient.sendMessage("-c WHAT")
         wsClient.expectMessage("""{"status":400,"message":"BAD_REQUEST:Not a valid message. Use 'HELP' for help."}""")
 
         wsClient.sendMessage("-c SET")
-        wsClient.expectMessage("""{"status":200,"message":"HYDRA-KAFKA-TOPIC -> test.Topic;HYDRA-ACK -> explicit"}""")
+        wsClient.expectMessage("""{"status":200,"message":"HYDRA-KAFKA-TOPIC -> test.Topic;hydra-ack -> Replicated"}""")
 
         wsClient.sendMessage("-c HELP")
         wsClient.expectMessage("""{"status":200,"message":"Set metadata: --set (name)=(value)"}""")

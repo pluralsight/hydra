@@ -9,6 +9,7 @@ import hydra.core.ingest._
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 
 import scala.concurrent.Future
+import scala.util.Success
 
 /**
   * Created by alexsilva on 3/14/17.
@@ -23,15 +24,16 @@ class HttpRequestFactory extends RequestFactory[HttpRequest] with CodingDirectiv
       .map(h => ValidationStrategy(h.value())).getOrElse(ValidationStrategy.Strict)
 
     lazy val as = request.headers.find(_.lowercaseName() == HYDRA_ACK_STRATEGY)
-      .map(h => AckStrategy(h.value())).getOrElse(AckStrategy.NoAck)
+      .map(h => AckStrategy(h.value())).getOrElse(Success(AckStrategy.NoAck))
 
     lazy val clientId = request.headers.find(_.lowercaseName() == HydraClientId)
       .map(_.value().toLowerCase)
 
-    Unmarshal(request.entity).to[String].map { payload =>
+    Unmarshal(request.entity).to[String].flatMap { payload =>
       val dPayload = if (request.method == HttpMethods.DELETE && payload.isEmpty) null else payload
       val metadata: Map[String, String] = request.headers.map(h => h.name.toLowerCase -> h.value).toMap
-      HydraRequest(correlationId, dPayload, clientId, metadata, vs, as)
+      Future.fromTry(as)
+        .map(ack => HydraRequest(correlationId, dPayload, clientId, metadata, vs, ack))
     }
   }
 }

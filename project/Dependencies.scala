@@ -1,6 +1,4 @@
 
-import java.sql.DriverManager
-
 import sbt.{ExclusionRule, _}
 
 
@@ -33,7 +31,7 @@ object Dependencies {
   val hikariCPVersion = "2.6.2"
   val jacksonVersion = "2.8.4"
   val opRabbitVersion = "2.0.0"
-  val constructRVersion = "0.18.1"
+  val constructRVersion = "0.19.0"
   val akkaHTTPCorsVersion = "0.2.2"
 
   val akkaKryoVersion = "0.5.2"

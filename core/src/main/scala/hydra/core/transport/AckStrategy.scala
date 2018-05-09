@@ -1,5 +1,7 @@
 package hydra.core.transport
 
+import scala.util.Try
+
 /**
   * Defines an Ack Strategy for messages being sent by a producer.
   *
@@ -13,11 +15,15 @@ sealed trait AckStrategy
 
 object AckStrategy {
 
-  def apply(strategy: String): AckStrategy = {
-    Option(strategy).map(_.trim.toLowerCase) match {
-      case Some("replicated") => Replicated
-      case Some("persisted") => Persisted
-      case _ => NoAck
+  def apply(strategy: String): Try[AckStrategy] = {
+    Try {
+      Option(strategy).map(_.trim.toLowerCase).collect {
+        case "replicated" => Replicated
+        case "persisted" => Persisted
+        case "noack" => NoAck
+        case s if s.isEmpty => NoAck
+        case x => throw new IllegalArgumentException(s"$x is not a valid ack strategy.")
+      }.getOrElse(NoAck)
     }
   }
 

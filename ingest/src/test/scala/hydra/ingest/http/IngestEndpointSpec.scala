@@ -49,6 +49,7 @@ class IngestEndpointSpec extends Matchers with WordSpecLike with ScalatestRouteT
       }
     }
 
+
     "rejects empty requests" in {
       Post("/ingest") ~> ingestRoute ~> check {
         rejection shouldEqual RequestEntityExpectedRejection
@@ -73,6 +74,15 @@ class IngestEndpointSpec extends Matchers with WordSpecLike with ScalatestRouteT
       val request = Post("/ingest", "payload").withHeaders(ingestor)
       request ~> ingestRoute ~> check {
         status shouldBe StatusCodes.OK
+      }
+    }
+
+    "rejects a request with an invalid ack strategy" in {
+      val ingestor = RawHeader(RequestParams.HYDRA_INGESTOR_PARAM, "tester")
+      val request = Post("/ingest", "payload").withHeaders(ingestor
+        , RawHeader(RequestParams.HYDRA_ACK_STRATEGY, "invalid"))
+      request ~> ingestRoute ~> check {
+        status shouldBe StatusCodes.BadRequest
       }
     }
 
