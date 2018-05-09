@@ -34,6 +34,8 @@ import scala.util.{Failure, Success, Try}
   */
 trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
+  implicit val genericErrorFormat = jsonFormat2(GenericError)
+
   implicit object StatusCodeJsonFormat extends JsonFormat[StatusCode] {
 
     override def write(t: StatusCode): JsValue =
@@ -127,6 +129,8 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
       }
     }
   }
-
 }
+
+case class GenericError(status: Int, errorMessage: String)
+
 

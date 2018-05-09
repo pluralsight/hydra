@@ -25,7 +25,7 @@ import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
 import hydra.core.ingest.{CorrelationIdBuilder, RequestParams}
-import hydra.core.marshallers.HydraJsonSupport
+import hydra.core.marshallers.{GenericError, HydraJsonSupport}
 import hydra.core.protocol.InitiateHttpRequest
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestionHandlerGateway
@@ -82,7 +82,7 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: Execut
   }
 
   private def exceptionHandler = ExceptionHandler {
-    case e: IllegalArgumentException => complete(400, e.getMessage)
+    case e: IllegalArgumentException => complete(400, GenericError(400, e.getMessage))
   }
 }
 
