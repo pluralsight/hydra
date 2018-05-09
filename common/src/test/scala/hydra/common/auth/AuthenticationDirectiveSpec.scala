@@ -7,7 +7,7 @@ import akka.http.scaladsl.testkit.ScalatestRouteTest
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FlatSpecLike, Matchers}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 class AuthenticationDirectiveSpec extends Matchers
   with FlatSpecLike
@@ -68,7 +68,8 @@ class AuthenticationDirectiveSpec extends Matchers
   }
 
   class TestAuthenticator extends HydraAuthenticator {
-    override def auth(creds: Option[HttpCredentials]): Future[String] = {
+    override def auth(creds: Option[HttpCredentials])
+                     (implicit ec: ExecutionContext): Future[String] = {
       creds match {
         case Some(c) =>
           val c1 = c.asInstanceOf[BasicHttpCredentials]

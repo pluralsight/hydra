@@ -10,7 +10,8 @@ trait HydraAuthenticator {
 
   val challenge = HttpChallenge("Hydra", Some("Hydra"))
 
-  def auth(credentials: Option[HttpCredentials]): Future[String]
+  def auth(credentials: Option[HttpCredentials])
+          (implicit ec: ExecutionContext): Future[String]
 
   def authenticate(credentials: Option[HttpCredentials])
                   (implicit ec: ExecutionContext): Future[AuthenticationResult[String]] = {
