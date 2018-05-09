@@ -12,7 +12,7 @@ import com.typesafe.config.Config
 import hydra.avro.registry.{ConfluentSchemaRegistry, SchemaRegistryException}
 import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
 import hydra.common.logging.LoggingAdapter
-import hydra.core.Settings
+import hydra.common.Settings
 import hydra.core.protocol.HydraApplicationError
 import org.apache.avro.{Schema, SchemaParseException}
 

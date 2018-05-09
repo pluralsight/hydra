@@ -21,7 +21,7 @@ import akka.actor.{OneForOneStrategy, _}
 import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.Subscribe
 import akka.util.Timeout
-import hydra.core.Settings
+import hydra.common.Settings
 import hydra.core.protocol.{InitiateHttpRequest, InitiateRequest}
 
 import scala.concurrent.duration._

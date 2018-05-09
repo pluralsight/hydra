@@ -5,7 +5,7 @@ import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.Publish
 import com.typesafe.config.Config
 import hydra.common.logging.LoggingAdapter
-import hydra.core.Settings
+import hydra.common.Settings
 import hydra.core.ingest.{HydraRequest, IngestionReport}
 import hydra.core.protocol.{HydraMessage, IngestorCompleted, InitiateRequest}
 
