@@ -18,14 +18,14 @@ package hydra.ingest.http
 
 import akka.actor._
 import akka.http.scaladsl.model.HttpRequest
-import akka.http.scaladsl.server.{Rejection, Route}
+import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
 import akka.stream.ActorMaterializer
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
 import hydra.core.ingest.{CorrelationIdBuilder, RequestParams}
-import hydra.core.marshallers.HydraJsonSupport
+import hydra.core.marshallers.{GenericError, HydraJsonSupport}
 import hydra.core.protocol.InitiateHttpRequest
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestionHandlerGateway
@@ -55,11 +55,13 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: Execut
   override val route: Route =
     pathPrefix("ingest") {
       pathEndOrSingleSlash {
-        post {
-          requestEntityPresent {
-            publishRequest
-          }
-        } ~ deleteRequest
+        handleExceptions(exceptionHandler) {
+          post {
+            requestEntityPresent {
+              publishRequest
+            }
+          } ~ deleteRequest
+        }
       }
     }
 
@@ -77,6 +79,10 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: Execut
         }
       }
     }
+  }
+
+  private def exceptionHandler = ExceptionHandler {
+    case e: IllegalArgumentException => complete(400, GenericError(400, e.getMessage))
   }
 }
 

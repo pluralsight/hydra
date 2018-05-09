@@ -7,8 +7,9 @@ import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 import scala.concurrent.duration._
+import scala.util.Success
 
-class ConnectorSettingSpec extends TestKit(ActorSystem("test"))
+class ConnectorSettingSpec extends TestKit(ActorSystem("ConnectorSettingSpec"))
   with Matchers
   with FlatSpecLike
   with BeforeAndAfterAll {
@@ -30,7 +31,7 @@ class ConnectorSettingSpec extends TestKit(ActorSystem("test"))
     val settings = new ConnectorSettings(config, system)
     settings.clustered shouldBe false //read from system
     settings.requestTimeout shouldBe 2.seconds
-    settings.ackStrategy shouldBe AckStrategy.Replicated
+    settings.ackStrategy shouldBe Success(AckStrategy.Replicated)
     settings.validationStrategy shouldBe ValidationStrategy.Relaxed
     settings.charset shouldBe "test"
     settings.metadata shouldBe Map("test" -> "true")

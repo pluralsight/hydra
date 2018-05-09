@@ -8,6 +8,7 @@ import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.{TestActorRef, TestKit}
 import hydra.common.util.ActorUtils
 import hydra.core.ingest.RequestParams
+import hydra.core.marshallers.GenericError
 import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.TestIngestor
@@ -19,7 +20,10 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 5/12/17.
   */
-class IngestEndpointSpec extends Matchers with WordSpecLike with ScalatestRouteTest {
+class IngestEndpointSpec extends Matchers
+  with WordSpecLike
+  with ScalatestRouteTest
+  with HydraIngestJsonSupport {
 
   private implicit val timeout = RouteTestTimeout(10.seconds)
   val probe = system.actorOf(Props[TestIngestor])
@@ -49,6 +53,7 @@ class IngestEndpointSpec extends Matchers with WordSpecLike with ScalatestRouteT
       }
     }
 
+
     "rejects empty requests" in {
       Post("/ingest") ~> ingestRoute ~> check {
         rejection shouldEqual RequestEntityExpectedRejection
@@ -73,6 +78,16 @@ class IngestEndpointSpec extends Matchers with WordSpecLike with ScalatestRouteT
       val request = Post("/ingest", "payload").withHeaders(ingestor)
       request ~> ingestRoute ~> check {
         status shouldBe StatusCodes.OK
+      }
+    }
+
+    "rejects a request with an invalid ack strategy" in {
+      val ingestor = RawHeader(RequestParams.HYDRA_INGESTOR_PARAM, "tester")
+      val request = Post("/ingest", "payload").withHeaders(ingestor
+        , RawHeader(RequestParams.HYDRA_ACK_STRATEGY, "invalid"))
+      request ~> ingestRoute ~> check {
+        status shouldBe StatusCodes.BadRequest
+        entityAs[GenericError].status shouldBe 400
       }
     }
 

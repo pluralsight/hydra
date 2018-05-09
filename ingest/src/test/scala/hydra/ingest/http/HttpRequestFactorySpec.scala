@@ -44,6 +44,17 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
       }
     }
 
+    it("errors out if an ack strategy that doesn't exist is specified") {
+      implicit val mat = ActorMaterializer()
+      val httpRequest = HttpRequest(
+        HttpMethods.POST,
+        uri = "/test",
+        entity = HttpEntity.Empty,
+        headers = Seq(RawHeader(RequestParams.HYDRA_ACK_STRATEGY, "invalid")))
+      val req = new HttpRequestFactory().createRequest("123", httpRequest)
+      whenReady(req.failed)(_ shouldBe an[IllegalArgumentException])
+    }
+
     it("builds a DELETE request") {
       implicit val mat = ActorMaterializer()
       val httpRequest = HttpRequest(
