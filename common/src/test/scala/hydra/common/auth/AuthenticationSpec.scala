@@ -17,38 +17,39 @@ class AuthenticationSpec extends TestKit(ActorSystem("AuthenticationSpec"))
 
   override def afterAll = TestKit.shutdownActorSystem(system)
 
-    "The Authenticator" should "delegate auth" in {
-      val authenticator = new TestAuthenticator()
+  "The Authenticator" should "delegate auth" in {
+    val authenticator = new TestAuthenticator()
 
-      whenReady(authenticator.authenticate(Some(new BasicHttpCredentials("test", "")))) { r =>
-        r shouldBe Left(authenticator.challenge)
-      }
-
-      whenReady(authenticator.authenticate(Some(new BasicHttpCredentials("nice-user", "")))) { r =>
-        r shouldBe Right("nice-user")
-      }
-
-      whenReady(authenticator.authenticate(None)) { r =>
-        r shouldBe Left(authenticator.challenge)
-      }
+    whenReady(authenticator.authenticate(Some(new BasicHttpCredentials("test", "")))) { r =>
+      r shouldBe Left(authenticator.challenge)
     }
+
+    whenReady(authenticator.authenticate(Some(new BasicHttpCredentials("nice-user", "")))) { r =>
+      r shouldBe Right(HydraPrincipal("nice-user", Set.empty))
+    }
+
+    whenReady(authenticator.authenticate(None)) { r =>
+      r shouldBe Left(authenticator.challenge)
+    }
+  }
 
   "The NoSecurityAuthenticator" should "always return true" in {
     whenReady(new NoSecurityAuthenticator().auth(Some(new BasicHttpCredentials("test", "test")))) { f =>
-      f shouldBe "Anonymous"
+      f shouldBe HydraPrincipal("Anonymous", Set.empty)
     }
     whenReady(new NoSecurityAuthenticator().auth(Some(new OAuth2BearerToken("test")))) { f =>
-      f shouldBe "Anonymous"
+      f shouldBe HydraPrincipal("Anonymous", Set.empty)
     }
   }
 
   class TestAuthenticator extends HydraAuthenticator {
     override def auth(creds: Option[HttpCredentials])
-                     (implicit s: ActorSystem, ec: ExecutionContext): Future[String] = {
+                     (implicit s: ActorSystem, ec: ExecutionContext): Future[HydraPrincipal] = {
+      val p = HydraPrincipal("nice-user", Set.empty)
       creds match {
         case Some(c) =>
           val c1 = c.asInstanceOf[BasicHttpCredentials]
-          if (c1.username == "nice-user") Future.successful("nice-user") else Future.failed(new RuntimeException())
+          if (c1.username == "nice-user") Future.successful(p) else Future.failed(new RuntimeException())
         case None => Future.failed(new RuntimeException())
       }
     }
