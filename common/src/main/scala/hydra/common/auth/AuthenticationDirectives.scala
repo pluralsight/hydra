@@ -1,5 +1,7 @@
 package hydra.common.auth
 
+import java.security.Principal
+
 import akka.actor.ActorSystem
 import akka.http.scaladsl.server.directives.{AuthenticationDirective, SecurityDirectives}
 import hydra.common.Settings
@@ -14,9 +16,9 @@ trait AuthenticationDirectives extends SecurityDirectives {
 
   protected[this] implicit def system: ActorSystem
 
-  def authenticate: AuthenticationDirective[String] =
+  def authenticate: AuthenticationDirective[HydraPrincipal] =
     authenticateOrRejectWithChallenge(authenticator.authenticate _)
 
-  def authenticateWith(authenticator: HydraAuthenticator): AuthenticationDirective[String] =
+  def authenticateWith(authenticator: HydraAuthenticator): AuthenticationDirective[HydraPrincipal] =
     authenticateOrRejectWithChallenge(authenticator.authenticate _)
 }

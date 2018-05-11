@@ -44,11 +44,12 @@ class AuthenticationSpec extends TestKit(ActorSystem("AuthenticationSpec"))
 
   class TestAuthenticator extends HydraAuthenticator {
     override def auth(creds: Option[HttpCredentials])
-                     (implicit s: ActorSystem, ec: ExecutionContext): Future[String] = {
+                     (implicit s: ActorSystem, ec: ExecutionContext): Future[HydraPrincipal] = {
+      val p = HydraPrincipal("nice-user",Set.empty)
       creds match {
         case Some(c) =>
           val c1 = c.asInstanceOf[BasicHttpCredentials]
-          if (c1.username == "nice-user") Future.successful("nice-user") else Future.failed(new RuntimeException())
+          if (c1.username == "nice-user") Future.successful(p) else Future.failed(new RuntimeException())
         case None => Future.failed(new RuntimeException())
       }
     }

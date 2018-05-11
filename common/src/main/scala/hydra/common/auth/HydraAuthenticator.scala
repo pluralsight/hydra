@@ -12,10 +12,10 @@ trait HydraAuthenticator {
   val challenge = HttpChallenge("Hydra", Some("Hydra"))
 
   def auth(credentials: Option[HttpCredentials])
-          (implicit system: ActorSystem, ec: ExecutionContext): Future[String]
+          (implicit system: ActorSystem, ec: ExecutionContext): Future[HydraPrincipal]
 
   def authenticate(credentials: Option[HttpCredentials])
-                  (implicit system: ActorSystem, ec: ExecutionContext): Future[AuthenticationResult[String]] = {
+                  (implicit system: ActorSystem, ec: ExecutionContext): Future[AuthenticationResult[HydraPrincipal]] = {
     auth(credentials)
       .map(Right(_))
       .recover {

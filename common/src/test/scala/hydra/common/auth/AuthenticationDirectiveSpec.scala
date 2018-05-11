@@ -23,8 +23,8 @@ class AuthenticationDirectiveSpec extends Matchers
     val authenticator = new TestAuthenticator()
     val route = Route.seal {
       path("secured") {
-        authenticateWith(authenticator) { user =>
-          complete(user)
+        authenticateWith(authenticator) { principal =>
+          complete(principal.name)
         }
       }
     }
@@ -56,8 +56,8 @@ class AuthenticationDirectiveSpec extends Matchers
   it should "use the configured authenticator" in {
     val route = Route.seal {
       path("secured") {
-        authenticate { user =>
-          complete(user)
+        authenticate { principal =>
+          complete(principal.name)
         }
       }
     }
@@ -70,12 +70,15 @@ class AuthenticationDirectiveSpec extends Matchers
 
   class TestAuthenticator extends HydraAuthenticator {
     override def auth(creds: Option[HttpCredentials])
-                     (implicit s: ActorSystem, ec: ExecutionContext): Future[String] = {
+                     (implicit s: ActorSystem, ec: ExecutionContext): Future[HydraPrincipal] = {
+
+      val anonymous = HydraPrincipal("Anonymous",Set.empty)
       creds match {
         case Some(c) =>
           val c1 = c.asInstanceOf[BasicHttpCredentials]
-          if (c1.username == "John") Future.successful("John") else Future.failed(new RuntimeException())
-        case None => Future.successful("Anonymous")
+          val john = HydraPrincipal("John",Set.empty)
+          if (c1.username == "John") Future.successful(john) else Future.failed(new RuntimeException())
+        case None => Future.successful(anonymous)
       }
     }
   }

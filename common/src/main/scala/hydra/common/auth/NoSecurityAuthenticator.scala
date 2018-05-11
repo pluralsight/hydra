@@ -7,7 +7,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class NoSecurityAuthenticator extends HydraAuthenticator {
   override def auth(creds: Option[HttpCredentials])
-                   (implicit system: ActorSystem, ec: ExecutionContext): Future[String] = {
-    Future.successful("Anonymous")
+                   (implicit system: ActorSystem, ec: ExecutionContext): Future[HydraPrincipal] = {
+    Future.successful(HydraPrincipal("Anonymous", Set.empty))
   }
 }
