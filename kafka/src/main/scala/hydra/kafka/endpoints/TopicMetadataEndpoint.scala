@@ -28,7 +28,7 @@ import scalacache.modes.scalaFuture._
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Map
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
 
 /**
   * A cluster metadata endpoint implemented exclusively with akka streams.
@@ -68,10 +68,12 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
       handleExceptions(exceptionHandler) {
         get {
           path("topics") {
-            parameters('names ?) { n =>
+            parameters('pattern ?, 'fields ?) { (pattern, n) =>
+              val topicList = pattern.map(filterByPattern) getOrElse topics
+              println(Await.result(topicList, 10.seconds))
               n match {
-                case Some(_) => complete(topics.map(_.keys))
-                case None => complete(topics)
+                case Some(_) => complete(topicList.map(_.keys))
+                case None => complete(topicList)
               }
             }
           } ~ path("topics" / Segment) { name =>
@@ -83,6 +85,10 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
       }
     }
   }
+
+  private def filterByPattern(pattern: String): Future[Map[String, Seq[PartitionInfo]]] =
+    topics.map(_.filter(e => e._1 matches pattern))
+
 
   private def createTopic = path("topics") {
     post {
@@ -111,7 +117,7 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
 
   private def topics: Future[Map[String, Seq[PartitionInfo]]] = {
     implicit val timeout = Timeout(5 seconds)
-    cachingF("topics")(ttl = Some(30.seconds)) {
+    cachingF("topics")(ttl = Some(1.minute)) {
       import akka.pattern.ask
       (consumerProxy ? ListTopics).mapTo[ListTopicsResponse].map { response =>
         response.topics.filter(t => filterSystemTopics(t._1)).map { case (k, v) => k -> v.toList }
