@@ -28,7 +28,7 @@ import scalacache.modes.scalaFuture._
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Map
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * A cluster metadata endpoint implemented exclusively with akka streams.
@@ -70,7 +70,6 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
           path("topics") {
             parameters('pattern ?, 'fields ?) { (pattern, n) =>
               val topicList = pattern.map(filterByPattern) getOrElse topics
-              println(Await.result(topicList, 10.seconds))
               n match {
                 case Some(_) => complete(topicList.map(_.keys))
                 case None => complete(topicList)
