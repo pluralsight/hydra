@@ -53,7 +53,19 @@ class TopicMetadataEndpointSpec extends Matchers with WordSpecLike with Scalates
   "The topics endpoint" should {
 
     "returns a list of topics names" in {
-      Get("/transports/kafka/topics?names") ~> route ~> check {
+      Get("/transports/kafka/topics?fields=name") ~> route ~> check {
+        responseAs[Seq[String]] shouldBe Seq("test1")
+      }
+    }
+
+    "filter out topics by pattern" in {
+      Get("/transports/kafka/topics?fields=name&pattern=a.*") ~> route ~> check {
+        responseAs[Seq[String]] shouldBe Seq.empty
+      }
+    }
+
+    "filter topics by pattern" in {
+      Get("/transports/kafka/topics?fields=name&pattern=test.*") ~> route ~> check {
         responseAs[Seq[String]] shouldBe Seq("test1")
       }
     }
