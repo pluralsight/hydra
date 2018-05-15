@@ -214,6 +214,8 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
     operations.clear()
   }
 
+  def rollback(): Unit = operations.clear()
+
   def close(): Unit = {
     flush()
   }
