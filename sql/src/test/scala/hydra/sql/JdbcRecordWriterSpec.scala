@@ -504,7 +504,7 @@ class JdbcRecordWriterSpec extends Matchers
       catalog.tableExists(TableIdentifier("versioned_table_v2")) shouldBe true
     }
 
-    it("rolls back a transaction") {
+    it("resets batched operations") {
       val schemaStr =
         """
           |{
