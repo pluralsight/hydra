@@ -33,7 +33,8 @@ object Dependencies {
   val opRabbitVersion = "2.0.0"
   val constructRVersion = "0.19.0"
   val akkaHTTPCorsVersion = "0.2.2"
-
+  val kamonVersion = "1.1.0"
+  val kamonPVersion = "1.0.0"
   val akkaKryoVersion = "0.5.2"
 
   object Compile {
@@ -47,6 +48,12 @@ object Dependencies {
     val scalaz = "org.scalaz" %% "scalaz-core" % scalazVersion
 
     val embeddedKafka = "net.manub" %% "scalatest-embedded-kafka" % "0.14.0"
+
+    lazy val kamon = Seq(
+      "io.kamon" %% "kamon-core" % kamonVersion,
+      "io.kamon" %% "kamon-scala-future" % kamonPVersion,
+      "io.kamon" %% "kamon-prometheus" % kamonPVersion
+    )
 
     val kafka = Seq(
       "org.apache.kafka" %% "kafka" % kafkaVersion,
@@ -145,7 +152,7 @@ object Dependencies {
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
   val coreDeps = akka ++ baseDeps ++
-    Seq(guavacache, reflections, serviceContainer, akkaKryo) ++ confluent ++ constructR
+    Seq(guavacache, reflections, serviceContainer, akkaKryo) ++ confluent ++ constructR ++ kamon
 
   val ingestDeps = coreDeps
 
