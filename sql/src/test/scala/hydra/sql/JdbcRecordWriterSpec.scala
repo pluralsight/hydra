@@ -504,5 +504,38 @@ class JdbcRecordWriterSpec extends Matchers
       catalog.tableExists(TableIdentifier("versioned_table_v2")) shouldBe true
     }
 
+    it("resets batched operations") {
+      val schemaStr =
+        """
+          |{
+          |	"type": "record",
+          |	"name": "TestRollback",
+          |	"namespace": "hydra",
+          |	"fields": [{
+          |			"name": "id",
+          |			"type": "int",
+          |			"doc": "doc"
+          |		},
+          |		{
+          |			"name": "username",
+          |			"type": ["null", "string"]
+          |		}
+          |	]
+          |}""".stripMargin
+
+      val writer = new JdbcRecordWriter(writerSettings, provider,
+        SchemaWrapper.from(new Schema.Parser().parse(schemaStr)))
+      writer.batch(Upsert(record))
+      writer.batch(Upsert(record))
+      writer.resetBatchedOps()
+      writer.flush()
+
+      val c = provider.getConnection()
+
+      TryWith(c.createStatement()) { stmt =>
+        val rs = stmt.executeQuery("select \"id\",\"username\" from test_rollback")
+        rs.next() shouldBe false
+      }.get
+    }
   }
 }
