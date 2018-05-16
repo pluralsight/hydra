@@ -527,7 +527,7 @@ class JdbcRecordWriterSpec extends Matchers
         SchemaWrapper.from(new Schema.Parser().parse(schemaStr)))
       writer.batch(Upsert(record))
       writer.batch(Upsert(record))
-      writer.rollback()
+      writer.resetBatchedOps()
       writer.flush()
 
       val c = provider.getConnection()
