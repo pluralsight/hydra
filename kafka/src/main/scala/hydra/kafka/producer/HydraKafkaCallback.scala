@@ -1,7 +1,7 @@
 package hydra.kafka.producer
 
 import akka.actor.ActorSelection
-import hydra.core.monitor.HydraMonitor
+import hydra.core.monitor.HydraCounters
 import hydra.core.transport.TransportCallback
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
 import org.apache.kafka.clients.producer.{Callback, RecordMetadata}
@@ -23,13 +23,13 @@ case class HydraKafkaCallback(deliveryId: Long,
 
   private def doAck(md: RecordMetadata) = {
     val kmd = KafkaRecordMetadata(md, deliveryId)
-    HydraMonitor.countSuccess(md.topic())
+    HydraCounters.countSuccess(md.topic())
     producer ! kmd
     callback.onCompletion(deliveryId, Some(kmd), None)
   }
 
   private def ackError(e: Exception) = {
-    HydraMonitor.countFail(record.destination)
+    HydraCounters.countFail(record.destination)
     producer ! RecordProduceError(deliveryId, record, e)
     callback.onCompletion(deliveryId, None, Some(e))
   }

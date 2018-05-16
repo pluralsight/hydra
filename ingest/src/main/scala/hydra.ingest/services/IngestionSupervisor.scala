@@ -21,6 +21,7 @@ import hydra.common.util.ActorUtils
 import hydra.core.ingest._
 import hydra.core.protocol._
 import hydra.ingest.IngestorInfo
+import kamon.Kamon
 import org.joda.time.DateTime
 
 import scala.collection.mutable
@@ -34,6 +35,8 @@ class IngestionSupervisor(request: HydraRequest, requestor: ActorRef, info: Seq[
   val start = DateTime.now()
 
   private val ingestors: mutable.Map[String, IngestorStatus] = new mutable.HashMap
+
+  private val ingestTimer = Kamon.timer("ingestion").start()
 
   info.foreach { i =>
     ingestors.update(i.name, RequestPublished)
@@ -104,6 +107,7 @@ class IngestionSupervisor(request: HydraRequest, requestor: ActorRef, info: Seq[
   private def stop(status: StatusCode): Unit = {
     val report = IngestionReport(request.correlationId, ingestors.toMap, status.intValue())
     requestor ! report
+    ingestTimer.stop()
     context.stop(self)
   }
 }

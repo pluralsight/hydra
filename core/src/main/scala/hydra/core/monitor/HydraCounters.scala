@@ -5,7 +5,7 @@ import kamon.metric.CounterMetric
 
 import scala.collection.concurrent.TrieMap
 
-object HydraMonitor {
+object HydraCounters {
 
   private val counters = new TrieMap[String, CounterMetric]()
 

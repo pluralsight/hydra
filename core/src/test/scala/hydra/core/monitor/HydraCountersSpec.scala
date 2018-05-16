@@ -8,7 +8,7 @@ import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 
-class HydraMonitorSpec extends Matchers
+class HydraCountersSpec extends Matchers
   with FlatSpecLike
   with Eventually
   with BeforeAndAfterAll {
@@ -36,14 +36,14 @@ class HydraMonitorSpec extends Matchers
   override def afterAll = Kamon.stopAllReporters()
 
   "The HydraMonitor" should "increment success counters" in {
-    HydraMonitor.countSuccess("test")
+    HydraCounters.countSuccess("test")
     eventually {
       reporter.snapshot.metrics.counters.filter(_.name == "test").head.value shouldBe 1
     }
   }
 
   it should "increment failure counters" in {
-    HydraMonitor.countFail("test")
+    HydraCounters.countFail("test")
     eventually {
       reporter.snapshot.metrics.counters.filter(_.name == "test_fail").head.value shouldBe 1
     }
