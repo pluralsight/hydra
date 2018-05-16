@@ -214,7 +214,7 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
     resetBatchedOps()
   }
 
-  def resetBatchedOps(): Unit = operations.clear()
+  def resetBatchedOps(): Unit = synchronized(operations.clear())
 
   def close(): Unit = {
     flush()
