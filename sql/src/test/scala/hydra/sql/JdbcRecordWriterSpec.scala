@@ -360,7 +360,7 @@ class JdbcRecordWriterSpec extends Matchers
         Seq(rs.getInt(1), rs.getString(2)) shouldBe Seq(1, "alex")
       }.get
     }
-    
+
     it("fails on deletes") {
       val schemaStr =
         """
