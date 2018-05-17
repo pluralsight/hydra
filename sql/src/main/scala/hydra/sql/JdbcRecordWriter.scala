@@ -203,6 +203,7 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
         conn.commit()
         logger.error(s"The following records could not be replicated to table $name:")
         recordsInError.foreach(r => logger.error(s"${r._1.toString} - [${r._2.getMessage}]"))
+        throw e
       case e: Exception =>
         throw e
     }
