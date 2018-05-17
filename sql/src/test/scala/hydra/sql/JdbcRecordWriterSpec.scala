@@ -360,57 +360,7 @@ class JdbcRecordWriterSpec extends Matchers
         Seq(rs.getInt(1), rs.getString(2)) shouldBe Seq(1, "alex")
       }.get
     }
-
-    it("handles errors in batches") {
-
-      val schemaStr =
-        """
-          |{
-          |	"type": "record",
-          |	"name": "BatchFail",
-          |	"namespace": "hydra",
-          |	"fields": [{
-          |			"name": "id",
-          |			"type": "int",
-          |			"doc": "doc"
-          |		},
-          |		{
-          |			"name": "username",
-          |			"type": ["null", "string"]
-          |		}
-          |	]
-          |}""".stripMargin
-
-
-      val wrapper = SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
-      val writer = new JdbcRecordWriter(writerSettings, provider, wrapper)
-      val badRecord = new GenericData.Record(wrapper.schema)
-      badRecord.put("id", null)
-      badRecord.put("username", "alex")
-      val goodRecord = new GenericData.Record(wrapper.schema)
-      goodRecord.put("id", 1)
-      goodRecord.put("username", "alex1")
-      writer.batch(Upsert(goodRecord))
-      writer.batch(Upsert(badRecord))
-
-      writer.flush()
-
-      val c = provider.getConnection
-      TryWith(c.createStatement()) { stmt =>
-        val rs = stmt.executeQuery("select \"id\",\"username\" from batch_fail")
-        rs.next() shouldBe true
-      }.get
-
-      writer.close()
-
-      TryWith(c.createStatement()) { stmt =>
-        val rs = stmt.executeQuery("select \"id\",\"username\" from batch_fail")
-        rs.next()
-        Seq(rs.getInt(1), rs.getString(2)) shouldBe Seq(1, "alex1")
-        rs.next() shouldBe false
-      }.get
-    }
-
+    
     it("fails on deletes") {
       val schemaStr =
         """

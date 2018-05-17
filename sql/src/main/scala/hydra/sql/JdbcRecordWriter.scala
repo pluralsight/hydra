@@ -14,8 +14,8 @@ import org.apache.avro.{LogicalType, LogicalTypes, Schema}
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
+import scala.util.Try
 import scala.util.control.NonFatal
-import scala.util.{Failure, Try}
 
 
 /**
@@ -199,12 +199,9 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
       case e: BatchUpdateException =>
         logger.error("Batch update error", e.getNextException())
         conn.rollback()
-        val recordsInError = handleBatchError(operations)
-        conn.commit()
-        logger.error(s"The following records could not be replicated to table $name:")
-        recordsInError.foreach(r => logger.error(s"${r._1.toString} - [${r._2.getMessage}]"))
         throw e
       case e: Exception =>
+        conn.rollback()
         throw e
     }
     finally {
@@ -219,21 +216,6 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
 
   def close(): Unit = {
     flush()
-  }
-
-  /**
-    * Try running the batch statements, one record at a time
-    *
-    * Returns the generic record(s) that caused the failure.
-    */
-  private[sql] def handleBatchError(records: Seq[Operation]): Seq[(Operation, Throwable)] = {
-    operations.map { operation =>
-      val result: Try[Unit] = operation match {
-        case Upsert(record) => upsert(record)
-        case DeleteByKey(keys) => delete(keys)
-      }
-      operation -> result
-    }.filter(_._2.isFailure).map(x => x._1 -> Failure(x._2.failed.get).exception)
   }
 }
 
