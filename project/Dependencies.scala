@@ -138,7 +138,8 @@ object Dependencies {
   import Compile._
   import Test._
 
-  val testDeps = Seq(scalaTest, junit, scalaMock, easyMock) ++ powerMock ++ akkaTest
+  val testDeps = Seq(scalaTest, junit, scalaMock, easyMock) ++ powerMock ++ akkaTest ++
+    Seq("org.postgresql" % "postgresql" % "9.4.1209")
 
   val baseDeps = akka ++ logging ++ Seq(scalaz, scalaConfigs, avro, spring) ++ joda ++ testDeps
 

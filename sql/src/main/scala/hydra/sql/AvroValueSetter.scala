@@ -15,6 +15,8 @@ import org.apache.avro.Schema.Type.LONG
 import org.apache.avro.generic.{GenericData, GenericRecord}
 import org.apache.avro.{AvroRuntimeException, LogicalTypes, Schema}
 
+import scala.collection.JavaConverters._
+
 /**
   * Created by alexsilva on 7/12/17.
   */
@@ -54,7 +56,11 @@ private[sql] class AvroValueSetter(schema: SchemaWrapper, dialect: JdbcDialect) 
     } else {
       schema.getType match {
         case Schema.Type.UNION => unionValue(value, jdbcType, schema, pstmt, idx)
-        case Schema.Type.ARRAY => arrayValue(value.asInstanceOf[GenericData.Array[AnyRef]], schema, pstmt, idx)
+        case Schema.Type.ARRAY =>
+          value match {
+            case a: GenericData.Array[_] => arrayValue(a.iterator().asScala.toList, schema, pstmt, idx)
+            case l: java.util.List[_] => arrayValue(l.asScala.toList, schema, pstmt, idx)
+          }
         case Schema.Type.STRING if isLogicalType(schema, IsoDate.IsoDateLogicalTypeName) =>
           pstmt.setTimestamp(idx,
             new Timestamp(new ISODateConverter()
@@ -77,7 +83,8 @@ private[sql] class AvroValueSetter(schema: SchemaWrapper, dialect: JdbcDialect) 
         case Schema.Type.LONG => pstmt.setLong(idx, value.toString.toLong)
         case Schema.Type.BYTES => byteValue(value, schema, pstmt, idx)
         case Schema.Type.ENUM => pstmt.setString(idx, value.toString)
-        case Schema.Type.RECORD => pstmt.setString(idx, value.toString)
+        case Schema.Type.RECORD =>
+          pstmt.setString(idx, value.toString)
         case Schema.Type.NULL =>
           pstmt.setNull(idx, jdbcType.targetSqlType.getVendorTypeNumber.intValue())
         case _ => throw new IllegalArgumentException(s"Type ${schema.getType} is not supported.")
@@ -97,11 +104,20 @@ private[sql] class AvroValueSetter(schema: SchemaWrapper, dialect: JdbcDialect) 
     }
   }
 
-  private def arrayValue(obj: GenericData.Array[AnyRef], schema: Schema, pstmt: PreparedStatement, idx: Int): Unit = {
+  private def arrayValue(values: List[_], schema: Schema, pstmt: PreparedStatement, idx: Int): Unit = {
     val aType = JdbcUtils.getJdbcType(schema.getElementType, dialect)
-    val values = Lists.newArrayList(obj.iterator()).toArray
-    val arr = pstmt.getConnection.createArrayOf(aType.targetSqlType.getName, values)
-    pstmt.setArray(idx, arr)
+    if (aType.databaseTypeDefinition == "JSON") {
+      //if it is json, we don't insert it as an array.
+      val elems = Lists.newArrayList(values.map(_.toString): _*).toArray
+      val colVal = "[" + elems.mkString(",") + "]"
+      pstmt.setString(idx, colVal)
+    } else {
+      val arr = pstmt.getConnection.createArrayOf(aType.targetSqlType.getName, values
+        .asInstanceOf[List[AnyRef]].toArray)
+      pstmt.setArray(idx, arr)
+    }
+
+
   }
 
   private def unionValue(obj: AnyRef, jdbcType: JdbcType, schema: Schema, pstmt: PreparedStatement, idx: Int): Unit = {

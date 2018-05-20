@@ -98,7 +98,9 @@ abstract class JdbcDialect extends Serializable {
   def insertStatement(table: String, schema: SchemaWrapper, dbs: DbSyntax): String = {
     val columns = schema.getFields
     val cols = columns.map(c => quoteIdentifier(dbs.format(c.name))).mkString(",")
-    s"INSERT INTO $table ($cols) VALUES (${parameterize(columns).mkString(",")})"
+    val insert = s"INSERT INTO $table ($cols) VALUES (${parameterize(columns).mkString(",")})"
+    println(insert)
+    insert
   }
 
   def deleteStatement(table: String, keys: Seq[String], dbs: DbSyntax): String = {
@@ -145,7 +147,7 @@ abstract class JdbcDialect extends Serializable {
 
   protected def parameterize(fields: Seq[Schema.Field]): Seq[String] = {
     fields.map { c =>
-      if (JdbcUtils.getJdbcType(c.schema(), this).databaseTypeDefinition == "JSON") jsonPlaceholder else "?"
+      if (JdbcUtils.getJdbcType(c.schema(), this).databaseTypeDefinition.startsWith("JSON")) jsonPlaceholder else "?"
     }
   }
 

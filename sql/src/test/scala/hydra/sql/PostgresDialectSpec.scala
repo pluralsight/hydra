@@ -5,6 +5,7 @@ import java.sql.JDBCType._
 
 import hydra.avro.convert.IsoDate
 import hydra.avro.util.SchemaWrapper
+import hydra.sql.JdbcUtils.getJdbcType
 import org.apache.avro.LogicalTypes.LogicalTypeFactory
 import org.apache.avro.{LogicalType, LogicalTypes, Schema}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
@@ -16,7 +17,7 @@ class PostgresDialectSpec extends Matchers
   with FunSpecLike
   with BeforeAndAfterAll {
 
-  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName,new LogicalTypeFactory {
+  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, new LogicalTypeFactory {
     override def fromSchema(schema: Schema): LogicalType = IsoDate
   })
 
@@ -407,6 +408,14 @@ class PostgresDialectSpec extends Matchers
     val stmt = PostgresDialect.deleteStatement("test_table",
       Seq("id1", "id2"), UnderscoreSyntax)
     stmt shouldBe """DELETE FROM test_table WHERE "id1" = ? AND "id2" = ?"""
+  }
+
+  it("handles nested array json types") {
+    val schemaR = Thread.currentThread().getContextClassLoader.getResourceAsStream("nested-json.avsc")
+    val schema = new Schema.Parser().parse(schemaR)
+    val field = schema.getField("authors")
+    getJdbcType(field.schema(), PostgresDialect).databaseTypeDefinition shouldBe "JSON[]"
+    println(PostgresDialect.insertStatement("json_test", SchemaWrapper.from(schema), UnderscoreSyntax))
   }
 
   it("returns the correct array type") {

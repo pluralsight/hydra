@@ -1,0 +1,49 @@
+{
+  "type": "record",
+  "name": "TestNested",
+  "namespace": "hydra",
+  "fields": [
+    {
+      "name": "id",
+      "type": "string",
+      "doc": "GUID Identifier"
+    },
+    {
+      "name": "nestedElement",
+      "type": [
+        "null",
+        {
+          "type": "record",
+          "name": "nested_element_record",
+          "fields": [
+            {
+              "name": "id",
+              "type": "string"
+            }
+          ]
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "authors",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "authors_record",
+          "fields": [
+            {
+              "name": "id",
+              "type": "string"
+            },
+            {
+              "name": "authorHandle",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

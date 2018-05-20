@@ -119,7 +119,27 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       |				"type": "string",
       |				"logicalType": "iso-datetime"
       |			}
-      |		}
+      |		},
+      |  {
+      |      "name": "authors",
+      |      "type": {
+      |        "type": "array",
+      |        "items": {
+      |          "type": "record",
+      |          "name": "authors_record",
+      |          "fields": [
+      |            {
+      |              "name": "id",
+      |              "type": "string"
+      |            },
+      |            {
+      |              "name": "authorHandle",
+      |              "type": "string"
+      |            }
+      |          ]
+      |        }
+      |      }
+      |    }
       |	]
       |}
     """.stripMargin
@@ -159,6 +179,7 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       (mockedStmt.setLong _).expects(14, 12342134223L)
       (mockedStmt.setBytes _).expects(15, *) //todo: how to verify the contents of an array in scala mock?
       (mockedStmt.setTimestamp(_: Int, _: Timestamp)).expects(16, new Timestamp(isoDate))
+      (mockedStmt.setString _).expects(17, """[{"id": "authorId", "authorHandle": "theHandle"}]""")
       (mockedStmt.addBatch _).expects()
 
       val avroSchema = schema.schema
@@ -181,6 +202,26 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       record.put("bigNumber", 12342134223L)
       record.put("byteField", ByteBuffer.wrap("test".getBytes))
       record.put("isoDate", "2015-07-28T19:55:57.693217+00:00")
+      val authors = new GenericData.Array[GenericData.Record](1, avroSchema.getField("authors").schema)
+      val eleSch = new Schema.Parser().parse(
+        """
+          | {"type": "record",
+          |          "name": "authors_record",
+          |          "fields": [
+          |            {
+          |              "name": "id",
+          |              "type": "string"
+          |            },
+          |            {
+          |              "name": "authorHandle",
+          |              "type": "string"
+          |            }]}
+        """.stripMargin)
+      val author = new GenericData.Record(eleSch)
+      author.put("id", "authorId")
+      author.put("authorHandle", "theHandle")
+      authors.add(author)
+      record.put("authors", authors)
       valueSetter.bind(record, mockedStmt)
     }
 
