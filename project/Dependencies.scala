@@ -26,7 +26,6 @@ object Dependencies {
   val scalaMockVersion = "3.5.0"
   val serviceContainerVersion = "2.0.7"
   val scalaCacheVersion = "0.23.0"
-  val postgresVersion = "9.4.1209"
   val commonsDbcpVersion = "1.4"
   val hikariCPVersion = "2.6.2"
   val jacksonVersion = "2.8.4"
@@ -138,8 +137,7 @@ object Dependencies {
   import Compile._
   import Test._
 
-  val testDeps = Seq(scalaTest, junit, scalaMock, easyMock) ++ powerMock ++ akkaTest ++
-    Seq("org.postgresql" % "postgresql" % "9.4.1209")
+  val testDeps = Seq(scalaTest, junit, scalaMock, easyMock) ++ powerMock ++ akkaTest
 
   val baseDeps = akka ++ logging ++ Seq(scalaz, scalaConfigs, avro, spring) ++ joda ++ testDeps
 
