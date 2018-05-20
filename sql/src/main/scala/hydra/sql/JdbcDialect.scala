@@ -98,9 +98,7 @@ abstract class JdbcDialect extends Serializable {
   def insertStatement(table: String, schema: SchemaWrapper, dbs: DbSyntax): String = {
     val columns = schema.getFields
     val cols = columns.map(c => quoteIdentifier(dbs.format(c.name))).mkString(",")
-    val insert = s"INSERT INTO $table ($cols) VALUES (${parameterize(columns).mkString(",")})"
-    println(insert)
-    insert
+    s"INSERT INTO $table ($cols) VALUES (${parameterize(columns).mkString(",")})"
   }
 
   def deleteStatement(table: String, keys: Seq[String], dbs: DbSyntax): String = {

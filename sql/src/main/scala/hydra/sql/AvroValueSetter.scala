@@ -104,7 +104,7 @@ private[sql] class AvroValueSetter(schema: SchemaWrapper, dialect: JdbcDialect) 
     }
   }
 
-  private def arrayValue(values: List[_], schema: Schema, pstmt: PreparedStatement, idx: Int): Unit = {
+  private[sql] def arrayValue(values: List[_], schema: Schema, pstmt: PreparedStatement, idx: Int): Unit = {
     val aType = JdbcUtils.getJdbcType(schema.getElementType, dialect)
     if (aType.databaseTypeDefinition == "JSON") {
       //if it is json, we don't insert it as an array.

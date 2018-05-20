@@ -40,8 +40,7 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
                        val schemaWrapper: SchemaWrapper,
                        val mode: SaveMode = SaveMode.ErrorIfExists,
                        tableIdentifier: Option[TableIdentifier] = None,
-                       parameters: Map[String, String] = Map.empty) extends RecordWriter
-  with JdbcHelper {
+                       parameters: Map[String, String] = Map.empty) extends RecordWriter {
 
   import JdbcRecordWriter._
 

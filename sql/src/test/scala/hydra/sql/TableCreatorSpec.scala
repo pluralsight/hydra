@@ -13,9 +13,8 @@ import scala.concurrent.duration._
   */
 class TableCreatorSpec extends Matchers
   with FunSpecLike
-  with BeforeAndAfterAll
-  with JdbcHelper {
-  
+  with BeforeAndAfterAll {
+
   val provider = new DriverManagerConnectionProvider("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1",
     "", "", 1, 1.millis)
 

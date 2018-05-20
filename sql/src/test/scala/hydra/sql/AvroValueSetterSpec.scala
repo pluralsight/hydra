@@ -6,20 +6,23 @@ import java.sql._
 import java.time.{LocalDate, ZoneId}
 
 import com.google.common.collect.Lists
+import com.pluralsight.hydra.avro.JsonConverter
 import com.pluralsight.hydra.sql.MockArray
 import hydra.avro.convert.{ISODateConverter, IsoDate}
 import hydra.avro.util.SchemaWrapper
 import org.apache.avro.LogicalTypes.LogicalTypeFactory
+import org.apache.avro.generic.{GenericData, GenericRecord}
 import org.apache.avro.{LogicalType, LogicalTypes, Schema}
-import org.apache.avro.generic.GenericData
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FunSpecLike, Matchers}
+
+import scala.collection.JavaConverters._
 
 
 /**
   * Created by alexsilva on 5/4/17.
   */
-class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
+class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
 
   LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, new LogicalTypeFactory {
     override def fromSchema(schema: Schema): LogicalType = IsoDate
@@ -157,7 +160,6 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
         Schema.create(Schema.Type.STRING), IsoDate).toInstant.toEpochMilli
 
       val mockedStmt = mock[PreparedStatement]
-
       val connection = mock[Connection]
       val friends = Lists.newArrayList("friend1", "friend2")
       (mockedStmt.getConnection _).expects().returning(connection)
@@ -255,6 +257,74 @@ class ValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       val binder = new AvroValueSetter(sch, PostgresDialect)
       binder.fieldTypes shouldBe PostgresDialect.upsertFields(sch)
         .map(f => f -> JdbcUtils.getJdbcType(f.schema(), PostgresDialect)).toMap
+    }
+
+    it("works with json arrays") {
+      val json =
+        """
+          | {
+          | 	"id": "1c762732-94f6-4678-a328-1f996d127c3f",
+          | 	"assessment": null,
+          | 	"contentPillar": "it-ops",
+          | 	"description": "desc.",
+          | 	"highlights": "highlists",
+          | 	"numberOfCourses": 2,
+          | 	"numberOfHours": 11,
+          | 	"prerequisites": "experience",
+          | 	"retired": false,
+          | 	"replacedById": null,
+          | 	"status": "published",
+          | 	"title": "Project+",
+          | 	"thumbnailUrl": "url",
+          | 	"type": "certificate",
+          | 	"url": "/paths/certificate/comptia-project-plus",
+          | 	"urlSlug": "comptia-project-plus",
+          | 	"version": 1,
+          | 	"createdAt": "2016-05-13T14:48:19.998Z",
+          | 	"updatedAt": "2016-10-19T18:34:20.998Z",
+          | 	"publishedAt": "2016-05-13T14:48:19.998Z",
+          | 	"authors": [{
+          | 		"id": "id",
+          | 		"authorHandle": "handle"
+          | 	}],
+          | 	"pathLevels": [{
+          | 		"id": "adf41442-6ec7-48ca-ad7f-2f8bfe57346d",
+          | 		"transcenderExamId": null,
+          | 		"title": "courses",
+          | 		"description": "desc.",
+          | 		"courses": [{
+          | 			"id": "course1",
+          | 			"deprecatedCourseId": "pt1"
+          | 		}, {
+          | 			"id": "course2",
+          | 			"deprecatedCourseId": "pt2"
+          | 		}],
+          | 		"comingSoonCourses": []
+          | 	}],
+          | 	"relatedTopics": [{
+          | 		"title": "PRINCE2"
+          | 	}, {
+          | 		"title": "PMP"
+          | 	}]
+          | }
+        """.stripMargin
+
+      val schema =
+        """
+          |{ "type": "record", "name": "ComplexTest", "namespace": "hydra.json", "fields": [{ "name": "id", "type": "string", "doc": "GUID Identifier" }, { "name": "assessment", "type": ["null", { "type": "record", "name": "assessment_record", "fields": [{ "name": "id", "type": "string" }] }], "default": null }, { "name": "contentPillar", "type": "string" }, { "name": "description", "type": "string" }, { "name": "highlights", "type": "string" }, { "name": "numberOfCourses", "type": "int" }, { "name": "numberOfHours", "type": "int", "default": null }, { "name": "prerequisites", "type": "string" }, { "name": "retired", "type": "boolean" }, { "name": "replacedById", "type": ["null", "string"], "default": null }, { "name": "status", "type": "string" }, { "name": "title", "type": "string", "doc": "Title for the Path" }, { "name": "thumbnailUrl", "type": "string" }, { "name": "type", "type": "string" }, { "name": "url", "type": "string" }, { "name": "urlSlug", "type": "string" }, { "name": "version", "type": "int" }, { "name": "createdAt", "type": { "type": "string", "logicalType": "iso-datetime" } }, { "name": "updatedAt", "type": { "type": "string", "logicalType": "iso-datetime" } }, { "name": "publishedAt", "type": { "type": "string", "logicalType": "iso-datetime" } }, { "name": "authors", "type": { "type": "array", "items": { "type": "record", "name": "authors_Record", "fields": [{ "name": "id", "type": "string" }, { "name": "authorHandle", "type": "string" }] } } }, { "name": "pathLevels", "type": { "type": "array", "items": { "type": "record", "name": "pathLevels_Record", "fields": [{ "name": "id", "type": "string" }, { "name": "transcenderExamId", "type": ["null", "string"], "default": null }, { "name": "title", "type": "string" }, { "name": "description", "type": "string" }, { "name": "courses", "type": { "type": "array", "items": { "type": "record", "name": "courses_Record", "fields": [{ "name": "id", "type": "string" }, { "name": "deprecatedCourseId", "type": "string" }] } } }, { "name": "comingSoonCourses", "type": ["null", { "type": "array", "items": { "type": "record", "name": "comingSoonCoursesRecord", "fields": [{ "name": "id", "type": "string" }] } }], "default": null }] } } }, { "name": "relatedTopics", "type": { "type": "array", "items": { "type": "record", "name": "relatedTopicsRecord", "fields": [{ "name": "title", "type": "string" }] } } }] }{ "type": "record", "name": "ComplexTest", "namespace": "hydra.json", "fields": [{ "name": "id", "type": "string", "doc": "GUID Identifier" }, { "name": "assessment", "type": ["null", { "type": "record", "name": "assessment_record", "fields": [{ "name": "id", "type": "string" }] }], "default": null }, { "name": "contentPillar", "type": "string" }, { "name": "description", "type": "string" }, { "name": "highlights", "type": "string" }, { "name": "numberOfCourses", "type": "int" }, { "name": "numberOfHours", "type": "int", "default": null }, { "name": "prerequisites", "type": "string" }, { "name": "retired", "type": "boolean" }, { "name": "replacedById", "type": ["null", "string"], "default": null }, { "name": "status", "type": "string" }, { "name": "title", "type": "string", "doc": "Title for the Path" }, { "name": "thumbnailUrl", "type": "string" }, { "name": "type", "type": "string" }, { "name": "url", "type": "string" }, { "name": "urlSlug", "type": "string" }, { "name": "version", "type": "int" }, { "name": "createdAt", "type": { "type": "string", "logicalType": "iso-datetime" } }, { "name": "updatedAt", "type": { "type": "string", "logicalType": "iso-datetime" } }, { "name": "publishedAt", "type": { "type": "string", "logicalType": "iso-datetime" } }, { "name": "authors", "type": { "type": "array", "items": { "type": "record", "name": "authors_Record", "fields": [{ "name": "id", "type": "string" }, { "name": "authorHandle", "type": "string" }] } } }, { "name": "pathLevels", "type": { "type": "array", "items": { "type": "record", "name": "pathLevels_Record", "fields": [{ "name": "id", "type": "string" }, { "name": "transcenderExamId", "type": ["null", "string"], "default": null }, { "name": "title", "type": "string" }, { "name": "description", "type": "string" }, { "name": "courses", "type": { "type": "array", "items": { "type": "record", "name": "courses_Record", "fields": [{ "name": "id", "type": "string" }, { "name": "deprecatedCourseId", "type": "string" }] } } }, { "name": "comingSoonCourses", "type": ["null", { "type": "array", "items": { "type": "record", "name": "comingSoonCoursesRecord", "fields": [{ "name": "id", "type": "string" }] } }], "default": null }] } } }, { "name": "relatedTopics", "type": { "type": "array", "items": { "type": "record", "name": "relatedTopicsRecord", "fields": [{ "name": "title", "type": "string" }] } } }] }
+          |""".stripMargin
+
+      val record = new JsonConverter[GenericRecord](new Schema.Parser().parse(schema)).convert(json)
+      //in avro complex types are Lists
+      record.get("relatedTopics") shouldBe a[java.util.List[_]]
+      val s = new AvroValueSetter(SchemaWrapper.from(record.getSchema), PostgresDialect)
+      val mockedStmt = mock[PreparedStatement]
+      val expected = """[{"title": "PRINCE2"},{"title": "PMP"}]"""
+      (mockedStmt.setString _).expects(1, expected)
+
+      s.arrayValue(record.get("relatedTopics").asInstanceOf[java.util.List[_]].asScala.toList,
+        record.getSchema().getField("relatedTopics").schema(), mockedStmt, 1)
+
     }
   }
 }
