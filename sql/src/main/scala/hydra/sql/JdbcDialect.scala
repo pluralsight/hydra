@@ -145,7 +145,7 @@ abstract class JdbcDialect extends Serializable {
 
   protected def parameterize(fields: Seq[Schema.Field]): Seq[String] = {
     fields.map { c =>
-      if (JdbcUtils.getJdbcType(c.schema(), this).databaseTypeDefinition == "JSON") jsonPlaceholder else "?"
+      if (JdbcUtils.getJdbcType(c.schema(), this).databaseTypeDefinition.startsWith("JSON")) jsonPlaceholder else "?"
     }
   }
 

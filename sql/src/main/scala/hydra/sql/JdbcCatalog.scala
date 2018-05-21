@@ -33,7 +33,7 @@ import scala.util.{Failure, Success, Try}
   * Internal implementation of the user-facing `Catalog`.
   */
 class JdbcCatalog(connectionProvider: ConnectionProvider,
-                  dbSyntax: DbSyntax, dialect: JdbcDialect) extends Catalog with JdbcHelper {
+                  dbSyntax: DbSyntax, dialect: JdbcDialect) extends Catalog  {
 
   override def createSchema(schema: String): Boolean = {
     val conn = connectionProvider.getConnection

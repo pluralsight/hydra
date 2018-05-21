@@ -5,6 +5,7 @@ import java.sql.JDBCType._
 
 import hydra.avro.convert.IsoDate
 import hydra.avro.util.SchemaWrapper
+import hydra.sql.JdbcUtils.getJdbcType
 import org.apache.avro.LogicalTypes.LogicalTypeFactory
 import org.apache.avro.{LogicalType, LogicalTypes, Schema}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
@@ -16,7 +17,7 @@ class PostgresDialectSpec extends Matchers
   with FunSpecLike
   with BeforeAndAfterAll {
 
-  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName,new LogicalTypeFactory {
+  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, new LogicalTypeFactory {
     override def fromSchema(schema: Schema): LogicalType = IsoDate
   })
 
@@ -148,11 +149,11 @@ class PostgresDialectSpec extends Matchers
 
       val avro = new Schema.Parser().parse(schema)
       PostgresDialect.getJDBCType(avro.getField("address").schema())
-        .get shouldBe JdbcType("JSON", JDBCType.CHAR)
+        .get shouldBe JdbcType("JSON", JDBCType.VARCHAR)
     }
 
     it("returns the right placeholder for json") {
-      PostgresDialect.jsonPlaceholder shouldBe "to_json(?::TEXT)"
+      PostgresDialect.jsonPlaceholder shouldBe "to_json(?::json)"
     }
 
     it("works with general sql commands") {
@@ -191,7 +192,7 @@ class PostgresDialectSpec extends Matchers
       val avro = new Schema.Parser().parse(schema)
 
       PostgresDialect.insertStatement("table", avro,
-        UnderscoreSyntax) shouldBe "INSERT INTO table (\"id\",\"username\",\"address\") VALUES (?,?,to_json(?::TEXT))"
+        UnderscoreSyntax) shouldBe "INSERT INTO table (\"id\",\"username\",\"address\") VALUES (?,?,to_json(?::json))"
     }
 
     it("builds an upsert") {
@@ -227,9 +228,9 @@ class PostgresDialectSpec extends Matchers
       val stmt = PostgresDialect.buildUpsert("table", avro, UnderscoreSyntax)
 
       val expected =
-        """insert into table ("id","username","address") values (?,?,to_json(?::TEXT))
+        """insert into table ("id","username","address") values (?,?,to_json(?::json))
           |on conflict ("id")
-          |do update set ("username","address") = (?,to_json(?::TEXT))
+          |do update set ("username","address") = (?,to_json(?::json))
           |where table."id"=?;""".stripMargin
 
       stmt shouldBe expected
@@ -407,6 +408,14 @@ class PostgresDialectSpec extends Matchers
     val stmt = PostgresDialect.deleteStatement("test_table",
       Seq("id1", "id2"), UnderscoreSyntax)
     stmt shouldBe """DELETE FROM test_table WHERE "id1" = ? AND "id2" = ?"""
+  }
+
+  it("handles nested array json types") {
+    val schemaR = Thread.currentThread().getContextClassLoader.getResourceAsStream("nested-json.avsc")
+    val schema = new Schema.Parser().parse(schemaR)
+    val field = schema.getField("authors")
+    getJdbcType(field.schema(), PostgresDialect).databaseTypeDefinition shouldBe "JSON" //the conversion is made by postgres
+    println(PostgresDialect.insertStatement("json_test", SchemaWrapper.from(schema), UnderscoreSyntax))
   }
 
   it("returns the correct array type") {

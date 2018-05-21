@@ -17,8 +17,7 @@ import scala.concurrent.duration._
   */
 class JdbcRecordWriterSpec extends Matchers
   with FunSpecLike
-  with BeforeAndAfterAll
-  with JdbcHelper {
+  with BeforeAndAfterAll {
 
   import scala.collection.JavaConverters._
 

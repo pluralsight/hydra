@@ -15,7 +15,7 @@ import org.apache.avro.{LogicalTypes, Schema}
   */
 private[sql] object PostgresDialect extends JdbcDialect {
 
-  override val jsonPlaceholder = "to_json(?::TEXT)"
+  override val jsonPlaceholder = "to_json(?::json)"
 
   override def canHandle(url: String): Boolean = url.startsWith("jdbc:postgresql")
 
@@ -26,7 +26,7 @@ private[sql] object PostgresDialect extends JdbcDialect {
     case Type.FLOAT => Some(JdbcType("FLOAT4", JDBCType.FLOAT))
     case Type.DOUBLE => Some(JdbcType("FLOAT8", JDBCType.DOUBLE))
     case UNION => unionType(schema)
-    case Type.RECORD => Some(JdbcType("JSON", JDBCType.CHAR))
+    case Type.RECORD => Some(JdbcType("JSON", JDBCType.VARCHAR))
     case Type.ARRAY => getArrayType(schema)
     case _ => None
   }
@@ -43,9 +43,8 @@ private[sql] object PostgresDialect extends JdbcDialect {
     getJDBCType(schema.getElementType).map(_.databaseTypeDefinition)
       .orElse(JdbcUtils.getCommonJDBCType(schema.getElementType).map(_.databaseTypeDefinition))
       .map { typeName =>
-        //we don't support json arrays yet.
-        val arrayType = if (typeName == "JSON") "TEXT" else typeName
-        JdbcType(s"$arrayType[]", java.sql.JDBCType.ARRAY)
+        val arrayType = if (typeName == "JSON") "JSON" else s"$typeName[]" //we store json arrays as JSON as well
+        JdbcType(arrayType, java.sql.JDBCType.ARRAY)
       }
   }
 
