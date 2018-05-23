@@ -66,7 +66,7 @@ private[sql] class AvroValueSetter(schema: SchemaWrapper, dialect: JdbcDialect) 
             new Timestamp(new ISODateConverter()
               .fromCharSequence(value.toString, schema, IsoDate).toInstant.toEpochMilli))
         case Schema.Type.STRING =>
-          pstmt.setString(idx, if (value == "null" || value.toString == "null") null else value.toString)
+          pstmt.setString(idx, value.toString)
         case Schema.Type.BOOLEAN =>
           pstmt.setBoolean(idx, value.asInstanceOf[Boolean])
         case Schema.Type.DOUBLE =>
