@@ -7,11 +7,13 @@ import hydra.avro.util.SchemaWrapper
 class TableCreator(provider: ConnectionProvider, dbSyntax: DbSyntax, dialect: JdbcDialect) {
 
 
-  def createOrAlterTable(mode: SaveMode, wrapper: SchemaWrapper, isTruncate: Boolean): Table = {
-    val tableName = dbSyntax.format(wrapper.schema.getName)
+  def createOrAlterTable(mode: SaveMode, wrapper: SchemaWrapper, isTruncate: Boolean,
+                         tableIdentifier: Option[TableIdentifier] = None): Table = {
+    val tableId = tableIdentifier.getOrElse(TableIdentifier(JdbcUtils.
+      createTableNameFromSchema(wrapper.schema)))
+    val tableName = dbSyntax.format(tableId.table)
     val conn = provider.getConnection
     val store = new JdbcCatalog(provider, UnderscoreSyntax, dialect)
-    val tableId = TableIdentifier(JdbcUtils.createTableNameFromSchema(wrapper.schema))
     val tableExists = store.tableExists(tableId)
     val table = Table(tableId.table, wrapper, tableId.database)
     if (tableExists) {

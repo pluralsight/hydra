@@ -50,6 +50,37 @@ class TableCreatorSpec extends Matchers
       }.get
     }
 
+    it("uses the table name when provided") {
+      val schemaStr =
+        """
+          |{
+          |	"type": "record",
+          |	"name": "HydraDrop",
+          |	"namespace": "hydra",
+          |	"fields": [{
+          |			"name": "id",
+          |			"type": "int",
+          |			"doc": "doc"
+          |		},
+          |		{
+          |			"name": "username",
+          |			"type": ["null", "string"]
+          |		}
+          |	]
+          |}""".stripMargin
+
+      val schema = SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
+
+      new TableCreator(provider, UnderscoreSyntax, H2Dialect).
+        createOrAlterTable(SaveMode.Overwrite, schema, false, Some(TableIdentifier("another_table")))
+
+      TryWith(provider.getConnection().createStatement()) { stmt =>
+        val rs = stmt.executeQuery("select \"id\",\"username\" from another_table")
+        rs.next() shouldBe false
+      }.get
+
+    }
+
     it("drops a table that already exists") {
 
       TryWith(provider.getConnection().createStatement()) { stmt =>

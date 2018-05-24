@@ -54,8 +54,6 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
 
   private val store: Catalog = new JdbcCatalog(connectionProvider, syntax, dialect)
 
-  private val tableId = tableIdentifier.getOrElse(TableIdentifier(JdbcUtils.createTableNameFromSchema(schemaWrapper.schema)))
-
   private val operations = new mutable.ArrayBuffer[Operation]()
 
   private var currentSchema = schemaWrapper
@@ -64,7 +62,9 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
     (dialect isCascadingTruncateTable()).contains(false)
 
   private val tableObj: Table = new TableCreator(connectionProvider, syntax, dialect)
-    .createOrAlterTable(mode, schemaWrapper, isTruncate)
+    .createOrAlterTable(mode, schemaWrapper, isTruncate, tableIdentifier)
+
+  private val tableId = tableObj.name
 
   private val name = syntax.format(tableObj.name)
 
@@ -107,7 +107,7 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
   private def updateDb(record: GenericRecord): Unit = synchronized {
     val cpks = currentSchema.primaryKeys
     val wrapper = SchemaWrapper.from(record.getSchema, cpks)
-    store.createOrAlterTable(Table(tableId.table, wrapper))
+    store.createOrAlterTable(Table(tableId, wrapper))
     currentSchema = wrapper
     upsertStmt = dialect.upsert(syntax.format(name), currentSchema, syntax)
     valueSetter = new AvroValueSetter(currentSchema, dialect)
