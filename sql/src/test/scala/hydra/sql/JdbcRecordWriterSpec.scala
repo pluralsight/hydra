@@ -113,6 +113,27 @@ class JdbcRecordWriterSpec extends Matchers
       catalog.tableExists(TableIdentifier("tester")) shouldBe true
     }
 
+    it("uses the table name provided by the constructor") {
+      val schemaStr =
+        """
+          |{
+          |	"type": "record",
+          |	"name": "CreateNew",
+          |	"namespace": "hydra",
+          |	"fields": [{
+          |			"name": "id",
+          |			"type": "int"
+          |		}
+          |	]
+          |}""".stripMargin
+
+      val s = new Schema.Parser().parse(schemaStr)
+      val tblId = Some(TableIdentifier("my_table"))
+      new JdbcRecordWriter(writerSettings, provider, SchemaWrapper.from(s), SaveMode.Append, tblId).close()
+      catalog.tableExists(TableIdentifier("my_table")) shouldBe true
+    }
+
+
     it("writes") {
       val writer = new JdbcRecordWriter(writerSettings, provider, schema)
       writer.batch(Upsert(record))
@@ -433,23 +454,24 @@ class JdbcRecordWriterSpec extends Matchers
     }
 
     it("writes to new a versioned table if schema is versioned") {
-      val schemaStrV2 = """{
-                          |  "type": "record",
-                          |  "name": "VersionedTable",
-                          |  "namespace": "hydra.v2",
-                          |  "fields": [{
-                          |    "name": "identifier",
-                          |    "type": "int"
-                          |  },
-                          |  {
-                          |    "name": "name",
-                          |    "type": "string"
-                          |  }]
-                          |}""".stripMargin
+      val schemaStrV2 =
+        """{
+          |  "type": "record",
+          |  "name": "VersionedTable",
+          |  "namespace": "hydra.v2",
+          |  "fields": [{
+          |    "name": "identifier",
+          |    "type": "int"
+          |  },
+          |  {
+          |    "name": "name",
+          |    "type": "string"
+          |  }]
+          |}""".stripMargin
 
       val schemaVersion2 = new Schema.Parser().parse(schemaStrV2)
 
-      new JdbcRecordWriter( writerSettings, provider, SchemaWrapper.from(schemaVersion2), SaveMode.Append).close()
+      new JdbcRecordWriter(writerSettings, provider, SchemaWrapper.from(schemaVersion2), SaveMode.Append).close()
       catalog.tableExists(TableIdentifier("versioned_table_v2")) shouldBe true
     }
 
