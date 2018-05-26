@@ -4,6 +4,7 @@ import org.apache.avro.Schema
 import org.apache.avro.Schema.Field
 
 import scala.collection.mutable
+import scala.util.Try
 
 /**
   * A wrapper class that holds both a schema and an optional list of primary keys.
@@ -19,7 +20,21 @@ import scala.collection.mutable
   * @param primaryKeys The list of primary keys; Empty if no primary keys.
   */
 case class SchemaWrapper(schema: Schema, primaryKeys: Seq[String]) {
+
   import scala.collection.JavaConverters._
+
+  def validate(): Try[Unit] = {
+    Try {
+      val errors = primaryKeys.map(k => k -> Option(schema.getField(k))).filter(_._2.isEmpty).toMap
+      if (!errors.isEmpty) {
+        val err = s"The field(s) '${errors.keys.mkString(",")}' were specified as " +
+          "primary keys, but they don't exist in the schema. " +
+          s"Possible fields are: ${schema.getFields.asScala.map(_.name()).mkString(",")}. " +
+          s"Please revise your request."
+        throw new IllegalArgumentException(err)
+      }
+    }
+  }
 
   def getFields: mutable.Buffer[Field] = schema.getFields.asScala
 

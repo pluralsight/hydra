@@ -59,6 +59,59 @@ class SchemaWrapperSpec extends Matchers with FlatSpecLike {
     SchemaWrapper.from(avro).primaryKeys shouldBe Seq("id")
   }
 
+  it should "throw an error when a primary key is invalid" in {
+    val schema =
+      """
+        |{
+        |	"type": "record",
+        |	"name": "User",
+        |	"namespace": "hydra",
+        | "hydra.key": "someKey",
+        |	"fields": [{
+        |			"name": "id",
+        |			"type": "int",
+        |			"doc": "doc"
+        |		},
+        |		{
+        |			"name": "username",
+        |			"type": ["null", "string"]
+        |		}
+        |	]
+        |}""".stripMargin
+
+    val avro = new Schema.Parser().parse(schema)
+
+    intercept[IllegalArgumentException] {
+      SchemaWrapper.from(avro).validate().get
+    }
+  }
+
+  it should "validate" in {
+    val schema =
+      """
+        |{
+        |	"type": "record",
+        |	"name": "User",
+        |	"namespace": "hydra",
+        | "hydra.key": "id",
+        |	"fields": [{
+        |			"name": "id",
+        |			"type": "int",
+        |			"doc": "doc"
+        |		},
+        |		{
+        |			"name": "username",
+        |			"type": ["null", "string"]
+        |		}
+        |	]
+        |}""".stripMargin
+
+    val avro = new Schema.Parser().parse(schema)
+
+    SchemaWrapper.from(avro).validate().get
+
+  }
+
   it should "allow primary keys to be supplied" in {
     val schema =
       """
@@ -110,7 +163,7 @@ class SchemaWrapperSpec extends Matchers with FlatSpecLike {
 
     val avro = new Schema.Parser().parse(schema)
 
-    SchemaWrapper.from(avro).primaryKeys shouldBe Seq("id1","id2")
+    SchemaWrapper.from(avro).primaryKeys shouldBe Seq("id1", "id2")
 
   }
 
