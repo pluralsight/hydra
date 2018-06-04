@@ -24,7 +24,7 @@ import scala.collection.JavaConverters._
   */
 class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
 
-  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, new LogicalTypeFactory {
+  LogicalTypes.register(IsoDate.getName, new LogicalTypeFactory {
     override def fromSchema(schema: Schema): LogicalType = IsoDate
   })
 
