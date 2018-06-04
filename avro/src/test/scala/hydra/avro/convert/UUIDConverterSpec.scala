@@ -1,30 +1,14 @@
 package hydra.avro.convert
 
-import java.util.UUID
-
 import org.apache.avro.{LogicalType, LogicalTypes, Schema}
 import org.scalatest.{FlatSpec, Matchers}
 
 class UUIDConverterSpec extends FlatSpec with Matchers {
 
-  LogicalTypes.register(HydraUUID.getName, new LogicalTypes.LogicalTypeFactory {
-    override def fromSchema(schema: Schema): LogicalType = HydraUUID
+  LogicalTypes.register(UUID.getName, new LogicalTypes.LogicalTypeFactory {
+    override def fromSchema(schema: Schema): LogicalType = UUID
   })
 
-  val uuidConverter = new UUIDConverter
-
-  "A UUIDConverter" should "get the converted type" in {
-    uuidConverter.getConvertedType shouldEqual classOf[UUID]
-  }
-
-  it should "get the logical type name" in {
-    uuidConverter.getLogicalTypeName shouldEqual HydraUUID.getName
-  }
-
-  it should "convert a UUID from a `CharSequence`" in {
-    val charSeq = "123e4567-e89b-42d3-a456-556642440000"
-    uuidConverter.fromCharSequence(charSeq, Schema.create(Schema.Type.STRING), HydraUUID)
-  }
 
   it should "use the logical type from a schema" in {
     val schemaStr =
@@ -38,7 +22,7 @@ class UUIDConverterSpec extends FlatSpec with Matchers {
         |      "name": "guid",
         |      "type":{
         |        "type": "string",
-        |        "logicalType":"hydra-uuid"
+        |        "logicalType":"uuid"
         |      }
         |    }
         |  ]
@@ -46,6 +30,14 @@ class UUIDConverterSpec extends FlatSpec with Matchers {
       """.stripMargin
 
     val schema = new Schema.Parser().parse(schemaStr)
-    schema.getField("guid").schema().getLogicalType shouldBe HydraUUID
+    schema.getField("guid").schema().getLogicalType.getName shouldBe UUID.getName
+  }
+
+  it should "validate the type" in {
+    UUID.validate(Schema.create(Schema.Type.STRING))
+
+    intercept[IllegalArgumentException] {
+      UUID.validate(Schema.create(Schema.Type.INT))
+    }
   }
 }
