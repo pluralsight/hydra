@@ -61,7 +61,7 @@ private[sql] class AvroValueSetter(schema: SchemaWrapper, dialect: JdbcDialect) 
             case a: GenericData.Array[_] => arrayValue(a.iterator().asScala.toList, schema, pstmt, idx)
             case l: java.util.List[_] => arrayValue(l.asScala.toList, schema, pstmt, idx)
           }
-        case Schema.Type.STRING if isLogicalType(schema, IsoDate.LogicalTypeName) =>
+        case Schema.Type.STRING if isLogicalType(schema, IsoDate.getName) =>
           pstmt.setTimestamp(idx,
             new Timestamp(new ISODateConverter()
               .fromCharSequence(value.toString, schema, IsoDate).toInstant.toEpochMilli))

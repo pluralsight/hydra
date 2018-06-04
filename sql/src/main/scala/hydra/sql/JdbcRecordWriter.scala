@@ -220,7 +220,7 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
 
 object JdbcRecordWriter {
 
-  LogicalTypes.register(IsoDate.LogicalTypeName, new LogicalTypeFactory {
+  LogicalTypes.register(IsoDate.getName, new LogicalTypeFactory {
     override def fromSchema(schema: Schema): LogicalType = IsoDate
   })
 
