@@ -24,7 +24,7 @@ object HydraUUID extends LogicalType("hydra-uuid") with HydraLogicalType {
 
   override def validate(schema: Schema): Unit = {
     if (schema.getType != Schema.Type.STRING) {
-      throw new IllegalArgumentException("uuid can only be used with an underlying string type")
+      throw new IllegalArgumentException("hydra-uuid can only be used with an underlying string type")
     }
   }
 }
