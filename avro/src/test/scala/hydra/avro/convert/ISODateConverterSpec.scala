@@ -1,8 +1,7 @@
-package hydra.avro
+package hydra.avro.convert
 
 import java.time.{Instant, ZoneOffset, ZonedDateTime}
 
-import hydra.avro.convert.{ISODateConverter, IsoDate}
 import org.apache.avro.LogicalTypes.LogicalTypeFactory
 import org.apache.avro.{LogicalType, LogicalTypes, Schema}
 import org.scalatest.{FlatSpecLike, Matchers}
@@ -65,5 +64,4 @@ class ISODateConverterSpec extends Matchers with FlatSpecLike {
       IsoDate.validate(Schema.create(Schema.Type.INT))
     }
   }
-
 }
