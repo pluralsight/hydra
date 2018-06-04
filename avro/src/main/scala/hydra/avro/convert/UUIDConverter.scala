@@ -11,7 +11,7 @@ class UUIDConverter extends Conversion[UUID] {
 
   override def getConvertedType: Class[UUID] = classOf[UUID]
 
-  override def getLogicalTypeName: String = UUIDLogicalTypeName
+  override def getLogicalTypeName: String = LogicalTypeName
 
   override def fromCharSequence(value: CharSequence,
                                 schema: avro.Schema, `type`: LogicalType): UUID = {
@@ -19,8 +19,8 @@ class UUIDConverter extends Conversion[UUID] {
   }
 }
 
-object HydraUUID extends LogicalType("hydra-uuid") {
-  val UUIDLogicalTypeName = "hydra-uuid"
+object HydraUUID extends LogicalType("hydra-uuid") with HydraLogicalType {
+  val LogicalTypeName = "hydra-uuid"
 
   override def validate(schema: Schema): Unit = {
     if (schema.getType != Schema.Type.STRING) {

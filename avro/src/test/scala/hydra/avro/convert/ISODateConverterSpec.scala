@@ -8,7 +8,7 @@ import org.scalatest.{FlatSpecLike, Matchers}
 
 class ISODateConverterSpec extends Matchers with FlatSpecLike {
 
-  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, new LogicalTypeFactory {
+  LogicalTypes.register(IsoDate.LogicalTypeName, new LogicalTypeFactory {
     override def fromSchema(schema: Schema): LogicalType = IsoDate
   })
 

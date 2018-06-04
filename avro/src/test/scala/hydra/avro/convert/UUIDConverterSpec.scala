@@ -7,7 +7,7 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class UUIDConverterSpec extends FlatSpec with Matchers {
 
-  LogicalTypes.register(HydraUUID.UUIDLogicalTypeName, new LogicalTypes.LogicalTypeFactory {
+  LogicalTypes.register(HydraUUID.LogicalTypeName, new LogicalTypes.LogicalTypeFactory {
     override def fromSchema(schema: Schema): LogicalType = HydraUUID
   })
 
@@ -18,7 +18,7 @@ class UUIDConverterSpec extends FlatSpec with Matchers {
   }
 
   it should "get the logical type name" in {
-    uuidConverter.getLogicalTypeName shouldEqual HydraUUID.UUIDLogicalTypeName
+    uuidConverter.getLogicalTypeName shouldEqual HydraUUID.LogicalTypeName
   }
 
   it should "convert a UUID from a `CharSequence`" in {

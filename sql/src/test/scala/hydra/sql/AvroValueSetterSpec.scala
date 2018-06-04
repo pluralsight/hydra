@@ -24,12 +24,132 @@ import scala.collection.JavaConverters._
   */
 class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
 
-  import AvroValueSetterSpec._
-
-  LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, new LogicalTypeFactory {
+  LogicalTypes.register(IsoDate.LogicalTypeName, new LogicalTypeFactory {
     override def fromSchema(schema: Schema): LogicalType = IsoDate
   })
 
+  val schemaStr =
+    """
+      |{
+      |	"type": "record",
+      |	"name": "User",
+      |	"namespace": "hydra",
+      |	"fields": [{
+      |			"name": "id",
+      |			"type": "int"
+      |		},
+      |		{
+      |			"name": "username",
+      |			"type": "string"
+      |		},
+      |		{
+      |			"name": "rate",
+      |   "type": {
+      |			"type": "bytes",
+      |			"logicalType": "decimal",
+      |			"precision": 4,
+      |			"scale": 2
+      |   }
+      |		},
+      |		{
+      |			"name": "active",
+      |			"type": "boolean",
+      |      "doc": "active_doc"
+      |		},
+      |		{
+      |			"name": "score",
+      |			"type": "float"
+      |		},
+      |		{
+      |			"name": "scored",
+      |			"type": "double"
+      |		},
+      |		{
+      |			"name": "signupTimestamp",
+      |			"type": {
+      |				"type": "long",
+      |				"logicalType": "timestamp-millis"
+      |			}
+      |		},
+      |		{
+      |			"name": "signupDate",
+      |			"type": {
+      |				"type": "int",
+      |				"logicalType": "date"
+      |			}
+      |		},
+      |		{
+      |			"name": "testUnion",
+      |			"type": ["null", "string"]
+      |		},
+      |  		{
+      |			"name": "testNullUnion",
+      |			"type": ["null", "string"]
+      |		},
+      |		{
+      |			"name": "friends",
+      |			"type": {
+      |				"type": "array",
+      |				"items": "string"
+      |			}
+      |		},
+      |  {
+      |    "name": "testEnum",
+      |    "type": {
+      |        "type": "enum",
+      |        "name": "enum_type",
+      |        "symbols": ["test1", "test2"]
+      |    }
+      |  },
+      |      {"name": "address", "type":
+      |      {"type": "record",
+      |       "name": "AddressRecord",
+      |       "fields": [
+      |         {"name": "street", "type": "string"}
+      |       ]}
+      |    },
+      |    {
+      |			"name": "bigNumber",
+      |			"type": "long"
+      |		},
+      |  {
+      |			"name": "byteField",
+      |			"type": "bytes"
+      |		},
+      |  {
+      |			"name": "isoDate",
+      |			"type": {
+      |				"type": "string",
+      |				"logicalType": "iso-datetime"
+      |			}
+      |		},
+      |  {
+      |      "name": "authors",
+      |      "type": {
+      |        "type": "array",
+      |        "items": {
+      |          "type": "record",
+      |          "name": "authors_record",
+      |          "fields": [
+      |            {
+      |              "name": "id",
+      |              "type": "string"
+      |            },
+      |            {
+      |              "name": "authorHandle",
+      |              "type": "string"
+      |            }
+      |          ]
+      |        }
+      |      }
+      |    }
+      |	]
+      |}
+    """.stripMargin
+
+  val schema = SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
+
+  val valueSetter = new AvroValueSetter(schema, PostgresDialect)
   describe("The AvroValueSetter") {
     it("sets values in inserts") {
       val ts = System.currentTimeMillis
@@ -38,10 +158,10 @@ class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       val dt = LocalDate.ofEpochDay(1234).atStartOfDay(ZoneId.systemDefault()).toInstant.toEpochMilli
       val isoDate = new ISODateConverter().fromCharSequence("2015-07-28T19:55:57.693217+00:00",
         Schema.create(Schema.Type.STRING), IsoDate).toInstant.toEpochMilli
-      val friends = Lists.newArrayList("friend1", "friend2")
 
       val mockedStmt = mock[PreparedStatement]
       val connection = mock[Connection]
+      val friends = Lists.newArrayList("friend1", "friend2")
       (mockedStmt.getConnection _).expects().returning(connection)
       val mockArray = new MockArray(friends)
       (connection.createArrayOf(_, _)).expects("VARCHAR", *).returning(mockArray)
@@ -207,136 +327,4 @@ class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
 
     }
   }
-}
-
-object AvroValueSetterSpec {
-  val schemaStr =
-    """
-      |{
-      |	"type": "record",
-      |	"name": "User",
-      |	"namespace": "hydra",
-      |	"fields": [{
-      |			"name": "id",
-      |			"type": "int"
-      |		},
-      |		{
-      |			"name": "username",
-      |			"type": "string"
-      |		},
-      |		{
-      |			"name": "rate",
-      |   "type": {
-      |			"type": "bytes",
-      |			"logicalType": "decimal",
-      |			"precision": 4,
-      |			"scale": 2
-      |   }
-      |		},
-      |		{
-      |			"name": "active",
-      |			"type": "boolean",
-      |      "doc": "active_doc"
-      |		},
-      |		{
-      |			"name": "score",
-      |			"type": "float"
-      |		},
-      |		{
-      |			"name": "scored",
-      |			"type": "double"
-      |		},
-      |		{
-      |			"name": "signupTimestamp",
-      |			"type": {
-      |				"type": "long",
-      |				"logicalType": "timestamp-millis"
-      |			}
-      |		},
-      |		{
-      |			"name": "signupDate",
-      |			"type": {
-      |				"type": "int",
-      |				"logicalType": "date"
-      |			}
-      |		},
-      |		{
-      |			"name": "testUnion",
-      |			"type": ["null", "string"]
-      |		},
-      |  		{
-      |			"name": "testNullUnion",
-      |			"type": ["null", "string"]
-      |		},
-      |		{
-      |			"name": "friends",
-      |			"type": {
-      |				"type": "array",
-      |				"items": "string"
-      |			}
-      |		},
-      |  {
-      |    "name": "testEnum",
-      |    "type": {
-      |        "type": "enum",
-      |        "name": "enum_type",
-      |        "symbols": ["test1", "test2"]
-      |    }
-      |  },
-      |      {"name": "address", "type":
-      |      {"type": "record",
-      |       "name": "AddressRecord",
-      |       "fields": [
-      |         {"name": "street", "type": "string"}
-      |       ]}
-      |    },
-      |    {
-      |			"name": "bigNumber",
-      |			"type": "long"
-      |		},
-      |  {
-      |			"name": "byteField",
-      |			"type": "bytes"
-      |		},
-      |  {
-      |			"name": "isoDate",
-      |			"type": {
-      |				"type": "string",
-      |				"logicalType": "iso-datetime"
-      |			}
-      |		},
-      |  {
-      |      "name": "myGuid",
-      |      "type": {
-      |        "type": "string",
-      |        "logicalType": "hydra-uuid"
-      |      }
-      |   },
-      |  {
-      |      "name": "authors",
-      |      "type": {
-      |        "type": "array",
-      |        "items": {
-      |          "type": "record",
-      |          "name": "authors_record",
-      |          "fields": [
-      |            {
-      |              "name": "id",
-      |              "type": "string"
-      |            },
-      |            {
-      |              "name": "authorHandle",
-      |              "type": "string"
-      |            }
-      |          ]
-      |        }
-      |      }
-      |    }
-      |	]
-      |}
-    """.stripMargin
-
-  val schema = SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
-
-  val valueSetter = new AvroValueSetter(schema, PostgresDialect)
 }

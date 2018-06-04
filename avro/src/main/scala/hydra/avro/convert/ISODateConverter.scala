@@ -16,7 +16,7 @@ class ISODateConverter extends Conversion[ZonedDateTime] with LoggingAdapter {
 
   private val utc = ZoneOffset.UTC
 
-  override def getLogicalTypeName: String = IsoDate.IsoDateLogicalTypeName
+  override def getLogicalTypeName: String = IsoDate.LogicalTypeName
 
   override def getConvertedType: Class[ZonedDateTime] = classOf[ZonedDateTime]
 
@@ -32,8 +32,8 @@ class ISODateConverter extends Conversion[ZonedDateTime] with LoggingAdapter {
   }
 }
 
-object IsoDate extends LogicalType("iso-datetime") {
-  val IsoDateLogicalTypeName = "iso-datetime"
+object IsoDate extends LogicalType("iso-datetime") with HydraLogicalType {
+  val LogicalTypeName = "iso-datetime"
 
   override def validate(schema: Schema): Unit = {
     if (schema.getType() != Schema.Type.STRING) {
