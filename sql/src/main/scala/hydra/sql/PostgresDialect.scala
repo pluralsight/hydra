@@ -34,6 +34,8 @@ private[sql] object PostgresDialect extends JdbcDialect {
   private def logicalStringTypes(schema: Schema) = {
     if (isLogicalType(schema, IsoDate.IsoDateLogicalTypeName)) {
       Some(JdbcType("TIMESTAMP", JDBCType.TIMESTAMP))
+    } else if (isLogicalType(schema, LogicalTypes.uuid().getName)) {
+      Some(JdbcType("UUID", JDBCType.OTHER))
     } else {
       Some(JdbcType("TEXT", JDBCType.VARCHAR))
     }

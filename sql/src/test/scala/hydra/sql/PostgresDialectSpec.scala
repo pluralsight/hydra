@@ -75,6 +75,13 @@ class PostgresDialectSpec extends Matchers
       |				"logicalType": "timestamp-millis"
       |			}
       |		},
+      |   {
+      |     "name": "guid",
+      |     "type": {
+      |       "type": "string",
+      |       "logicalType": "uuid"
+      |     }
+      |   },
       |		{
       |			"name": "signupDate",
       |			"type": {
@@ -123,6 +130,7 @@ class PostgresDialectSpec extends Matchers
       PostgresDialect.getJDBCType(avro.getField("friends").schema()) shouldBe Some(JdbcType("TEXT[]", ARRAY))
       PostgresDialect.getJDBCType(avro.getField("signupDate").schema()) shouldBe None
       PostgresDialect.getJDBCType(avro.getField("testTS").schema()).get shouldBe JdbcType("TIMESTAMP", TIMESTAMP)
+      PostgresDialect.getJDBCType(avro.getField("guid").schema()).get shouldBe JdbcType("UUID", OTHER)
     }
 
     it("works with record types") {
