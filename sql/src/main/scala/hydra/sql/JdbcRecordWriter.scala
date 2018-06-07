@@ -45,7 +45,6 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
   import JdbcRecordWriter._
 
   logger.debug("Initializing JdbcRecordWriter")
-
   private val batchSize = settings.batchSize
 
   private val syntax = settings.dbSyntax
