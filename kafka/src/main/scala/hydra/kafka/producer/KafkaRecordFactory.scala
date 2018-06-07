@@ -1,5 +1,6 @@
 package hydra.kafka.producer
 
+import com.fasterxml.jackson.databind.JsonNode
 import hydra.avro.util.SchemaWrapper
 import hydra.core.ingest.RequestParams._
 import hydra.core.ingest.{HydraRequest, RequestParams}
@@ -59,9 +60,16 @@ object KafkaRecordFactory {
 
   object RecordKeyExtractor {
 
-    implicit object JsonRecordKeyExtractor extends RecordKeyExtractor[String, String] {
+    implicit object StringRecordKeyExtractor extends RecordKeyExtractor[String, String] {
       override def extractKey(request: HydraRequest, record: String): Option[String] = {
         request.metadataValue(HYDRA_RECORD_KEY_PARAM).map(key => JsonPathKeys.getKey(key, record))
+      }
+    }
+
+    implicit object JsonRecordKeyExtractor extends RecordKeyExtractor[String, JsonNode] {
+      override def extractKey(request: HydraRequest, record: JsonNode): Option[String] = {
+        request.metadataValue(HYDRA_RECORD_KEY_PARAM)
+          .map(key => JsonPathKeys.getKey(key, record.toString))
       }
     }
 
