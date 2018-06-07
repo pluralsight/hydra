@@ -34,8 +34,8 @@ import scala.concurrent.duration._
 import scala.io.Source
 
 /**
- * Created by alexsilva on 1/11/17.
- */
+  * Created by alexsilva on 1/11/17.
+  */
 class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
   with Matchers
   with FunSpecLike
@@ -44,9 +44,31 @@ class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
 
   val testSchema = new Schema.Parser().parse(Source.fromResource("avro-factory-test.avsc").mkString)
 
+  val testKeyedSchema = new Schema.Parser().parse(
+    """
+      |{
+      |  "namespace": "hydra.test",
+      |  "type": "record",
+      |  "name": "Tester",
+      |  "hydra.key":"name",
+      |  "fields": [
+      |    {
+      |      "name": "name",
+      |      "type": "string"
+      |    },
+      |    {
+      |      "name": "rank",
+      |      "type": "int"
+      |    }
+      |  ]
+      |}
+    """.stripMargin)
+
   val loader = system.actorOf(Props(new Actor() {
     override def receive: Receive = {
-      case FetchSchemaRequest(schema) => sender ! FetchSchemaResponse(SchemaResource(1,1,testSchema))
+      case FetchSchemaRequest(name) =>
+        sender ! FetchSchemaResponse(SchemaResource(1, 1,
+          if (name == "avro-factory-test") testSchema else testKeyedSchema))
     }
   }))
 
@@ -110,7 +132,7 @@ class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
       }
     }
 
-    it("builds keyed messages") {
+    it("builds keyed messages using HYDRA_RECORD_KEY_PARAM") {
       val json = """{"name":"test", "rank":10}"""
       val request = HydraRequest("123", json)
         .withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-test")
@@ -126,11 +148,26 @@ class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
       }
     }
 
+    it("builds keyed messages using hydra.key") {
+      val json = """{"name":"thisIsTheKey", "rank":10}"""
+      val request = HydraRequest("123", json)
+        .withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-keyed-test")
+        .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
+      whenReady(factory.build(request)) { msg =>
+        msg.destination shouldBe "test-topic"
+        msg.schema shouldBe testKeyedSchema
+        msg.payload.get("name") shouldBe "thisIsTheKey"
+        msg.payload.get("rank") shouldBe 10
+        msg.key shouldBe Some("thisIsTheKey")
+        msg.payload shouldBe new JsonConverter[GenericRecord](testKeyedSchema).convert(json)
+      }
+    }
+
     it("has the right subject when a schema is specified") {
       val request = HydraRequest("123", """{"name":"test", "rank":10}""")
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:avro-factory-test.avsc")
+        .withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-test")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      factory.getTopicAndSchemaSubject(request).get._2 shouldBe "classpath:avro-factory-test.avsc"
+      factory.getTopicAndSchemaSubject(request).get._2 shouldBe "avro-factory-test"
     }
 
     it("defaults to target as the subject") {
@@ -147,7 +184,7 @@ class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
     //validation
     it("returns invalid for payloads that do not conform to the schema") {
       val r = HydraRequest("1", """{"name":"test"}""")
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:avro-factory-test.avsc")
+        .withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-test.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = factory.build(r)
       whenReady(rec.failed)(_ shouldBe a[JsonToAvroConversionExceptionWithMetadata])
@@ -155,7 +192,7 @@ class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
 
     it("validates good avro payloads") {
       val r = HydraRequest("1", """{"name":"test","rank":10}""")
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "classpath:avro-factory-test.avsc")
+        .withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-test")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       whenReady(factory.build(r)) { rec =>
         val genericRecord = new GenericRecordBuilder(testSchema)
