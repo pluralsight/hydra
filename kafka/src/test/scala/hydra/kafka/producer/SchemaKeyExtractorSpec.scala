@@ -36,7 +36,7 @@ class SchemaKeyExtractorSpec extends Matchers with FlatSpecLike {
       """{"name":"hydra","rank":1}""")
 
     val req = HydraRequest("123", """{"name":"hydra","rank":1}""")
-    SchemaKeyExtractor.extractKey(req, record) shouldBe None
+    SchemaKeyExtractor.extractKeyValue(req, record) shouldBe None
   }
 
   it should "return a key when one is in the request" in {
@@ -62,7 +62,7 @@ class SchemaKeyExtractorSpec extends Matchers with FlatSpecLike {
 
     val req = HydraRequest("123", """{"name":"hydra","rank":1}""")
       .withMetadata(RequestParams.HYDRA_RECORD_KEY_PARAM -> "theKey")
-    SchemaKeyExtractor.extractKey(req, record) shouldBe Some("theKey")
+    SchemaKeyExtractor.extractKeyValue(req, record) shouldBe Some("theKey")
   }
 
   it should "return the key defined by 'hydra.key'" in {
@@ -88,7 +88,7 @@ class SchemaKeyExtractorSpec extends Matchers with FlatSpecLike {
       """{"name":"hydra","rank":1}""")
 
     val req = HydraRequest("123", """{"name":"hydra","rank":1}""")
-    SchemaKeyExtractor.extractKey(req, record) shouldBe Some("hydra")
+    SchemaKeyExtractor.extractKeyValue(req, record) shouldBe Some("hydra")
   }
 
   it should "return the request when both hydra-record-key and hydra.key are present" in {
@@ -115,7 +115,7 @@ class SchemaKeyExtractorSpec extends Matchers with FlatSpecLike {
 
     val req = HydraRequest("123", """{"name":"hydra","rank":1}""")
       .withMetadata(RequestParams.HYDRA_RECORD_KEY_PARAM -> "theKey")
-    SchemaKeyExtractor.extractKey(req, record) shouldBe Some("theKey")
+    SchemaKeyExtractor.extractKeyValue(req, record) shouldBe Some("theKey")
   }
 
   it should "error when trying to use hydra.key for a non-existent key" in {
@@ -142,7 +142,7 @@ class SchemaKeyExtractorSpec extends Matchers with FlatSpecLike {
 
     val req = HydraRequest("123", """{"name":"hydra","rank":1}""")
     intercept[IllegalArgumentException] {
-      SchemaKeyExtractor.extractKey(req, record) shouldBe Some("1")
+      SchemaKeyExtractor.extractKeyValue(req, record) shouldBe Some("1")
     }
   }
 
@@ -169,6 +169,6 @@ class SchemaKeyExtractorSpec extends Matchers with FlatSpecLike {
       """{"name":"hydra","rank":1}""")
 
     val req = HydraRequest("123", """{"name":"hydra","rank":1}""")
-    SchemaKeyExtractor.extractKey(req, record) shouldBe Some("hydra|1")
+    SchemaKeyExtractor.extractKeyValue(req, record) shouldBe Some("hydra|1")
   }
 }

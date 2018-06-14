@@ -18,7 +18,7 @@ import scala.util.{Failure, Success, Try}
 trait KafkaRecordFactory[K, V] extends RecordFactory[K, V] {
 
   def getKey(request: HydraRequest, value: V)(implicit ev: RecordKeyExtractor[K, V]): Option[K] =
-    ev.extractKey(request, value)
+    ev.extractKeyValue(request, value)
 
   //delete requests
   def getKey(request: HydraRequest): Option[String] = request.metadataValue(HYDRA_RECORD_KEY_PARAM)
@@ -55,26 +55,26 @@ object KafkaRecordFactory {
 
   trait RecordKeyExtractor[K, V] {
 
-    def extractKey(request: HydraRequest, record: V): Option[K]
+    def extractKeyValue(request: HydraRequest, record: V): Option[K]
   }
 
   object RecordKeyExtractor {
 
     implicit object StringRecordKeyExtractor extends RecordKeyExtractor[String, String] {
-      override def extractKey(request: HydraRequest, record: String): Option[String] = {
+      override def extractKeyValue(request: HydraRequest, record: String): Option[String] = {
         request.metadataValue(HYDRA_RECORD_KEY_PARAM).map(key => JsonPathKeys.getKey(key, record))
       }
     }
 
     implicit object JsonRecordKeyExtractor extends RecordKeyExtractor[String, JsonNode] {
-      override def extractKey(request: HydraRequest, record: JsonNode): Option[String] = {
+      override def extractKeyValue(request: HydraRequest, record: JsonNode): Option[String] = {
         request.metadataValue(HYDRA_RECORD_KEY_PARAM)
           .map(key => JsonPathKeys.getKey(key, record.toString))
       }
     }
 
     implicit object SchemaKeyExtractor extends RecordKeyExtractor[String, GenericRecord] {
-      override def extractKey(request: HydraRequest, payload: GenericRecord): Option[String] = {
+      override def extractKeyValue(request: HydraRequest, payload: GenericRecord): Option[String] = {
         request.metadataValue(HYDRA_RECORD_KEY_PARAM).map { key =>
           JsonPathKeys.getKey(key, request.payload)
         }.orElse {

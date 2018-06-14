@@ -13,7 +13,7 @@ class JsonRecordKeyExtractorSpec extends Matchers with FlatSpecLike {
     val json = """{"name":"hydra","rank":1}"""
     val node = mapper.reader().readTree(json)
     val request = ingest.HydraRequest("corr", node.asText())
-    JsonRecordKeyExtractor.extractKey(request, node) shouldBe None
+    JsonRecordKeyExtractor.extractKeyValue(request, node) shouldBe None
   }
 
   it should "return a key" in {
@@ -21,6 +21,6 @@ class JsonRecordKeyExtractorSpec extends Matchers with FlatSpecLike {
     val node = mapper.reader().readTree(json)
     val request = ingest.HydraRequest("corr", node.asText())
       .withMetadata(RequestParams.HYDRA_RECORD_KEY_PARAM -> "{$.name}")
-    JsonRecordKeyExtractor.extractKey(request, node) shouldBe Some("hydra")
+    JsonRecordKeyExtractor.extractKeyValue(request, node) shouldBe Some("hydra")
   }
 }

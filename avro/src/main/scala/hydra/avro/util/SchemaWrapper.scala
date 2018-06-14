@@ -36,7 +36,7 @@ case class SchemaWrapper(schema: Schema, primaryKeys: Seq[String]) {
 
       val unionMap = primaryKeys.map(schema.getField)
         .map(f => f.name() -> isNullableUnion(f.schema())).filter(_._2).toMap
-      
+
       if (!unionMap.isEmpty) {
         val err = s"The field(s) '${unionMap.keys.mkString(",")}' were specified as " +
           "primary keys, but they are nullable.  This is currently not supported."
