@@ -101,7 +101,7 @@ class SchemaWrapperSpec extends Matchers with FlatSpecLike {
         |		},
         |		{
         |			"name": "username",
-        |			"type": ["null", "string"]
+        |			"type": "string"
         |		}
         |	]
         |}""".stripMargin
@@ -109,6 +109,34 @@ class SchemaWrapperSpec extends Matchers with FlatSpecLike {
     val avro = new Schema.Parser().parse(schema)
 
     SchemaWrapper.from(avro).validate().get
+
+  }
+
+  it should "validate primary key fields are not nullable" in {
+    val schema =
+      """
+        |{
+        |	"type": "record",
+        |	"name": "User",
+        |	"namespace": "hydra",
+        | "hydra.key": "username",
+        |	"fields": [{
+        |			"name": "id",
+        |			"type": "int",
+        |			"doc": "doc"
+        |		},
+        |		{
+        |			"name": "username",
+        |			"type": ["null", "string"]
+        |		}
+        |	]
+        |}""".stripMargin
+
+    val avro = new Schema.Parser().parse(schema)
+
+    intercept[IllegalArgumentException] {
+      SchemaWrapper.from(avro).validate().get
+    }
 
   }
 

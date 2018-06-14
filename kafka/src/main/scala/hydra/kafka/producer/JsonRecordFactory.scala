@@ -33,7 +33,7 @@ object JsonRecordFactory extends KafkaRecordFactory[String, JsonNode] {
     for {
       topic <- Future.fromTry(getTopic(request))
       payload <- parseJson(request.payload)
-    } yield JsonRecord(topic, getKey(request), payload)
+    } yield JsonRecord(topic, getKey(request, payload), payload)
 
   }
 

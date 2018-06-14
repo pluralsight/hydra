@@ -44,12 +44,12 @@ class DeleteTombstoneRecordFactorySpec extends Matchers
     }
 
     it("builds a delete record") {
-      val request = HydraRequest("123", """{"name":"test"}""")
-        .withMetadata(HYDRA_RECORD_KEY_PARAM -> "{$.name}")
+      val request = HydraRequest("123", null)
+        .withMetadata(HYDRA_RECORD_KEY_PARAM -> "key")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       whenReady(DeleteTombstoneRecordFactory.build(request)) { rec =>
         rec.destination shouldBe "test-topic"
-        rec.key shouldBe Some("test")
+        rec.key shouldBe Some("key")
         rec.formatName shouldBe "string"
         Option(rec.payload).isDefined shouldBe false
       }

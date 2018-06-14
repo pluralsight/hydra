@@ -1,7 +1,7 @@
 package hydra.avro.util
 
 import org.apache.avro.Schema
-import org.apache.avro.Schema.Field
+import org.apache.avro.Schema.{Field, Type}
 
 import scala.collection.mutable
 import scala.util.Try
@@ -33,10 +33,24 @@ case class SchemaWrapper(schema: Schema, primaryKeys: Seq[String]) {
           s"Please revise your request."
         throw new IllegalArgumentException(err)
       }
+
+      val unionMap = primaryKeys.map(schema.getField)
+        .map(f => f.name() -> isNullableUnion(f.schema())).filter(_._2).toMap
+
+      if (!unionMap.isEmpty) {
+        val err = s"The field(s) '${unionMap.keys.mkString(",")}' were specified as " +
+          "primary keys, but they are nullable.  This is currently not supported."
+        throw new IllegalArgumentException(err)
+      }
+
     }
   }
 
   def getFields: mutable.Buffer[Field] = schema.getFields.asScala
+
+  private def isNullableUnion(schema: Schema): Boolean =
+    schema.getType == Type.UNION && schema.getTypes.size == 2 && schema.getTypes()
+      .contains(Schema.create(Type.NULL))
 
   def getName: String = schema.getName
 }
