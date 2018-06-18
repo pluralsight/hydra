@@ -47,6 +47,8 @@ object Dependencies {
 
     val embeddedKafka = "net.manub" %% "scalatest-embedded-kafka" % "0.14.0"
 
+    val sdNotify = "info.faljse" % "SDNotify" % "1.1"
+
     val kafka = Seq(
       "org.apache.kafka" %% "kafka" % kafkaVersion,
       "org.apache.kafka" % "kafka-clients" % kafkaVersion,
@@ -144,7 +146,7 @@ object Dependencies {
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
   val coreDeps = akka ++ baseDeps ++
-    Seq(guavacache, reflections, serviceContainer, akkaKryo) ++ confluent ++ constructR
+    Seq(guavacache, reflections, serviceContainer, akkaKryo, sdNotify) ++ confluent ++ constructR
 
   val ingestDeps = coreDeps
 
