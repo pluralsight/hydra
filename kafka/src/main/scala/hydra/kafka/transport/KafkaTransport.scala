@@ -16,6 +16,8 @@
 
 package hydra.kafka.transport
 
+import java.util.concurrent.atomic.AtomicLong
+
 import akka.actor.SupervisorStrategy._
 import akka.actor._
 import akka.kafka.ProducerSettings
@@ -24,30 +26,42 @@ import hydra.core.transport.Transport
 import hydra.core.transport.Transport.Deliver
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata}
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
-import hydra.kafka.transport.KafkaTransport.RecordProduceError
+import hydra.kafka.transport.KafkaTransport.{RecordProduceError, ReportMetrics}
 import hydra.kafka.util.KafkaUtils
+import kamon.Kamon
 
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 import scala.language.existentials
 
 /**
   * Created by alexsilva on 10/28/15.
   */
-class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) extends Transport {
+class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) extends Transport
+  with Timers {
 
   private type KR = KafkaRecord[_, _]
 
   private[kafka] lazy val metrics = KafkaMetrics(applicationConfig)(context.system)
 
+  private[kafka] val histogram = Kamon.histogram("kafka-transport")
+
+  private val msgCounter = new AtomicLong()
+
+  timers.startPeriodicTimer("kamon", ReportMetrics, 1.second)
+
   override def transport: Receive = {
     case Deliver(kr: KafkaRecord[_, _], deliveryId, ack) =>
       withProducer(kr.formatName)(_ ! ProduceToKafka(deliveryId, kr, ack))(e => ack.onCompletion(deliveryId, None, e))
 
-    case kmd: KafkaRecordMetadata => metrics.saveMetrics(kmd)
+    case kmd: KafkaRecordMetadata =>
+      metrics.saveMetrics(kmd)
+      msgCounter.incrementAndGet()
 
     case e: RecordProduceError => context.system.eventStream.publish(e)
 
     case p: ProducerInitializationError => context.system.eventStream.publish(p)
+
+    case ReportMetrics => histogram.record(msgCounter.getAndSet(0L))
   }
 
   private def withProducer(id: String)(success: (ActorRef) => Unit)(fail: (Option[Throwable]) => Unit) = {
@@ -76,6 +90,8 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 object KafkaTransport {
 
   case class RecordProduceError(deliveryId: Long, record: KafkaRecord[_, _], error: Throwable)
+
+  case object ReportMetrics
 
   /**
     * Method to comply with TransportRegistrar that looks for a method in the companion object called props

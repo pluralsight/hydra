@@ -5,10 +5,14 @@ import hydra.common.config.ConfigSupport
 import hydra.core.protocol.{HydraMessage, Produce, RecordAccepted, RecordProduced}
 import hydra.core.transport.AckStrategy.{NoAck, Persisted, Replicated}
 import hydra.core.transport.Transport.{Confirm, Deliver, DestinationConfirmed, TransportError}
+import kamon.Kamon
 
 
 trait Transport extends PersistentActor with ConfigSupport with AtLeastOnceDelivery {
   override val persistenceId = getClass.getSimpleName
+
+  private[transport] val journalSampler = Kamon.rangeSampler("transport")
+    .refine("id" -> persistenceId)
 
   def transport: Receive
 
@@ -31,7 +35,9 @@ trait Transport extends PersistentActor with ConfigSupport with AtLeastOnceDeliv
   protected def updateState(evt: HydraMessage): Unit = evt match {
     case Produce(rec, _, _) => deliver(self.path)(deliveryId => Deliver(rec, deliveryId,
       new TransportSupervisorCallback(self)))
-    case DestinationConfirmed(deliveryId) => confirmDelivery(deliveryId)
+    case DestinationConfirmed(deliveryId) =>
+      journalSampler.decrement()
+      confirmDelivery(deliveryId)
   }
 
   private def deliver(p: Produce[Any, Any]): Unit = {
@@ -43,6 +49,7 @@ trait Transport extends PersistentActor with ConfigSupport with AtLeastOnceDeliv
       case Persisted =>
         val ingestor = sender
         persistAsync(p) { p =>
+          journalSampler.increment()
           updateState(p)
           ingestor ! RecordProduced(HydraRecordMetadata(System.currentTimeMillis), p.supervisor)
         }
