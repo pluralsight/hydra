@@ -48,6 +48,8 @@ object Dependencies {
 
     val embeddedKafka = "net.manub" %% "scalatest-embedded-kafka" % "0.14.0"
 
+    val sdNotify = "info.faljse" % "SDNotify" % "1.1"
+
     lazy val kamon = Seq(
       "io.kamon" %% "kamon-core" % kamonVersion,
       "io.kamon" %% "kamon-scala-future" % kamonPVersion,
@@ -151,7 +153,7 @@ object Dependencies {
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
   val coreDeps = akka ++ baseDeps ++
-    Seq(guavacache, reflections, serviceContainer, akkaKryo) ++ confluent ++ constructR ++ kamon
+    Seq(guavacache, reflections, serviceContainer, akkaKryo, sdNotify) ++ confluent ++ constructR ++ kamon
 
   val ingestDeps = coreDeps
 
