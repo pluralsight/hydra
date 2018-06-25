@@ -22,6 +22,7 @@ import akka.actor.SupervisorStrategy._
 import akka.actor._
 import akka.kafka.ProducerSettings
 import com.typesafe.config.Config
+import hydra.core.monitor.HydraMetrics
 import hydra.core.transport.Transport
 import hydra.core.transport.Transport.Deliver
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata}
@@ -43,9 +44,9 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 
   private[kafka] lazy val metrics = KafkaMetrics(applicationConfig)(context.system)
 
-  private[kafka] val histogram = Kamon.histogram("kafka-transport")
+  private[kafka] val histogram = Kamon.histogram("hydra_ingest_records_published_total_minutes_bucket")
 
-  private val msgCounter = new AtomicLong()
+  private[kafka] val msgCounter = new AtomicLong()
 
   timers.startPeriodicTimer("kamon", ReportMetrics, 1.second)
 
@@ -54,10 +55,12 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
       withProducer(kr.formatName)(_ ! ProduceToKafka(deliveryId, kr, ack))(e => ack.onCompletion(deliveryId, None, e))
 
     case kmd: KafkaRecordMetadata =>
+      HydraMetrics.countSuccess("hydra_ingest_records_published_total", kmd.topic)
       metrics.saveMetrics(kmd)
-      msgCounter.incrementAndGet()
 
-    case e: RecordProduceError => context.system.eventStream.publish(e)
+    case e: RecordProduceError =>
+      HydraMetrics.countFail("hydra_ingest_records_published_total", e.record.topic())
+      context.system.eventStream.publish(e)
 
     case p: ProducerInitializationError => context.system.eventStream.publish(p)
 

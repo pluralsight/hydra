@@ -17,7 +17,8 @@ object Dependencies {
   val jodaTimeVersion = "2.9.9"
   val jodaConvertVersion = "1.8.1"
   val confluentVersion = "3.2.0"
-  val sprayJsonVersion = "1.3.c2"
+  val sprayJsonVersion = "1.3.c2" +
+    ""
   val kafkaVersion = "0.10.2.1"
   val reflectionsVersion = "0.9.11"
   val akkaHTTPVersion = "10.1.0"
