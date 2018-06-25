@@ -2,17 +2,16 @@ package hydra.core.transport
 
 import akka.persistence.{AtLeastOnceDelivery, PersistentActor}
 import hydra.common.config.ConfigSupport
+import hydra.core.monitor.HydraMetrics
 import hydra.core.protocol.{HydraMessage, Produce, RecordAccepted, RecordProduced}
 import hydra.core.transport.AckStrategy.{NoAck, Persisted, Replicated}
 import hydra.core.transport.Transport.{Confirm, Deliver, DestinationConfirmed, TransportError}
-import kamon.Kamon
 
 
 trait Transport extends PersistentActor with ConfigSupport with AtLeastOnceDelivery {
   override val persistenceId = getClass.getSimpleName
 
-  private[transport] val journalSampler = Kamon.rangeSampler("hydra_ingest_journal_message_count")
-    .refine("type" -> persistenceId)
+  private[transport] val journalMetricName = "hydra_ingest_journal_message_count"
 
   def transport: Receive
 
@@ -36,7 +35,10 @@ trait Transport extends PersistentActor with ConfigSupport with AtLeastOnceDeliv
     case Produce(rec, _, _) => deliver(self.path)(deliveryId => Deliver(rec, deliveryId,
       new TransportSupervisorCallback(self)))
     case DestinationConfirmed(deliveryId) =>
-      //HydraMetrics.rangeSamplerDecrement("hydra_ingest_journal_message_count")
+      HydraMetrics.decrementGauge(
+        journalMetricName,
+        "type" -> persistenceId
+        )
       confirmDelivery(deliveryId)
   }
 
@@ -49,7 +51,10 @@ trait Transport extends PersistentActor with ConfigSupport with AtLeastOnceDeliv
       case Persisted =>
         val ingestor = sender
         persistAsync(p) { p =>
-          //HydraMetrics.rangeSamplerIncrement("hydra_ingest_journal_message_count")
+          HydraMetrics.incrementGauge(
+            journalMetricName,
+            "type" -> persistenceId
+          )
           updateState(p)
           ingestor ! RecordProduced(HydraRecordMetadata(System.currentTimeMillis), p.supervisor)
         }

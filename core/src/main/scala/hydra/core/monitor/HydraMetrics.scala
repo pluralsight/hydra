@@ -2,6 +2,7 @@ package hydra.core.monitor
 
 import kamon.Kamon
 import kamon.metric.{Counter, Gauge, Histogram}
+import kamon.metric.MeasurementUnit._
 
 import scala.collection.concurrent.TrieMap
 
@@ -38,7 +39,7 @@ object HydraMetrics {
   def histogramRecord(metricName: String): Unit = {
     histograms
       .getOrElseUpdate(metricName,
-        Kamon.histogram(metricName))
+        Kamon.histogram(metricName, time.seconds))
       .record(1)
   }
 }
