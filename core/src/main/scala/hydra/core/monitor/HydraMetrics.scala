@@ -28,7 +28,7 @@ object HydraMetrics {
       .increment()
   }
 
-  def incrementJournalCount(metricName: String, transportType: String): Unit = {
+  def incrementGauge(metricName: String, transportType: String): Unit = {
     val lookupKey = Seq(metricName, transportType).mkString("-")
     gauges
       .getOrElseUpdate(lookupKey,
@@ -36,7 +36,7 @@ object HydraMetrics {
       .increment()
   }
 
-  def decrementJournalCount(metricName: String, transportType: String): Unit = {
+  def decrementGauge(metricName: String, transportType: String): Unit = {
     val lookupKey = Seq(metricName, transportType).mkString("-")
     gauges
       .getOrElseUpdate(lookupKey,

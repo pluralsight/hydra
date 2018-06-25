@@ -47,9 +47,9 @@ class HydraMetricsSpec extends Matchers
   it should "increment/decrement a gauge with the same metricName" in {
     val metricName = "hydra_ingest_journal_message_count"
     val transportType = "KafkaTransport"
-    HydraMetrics.incrementJournalCount(metricName, transportType)
-    HydraMetrics.incrementJournalCount(metricName, transportType)
-    HydraMetrics.decrementJournalCount(metricName, transportType)
+    HydraMetrics.incrementGauge(metricName, transportType)
+    HydraMetrics.incrementGauge(metricName, transportType)
+    HydraMetrics.decrementGauge(metricName, transportType)
     eventually {
       reporter.snapshot.metrics.gauges.filter(_.tags("id") == transportType).head.value shouldBe 1
     }
