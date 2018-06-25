@@ -36,8 +36,8 @@ class HydraMetricsSpec extends Matchers
   override def afterAll = Kamon.stopAllReporters()
 
   "HydraMetrics" should "increment success and fail counters with the same metricName" in {
-    HydraMetrics.countSuccess("hydra-count", "test.topic")
-    HydraMetrics.countFail("hydra-count", "test.topic")
+    HydraMetrics.incrementCounter("hydra-count", "destination" -> "test.topic", "type" -> "success")
+    HydraMetrics.incrementCounter("hydra-count", "destination" -> "test.topic", "type" -> "fail")
     eventually {
       reporter.snapshot.metrics.counters.filter(_.tags("type") == "success").head.value shouldBe 1
       reporter.snapshot.metrics.counters.filter(_.tags("type") == "fail").head.value shouldBe 1
@@ -47,9 +47,9 @@ class HydraMetricsSpec extends Matchers
   it should "increment/decrement a gauge with the same metricName" in {
     val metricName = "hydra_ingest_journal_message_count"
     val transportType = "KafkaTransport"
-    HydraMetrics.incrementGauge(metricName, transportType)
-    HydraMetrics.incrementGauge(metricName, transportType)
-    HydraMetrics.decrementGauge(metricName, transportType)
+    HydraMetrics.incrementGauge(metricName, "id" -> transportType)
+    HydraMetrics.incrementGauge(metricName, "id" -> transportType)
+    HydraMetrics.decrementGauge(metricName, "id" -> transportType)
     eventually {
       reporter.snapshot.metrics.gauges.filter(_.tags("id") == transportType).head.value shouldBe 1
     }

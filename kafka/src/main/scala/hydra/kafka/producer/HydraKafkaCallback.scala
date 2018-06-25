@@ -23,13 +23,23 @@ case class HydraKafkaCallback(deliveryId: Long,
 
   private def doAck(md: RecordMetadata) = {
     val kmd = KafkaRecordMetadata(md, deliveryId)
-    HydraMetrics.countSuccess("hydra_ingest_records_published_total", md.topic())
+    HydraMetrics.incrementCounter(
+      metricName = "hydra_ingest_records_published_total",
+      "destination" -> md.topic(),
+      "type" -> "success",
+      "transport" -> "KafkaTransport"
+    )
     producer ! kmd
     callback.onCompletion(deliveryId, Some(kmd), None)
   }
 
   private def ackError(e: Exception) = {
-    HydraMetrics.countFail("hydra_ingest_records_published_total", record.destination)
+    HydraMetrics.incrementCounter(
+      metricName = "hydra_ingest_records_published_total",
+      "destination" -> record.destination,
+      "type" -> "fail",
+      "transport" -> "KafkaTransport"
+    )
     producer ! RecordProduceError(deliveryId, record, e)
     callback.onCompletion(deliveryId, None, Some(e))
   }

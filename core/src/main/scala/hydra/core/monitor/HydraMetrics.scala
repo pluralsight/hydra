@@ -11,37 +11,27 @@ object HydraMetrics {
   private val gauges = new TrieMap[String, Gauge]()
   private val histograms = new TrieMap[String, Histogram]()
 
-  def countSuccess(metricName: String, destination: String): Unit = {
-    val result = "success"
-    val lookupKey = Seq(metricName, destination, result).mkString("-")
+  def incrementCounter(metricName: String, tags: (String, String)*): Unit = {
+    val lookupKey = (Seq(metricName) ++ tags).mkString("-")
     counters
       .getOrElseUpdate(lookupKey,
-        Kamon.counter(metricName).refine("type" -> result, "destination" -> destination))
+        Kamon.counter(metricName).refine(tags: _*))
       .increment()
   }
 
-  def countFail(metricName: String, destination: String): Unit = {
-    val result = "fail"
-    val lookupKey = Seq(metricName, destination, result).mkString("-")
-    counters
-      .getOrElseUpdate(lookupKey,
-        Kamon.counter(metricName).refine("type" -> result, "destination" -> destination))
-      .increment()
-  }
-
-  def incrementGauge(metricName: String, transportType: String): Unit = {
-    val lookupKey = Seq(metricName, transportType).mkString("-")
+  def incrementGauge(metricName: String, tags: (String, String)*): Unit = {
+    val lookupKey = (Seq(metricName) ++ tags).mkString("-")
     gauges
       .getOrElseUpdate(lookupKey,
-        Kamon.gauge(metricName).refine("id" -> transportType))
+        Kamon.gauge(metricName).refine(tags: _*))
       .increment()
   }
 
-  def decrementGauge(metricName: String, transportType: String): Unit = {
-    val lookupKey = Seq(metricName, transportType).mkString("-")
+  def decrementGauge(metricName: String, tags: (String, String)*): Unit = {
+    val lookupKey = (Seq(metricName) ++ tags).mkString("-")
     gauges
       .getOrElseUpdate(lookupKey,
-        Kamon.gauge(metricName).refine("id" -> transportType))
+        Kamon.gauge(metricName).refine(tags: _*))
       .decrement()
   }
 

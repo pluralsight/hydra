@@ -55,11 +55,21 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
       withProducer(kr.formatName)(_ ! ProduceToKafka(deliveryId, kr, ack))(e => ack.onCompletion(deliveryId, None, e))
 
     case kmd: KafkaRecordMetadata =>
-      HydraMetrics.countSuccess("hydra_ingest_records_published_total", kmd.topic)
+      HydraMetrics.incrementCounter(
+        metricName = "hydra_ingest_records_published_total",
+        "destination" -> kmd.topic,
+        "type" -> "success",
+        "transport" -> persistenceId
+      )
       metrics.saveMetrics(kmd)
 
     case e: RecordProduceError =>
-      HydraMetrics.countFail("hydra_ingest_records_published_total", e.record.topic())
+      HydraMetrics.incrementCounter(
+        metricName = "hydra_ingest_records_published_total",
+        "destination" -> e.record.topic(),
+        "type" -> "fail",
+        "transport" -> persistenceId
+      )
       context.system.eventStream.publish(e)
 
     case p: ProducerInitializationError => context.system.eventStream.publish(p)
