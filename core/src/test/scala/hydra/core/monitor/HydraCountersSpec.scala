@@ -36,16 +36,17 @@ class HydraCountersSpec extends Matchers
   override def afterAll = Kamon.stopAllReporters()
 
   "The HydraMonitor" should "increment success counters" in {
-    HydraCounters.countSuccess("test")
+    HydraCounters.countSuccess("hydra-success-count", "test.topic")
+    HydraCounters.countSuccess("hydra-success-count", "test.topic")
     eventually {
-      reporter.snapshot.metrics.counters.filter(_.name == "test").head.value shouldBe 1
+      reporter.snapshot.metrics.counters.filter(_.name == "hydra-success-count").head.value shouldBe 2
     }
   }
 
   it should "increment failure counters" in {
-    HydraCounters.countFail("test")
+    HydraCounters.countFail("hydra-fail-count", "test.topic")
     eventually {
-      reporter.snapshot.metrics.counters.filter(_.name == "test_fail").head.value shouldBe 1
+      reporter.snapshot.metrics.counters.filter(_.name == "hydra-fail-count").head.value shouldBe 1
     }
   }
 }
