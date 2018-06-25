@@ -1,14 +1,14 @@
 package hydra.core.monitor
 
 import kamon.Kamon
-import kamon.metric.{Counter, RangeSampler}
+import kamon.metric.{Counter, Gauge}
 
 import scala.collection.concurrent.TrieMap
 
 object HydraMetrics {
 
   private val counters = new TrieMap[String, Counter]()
-  private val rangeSamplers = new TrieMap[String, RangeSampler]()
+  private val gauges = new TrieMap[String, Gauge]()
 
   def countSuccess(metricName: String, destination: String): Unit = {
     val result = "success"
@@ -28,19 +28,20 @@ object HydraMetrics {
       .increment()
   }
 
-  def rangeSamplerIncrement(metricName: String, transportType: String): Unit = {
+  def incrementJournalCount(metricName: String, transportType: String): Unit = {
     val lookupKey = Seq(metricName, transportType).mkString("-")
-    rangeSamplers
+    gauges
       .getOrElseUpdate(lookupKey,
-        Kamon.rangeSampler(metricName).refine("id" -> transportType))
+        Kamon.gauge(metricName).refine("id" -> transportType))
       .increment()
   }
 
-  def rangeSamplerDecrement(metricName: String, transportType: String): Unit = {
+  def decrementJournalCount(metricName: String, transportType: String): Unit = {
     val lookupKey = Seq(metricName, transportType).mkString("-")
-    rangeSamplers
+    gauges
       .getOrElseUpdate(lookupKey,
-        Kamon.rangeSampler(metricName).refine("id" -> transportType))
+        Kamon.gauge(metricName).refine("id" -> transportType))
       .decrement()
   }
+
 }

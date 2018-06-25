@@ -36,7 +36,7 @@ trait Transport extends PersistentActor with ConfigSupport with AtLeastOnceDeliv
     case Produce(rec, _, _) => deliver(self.path)(deliveryId => Deliver(rec, deliveryId,
       new TransportSupervisorCallback(self)))
     case DestinationConfirmed(deliveryId) =>
-      journalSampler.decrement()
+      //HydraMetrics.rangeSamplerDecrement("hydra_ingest_journal_message_count")
       confirmDelivery(deliveryId)
   }
 
@@ -49,7 +49,7 @@ trait Transport extends PersistentActor with ConfigSupport with AtLeastOnceDeliv
       case Persisted =>
         val ingestor = sender
         persistAsync(p) { p =>
-          journalSampler.increment()
+          //HydraMetrics.rangeSamplerIncrement("hydra_ingest_journal_message_count")
           updateState(p)
           ingestor ! RecordProduced(HydraRecordMetadata(System.currentTimeMillis), p.supervisor)
         }

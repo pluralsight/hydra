@@ -35,33 +35,24 @@ class HydraMetricsSpec extends Matchers
 
   override def afterAll = Kamon.stopAllReporters()
 
-  "HydraMetrics" should "increment success counters" in {
-    HydraMetrics.countSuccess("hydra-success-count", "test.topic")
-    HydraMetrics.countSuccess("hydra-success-count", "test.topic")
+  "HydraMetrics" should "increment success and fail counters with the same metricName" in {
+    HydraMetrics.countSuccess("hydra-count", "test.topic")
+    HydraMetrics.countFail("hydra-count", "test.topic")
     eventually {
-      reporter.snapshot.metrics.counters.filter(_.name == "hydra-success-count").head.value shouldBe 2
+      reporter.snapshot.metrics.counters.filter(_.tags("type") == "success").head.value shouldBe 1
+      reporter.snapshot.metrics.counters.filter(_.tags("type") == "fail").head.value shouldBe 1
     }
   }
 
-  it should "increment failure counters" in {
-    HydraMetrics.countFail("hydra-fail-count", "test.topic")
-    HydraMetrics.countFail("hydra-fail-count", "test.topic")
+  it should "increment/decrement a gauge with the same metricName" in {
+    val metricName = "hydra_ingest_journal_message_count"
+    val transportType = "KafkaTransport"
+    HydraMetrics.incrementJournalCount(metricName, transportType)
+    HydraMetrics.incrementJournalCount(metricName, transportType)
+    HydraMetrics.decrementJournalCount(metricName, transportType)
     eventually {
-      reporter.snapshot.metrics.counters.filter(_.name == "hydra-fail-count").head.value shouldBe 2
+      reporter.snapshot.metrics.gauges.filter(_.tags("id") == transportType).head.value shouldBe 1
     }
   }
 
-  it should "increment a range sampler" in {
-    HydraMetrics.rangeSamplerIncrement("range-sampler-increment", "test-transport")
-    eventually {
-      reporter.snapshot.metrics.rangeSamplers.filter(_.name == "range-sampler-increment").head.distribution.count shouldBe 1
-    }
-  }
-
-  it should "decrement a range sampler" in {
-    HydraMetrics.rangeSamplerDecrement("range-sampler-decrement", "test-transport")
-    eventually {
-      reporter.snapshot.metrics.rangeSamplers.filter(_.name == "range-sampler-decrement").head.distribution.count shouldBe 1
-    }
-  }
 }
