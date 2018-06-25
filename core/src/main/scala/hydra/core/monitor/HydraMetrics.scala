@@ -1,7 +1,7 @@
 package hydra.core.monitor
 
 import kamon.Kamon
-import kamon.metric.{Counter, Gauge}
+import kamon.metric.{Counter, Gauge, Histogram}
 
 import scala.collection.concurrent.TrieMap
 
@@ -9,6 +9,7 @@ object HydraMetrics {
 
   private val counters = new TrieMap[String, Counter]()
   private val gauges = new TrieMap[String, Gauge]()
+  private val histograms = new TrieMap[String, Histogram]()
 
   def countSuccess(metricName: String, destination: String): Unit = {
     val result = "success"
@@ -44,4 +45,10 @@ object HydraMetrics {
       .decrement()
   }
 
+  def histogramRecord(metricName: String): Unit = {
+    histograms
+      .getOrElseUpdate(metricName,
+        Kamon.histogram(metricName))
+      .record(1)
+  }
 }
