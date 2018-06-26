@@ -30,6 +30,7 @@ import hydra.kafka.util.KafkaUtils
 
 import scala.concurrent.duration._
 import scala.language.existentials
+import java.util.concurrent.atomic.AtomicLong
 
 /**
   * Created by alexsilva on 10/28/15.
@@ -42,6 +43,8 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
   private[kafka] val histogramMetricName = "hydra_ingest_records_published_total_minutes_bucket"
 
   private[kafka] lazy val metrics = KafkaMetrics(applicationConfig)(context.system)
+
+  private[kafka] val msgCounter = new AtomicLong()
 
   timers.startPeriodicTimer("kamon", ReportMetrics, 1.minute)
 
@@ -57,6 +60,7 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
         "type" -> "success",
         "transport" -> persistenceId
       )
+      msgCounter.incrementAndGet()
       metrics.saveMetrics(kmd)
 
     case e: RecordProduceError =>
@@ -70,7 +74,9 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 
     case p: ProducerInitializationError => context.system.eventStream.publish(p)
 
-    case ReportMetrics => HydraMetrics.histogramRecord(histogramMetricName, "transport" -> persistenceId)
+    case ReportMetrics => HydraMetrics.histogramRecord(histogramMetricName,
+      msgCounter.getAndSet(0L),
+      "transport" -> persistenceId)
   }
 
   private def withProducer(id: String)(success: (ActorRef) => Unit)(fail: (Option[Throwable]) => Unit) = {

@@ -57,10 +57,9 @@ class HydraMetricsSpec extends Matchers
 
   it should "record histogram metrics" in {
     val metricName = "hydra_ingest_histogram_test"
-    HydraMetrics.histogramRecord(metricName)
-    HydraMetrics.histogramRecord(metricName)
+    HydraMetrics.histogramRecord(metricName, 100L, "transport" -> "TestTransport")
     eventually {
-      reporter.snapshot.metrics.histograms.filter(_.name == metricName).head.distribution.count shouldBe 2
+      reporter.snapshot.metrics.histograms.filter(_.name == metricName).head.distribution.sum shouldBe 100L
     }
   }
 
