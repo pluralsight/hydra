@@ -10,6 +10,8 @@ import hydra.core.test.TestRecord
 import hydra.core.transport.AckStrategy.{NoAck, Persisted, Replicated}
 import hydra.core.transport.Transport.{Confirm, Deliver, TransportError}
 import org.iq80.leveldb.util.FileUtils
+import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 class TransportSpec extends TestKit(ActorSystem("TransportSupervisorSpec"))
@@ -17,7 +19,11 @@ class TransportSpec extends TestKit(ActorSystem("TransportSupervisorSpec"))
   with FunSpecLike
   with BeforeAndAfterAll
   with ImplicitSender
-  with ConfigSupport {
+  with ConfigSupport
+  with ScalaFutures {
+
+  implicit override val patienceConfig =
+    PatienceConfig(timeout = scaled(Span(60, Seconds)), interval = scaled(Span(60, Millis)))
 
   override def afterAll() {
     super.afterAll()
