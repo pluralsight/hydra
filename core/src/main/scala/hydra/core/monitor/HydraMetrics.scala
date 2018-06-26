@@ -36,10 +36,11 @@ object HydraMetrics {
       .decrement()
   }
 
-  def histogramRecord(metricName: String): Unit = {
+  def histogramRecord(metricName: String, tags: (String, String)*): Unit = {
     histograms
       .getOrElseUpdate(metricName,
-        Kamon.histogram(metricName, time.seconds))
+        Kamon.histogram(metricName).refine(tags: _*))
       .record(1)
   }
+
 }

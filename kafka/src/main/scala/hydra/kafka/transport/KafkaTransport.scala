@@ -25,7 +25,7 @@ import hydra.core.transport.Transport
 import hydra.core.transport.Transport.Deliver
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata}
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
-import hydra.kafka.transport.KafkaTransport.RecordProduceError
+import hydra.kafka.transport.KafkaTransport.{RecordProduceError, ReportMetrics}
 import hydra.kafka.util.KafkaUtils
 
 import scala.concurrent.duration._
@@ -43,6 +43,8 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 
   private[kafka] lazy val metrics = KafkaMetrics(applicationConfig)(context.system)
 
+  timers.startPeriodicTimer("kamon", ReportMetrics, 1.minute)
+
   override def transport: Receive = {
     case Deliver(kr: KafkaRecord[_, _], deliveryId, ack) =>
       withProducer(kr.formatName)(_ ! ProduceToKafka(deliveryId, kr, ack))(e => ack.onCompletion(deliveryId, None, e))
@@ -55,7 +57,6 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
         "type" -> "success",
         "transport" -> persistenceId
       )
-      HydraMetrics.histogramRecord()
       metrics.saveMetrics(kmd)
 
     case e: RecordProduceError =>
@@ -68,6 +69,8 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
       context.system.eventStream.publish(e)
 
     case p: ProducerInitializationError => context.system.eventStream.publish(p)
+
+    case ReportMetrics => HydraMetrics.histogramRecord(histogramMetricName, "transport" -> persistenceId)
   }
 
   private def withProducer(id: String)(success: (ActorRef) => Unit)(fail: (Option[Throwable]) => Unit) = {
@@ -96,6 +99,8 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 object KafkaTransport {
 
   case class RecordProduceError(deliveryId: Long, record: KafkaRecord[_, _], error: Throwable)
+
+  case object ReportMetrics
 
   /**
     * Method to comply with TransportRegistrar that looks for a method in the companion object called props
