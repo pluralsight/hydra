@@ -11,7 +11,7 @@ import kamon.Kamon
 trait Transport extends PersistentActor with ConfigSupport with AtLeastOnceDelivery {
   override val persistenceId = getClass.getSimpleName
 
-  private[transport] val journalSampler = Kamon.rangeSampler("transport")
+  private[transport] lazy val journalSampler = Kamon.rangeSampler("transport")
     .refine("id" -> persistenceId)
 
   def transport: Receive
