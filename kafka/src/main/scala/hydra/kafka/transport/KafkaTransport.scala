@@ -40,8 +40,6 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 
   private type KR = KafkaRecord[_, _]
 
-  private[kafka] val histogramMetricName = "hydra_ingest_records_published_total_minutes_bucket"
-
   private[kafka] lazy val metrics = KafkaMetrics(applicationConfig)(context.system)
 
   private[kafka] val msgCounter = new AtomicLong()
@@ -55,7 +53,7 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
       // TODO finalize histogram api and bucket timing
     case kmd: KafkaRecordMetadata =>
       HydraMetrics.incrementCounter(
-        metricName = "hydra_ingest_records_published_total",
+        metricName = KafkaTransport.counterMetricName,
         "destination" -> kmd.topic,
         "type" -> "success",
         "transport" -> persistenceId
@@ -65,7 +63,7 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 
     case e: RecordProduceError =>
       HydraMetrics.incrementCounter(
-        metricName = "hydra_ingest_records_published_total",
+        metricName = KafkaTransport.counterMetricName,
         "destination" -> e.record.topic(),
         "type" -> "fail",
         "transport" -> persistenceId
@@ -74,7 +72,7 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 
     case p: ProducerInitializationError => context.system.eventStream.publish(p)
 
-    case ReportMetrics => HydraMetrics.histogramRecord(histogramMetricName,
+    case ReportMetrics => HydraMetrics.histogramRecord(KafkaTransport.histogramMetricName,
       msgCounter.getAndSet(0L),
       "transport" -> persistenceId)
   }
@@ -103,6 +101,9 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 }
 
 object KafkaTransport {
+
+  private[kafka] val histogramMetricName = "hydra_ingest_records_published_total_minutes_bucket"
+  private[kafka] val counterMetricName = "hydra_ingest_records_published_total"
 
   case class RecordProduceError(deliveryId: Long, record: KafkaRecord[_, _], error: Throwable)
 
