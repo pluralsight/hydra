@@ -3,6 +3,8 @@ package hydra.core.bootstrap
 import java.lang.reflect.Modifier
 
 import akka.actor.Props
+import akka.management.AkkaManagement
+import akka.management.cluster.bootstrap.ClusterBootstrap
 import com.github.vonnagy.service.container.ContainerBuilder
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import com.github.vonnagy.service.container.listener.ContainerLifecycleListener
@@ -48,11 +50,15 @@ trait BootstrappingSupport extends ConfigSupport with LoggingAdapter {
 
   def containerService: ContainerService = {
     log.info(s"The following services will be started: ${services.map(_._1).mkString(", ")}")
-    ContainerBuilder()
+    val container = ContainerBuilder()
       .withConfig(rootConfig)
       .withRoutes(endpoints: _*)
       .withActors(services: _*)
       .withListeners(listeners: _*)
       .withName(applicationName).build
+
+    AkkaManagement(container.system).start()
+    ClusterBootstrap(container.system).start()
+    container
   }
 }

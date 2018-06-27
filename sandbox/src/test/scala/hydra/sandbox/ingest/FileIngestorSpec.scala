@@ -41,7 +41,6 @@ class FileIngestorSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with M
       ingestor ! Publish(hr)
       eventually {
         expectMsg(60.seconds, Ignore)
-
       }
     }
 
