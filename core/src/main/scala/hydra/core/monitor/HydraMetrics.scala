@@ -2,15 +2,14 @@ package hydra.core.monitor
 
 import kamon.Kamon
 import kamon.metric.{Counter, Gauge, Histogram}
-import kamon.metric.MeasurementUnit._
 
 import scala.collection.concurrent.TrieMap
 
 object HydraMetrics {
 
-  private val counters = new TrieMap[String, Counter]()
-  private val gauges = new TrieMap[String, Gauge]()
-  private val histograms = new TrieMap[String, Histogram]()
+  private[core] val counters = new TrieMap[String, Counter]()
+  private[core] val gauges = new TrieMap[String, Gauge]()
+  private[core] val histograms = new TrieMap[String, Histogram]()
 
   def incrementCounter(metricName: String, tags: (String, String)*): Unit = {
     val lookupKey = (Seq(metricName) ++ tags).mkString("-")

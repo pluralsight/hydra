@@ -5,13 +5,15 @@ import kamon.{Kamon, MetricReporter}
 import kamon.metric.PeriodSnapshot
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.{Millis, Seconds, Span}
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FlatSpecLike, Matchers}
 
 
 class HydraMetricsSpec extends Matchers
   with FlatSpecLike
   with Eventually
-  with BeforeAndAfterAll {
+  with BeforeAndAfterAll
+  with BeforeAndAfterEach {
+
 
   implicit override val patienceConfig =
     PatienceConfig(timeout = scaled(Span(2, Seconds)), interval = scaled(Span(5, Millis)))
@@ -32,6 +34,12 @@ class HydraMetricsSpec extends Matchers
   }
 
   override def beforeAll = Kamon.addReporter(reporter)
+
+  override def beforeEach() = {
+    HydraMetrics.gauges.clear()
+    HydraMetrics.counters.clear()
+    HydraMetrics.histograms.clear()
+  }
 
   override def afterAll = Kamon.stopAllReporters()
 
@@ -63,6 +71,22 @@ class HydraMetricsSpec extends Matchers
       reporter.snapshot.metrics.histograms.filter(_.name == metricName).head.distribution.sum shouldBe 150L
       reporter.snapshot.metrics.histograms.filter(_.name == metricName).head.distribution.count shouldBe 2
     }
+  }
+
+  it should "use the local cache for maintaining counters in" in {
+    HydraMetrics.counters.size shouldBe 0
+    val _ =  HydraMetrics.getOrCreateCounter("hydra-count", "destination" -> "test.topic", "type" -> "success")
+    HydraMetrics.counters.size shouldBe 1
+    HydraMetrics.incrementCounter("hydra-count", "destination" -> "test.topic", "type" -> "success")
+    HydraMetrics.counters.size shouldBe 1
+  }
+
+  it should "use the local cache for maintaining gauges in" in {
+    HydraMetrics.gauges.size shouldBe 0
+    val _ =  HydraMetrics.getOrCreateGauge("hydra-gauge", "destination" -> "test.topic")
+    HydraMetrics.gauges.size shouldBe 1
+    HydraMetrics.incrementGauge("hydra-gauge", "destination" -> "test.topic")
+    HydraMetrics.gauges.size shouldBe 1
   }
 
 }
