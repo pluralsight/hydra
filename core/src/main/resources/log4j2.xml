@@ -43,6 +43,9 @@
         <Logger name="com.github.vonnagy" additivity="false">
             <AppenderRef ref="STDOUT"/>
         </Logger>
+        <Logger name="org.apache.http" additivity="false" level="error">
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
         <Logger name="org.apache.kafka.common" additivity="false">
             <AppenderRef ref="STDOUT"/>
         </Logger>
