@@ -120,12 +120,6 @@ object Dependencies {
         ExclusionRule(organization = "ch.qos.logback"),
         ExclusionRule(organization = "org.slf4j")
       )
-
-    //    val constructR = Seq(
-    //      "de.heikoseeberger" %% "constructr" % constructRVersion,
-    //      // "com.lightbend.constructr" %% "constructr-coordination-zookeeper" % "0.4.0" //if using zk,
-    //      "com.tecsisa" %% "constructr-coordination-consul" % "0.9.0"
-    //    )
   }
 
   object Test {
