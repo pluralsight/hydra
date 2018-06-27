@@ -32,6 +32,8 @@ import scala.concurrent.duration._
 import scala.language.existentials
 import java.util.concurrent.atomic.AtomicLong
 
+import kamon.metric.Counter
+
 /**
   * Created by alexsilva on 10/28/15.
   */
@@ -46,28 +48,21 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 
   timers.startPeriodicTimer("kamon", ReportMetrics, 1.minute)
 
+  private[kafka] val counters = new scala.collection.mutable.HashMap[String, Counter]()
+
+
   override def transport: Receive = {
     case Deliver(kr: KafkaRecord[_, _], deliveryId, ack) =>
       withProducer(kr.formatName)(_ ! ProduceToKafka(deliveryId, kr, ack))(e => ack.onCompletion(deliveryId, None, e))
 
       // TODO finalize histogram api and bucket timing
     case kmd: KafkaRecordMetadata =>
-      HydraMetrics.incrementCounter(
-        metricName = KafkaTransport.counterMetricName,
-        "destination" -> kmd.topic,
-        "type" -> "success",
-        "transport" -> persistenceId
-      )
+      getOrCreateTopicCounter(kmd.topic, "success").increment()
       msgCounter.incrementAndGet()
       metrics.saveMetrics(kmd)
 
     case e: RecordProduceError =>
-      HydraMetrics.incrementCounter(
-        metricName = KafkaTransport.counterMetricName,
-        "destination" -> e.record.topic(),
-        "type" -> "fail",
-        "transport" -> persistenceId
-      )
+      getOrCreateTopicCounter(e.record.topic(), "fail").increment()
       context.system.eventStream.publish(e)
 
     case p: ProducerInitializationError => context.system.eventStream.publish(p)
@@ -82,6 +77,15 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
       case Some(producer) => success(producer)
       case None => fail(Some(new IllegalArgumentException(s"No Kafka producer named $id found.")))
     }
+  }
+
+  private[kafka] def getOrCreateTopicCounter(kafkaTopic: String, resultType: String): Counter = {
+    counters.getOrElseUpdate(kafkaTopic + resultType, HydraMetrics.getOrCreateCounter(
+      KafkaTransport.counterMetricName,
+      "destination" -> kafkaTopic,
+      "type" -> resultType,
+      "transport" -> persistenceId)
+    )
   }
 
   override val supervisorStrategy =

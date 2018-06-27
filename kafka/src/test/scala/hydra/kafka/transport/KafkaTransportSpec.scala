@@ -1,7 +1,7 @@
 package hydra.kafka.transport
 
-import akka.actor.ActorSystem
-import akka.testkit.{ImplicitSender, TestKit, TestProbe}
+import akka.actor.{ActorSystem, Props}
+import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import hydra.common.config.ConfigSupport
 import hydra.core.transport.Transport.Deliver
@@ -9,6 +9,8 @@ import hydra.core.transport.{RecordMetadata, TransportCallback}
 import hydra.kafka.producer.{DeleteTombstoneRecord, JsonRecord, StringRecord}
 import hydra.kafka.transport.KafkaProducerProxy.ProducerInitializationError
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
+import hydra.kafka.util.KafkaUtils
+
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.errors.SerializationException
@@ -28,6 +30,7 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra"))
 
   val producerName = StringRecord("transport_test", Some("key"), "payload").formatName
 
+  lazy val transportRef: TestActorRef[KafkaTransport]  = TestActorRef(Props(new KafkaTransport(KafkaUtils.producerSettings(rootConfig))))
   lazy val transport = system.actorOf(KafkaTransport.props(rootConfig), "kafka")
 
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
@@ -89,6 +92,14 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra"))
           r shouldBe rec
           err shouldBe a[SerializationException]
       }
+    }
+
+    it("gets a counter from internal counter map in") {
+      val actor = transportRef.underlyingActor
+      actor.counters.get("test.topic") shouldBe None
+      actor.getOrCreateTopicCounter("test.topic", "success") shouldBe a[kamon.metric.Counter]
+      actor.getOrCreateTopicCounter("test.topic", "fail")
+      actor.counters.size shouldBe 2
     }
 
     it("publishes producer init errors to the stream") {

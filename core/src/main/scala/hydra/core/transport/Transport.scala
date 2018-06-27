@@ -12,6 +12,10 @@ trait Transport extends PersistentActor with ConfigSupport with AtLeastOnceDeliv
   override val persistenceId = getClass.getSimpleName
 
   private[transport] val journalMetricName = "hydra_ingest_journal_message_count"
+  private[transport] val journalGauge = HydraMetrics.getOrCreateGauge(
+    journalMetricName,
+    "type" -> persistenceId
+  )
 
   def transport: Receive
 
@@ -35,10 +39,7 @@ trait Transport extends PersistentActor with ConfigSupport with AtLeastOnceDeliv
     case Produce(rec, _, _) => deliver(self.path)(deliveryId => Deliver(rec, deliveryId,
       new TransportSupervisorCallback(self)))
     case DestinationConfirmed(deliveryId) =>
-      HydraMetrics.decrementGauge(
-        journalMetricName,
-        "type" -> persistenceId
-        )
+      journalGauge.decrement()
       confirmDelivery(deliveryId)
   }
 
@@ -51,10 +52,7 @@ trait Transport extends PersistentActor with ConfigSupport with AtLeastOnceDeliv
       case Persisted =>
         val ingestor = sender
         persistAsync(p) { p =>
-          HydraMetrics.incrementGauge(
-            journalMetricName,
-            "type" -> persistenceId
-          )
+          journalGauge.increment()
           updateState(p)
           ingestor ! RecordProduced(HydraRecordMetadata(System.currentTimeMillis), p.supervisor)
         }

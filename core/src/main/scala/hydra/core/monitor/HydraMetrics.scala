@@ -43,4 +43,18 @@ object HydraMetrics {
       .record(value)
   }
 
+  def getOrCreateCounter(metricName: String, tags: (String, String)*): Counter = {
+    val lookupKey = (Seq(metricName) ++ tags).mkString("-")
+    counters
+      .getOrElseUpdate(lookupKey,
+        Kamon.counter(metricName).refine(tags: _*))
+  }
+
+  def getOrCreateGauge(metricName: String, tags: (String, String)*): Gauge = {
+    val lookupKey = (Seq(metricName) ++ tags).mkString("-")
+    gauges
+      .getOrElseUpdate(lookupKey,
+        Kamon.gauge(metricName).refine(tags: _*))
+  }
+
 }
