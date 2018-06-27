@@ -14,6 +14,9 @@ case class HydraKafkaCallback(deliveryId: Long,
                               producer: ActorSelection,
                               callback: TransportCallback) extends Callback {
 
+  private[kafka] val metricName = "hydra_ingest_records_published_total"
+  private[kafka] val transportName = "KafkaTransport"
+
   override def onCompletion(metadata: RecordMetadata, e: Exception): Unit = {
     Option(e) match {
       case Some(err) => ackError(err)
@@ -24,10 +27,10 @@ case class HydraKafkaCallback(deliveryId: Long,
   private def doAck(md: RecordMetadata) = {
     val kmd = KafkaRecordMetadata(md, deliveryId)
     HydraMetrics.incrementCounter(
-      metricName = "hydra_ingest_records_published_total",
+      metricName = metricName,
       "destination" -> md.topic(),
       "type" -> "success",
-      "transport" -> "KafkaTransport"
+      "transport" -> transportName
     )
     producer ! kmd
     callback.onCompletion(deliveryId, Some(kmd), None)
@@ -35,10 +38,10 @@ case class HydraKafkaCallback(deliveryId: Long,
 
   private def ackError(e: Exception) = {
     HydraMetrics.incrementCounter(
-      metricName = "hydra_ingest_records_published_total",
+      metricName = metricName,
       "destination" -> record.destination,
       "type" -> "fail",
-      "transport" -> "KafkaTransport"
+      "transport" -> transportName
     )
     producer ! RecordProduceError(deliveryId, record, e)
     callback.onCompletion(deliveryId, None, Some(e))
