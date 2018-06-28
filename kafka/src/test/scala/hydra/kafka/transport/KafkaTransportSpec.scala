@@ -94,14 +94,6 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra"))
       }
     }
 
-    it("gets a counter from internal counter map in") {
-      val actor = transportRef.underlyingActor
-      actor.counters.get("test.topic") shouldBe None
-      actor.getOrCreateTopicCounter("test.topic", "success") shouldBe a[kamon.metric.Counter]
-      actor.getOrCreateTopicCounter("test.topic", "fail")
-      actor.counters.size shouldBe 2
-    }
-
     it("publishes producer init errors to the stream") {
 
       val cfg = ConfigFactory.parseString(

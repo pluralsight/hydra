@@ -5,16 +5,20 @@ import hydra.common.config.ConfigSupport
 import hydra.core.monitor.HydraMetrics
 import hydra.core.protocol.{HydraMessage, Produce, RecordAccepted, RecordProduced}
 import hydra.core.transport.AckStrategy.{NoAck, Persisted, Replicated}
-import hydra.core.transport.Transport.{Confirm, Deliver, DestinationConfirmed, TransportError}
 
 
-trait Transport extends PersistentActor with ConfigSupport with AtLeastOnceDelivery {
+trait Transport extends PersistentActor
+  with ConfigSupport
+  with AtLeastOnceDelivery
+  with HydraMetrics {
+  import Transport._
+
   override val persistenceId = getClass.getSimpleName
 
-  private[transport] val journalMetricName = "hydra_ingest_journal_message_count"
-  private[transport] val journalGauge = HydraMetrics.getOrCreateGauge(
+  private[transport] val journalGauge = getOrCreateGauge(
+    persistenceId,
     journalMetricName,
-    "type" -> persistenceId
+    Seq("type" -> persistenceId)
   )
 
   def transport: Receive
@@ -66,6 +70,8 @@ trait Transport extends PersistentActor with ConfigSupport with AtLeastOnceDeliv
 }
 
 object Transport {
+
+  val journalMetricName = "hydra_ingest_journal_message_count"
 
   trait TransportMessage extends HydraMessage
 

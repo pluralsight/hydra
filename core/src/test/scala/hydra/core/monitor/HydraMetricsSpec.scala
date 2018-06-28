@@ -1,18 +1,24 @@
 package hydra.core.monitor
 
 import com.typesafe.config.Config
+import kamon.metric.{Counter, Gauge, Histogram, PeriodSnapshot}
 import kamon.{Kamon, MetricReporter}
-import kamon.metric.PeriodSnapshot
+import org.scalamock.scalatest.proxy.MockFactory
+import org.scalatest._
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.{Millis, Seconds, Span}
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FlatSpecLike, Matchers}
+
+import scala.collection.mutable
+import scala.reflect.ClassTag
 
 
 class HydraMetricsSpec extends Matchers
   with FlatSpecLike
   with Eventually
   with BeforeAndAfterAll
-  with BeforeAndAfterEach {
+  with BeforeAndAfterEach
+  with MockFactory
+  with HydraMetrics {
 
 
   implicit override val patienceConfig =
@@ -36,57 +42,46 @@ class HydraMetricsSpec extends Matchers
   override def beforeAll = Kamon.addReporter(reporter)
 
   override def beforeEach() = {
-    HydraMetrics.gauges.clear()
-    HydraMetrics.counters.clear()
-    HydraMetrics.histograms.clear()
+    gauges.clear()
+    counters.clear()
+    histograms.clear()
   }
 
   override def afterAll = Kamon.stopAllReporters()
 
-  "HydraMetrics" should "increment success and fail counters with the same metricName" in {
-    HydraMetrics.incrementCounter("hydra-count", "destination" -> "test.topic", "type" -> "success")
-    HydraMetrics.incrementCounter("hydra-count", "destination" -> "test.topic", "type" -> "fail")
-    eventually {
-      reporter.snapshot.metrics.counters.filter(_.tags("type") == "success").head.value shouldBe 1
-      reporter.snapshot.metrics.counters.filter(_.tags("type") == "fail").head.value shouldBe 1
-    }
+  "An object mixing in HydraMetrics" should "get or create a counter" in {
+    harness[Counter]("test.counters", counters)(getOrCreateCounter _)
   }
 
-  it should "increment/decrement a gauge with the same metricName" in {
-    val metricName = "hydra_ingest_journal_message_count"
-    val transportType = "KafkaTransport"
-    HydraMetrics.incrementGauge(metricName, "id" -> transportType)
-    HydraMetrics.incrementGauge(metricName, "id" -> transportType)
-    HydraMetrics.decrementGauge(metricName, "id" -> transportType)
-    eventually {
-      reporter.snapshot.metrics.gauges.filter(_.tags("id") == transportType).head.value shouldBe 1
-    }
+  it should "get or create a gauge" in {
+    harness[Gauge]("test.gauges", gauges)(getOrCreateGauge _)
   }
 
-  it should "record histogram metrics" in {
-    val metricName = "hydra_ingest_histogram_test"
-    HydraMetrics.histogramRecord(metricName, 100L, "transport" -> "TestTransport")
-    HydraMetrics.histogramRecord(metricName, 50L, "transport" -> "TestTransport")
-    eventually {
-      reporter.snapshot.metrics.histograms.filter(_.name == metricName).head.distribution.sum shouldBe 150L
-      reporter.snapshot.metrics.histograms.filter(_.name == metricName).head.distribution.count shouldBe 2
-    }
+  // Can't use the harness for this test since Kamon always returns the same histogram instance.
+  it should "get or create a histogram" in {
+    val metricName = "test.histogram"
+
+    val h = getOrCreateHistogram("test.1.lookup", metricName, Seq("tag1" -> "success"))
+    h shouldBe a[Histogram]
+    histograms.size shouldBe 1
+
+    val h2 = getOrCreateHistogram("test.1.lookup", metricName, Seq("tag1" -> "fail"))
+    h2 shouldEqual h
+    histograms.size shouldBe 1
   }
 
-  it should "use the local cache for maintaining counters in" in {
-    HydraMetrics.counters.size shouldBe 0
-    val _ =  HydraMetrics.getOrCreateCounter("hydra-count", "destination" -> "test.topic", "type" -> "success")
-    HydraMetrics.counters.size shouldBe 1
-    HydraMetrics.incrementCounter("hydra-count", "destination" -> "test.topic", "type" -> "success")
-    HydraMetrics.counters.size shouldBe 1
-  }
+  def harness[A: ClassTag](metricName: String, internalMap: mutable.HashMap[String, A])
+                          (f: (String, String, => Seq[(String, String)]) => A): Assertion = {
+    val metric = f("test.1.lookup", metricName, Seq("tag1" -> "success"))
+    metric shouldBe a[A]
+    internalMap.size shouldBe 1
 
-  it should "use the local cache for maintaining gauges in" in {
-    HydraMetrics.gauges.size shouldBe 0
-    val _ =  HydraMetrics.getOrCreateGauge("hydra-gauge", "destination" -> "test.topic")
-    HydraMetrics.gauges.size shouldBe 1
-    HydraMetrics.incrementGauge("hydra-gauge", "destination" -> "test.topic")
-    HydraMetrics.gauges.size shouldBe 1
-  }
+    val metric2 = f("test.1.lookup", metricName, Seq("tag1" -> "success"))
+    metric2 shouldEqual metric
+    internalMap.size shouldBe 1
 
+    val metric3 = f("test.2.lookup", metricName, Seq("tag1" -> "fail", "tag2" -> "other"))
+    metric3 should not equal metric
+    internalMap.size shouldBe 2
+  }
 }

@@ -3,57 +3,28 @@ package hydra.core.monitor
 import kamon.Kamon
 import kamon.metric.{Counter, Gauge, Histogram}
 
-import scala.collection.concurrent.TrieMap
+import scala.collection.mutable
 
-object HydraMetrics {
+trait HydraMetrics {
+  private[core] lazy val counters = new mutable.HashMap[String, Counter]()
+  private[core] lazy val gauges = new mutable.HashMap[String, Gauge]()
+  private[core] lazy val histograms = new mutable.HashMap[String, Histogram]()
 
-  private[core] val counters = new TrieMap[String, Counter]()
-  private[core] val gauges = new TrieMap[String, Gauge]()
-  private[core] val histograms = new TrieMap[String, Histogram]()
-
-  def incrementCounter(metricName: String, tags: (String, String)*): Unit = {
-    val lookupKey = (Seq(metricName) ++ tags).mkString("-")
+  def getOrCreateCounter(lookupKey: String, metricName: String, tags: => Seq[(String, String)]): Counter = {
     counters
       .getOrElseUpdate(lookupKey,
         Kamon.counter(metricName).refine(tags: _*))
-      .increment()
   }
 
-  def incrementGauge(metricName: String, tags: (String, String)*): Unit = {
-    val lookupKey = (Seq(metricName) ++ tags).mkString("-")
+  def getOrCreateGauge(lookupKey: String, metricName: String, tags: => Seq[(String, String)]): Gauge = {
     gauges
       .getOrElseUpdate(lookupKey,
         Kamon.gauge(metricName).refine(tags: _*))
-      .increment()
   }
 
-  def decrementGauge(metricName: String, tags: (String, String)*): Unit = {
-    val lookupKey = (Seq(metricName) ++ tags).mkString("-")
-    gauges
-      .getOrElseUpdate(lookupKey,
-        Kamon.gauge(metricName).refine(tags: _*))
-      .decrement()
-  }
-
-  def histogramRecord(metricName: String, value: Long, tags: (String, String)*): Unit = {
+  def getOrCreateHistogram(lookupKey: String, metricName: String, tags: => Seq[(String, String)]): Histogram = {
     histograms
-      .getOrElseUpdate(metricName,
+      .getOrElseUpdate(lookupKey,
         Kamon.histogram(metricName).refine(tags: _*))
-      .record(value)
   }
-
-  def getOrCreateCounter(metricName: String, tags: (String, String)*): Counter = {
-    val lookupKey = (Seq(metricName) ++ tags).mkString("-")
-    counters
-      .getOrElseUpdate(lookupKey,
-        Kamon.counter(metricName).refine(tags: _*))
-  }
-
-  def getOrCreateGauge(metricName: String, tags: (String, String)*): Gauge = {
-    val lookupKey = (Seq(metricName) ++ tags).mkString("-")
-    gauges
-      .getOrElseUpdate(lookupKey,
-        Kamon.gauge(metricName).refine(tags: _*))
-  }
-
 }
