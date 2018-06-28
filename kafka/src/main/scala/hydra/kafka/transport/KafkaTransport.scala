@@ -52,7 +52,6 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
     case Deliver(kr: KafkaRecord[_, _], deliveryId, ack) =>
       withProducer(kr.formatName)(_ ! ProduceToKafka(deliveryId, kr, ack))(e => ack.onCompletion(deliveryId, None, e))
 
-    // TODO finalize histogram api and bucket timing
     case kmd: KafkaRecordMetadata =>
       val resultType = "success"
       getOrCreateCounter(
