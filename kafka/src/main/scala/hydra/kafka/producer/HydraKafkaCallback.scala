@@ -12,8 +12,7 @@ import org.apache.kafka.clients.producer.{Callback, RecordMetadata}
 case class HydraKafkaCallback(deliveryId: Long,
                               record: KafkaRecord[_, _],
                               producer: ActorSelection,
-                              callback: TransportCallback) extends Callback
-  with HydraMetrics {
+                              callback: TransportCallback) extends Callback {
 
   private[kafka] val metricName = "hydra_ingest_records_published_total"
   private[kafka] val transportName = "KafkaTransport"

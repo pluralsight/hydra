@@ -54,33 +54,40 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 
     case kmd: KafkaRecordMetadata =>
       val resultType = "success"
-      getOrCreateCounter(
+      incrementCounter(
         kmd.topic + resultType,
         KafkaTransport.counterMetricName,
-        Seq("destination" -> kmd.topic,
+        Seq(
+          "destination" -> kmd.topic,
           "type" -> resultType,
-          "transport" -> persistenceId)
-      ).increment()
+          "transport" -> persistenceId
+        )
+      )
       msgCounter.incrementAndGet()
       metrics.saveMetrics(kmd)
 
     case e: RecordProduceError =>
       val resultType = "fail"
-      getOrCreateCounter(e.record.topic + resultType,
+      incrementCounter(
+        e.record.topic + resultType,
         KafkaTransport.counterMetricName,
-        Seq("destination" -> e.record.topic,
+        Seq(
+          "destination" -> e.record.topic,
           "type" -> resultType,
-          "transport" -> persistenceId)
-      ).increment()
+          "transport" -> persistenceId
+        )
+      )
       context.system.eventStream.publish(e)
 
     case p: ProducerInitializationError => context.system.eventStream.publish(p)
 
     case ReportMetrics =>
-      val histogram = getOrCreateHistogram(s"${this.getClass.getSimpleName}",
+      recordToHistogram(
+        s"${this.getClass.getSimpleName}",
         KafkaTransport.histogramMetricName,
-        Seq("transport" -> persistenceId))
-      histogram.record(msgCounter.getAndSet(0L))
+        msgCounter.getAndSet(0L),
+        Seq("transport" -> persistenceId)
+      )
   }
 
   private def withProducer(id: String)(success: (ActorRef) => Unit)(fail: (Option[Throwable]) => Unit) = {

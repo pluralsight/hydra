@@ -1,7 +1,7 @@
 package hydra.core.monitor
 
 import com.typesafe.config.Config
-import kamon.metric.{Counter, Gauge, Histogram, PeriodSnapshot}
+import kamon.metric.{Counter, Gauge, PeriodSnapshot}
 import kamon.{Kamon, MetricReporter}
 import org.scalamock.scalatest.proxy.MockFactory
 import org.scalatest._
@@ -9,7 +9,7 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.time.{Millis, Seconds, Span}
 
 import scala.collection.mutable
-import scala.reflect.ClassTag
+import scala.util.Random
 
 
 class HydraMetricsSpec extends Matchers
@@ -49,39 +49,64 @@ class HydraMetricsSpec extends Matchers
 
   override def afterAll = Kamon.stopAllReporters()
 
-  "An object mixing in HydraMetrics" should "get or create a counter" in {
-    harness[Counter]("test.counters", counters)(getOrCreateCounter _)
+  val lookup = "lookup.xyz"
+  val lookup2 = "lookup.abc"
+
+  def generateTags: Seq[(String, String)] = Seq("tag1" -> "Everything's fine.")
+
+  "An object mixing in HydraMetrics" should
+    "create new counters with new lookup keys + metric names" in {
+    shouldCreateNewMetric[Counter](incrementCounter _, counters)
   }
 
-  it should "get or create a gauge" in {
-    harness[Gauge]("test.gauges", gauges)(getOrCreateGauge _)
+  it should
+    "create new gauges with new lookup keys + metric names" in {
+    shouldCreateNewMetric[Gauge](incrementGauge _, gauges)
   }
 
-  // Can't use the harness for this test since Kamon always returns the same histogram instance.
-  it should "get or create a histogram" in {
-    val metricName = "test.histogram"
+  it should "lookup existing counters" in {
+    shouldLookupExistingMetric[Counter](incrementCounter _, counters)
+  }
 
-    val h = getOrCreateHistogram("test.1.lookup", metricName, Seq("tag1" -> "success"))
-    h shouldBe a[Histogram]
+  it should
+    "lookup an existing gauge" in {
+    shouldLookupExistingMetric[Gauge](decrementGauge _, gauges)
+  }
+
+  it should
+    "create a new histogram" in {
+    recordToHistogram(lookup, "histogram.metric", 100, generateTags)
+
     histograms.size shouldBe 1
 
-    val h2 = getOrCreateHistogram("test.1.lookup", metricName, Seq("tag1" -> "fail"))
-    h2 shouldEqual h
-    histograms.size shouldBe 1
+    recordToHistogram(lookup2, "histogram.metric", 250, Seq("tag2" -> "Let it burn!"))
+
+    histograms.size shouldBe 2
   }
 
-  def harness[A: ClassTag](metricName: String, internalMap: mutable.HashMap[String, A])
-                          (f: (String, String, => Seq[(String, String)]) => A): Assertion = {
-    val metric = f("test.1.lookup", metricName, Seq("tag1" -> "success"))
-    metric shouldBe a[A]
-    internalMap.size shouldBe 1
+  it should
+    "lookup an existing histogram" in {
+    for (x <- 1 to 2) {
+      recordToHistogram(lookup, "histogram.metric", 100, generateTags)
 
-    val metric2 = f("test.1.lookup", metricName, Seq("tag1" -> "success"))
-    metric2 shouldEqual metric
-    internalMap.size shouldBe 1
+      histograms.size shouldBe 1
+    }
+  }
 
-    val metric3 = f("test.2.lookup", metricName, Seq("tag1" -> "fail", "tag2" -> "other"))
-    metric3 should not equal metric
-    internalMap.size shouldBe 2
+  private def shouldCreateNewMetric[A](f: (String, String, => Seq[(String, String)]) => Unit, map: mutable.HashMap[String, A]) = {
+    f(lookup, "metric" + Random.nextInt(Integer.MAX_VALUE), generateTags)
+    map.size shouldBe 1
+
+    f(lookup2, "metric" + Random.nextInt(Integer.MAX_VALUE), generateTags)
+    map.size shouldBe 2
+  }
+
+  private def shouldLookupExistingMetric[A](f: (String, String, => Seq[(String, String)]) => Unit, map: mutable.HashMap[String, A]) = {
+    val metric = "metric" + Random.nextInt(Integer.MAX_VALUE)
+    for (x <- 1 to 2) {
+      f(lookup, metric, generateTags)
+
+      map.size shouldBe 1
+    }
   }
 }
