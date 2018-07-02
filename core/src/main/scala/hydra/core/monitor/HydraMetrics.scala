@@ -26,6 +26,12 @@ trait HydraMetrics {
       .increment()
   }
 
+  def lookupGauge(lookupKey: String, metricName: String, tags: => Tags): Gauge = {
+    gauges
+      .getOrElseUpdate(lookupKey,
+        Kamon.gauge(metricName).refine(tags: _*))
+  }
+
   def decrementGauge(lookupKey: String, metricName: String, tags: => Tags): Unit = {
     gauges
       .getOrElseUpdate(lookupKey,
