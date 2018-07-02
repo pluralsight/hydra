@@ -2,17 +2,22 @@ package hydra.core.transport
 
 import akka.persistence.{AtLeastOnceDelivery, PersistentActor}
 import hydra.common.config.ConfigSupport
+import hydra.core.monitor.HydraMetrics
 import hydra.core.protocol.{HydraMessage, Produce, RecordAccepted, RecordProduced}
 import hydra.core.transport.AckStrategy.{NoAck, Persisted, Replicated}
-import hydra.core.transport.Transport.{Confirm, Deliver, DestinationConfirmed, TransportError}
-import kamon.Kamon
 
 
-trait Transport extends PersistentActor with ConfigSupport with AtLeastOnceDelivery {
+trait Transport extends PersistentActor
+  with ConfigSupport
+  with AtLeastOnceDelivery {
+  import Transport._
+
   override val persistenceId = getClass.getSimpleName
 
-  private[transport] val journalSampler = Kamon.rangeSampler("transport")
-    .refine("id" -> persistenceId)
+  private[core] lazy val generateTags = Seq("type" -> persistenceId)
+
+  private val journalGauge = HydraMetrics.getOrCreateGauge(persistenceId, journalMetricName,
+    generateTags)
 
   def transport: Receive
 
@@ -36,7 +41,7 @@ trait Transport extends PersistentActor with ConfigSupport with AtLeastOnceDeliv
     case Produce(rec, _, _) => deliver(self.path)(deliveryId => Deliver(rec, deliveryId,
       new TransportSupervisorCallback(self)))
     case DestinationConfirmed(deliveryId) =>
-      journalSampler.decrement()
+      journalGauge.increment()
       confirmDelivery(deliveryId)
   }
 
@@ -49,7 +54,7 @@ trait Transport extends PersistentActor with ConfigSupport with AtLeastOnceDeliv
       case Persisted =>
         val ingestor = sender
         persistAsync(p) { p =>
-          journalSampler.increment()
+          journalGauge.decrement()
           updateState(p)
           ingestor ! RecordProduced(HydraRecordMetadata(System.currentTimeMillis), p.supervisor)
         }
@@ -63,6 +68,8 @@ trait Transport extends PersistentActor with ConfigSupport with AtLeastOnceDeliv
 }
 
 object Transport {
+
+  val journalMetricName = "hydra_ingest_journal_message_count"
 
   trait TransportMessage extends HydraMessage
 
