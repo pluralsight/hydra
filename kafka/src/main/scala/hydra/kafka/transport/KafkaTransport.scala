@@ -37,14 +37,19 @@ import scala.language.existentials
   * Created by alexsilva on 10/28/15.
   */
 class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) extends Transport
-  with Timers
-  with HydraMetrics {
+  with Timers {
 
   private type KR = KafkaRecord[_, _]
 
   private[kafka] lazy val metrics = KafkaMetrics(applicationConfig)(context.system)
 
   private[kafka] val msgCounter = new AtomicLong()
+
+  private[kafka] val histogram = HydraMetrics.getOrCreateHistogram(
+    persistenceId,
+    KafkaTransport.histogramMetricName,
+    Seq("transport" -> persistenceId)
+  )
 
   timers.startPeriodicTimer("kamon", ReportMetrics, 1.minute)
 
@@ -54,7 +59,7 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 
     case kmd: KafkaRecordMetadata =>
       val resultType = "success"
-      incrementCounter(
+      HydraMetrics.incrementCounter(
         kmd.topic + resultType,
         KafkaTransport.counterMetricName,
         Seq(
@@ -68,7 +73,7 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 
     case e: RecordProduceError =>
       val resultType = "fail"
-      incrementCounter(
+      HydraMetrics.incrementCounter(
         e.record.topic + resultType,
         KafkaTransport.counterMetricName,
         Seq(
@@ -82,12 +87,7 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
     case p: ProducerInitializationError => context.system.eventStream.publish(p)
 
     case ReportMetrics =>
-      recordToHistogram(
-        s"${this.getClass.getSimpleName}",
-        KafkaTransport.histogramMetricName,
-        msgCounter.getAndSet(0L),
-        Seq("transport" -> persistenceId)
-      )
+      histogram.record(msgCounter.getAndSet(0L))
   }
 
   private def withProducer(id: String)(success: (ActorRef) => Unit)(fail: (Option[Throwable]) => Unit) = {

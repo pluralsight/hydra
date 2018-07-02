@@ -17,9 +17,8 @@ class HydraMetricsSpec extends Matchers
   with Eventually
   with BeforeAndAfterAll
   with BeforeAndAfterEach
-  with MockFactory
-  with HydraMetrics {
-
+  with MockFactory {
+  import HydraMetrics._
 
   implicit override val patienceConfig =
     PatienceConfig(timeout = scaled(Span(2, Seconds)), interval = scaled(Span(5, Millis)))

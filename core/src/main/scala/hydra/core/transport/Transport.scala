@@ -9,13 +9,15 @@ import hydra.core.transport.AckStrategy.{NoAck, Persisted, Replicated}
 
 trait Transport extends PersistentActor
   with ConfigSupport
-  with AtLeastOnceDelivery
-  with HydraMetrics {
+  with AtLeastOnceDelivery {
   import Transport._
 
   override val persistenceId = getClass.getSimpleName
 
-  private val journalGauge = lookupGauge(persistenceId, journalMetricName, generateTags)
+  private[core] lazy val generateTags = Seq("type" -> persistenceId)
+
+  private val journalGauge = HydraMetrics.getOrCreateGauge(persistenceId, journalMetricName,
+    generateTags)
 
   def transport: Receive
 
@@ -28,8 +30,6 @@ trait Transport extends PersistentActor
     case TransportError(deliveryId) =>
       if (deliveryId > 0) persistAsync(DestinationConfirmed(deliveryId))(updateState) //delete from journal (error)
   }
-
-  private[core] def generateTags = Seq("type" -> persistenceId)
 
   final override def receiveCommand = baseCommand orElse transport
 
