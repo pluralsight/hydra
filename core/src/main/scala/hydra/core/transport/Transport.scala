@@ -15,6 +15,12 @@ trait Transport extends PersistentActor
 
   override val persistenceId = getClass.getSimpleName
 
+  private def incrementTransportGauge(): Unit =
+    incrementGauge(persistenceId, journalMetricName, generateTags)
+
+  private def decrementTransportGauge(): Unit =
+    decrementGauge(persistenceId, journalMetricName, generateTags)
+
   def transport: Receive
 
   private final def baseCommand: Receive = {
@@ -39,11 +45,7 @@ trait Transport extends PersistentActor
     case Produce(rec, _, _) => deliver(self.path)(deliveryId => Deliver(rec, deliveryId,
       new TransportSupervisorCallback(self)))
     case DestinationConfirmed(deliveryId) =>
-      decrementGauge(
-        persistenceId,
-        journalMetricName,
-        generateTags
-      )
+      decrementTransportGauge()
       confirmDelivery(deliveryId)
   }
 
@@ -56,11 +58,7 @@ trait Transport extends PersistentActor
       case Persisted =>
         val ingestor = sender
         persistAsync(p) { p =>
-          incrementGauge(
-            persistenceId,
-            journalMetricName,
-            generateTags
-          )
+          incrementTransportGauge()
           updateState(p)
           ingestor ! RecordProduced(HydraRecordMetadata(System.currentTimeMillis), p.supervisor)
         }
