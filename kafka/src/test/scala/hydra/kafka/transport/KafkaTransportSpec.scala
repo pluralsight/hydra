@@ -30,7 +30,6 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra"))
 
   val producerName = StringRecord("transport_test", Some("key"), "payload").formatName
 
-  lazy val transportRef: TestActorRef[KafkaTransport]  = TestActorRef(Props(new KafkaTransport(KafkaUtils.producerSettings(rootConfig))))
   lazy val transport = system.actorOf(KafkaTransport.props(rootConfig), "kafka")
 
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,

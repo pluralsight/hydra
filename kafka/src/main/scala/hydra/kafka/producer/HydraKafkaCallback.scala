@@ -14,9 +14,6 @@ case class HydraKafkaCallback(deliveryId: Long,
                               producer: ActorSelection,
                               callback: TransportCallback) extends Callback {
 
-  private[kafka] val metricName = "hydra_ingest_records_published_total"
-  private[kafka] val transportName = "KafkaTransport"
-
   override def onCompletion(metadata: RecordMetadata, e: Exception): Unit = {
     Option(e) match {
       case Some(err) => ackError(err)

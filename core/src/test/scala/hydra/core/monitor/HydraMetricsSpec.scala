@@ -23,23 +23,6 @@ class HydraMetricsSpec extends Matchers
   implicit override val patienceConfig =
     PatienceConfig(timeout = scaled(Span(2, Seconds)), interval = scaled(Span(5, Millis)))
 
-  val reporter = new MetricReporter {
-
-    var snapshot: PeriodSnapshot = _
-
-    override def reportPeriodSnapshot(snapshot: PeriodSnapshot): Unit = {
-      this.snapshot = snapshot
-    }
-
-    override def start(): Unit = {}
-
-    override def stop(): Unit = {}
-
-    override def reconfigure(config: Config): Unit = {}
-  }
-
-  override def beforeAll = Kamon.addReporter(reporter)
-
   override def beforeEach() = {
     gauges.clear()
     counters.clear()
