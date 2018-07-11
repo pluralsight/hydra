@@ -35,7 +35,7 @@ object Dependencies {
   val kamonVersion = "1.1.0"
   val kamonPVersion = "1.0.0"
   val akkaKryoVersion = "0.5.2"
-  val akkaManagementVersion = "0.14.0"
+  val akkaManagementVersion = "0.15.0"
 
   object Compile {
 
@@ -76,6 +76,7 @@ object Dependencies {
     val akka = Seq("com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
       "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaManagementVersion,
+      "com.lightbend.akka.discovery" %% "akka-discovery-dns" % akkaManagementVersion,
       "com.lightbend.akka.management" %% "akka-management-cluster-http" % akkaManagementVersion,
       "com.lightbend.akka.discovery" %% "akka-discovery-aws-api" % akkaManagementVersion,
       "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
