@@ -35,6 +35,7 @@ object Dependencies {
   val kamonVersion = "1.1.0"
   val kamonPVersion = "1.0.0"
   val akkaKryoVersion = "0.5.2"
+  val akkaManagementVersion = "0.14.0"
 
   object Compile {
 
@@ -74,6 +75,9 @@ object Dependencies {
 
     val akka = Seq("com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
+      "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaManagementVersion,
+      "com.lightbend.akka.management" %% "akka-management-cluster-http" % akkaManagementVersion,
+      "com.lightbend.akka.discovery" %% "akka-discovery-aws-api" % akkaManagementVersion,
       "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
@@ -116,12 +120,6 @@ object Dependencies {
         ExclusionRule(organization = "ch.qos.logback"),
         ExclusionRule(organization = "org.slf4j")
       )
-
-    val constructR = Seq(
-      "de.heikoseeberger" %% "constructr" % constructRVersion,
-      // "com.lightbend.constructr" %% "constructr-coordination-zookeeper" % "0.4.0" //if using zk,
-      "com.tecsisa" %% "constructr-coordination-consul" % "0.9.0"
-    )
   }
 
   object Test {
@@ -153,7 +151,7 @@ object Dependencies {
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
   val coreDeps = akka ++ baseDeps ++
-    Seq(guavacache, reflections, serviceContainer, akkaKryo, sdNotify) ++ confluent ++ constructR ++ kamon
+    Seq(guavacache, reflections, serviceContainer, akkaKryo, sdNotify) ++ confluent ++ kamon
 
   val ingestDeps = coreDeps
 
