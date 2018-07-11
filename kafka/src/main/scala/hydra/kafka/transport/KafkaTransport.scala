@@ -22,13 +22,13 @@ import akka.actor.SupervisorStrategy._
 import akka.actor._
 import akka.kafka.ProducerSettings
 import com.typesafe.config.Config
+import hydra.core.monitor.HydraMetrics
 import hydra.core.transport.Transport
 import hydra.core.transport.Transport.Deliver
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata}
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
 import hydra.kafka.transport.KafkaTransport.{RecordProduceError, ReportMetrics}
 import hydra.kafka.util.KafkaUtils
-import kamon.Kamon
 
 import scala.concurrent.duration._
 import scala.language.existentials
@@ -43,25 +43,51 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 
   private[kafka] lazy val metrics = KafkaMetrics(applicationConfig)(context.system)
 
-  private[kafka] val histogram = Kamon.histogram("kafka-transport")
+  private[kafka] val msgCounter = new AtomicLong()
 
-  private val msgCounter = new AtomicLong()
+  private[kafka] val histogram = HydraMetrics.getOrCreateHistogram(
+    persistenceId,
+    KafkaTransport.histogramMetricName,
+    Seq("transport" -> persistenceId)
+  )
 
-  timers.startPeriodicTimer("kamon", ReportMetrics, 1.second)
+  timers.startPeriodicTimer("kamon", ReportMetrics, 1.minute)
 
   override def transport: Receive = {
     case Deliver(kr: KafkaRecord[_, _], deliveryId, ack) =>
       withProducer(kr.formatName)(_ ! ProduceToKafka(deliveryId, kr, ack))(e => ack.onCompletion(deliveryId, None, e))
 
     case kmd: KafkaRecordMetadata =>
-      metrics.saveMetrics(kmd)
+      val resultType = "success"
+      HydraMetrics.incrementCounter(
+        kmd.topic + resultType,
+        KafkaTransport.counterMetricName,
+        Seq(
+          "destination" -> kmd.topic,
+          "type" -> resultType,
+          "transport" -> persistenceId
+        )
+      )
       msgCounter.incrementAndGet()
+      metrics.saveMetrics(kmd)
 
-    case e: RecordProduceError => context.system.eventStream.publish(e)
+    case e: RecordProduceError =>
+      val resultType = "fail"
+      HydraMetrics.incrementCounter(
+        e.record.topic + resultType,
+        KafkaTransport.counterMetricName,
+        Seq(
+          "destination" -> e.record.topic,
+          "type" -> resultType,
+          "transport" -> persistenceId
+        )
+      )
+      context.system.eventStream.publish(e)
 
     case p: ProducerInitializationError => context.system.eventStream.publish(p)
 
-    case ReportMetrics => histogram.record(msgCounter.getAndSet(0L))
+    case ReportMetrics =>
+      histogram.record(msgCounter.getAndSet(0L))
   }
 
   private def withProducer(id: String)(success: (ActorRef) => Unit)(fail: (Option[Throwable]) => Unit) = {
@@ -77,7 +103,6 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
       case _: Exception => Restart
     }
 
-
   override def preStart(): Unit = {
     producerSettings.foreach { case (id, s) =>
       context.actorOf(KafkaProducerProxy.props(id, s), id)
@@ -88,6 +113,9 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 }
 
 object KafkaTransport {
+
+  private[kafka] val histogramMetricName = "hydra_ingest_records_published_total_minutes_bucket"
+  private[kafka] val counterMetricName = "hydra_ingest_records_published_total"
 
   case class RecordProduceError(deliveryId: Long, record: KafkaRecord[_, _], error: Throwable)
 

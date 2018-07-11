@@ -1,7 +1,7 @@
 package hydra.kafka.transport
 
-import akka.actor.ActorSystem
-import akka.testkit.{ImplicitSender, TestKit, TestProbe}
+import akka.actor.{ActorSystem, Props}
+import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import hydra.common.config.ConfigSupport
 import hydra.core.transport.Transport.Deliver
@@ -9,6 +9,8 @@ import hydra.core.transport.{RecordMetadata, TransportCallback}
 import hydra.kafka.producer.{DeleteTombstoneRecord, JsonRecord, StringRecord}
 import hydra.kafka.transport.KafkaProducerProxy.ProducerInitializationError
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
+import hydra.kafka.util.KafkaUtils
+
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.errors.SerializationException
