@@ -59,6 +59,7 @@ trait BootstrappingSupport extends ConfigSupport with LoggingAdapter {
 
     AkkaManagement(container.system).start()
     ClusterBootstrap(container.system).start()
+
     container
   }
 }
