@@ -3,37 +3,21 @@ package hydra.core.listeners
 import akka.actor.ActorSystem
 import akka.testkit.TestKit
 import com.github.vonnagy.service.container.service.ContainerService
-import com.google.common.net.HostAndPort
-import com.orbitz.consul.Consul
-import com.pszymczyk.consul.ConsulStarterBuilder
 import com.typesafe.config.ConfigFactory
-import hydra.common.config.ConfigSupport
-import hydra.common.logging.LoggingAdapter
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+import hydra.core.test.ConsulTestingSupport
+import org.scalatest.{FlatSpecLike, Matchers}
 
 import scala.collection.JavaConverters._
 
 class ConsulRegistrationListenerSpec extends TestKit(ActorSystem("ConsulRegistrationListenerSpec"))
   with Matchers
   with FlatSpecLike
-  with BeforeAndAfterAll
-  with LoggingAdapter
-  with ConfigSupport {
-
-  private val consulPort = rootConfig.getInt("consul.http.port")
-  private val consulAddress = rootConfig.getString("consul.http.address")
-  lazy val consul = ConsulStarterBuilder.consulStarter()
-    .withHttpPort(consulPort).build().start()
-
-  override def beforeAll() = log.debug(s"Started consul at ${consul.getAddress}:${consul.getHttpPort}.")
+  with ConsulTestingSupport {
 
   override def afterAll() = {
     TestKit.shutdownActorSystem(system)
-    consul.close()
+    super.afterAll()
   }
-
-  private lazy val consulClient = Consul.builder()
-    .withHostAndPort(HostAndPort.fromParts(consulAddress, consulPort)).build()
 
   "The ConsulRegistrationListener" should "register Hydra on start up and deregister on shutdown" in {
     val listener = new ConsulRegistrationListener()
