@@ -140,12 +140,14 @@ object Dependencies {
     val junit = "junit" % "junit" % "4.12" % "test"
 
     val h2db = "com.h2database" % "h2" % "1.4.196" % "test"
+
+    val embeddedConsul = "com.pszymczyk.consul" % "embedded-consul" % "1.1.1" % "test"
   }
 
   import Compile._
   import Test._
 
-  val testDeps = Seq(scalaTest, junit, scalaMock, easyMock) ++ powerMock ++ akkaTest
+  val testDeps = Seq(scalaTest, junit, scalaMock, easyMock,embeddedConsul) ++ powerMock ++ akkaTest
 
   val baseDeps = akka ++ logging ++ Seq(scalaz, scalaConfigs, avro, spring) ++ joda ++ testDeps
 
