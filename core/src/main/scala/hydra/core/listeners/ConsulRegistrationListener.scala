@@ -22,12 +22,12 @@ class ConsulRegistrationListener extends ContainerLifecycleListener with ConfigS
     .build()
 
   private def service(consulSettings: ConsulSettings) = ImmutableService.builder()
-    .address(consulSettings.httpAddress)
+    .address(consulSettings.consulHttpHost)
     .id(consulSettings.serviceId)
     .service(consulSettings.serviceName)
-    .port(consulSettings.httpPort)
+    .port(consulSettings.akkaManagementPort)
     .addTags("system:" + consulSettings.serviceName,
-      "akka-management-port:" + consulSettings.httpPort).build()
+      "akka-management-port:" + consulSettings.akkaManagementPort).build()
 
   override def onStartup(container: ContainerService): Unit = {
     if (ConsulRegistrationListener.usingConsul(container.getConfig(None))) {
@@ -35,13 +35,14 @@ class ConsulRegistrationListener extends ContainerLifecycleListener with ConfigS
       val reg = ImmutableCatalogRegistration.builder()
         .datacenter(consulSettings.dataCenter)
         .service(service(consulSettings))
-        .address(consulSettings.httpAddress)
+        .address(consulSettings.consulHttpHost)
         .node(consulSettings.nodeName)
         .check(check(consulSettings))
         .build()
 
       val consul = Consul.builder()
-        .withHostAndPort(HostAndPort.fromParts(consulSettings.consulHost, consulSettings.consulPort))
+        .withHostAndPort(HostAndPort.fromParts(consulSettings.consulHttpHost,
+          consulSettings.consulHttpPort))
         .build()
 
       consul.catalogClient().register(reg)
@@ -59,7 +60,7 @@ class ConsulRegistrationListener extends ContainerLifecycleListener with ConfigS
         .node(consulSettings.nodeName)
         .build()
       val consul = Consul.builder()
-        .withHostAndPort(HostAndPort.fromParts(consulSettings.consulHost, consulSettings.consulPort))
+        .withHostAndPort(HostAndPort.fromParts(consulSettings.consulHttpHost, consulSettings.consulHttpPort))
         .build()
       consul.catalogClient().deregister(dreg)
       consul.destroy()
@@ -69,22 +70,20 @@ class ConsulRegistrationListener extends ContainerLifecycleListener with ConfigS
 
 case class ConsulSettings(config: Config) {
 
-  private val consulConfig = config.getConfig("akka.discovery.akka-consul")
-    .withFallback(config.getConfig("consul"))
+  private val consulConfig = config.getConfig("consul")
 
-
-  val consulHost = consulConfig.getString("consul-host")
-  val consulPort = consulConfig.getInt("consul-port")
-  val httpAddress = consulConfig.getString("http.address")
+  val akkaManagementPort = config.getInt("akka.management.http.port")
+  val consulHttpHost = consulConfig.getString("http.host")
+  val consulHttpPort = consulConfig.getInt("http.port")
   val dataCenter = consulConfig.getString("datacenter")
   val serviceId = consulConfig.getString("service.id")
   val serviceName = consulConfig.getString("service.name")
-  val httpPort = consulConfig.getInt("http.port")
   val nodeName = consulConfig.getString("node.name")
-  val containerPort = config.getInt("container.http.port")
+  val checkPort = consulConfig.getInt("service.check.port")
+  val checkHost = consulConfig.getString("service.check.host")
 
   val healthEndpoint = Uri.from(scheme = "http",
-    host = httpAddress, port = containerPort, path = "/health")
+    host = checkHost, port = checkPort, path = "/health")
 }
 
 object ConsulRegistrationListener {
