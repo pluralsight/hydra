@@ -12,7 +12,7 @@ import hydra.common.logging.LoggingAdapter
 import hydra.common.util.TryWith
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.util.KafkaUtils.requestAndReceive
-import kafka.admin.AdminUtils
+import kafka.admin.{AdminClient, AdminUtils}
 import kafka.utils.ZkUtils
 import org.I0Itec.zkclient.ZkClient
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -31,6 +31,8 @@ case class KafkaUtils(zkString: String, client: () => ZkClient) extends LoggingA
   with ConfigSupport {
 
   private[kafka] var zkUtils = Try(client.apply()).map(ZkUtils(_, false))
+
+  private [kafka] val adminClient = AdminClient.create(config)
 
   private[kafka] def withRunningZookeeper[T](body: ZkUtils => T): Try[T] = {
     if (zkUtils.isFailure) {
@@ -54,7 +56,7 @@ case class KafkaUtils(zkString: String, client: () => ZkClient) extends LoggingA
     withRunningZookeeper { zk =>
       topics.keys.foreach { topic =>
         if (AdminUtils.topicExists(zk, topic)) {
-          throw new IllegalArgumentException(s"Topic $topic already exist.")
+          throw new IllegalArgumentException(s"Topic $topic already exists.")
         }
       }
     }.flatMap { _ => //accounts for topic exists or zookeeper connection error
