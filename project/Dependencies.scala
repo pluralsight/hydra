@@ -4,7 +4,7 @@ import sbt.{ExclusionRule, _}
 
 object Dependencies {
 
-  val akkaVersion = "2.5.11"
+  val akkaVersion = "2.5.14"
   val scalaTestVersion = "3.0.4"
   val easyMockVersion = "3.5" //needed for mocking static java methods
   val powerMockVersion = "2.0.0-beta.5" //needed for mocking static java methods
@@ -76,9 +76,9 @@ object Dependencies {
     val akka = Seq("com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
       "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaManagementVersion,
+      "com.lightbend.akka.discovery" %% "akka-discovery-consul" % akkaManagementVersion,
       "com.lightbend.akka.discovery" %% "akka-discovery-dns" % akkaManagementVersion,
       "com.lightbend.akka.management" %% "akka-management-cluster-http" % akkaManagementVersion,
-      "com.lightbend.akka.discovery" %% "akka-discovery-aws-api" % akkaManagementVersion,
       "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
@@ -140,12 +140,14 @@ object Dependencies {
     val junit = "junit" % "junit" % "4.12" % "test"
 
     val h2db = "com.h2database" % "h2" % "1.4.196" % "test"
+
+    val embeddedConsul = "com.pszymczyk.consul" % "embedded-consul" % "1.1.1" % "test"
   }
 
   import Compile._
   import Test._
 
-  val testDeps = Seq(scalaTest, junit, scalaMock, easyMock) ++ powerMock ++ akkaTest
+  val testDeps = Seq(scalaTest, junit, scalaMock, easyMock,embeddedConsul) ++ powerMock ++ akkaTest
 
   val baseDeps = akka ++ logging ++ Seq(scalaz, scalaConfigs, avro, spring) ++ joda ++ testDeps
 

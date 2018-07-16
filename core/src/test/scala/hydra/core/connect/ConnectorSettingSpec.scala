@@ -29,7 +29,7 @@ class ConnectorSettingSpec extends TestKit(ActorSystem("ConnectorSettingSpec"))
         |
       """.stripMargin)
     val settings = new ConnectorSettings(config, system)
-    settings.clustered shouldBe false //read from system
+    settings.clustered shouldBe true //read from system
     settings.requestTimeout shouldBe 2.seconds
     settings.ackStrategy shouldBe Success(AckStrategy.Replicated)
     settings.validationStrategy shouldBe ValidationStrategy.Relaxed
@@ -39,7 +39,7 @@ class ConnectorSettingSpec extends TestKit(ActorSystem("ConnectorSettingSpec"))
 
   it should "have sensible defaults in" in {
     val settings = new ConnectorSettings(ConfigFactory.empty(), system)
-    settings.clustered shouldBe false
+    settings.clustered shouldBe true
     settings.requestTimeout shouldBe 2.seconds
     settings.ackStrategy shouldBe AckStrategy.NoAck
     settings.validationStrategy shouldBe ValidationStrategy.Strict
