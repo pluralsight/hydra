@@ -88,6 +88,7 @@ class ConsulRegistrationListenerSpec extends TestKit(ActorSystem("ConsulRegistra
 
     val settings = ConsulSettings(config)
     settings.akkaManagementPort shouldBe 8558
+    settings.akkaManagementHostName shouldBe "localhost"
     settings.consulHttpPort shouldBe 8500
     settings.dataCenter shouldBe "dc1"
     settings.consulHttpHost shouldBe "localhost"

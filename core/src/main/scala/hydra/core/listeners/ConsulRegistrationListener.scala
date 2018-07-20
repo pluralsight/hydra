@@ -22,7 +22,7 @@ class ConsulRegistrationListener extends ContainerLifecycleListener with ConfigS
     .build()
 
   private def service(consulSettings: ConsulSettings) = ImmutableService.builder()
-    .address(consulSettings.consulHttpHost)
+    .address(consulSettings.akkaManagementHostName)
     .id(consulSettings.serviceId)
     .service(consulSettings.serviceName)
     .port(consulSettings.akkaManagementPort)
@@ -73,6 +73,7 @@ case class ConsulSettings(config: Config) {
   private val consulConfig = config.getConfig("consul")
 
   val akkaManagementPort = config.getInt("akka.management.http.port")
+  val akkaManagementHostName = config.getString("akka.management.http.hostname")
   val consulHttpHost = consulConfig.getString("http.host")
   val consulHttpPort = consulConfig.getInt("http.port")
   val dataCenter = consulConfig.getString("datacenter")
