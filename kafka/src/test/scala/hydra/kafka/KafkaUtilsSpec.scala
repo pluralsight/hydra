@@ -1,18 +1,18 @@
 package hydra.kafka
 
+import java.util.concurrent.ExecutionException
+
 import com.typesafe.config.ConfigFactory
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.util.KafkaUtils
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.I0Itec.zkclient.ZkClient
-import org.apache.kafka.common.protocol.Errors
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 import org.apache.zookeeper.Watcher
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
 
 import scala.collection.JavaConverters._
-import scala.util.Failure
 
 /**
   * Created by alexsilva on 5/17/17.
@@ -42,7 +42,18 @@ class KafkaUtilsSpec extends WordSpec
   }
 
 
-  val ku = KafkaUtils("test", () => new MockableZK)
+  val defaultCfg = Map(
+    "key.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
+    "auto.offset.reset" -> "latest",
+    "group.id" -> "hydra",
+    "bootstrap.servers" -> "localhost:8092",
+    "enable.auto.commit" -> "false",
+    "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
+    "zookeeper.connect" -> "localhost:3181",
+    "client.id" -> "string",
+    "metadata.fetch.timeout.ms" -> "100000")
+
+  val ku = new KafkaUtils("test", () => new MockableZK, defaultCfg)
 
   val cfg = ConfigFactory.parseString(
     """
@@ -155,16 +166,13 @@ class KafkaUtilsSpec extends WordSpec
           "cleanup.policy" -> "compact",
           "segment.bytes" -> "1048576"
         )
-        val kafkaUtils = new KafkaUtils("", () => new ZkClient("localhost:3181"))
+        val kafkaUtils = new KafkaUtils("", () => new ZkClient("localhost:3181"), defaultCfg)
         kafkaUtils.topicExists("test.Hydra").get shouldBe false
         val details = new TopicDetails(1, 1: Short, configs.asJava)
-        val response = kafkaUtils.createTopic("test.Hydra", details, 3000)
-
-        val ctr = response.get
-        //temporary "workaround" until we can upgrade to kafka 1
-        Seq(ctr.errors().asScala("test.Hydra").error()) should contain oneOf(Errors.NONE, Errors.INVALID_REPLICATION_FACTOR)
-
-        kafkaUtils.topicExists("test.Hydra").get shouldBe true
+        whenReady(kafkaUtils.createTopic("test.Hydra", details, 3000)) { response =>
+          response.all().get() shouldBe null //the kafka API returns a 'Void'
+          kafkaUtils.topicExists("test.Hydra").get shouldBe true
+        }
       }
     }
 
@@ -175,13 +183,13 @@ class KafkaUtilsSpec extends WordSpec
           "cleanup.policy" -> "compact",
           "segment.bytes" -> "1048576"
         )
-        val kafkaUtils = new KafkaUtils("", () => new ZkClient("localhost:3181"))
+        val kafkaUtils = new KafkaUtils("", () => new ZkClient("localhost:3181"), defaultCfg)
         createCustomTopic("hydra.already.Exists")
         kafkaUtils.topicExists("hydra.already.Exists").get shouldBe true
         val details = new TopicDetails(1, 1, configs.asJava)
-        val response = kafkaUtils.createTopic("hydra.already.Exists", details, 1000)
-
-        response shouldBe a[Failure[_]]
+        whenReady(kafkaUtils.createTopic("hydra.already.Exists", details, 1000).failed) { response =>
+          response shouldBe an[IllegalArgumentException]
+        }
       }
     }
 
@@ -191,10 +199,11 @@ class KafkaUtilsSpec extends WordSpec
           "min.insync.replicas" -> "1",
           "cleanup.policy" -> "under the carpet"
         )
-        val kafkaUtils = new KafkaUtils("", () => new ZkClient("localhost:3181"))
+        val kafkaUtils = new KafkaUtils("", () => new ZkClient("localhost:3181"), defaultCfg)
         val details = new TopicDetails(1, 1, configs.asJava)
-        val r = kafkaUtils.createTopic("InvalidConfig", details, 1000)
-        r.get.errors().asScala("InvalidConfig").error().code() shouldBe Errors.UNKNOWN.code()
+        whenReady(kafkaUtils.createTopic("InvalidConfig", details, 1000)) { response =>
+          intercept[ExecutionException](response.all().get)
+        }
       }
     }
   }

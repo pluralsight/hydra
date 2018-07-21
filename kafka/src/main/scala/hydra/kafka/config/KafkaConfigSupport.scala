@@ -22,11 +22,11 @@ import hydra.common.config.ConfigSupport
   */
 object KafkaConfigSupport extends ConfigSupport {
 
-  protected[config] val kafkaConfig = applicationConfig.withOnlyPath("kafka")
+  val kafkaConfig = applicationConfig.withOnlyPath("kafka")
 
   val zkString = kafkaConfig.getString("kafka.consumer.zookeeper.connect")
 
   val bootstrapServers = kafkaConfig.getString("kafka.producer.bootstrap.servers")
 
-  val schemaRegistryUrl:String = applicationConfig.getString("schema.registry.url")
+  val schemaRegistryUrl: String = applicationConfig.getString("schema.registry.url")
 }

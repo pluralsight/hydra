@@ -5,19 +5,23 @@ import akka.testkit.TestKit
 import com.typesafe.config.ConfigFactory
 import hydra.kafka.producer.KafkaRecordMetadata
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
-import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 import spray.json.DefaultJsonProtocol
 
 /**
   * Created by alexsilva on 12/5/16.
   */
-class KafkaMetricsSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike
-  with BeforeAndAfterAll with DefaultJsonProtocol {
+class KafkaMetricsSpec extends TestKit(ActorSystem("hydra"))
+  with Matchers
+  with FunSpecLike
+  with BeforeAndAfterAll
+  with DefaultJsonProtocol {
 
   private implicit val mdFormat = jsonFormat5(KafkaRecordMetadata.apply)
 
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
-    customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
+    customBrokerProperties = Map("auto.create.topics.enable" -> "false",
+      "offsets.topic.replication.factor" -> "1"))
 
   override def afterAll() = {
     EmbeddedKafka.stop()
