@@ -21,12 +21,12 @@ class ConsulRegistrationListener extends ContainerLifecycleListener with ConfigS
     .http(consulSettings.healthEndpoint.toString())
     .build()
 
-  private def service(consulSettings: ConsulSettings) = ImmutableService.builder()
+  private def service(consulSettings: ConsulSettings, name: String) = ImmutableService.builder()
     .address(consulSettings.akkaManagementHostName)
     .id(consulSettings.serviceId)
     .service(consulSettings.serviceName)
     .port(consulSettings.akkaManagementPort)
-    .addTags("system:" + consulSettings.serviceName,
+    .addTags(s"system:$name",
       "akka-management-port:" + consulSettings.akkaManagementPort).build()
 
   override def onStartup(container: ContainerService): Unit = {
@@ -34,7 +34,7 @@ class ConsulRegistrationListener extends ContainerLifecycleListener with ConfigS
       val consulSettings = ConsulSettings(container.getConfig(Some(rootConfig)))
       val reg = ImmutableCatalogRegistration.builder()
         .datacenter(consulSettings.dataCenter)
-        .service(service(consulSettings))
+        .service(service(consulSettings, container.system.name))
         .address(consulSettings.consulHttpHost)
         .node(consulSettings.nodeName)
         .check(check(consulSettings))
