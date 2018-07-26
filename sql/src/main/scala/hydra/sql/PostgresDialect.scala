@@ -78,7 +78,7 @@ private[sql] object PostgresDialect extends JdbcDialect {
     val sql =
       s"""insert into $table ($columns) values (${placeholders.mkString(",")})
          |on conflict (${idFields.map(formatColName).mkString(",")})
-         |do update set ($updateColumns) = (${updatePlaceholders.mkString(",")})
+         |do update set ($updateColumns) = ROW (${updatePlaceholders.mkString(",")})
          |where $whereClause;""".stripMargin
 
     sql

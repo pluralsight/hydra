@@ -130,7 +130,7 @@ class AggregatedDialectSpec extends Matchers with FunSpecLike {
       val upsert =
         """insert into table ("id","username","active") values (?,?,?)
           |on conflict ("id")
-          |do update set ("username","active") = (?,?)
+          |do update set ("username","active") = ROW (?,?)
           |where table."id"=?;""".stripMargin
       dialect.buildUpsert("table", schema, UnderscoreSyntax) shouldBe upsert
     }

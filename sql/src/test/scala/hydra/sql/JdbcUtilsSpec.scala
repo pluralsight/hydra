@@ -402,7 +402,7 @@ class JdbcUtilsSpec extends Matchers
       JdbcUtils.dropTable(provider.getConnection(), "drop_test")
       intercept[JdbcSQLException] {
         TryWith(provider.getConnection().createStatement()) { stmt =>
-          stmt.executeUpdate("""insert into hydra_drop values(1,'test')""") shouldBe 1
+          stmt.executeUpdate("""insert into drop_test values(1,'test')""") shouldBe 1
         }.get
       }
     }
