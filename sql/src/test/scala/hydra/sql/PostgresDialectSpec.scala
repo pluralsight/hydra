@@ -230,7 +230,7 @@ class PostgresDialectSpec extends Matchers
       val expected =
         """insert into table ("id","username","address") values (?,?,to_json(?::json))
           |on conflict ("id")
-          |do update set ("username","address") = (?,to_json(?::json))
+          |do update set ("username","address") = ROW (?,to_json(?::json))
           |where table."id"=?;""".stripMargin
 
       stmt shouldBe expected
@@ -269,7 +269,7 @@ class PostgresDialectSpec extends Matchers
       val expected =
         """insert into table ("id1","id2","username") values (?,?,?)
           |on conflict ("id1","id2")
-          |do update set ("username") = (?)
+          |do update set ("username") = ROW (?)
           |where table."id1"=? and table."id2"=?;""".stripMargin
 
       stmt shouldBe expected
@@ -415,7 +415,6 @@ class PostgresDialectSpec extends Matchers
     val schema = new Schema.Parser().parse(schemaR)
     val field = schema.getField("authors")
     getJdbcType(field.schema(), PostgresDialect).databaseTypeDefinition shouldBe "JSON" //the conversion is made by postgres
-    println(PostgresDialect.insertStatement("json_test", SchemaWrapper.from(schema), UnderscoreSyntax))
   }
 
   it("returns the correct array type") {

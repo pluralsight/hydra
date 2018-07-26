@@ -142,12 +142,16 @@ object Dependencies {
     val h2db = "com.h2database" % "h2" % "1.4.196" % "test"
 
     val embeddedConsul = "com.pszymczyk.consul" % "embedded-consul" % "1.1.1" % "test"
+
+    val embeddedPostgres = "com.opentable.components" % "otj-pg-embedded" % "0.12.0" % "test"
+
   }
 
   import Compile._
   import Test._
 
-  val testDeps = Seq(scalaTest, junit, scalaMock, easyMock,embeddedConsul) ++ powerMock ++ akkaTest
+  val testDeps = Seq(scalaTest, junit, scalaMock, easyMock, embeddedConsul, embeddedPostgres) ++
+    powerMock ++ akkaTest
 
   val baseDeps = akka ++ logging ++ Seq(scalaz, scalaConfigs, avro, spring) ++ joda ++ testDeps
 
