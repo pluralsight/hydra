@@ -72,14 +72,12 @@ private[sql] object PostgresDialect extends JdbcDialect {
     val placeholders = parameterize(fields)
     val updateSchema = fields -- idFields
     val updateColumns = updateSchema.map(formatColName).mkString(",")
-    val updatePlaceholders = parameterize(updateSchema)
-    val whereClause = idFields.map(c => s"$table.${formatColName(c)}=?").mkString(" and ")
+    val excludedValues = updateSchema.map(formatColName).map(x => s"EXCLUDED."+x).mkString(",")
 
     val sql =
       s"""insert into $table ($columns) values (${placeholders.mkString(",")})
          |on conflict (${idFields.map(formatColName).mkString(",")})
-         |do update set ($updateColumns) = ROW (${updatePlaceholders.mkString(",")})
-         |where $whereClause;""".stripMargin
+         |do update set ($updateColumns) = (${excludedValues});""".stripMargin
 
     sql
 
