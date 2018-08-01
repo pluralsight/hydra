@@ -1,4 +1,4 @@
-package hydra.core.listeners
+package hydra.core.consul
 
 import akka.actor.ActorSystem
 import akka.testkit.TestKit
@@ -6,7 +6,6 @@ import com.github.vonnagy.service.container.service.ContainerService
 import com.typesafe.config.ConfigFactory
 import hydra.core.test.ConsulTestingSupport
 import org.scalatest.{FlatSpecLike, Matchers}
-
 import scala.collection.JavaConverters._
 
 class ConsulRegistrationListenerSpec extends TestKit(ActorSystem("ConsulRegistrationListenerSpec"))
@@ -25,7 +24,7 @@ class ConsulRegistrationListenerSpec extends TestKit(ActorSystem("ConsulRegistra
     listener.onStartup(container)
     val r = consulClient.catalogClient().getService("hydra")
     r.getResponse.size() shouldBe 1
-    val hydra = r.getResponse.asScala(0)
+    val hydra = r.getResponse.asScala.head
     hydra.getAddress shouldBe "localhost"
     hydra.getDatacenter.get shouldBe "dc1"
     hydra.getServiceName shouldBe "hydra"
@@ -52,39 +51,39 @@ class ConsulRegistrationListenerSpec extends TestKit(ActorSystem("ConsulRegistra
   it should "be set up properly from configs" in {
     val config = ConfigFactory.parseString(
       s"""
-        |container.http.port = 8080
-        |
+         |container.http.port = 8080
+         |
         |akka {
-        |  discovery {
-        |    method = akka-consul
-        |  }
-        |
+         |  discovery {
+         |    method = akka-consul
+         |  }
+         |
         |  management {
-        |    http {
-        |      hostname = "127.0.0.1"
-        |      port = 8558
-        |      bind-hostname = 0.0.0.0
-        |      bind-port = 8558
-        |    }
-        |  }
-        |}
-        |
+         |    http {
+         |      hostname = "127.0.0.1"
+         |      port = 8558
+         |      bind-hostname = 0.0.0.0
+         |      bind-port = 8558
+         |    }
+         |  }
+         |}
+         |
         |consul {
-        |  datacenter = dc1
-        |  node.name = hydra-node
-        |  service {
-        |    id = hydra
-        |    name = hydra-ingest
-        |    check {
-        |      host = hydra-test
-        |      port = $${container.http.port}
-        |    }
-        |  }
-        |  http {
-        |    host = localhost
-        |    port = 8500
-        |  }
-        |}""".stripMargin).resolve()
+         |  datacenter = dc1
+         |  node.name = hydra-node
+         |  service {
+         |    id = hydra
+         |    name = hydra-ingest
+         |    check {
+         |      host = hydra-test
+         |      port = $${container.http.port}
+         |    }
+         |  }
+         |  http {
+         |    host = localhost
+         |    port = 8500
+         |  }
+         |}""".stripMargin).resolve()
 
     val settings = ConsulSettings(config)
     settings.akkaManagementPort shouldBe 8558
