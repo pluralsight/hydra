@@ -57,10 +57,7 @@ private[sql] object PostgresDialect extends JdbcDialect {
   }
 
   override def upsertFields(schema: SchemaWrapper): Seq[Field] = {
-    val fields = schema.getFields
-    val idFields = schema.primaryKeys.map(schema.schema.getField)
-    val updateSchema = if (idFields.isEmpty) Seq.empty else fields -- idFields
-    fields ++ updateSchema ++ idFields
+    schema.getFields
   }
 
   override def buildUpsert(table: String, schema: SchemaWrapper, dbs: DbSyntax): String = {
@@ -71,15 +68,12 @@ private[sql] object PostgresDialect extends JdbcDialect {
     val columns = fields.map(formatColName).mkString(",")
     val placeholders = parameterize(fields)
     val updateSchema = fields -- idFields
-    val updateColumns = updateSchema.map(formatColName).mkString(",")
-    val updatePlaceholders = parameterize(updateSchema)
-    val whereClause = idFields.map(c => s"$table.${formatColName(c)}=?").mkString(" and ")
+    val upsertColumns = updateSchema.map(formatColName).map(col => s"${col} = EXCLUDED.${col}")
 
     val sql =
       s"""insert into $table ($columns) values (${placeholders.mkString(",")})
          |on conflict (${idFields.map(formatColName).mkString(",")})
-         |do update set ($updateColumns) = ROW (${updatePlaceholders.mkString(",")})
-         |where $whereClause;""".stripMargin
+         |do update set ${upsertColumns.mkString(",")};""".stripMargin
 
     sql
 

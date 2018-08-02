@@ -230,8 +230,7 @@ class PostgresDialectSpec extends Matchers
       val expected =
         """insert into table ("id","username","address") values (?,?,to_json(?::json))
           |on conflict ("id")
-          |do update set ("username","address") = ROW (?,to_json(?::json))
-          |where table."id"=?;""".stripMargin
+          |do update set "username" = EXCLUDED."username","address" = EXCLUDED."address";""".stripMargin
 
       stmt shouldBe expected
     }
@@ -269,8 +268,7 @@ class PostgresDialectSpec extends Matchers
       val expected =
         """insert into table ("id1","id2","username") values (?,?,?)
           |on conflict ("id1","id2")
-          |do update set ("username") = ROW (?)
-          |where table."id1"=? and table."id2"=?;""".stripMargin
+          |do update set "username" = EXCLUDED."username";""".stripMargin
 
       stmt shouldBe expected
     }
@@ -333,7 +331,7 @@ class PostgresDialectSpec extends Matchers
       val avro = new Schema.Parser().parse(schema)
 
       PostgresDialect.upsertFields(avro) shouldBe Seq(avro.getField("id1"), avro.getField("id2"),
-        avro.getField("username"), avro.getField("username"), avro.getField("id1"), avro.getField("id2"))
+        avro.getField("username"))
     }
 
     it("Creates the correct alter table statements") {
