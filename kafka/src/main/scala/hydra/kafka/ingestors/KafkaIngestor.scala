@@ -18,8 +18,10 @@ package hydra.kafka.ingestors
 
 import hydra.core.ingest.Ingestor
 import hydra.core.ingest.RequestParams._
+import hydra.core.monitor.HydraMetrics
 import hydra.core.protocol._
-import hydra.kafka.producer.{ KafkaProducerSupport, KafkaRecordFactories }
+import hydra.kafka.producer.{KafkaProducerSupport, KafkaRecordFactories}
+import hydra.kafka.config.KafkaReconciliationMetrics._
 
 /**
  * Sends JSON messages to a topic in Kafka.  In order for this handler to be activated.
@@ -27,14 +29,21 @@ import hydra.kafka.producer.{ KafkaProducerSupport, KafkaRecordFactories }
  *
  */
 class KafkaIngestor extends Ingestor with KafkaProducerSupport {
-
   override val recordFactory = new KafkaRecordFactories(schemaRegistryActor)
 
   //todo: Validate topic Name Topic.validate(topic)
   ingest {
     case Publish(request) =>
-      val hasTopic = request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM).isDefined
-      sender ! (if (hasTopic) Join else Ignore)
+      request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM) match {
+        case Some(topic) =>
+          HydraMetrics.incrementGauge(
+            lookupKey = reconciliationGaugeName + s"_$topic",
+            metricName = reconciliationMetricName,
+            tags = Seq("ingestor" -> "kafka", "topic" -> topic)
+          )
+          sender ! Join
+        case _ => sender ! Ignore
+      }
 
     case Ingest(record, ackStrategy) => transport(record, ackStrategy)
   }
