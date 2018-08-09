@@ -25,6 +25,7 @@ trait Transport extends PersistentActor
     case p@Produce(_, _, _) => deliver(p)
 
     case Confirm(deliveryId) =>
+      journalGauge.decrement()
       if (deliveryId > 0) persistAsync(DestinationConfirmed(deliveryId))(updateState)
 
     case TransportError(deliveryId) =>
@@ -41,7 +42,6 @@ trait Transport extends PersistentActor
     case Produce(rec, _, _) => deliver(self.path)(deliveryId => Deliver(rec, deliveryId,
       new TransportSupervisorCallback(self)))
     case DestinationConfirmed(deliveryId) =>
-      journalGauge.increment()
       confirmDelivery(deliveryId)
   }
 
@@ -54,7 +54,7 @@ trait Transport extends PersistentActor
       case Persisted =>
         val ingestor = sender
         persistAsync(p) { p =>
-          journalGauge.decrement()
+          journalGauge.increment()
           updateState(p)
           ingestor ! RecordProduced(HydraRecordMetadata(System.currentTimeMillis), p.supervisor)
         }

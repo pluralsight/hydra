@@ -39,7 +39,7 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
           HydraMetrics.incrementGauge(
             lookupKey = reconciliationGaugeName + s"_$topic",
             metricName = reconciliationMetricName,
-            tags = Seq("ingestor" -> "kafka", "topic" -> topic)
+            tags = Seq("ingestor" -> "kafka", "topic" -> topic, "ack_level" -> request.ackStrategy.toString)
           )
           sender ! Join
         case _ => sender ! Ignore
