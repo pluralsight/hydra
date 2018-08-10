@@ -2,32 +2,45 @@ package hydra.core.monitor
 
 import kamon.Kamon
 import kamon.metric.{Counter, Gauge, Histogram}
+import scalacache.guava.GuavaCache
 
-import scala.collection.mutable
+import scala.util.{Failure, Success}
 
 object HydraMetrics {
+
+  import scalacache.modes.try_._
+
   type Tags = Seq[(String, String)]
 
-  private[core] lazy val counters = new mutable.HashMap[String, Counter]()
-  private[core] lazy val gauges = new mutable.HashMap[String, Gauge]()
-  private[core] lazy val histograms = new mutable.HashMap[String, Histogram]()
+  private[core] lazy val countersCache = GuavaCache[Counter]
+  private[core] lazy val gaugesCache = GuavaCache[Gauge]
+  private[core] lazy val histogramsCache = GuavaCache[Histogram]
 
   def getOrCreateCounter(lookupKey: String, metricName: String, tags: => Tags): Counter = {
-    counters
-      .getOrElseUpdate(lookupKey,
-        Kamon.counter(metricName).refine(tags: _*))
+    countersCache.caching(lookupKey)(ttl = None) {
+      Kamon.counter(metricName).refine(tags: _*)
+    } match {
+      case Success(value) => value
+      case Failure(exception) => throw exception
+    }
   }
 
   def getOrCreateGauge(lookupKey: String, metricName: String, tags: => Tags): Gauge = {
-    gauges
-      .getOrElseUpdate(lookupKey,
-        Kamon.gauge(metricName).refine(tags: _*))
+    gaugesCache.caching(lookupKey)(ttl = None) {
+      Kamon.gauge(metricName).refine(tags: _*)
+    } match {
+      case Success(value) => value
+      case Failure(exception) => throw exception
+    }
   }
 
   def getOrCreateHistogram(lookupKey: String, metricName: String, tags: => Tags): Histogram = {
-    histograms
-      .getOrElseUpdate(lookupKey,
-        Kamon.histogram(metricName).refine(tags: _*))
+    histogramsCache.caching(lookupKey)(ttl = None) {
+      Kamon.histogram(metricName).refine(tags: _*)
+    } match {
+      case Success(value) => value
+      case Failure(exception) => throw exception
+    }
   }
 
   def incrementCounter(lookupKey: String, metricName: String, tags: => Tags): Unit = {

@@ -10,19 +10,15 @@ import hydra.core.transport.AckStrategy.{NoAck, Persisted, Replicated}
 trait Transport extends PersistentActor
   with ConfigSupport
   with AtLeastOnceDelivery {
+
   import Transport._
 
   override val persistenceId = getClass.getSimpleName
 
-  private[core] lazy val generateTags = Seq("type" -> persistenceId)
-
-  private val journalGauge = HydraMetrics.getOrCreateGauge(persistenceId, journalMetricName,
-    generateTags)
-
   def transport: Receive
 
   private final def baseCommand: Receive = {
-    case p@Produce(_, _, _) => deliver(p)
+    case p @ Produce(_, _, _) => deliver(p)
 
     case Confirm(deliveryId) =>
       if (deliveryId > 0) persistAsync(DestinationConfirmed(deliveryId))(updateState)
@@ -41,7 +37,6 @@ trait Transport extends PersistentActor
     case Produce(rec, _, _) => deliver(self.path)(deliveryId => Deliver(rec, deliveryId,
       new TransportSupervisorCallback(self)))
     case DestinationConfirmed(deliveryId) =>
-      journalGauge.increment()
       confirmDelivery(deliveryId)
   }
 
@@ -54,7 +49,6 @@ trait Transport extends PersistentActor
       case Persisted =>
         val ingestor = sender
         persistAsync(p) { p =>
-          journalGauge.decrement()
           updateState(p)
           ingestor ! RecordProduced(HydraRecordMetadata(System.currentTimeMillis), p.supervisor)
         }

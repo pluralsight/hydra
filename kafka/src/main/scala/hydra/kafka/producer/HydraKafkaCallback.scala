@@ -1,7 +1,6 @@
 package hydra.kafka.producer
 
 import akka.actor.ActorSelection
-import hydra.core.monitor.HydraMetrics
 import hydra.core.transport.TransportCallback
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
 import org.apache.kafka.clients.producer.{Callback, RecordMetadata}
