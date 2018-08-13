@@ -16,13 +16,13 @@
 
 package hydra.kafka.ingestors
 
-import hydra.core.ingest.{HydraRequest, Ingestor}
 import hydra.core.ingest.RequestParams._
+import hydra.core.ingest.{HydraRequest, Ingestor}
 import hydra.core.monitor.HydraMetrics
 import hydra.core.protocol._
 import hydra.kafka.producer.{KafkaProducerSupport, KafkaRecordFactories}
 
-import scala.util.{Success, Try}
+import scala.util.Try
 
 /**
   * Sends JSON messages to a topic in Kafka.  In order for this handler to be activated.
@@ -43,7 +43,7 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
   }
 
   override def validateRequest(request: HydraRequest): Try[HydraRequest] = {
-    val topic = request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM).get
+    val topic = request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM).getOrElse("topicMissing")
 
     HydraMetrics.incrementGauge(
       lookupKey = ReconciliationGaugeName + s"_$topic",
@@ -51,7 +51,7 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
       tags = Seq("ingestType" -> "kafka", "topic" -> topic)
     )
 
-    Success(request)
+    super.validateRequest(request)
   }
 }
 
