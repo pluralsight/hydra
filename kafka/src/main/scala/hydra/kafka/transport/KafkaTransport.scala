@@ -25,6 +25,7 @@ import com.typesafe.config.Config
 import hydra.core.monitor.HydraMetrics
 import hydra.core.transport.Transport
 import hydra.core.transport.Transport.Deliver
+import hydra.kafka.ingestors.KafkaIngestor
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata}
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
 import hydra.kafka.transport.KafkaTransport.{RecordProduceError, ReportMetrics}
@@ -58,7 +59,10 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
       withProducer(kr.formatName)(_ ! ProduceToKafka(deliveryId, kr, ack))(e => ack.onCompletion(deliveryId, None, e))
 
     case kmd: KafkaRecordMetadata =>
+      val topic = kmd.topic
+
       val resultType = "success"
+
       HydraMetrics.incrementCounter(
         kmd.topic + resultType,
         KafkaTransport.counterMetricName,
@@ -68,11 +72,19 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
           "transport" -> persistenceId
         )
       )
+
+      HydraMetrics.decrementGauge(
+        KafkaIngestor.ReconciliationGaugeName + s"_$topic",
+        KafkaIngestor.ReconciliationMetricName,
+        tags = Seq("ingestType" -> "kafka", "topic" -> topic)
+      )
+
       msgCounter.incrementAndGet()
       metrics.saveMetrics(kmd)
 
     case e: RecordProduceError =>
       val resultType = "fail"
+
       HydraMetrics.incrementCounter(
         e.record.topic + resultType,
         KafkaTransport.counterMetricName,
@@ -82,6 +94,7 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
           "transport" -> persistenceId
         )
       )
+
       context.system.eventStream.publish(e)
 
     case p: ProducerInitializationError => context.system.eventStream.publish(p)
@@ -90,7 +103,7 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
       histogram.record(msgCounter.getAndSet(0L))
   }
 
-  private def withProducer(id: String)(success: (ActorRef) => Unit)(fail: (Option[Throwable]) => Unit) = {
+  private def withProducer(id: String)(success: ActorRef => Unit)(fail: Option[Throwable] => Unit) = {
     context.child(id) match {
       case Some(producer) => success(producer)
       case None => fail(Some(new IllegalArgumentException(s"No Kafka producer named $id found.")))
@@ -115,6 +128,7 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 object KafkaTransport {
 
   private[kafka] val histogramMetricName = "hydra_ingest_records_published_total_minutes_bucket"
+
   private[kafka] val counterMetricName = "hydra_ingest_records_published_total"
 
   case class RecordProduceError(deliveryId: Long, record: KafkaRecord[_, _], error: Throwable)

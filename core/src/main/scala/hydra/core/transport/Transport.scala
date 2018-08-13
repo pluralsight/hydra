@@ -10,6 +10,7 @@ import hydra.core.transport.AckStrategy.{NoAck, Persisted, Replicated}
 trait Transport extends PersistentActor
   with ConfigSupport
   with AtLeastOnceDelivery {
+
   import Transport._
 
   override val persistenceId = getClass.getSimpleName

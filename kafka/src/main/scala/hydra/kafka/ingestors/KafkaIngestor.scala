@@ -16,21 +16,24 @@
 
 package hydra.kafka.ingestors
 
-import hydra.core.ingest.Ingestor
+import hydra.core.ingest.{HydraRequest, Ingestor}
 import hydra.core.ingest.RequestParams._
+import hydra.core.monitor.HydraMetrics
 import hydra.core.protocol._
-import hydra.kafka.producer.{ KafkaProducerSupport, KafkaRecordFactories }
+import hydra.kafka.producer.{KafkaProducerSupport, KafkaRecordFactories}
+
+import scala.util.{Success, Try}
 
 /**
- * Sends JSON messages to a topic in Kafka.  In order for this handler to be activated.
- * a request param "Hydra-kafka-topic" must be present.
- *
- */
+  * Sends JSON messages to a topic in Kafka.  In order for this handler to be activated.
+  * a request param "Hydra-kafka-topic" must be present.
+  *
+  */
 class KafkaIngestor extends Ingestor with KafkaProducerSupport {
+  import KafkaIngestor._
 
   override val recordFactory = new KafkaRecordFactories(schemaRegistryActor)
 
-  //todo: Validate topic Name Topic.validate(topic)
   ingest {
     case Publish(request) =>
       val hasTopic = request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM).isDefined
@@ -38,4 +41,21 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
 
     case Ingest(record, ackStrategy) => transport(record, ackStrategy)
   }
+
+  override def validateRequest(request: HydraRequest): Try[HydraRequest] = {
+    val topic = request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM).get
+
+    HydraMetrics.incrementGauge(
+      lookupKey = ReconciliationGaugeName + s"_$topic",
+      metricName = ReconciliationMetricName,
+      tags = Seq("ingestType" -> "kafka", "topic" -> topic)
+    )
+
+    Success(request)
+  }
+}
+
+object KafkaIngestor {
+  val ReconciliationGaugeName = "hydra_ingest_kafka_reconciliation"
+  val ReconciliationMetricName = "ingest_kafka_reconciliation"
 }
