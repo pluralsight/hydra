@@ -21,8 +21,7 @@ import akka.testkit.TestActors.ForwardActor
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import hydra.core.ingest.HydraRequest
 import hydra.core.protocol._
-import hydra.core.transport.AckStrategy.NoAck
-import hydra.core.transport.HydraRecord
+import hydra.core.transport.{AckStrategy, HydraRecord}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
@@ -60,10 +59,10 @@ class RabbitIngestorSpec extends TestKit(ActorSystem("rabbit-ingestor-spec")) wi
     }
 
     it("transports") {
-      ingestor ! Ingest(TestRecord("test", "test", None), NoAck)
-      probe.expectMsg(Produce(TestRecord("test", "test", None), self, NoAck))
+      ingestor ! Ingest(TestRecord("test", "test", None, AckStrategy.NoAck), AckStrategy.NoAck)
+      probe.expectMsg(Produce(TestRecord("test", "test", None, AckStrategy.NoAck), self, AckStrategy.NoAck))
     }
   }
 }
 
-case class TestRecord(destination: String, payload: String, key: Option[String]) extends HydraRecord[String, String]
+case class TestRecord(destination: String, payload: String, key: Option[String], ackStrategy: AckStrategy) extends HydraRecord[String, String]

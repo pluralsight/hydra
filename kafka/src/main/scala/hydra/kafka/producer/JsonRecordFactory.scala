@@ -29,11 +29,10 @@ object JsonRecordFactory extends KafkaRecordFactory[String, JsonNode] {
 
   override def build(request: HydraRequest)
                     (implicit ec: ExecutionContext): Future[KafkaRecord[String, JsonNode]] = {
-    //TODO: Strict validation with a json schema
     for {
       topic <- Future.fromTry(getTopic(request))
       payload <- parseJson(request.payload)
-    } yield JsonRecord(topic, getKey(request, payload), payload)
+    } yield JsonRecord(topic, getKey(request, payload), payload, request.ackStrategy)
 
   }
 

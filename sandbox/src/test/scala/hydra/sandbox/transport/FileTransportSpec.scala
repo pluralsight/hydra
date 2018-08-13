@@ -7,7 +7,7 @@ import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import hydra.core.protocol.{RecordNotProduced, RecordProduced}
 import hydra.core.transport.Transport.Deliver
-import hydra.core.transport.{HydraRecord, RecordMetadata, TransportCallback}
+import hydra.core.transport.{AckStrategy, HydraRecord, RecordMetadata, TransportCallback}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.{Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
@@ -43,13 +43,13 @@ class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with 
 
   describe("The FileTransport") {
     it("saves to a file") {
-      transport ! Deliver(FileRecord("test", "test-payload"))
+      transport ! Deliver(FileRecord("test", "test-payload", AckStrategy.NoAck))
       eventually(Source.fromFile(files("hydra.transports.file.destinations.test"))
         .getLines().toSeq should contain("test-payload"))
     }
 
     it("reports record not produced") {
-      val fr = FileRecord("???", "test-payload1")
+      val fr = FileRecord("???", "test-payload1", AckStrategy.NoAck)
       transport.tell(Deliver(fr, 1, callback(fr)), ingestor.ref)
 
       ingestor.expectMsgPF(20.seconds) {
@@ -62,7 +62,7 @@ class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with 
     }
 
     it("saves to a file and acks the ingestor") {
-      val fr = FileRecord("test", "test-payload1")
+      val fr = FileRecord("test", "test-payload1", AckStrategy.NoAck)
       transport.tell(Deliver(fr, 1, callback(fr)), ingestor.ref)
 
       ingestor.expectMsgPF(20.seconds) {

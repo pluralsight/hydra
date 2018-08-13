@@ -23,6 +23,7 @@ import hydra.core.akka.SchemaRegistryActor.{FetchSchemaRequest, FetchSchemaRespo
 import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_FORMAT_PARAM, HYDRA_SCHEMA_PARAM}
 import hydra.core.ingest.{HydraRequest, RequestParams}
 import hydra.core.protocol.InvalidRequest
+import hydra.core.transport.AckStrategy
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecordBuilder
 import org.scalatest.concurrent.ScalaFutures
@@ -67,7 +68,7 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
       val record = factories.build(request)
       val genericRecord = new GenericRecordBuilder(avroSchema).set("name", "test").set("rank", 10).build()
 
-      whenReady(record)(_ shouldBe AvroRecord("test-topic", avroSchema, None, genericRecord))
+      whenReady(record)(_ shouldBe AvroRecord("test-topic", avroSchema, None, genericRecord, AckStrategy.NoAck))
     }
 
     it("handles delete records") {
@@ -76,7 +77,7 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
           HYDRA_KAFKA_TOPIC_PARAM -> "test-topic",
           RequestParams.HYDRA_RECORD_KEY_PARAM -> "123")
       val record = factories.build(request)
-      whenReady(record)(_ shouldBe DeleteTombstoneRecord("test-topic", Some("123")))
+      whenReady(record)(_ shouldBe DeleteTombstoneRecord("test-topic", Some("123"), AckStrategy.NoAck))
     }
 
     it("handles json") {
@@ -87,7 +88,7 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = factories.build(request)
       whenReady(record)(_ shouldBe JsonRecord("test-topic", None,
-        new ObjectMapper().reader().readTree(json)))
+        new ObjectMapper().reader().readTree(json), AckStrategy.NoAck))
     }
 
     it("handles strings") {
@@ -97,7 +98,7 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "string")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = factories.build(request)
-      whenReady(record)(_ shouldBe StringRecord("test-topic", None, json))
+      whenReady(record)(_ shouldBe StringRecord("test-topic", None, json, AckStrategy.NoAck))
     }
 
     it("validates json records") {

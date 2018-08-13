@@ -5,7 +5,7 @@ import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import hydra.common.config.ConfigSupport
 import hydra.core.protocol.{RecordNotProduced, RecordProduced}
 import hydra.core.transport
-import hydra.core.transport.{HydraRecord, NoCallback, TransportCallback}
+import hydra.core.transport.{AckStrategy, HydraRecord, NoCallback, TransportCallback}
 import hydra.kafka.producer.{JsonRecord, KafkaRecordMetadata, StringRecord}
 import hydra.kafka.transport.KafkaProducerProxy.ProduceToKafka
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
@@ -65,7 +65,7 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("KafkaProducerProxySpec
 
   describe("When Producing messages") {
     it("produces without acking") {
-      val record = StringRecord("kafka_producer_spec", Some("key"), "payload")
+      val record = StringRecord("kafka_producer_spec", Some("key"), "payload", AckStrategy.NoAck)
       kafkaProducer ! ProduceToKafka(10, record, NoCallback)
       parent.expectMsgPF(10.seconds) {
         case KafkaRecordMetadata(offset, ts, "kafka_producer_spec", part, deliveryId) =>
@@ -77,7 +77,7 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("KafkaProducerProxySpec
     }
 
     it("acks") {
-      val record = StringRecord("kafka_producer_spec", Some("key"), "payload")
+      val record = StringRecord("kafka_producer_spec", Some("key"), "payload", AckStrategy.NoAck)
       kafkaProducer ! ProduceToKafka(123, record, callback(record))
       parent.expectMsgPF(15.seconds) {
         case md: KafkaRecordMetadata =>
@@ -94,7 +94,7 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("KafkaProducerProxySpec
     }
 
     it("acks the produce error") {
-      val record = StringRecord(null, Some("key"), "test-error-payload")
+      val record = StringRecord(null, Some("key"), "test-error-payload", AckStrategy.NoAck)
       kafkaProducer ! ProduceToKafka(123, record, callback(record))
       parent.expectMsgPF() {
         case err: RecordProduceError =>
@@ -118,7 +118,8 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("KafkaProducerProxySpec
     }
 
     it("sends the error back to the parent") {
-      val record = StringRecord("kafka_producer_spec", Some("key"), "payload")
+      val record = StringRecord("kafka_producer_spec", Some("key"), "payload",
+        AckStrategy.NoAck)
       val err = new IllegalArgumentException("ERROR")
       kafkaProducer ! RecordProduceError(123, record, err)
       parent.expectMsg(RecordProduceError(123, record, err))
@@ -128,7 +129,8 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("KafkaProducerProxySpec
       val probe = TestProbe()
       val act = probe.childActorOf(KafkaProducerProxy.props("tester",
         KafkaUtils.producerSettings("tester", rootConfig)))
-      val record = JsonRecord("kafka_producer_spec", Some("key"), """{"name":"alex"}""")
+      val record = JsonRecord("kafka_producer_spec", Some("key"), """{"name":"alex"}""",
+        AckStrategy.NoAck)
       act ! ProduceToKafka(0, record, callback(record))
       probe.expectMsgPF(10.seconds) {
         case RecordProduceError(0, rec, ex) =>

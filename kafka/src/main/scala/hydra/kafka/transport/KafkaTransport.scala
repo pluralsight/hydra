@@ -59,26 +59,6 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
       withProducer(kr.formatName)(_ ! ProduceToKafka(deliveryId, kr, ack))(e => ack.onCompletion(deliveryId, None, e))
 
     case kmd: KafkaRecordMetadata =>
-      val topic = kmd.topic
-
-      val resultType = "success"
-
-      HydraMetrics.incrementCounter(
-        kmd.topic + resultType,
-        KafkaTransport.counterMetricName,
-        Seq(
-          "destination" -> kmd.topic,
-          "type" -> resultType,
-          "transport" -> persistenceId
-        )
-      )
-
-      HydraMetrics.decrementGauge(
-        KafkaIngestor.ReconciliationGaugeName + s"_$topic",
-        KafkaIngestor.ReconciliationMetricName,
-        tags = Seq("ingestType" -> "kafka", "topic" -> topic)
-      )
-
       msgCounter.incrementAndGet()
       metrics.saveMetrics(kmd)
 

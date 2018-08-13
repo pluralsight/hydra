@@ -43,14 +43,14 @@ class TransportSpec extends TestKit(ActorSystem("TransportSupervisorSpec"))
   describe("The Transport trait") {
 
     it("handles NoAck produces") {
-      val rec = TestRecord("OK", Some("1"), "test")
+      val rec = TestRecord("OK", Some("1"), "test", AckStrategy.NoAck)
       transport ! Produce(rec, supervisor.ref, NoAck)
       expectMsg(RecordAccepted(supervisor.ref))
       transportProbe.expectMsg(Deliver(rec, -1, NoCallback))
     }
 
     it("handles LocalAck produces") {
-      val rec = TestRecord("OK", Some("1"), "test")
+      val rec = TestRecord("OK", Some("1"), "test", AckStrategy.NoAck)
       transport ! Produce(rec, supervisor.ref, Persisted)
       transportProbe.expectMsgPF() {
         case Deliver(r, id, ack) =>
@@ -69,7 +69,7 @@ class TransportSpec extends TestKit(ActorSystem("TransportSupervisorSpec"))
     }
 
     it("handles TransportAck produces") {
-      val rec = TestRecord("OK", Some("1"), "test")
+      val rec = TestRecord("OK", Some("1"), "test", AckStrategy.NoAck)
       transport ! Produce(rec, supervisor.ref, Replicated)
       transportProbe.expectMsgPF() {
         case Deliver(r, deliveryId, callback) =>

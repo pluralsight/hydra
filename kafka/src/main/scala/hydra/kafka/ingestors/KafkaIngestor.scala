@@ -16,13 +16,10 @@
 
 package hydra.kafka.ingestors
 
+import hydra.core.ingest.Ingestor
 import hydra.core.ingest.RequestParams._
-import hydra.core.ingest.{HydraRequest, Ingestor}
-import hydra.core.monitor.HydraMetrics
 import hydra.core.protocol._
 import hydra.kafka.producer.{KafkaProducerSupport, KafkaRecordFactories}
-
-import scala.util.Try
 
 /**
   * Sends JSON messages to a topic in Kafka.  In order for this handler to be activated.
@@ -30,7 +27,6 @@ import scala.util.Try
   *
   */
 class KafkaIngestor extends Ingestor with KafkaProducerSupport {
-  import KafkaIngestor._
 
   override val recordFactory = new KafkaRecordFactories(schemaRegistryActor)
 
@@ -41,21 +37,4 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
 
     case Ingest(record, ackStrategy) => transport(record, ackStrategy)
   }
-
-  override def validateRequest(request: HydraRequest): Try[HydraRequest] = {
-    val topic = request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM).getOrElse("topicMissing")
-
-    HydraMetrics.incrementGauge(
-      lookupKey = ReconciliationGaugeName + s"_$topic",
-      metricName = ReconciliationMetricName,
-      tags = Seq("ingestType" -> "kafka", "topic" -> topic)
-    )
-
-    super.validateRequest(request)
-  }
-}
-
-object KafkaIngestor {
-  val ReconciliationGaugeName = "hydra_ingest_kafka_reconciliation"
-  val ReconciliationMetricName = "ingest_kafka_reconciliation"
 }

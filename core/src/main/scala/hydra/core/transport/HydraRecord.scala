@@ -15,4 +15,6 @@ trait HydraRecord[+K, +P] {
   def key: Option[K]
 
   def payload: P
+
+  def ackStrategy: AckStrategy
 }

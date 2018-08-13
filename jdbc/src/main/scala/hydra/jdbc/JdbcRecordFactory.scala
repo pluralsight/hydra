@@ -12,7 +12,7 @@ import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_SCHEMA_PARAM
 import hydra.core.protocol.MissingMetadataException
 import hydra.core.transport.ValidationStrategy.Strict
-import hydra.core.transport.{HydraRecord, RecordFactory, RecordMetadata}
+import hydra.core.transport.{AckStrategy, HydraRecord, RecordFactory, RecordMetadata}
 import hydra.jdbc.JdbcRecordFactory.{DB_PROFILE_PARAM, TABLE_PARAM}
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
@@ -24,7 +24,6 @@ import scala.util.{Failure, Success, Try}
 class JdbcRecordFactory(schemaResourceLoader: ActorRef) extends RecordFactory[Seq[String], GenericRecord]
   with ConfigSupport {
 
-  //todo: config-driven
   private implicit val timeout = util.Timeout(3.seconds)
 
   override def build(request: HydraRequest)(implicit ec: ExecutionContext): Future[JdbcRecord] = {
@@ -32,7 +31,7 @@ class JdbcRecordFactory(schemaResourceLoader: ActorRef) extends RecordFactory[Se
       subject <- Future.fromTry(JdbcRecordFactory.getSchemaName(request))
       schema <- (schemaResourceLoader ? FetchSchemaRequest(subject)).mapTo[FetchSchemaResponse].map(_.schemaResource)
       avro <- convert(schema, request)
-      record <- buildRecord(request, avro, schema.schema)
+      record <- buildRecord(request, avro, schema.schema, request.ackStrategy)
     } yield record
 
   }
@@ -45,7 +44,8 @@ class JdbcRecordFactory(schemaResourceLoader: ActorRef) extends RecordFactory[Se
       .recover { case ex => throw AvroUtils.improveException(ex, schemaResource) }
   }
 
-  private def buildRecord(request: HydraRequest, record: GenericRecord, schema: Schema)(implicit ec: ExecutionContext): Future[JdbcRecord] = {
+  private def buildRecord(request: HydraRequest, record: GenericRecord, schema: Schema, ackStrategy: AckStrategy)
+                         (implicit ec: ExecutionContext): Future[JdbcRecord] = {
     Future {
       val table = request.metadataValue(TABLE_PARAM).getOrElse(schema.getName)
 
@@ -54,7 +54,7 @@ class JdbcRecordFactory(schemaResourceLoader: ActorRef) extends RecordFactory[Se
           DB_PROFILE_PARAM,
           s"A db profile name is required ${DB_PROFILE_PARAM}]."))
 
-      JdbcRecord(table, Some(JdbcRecordFactory.pk(request, schema)), record, dbProfile)
+      JdbcRecord(table, Some(JdbcRecordFactory.pk(request, schema)), record, dbProfile, ackStrategy)
     }
   }
 }
@@ -81,14 +81,8 @@ object JdbcRecordFactory {
   }
 }
 
-/**
-  *
-  * @param destination The Table name
-  * @param key         The name of the primary key for the table (optional)
-  * @param payload     The avro record representing a row in the table.
-  */
-case class JdbcRecord(destination: String,
-                      key: Option[Seq[String]], payload: GenericRecord, dbProfile: String)
+case class JdbcRecord(destination: String, key: Option[Seq[String]], payload: GenericRecord,
+                      dbProfile: String, ackStrategy: AckStrategy)
   extends HydraRecord[Seq[String], GenericRecord] {
   lazy val primaryKeys = key.getOrElse(Seq.empty)
   lazy val keyValues: Map[String, AnyRef] = primaryKeys.map(k => k -> payload.get(k)).toMap

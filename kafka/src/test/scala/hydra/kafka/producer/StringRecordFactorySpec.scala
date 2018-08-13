@@ -18,6 +18,7 @@ package hydra.kafka.producer
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_KEY_PARAM}
 import hydra.core.protocol.MissingMetadataException
+import hydra.core.transport.AckStrategy
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FunSpecLike, Matchers}
 
@@ -40,7 +41,7 @@ class StringRecordFactorySpec extends Matchers
     it("handles valid strings") {
       val request = HydraRequest("123","""{"name":"test"}""").withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test")
       val rec = StringRecordFactory.build(request)
-      whenReady(rec)(_ shouldBe StringRecord("test", None,"""{"name":"test"}"""))
+      whenReady(rec)(_ shouldBe StringRecord("test", None,"""{"name":"test"}""", AckStrategy.NoAck))
     }
 
     it("builds") {

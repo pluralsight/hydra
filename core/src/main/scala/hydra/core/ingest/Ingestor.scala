@@ -2,9 +2,12 @@ package hydra.core.ingest
 
 import akka.actor.{Actor, OneForOneStrategy, SupervisorStrategy}
 import akka.pattern.pipe
+import hydra.common.util.ActorUtils
 import hydra.core.akka.InitializingActor
+import hydra.core.monitor.HydraMetrics
 import hydra.core.protocol._
 import hydra.core.transport.RecordFactory
+import org.apache.commons.lang3.ClassUtils
 
 import scala.concurrent.Future
 import scala.util.{Success, Try}
@@ -15,7 +18,11 @@ import scala.util.{Success, Try}
 
 trait Ingestor extends InitializingActor {
 
+  import Ingestor._
+
   private implicit val ec = context.dispatcher
+
+  val ingestorName = ActorUtils.actorName(self)
 
   def recordFactory: RecordFactory[_, _]
 
@@ -47,11 +54,25 @@ trait Ingestor extends InitializingActor {
 
   final def doValidate(request: HydraRequest): Future[MessageValidationResult] = {
     Future.fromTry(validateRequest(request))
-      .flatMap[MessageValidationResult](r => recordFactory.build(r).map(ValidRequest(_)))
-      .recover { case e => InvalidRequest(e) }
+      .flatMap[MessageValidationResult] { r =>
+      recordFactory.build(r).map { r =>
+
+        val destination = r.destination
+
+        val ackStrategy = r.ackStrategy.toString
+
+        val recordType = ClassUtils.getSimpleName(r.getClass)
+
+        HydraMetrics.incrementGauge(
+          lookupKey = ReconciliationGaugeName + s"_$destination",
+          metricName = ReconciliationMetricName,
+          tags = Seq("recordType" -> recordType, "destination" -> destination,
+            "ackStrategy" -> ackStrategy)
+        )
+        ValidRequest(r)
+      }
+    }.recover { case e => InvalidRequest(e) }
   }
-
-
 
   override def initializationError(ex: Throwable): Receive = {
     case Publish(req) =>
@@ -64,4 +85,9 @@ trait Ingestor extends InitializingActor {
   def ingest(next: Actor.Receive) = compose(next)
 
   override val supervisorStrategy = OneForOneStrategy() { case _ => SupervisorStrategy.Restart }
+}
+
+object Ingestor {
+  val ReconciliationGaugeName = "hydra_ingest_reconciliation"
+  val ReconciliationMetricName = "ingest_reconciliation"
 }

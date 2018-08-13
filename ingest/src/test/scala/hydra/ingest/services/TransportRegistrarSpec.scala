@@ -4,7 +4,7 @@ import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
-import hydra.core.transport.Transport
+import hydra.core.transport.{AckStrategy, Transport}
 import hydra.core.transport.Transport.Deliver
 import hydra.ingest.services.TransportRegistrar._
 import hydra.ingest.test.TestRecord
@@ -26,14 +26,14 @@ class TransportRegistrarSpec extends TestKit(ActorSystem("test")) with Matchers
     }
     it("registers a transport using its companion object") {
       val transports = bootstrap(Map("transport_test1" -> classOf[TransportTest]), system, applicationConfig)
-      transports(0).get ! Deliver(TestRecord("transport_test", Some("key"), """{"name":"alex"}"""))
+      transports(0).get ! Deliver(TestRecord("transport_test", Some("key"), """{"name":"alex"}""", AckStrategy.NoAck))
       expectMsg("HELLO!") //defined in reference.conf
     }
 
     it("registers a transport without a companion object") {
       val transports = bootstrap(Map("transport_test2" -> classOf[CompanionLessTransportTest]), system,
         applicationConfig)
-      transports(0).get ! Deliver(TestRecord("transport_test", Some("key"), """{"name":"alex"}"""))
+      transports(0).get ! Deliver(TestRecord("transport_test", Some("key"), """{"name":"alex"}""", AckStrategy.NoAck))
       expectMsg("HI!")
     }
 

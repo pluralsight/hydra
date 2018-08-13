@@ -36,7 +36,6 @@ import scala.concurrent.{ExecutionContext, Future}
 class AvroRecordFactory(schemaResourceLoader: ActorRef)
   extends KafkaRecordFactory[String, GenericRecord] with ConfigSupport {
 
-  //todo: config-driven
   private implicit val timeout = util.Timeout(3.seconds)
 
   override def build(request: HydraRequest)(implicit ec: ExecutionContext): Future[AvroRecord] = {
@@ -44,7 +43,8 @@ class AvroRecordFactory(schemaResourceLoader: ActorRef)
       (topic, subject) <- Future.fromTry(getTopicAndSchemaSubject(request))
       schemaResource <- (schemaResourceLoader ? FetchSchemaRequest(subject)).mapTo[FetchSchemaResponse].map(_.schemaResource)
       record <- convert(schemaResource, request)
-    } yield AvroRecord(topic, schemaResource.schema, getKey(request, record), record)
+    } yield AvroRecord(topic, schemaResource.schema, getKey(request, record), record,
+      request.ackStrategy)
   }
 
   private def convert(schemaResource: SchemaResource, request: HydraRequest)(implicit ec: ExecutionContext): Future[GenericRecord] = {
