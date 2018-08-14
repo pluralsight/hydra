@@ -25,7 +25,6 @@ import com.typesafe.config.Config
 import hydra.core.monitor.HydraMetrics
 import hydra.core.transport.Transport
 import hydra.core.transport.Transport.Deliver
-import hydra.kafka.ingestors.KafkaIngestor
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata}
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
 import hydra.kafka.transport.KafkaTransport.{RecordProduceError, ReportMetrics}

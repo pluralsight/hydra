@@ -2,9 +2,11 @@ package hydra.core.transport
 
 import akka.persistence.{AtLeastOnceDelivery, PersistentActor}
 import hydra.common.config.ConfigSupport
+import hydra.core.ingest.Ingestor
 import hydra.core.monitor.HydraMetrics
 import hydra.core.protocol.{HydraMessage, Produce, RecordAccepted, RecordProduced}
 import hydra.core.transport.AckStrategy.{NoAck, Persisted, Replicated}
+import org.apache.commons.lang3.ClassUtils
 
 
 trait Transport extends PersistentActor
@@ -36,6 +38,7 @@ trait Transport extends PersistentActor
   protected def updateState(evt: HydraMessage): Unit = evt match {
     case Produce(rec, _, _) => deliver(self.path)(deliveryId => Deliver(rec, deliveryId,
       new TransportSupervisorCallback(self)))
+
     case DestinationConfirmed(deliveryId) =>
       confirmDelivery(deliveryId)
   }
@@ -43,6 +46,7 @@ trait Transport extends PersistentActor
   private def deliver(p: Produce[Any, Any]): Unit = {
     p.ack match {
       case NoAck =>
+        decrementTransportGauge(p.record)
         sender ! RecordAccepted(p.supervisor)
         self ! Deliver(p.record)
 
@@ -50,20 +54,19 @@ trait Transport extends PersistentActor
         val ingestor = sender
         persistAsync(p) { p =>
           updateState(p)
-          ingestor ! RecordProduced(HydraRecordMetadata(System.currentTimeMillis), p.supervisor)
+          ingestor ! RecordProduced(HydraRecordMetadata(System.currentTimeMillis, p.record),
+            p.supervisor)
         }
 
       case Replicated =>
         val ingestor = sender
-        self ! Deliver(p.record, -1, new IngestorCallback[Any, Any](p.record, ingestor, p.supervisor, self))
+        self ! Deliver(p.record, -1, new IngestorCallback[Any, Any](p.record, ingestor,
+          p.supervisor, self))
     }
   }
-
 }
 
 object Transport {
-
-  val journalMetricName = "hydra_ingest_journal_message_count"
 
   trait TransportMessage extends HydraMessage
 
@@ -77,4 +80,18 @@ object Transport {
                            deliveryId: Long = -1,
                            callback: TransportCallback = NoCallback) extends TransportMessage
 
+  def decrementTransportGauge[K, V](record: HydraRecord[K, V]): Unit = {
+    val destination = record.destination
+
+    val ackStrategy = record.ackStrategy.toString
+
+    val recordType = ClassUtils.getSimpleName(record.getClass)
+
+    HydraMetrics.decrementGauge(
+      lookupKey = Ingestor.ReconciliationGaugeName + s"_${destination}_$ackStrategy",
+      metricName = Ingestor.ReconciliationMetricName,
+      tags = Seq("recordType" -> recordType, "destination" -> destination,
+        "ackStrategy" -> ackStrategy)
+    )
+  }
 }
