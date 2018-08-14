@@ -9,14 +9,14 @@ import hydra.core.transport.Transport.{Confirm, TransportError}
   *
   * This callback will generally execute in a separate Akka thread so it should be fast.
   */
-trait TransportCallback[K, V] {
+trait TransportCallback {
 
   /**
     * Will be called when the transport has finished producing the record.
     *
     * Exactly one of the optional arguments will be a `Some`.
     */
-  def onCompletion(deliveryId: Long, md: Option[RecordMetadata[K, V]], exception: Option[Throwable]): Unit
+  def onCompletion(deliveryId: Long, md: Option[RecordMetadata], exception: Option[Throwable]): Unit
 }
 
 class IngestorCallback[K, V](record: HydraRecord[K, V], ingestor: ActorRef, supervisor: ActorRef, transport: ActorRef)
@@ -31,7 +31,6 @@ class IngestorCallback[K, V](record: HydraRecord[K, V], ingestor: ActorRef, supe
   }
 
   private def onSuccess(deliveryId: Long, md: RecordMetadata) = {
-    Transport.decrementTransportGauge(record) // here or in onCompletion?
     ingestor ! RecordProduced(md, supervisor)
     transport ! Confirm(deliveryId)
   }

@@ -54,8 +54,7 @@ trait Transport extends PersistentActor
         val ingestor = sender
         persistAsync(p) { p =>
           updateState(p)
-          ingestor ! RecordProduced(HydraRecordMetadata(System.currentTimeMillis, p.record),
-            p.supervisor)
+          ingestor ! RecordProduced(HydraRecordMetadata(System.currentTimeMillis), p.supervisor)
         }
 
       case Replicated =>

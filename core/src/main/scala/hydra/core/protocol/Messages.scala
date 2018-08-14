@@ -4,7 +4,7 @@ import akka.actor.ActorRef
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.HydraRequest
-import hydra.core.transport.{AckStrategy, HydraRecord, RecordMetadata}
+import hydra.core.transport.{AckStrategy, HydraRecord, HydraRecordMetadata, RecordMetadata}
 import org.joda.time.DateTime
 
 import scala.concurrent.duration.FiniteDuration
@@ -118,7 +118,7 @@ case class RecordAccepted(supervisor: ActorRef) extends HydraMessage
   * @param supervisor The ingestor should send this message to its supervisor if present.
   *                   This reference is here because most times the record is produced asynchronously.
   */
-case class RecordProduced[K, V](md: RecordMetadata[K, V], supervisor: ActorRef) extends HydraMessage
+case class RecordProduced(md: RecordMetadata, supervisor: ActorRef) extends HydraMessage
 
 case class RecordNotProduced[K, V](record: HydraRecord[K, V], error: Throwable,
                                    supervisor: ActorRef) extends HydraMessage

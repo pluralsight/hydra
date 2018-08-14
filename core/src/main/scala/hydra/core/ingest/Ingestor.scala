@@ -32,7 +32,7 @@ trait Ingestor extends InitializingActor {
       doValidate(request) pipeTo sender
 
     case RecordProduced(md, sup) =>
-      Transport.decrementTransportGauge(md.record)
+//      Transport.decrementTransportGauge(md.record)
       sup ! IngestorCompleted
 
     case RecordAccepted(sup) =>
