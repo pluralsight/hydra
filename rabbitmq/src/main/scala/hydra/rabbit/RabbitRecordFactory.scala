@@ -59,4 +59,5 @@ object RabbitRecord {
 
 }
 
-case class RabbitRecordMetadata(timestamp: Long, id: Long, destination: String, destinationType: String) extends RecordMetadata
+case class RabbitRecordMetadata(timestamp: Long, id: Long, destination: String,
+                                destinationType: String, ackStrategy: AckStrategy) extends RecordMetadata

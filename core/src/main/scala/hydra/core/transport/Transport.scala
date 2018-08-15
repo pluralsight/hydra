@@ -2,11 +2,8 @@ package hydra.core.transport
 
 import akka.persistence.{AtLeastOnceDelivery, PersistentActor}
 import hydra.common.config.ConfigSupport
-import hydra.core.ingest.Ingestor
-import hydra.core.monitor.HydraMetrics
 import hydra.core.protocol.{HydraMessage, Produce, RecordAccepted, RecordProduced}
 import hydra.core.transport.AckStrategy.{NoAck, Persisted, Replicated}
-import org.apache.commons.lang3.ClassUtils
 
 
 trait Transport extends PersistentActor
@@ -46,15 +43,19 @@ trait Transport extends PersistentActor
   private def deliver(p: Produce[Any, Any]): Unit = {
     p.ack match {
       case NoAck =>
-        decrementTransportGauge(p.record)
-        sender ! RecordAccepted(p.supervisor)
+        sender ! RecordAccepted(p.supervisor, p.record.destination)
         self ! Deliver(p.record)
 
       case Persisted =>
+        val destination = p.record.destination
+
+        val ackStrategy = p.ack
+
         val ingestor = sender
         persistAsync(p) { p =>
           updateState(p)
-          ingestor ! RecordProduced(HydraRecordMetadata(System.currentTimeMillis), p.supervisor)
+          ingestor ! RecordProduced(HydraRecordMetadata(System.currentTimeMillis, destination,
+            ackStrategy), p.supervisor)
         }
 
       case Replicated =>
@@ -79,18 +80,4 @@ object Transport {
                            deliveryId: Long = -1,
                            callback: TransportCallback = NoCallback) extends TransportMessage
 
-  def decrementTransportGauge[K, V](record: HydraRecord[K, V]): Unit = {
-    val destination = record.destination
-
-    val ackStrategy = record.ackStrategy.toString
-
-    val recordType = ClassUtils.getSimpleName(record.getClass)
-
-    HydraMetrics.decrementGauge(
-      lookupKey = Ingestor.ReconciliationGaugeName + s"_${destination}_$ackStrategy",
-      metricName = Ingestor.ReconciliationMetricName,
-      tags = Seq("recordType" -> recordType, "destination" -> destination,
-        "ackStrategy" -> ackStrategy)
-    )
-  }
 }

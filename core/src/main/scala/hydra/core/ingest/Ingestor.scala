@@ -5,7 +5,7 @@ import akka.pattern.pipe
 import hydra.core.akka.InitializingActor
 import hydra.core.monitor.HydraMetrics
 import hydra.core.protocol._
-import hydra.core.transport.{RecordFactory, Transport}
+import hydra.core.transport.{HydraRecord, RecordFactory, Transport}
 import org.apache.commons.lang3.ClassUtils
 
 import scala.concurrent.Future
@@ -18,6 +18,8 @@ import scala.util.{Success, Try}
 trait Ingestor extends InitializingActor {
 
   import Ingestor._
+
+  def name: String = ClassUtils.getSimpleName(this.getClass)
 
   private implicit val ec = context.dispatcher
 
@@ -32,10 +34,11 @@ trait Ingestor extends InitializingActor {
       doValidate(request) pipeTo sender
 
     case RecordProduced(md, sup) =>
-//      Transport.decrementTransportGauge(md.record)
+      decrementGaugeOnReceipt(md.destination, md.ackStrategy.toString)
       sup ! IngestorCompleted
 
-    case RecordAccepted(sup) =>
+    case RecordAccepted(sup, destination) =>
+      decrementGaugeOnReceipt(destination, "noack")
       sup ! IngestorCompleted
 
     case RecordNotProduced(rec, error, supervisor) =>
@@ -59,13 +62,10 @@ trait Ingestor extends InitializingActor {
 
         val ackStrategy = r.ackStrategy.toString
 
-        val recordType = ClassUtils.getSimpleName(r.getClass)
-
         HydraMetrics.incrementGauge(
           lookupKey = ReconciliationGaugeName + s"_${destination}_$ackStrategy",
           metricName = ReconciliationMetricName,
-          tags = Seq("recordType" -> recordType, "destination" -> destination,
-            "ackStrategy" -> ackStrategy)
+          tags = Seq("destination" -> destination, "ackStrategy" -> ackStrategy, "ingestor" -> name)
         )
 
         ValidRequest(r)
@@ -84,6 +84,17 @@ trait Ingestor extends InitializingActor {
   def ingest(next: Actor.Receive) = compose(next)
 
   override val supervisorStrategy = OneForOneStrategy() { case _ => SupervisorStrategy.Restart }
+
+  def decrementGaugeOnReceipt(destination: String, ackStrategy: String): Future[Unit] = {
+    Future {
+      HydraMetrics.decrementGauge(
+        lookupKey = Ingestor.ReconciliationGaugeName + s"_${destination}_$ackStrategy",
+        metricName = Ingestor.ReconciliationMetricName,
+        tags = Seq("ingestor" -> name, "destination" -> destination,
+          "ackStrategy" -> ackStrategy)
+      )
+    }
+  }
 }
 
 object Ingestor {

@@ -68,7 +68,7 @@ class FileTransportSpec extends TestKit(ActorSystem("hydra-sandbox-test")) with 
       ingestor.expectMsgPF(20.seconds) {
         case RecordProduced(fmd, sup) =>
           fmd shouldBe a[FileRecordMetadata]
-          fmd.asInstanceOf[FileRecordMetadata].path shouldBe files("hydra.transports.file.destinations.test").getAbsolutePath
+          fmd.asInstanceOf[FileRecordMetadata].destination shouldBe files("hydra.transports.file.destinations.test").getAbsolutePath
           sup shouldBe supervisor
       }
 

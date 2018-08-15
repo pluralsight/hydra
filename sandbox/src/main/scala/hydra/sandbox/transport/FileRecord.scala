@@ -12,5 +12,5 @@ case class FileRecord(destination: String, payload: String, ackStrategy: AckStra
 }
 
 
-case class FileRecordMetadata(path: String, deliveryId: Long = 0L, timestamp: Long = System.currentTimeMillis)
+case class FileRecordMetadata(destination: String, deliveryId: Long = 0L, timestamp: Long = System.currentTimeMillis, ackStrategy: AckStrategy)
   extends RecordMetadata

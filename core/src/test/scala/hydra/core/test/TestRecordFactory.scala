@@ -25,7 +25,8 @@ case class TestRecord(destination: String,
                       ackStrategy: AckStrategy) extends HydraRecord[String, String]
 
 
-case class TestRecordMetadata(deliveryId: Long, timestamp: Long = System.currentTimeMillis) extends RecordMetadata
+case class TestRecordMetadata(deliveryId: Long, timestamp: Long = System.currentTimeMillis,
+                              destination: String, ackStrategy: AckStrategy) extends RecordMetadata
 
 case class TimeoutRecord(destination: String,
                          key: Option[String],

@@ -47,7 +47,7 @@ class HydraKafkaCallbackSpec extends TestKit(ActorSystem("hydra")) with Matchers
       val e = new HydraKafkaCallback(112, record, ActorSelection(probe.ref, Seq.empty), callback(record))
       val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1L: java.lang.Long, 1, 1)
       e.onCompletion(md, null)
-      probe.expectMsg(KafkaRecordMetadata(md, 112))
+      probe.expectMsg(KafkaRecordMetadata(md, 112, AckStrategy.NoAck))
       transport.expectMsg(Confirm(112))
     }
 
@@ -67,8 +67,8 @@ class HydraKafkaCallbackSpec extends TestKit(ActorSystem("hydra")) with Matchers
         ActorSelection(probe.ref, Seq.empty), callback(record))
       val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1L: java.lang.Long, 1, 1)
       e.onCompletion(md, null)
-      probe.expectMsg(KafkaRecordMetadata(md, 112))
-      ingestor.expectMsg(RecordProduced(KafkaRecordMetadata(md, 112), supervisor.ref))
+      probe.expectMsg(KafkaRecordMetadata(md, 112, AckStrategy.NoAck))
+      ingestor.expectMsg(RecordProduced(KafkaRecordMetadata(md, 112, AckStrategy.NoAck), supervisor.ref))
     }
 
     it("sends the error to the actor selection and acks the ingestor") {

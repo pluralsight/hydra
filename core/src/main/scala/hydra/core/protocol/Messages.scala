@@ -102,7 +102,7 @@ case class Produce[K, V](record: HydraRecord[K, V],
   *
   * @param supervisor
   */
-case class RecordAccepted(supervisor: ActorRef) extends HydraMessage
+case class RecordAccepted(supervisor: ActorRef, destination: String) extends HydraMessage
 
 /**
   * Signals that a record was successfully produced by Hydra.

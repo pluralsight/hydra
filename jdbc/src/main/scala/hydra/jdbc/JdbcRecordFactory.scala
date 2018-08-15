@@ -88,4 +88,4 @@ case class JdbcRecord(destination: String, key: Option[Seq[String]], payload: Ge
   lazy val keyValues: Map[String, AnyRef] = primaryKeys.map(k => k -> payload.get(k)).toMap
 }
 
-case class JdbcRecordMetadata(table: String, timestamp: Long = System.currentTimeMillis) extends RecordMetadata
+case class JdbcRecordMetadata(destination: String, timestamp: Long = System.currentTimeMillis, ackStrategy: AckStrategy) extends RecordMetadata

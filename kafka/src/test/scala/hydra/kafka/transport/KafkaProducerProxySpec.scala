@@ -68,7 +68,7 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("KafkaProducerProxySpec
       val record = StringRecord("kafka_producer_spec", Some("key"), "payload", AckStrategy.NoAck)
       kafkaProducer ! ProduceToKafka(10, record, NoCallback)
       parent.expectMsgPF(10.seconds) {
-        case KafkaRecordMetadata(offset, ts, "kafka_producer_spec", part, deliveryId) =>
+        case KafkaRecordMetadata(offset, ts, "kafka_producer_spec", part, deliveryId, AckStrategy.NoAck) =>
           deliveryId shouldBe 10
           offset should be >= 0L
           ts should be > 0L
@@ -81,12 +81,12 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("KafkaProducerProxySpec
       kafkaProducer ! ProduceToKafka(123, record, callback(record))
       parent.expectMsgPF(15.seconds) {
         case md: KafkaRecordMetadata =>
-          md.topic shouldBe "kafka_producer_spec"
+          md.destination shouldBe "kafka_producer_spec"
           md.deliveryId shouldBe 123
       }
 
       ingestor.expectMsgPF() {
-        case RecordProduced(KafkaRecordMetadata(offset, _, "kafka_producer_spec", 0, deliveryId), sup) =>
+        case RecordProduced(KafkaRecordMetadata(offset, _, "kafka_producer_spec", 0, deliveryId, AckStrategy.NoAck), sup) =>
           deliveryId shouldBe 123
           offset should be >= 0L
           sup shouldBe supervisor.ref
@@ -112,7 +112,7 @@ class KafkaProducerProxySpec extends TestKit(ActorSystem("KafkaProducerProxySpec
     }
 
     it("sends metadata back to the parent") {
-      val kmd = KafkaRecordMetadata(recordMetadata, 0)
+      val kmd = KafkaRecordMetadata(recordMetadata, 0, AckStrategy.NoAck)
       kafkaProducer ! kmd
       parent.expectMsg(kmd)
     }

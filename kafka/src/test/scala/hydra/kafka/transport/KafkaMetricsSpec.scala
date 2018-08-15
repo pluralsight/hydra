@@ -3,6 +3,7 @@ package hydra.kafka.transport
 import akka.actor.ActorSystem
 import akka.testkit.TestKit
 import com.typesafe.config.ConfigFactory
+import hydra.core.transport.AckStrategy
 import hydra.kafka.producer.KafkaRecordMetadata
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSpecLike, Matchers}
@@ -14,7 +15,7 @@ import spray.json.DefaultJsonProtocol
 class KafkaMetricsSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike
   with BeforeAndAfterAll with DefaultJsonProtocol {
 
-  private implicit val mdFormat = jsonFormat5(KafkaRecordMetadata.apply)
+  import KafkaRecordMetadata._
 
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
     customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
@@ -46,7 +47,7 @@ class KafkaMetricsSpec extends TestKit(ActorSystem("hydra")) with Matchers with 
            | transports.kafka.metrics.enabled=true""".stripMargin)
       val pm = KafkaMetrics(cfg)
       pm shouldBe a[PublishMetrics]
-      val kmd = KafkaRecordMetadata(1, 1, "topic", 1, 1)
+      val kmd = KafkaRecordMetadata(1, 1, "topic", 1, 1, AckStrategy.NoAck)
       pm.saveMetrics(kmd)
       EmbeddedKafka.consumeFirstStringMessageFrom("metrics_topic").parseJson shouldBe kmd.toJson
 

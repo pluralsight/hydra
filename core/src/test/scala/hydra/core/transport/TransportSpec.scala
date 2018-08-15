@@ -43,14 +43,14 @@ class TransportSpec extends TestKit(ActorSystem("TransportSupervisorSpec"))
   describe("The Transport trait") {
 
     it("handles NoAck produces") {
-      val rec = TestRecord("OK", Some("1"), "test", AckStrategy.NoAck)
+      val rec = TestRecord("OK", Some("1"), "test", NoAck)
       transport ! Produce(rec, supervisor.ref, NoAck)
-      expectMsg(RecordAccepted(supervisor.ref))
+      expectMsg(RecordAccepted(supervisor.ref, "OK"))
       transportProbe.expectMsg(Deliver(rec, -1, NoCallback))
     }
 
     it("handles LocalAck produces") {
-      val rec = TestRecord("OK", Some("1"), "test", AckStrategy.NoAck)
+      val rec = TestRecord("OK", Some("1"), "test", Persisted)
       transport ! Produce(rec, supervisor.ref, Persisted)
       transportProbe.expectMsgPF() {
         case Deliver(r, id, ack) =>
@@ -69,7 +69,7 @@ class TransportSpec extends TestKit(ActorSystem("TransportSupervisorSpec"))
     }
 
     it("handles TransportAck produces") {
-      val rec = TestRecord("OK", Some("1"), "test", AckStrategy.NoAck)
+      val rec = TestRecord("OK", Some("1"), "test", Replicated)
       transport ! Produce(rec, supervisor.ref, Replicated)
       transportProbe.expectMsgPF() {
         case Deliver(r, deliveryId, callback) =>
@@ -77,7 +77,7 @@ class TransportSpec extends TestKit(ActorSystem("TransportSupervisorSpec"))
           deliveryId shouldBe -1 //we don't save transport acks to the journal
 
           //simulate an callback from the transport
-          callback.onCompletion(-1, Some(HydraRecordMetadata(System.currentTimeMillis)), None)
+          callback.onCompletion(-1, Some(HydraRecordMetadata(System.currentTimeMillis, "", Replicated)), None)
           transport ! Confirm(-1)
           expectMsgPF() { //ingestor receives this message
             case RecordProduced(_, sup) =>

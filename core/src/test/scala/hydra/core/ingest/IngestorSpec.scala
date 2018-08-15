@@ -78,7 +78,7 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
       expectMsg(Ignore)
       ing ! Validate(req)
       expectMsg(ValidRequest(TestRecord("test-topic", Some("1"), "test", AckStrategy.NoAck)))
-      ing ! RecordProduced(TestRecordMetadata(0), self)
+      ing ! RecordProduced(TestRecordMetadata(0, 0, "", AckStrategy.NoAck), self)
       expectMsg(IngestorCompleted)
       ing ! RecordNotProduced(TestRecord("test-topic", Some("1"), "test", AckStrategy.NoAck), new IllegalArgumentException, sup.ref)
       sup.expectMsgPF() {
@@ -86,7 +86,7 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
           i.cause shouldBe a[IllegalArgumentException]
       }
 
-      ing ! RecordAccepted(sup.ref)
+      ing ! RecordAccepted(sup.ref, "")
       sup.expectMsg(IngestorCompleted)
     }
   }

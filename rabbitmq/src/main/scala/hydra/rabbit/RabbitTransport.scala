@@ -51,7 +51,7 @@ class RabbitTransport(rabbitControlProps: Props) extends Transport {
         result match {
           case x: Ack =>
             callback.onCompletion(deliveryId, Some(RabbitRecordMetadata(System.currentTimeMillis(), x.id, r.destination,
-              r.destinationType)), None)
+              r.destinationType, r.ackStrategy)), None)
           case _: Nack =>
             callback.onCompletion(deliveryId, None, Some(RabbitProducerException("Rabbit returned Nack, record not produced")))
           case x: Fail =>
