@@ -5,7 +5,7 @@ import akka.pattern.pipe
 import hydra.core.akka.InitializingActor
 import hydra.core.monitor.HydraMetrics
 import hydra.core.protocol._
-import hydra.core.transport.{HydraRecord, RecordFactory, Transport}
+import hydra.core.transport.{AckStrategy, HydraRecord, RecordFactory, Transport}
 import org.apache.commons.lang3.ClassUtils
 
 import scala.concurrent.Future
@@ -38,12 +38,13 @@ trait Ingestor extends InitializingActor {
       sup ! IngestorCompleted
 
     case RecordAccepted(sup, destination) =>
-      decrementGaugeOnReceipt(destination, "noack")
+      decrementGaugeOnReceipt(destination, AckStrategy.NoAck.toString)
       sup ! IngestorCompleted
 
     case RecordNotProduced(rec, error, supervisor) =>
       supervisor ! IngestorError(error)
   }
+  
 
   /**
     * To be overriden by ingestors needing extra validation
@@ -65,7 +66,7 @@ trait Ingestor extends InitializingActor {
         HydraMetrics.incrementGauge(
           lookupKey = ReconciliationGaugeName + s"_${destination}_$ackStrategy",
           metricName = ReconciliationMetricName,
-          tags = Seq("destination" -> destination, "ackStrategy" -> ackStrategy, "ingestor" -> name)
+          tags = Seq("ingestor" -> name, "destination" -> destination, "ackStrategy" -> ackStrategy)
         )
 
         ValidRequest(r)
@@ -90,8 +91,7 @@ trait Ingestor extends InitializingActor {
       HydraMetrics.decrementGauge(
         lookupKey = Ingestor.ReconciliationGaugeName + s"_${destination}_$ackStrategy",
         metricName = Ingestor.ReconciliationMetricName,
-        tags = Seq("ingestor" -> name, "destination" -> destination,
-          "ackStrategy" -> ackStrategy)
+        tags = Seq("ingestor" -> name, "destination" -> destination, "ackStrategy" -> ackStrategy)
       )
     }
   }
