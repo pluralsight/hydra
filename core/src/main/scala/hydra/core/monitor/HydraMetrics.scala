@@ -4,11 +4,11 @@ import kamon.Kamon
 import kamon.metric.{Counter, Gauge, Histogram}
 import scalacache.guava.GuavaCache
 
-import scala.util.{Failure, Success}
+import scala.concurrent.{ExecutionContext, Future}
 
 object HydraMetrics {
 
-  import scalacache.modes.try_._
+  import scalacache.modes.scalaFuture._
 
   type Tags = Seq[(String, String)]
 
@@ -16,47 +16,45 @@ object HydraMetrics {
   private[core] lazy val gaugesCache = GuavaCache[Gauge]
   private[core] lazy val histogramsCache = GuavaCache[Histogram]
 
-  def getOrCreateCounter(lookupKey: String, metricName: String, tags: => Tags): Counter = {
+  def getOrCreateCounter(lookupKey: String, metricName: String, tags: => Tags)
+                        (implicit ec: ExecutionContext): Future[Counter] = {
     countersCache.caching(lookupKey)(ttl = None) {
       Kamon.counter(metricName).refine(tags: _*)
-    } match {
-      case Success(value) => value
-      case Failure(exception) => throw exception
     }
   }
 
-  def getOrCreateGauge(lookupKey: String, metricName: String, tags: => Tags): Gauge = {
+  def getOrCreateGauge(lookupKey: String, metricName: String, tags: => Tags)
+                      (implicit ec: ExecutionContext): Future[Gauge] = {
     gaugesCache.caching(lookupKey)(ttl = None) {
       Kamon.gauge(metricName).refine(tags: _*)
-    } match {
-      case Success(value) => value
-      case Failure(exception) => throw exception
     }
   }
 
-  def getOrCreateHistogram(lookupKey: String, metricName: String, tags: => Tags): Histogram = {
+  def getOrCreateHistogram(lookupKey: String, metricName: String, tags: => Tags)
+                          (implicit ec: ExecutionContext): Future[Histogram] = {
     histogramsCache.caching(lookupKey)(ttl = None) {
       Kamon.histogram(metricName).refine(tags: _*)
-    } match {
-      case Success(value) => value
-      case Failure(exception) => throw exception
     }
   }
 
-  def incrementCounter(lookupKey: String, metricName: String, tags: => Tags): Unit = {
-    getOrCreateCounter(lookupKey, metricName, tags).increment()
+  def incrementCounter(lookupKey: String, metricName: String, tags: => Tags)
+                      (implicit ec: ExecutionContext): Future[Unit] = {
+    getOrCreateCounter(lookupKey, metricName, tags).map(_.increment())
   }
 
-  def incrementGauge(lookupKey: String, metricName: String, tags: => Tags): Unit = {
-    getOrCreateGauge(lookupKey, metricName, tags).increment()
+  def incrementGauge(lookupKey: String, metricName: String, tags: => Tags)
+                    (implicit ec: ExecutionContext): Future[Unit] = {
+    getOrCreateGauge(lookupKey, metricName, tags).map(_.increment())
   }
 
 
-  def decrementGauge(lookupKey: String, metricName: String, tags: => Tags): Unit = {
-    getOrCreateGauge(lookupKey, metricName, tags).decrement()
+  def decrementGauge(lookupKey: String, metricName: String, tags: => Tags)
+                    (implicit ec: ExecutionContext): Future[Unit] = {
+    getOrCreateGauge(lookupKey, metricName, tags).map(_.decrement())
   }
 
-  def recordToHistogram(lookupKey: String, metricName: String, value: Long, tags: => Tags): Unit = {
-    getOrCreateHistogram(lookupKey, metricName, tags).record(value)
+  def recordToHistogram(lookupKey: String, metricName: String, value: Long, tags: => Tags)
+                       (implicit ec: ExecutionContext): Future[Unit] = {
+    getOrCreateHistogram(lookupKey, metricName, tags).map(_.record(value))
   }
 }

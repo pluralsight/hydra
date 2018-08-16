@@ -5,10 +5,11 @@ import kamon.Kamon
 import kamon.metric.{Counter, Gauge}
 import org.scalamock.scalatest.proxy.MockFactory
 import org.scalatest._
-import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Millis, Seconds, Span}
 import scalacache.guava.GuavaCache
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
 
 
@@ -17,7 +18,8 @@ class HydraMetricsSpec extends Matchers
   with Eventually
   with BeforeAndAfterAll
   with BeforeAndAfterEach
-  with MockFactory {
+  with MockFactory
+  with ScalaFutures {
 
   import HydraMetrics._
   import scalacache.modes.try_._
@@ -74,8 +76,11 @@ class HydraMetricsSpec extends Matchers
     "lookup an existing histogram" in {
     val f = recordToHistogram _
 
-    f(lookup, "histogram.metric", 100, generateTags) shouldEqual
-      f(lookup, "histogram.metric", 100, generateTags)
+    whenReady(f(lookup, "histogram.metric", 100, generateTags)) { r =>
+      whenReady(f(lookup, "histogram.metric", 100, generateTags)) { x =>
+        r shouldEqual x
+      }
+    }
   }
 
   private def shouldCreateNewMetric[A](f: (String, String, => Seq[(String, String)]) => Unit, cache: GuavaCache[A]) = {

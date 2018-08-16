@@ -45,12 +45,6 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 
   private[kafka] val msgCounter = new AtomicLong()
 
-  private[kafka] val histogram = HydraMetrics.getOrCreateHistogram(
-    persistenceId,
-    KafkaTransport.histogramMetricName,
-    Seq("transport" -> persistenceId)
-  )
-
   timers.startPeriodicTimer("kamon", ReportMetrics, 1.minute)
 
   override def transport: Receive = {
@@ -62,24 +56,9 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
       metrics.saveMetrics(kmd)
 
     case e: RecordProduceError =>
-      val resultType = "fail"
-
-      HydraMetrics.incrementCounter(
-        e.record.topic + resultType,
-        KafkaTransport.counterMetricName,
-        Seq(
-          "destination" -> e.record.topic,
-          "type" -> resultType,
-          "transport" -> persistenceId
-        )
-      )
-
       context.system.eventStream.publish(e)
 
     case p: ProducerInitializationError => context.system.eventStream.publish(p)
-
-    case ReportMetrics =>
-      histogram.record(msgCounter.getAndSet(0L))
   }
 
   private def withProducer(id: String)(success: ActorRef => Unit)(fail: Option[Throwable] => Unit) = {
