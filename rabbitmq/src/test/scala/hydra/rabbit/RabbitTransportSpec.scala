@@ -22,7 +22,7 @@ import com.spingo.op_rabbit.Message
 import com.spingo.op_rabbit.Message._
 import hydra.common.config.ConfigSupport
 import hydra.core.transport.Transport.Deliver
-import hydra.core.transport.{RecordMetadata, TransportCallback}
+import hydra.core.transport.{AckStrategy, RecordMetadata, TransportCallback}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 class RabbitTransportSpec extends TestKit(ActorSystem("rabbit-transport-spec")) with Matchers with FunSpecLike
@@ -40,7 +40,7 @@ class RabbitTransportSpec extends TestKit(ActorSystem("rabbit-transport-spec")) 
   describe("When using the RabbitTransport") {
     it("sends valid exchange messages and receive ack") {
       val rabbitTransport = system.actorOf(RabbitTransport.props(testRabbitControl))
-      val rec = RabbitRecord("test.exchange", RabbitRecord.DESTINATION_TYPE_EXCHANGE, "exchange-ack")
+      val rec = RabbitRecord("test.exchange", RabbitRecord.DESTINATION_TYPE_EXCHANGE, "exchange-ack", AckStrategy.NoAck)
       val ack: TransportCallback = (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) => probe.ref ! md.get
       val m = Deliver(rec, 1, ack)
       rabbitTransport ! m
@@ -54,7 +54,7 @@ class RabbitTransportSpec extends TestKit(ActorSystem("rabbit-transport-spec")) 
 
     it("sends valid queue messages and receive ack") {
       val rabbitTransport = system.actorOf(RabbitTransport.props(testRabbitControl))
-      val rec = RabbitRecord("test.queue", RabbitRecord.DESTINATION_TYPE_QUEUE, "queue-ack")
+      val rec = RabbitRecord("test.queue", RabbitRecord.DESTINATION_TYPE_QUEUE, "queue-ack", AckStrategy.NoAck)
       val ack: TransportCallback = (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) => probe.ref ! md.get
       val m = Deliver(rec, 1, ack)
       rabbitTransport ! m
@@ -68,7 +68,7 @@ class RabbitTransportSpec extends TestKit(ActorSystem("rabbit-transport-spec")) 
 
     it("receives error on Fail condition") {
       val rabbitTransport = system.actorOf(RabbitTransport.props(testRabbitControl))
-      val rec = RabbitRecord("test.exchange", RabbitRecord.DESTINATION_TYPE_EXCHANGE, "exchange-Fail")
+      val rec = RabbitRecord("test.exchange", RabbitRecord.DESTINATION_TYPE_EXCHANGE, "exchange-Fail", AckStrategy.NoAck)
       val err: TransportCallback = (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) => probe.ref ! err.get
       val m = Deliver(rec, 1, err)
       rabbitTransport ! m
@@ -77,7 +77,7 @@ class RabbitTransportSpec extends TestKit(ActorSystem("rabbit-transport-spec")) 
 
     it("receives error on Nack condition") {
       val rabbitTransport = system.actorOf(RabbitTransport.props(testRabbitControl))
-      val rec = RabbitRecord("test.exchange", RabbitRecord.DESTINATION_TYPE_EXCHANGE, "exchange-Nack")
+      val rec = RabbitRecord("test.exchange", RabbitRecord.DESTINATION_TYPE_EXCHANGE, "exchange-Nack", AckStrategy.NoAck)
       val err: TransportCallback = (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) => probe.ref ! err.get
       val m = Deliver(rec, 1, err)
       rabbitTransport ! m

@@ -27,7 +27,7 @@ class PublishMetrics(topic: String)(implicit system: ActorSystem) extends KafkaM
 
   import spray.json._
 
-  private implicit val mdFormat = jsonFormat5(KafkaRecordMetadata.apply)
+  import KafkaRecordMetadata._
 
   private val producer = {
     KafkaUtils.producerSettings[String, String]("string", rootConfig)
@@ -37,7 +37,7 @@ class PublishMetrics(topic: String)(implicit system: ActorSystem) extends KafkaM
 
   def saveMetrics(record: KafkaRecordMetadata) = {
     val payload = record.toJson.compactPrint
-    producer.send(new ProducerRecord(topic, record.topic, payload))
+    producer.send(new ProducerRecord(topic, record.destination, payload))
   }
 
   override def close(): Unit = {

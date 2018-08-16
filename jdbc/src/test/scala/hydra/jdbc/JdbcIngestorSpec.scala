@@ -8,7 +8,7 @@ import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_SCHEMA_PARAM
 import hydra.core.protocol._
 import hydra.core.transport.AckStrategy.NoAck
-import hydra.core.transport.HydraRecord
+import hydra.core.transport.{AckStrategy, HydraRecord}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
 
@@ -81,11 +81,11 @@ class JdbcIngestorSpec
     }
 
     it("transports") {
-      ingestor ! Ingest(TestRecord("test", "test", None), NoAck)
-      probe.expectMsg(Produce(TestRecord("test", "test", None), self, NoAck))
+      ingestor ! Ingest(TestRecord("test", "test", None, AckStrategy.NoAck), NoAck)
+      probe.expectMsg(Produce(TestRecord("test", "test", None, AckStrategy.NoAck), self, NoAck))
     }
   }
 
-  case class TestRecord(destination: String, payload: String, key: Option[String]) extends HydraRecord[String, String]
+  case class TestRecord(destination: String, payload: String, key: Option[String], ackStrategy: AckStrategy) extends HydraRecord[String, String]
 
 }

@@ -45,12 +45,6 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 
   private[kafka] val msgCounter = new AtomicLong()
 
-  private[kafka] val histogram = HydraMetrics.getOrCreateHistogram(
-    persistenceId,
-    KafkaTransport.histogramMetricName,
-    Seq("transport" -> persistenceId)
-  )
-
   timers.startPeriodicTimer("kamon", ReportMetrics, 1.minute)
 
   override def transport: Receive = {
@@ -58,39 +52,16 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
       withProducer(kr.formatName)(_ ! ProduceToKafka(deliveryId, kr, ack))(e => ack.onCompletion(deliveryId, None, e))
 
     case kmd: KafkaRecordMetadata =>
-      val resultType = "success"
-      HydraMetrics.incrementCounter(
-        kmd.topic + resultType,
-        KafkaTransport.counterMetricName,
-        Seq(
-          "destination" -> kmd.topic,
-          "type" -> resultType,
-          "transport" -> persistenceId
-        )
-      )
       msgCounter.incrementAndGet()
       metrics.saveMetrics(kmd)
 
     case e: RecordProduceError =>
-      val resultType = "fail"
-      HydraMetrics.incrementCounter(
-        e.record.topic + resultType,
-        KafkaTransport.counterMetricName,
-        Seq(
-          "destination" -> e.record.topic,
-          "type" -> resultType,
-          "transport" -> persistenceId
-        )
-      )
       context.system.eventStream.publish(e)
 
     case p: ProducerInitializationError => context.system.eventStream.publish(p)
-
-    case ReportMetrics =>
-      histogram.record(msgCounter.getAndSet(0L))
   }
 
-  private def withProducer(id: String)(success: (ActorRef) => Unit)(fail: (Option[Throwable]) => Unit) = {
+  private def withProducer(id: String)(success: ActorRef => Unit)(fail: Option[Throwable] => Unit) = {
     context.child(id) match {
       case Some(producer) => success(producer)
       case None => fail(Some(new IllegalArgumentException(s"No Kafka producer named $id found.")))
@@ -115,6 +86,7 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 object KafkaTransport {
 
   private[kafka] val histogramMetricName = "hydra_ingest_records_published_total_minutes_bucket"
+
   private[kafka] val counterMetricName = "hydra_ingest_records_published_total"
 
   case class RecordProduceError(deliveryId: Long, record: KafkaRecord[_, _], error: Throwable)

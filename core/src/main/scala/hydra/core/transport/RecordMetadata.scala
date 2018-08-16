@@ -7,6 +7,10 @@ trait RecordMetadata {
 
   def timestamp: Long
 
+  def destination: String
+
+  def ackStrategy: AckStrategy
+
 }
 
-case class HydraRecordMetadata(timestamp: Long) extends RecordMetadata
+case class HydraRecordMetadata(timestamp: Long, destination: String, ackStrategy: AckStrategy) extends RecordMetadata

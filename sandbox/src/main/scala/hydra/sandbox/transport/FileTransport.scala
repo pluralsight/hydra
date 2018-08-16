@@ -41,7 +41,7 @@ class FileTransport(destinations: Map[String, String]) extends Transport {
         f.onComplete {
           case Success(_) =>
             //todo: look at the QueueOfferResult object
-            val md = FileRecordMetadata(destinations(r.destination), 0)
+            val md = FileRecordMetadata(destinations(r.destination), 0, ackStrategy = r.ackStrategy)
             callback.onCompletion(deliveryId, Some(md), None)
           case Failure(ex) => ex.printStackTrace(); callback.onCompletion(deliveryId, None, Some(ex))
         }

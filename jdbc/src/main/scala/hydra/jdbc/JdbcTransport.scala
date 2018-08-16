@@ -29,7 +29,8 @@ class JdbcTransport extends Transport with ConfigSupport with LoggingAdapter {
         val writer = getOrUpdateWriter(dbProfiles(record.dbProfile), record)
         val op = Option(record.payload).map(p => Upsert(p)).getOrElse(DeleteByKey(record.keyValues))
         writer.execute(op)
-        callback.onCompletion(deliveryId, Some(JdbcRecordMetadata(record.destination)), None)
+        callback.onCompletion(deliveryId, Some(JdbcRecordMetadata(record.destination,
+          ackStrategy = record.ackStrategy)), None)
       }.recover {
         case e: Exception =>
           callback.onCompletion(deliveryId, None, Some(e))

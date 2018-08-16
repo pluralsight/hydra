@@ -2,7 +2,6 @@ package hydra.core.transport
 
 import akka.persistence.{AtLeastOnceDelivery, PersistentActor}
 import hydra.common.config.ConfigSupport
-import hydra.core.monitor.HydraMetrics
 import hydra.core.protocol.{HydraMessage, Produce, RecordAccepted, RecordProduced}
 import hydra.core.transport.AckStrategy.{NoAck, Persisted, Replicated}
 
@@ -10,14 +9,10 @@ import hydra.core.transport.AckStrategy.{NoAck, Persisted, Replicated}
 trait Transport extends PersistentActor
   with ConfigSupport
   with AtLeastOnceDelivery {
+
   import Transport._
 
   override val persistenceId = getClass.getSimpleName
-
-  private[core] lazy val generateTags = Seq("type" -> persistenceId)
-
-  private val journalGauge = HydraMetrics.getOrCreateGauge(persistenceId, journalMetricName,
-    generateTags)
 
   def transport: Receive
 
@@ -40,36 +35,38 @@ trait Transport extends PersistentActor
   protected def updateState(evt: HydraMessage): Unit = evt match {
     case Produce(rec, _, _) => deliver(self.path)(deliveryId => Deliver(rec, deliveryId,
       new TransportSupervisorCallback(self)))
+
     case DestinationConfirmed(deliveryId) =>
-      journalGauge.increment()
       confirmDelivery(deliveryId)
   }
 
   private def deliver(p: Produce[Any, Any]): Unit = {
     p.ack match {
       case NoAck =>
-        sender ! RecordAccepted(p.supervisor)
+        sender ! RecordAccepted(p.supervisor, p.record.destination)
         self ! Deliver(p.record)
 
       case Persisted =>
+        val destination = p.record.destination
+
+        val ackStrategy = p.ack
+
         val ingestor = sender
         persistAsync(p) { p =>
-          journalGauge.decrement()
           updateState(p)
-          ingestor ! RecordProduced(HydraRecordMetadata(System.currentTimeMillis), p.supervisor)
+          ingestor ! RecordProduced(HydraRecordMetadata(System.currentTimeMillis, destination,
+            ackStrategy), p.supervisor)
         }
 
       case Replicated =>
         val ingestor = sender
-        self ! Deliver(p.record, -1, new IngestorCallback[Any, Any](p.record, ingestor, p.supervisor, self))
+        self ! Deliver(p.record, -1, new IngestorCallback[Any, Any](p.record, ingestor,
+          p.supervisor, self))
     }
   }
-
 }
 
 object Transport {
-
-  val journalMetricName = "hydra_ingest_journal_message_count"
 
   trait TransportMessage extends HydraMessage
 

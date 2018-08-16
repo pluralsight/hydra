@@ -1,14 +1,15 @@
 package hydra.core.monitor
 
-import com.typesafe.config.Config
-import kamon.metric.{Counter, Gauge, PeriodSnapshot}
-import kamon.{Kamon, MetricReporter}
+import akka.japi.Option.Some
+import kamon.Kamon
+import kamon.metric.{Counter, Gauge}
 import org.scalamock.scalatest.proxy.MockFactory
 import org.scalatest._
-import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Millis, Seconds, Span}
+import scalacache.guava.GuavaCache
 
-import scala.collection.mutable
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
 
 
@@ -17,16 +18,19 @@ class HydraMetricsSpec extends Matchers
   with Eventually
   with BeforeAndAfterAll
   with BeforeAndAfterEach
-  with MockFactory {
+  with MockFactory
+  with ScalaFutures {
+
   import HydraMetrics._
+  import scalacache.modes.try_._
 
   implicit override val patienceConfig =
     PatienceConfig(timeout = scaled(Span(2, Seconds)), interval = scaled(Span(5, Millis)))
 
   override def beforeEach() = {
-    gauges.clear()
-    counters.clear()
-    histograms.clear()
+    gaugesCache.removeAll()
+    countersCache.removeAll()
+    histogramsCache.removeAll()
   }
 
   override def afterAll = Kamon.stopAllReporters()
@@ -38,57 +42,62 @@ class HydraMetricsSpec extends Matchers
 
   "An object mixing in HydraMetrics" should
     "create new counters with new lookup keys + metric names" in {
-    shouldCreateNewMetric[Counter](incrementCounter _, counters)
+    shouldCreateNewMetric[Counter](incrementCounter _, countersCache)
   }
 
   it should
     "create new gauges with new lookup keys + metric names" in {
-    shouldCreateNewMetric[Gauge](incrementGauge _, gauges)
+    shouldCreateNewMetric[Gauge](incrementGauge _, gaugesCache)
   }
 
   it should "lookup existing counters" in {
-    shouldLookupExistingMetric[Counter](incrementCounter _, counters)
+    shouldLookupExistingMetric[Counter](incrementCounter _, countersCache)
   }
 
   it should
     "lookup an existing gauge" in {
-    shouldLookupExistingMetric[Gauge](decrementGauge _, gauges)
+    shouldLookupExistingMetric[Gauge](decrementGauge _, gaugesCache)
   }
 
   it should
     "create a new histogram" in {
+    histogramsCache.get(lookup).map { result =>
+      result shouldBe None
+    }
+
     recordToHistogram(lookup, "histogram.metric", 100, generateTags)
 
-    histograms.size shouldBe 1
-
-    recordToHistogram(lookup2, "histogram.metric", 250, Seq("tag2" -> "Let it burn!"))
-
-    histograms.size shouldBe 2
+    histogramsCache.get(lookup).map { result =>
+      result shouldBe a[Some[_]]
+    }
   }
 
   it should
     "lookup an existing histogram" in {
-    for (x <- 1 to 2) {
-      recordToHistogram(lookup, "histogram.metric", 100, generateTags)
+    val f = recordToHistogram _
 
-      histograms.size shouldBe 1
+    whenReady(f(lookup, "histogram.metric", 100, generateTags)) { r =>
+      whenReady(f(lookup, "histogram.metric", 100, generateTags)) { x =>
+        r shouldEqual x
+      }
     }
   }
 
-  private def shouldCreateNewMetric[A](f: (String, String, => Seq[(String, String)]) => Unit, map: mutable.HashMap[String, A]) = {
+  private def shouldCreateNewMetric[A](f: (String, String, => Seq[(String, String)]) => Unit, cache: GuavaCache[A]) = {
+    cache.get(lookup).map { result =>
+      result shouldBe None
+    }
+
     f(lookup, "metric" + Random.nextInt(Integer.MAX_VALUE), generateTags)
-    map.size shouldBe 1
 
-    f(lookup2, "metric" + Random.nextInt(Integer.MAX_VALUE), generateTags)
-    map.size shouldBe 2
+    cache.get(lookup).map { result =>
+      result shouldBe a[Some[_]]
+    }
   }
 
-  private def shouldLookupExistingMetric[A](f: (String, String, => Seq[(String, String)]) => Unit, map: mutable.HashMap[String, A]) = {
+  private def shouldLookupExistingMetric[A](f: (String, String, => Seq[(String, String)]) => Unit, cache: GuavaCache[A]) = {
     val metric = "metric" + Random.nextInt(Integer.MAX_VALUE)
-    for (x <- 1 to 2) {
-      f(lookup, metric, generateTags)
 
-      map.size shouldBe 1
-    }
+    f(lookup, metric, generateTags) shouldEqual f(lookup, metric, generateTags)
   }
 }
