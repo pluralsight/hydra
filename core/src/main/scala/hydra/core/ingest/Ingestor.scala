@@ -44,7 +44,6 @@ trait Ingestor extends InitializingActor {
     case RecordNotProduced(rec, error, supervisor) =>
       supervisor ! IngestorError(error)
   }
-  
 
   /**
     * To be overriden by ingestors needing extra validation
@@ -64,8 +63,14 @@ trait Ingestor extends InitializingActor {
         val ackStrategy = r.ackStrategy.toString
 
         HydraMetrics.incrementGauge(
-          lookupKey = ReconciliationGaugeName + s"_${destination}_$ackStrategy",
+          lookupKey = ReconciliationMetricName + s"_${destination}_$ackStrategy",
           metricName = ReconciliationMetricName,
+          tags = Seq("ingestor" -> name, "destination" -> destination, "ackStrategy" -> ackStrategy)
+        )
+
+        HydraMetrics.incrementCounter(
+          lookupKey = IngestCounterMetricName + s"_${destination}_$ackStrategy",
+          metricName = IngestCounterMetricName,
           tags = Seq("ingestor" -> name, "destination" -> destination, "ackStrategy" -> ackStrategy)
         )
 
@@ -89,7 +94,7 @@ trait Ingestor extends InitializingActor {
   def decrementGaugeOnReceipt(destination: String, ackStrategy: String): Future[Unit] = {
     Future {
       HydraMetrics.decrementGauge(
-        lookupKey = Ingestor.ReconciliationGaugeName + s"_${destination}_$ackStrategy",
+        lookupKey = Ingestor.ReconciliationMetricName + s"_${destination}_$ackStrategy",
         metricName = Ingestor.ReconciliationMetricName,
         tags = Seq("ingestor" -> name, "destination" -> destination, "ackStrategy" -> ackStrategy)
       )
@@ -99,7 +104,7 @@ trait Ingestor extends InitializingActor {
 
 object Ingestor {
 
-  val ReconciliationGaugeName = "hydra_ingest_reconciliation"
+  val ReconciliationMetricName = "hydra_ingest_reconciliation"
 
-  val ReconciliationMetricName = "ingest_reconciliation"
+  val IngestCounterMetricName = "hydra_ingest_message_counter"
 }
