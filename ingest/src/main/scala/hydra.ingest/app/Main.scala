@@ -13,7 +13,7 @@ object Main extends App with BootstrappingSupport with LoggingAdapter {
 
     val enablePrometheus = applicationConfig
       .get[Boolean]("monitoring.prometheus.enable")
-      .valueOrElse(true)
+      .valueOrElse(false)
     if (enablePrometheus) {
       Kamon.addReporter(new PrometheusReporter())
     }
