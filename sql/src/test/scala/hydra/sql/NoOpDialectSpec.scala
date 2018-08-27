@@ -24,5 +24,11 @@ class NoOpDialectSpec extends Matchers with FunSpecLike {
     it("returns the correct json placeholder") {
       NoopDialect.jsonPlaceholder shouldBe "?"
     }
+
+    it("does not support dropping constraints by default") {
+      intercept[UnsupportedOperationException] {
+        NoopDialect.dropNotNullConstraintQueries("table", null, UnderscoreSyntax)
+      }
+    }
   }
 }
