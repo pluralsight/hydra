@@ -157,6 +157,11 @@ abstract class JdbcDialect extends Serializable {
     throw new UnsupportedOperationException("Alter tables are not supported by this dialect.")
   }
 
+  @throws[UnsupportedOperationException]
+  def dropNotNullConstraintQueries(tableName: String, schema: SchemaWrapper, dbs: DbSyntax): Seq[String] = {
+    throw new UnsupportedOperationException("Dropping NOT NULL constraints are not supported by this dialect.")
+  }
+
   def getArrayType(schema: Schema) = {
     getJDBCType(schema.getElementType).map(_.databaseTypeDefinition)
       .orElse(JdbcUtils.getCommonJDBCType(schema.getElementType).map(_.databaseTypeDefinition))

@@ -25,6 +25,7 @@ import hydra.common.util.TryWith
 import org.apache.avro.AvroRuntimeException
 import org.apache.avro.Schema.Field
 import org.slf4j.LoggerFactory
+import scala.collection.JavaConverters._
 
 import scala.util.{Failure, Success, Try}
 
@@ -33,7 +34,7 @@ import scala.util.{Failure, Success, Try}
   * Internal implementation of the user-facing `Catalog`.
   */
 class JdbcCatalog(connectionProvider: ConnectionProvider,
-                  dbSyntax: DbSyntax, dialect: JdbcDialect) extends Catalog  {
+                  dbSyntax: DbSyntax, dialect: JdbcDialect) extends Catalog {
 
   override def createSchema(schema: String): Boolean = {
     val conn = connectionProvider.getConnection
@@ -74,8 +75,7 @@ class JdbcCatalog(connectionProvider: ConnectionProvider,
   }
 
   private def alterIfNeeded(table: Table, connection: Connection): Try[Boolean] = {
-    //todo: make this a config
-    val autoEvolve = true
+    val autoEvolve = true //todo: make this a config
     getTableMetadata(TableIdentifier(table.name, None, table.dbSchema)).flatMap { tableMetadata =>
       val dbColumns = tableMetadata.columns
       findMissingFields(table.schema, dbColumns) match {
@@ -98,6 +98,18 @@ class JdbcCatalog(connectionProvider: ConnectionProvider,
             alterQueries.foreach(stmt.executeUpdate)
             true
           }
+      }
+
+      //drop constraint from not nullable fields if required
+      TryWith(connection.createStatement()) { stmt =>
+        val fields = table.schema.schema.getFields
+          .asScala.filter(f => JdbcUtils.isNullableUnion(f.schema()))
+        val alterQueries = dialect.dropNotNullConstraintQueries(dbSyntax.format(table.name),
+          table.schema, dbSyntax)
+        JdbcCatalog.log.info("Removing NOT NULLABLE constraint from fields:{} with SQL: {}",
+          fields.mkString(","), alterQueries.mkString(","), "")
+        alterQueries.foreach(stmt.executeUpdate)
+        true
       }
     }
   }

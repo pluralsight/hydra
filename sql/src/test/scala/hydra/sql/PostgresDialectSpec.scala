@@ -439,4 +439,27 @@ class PostgresDialectSpec extends Matchers
     val tp = PostgresDialect.getArrayType(schema.getField("friends").schema())
     tp.get shouldBe JdbcType("TEXT[]", java.sql.JDBCType.ARRAY)
   }
+
+  it("creates drop not null constraint queries") {
+    val str =
+      """
+        |{
+        |	"type": "record",
+        |	"name": "User",
+        |	"namespace": "hydra",
+        |	"fields": [
+        | {
+        |			"name": "username",
+        |			"type": "string"
+        |		}
+        |	]
+        |}
+      """.stripMargin
+
+    val schema = SchemaWrapper.from(new Schema.Parser().parse(str))
+
+    val tp = PostgresDialect
+      .dropNotNullConstraintQueries("user", schema, UnderscoreSyntax)
+    tp shouldBe Seq("""alter table user alter column "username" drop not null""")
+  }
 }

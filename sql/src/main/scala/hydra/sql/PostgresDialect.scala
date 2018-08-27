@@ -4,6 +4,7 @@ import java.sql.JDBCType
 
 import hydra.avro.convert.IsoDate
 import hydra.avro.util.SchemaWrapper
+import hydra.common.logging.LoggingAdapter
 import hydra.sql.JdbcUtils.isLogicalType
 import org.apache.avro.LogicalTypes.Decimal
 import org.apache.avro.Schema.Type.{BYTES, UNION}
@@ -13,7 +14,7 @@ import org.apache.avro.{LogicalTypes, Schema}
 /**
   * Created by alexsilva on 5/4/17.
   */
-private[sql] object PostgresDialect extends JdbcDialect {
+private[sql] object PostgresDialect extends JdbcDialect with LoggingAdapter {
 
   override val jsonPlaceholder = "to_json(?::json)"
 
@@ -99,6 +100,15 @@ private[sql] object PostgresDialect extends JdbcDialect {
       val dbDef = JdbcUtils.getJdbcType(f.schema, this).databaseTypeDefinition
       val colName = quoteIdentifier(dbs.format(f.name))
       s"alter table $table add column $colName $dbDef"
+    }
+  }
+
+  override def dropNotNullConstraintQueries(table: String, schema: SchemaWrapper, dbs: DbSyntax): Seq[String] = {
+    schema.getFields.filterNot(f => schema.primaryKeys.contains(f.name)).map { f =>
+      val colName = quoteIdentifier(dbs.format(f.name))
+      val sql = s"alter table $table alter column $colName drop not null"
+      log.debug(sql)
+      sql
     }
   }
 
