@@ -3,12 +3,9 @@ package hydra.kafka
 import java.util.concurrent.ExecutionException
 
 import com.typesafe.config.ConfigFactory
-import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.util.KafkaUtils
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
-import org.I0Itec.zkclient.ZkClient
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
-import org.apache.zookeeper.Watcher
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
 
@@ -26,22 +23,6 @@ class KafkaUtilsSpec extends WordSpec
 
   implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
 
-  class MockableZK extends ZkClient("localhost:2181", 5000) {
-    override def connect(maxMsToWaitUntilConnected: Long, watcher: Watcher): Unit = {
-
-    }
-
-    override def exists(path: String, watch: Boolean): Boolean = {
-      if (path == "/brokers/topics/unknown") false else true
-    }
-
-
-    override def getChildren(path: String, watch: Boolean) = {
-      Seq("test-kafka-utils").asJava
-    }
-  }
-
-
   val defaultCfg = Map(
     "key.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
     "auto.offset.reset" -> "latest",
@@ -53,7 +34,15 @@ class KafkaUtilsSpec extends WordSpec
     "client.id" -> "string",
     "metadata.fetch.timeout.ms" -> "100000")
 
-  val ku = new KafkaUtils("test", () => new MockableZK, defaultCfg)
+  val ku = new KafkaUtils(defaultCfg)
+
+  override def beforeAll = {
+    EmbeddedKafka.start()
+    val dt = new TopicDetails(1, 1: Short)
+    ku.createTopic("test-kafka-utils", dt, 10)
+  }
+
+  override def afterAll = EmbeddedKafka.stop()
 
   val cfg = ConfigFactory.parseString(
     """
@@ -91,12 +80,8 @@ class KafkaUtilsSpec extends WordSpec
       assert(!exists)
     }
 
-    "uses the zkString in the config" in {
-      KafkaUtils().zkString shouldBe KafkaConfigSupport.zkString
-    }
-
     "return true for a topic that exists" in {
-      assert(ku.topicExists("test-kafka-utils").isSuccess)
+      assert(ku.topicExists("test-kafka-utils").map(_ == true).get)
     }
 
     "return a list of topics" in {
@@ -160,50 +145,47 @@ class KafkaUtilsSpec extends WordSpec
     }
 
     "create a topic" in {
-      withRunningKafka {
-        val configs = Map(
-          "min.insync.replicas" -> "1",
-          "cleanup.policy" -> "compact",
-          "segment.bytes" -> "1048576"
-        )
-        val kafkaUtils = new KafkaUtils("", () => new ZkClient("localhost:3181"), defaultCfg)
-        kafkaUtils.topicExists("test.Hydra").get shouldBe false
-        val details = new TopicDetails(1, 1: Short, configs.asJava)
-        whenReady(kafkaUtils.createTopic("test.Hydra", details, 3000)) { response =>
-          response.all().get() shouldBe null //the kafka API returns a 'Void'
-          kafkaUtils.topicExists("test.Hydra").get shouldBe true
-        }
+
+      val configs = Map(
+        "min.insync.replicas" -> "1",
+        "cleanup.policy" -> "compact",
+        "segment.bytes" -> "1048576"
+      )
+      val kafkaUtils = new KafkaUtils(defaultCfg)
+      kafkaUtils.topicExists("test.Hydra").get shouldBe false
+      val details = new TopicDetails(1, 1: Short, configs.asJava)
+      whenReady(kafkaUtils.createTopic("test.Hydra", details, 3000)) { response =>
+        response.all().get() shouldBe null //the kafka API returns a 'Void'
+        kafkaUtils.topicExists("test.Hydra").get shouldBe true
       }
     }
+
 
     "throws error if topic exists" in {
-      withRunningKafka {
-        val configs = Map(
-          "min.insync.replicas" -> "1",
-          "cleanup.policy" -> "compact",
-          "segment.bytes" -> "1048576"
-        )
-        val kafkaUtils = new KafkaUtils("", () => new ZkClient("localhost:3181"), defaultCfg)
-        createCustomTopic("hydra.already.Exists")
-        kafkaUtils.topicExists("hydra.already.Exists").get shouldBe true
-        val details = new TopicDetails(1, 1, configs.asJava)
-        whenReady(kafkaUtils.createTopic("hydra.already.Exists", details, 1000).failed) { response =>
-          response shouldBe an[IllegalArgumentException]
-        }
+      val configs = Map(
+        "min.insync.replicas" -> "1",
+        "cleanup.policy" -> "compact",
+        "segment.bytes" -> "1048576"
+      )
+      val kafkaUtils = new KafkaUtils(defaultCfg)
+      createCustomTopic("hydra.already.Exists")
+      kafkaUtils.topicExists("hydra.already.Exists").get shouldBe true
+      val details = new TopicDetails(1, 1, configs.asJava)
+      whenReady(kafkaUtils.createTopic("hydra.already.Exists", details, 1000).failed) { response =>
+        response shouldBe an[IllegalArgumentException]
       }
     }
 
+
     "throws error if configs are invalid" in {
-      withRunningKafka {
-        val configs = Map(
-          "min.insync.replicas" -> "1",
-          "cleanup.policy" -> "under the carpet"
-        )
-        val kafkaUtils = new KafkaUtils("", () => new ZkClient("localhost:3181"), defaultCfg)
-        val details = new TopicDetails(1, 1, configs.asJava)
-        whenReady(kafkaUtils.createTopic("InvalidConfig", details, 1000)) { response =>
-          intercept[ExecutionException](response.all().get)
-        }
+      val configs = Map(
+        "min.insync.replicas" -> "1",
+        "cleanup.policy" -> "under the carpet"
+      )
+      val kafkaUtils = new KafkaUtils(defaultCfg)
+      val details = new TopicDetails(1, 1, configs.asJava)
+      whenReady(kafkaUtils.createTopic("InvalidConfig", details, 1000)) { response =>
+        intercept[ExecutionException](response.all().get)
       }
     }
   }

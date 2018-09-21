@@ -10,9 +10,6 @@ import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.common.util.TryWith
 import hydra.kafka.config.KafkaConfigSupport
-import kafka.admin.AdminUtils
-import kafka.utils.ZkUtils
-import org.I0Itec.zkclient.ZkClient
 import org.apache.kafka.clients.admin.{AdminClient, CreateTopicsResult, NewTopic}
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
@@ -25,24 +22,18 @@ import scala.util.Try
 /**
   * Created by alexsilva on 5/17/17.
   */
-case class KafkaUtils(zkString: String, client: () => ZkClient,
-                      config: Map[String, AnyRef]) extends LoggingAdapter
+case class KafkaUtils(config: Map[String, AnyRef]) extends LoggingAdapter
   with ConfigSupport {
 
-  private[kafka] var zkUtils = Try(client.apply()).map(ZkUtils(_, false))
-
-  private[kafka] def withRunningZookeeper[T](body: ZkUtils => T): Try[T] = {
-    if (zkUtils.isFailure) {
-      synchronized {
-        zkUtils = Try(client.apply()).map(ZkUtils(_, false))
-      }
-    }
-    zkUtils.map(body)
+  private[kafka] def withClient[T](body: AdminClient => T): Try[T] = {
+    TryWith(AdminClient.create(config.asJava))(body)
   }
 
-  def topicExists(name: String): Try[Boolean] = withRunningZookeeper(AdminUtils.topicExists(_, name))
+  def topicExists(name: String): Try[Boolean] = withClient { c =>
+    c.listTopics().names.get.asScala.exists(s => s == name)
+  }
 
-  def topicNames(): Try[Seq[String]] = withRunningZookeeper(_.getAllTopics())
+  def topicNames(): Try[Seq[String]] = withClient(c => c.listTopics().names.get.asScala.toSeq)
 
   def createTopic(topic: String, details: TopicDetails, timeout: Int): Future[CreateTopicsResult] = {
     createTopics(Map(topic -> details), timeout)
@@ -51,9 +42,10 @@ case class KafkaUtils(zkString: String, client: () => ZkClient,
   def createTopics(topics: Map[String, TopicDetails], timeout: Int): Future[CreateTopicsResult] = {
     Future.fromTry {
       //check for existence first
-      withRunningZookeeper { zk =>
+      withClient { client =>
+        val kafkaTopics = client.listTopics().names().get.asScala
         topics.keys.foreach { topic =>
-          if (AdminUtils.topicExists(zk, topic)) {
+          if (kafkaTopics.exists(s => s == topic)) {
             throw new IllegalArgumentException(s"Topic $topic already exists.")
           }
         }
@@ -140,10 +132,7 @@ object KafkaUtils extends ConfigSupport {
     }
   }
 
-  def apply(zkString: String, config: Config, connectionTimeout: Int = 5000): KafkaUtils =
-    KafkaUtils(zkString, () => new ZkClient(zkString, connectionTimeout),
-      ConfigSupport.toMap(config))
+  def apply(config: Config): KafkaUtils = KafkaUtils(ConfigSupport.toMap(config))
 
-  def apply(): KafkaUtils = apply(KafkaConfigSupport.zkString,
-    KafkaConfigSupport.kafkaConfig.getConfig("kafka.producer"))
+  def apply(): KafkaUtils = apply(KafkaConfigSupport.kafkaConfig.getConfig("kafka.producer"))
 }

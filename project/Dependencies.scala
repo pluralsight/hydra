@@ -45,7 +45,7 @@ object Dependencies {
 
     val scalaz = "org.scalaz" %% "scalaz-core" % scalazVersion
 
-    val embeddedKafka = "net.manub" %% "scalatest-embedded-kafka" % "1.1.1"
+    val embeddedKafka = "net.manub" %% "scalatest-embedded-kafka" % "2.0.0"
 
     val sdNotify = "info.faljse" % "SDNotify" % "1.1"
 
