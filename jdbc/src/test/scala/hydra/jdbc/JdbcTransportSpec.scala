@@ -6,7 +6,7 @@ import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import hydra.common.util.TryWith
 import hydra.core.transport.Transport.Deliver
-import hydra.core.transport.{HydraRecord, RecordMetadata, TransportCallback}
+import hydra.core.transport.{AckStrategy, HydraRecord, RecordMetadata, TransportCallback}
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericData
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
@@ -43,13 +43,13 @@ class JdbcTransportSpec extends TestKit(ActorSystem("jdbc-transport-spec")) with
     }
 
     it("reports error if profile can't be found") {
-      val record = JdbcRecord("dest", Some(Seq.empty), gr, "dbProfile")
+      val record = JdbcRecord("dest", Some(Seq.empty), gr, "dbProfile", AckStrategy.NoAck)
       jdbcTransport ! Deliver(record, 1, ack)
       probe.expectMsgType[NoSuchElementException]
     }
 
     it("transports") {
-      val record = JdbcRecord("test_transport", Some(Seq.empty), gr, "test-dsprofile")
+      val record = JdbcRecord("test_transport", Some(Seq.empty), gr, "test-dsprofile", AckStrategy.NoAck)
       jdbcTransport ! Deliver(record, 1, ack)
       probe.expectMsg("DONE")
       //check the db too
@@ -65,14 +65,14 @@ class JdbcTransportSpec extends TestKit(ActorSystem("jdbc-transport-spec")) with
     it("errors if underlying datasource is closed") {
       val jt = TestActorRef[JdbcTransport](Props[JdbcTransport])
       jt.underlyingActor.dbProfiles("test-dsprofile").close()
-      val record = JdbcRecord("test_transport", Some(Seq.empty), gr, "test-dsprofile")
+      val record = JdbcRecord("test_transport", Some(Seq.empty), gr, "test-dsprofile", AckStrategy.NoAck)
       jt ! Deliver(record, 1, ack)
       probe.expectMsgType[SQLException]
       system.stop(jt)
     }
   }
 
-  case class TestRecord(destination: String, payload: String, key: Option[String]) extends HydraRecord[String, String]
+  case class TestRecord(destination: String, payload: String, key: Option[String], ackStrategy: AckStrategy) extends HydraRecord[String, String]
 
 }
 

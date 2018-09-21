@@ -46,4 +46,12 @@ private object H2Dialect extends JdbcDialect {
       s"alter table $table add column $colName $dbDef"
     }
   }
+
+  override def dropNotNullConstraintQueries(table: String, schema: SchemaWrapper,
+                                            dbs: DbSyntax): Seq[String] = {
+    schema.getFields.filterNot(f => schema.primaryKeys.contains(f.name)).map { f =>
+      val colName = quoteIdentifier(dbs.format(f.name))
+      s"alter table $table alter column $colName drop not null"
+    }
+  }
 }

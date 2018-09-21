@@ -148,7 +148,7 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
           |		},
           |		{
           |			"name": "username",
-          |			"type": ["null", "string"]
+          |			"type": "string"
           |		},
           |  {
           |			"name": "optional",
@@ -156,7 +156,7 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
           |     "default":"test"
           |		}
           |	]
-          |}""".stripMargin))
+          |}""".stripMargin), Seq("id"))
 
       val dbTable = store.createOrAlterTable(Table("test_table", newSchema))
 
@@ -196,6 +196,72 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
       val catalog = new JdbcCatalog(provider, UnderscoreSyntax, PostgresDialect)
 
       catalog.findMissingFields(sc, cols) shouldBe Seq(sc.schema.getField("lastName"))
+    }
+
+    it("drops constraints from a table upon altering") {
+      val schema = SchemaWrapper.from(new Schema.Parser().parse(
+        """
+          |{
+          |	"type": "record",
+          |	"name": "User",
+          |	"namespace": "hydra",
+          |	"fields": [{
+          |			"name": "id",
+          |			"type": "int",
+          |			"doc": "doc"
+          |		},
+          |		{
+          |			"name": "username",
+          |			"type": "string"
+          |		},
+          |  {
+          |			"name": "testColumn",
+          |			"type": "string",
+          |     "default":"test"
+          |		}
+          |	]
+          |}""".stripMargin), Seq("id"))
+
+      store.createOrAlterTable(Table("test_constraint", schema))
+
+      val cols = List(
+        DbColumn("id", JDBCType.INTEGER, false, Some("")),
+        DbColumn("username", JDBCType.CLOB, false, Some("")),
+        DbColumn("testColumn", JDBCType.CLOB, false, Some("")))
+      store.getTableMetadata(TableIdentifier("test_constraint", None, Some("")))
+        .get shouldBe DbTable("test_constraint", cols, None)
+
+      val newSchema = SchemaWrapper.from(new Schema.Parser().parse(
+        """
+          |{
+          |	"type": "record",
+          |	"name": "User",
+          |	"namespace": "hydra",
+          |	"fields": [{
+          |			"name": "id",
+          |			"type": "int",
+          |			"doc": "doc"
+          |		},
+          |		{
+          |			"name": "username",
+          |			"type": ["null", "string"]
+          |		},
+          |  {
+          |			"name": "testColumn",
+          |			"type": ["null", "string"],
+          |     "default":"test"
+          |		}
+          |	]
+          |}""".stripMargin), Seq("id"))
+
+      store.createOrAlterTable(Table("test_constraint", newSchema))
+
+      val ncols = List(
+        DbColumn("id", JDBCType.INTEGER, false, Some("")),
+        DbColumn("username", JDBCType.CLOB, true, Some("")),
+        DbColumn("testColumn", JDBCType.CLOB, true, Some("")))
+      store.getTableMetadata(TableIdentifier("test_constraint", None, Some("")))
+        .get shouldBe DbTable("test_constraint", ncols, None)
     }
   }
 }

@@ -22,7 +22,7 @@ case class HydraKafkaCallback(deliveryId: Long,
   }
 
   private def doAck(md: RecordMetadata) = {
-    val kmd = KafkaRecordMetadata(md, deliveryId)
+    val kmd = KafkaRecordMetadata(md, deliveryId, record.ackStrategy)
     producer ! kmd
     callback.onCompletion(deliveryId, Some(kmd), None)
   }

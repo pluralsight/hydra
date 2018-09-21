@@ -18,7 +18,7 @@ package hydra.rabbit
 
 import hydra.common.config.ConfigSupport
 import hydra.core.ingest.HydraRequest
-import hydra.core.transport.{HydraRecord, RecordFactory, RecordMetadata}
+import hydra.core.transport.{AckStrategy, HydraRecord, RecordFactory, RecordMetadata}
 import hydra.rabbit.RabbitRecord.{DESTINATION_TYPE_EXCHANGE, DESTINATION_TYPE_QUEUE, HYDRA_RABBIT_EXCHANGE, HYDRA_RABBIT_QUEUE}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -33,14 +33,15 @@ object RabbitRecordFactory extends RecordFactory[String, String] with ConfigSupp
         case Some(exchange) => (exchange, DESTINATION_TYPE_EXCHANGE)
         case _ => (request.metadataValue(HYDRA_RABBIT_QUEUE).get, DESTINATION_TYPE_QUEUE)
       }
-      RabbitRecord(destination._1, destination._2, request.payload)
+      RabbitRecord(destination._1, destination._2, request.payload, request.ackStrategy)
     }
   }
 }
 
 case class RabbitRecord(destination: String,
                         destinationType: String,
-                        payload: String)
+                        payload: String,
+                        ackStrategy: AckStrategy)
   extends HydraRecord[String, String] {
 
   override val key: Option[String] = None
@@ -58,4 +59,5 @@ object RabbitRecord {
 
 }
 
-case class RabbitRecordMetadata(timestamp: Long, id: Long, destination: String, destinationType: String) extends RecordMetadata
+case class RabbitRecordMetadata(timestamp: Long, id: Long, destination: String,
+                                destinationType: String, ackStrategy: AckStrategy) extends RecordMetadata

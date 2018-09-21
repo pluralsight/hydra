@@ -28,7 +28,8 @@ object StringRecordFactory extends KafkaRecordFactory[String, String] {
   override def build(request: HydraRequest)(implicit ex: ExecutionContext) = {
     for {
       topic <- Future.fromTry(getTopic(request))
-    } yield StringRecord(topic, getKey(request, request.payload), request.payload)
+    } yield StringRecord(topic, getKey(request, request.payload), request.payload,
+      request.ackStrategy)
   }
 }
 

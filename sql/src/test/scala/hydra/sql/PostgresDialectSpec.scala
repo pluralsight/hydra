@@ -230,8 +230,7 @@ class PostgresDialectSpec extends Matchers
       val expected =
         """insert into table ("id","username","address") values (?,?,to_json(?::json))
           |on conflict ("id")
-          |do update set ("username","address") = (?,to_json(?::json))
-          |where table."id"=?;""".stripMargin
+          |do update set "username" = EXCLUDED."username","address" = EXCLUDED."address";""".stripMargin
 
       stmt shouldBe expected
     }
@@ -269,8 +268,7 @@ class PostgresDialectSpec extends Matchers
       val expected =
         """insert into table ("id1","id2","username") values (?,?,?)
           |on conflict ("id1","id2")
-          |do update set ("username") = (?)
-          |where table."id1"=? and table."id2"=?;""".stripMargin
+          |do update set "username" = EXCLUDED."username";""".stripMargin
 
       stmt shouldBe expected
     }
@@ -333,7 +331,7 @@ class PostgresDialectSpec extends Matchers
       val avro = new Schema.Parser().parse(schema)
 
       PostgresDialect.upsertFields(avro) shouldBe Seq(avro.getField("id1"), avro.getField("id2"),
-        avro.getField("username"), avro.getField("username"), avro.getField("id1"), avro.getField("id2"))
+        avro.getField("username"))
     }
 
     it("Creates the correct alter table statements") {
@@ -415,7 +413,6 @@ class PostgresDialectSpec extends Matchers
     val schema = new Schema.Parser().parse(schemaR)
     val field = schema.getField("authors")
     getJdbcType(field.schema(), PostgresDialect).databaseTypeDefinition shouldBe "JSON" //the conversion is made by postgres
-    println(PostgresDialect.insertStatement("json_test", SchemaWrapper.from(schema), UnderscoreSyntax))
   }
 
   it("returns the correct array type") {
@@ -441,5 +438,28 @@ class PostgresDialectSpec extends Matchers
 
     val tp = PostgresDialect.getArrayType(schema.getField("friends").schema())
     tp.get shouldBe JdbcType("TEXT[]", java.sql.JDBCType.ARRAY)
+  }
+
+  it("creates drop not null constraint queries") {
+    val str =
+      """
+        |{
+        |	"type": "record",
+        |	"name": "User",
+        |	"namespace": "hydra",
+        |	"fields": [
+        | {
+        |			"name": "username",
+        |			"type": "string"
+        |		}
+        |	]
+        |}
+      """.stripMargin
+
+    val schema = SchemaWrapper.from(new Schema.Parser().parse(str))
+
+    val tp = PostgresDialect
+      .dropNotNullConstraintQueries("user", schema, UnderscoreSyntax)
+    tp shouldBe Seq("""alter table user alter column "username" drop not null""")
   }
 }

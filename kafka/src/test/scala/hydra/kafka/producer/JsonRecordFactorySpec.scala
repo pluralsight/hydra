@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_KEY_PARAM}
 import hydra.core.protocol.MissingMetadataException
+import hydra.core.transport.AckStrategy
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FunSpecLike, Matchers}
 
@@ -52,7 +53,7 @@ class JsonRecordFactorySpec extends Matchers
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = JsonRecordFactory.build(request)
       val node = new ObjectMapper().reader().readTree("""{"name":"test"}""")
-      whenReady(rec)(_ shouldBe JsonRecord("test-topic", None, node))
+      whenReady(rec)(_ shouldBe JsonRecord("test-topic", None, node, AckStrategy.NoAck))
     }
 
     it("builds") {

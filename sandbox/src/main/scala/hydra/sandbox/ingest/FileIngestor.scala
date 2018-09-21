@@ -40,7 +40,8 @@ object FileRecordFactory extends RecordFactory[String, String] with ConfigSuppor
   override def build(r: HydraRequest)(implicit ec: ExecutionContext): Future[REC] = {
     val file = r.metadataValue("hydra-file-stream").get
     destinations.get(file)
-      .map(_ => Future.successful(FileRecord(r.metadataValue("hydra-file-stream").get, r.payload)))
+      .map(_ => Future.successful(FileRecord(r.metadataValue("hydra-file-stream").get,
+        r.payload, r.ackStrategy)))
       .getOrElse(Future.failed(new IllegalArgumentException(s"No file stream with id $file was configured.")))
   }
 }

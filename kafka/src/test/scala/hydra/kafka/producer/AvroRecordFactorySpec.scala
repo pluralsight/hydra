@@ -24,6 +24,7 @@ import hydra.core.akka.SchemaRegistryActor.{FetchSchemaRequest, FetchSchemaRespo
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams._
 import hydra.core.protocol.MissingMetadataException
+import hydra.core.transport.AckStrategy
 import org.apache.avro.Schema
 import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
 import org.scalatest.concurrent.ScalaFutures
@@ -197,7 +198,7 @@ class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
       whenReady(factory.build(r)) { rec =>
         val genericRecord = new GenericRecordBuilder(testSchema)
           .set("name", "test").set("rank", 10).build()
-        val avroRecord = AvroRecord("test-topic", testSchema, None, genericRecord)
+        val avroRecord = AvroRecord("test-topic", testSchema, None, genericRecord, AckStrategy.NoAck)
         rec shouldBe avroRecord
       }
     }

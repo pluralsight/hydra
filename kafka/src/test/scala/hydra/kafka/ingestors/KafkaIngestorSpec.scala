@@ -1,8 +1,8 @@
 package hydra.kafka.ingestors
 
-import akka.actor.{ ActorSystem, Props }
+import akka.actor.{ActorSystem, Props}
 import akka.testkit.TestActors.ForwardActor
-import akka.testkit.{ ImplicitSender, TestKit, TestProbe }
+import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.typesafe.config.ConfigFactory
 import hydra.avro.registry.ConfluentSchemaRegistry
@@ -10,15 +10,16 @@ import hydra.common.config.ConfigSupport
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams._
 import hydra.core.protocol._
+import hydra.core.transport.AckStrategy
 import hydra.core.transport.AckStrategy.NoAck
 import hydra.kafka.producer
-import hydra.kafka.producer.{ AvroRecord, AvroRecordFactory, JsonRecord }
+import hydra.kafka.producer.{AvroRecord, AvroRecordFactory, JsonRecord}
 import hydra.kafka.test.TestRecordFactory
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Parser
 import org.apache.avro.generic.GenericRecordBuilder
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{ BeforeAndAfterAll, FunSpecLike, Matchers }
+import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -61,7 +62,7 @@ class KafkaIngestorSpec
   val avroSchema = new Schema.Parser().parse(schema)
 
   val record = new GenericRecordBuilder(avroSchema).set("first", "hydra").set("last", "hydra").build()
-  val ar = producer.AvroRecord("test-schema", avroSchema, None, record)
+  val ar = producer.AvroRecord("test-schema", avroSchema, None, record, AckStrategy.NoAck)
 
   val json = """{"first":"hydra","last":"hydra"}"""
 
@@ -127,7 +128,7 @@ class KafkaIngestorSpec
       Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "just-a-topic", HYDRA_SCHEMA_PARAM -> "test-schema"))
     avroRecordFactory.getTopicAndSchemaSubject(request).get._2 shouldBe "test-schema"
     kafkaIngestor ! Validate(request)
-    val ar = AvroRecord("just-a-topic", avroSchema, None, record)
+    val ar = AvroRecord("just-a-topic", avroSchema, None, record, AckStrategy.NoAck)
     expectMsg(ValidRequest(ar))
   }
   it("is valid if schema can't be found, but json is allowed") {
@@ -135,7 +136,7 @@ class KafkaIngestorSpec
       Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_RECORD_FORMAT_PARAM -> "json", HYDRA_KAFKA_TOPIC_PARAM -> "json-topic"))
     kafkaIngestor ! Validate(request)
     val node = new ObjectMapper().reader().readTree("""{"first":"hydra","last":"hydra"}""")
-    expectMsg(ValidRequest(JsonRecord("json-topic", None, node)))
+    expectMsg(ValidRequest(JsonRecord("json-topic", None, node, AckStrategy.NoAck)))
   }
 
 }

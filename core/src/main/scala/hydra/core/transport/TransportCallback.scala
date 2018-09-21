@@ -22,6 +22,7 @@ trait TransportCallback {
 class IngestorCallback[K, V](record: HydraRecord[K, V], ingestor: ActorRef, supervisor: ActorRef, transport: ActorRef)
   extends TransportCallback {
 
+
   override def onCompletion(deliveryId: Long, md: Option[RecordMetadata], exception: Option[Throwable]): Unit = {
     md match {
       case Some(recordMetadata) => onSuccess(deliveryId, recordMetadata)

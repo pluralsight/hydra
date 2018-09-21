@@ -88,7 +88,7 @@ private[sql] object JdbcUtils {
                   createTableOptions: String,
                   dbSyntax: DbSyntax,
                   conn: Connection): Int = {
-    val strSchema = schemaString(schema, dialect, dbSyntax)
+    val strSchema = schemaString(schema, table, dialect, dbSyntax)
     val sql = s"CREATE TABLE $table ($strSchema) $createTableOptions"
     logger.debug(sql)
     val statement = conn.createStatement
@@ -140,7 +140,7 @@ private[sql] object JdbcUtils {
   }
 
 
-  def schemaString(schema: SchemaWrapper, dialect: JdbcDialect,
+  def schemaString(schema: SchemaWrapper, tableName:String, dialect: JdbcDialect,
                    dbSyntax: DbSyntax = NoOpSyntax): String = {
     val schemaStr = schema.getFields.map { field =>
       val name = dialect.quoteIdentifier(dbSyntax.format(field.name))
@@ -150,7 +150,7 @@ private[sql] object JdbcUtils {
     }
     val pkSeq = schema.primaryKeys
       .map(f => dialect.quoteIdentifier(dbSyntax.format(f)))
-    val pkStmt = if (!pkSeq.isEmpty) s",CONSTRAINT ${schema.getName}_PK PRIMARY KEY (${pkSeq.mkString(",")})" else ""
+    val pkStmt = if (!pkSeq.isEmpty) s""",CONSTRAINT "${tableName}_PK" PRIMARY KEY (${pkSeq.mkString(",")})""" else ""
     val ddl = s"${schemaStr.mkString(",")}${pkStmt}"
     ddl
   }

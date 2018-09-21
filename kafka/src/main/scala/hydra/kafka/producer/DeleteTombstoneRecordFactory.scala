@@ -29,7 +29,7 @@ object DeleteTombstoneRecordFactory extends KafkaRecordFactory[String, Any] {
                     (implicit ex: ExecutionContext): Future[DeleteTombstoneRecord] = {
     for {
       topic <- Future.fromTry(getTopic(request))
-    } yield DeleteTombstoneRecord(topic, getKey(request))
+    } yield DeleteTombstoneRecord(topic, getKey(request), request.ackStrategy)
   }
 }
 

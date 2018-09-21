@@ -4,6 +4,7 @@ import java.sql.JDBCType
 
 import hydra.avro.convert.IsoDate
 import hydra.avro.util.SchemaWrapper
+import hydra.common.logging.LoggingAdapter
 import hydra.sql.JdbcUtils.isLogicalType
 import org.apache.avro.LogicalTypes.Decimal
 import org.apache.avro.Schema.Type.{BYTES, UNION}
@@ -13,7 +14,7 @@ import org.apache.avro.{LogicalTypes, Schema}
 /**
   * Created by alexsilva on 5/4/17.
   */
-private[sql] object PostgresDialect extends JdbcDialect {
+private[sql] object PostgresDialect extends JdbcDialect with LoggingAdapter {
 
   override val jsonPlaceholder = "to_json(?::json)"
 
@@ -57,10 +58,7 @@ private[sql] object PostgresDialect extends JdbcDialect {
   }
 
   override def upsertFields(schema: SchemaWrapper): Seq[Field] = {
-    val fields = schema.getFields
-    val idFields = schema.primaryKeys.map(schema.schema.getField)
-    val updateSchema = if (idFields.isEmpty) Seq.empty else fields -- idFields
-    fields ++ updateSchema ++ idFields
+    schema.getFields
   }
 
   override def buildUpsert(table: String, schema: SchemaWrapper, dbs: DbSyntax): String = {
@@ -71,15 +69,12 @@ private[sql] object PostgresDialect extends JdbcDialect {
     val columns = fields.map(formatColName).mkString(",")
     val placeholders = parameterize(fields)
     val updateSchema = fields -- idFields
-    val updateColumns = updateSchema.map(formatColName).mkString(",")
-    val updatePlaceholders = parameterize(updateSchema)
-    val whereClause = idFields.map(c => s"$table.${formatColName(c)}=?").mkString(" and ")
+    val upsertColumns = updateSchema.map(formatColName).map(col => s"${col} = EXCLUDED.${col}")
 
     val sql =
       s"""insert into $table ($columns) values (${placeholders.mkString(",")})
          |on conflict (${idFields.map(formatColName).mkString(",")})
-         |do update set ($updateColumns) = (${updatePlaceholders.mkString(",")})
-         |where $whereClause;""".stripMargin
+         |do update set ${upsertColumns.mkString(",")};""".stripMargin
 
     sql
 
@@ -105,6 +100,15 @@ private[sql] object PostgresDialect extends JdbcDialect {
       val dbDef = JdbcUtils.getJdbcType(f.schema, this).databaseTypeDefinition
       val colName = quoteIdentifier(dbs.format(f.name))
       s"alter table $table add column $colName $dbDef"
+    }
+  }
+
+  override def dropNotNullConstraintQueries(table: String, schema: SchemaWrapper, dbs: DbSyntax): Seq[String] = {
+    schema.getFields.filterNot(f => schema.primaryKeys.contains(f.name)).map { f =>
+      val colName = quoteIdentifier(dbs.format(f.name))
+      val sql = s"alter table $table alter column $colName drop not null"
+      log.debug(sql)
+      sql
     }
   }
 

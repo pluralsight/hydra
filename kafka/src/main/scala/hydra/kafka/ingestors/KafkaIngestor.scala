@@ -19,18 +19,17 @@ package hydra.kafka.ingestors
 import hydra.core.ingest.Ingestor
 import hydra.core.ingest.RequestParams._
 import hydra.core.protocol._
-import hydra.kafka.producer.{ KafkaProducerSupport, KafkaRecordFactories }
+import hydra.kafka.producer.{KafkaProducerSupport, KafkaRecordFactories}
 
 /**
- * Sends JSON messages to a topic in Kafka.  In order for this handler to be activated.
- * a request param "Hydra-kafka-topic" must be present.
- *
- */
+  * Sends JSON messages to a topic in Kafka.  In order for this handler to be activated.
+  * a request param "Hydra-kafka-topic" must be present.
+  *
+  */
 class KafkaIngestor extends Ingestor with KafkaProducerSupport {
 
   override val recordFactory = new KafkaRecordFactories(schemaRegistryActor)
 
-  //todo: Validate topic Name Topic.validate(topic)
   ingest {
     case Publish(request) =>
       val hasTopic = request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM).isDefined

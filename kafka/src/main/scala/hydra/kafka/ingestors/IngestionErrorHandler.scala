@@ -54,7 +54,7 @@ class IngestionErrorHandler extends Actor with ConfigSupport with DefaultJsonPro
     val errorInfo = HydraIngestionErrorInfo(err.ingestor, topic, err.cause.getMessage,
       err.request.metadata, schema, err.request.payload).toJson.compactPrint
 
-    AvroRecord(errorTopic, errorSchema, topic, errorInfo)
+    AvroRecord(errorTopic, errorSchema, topic, errorInfo, err.request.ackStrategy)
   }
 }
 

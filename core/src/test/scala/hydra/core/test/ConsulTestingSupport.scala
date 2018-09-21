@@ -13,7 +13,7 @@ trait ConsulTestingSupport extends TestSuite
   with BeforeAndAfterAll {
 
   val consulPort = rootConfig.getInt("consul.http.port")
-  val consulAddress = rootConfig.getString("consul.http.address")
+  val consulAddress = rootConfig.getString("consul.http.host")
 
   lazy val consul = ConsulStarterBuilder.consulStarter()
     .withHttpPort(consulPort).build().start()

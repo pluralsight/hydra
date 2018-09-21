@@ -4,7 +4,7 @@ import akka.actor.ActorRef
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.HydraRequest
-import hydra.core.transport.{AckStrategy, HydraRecord, RecordMetadata}
+import hydra.core.transport.{AckStrategy, HydraRecord, HydraRecordMetadata, RecordMetadata}
 import org.joda.time.DateTime
 
 import scala.concurrent.duration.FiniteDuration
@@ -102,7 +102,7 @@ case class Produce[K, V](record: HydraRecord[K, V],
   *
   * @param supervisor
   */
-case class RecordAccepted(supervisor: ActorRef) extends HydraMessage
+case class RecordAccepted(supervisor: ActorRef, destination: String) extends HydraMessage
 
 /**
   * Signals that a record was successfully produced by Hydra.

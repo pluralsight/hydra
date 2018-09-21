@@ -295,7 +295,7 @@ class JdbcUtilsSpec extends Matchers
         "\"passwordHash\" BYTE NOT NULL,\"signupTimestamp\" TIMESTAMP NOT NULL,\"scoreLong\" BIGINT NOT NULL," +
         "\"signupDate\" DATE NOT NULL,\"justANumber\" INTEGER NOT NULL,\"testUnion\" TEXT "
 
-      JdbcUtils.schemaString(SchemaWrapper.from(avro), NoopDialect) shouldBe columns
+      JdbcUtils.schemaString(SchemaWrapper.from(avro), "User", NoopDialect) shouldBe columns
     }
 
     it("Generates the correct ddl statement") {
@@ -329,8 +329,8 @@ class JdbcUtilsSpec extends Matchers
 
       val avro = new Schema.Parser().parse(schema)
 
-      val stmt = JdbcUtils.schemaString(SchemaWrapper.from((avro)), PostgresDialect)
-      stmt shouldBe "\"id\" INTEGER NOT NULL,\"username\" TEXT NOT NULL,\"testEnum\" TEXT NOT NULL,CONSTRAINT User_PK PRIMARY KEY (\"id\")"
+      val stmt = JdbcUtils.schemaString(SchemaWrapper.from((avro)), "User", PostgresDialect)
+      stmt shouldBe "\"id\" INTEGER NOT NULL,\"username\" TEXT NOT NULL,\"testEnum\" TEXT NOT NULL,CONSTRAINT \"User_PK\" PRIMARY KEY (\"id\")"
     }
 
     it("Generates the correct ddl statement with composite primary  keys") {
@@ -367,9 +367,9 @@ class JdbcUtilsSpec extends Matchers
         """.stripMargin
 
       val avro = new Schema.Parser().parse(schema)
-      val stmt = JdbcUtils.schemaString(SchemaWrapper.from((avro)), PostgresDialect)
+      val stmt = JdbcUtils.schemaString(SchemaWrapper.from((avro)), "User", PostgresDialect)
       stmt shouldBe "\"id1\" INTEGER NOT NULL,\"id2\" INTEGER NOT NULL,\"username\" TEXT NOT NULL," +
-        "\"testEnum\" TEXT NOT NULL,CONSTRAINT User_PK PRIMARY KEY (\"id1\",\"id2\")"
+        "\"testEnum\" TEXT NOT NULL,CONSTRAINT \"User_PK\" PRIMARY KEY (\"id1\",\"id2\")"
     }
 
     it("Generates the correct table name from a versioned schema") {
@@ -402,7 +402,7 @@ class JdbcUtilsSpec extends Matchers
       JdbcUtils.dropTable(provider.getConnection(), "drop_test")
       intercept[JdbcSQLException] {
         TryWith(provider.getConnection().createStatement()) { stmt =>
-          stmt.executeUpdate("""insert into hydra_drop values(1,'test')""") shouldBe 1
+          stmt.executeUpdate("""insert into drop_test values(1,'test')""") shouldBe 1
         }.get
       }
     }

@@ -33,18 +33,18 @@ class TransportCallbackSpec extends TestKit(ActorSystem("test")) with Matchers w
       supervisor.expectNoMessage(3 seconds)
       probe.expectMsg(TransportError(-11))
 
-      new TransportSupervisorCallback(probe.ref).onCompletion(-11, Some(TestRecordMetadata(1)), None)
+      new TransportSupervisorCallback(probe.ref).onCompletion(-11, Some(TestRecordMetadata(1, 0, "", AckStrategy.NoAck)), None)
       ingestor.expectNoMessage(3 seconds)
       supervisor.expectNoMessage(3 seconds)
       probe.expectMsg(Confirm(-11))
     }
 
     it("handles ingestor callbacks") {
-      val rec = TestRecord("OK", Some("1"), "test")
+      val rec = TestRecord("OK", Some("1"), "test", AckStrategy.NoAck)
       val transport = TestProbe()
       val cb = new IngestorCallback[String, String](rec, ingestor.ref, supervisor.ref, transport.ref)
 
-      cb.onCompletion(1, Some(TestRecordMetadata(1)), None)
+      cb.onCompletion(1, Some(TestRecordMetadata(1, 0, "", AckStrategy.NoAck)), None)
       ingestor.expectMsgPF() {
         case RecordProduced(md, sup) =>
           sup shouldBe supervisor.ref
