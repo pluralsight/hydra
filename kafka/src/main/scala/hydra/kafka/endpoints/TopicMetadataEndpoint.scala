@@ -1,5 +1,7 @@
 package hydra.kafka.endpoints
 
+import java.util.concurrent.TimeUnit
+
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
@@ -11,16 +13,12 @@ import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.common.util.ActorUtils
 import hydra.core.http.{CorsSupport, HydraDirectives, NotFoundException}
-import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.util.KafkaUtils
-import org.I0Itec.zkclient.ZkClient
 import org.apache.kafka.common.PartitionInfo
-import org.apache.kafka.common.protocol.Errors
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
-import org.apache.kafka.common.requests.CreateTopicsResponse
 import scalacache._
 import scalacache.guava.GuavaCache
 import scalacache.modes.scalaFuture._
@@ -29,6 +27,7 @@ import scala.collection.JavaConverters._
 import scala.collection.immutable.Map
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 /**
   * A cluster metadata endpoint implemented exclusively with akka streams.
@@ -58,8 +57,7 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
 
   implicit val timeout = Timeout(5 seconds)
 
-  private lazy val kafkaUtils = new KafkaUtils(KafkaConfigSupport.zkString,
-    () => new ZkClient(KafkaConfigSupport.zkString))
+  private lazy val kafkaUtils = KafkaUtils()
 
   private val filterSystemTopics = (t: String) => (t.startsWith("_") && showSystemTopics) || !t.startsWith("_")
 
@@ -94,24 +92,19 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
       entity(as[CreateTopicReq]) { req =>
         val details = new TopicDetails(req.partitions, req.replicationFactor, req.config.asJava)
         val to = timeout.duration.toMillis.toInt
-        onSuccess(Future.fromTry(kafkaUtils.createTopic(req.topic, details, to))) { f =>
-          f.errors.asScala.find(_._2.error != Errors.NONE).map { _ =>
-            complete(StatusCodes.BadRequest, fromKafka(f.errors.asScala.toMap))
-          }.getOrElse(complete(StatusCodes.OK, topicInfo(req.topic)))
+        onSuccess(kafkaUtils.createTopic(req.topic, details, to)) { result =>
+          Try(result.all.get(timeout.duration.toSeconds, TimeUnit.SECONDS))
+            .map(_ => complete(StatusCodes.OK, topicInfo(req.topic)))
+            .recover { case e: Exception => complete(StatusCodes.BadRequest,
+              CreateTopicResponseError(e.getMessage)) }.get
         }
       }
     }
   }
 
-
-  private def fromKafka(errors: Map[String, CreateTopicsResponse.Error]) =
-    CreateTopicResponseError(errors.map { err => err._1 -> err._2.message() })
-
-
   private def topicInfo(name: String): Future[Seq[PartitionInfo]] = {
     import akka.pattern.ask
     (consumerProxy ? GetPartitionInfo(name)).mapTo[PartitionInfoResponse].map(_.partitionInfo)
-
   }
 
   private def topics: Future[Map[String, Seq[PartitionInfo]]] = {
@@ -138,7 +131,7 @@ case class CreateTopicReq(topic: String,
                           config: Map[String, String])
 
 
-case class CreateTopicResponseError(errors: Map[String, String])
+case class CreateTopicResponseError(error:String)
 
 
 

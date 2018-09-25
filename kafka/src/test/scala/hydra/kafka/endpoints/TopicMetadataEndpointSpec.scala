@@ -8,8 +8,12 @@ import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.common.{Node, PartitionInfo}
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
-class TopicMetadataEndpointSpec extends Matchers with WordSpecLike with ScalatestRouteTest
-  with HydraKafkaJsonSupport with BeforeAndAfterAll with EmbeddedKafka {
+class TopicMetadataEndpointSpec extends Matchers
+  with WordSpecLike
+  with ScalatestRouteTest
+  with HydraKafkaJsonSupport
+  with BeforeAndAfterAll
+  with EmbeddedKafka {
 
   import spray.json._
 
@@ -132,7 +136,7 @@ class TopicMetadataEndpointSpec extends Matchers with WordSpecLike with Scalates
       Post("/transports/kafka/topics", entity) ~> route ~> check {
         response.status.intValue() shouldBe 400
         val r = responseAs[CreateTopicResponseError]
-        r.errors should contain key ("test")
+        r.error.indexOf("UnknownServerException") should be > -1
       }
     }
   }
