@@ -1,8 +1,8 @@
 package hydra.kafka.producer
 
 import hydra.core.transport.HydraRecord
-import org.apache.commons.lang3.ClassUtils
 import org.apache.kafka.clients.producer.ProducerRecord
+import org.springframework.util.ClassUtils
 
 /**
   * Created by alexsilva on 2/22/17.
@@ -20,7 +20,7 @@ trait KafkaRecord[K, V] extends HydraRecord[K, V] {
     *
     */
   val formatName: String = {
-    val cname = ClassUtils.getSimpleName(getClass)
+    val cname = ClassUtils.getShortName(getClass)
     val idx = cname.indexOf("Record")
     if (idx != -1) {
       cname.take(idx).toLowerCase
