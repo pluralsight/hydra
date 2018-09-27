@@ -22,8 +22,8 @@ trait Transport extends PersistentActor
     case Confirm(deliveryId) =>
       if (deliveryId > 0) persistAsync(DestinationConfirmed(deliveryId))(updateState)
 
-    case t@TransportError(_) =>
-      context.system.eventStream.publish(t)
+    case TransportError(deliveryId) =>
+      if (deliveryId > 0) persistAsync(DestinationConfirmed(deliveryId))(updateState) //delete from journal (error)
   }
 
   final override def receiveCommand = baseCommand orElse transport
