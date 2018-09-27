@@ -29,9 +29,11 @@ class PublishMetrics(topic: String)(implicit system: ActorSystem) extends KafkaM
 
   import KafkaRecordMetadata._
 
-  private val producer = KafkaUtils.producerSettings[String, String]("string", rootConfig)
-    .withProperty("client.id", "hydra.kafka.metrics")
-    .createKafkaProducer()
+  private val producer = {
+    KafkaUtils.producerSettings[String, String]("string", rootConfig)
+      .withProperty("client.id", "hydra.kafka.metrics")
+      .createKafkaProducer()
+  }
 
   def saveMetrics(record: KafkaRecordMetadata) = {
     val payload = record.toJson.compactPrint

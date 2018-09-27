@@ -13,11 +13,12 @@ object Dependencies {
   val kxbmapConfigVersion = "0.4.4"
   val typesafeConfigVersion = "1.3.2"
   val avroVersion = "1.8.1"
+  val springVersion = "4.2.2.RELEASE"
   val jodaTimeVersion = "2.9.9"
   val jodaConvertVersion = "1.8.1"
-  val confluentVersion = "5.0.0"
+  val confluentVersion = "3.2.0"
   val sprayJsonVersion = "1.3.c2"
-  val kafkaVersion = "2.0.0"
+  val kafkaVersion = "0.10.2.1"
   val reflectionsVersion = "0.9.11"
   val akkaHTTPVersion = "10.1.5"
   val akkaKafkaStreamVersion = "0.14"
@@ -29,6 +30,7 @@ object Dependencies {
   val hikariCPVersion = "2.6.2"
   val jacksonVersion = "2.9.5"
   val opRabbitVersion = "2.0.0"
+  val constructRVersion = "0.19.0"
   val akkaHTTPCorsVersion = "0.2.2"
   val kamonVersion = "1.1.0"
   val kamonPVersion = "1.0.0"
@@ -45,7 +47,7 @@ object Dependencies {
 
     val scalaz = "org.scalaz" %% "scalaz-core" % scalazVersion
 
-    val embeddedKafka = "net.manub" %% "scalatest-embedded-kafka" % "2.0.0"
+    val embeddedKafka = "net.manub" %% "scalatest-embedded-kafka" % "0.14.0"
 
     val sdNotify = "info.faljse" % "SDNotify" % "1.1"
 
@@ -90,6 +92,8 @@ object Dependencies {
     val akkaKafkaStream = "com.typesafe.akka" %% "akka-stream-kafka" % akkaKafkaStreamVersion
 
     val avro = "org.apache.avro" % "avro" % avroVersion
+
+    val spring = "org.springframework" % "spring-core" % springVersion
 
     val jsonLenses = "net.virtual-void" %% "json-lenses" % "0.6.2"
 
@@ -149,7 +153,7 @@ object Dependencies {
   val testDeps = Seq(scalaTest, junit, scalaMock, easyMock, embeddedConsul, embeddedPostgres) ++
     powerMock ++ akkaTest
 
-  val baseDeps = akka ++ logging ++ Seq(scalaz, scalaConfigs, avro) ++ joda ++ testDeps
+  val baseDeps = akka ++ logging ++ Seq(scalaz, scalaConfigs, avro, spring) ++ joda ++ testDeps
 
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
