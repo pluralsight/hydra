@@ -7,7 +7,7 @@ class TopicNameValidatorSpec extends FlatSpec
   with Matchers {
 
   "A TopicNameValidator" should "return Valid for a valid topic" in {
-    TopicNameValidator.validate("dvs.test.v1.TestEntity") shouldBe Valid
+    TopicNameValidator.validate("dvs.test-topic.v1.TestEntity") shouldBe Valid
   }
 
   it should "return Invalid for a topic name longer than 249 characters" in {
@@ -18,11 +18,6 @@ class TopicNameValidatorSpec extends FlatSpec
   it should "return Invalid for a topic containing invalid characters" in {
     TopicNameValidator.validate("exp.test.Test(Topic)") shouldBe
       InvalidReport(Invalid(InvalidCharacterError))
-  }
-
-  it should "return Valid for a topic containing no invalid characters" in {
-    TopicNameValidator.validate("exp.test-test.TestTopic") shouldBe
-      Valid
   }
 
   it should "return invalid if doesn't start with a valid org prefix" in {
