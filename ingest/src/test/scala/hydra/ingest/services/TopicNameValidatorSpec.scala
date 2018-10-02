@@ -20,6 +20,11 @@ class TopicNameValidatorSpec extends FlatSpec
       InvalidReport(Invalid(InvalidCharacterError))
   }
 
+  it should "return Valid for a topic containing no invalid characters" in {
+    TopicNameValidator.validate("exp.test-test.TestTopic") shouldBe
+      Valid
+  }
+
   it should "return invalid if doesn't start with a valid org prefix" in {
     TopicNameValidator.validate("false.test.TestTopic") shouldBe
       InvalidReport(Invalid(BadOrgError))

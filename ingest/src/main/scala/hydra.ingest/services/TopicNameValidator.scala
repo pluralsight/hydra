@@ -29,9 +29,8 @@ object TopicNameValidator {
     }
   }
 
-  // TODO fix regex
   private def topicContainsInvalidChars(topic: String): ValidationResponse = {
-    if (topic.matches("^[a-zA-Z0-9.-_]*$")) {
+    if (topic.matches("^[a-zA-Z0-9\\.\\-\\_]*$")) {
       Valid
     }
     else {
