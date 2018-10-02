@@ -18,6 +18,7 @@ package hydra.ingest.http
 
 import akka.actor._
 import akka.http.scaladsl.model.HttpRequest
+import akka.http.scaladsl.model.StatusCodes.OK
 import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
 import akka.stream.ActorMaterializer
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
@@ -61,6 +62,17 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: Execut
               publishRequest
             }
           } ~ deleteRequest
+        }
+      }
+    } ~
+    pathPrefix("topics") {
+      pathEndOrSingleSlash {
+        handleExceptions(exceptionHandler) {
+          post {
+            requestEntityPresent {
+              complete(OK, "Yep, endpoint works when you post a payload.")
+            }
+          } ~ complete(OK, "This endpoint does not accept not POSTs")
         }
       }
     }
