@@ -105,5 +105,9 @@ class IngestEndpointSpec extends Matchers
         status shouldBe StatusCodes.OK
       }
     }
+
+    "forwards topic metadata to the appropriate handler" in {
+      succeed
+    }
   }
 }

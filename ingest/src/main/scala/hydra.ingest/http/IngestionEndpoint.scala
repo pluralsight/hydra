@@ -93,6 +93,14 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: Execut
     }
   }
 
+  private def publishMetadataRequest = extractRequest { req =>
+      onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>
+        imperativelyComplete { ctx =>
+          requestHandler ! InitiateHttpRequest(hydraRequest, ingestTimeout, ctx)
+        }
+      }
+    }
+
   private def exceptionHandler = ExceptionHandler {
     case e: IllegalArgumentException => complete(400, GenericError(400, e.getMessage))
   }
