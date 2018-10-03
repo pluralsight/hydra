@@ -19,7 +19,7 @@ case class ConfluentSchemaRegistry(registryClient: SchemaRegistryClient, registr
 
 
   def getById(id: Int, suffix: String = "-value")(implicit ec: ExecutionContext): Future[SchemaMetadata] = Future {
-    val schema = registryClient.getByID(id)
+    val schema = registryClient.getById(id)
     val subject = schema.getFullName + suffix
     registryClient.getLatestSchemaMetadata(subject)
   }
