@@ -2,7 +2,6 @@ package hydra.kafka.util
 
 import java.io.{DataInputStream, DataOutputStream}
 import java.net.Socket
-import java.nio.ByteBuffer
 
 import akka.kafka.{ConsumerSettings, ProducerSettings}
 import com.typesafe.config.{Config, ConfigFactory}
@@ -11,79 +10,56 @@ import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.common.util.TryWith
 import hydra.kafka.config.KafkaConfigSupport
-import hydra.kafka.util.KafkaUtils.requestAndReceive
-import kafka.admin.AdminUtils
-import kafka.utils.ZkUtils
-import org.I0Itec.zkclient.ZkClient
+import org.apache.kafka.clients.admin.{AdminClient, CreateTopicsResult, NewTopic}
 import org.apache.kafka.clients.consumer.ConsumerConfig
-import org.apache.kafka.common.protocol.ApiKeys
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
-import org.apache.kafka.common.requests.{CreateTopicsRequest, CreateTopicsResponse, RequestHeader, ResponseHeader}
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Map
-import scala.util.{Random, Try}
+import scala.concurrent.Future
+import scala.util.Try
 
 /**
   * Created by alexsilva on 5/17/17.
   */
-case class KafkaUtils(zkString: String, client: () => ZkClient) extends LoggingAdapter
+case class KafkaUtils(config: Map[String, AnyRef]) extends LoggingAdapter
   with ConfigSupport {
 
-  private[kafka] var zkUtils = Try(client.apply()).map(ZkUtils(_, false))
-
-  private[kafka] def withRunningZookeeper[T](body: ZkUtils => T): Try[T] = {
-    if (zkUtils.isFailure) {
-      synchronized {
-        zkUtils = Try(client.apply()).map(ZkUtils(_, false))
-      }
-    }
-    zkUtils.map(body)
+  private[kafka] def withClient[T](body: AdminClient => T): Try[T] = {
+    TryWith(AdminClient.create(config.asJava))(body)
   }
 
-  def topicExists(name: String): Try[Boolean] = withRunningZookeeper(AdminUtils.topicExists(_, name))
+  def topicExists(name: String): Try[Boolean] = withClient { c =>
+    c.listTopics().names.get.asScala.exists(s => s == name)
+  }
 
-  def topicNames(): Try[Seq[String]] = withRunningZookeeper(_.getAllTopics())
+  def topicNames(): Try[Seq[String]] = withClient(c => c.listTopics().names.get.asScala.toSeq)
 
-  def createTopic(topic: String, details: TopicDetails, timeout: Int): Try[CreateTopicsResponse] = {
+  def createTopic(topic: String, details: TopicDetails, timeout: Int): Future[CreateTopicsResult] = {
     createTopics(Map(topic -> details), timeout)
   }
 
-  def createTopics(topics: Map[String, TopicDetails], timeout: Int): Try[CreateTopicsResponse] = {
-    //check for existence first
-    withRunningZookeeper { zk =>
-      topics.keys.foreach { topic =>
-        if (AdminUtils.topicExists(zk, topic)) {
-          throw new IllegalArgumentException(s"Topic $topic already exist.")
+  def createTopics(topics: Map[String, TopicDetails], timeout: Int): Future[CreateTopicsResult] = {
+    Future.fromTry {
+      //check for existence first
+      withClient { client =>
+        val kafkaTopics = client.listTopics().names().get.asScala
+        topics.keys.foreach { topic =>
+          if (kafkaTopics.exists(s => s == topic)) {
+            throw new IllegalArgumentException(s"Topic $topic already exists.")
+          }
         }
+      }.flatMap { _ => //accounts for topic exists or zookeeper connection error
+        val newTopics = topics.map(t =>
+          new NewTopic(t._1, t._2.numPartitions, t._2.replicationFactor).configs(t._2.configs))
+        TryWith(AdminClient.create(config.asJava)) { client => client.createTopics(newTopics.asJavaCollection) }
       }
-    }.flatMap { _ => //accounts for topic exists or zookeeper connection error
-      val builder = new CreateTopicsRequest.Builder(topics.asJava, timeout, false)
-      val broker = Random.shuffle(KafkaConfigSupport.bootstrapServers.split(",").toSeq).head
-      createTopicResponse(builder.build(), broker)
-    }
-  }
-
-  private def createTopicResponse(request: CreateTopicsRequest,
-                                  brokerInfo: String): Try[CreateTopicsResponse] = {
-    val comp = brokerInfo.split(":")
-    require(comp.length == 2, s"$comp is not a valid broker address. Use [host:port].")
-    val address = comp(0)
-    val port = comp(1).toInt
-
-    val header = new RequestHeader(ApiKeys.CREATE_TOPICS.id, 1, brokerInfo, -1)
-    val buffer = ByteBuffer.allocate(header.sizeOf + request.sizeOf)
-    header.writeTo(buffer)
-    request.writeTo(buffer)
-    requestAndReceive(buffer.array, address, port).map { resp =>
-      val respBuffer = ByteBuffer.wrap(resp)
-      ResponseHeader.parse(respBuffer)
-      CreateTopicsResponse.parse(respBuffer)
     }
   }
 }
 
 object KafkaUtils extends ConfigSupport {
+
   private val _consumerSettings = consumerSettings(rootConfig)
 
   val stringConsumerSettings: ConsumerSettings[String, String] =
@@ -156,8 +132,7 @@ object KafkaUtils extends ConfigSupport {
     }
   }
 
-  def apply(zkString: String, connectionTimeout: Int = 5000): KafkaUtils =
-    KafkaUtils(zkString, () => new ZkClient(zkString, connectionTimeout))
+  def apply(config: Config): KafkaUtils = KafkaUtils(ConfigSupport.toMap(config))
 
-  def apply(): KafkaUtils = apply(KafkaConfigSupport.zkString)
+  def apply(): KafkaUtils = apply(KafkaConfigSupport.kafkaConfig.getConfig("kafka.producer"))
 }
