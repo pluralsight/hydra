@@ -18,7 +18,7 @@ package hydra.ingest.http
 
 import akka.actor._
 import akka.http.scaladsl.model.HttpRequest
-import akka.http.scaladsl.model.StatusCodes.{OK, BadRequest}
+import akka.http.scaladsl.model.StatusCodes.{BadRequest, OK}
 import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
 import akka.stream.ActorMaterializer
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
@@ -26,10 +26,10 @@ import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
 import hydra.core.ingest.{CorrelationIdBuilder, RequestParams}
-import hydra.core.marshallers.{GenericError, HydraJsonSupport}
+import hydra.core.marshallers.{GenericError, HydraJsonSupport, TopicCreationMetadata}
 import hydra.core.protocol.InitiateHttpRequest
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
-import hydra.ingest.services.IngestionHandlerGateway
+import hydra.ingest.services._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{FiniteDuration, _}
@@ -65,17 +65,31 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: Execut
         }
       }
     } ~
-    pathPrefix("topics") {
-      pathEndOrSingleSlash {
-        handleExceptions(exceptionHandler) {
-          post {
-            requestEntityPresent {
-              complete(OK, "Yep, endpoint works when you post a payload.")
-            }
-          } ~ complete(BadRequest, "This endpoint does not accept not POSTs")
+      pathPrefix("topics") {
+        pathEndOrSingleSlash {
+          handleExceptions(exceptionHandler) {
+            post {
+              requestEntityPresent {
+                entity(as[TopicCreationMetadata]) { topicCreationMetadata =>
+                  val isValidOrErrorReport = TopicNameValidator.validate(topicCreationMetadata.topic)
+                  isValidOrErrorReport match {
+                    case Valid => complete(OK, "Yep, endpoint works when you post a payload.")
+                    case InvalidReport(reasons) =>
+                      val invalidDisplayString = reasons
+                        .map(_.reason)
+                        .map("\t" + _)
+                        .mkString("\n")
+
+                      complete(
+                        BadRequest,
+                        s"The topic name is not valid for the following reasons: $invalidDisplayString")
+                  }
+                }
+              }
+            } ~ complete(BadRequest, "This endpoint does not accept not POSTs")
+          }
         }
       }
-    }
 
   private def deleteRequest = delete {
     headerValueByName(RequestParams.HYDRA_RECORD_KEY_PARAM)(_ => publishRequest)

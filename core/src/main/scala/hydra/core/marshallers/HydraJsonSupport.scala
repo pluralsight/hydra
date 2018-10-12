@@ -36,6 +36,8 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
   implicit val genericErrorFormat = jsonFormat2(GenericError)
 
+  implicit val topicCreationMetadataFormat = jsonFormat1(TopicCreationMetadata)
+
   implicit object StatusCodeJsonFormat extends JsonFormat[StatusCode] {
 
     override def write(t: StatusCode): JsValue =
@@ -133,4 +135,4 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
 case class GenericError(status: Int, errorMessage: String)
 
-
+case class TopicCreationMetadata(topic: String)

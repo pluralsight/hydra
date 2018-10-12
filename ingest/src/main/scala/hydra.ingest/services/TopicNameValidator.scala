@@ -17,7 +17,7 @@ object TopicNameValidator {
       .collect {
         case r: Invalid => r
       } match {
-      case respSeq: Seq[ValidationResponse] if respSeq.nonEmpty => InvalidReport(respSeq: _*)
+      case respSeq: Seq[ValidationResponse] if respSeq.nonEmpty => InvalidReport(respSeq)
       case _ => Valid
     }
   }
@@ -83,4 +83,4 @@ case object Valid extends ValidationResponse
 
 case class Invalid(reason: String) extends ValidationResponse
 
-case class InvalidReport(reasons: Invalid*) extends ValidationResponse
+case class InvalidReport(reasons: Seq[Invalid]) extends ValidationResponse

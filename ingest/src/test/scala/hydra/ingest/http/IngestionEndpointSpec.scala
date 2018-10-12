@@ -1,8 +1,8 @@
 package hydra.ingest.http
 
 import akka.actor.{Actor, Props}
+import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.model.{HttpMethods, StatusCodes}
 import akka.http.scaladsl.server.{MethodRejection, MissingHeaderRejection, RequestEntityExpectedRejection}
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.{TestActorRef, TestKit}
@@ -52,7 +52,6 @@ class IngestionEndpointSpec extends Matchers
           MethodRejection(HttpMethods.DELETE)))
       }
     }
-
 
     "rejects empty requests" in {
       Post("/ingest") ~> ingestRoute ~> check {
@@ -107,14 +106,22 @@ class IngestionEndpointSpec extends Matchers
     }
 
     "forwards topic metadata to the appropriate handler" in {
-      val request = Post("/topics", "Some Stuffs")
-      request ~> ingestRoute ~> check {
+      val request = HttpEntity(ContentTypes.`application/json`, """{"topic": "exp.something.MyBC"}""")
+      Post("/topics", request) ~> ingestRoute ~> check {
         status shouldBe StatusCodes.OK
       }
       val badRequest = Post("/topics")
       badRequest ~> ingestRoute ~> check {
         status shouldBe StatusCodes.BadRequest
       }
+    }
+  }
+
+  "rejects requests with invalid topic names" in {
+    val request = HttpEntity(ContentTypes.`application/json`, """{"topic": "invalid"}""")
+
+    Post("/topics", request) ~> ingestRoute ~> check {
+      status shouldBe StatusCodes.BadRequest
     }
   }
 }
