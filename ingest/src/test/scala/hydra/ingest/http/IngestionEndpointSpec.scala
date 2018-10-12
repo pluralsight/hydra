@@ -116,5 +116,7 @@ class IngestionEndpointSpec extends Matchers
         status shouldBe StatusCodes.BadRequest
       }
     }
+
+    "reject requests containing an invalid topic name"
   }
 }
