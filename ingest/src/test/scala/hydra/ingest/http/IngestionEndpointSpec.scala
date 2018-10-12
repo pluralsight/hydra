@@ -20,7 +20,7 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 5/12/17.
   */
-class IngestEndpointSpec extends Matchers
+class IngestionEndpointSpec extends Matchers
   with WordSpecLike
   with ScalatestRouteTest
   with HydraIngestJsonSupport {
@@ -103,6 +103,17 @@ class IngestEndpointSpec extends Matchers
       val request = Post("/ingest", "payload")
       request ~> ingestRoute ~> check {
         status shouldBe StatusCodes.OK
+      }
+    }
+
+    "forwards topic metadata to the appropriate handler" in {
+      val request = Post("/topics", "Some Stuffs")
+      request ~> ingestRoute ~> check {
+        status shouldBe StatusCodes.OK
+      }
+      val badRequest = Post("/topics")
+      badRequest ~> ingestRoute ~> check {
+        status shouldBe StatusCodes.BadRequest
       }
     }
   }
