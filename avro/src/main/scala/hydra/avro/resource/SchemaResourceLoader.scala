@@ -100,7 +100,7 @@ class SchemaResourceLoader(registryUrl: String,
     log.debug(s"Loading schema $subject, version $version from schema registry $registryUrl.")
     Future(version.toInt).map(v => registry.getSchemaMetadata(subject, v)).map(toSchemaResource)
       .map(m => {
-        registry.getByID(m.id) //this is what will throw if the schema does not exist
+        registry.getById(m.id) //this is what will throw if the schema does not exist
         m
       })
       .recoverWith {
