@@ -18,7 +18,7 @@ package hydra.ingest.http
 
 import akka.actor._
 import akka.http.scaladsl.model.HttpRequest
-import akka.http.scaladsl.model.StatusCodes.OK
+import akka.http.scaladsl.model.StatusCodes.{OK, BadRequest}
 import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
 import akka.stream.ActorMaterializer
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
@@ -72,7 +72,7 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: Execut
             requestEntityPresent {
               complete(OK, "Yep, endpoint works when you post a payload.")
             }
-          } ~ complete(OK, "This endpoint does not accept not POSTs")
+          } ~ complete(BadRequest, "This endpoint does not accept not POSTs")
         }
       }
     }
@@ -92,14 +92,6 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: Execut
       }
     }
   }
-
-  private def publishMetadataRequest = extractRequest { req =>
-      onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>
-        imperativelyComplete { ctx =>
-          requestHandler ! InitiateHttpRequest(hydraRequest, ingestTimeout, ctx)
-        }
-      }
-    }
 
   private def exceptionHandler = ExceptionHandler {
     case e: IllegalArgumentException => complete(400, GenericError(400, e.getMessage))
