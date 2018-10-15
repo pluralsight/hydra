@@ -135,4 +135,14 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
 case class GenericError(status: Int, errorMessage: String)
 
-case class TopicCreationMetadata(topic: String)
+case class TopicCreationMetadata(topicName: String,
+                                 topicSchema: String,
+                                 streamType: String,
+                                 streamSubType: String,
+                                 dataClassification: String,
+                                 dataSourceOwner: String,
+                                 dataSourceContact: String,
+                                 psDataLake: String,
+                                 locationToDataDocumentation: String,
+                                 dataOwnerNotes: String,
+                                 kafkaConfiguration: Map)
