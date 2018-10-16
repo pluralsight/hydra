@@ -30,7 +30,8 @@ import hydra.core.ingest.{CorrelationIdBuilder, RequestParams}
 import hydra.core.marshallers.{GenericError, HydraJsonSupport, TopicCreationMetadata}
 import hydra.core.protocol.InitiateHttpRequest
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
-import hydra.ingest.services.TopicBootstrapActor.InitiateTopicBootstrap
+import hydra.ingest.bootstrap.RequestFactories.createRequest
+import hydra.ingest.services.TopicBootstrapActor.{InitiateTopicBootstrap, TopicMetadataRequest}
 import hydra.ingest.services._
 
 import scala.concurrent.ExecutionContext
@@ -61,16 +62,20 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
           handleExceptions(exceptionHandler) {
             post {
               requestEntityPresent {
-                entity(as[TopicCreationMetadata]) { topicCreationMetadata =>
+                entity(as[TopicMetadataRequest]) { topicCreationMetadataRequest =>
                   imperativelyComplete { ctx =>
-                    bootstrapActor ! InitiateTopicBootstrap(topicCreationMetadata, ctx)
+                    bootstrapActor ! InitiateTopicBootstrap(topicCreationMetadataRequest, ctx)
+                  }
+                }
                   }
                 }
               }
             }
           } ~ complete(BadRequest, "This endpoint requires a payload.")
-        }
-      }
+
+  private def publishRequest = parameter("correlationId" ?) { cIdOpt =>
+
+  }
 
 
   private def exceptionHandler = ExceptionHandler {

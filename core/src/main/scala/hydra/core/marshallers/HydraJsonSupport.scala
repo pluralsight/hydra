@@ -36,7 +36,6 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
   implicit val genericErrorFormat = jsonFormat2(GenericError)
 
-  implicit val topicCreationMetadataFormat = jsonFormat11(TopicCreationMetadata)
 
   implicit object StatusCodeJsonFormat extends JsonFormat[StatusCode] {
 
@@ -135,14 +134,3 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
 case class GenericError(status: Int, errorMessage: String)
 
-case class TopicCreationMetadata(topicName: String,
-                                 topicSchema: String,
-                                 streamType: String,
-                                 streamSubType: String,
-                                 dataClassification: String,
-                                 dataSourceOwner: String,
-                                 dataSourceContact: String,
-                                 psDataLake: String,
-                                 locationToDataDocumentation: String,
-                                 dataOwnerNotes: String,
-                                 kafkaConfiguration: Map[String, String])

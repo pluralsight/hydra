@@ -27,7 +27,29 @@ class BootstrapEndpointSpec extends Matchers
 
 
     "forwards topic metadata to the appropriate handler" in {
-      val request = HttpEntity(ContentTypes.`application/json`, """{"topic": "exp.something.MyBC"}""")
+      val request = HttpEntity(ContentTypes.`application/json`, """{
+                                                                  |	"streamName": "exp.dataplatform.testsubject",
+                                                                  |	"streamType": "Historical",
+                                                                  |	"streamSubtype": "Source Of Truth",
+                                                                  |	"dataClassification": "Public",
+                                                                  |	"dataSourceOwner": "BARTON",
+                                                                  |	"dataSourceContact": "slackity slack dont talk back",
+                                                                  |	"psDataLake": "false",
+                                                                  |	"dataDocPath": "akka://some/path/here.jpggifyo",
+                                                                  |	"dataOwnerNotes": "here are some notes topkek",
+                                                                  |	"streamSchema": {
+                                                                  |	  "namespace": "exp.assessment",
+                                                                  |	  "name": "SkillAssessmentTopicsScored",
+                                                                  |	  "type": "record",
+                                                                  |	  "version": 1,
+                                                                  |	  "fields": [
+                                                                  |	    {
+                                                                  |	      "name": "test-field",
+                                                                  |	      "type": "string"
+                                                                  |	    }
+                                                                  |	  ]
+                                                                  |	}
+                                                                  |}""")
       Post("/topics", request) ~> bootstrapRoute ~> check {
         status shouldBe StatusCodes.OK
       }
