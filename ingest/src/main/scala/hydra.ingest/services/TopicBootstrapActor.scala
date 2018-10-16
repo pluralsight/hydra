@@ -17,7 +17,10 @@ class TopicBootstrapActor(
 
   override def receive: Receive = {
     //need to pass ctx forward to IngestionHandlerGateway
-    case InitiateTopicBootstrap(topicMetadata, ctx) => doValidate(topicMetadata)
+    case InitiateTopicBootstrap(topicMetadata, ctx) => {
+      doValidate(topicMetadata)
+      //ctx.complete(OK)
+    }
     case TopicNameValidated => {}
     case TopicNameValidationError => {}
     case ForwardBootstrapPayload => {}
@@ -53,6 +56,5 @@ object TopicBootstrapActor {
   case class InitiateTopicBootstrap(topicMetadata: TopicCreationMetadata, context: ImperativeRequestContext) extends TopicBootstrapMessage
 
   case class ForwardBootstrapPayload(request: HydraRequest) extends TopicBootstrapMessage
-
 
 }

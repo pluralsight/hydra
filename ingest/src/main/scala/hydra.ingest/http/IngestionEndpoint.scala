@@ -28,7 +28,7 @@ import hydra.core.ingest.{CorrelationIdBuilder, RequestParams}
 import hydra.core.marshallers.{GenericError, HydraJsonSupport}
 import hydra.core.protocol.InitiateHttpRequest
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
-import hydra.ingest.services._
+import hydra.ingest.services.IngestionHandlerGateway
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{FiniteDuration, _}
