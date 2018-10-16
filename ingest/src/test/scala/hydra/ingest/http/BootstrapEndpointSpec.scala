@@ -61,7 +61,7 @@ class BootstrapEndpointSpec extends Matchers
   }
 
   "rejects requests with invalid topic names" in {
-    val request = HttpEntity(ContentTypes.`application/json`, """{"topic": "invalid"}""")
+    val request = HttpEntity(ContentTypes.`application/json`, """{"streamName": "invalid"}""")
 
     Post("/topics", request) ~> bootstrapRoute ~> check {
       status shouldBe StatusCodes.BadRequest

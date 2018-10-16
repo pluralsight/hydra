@@ -1,16 +1,13 @@
 package hydra.ingest.services
 
-import java.util.UUID
-
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import hydra.core.akka.SchemaRegistryActor
-import TopicBootstrapActor._
 import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.Config
+import hydra.core.akka.SchemaRegistryActor
 import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.HydraRequest
-import hydra.core.marshallers.HydraJsonSupport
-import spray.json.{JsObject}
+import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
+import hydra.ingest.services.TopicBootstrapActor._
 
 //first we make sure topic name is valid
 //first we need to try and create the topic
@@ -20,9 +17,6 @@ class TopicBootstrapActor(
                          schemaRegistryActor: SchemaRegistryActor,
                          ingestionHandlerGateway: IngestionHandlerGateway,
                          ) extends Actor with HydraJsonSupport with ActorLogging {
-
-  implicit val topicCreationMetadataFormat = jsonFormat10(TopicMetadataRequest)
-
 
   //actor could have multiple instances, need to refactor this
   var ctx: ImperativeRequestContext = _
@@ -73,19 +67,5 @@ object TopicBootstrapActor {
 
   case class ForwardBootstrapPayload(request: HydraRequest) extends TopicBootstrapMessage
 
-  case class TopicMetadataRequest(streamName: String,
-                                  streamSchema: JsObject,
-                                  streamType: String,
-                                  streamSubType: String,
-                                  dataClassification: String,
-                                  dataSourceOwner: String,
-                                  dataSourceContact: String,
-                                  psDataLake: Option[Boolean],
-                                  dataDocPath: Option[String],
-                                  dataOwnerNotes: Option[String])
-
-  case class TopicMetadata(streamId: UUID=UUID.randomUUID(),
-                           streamCreated: java.time.LocalDateTime = java.time.LocalDateTime.now(),
-                           topicCreationMetadataRequest: TopicMetadataRequest)
 
 }

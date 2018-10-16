@@ -17,21 +17,17 @@
 package hydra.ingest.http
 
 import akka.actor._
-import akka.http.scaladsl.model.HttpRequest
-import akka.http.scaladsl.model.StatusCodes.{BadRequest, OK}
-import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
+import akka.http.scaladsl.model.StatusCodes.BadRequest
+import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.stream.ActorMaterializer
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.http.HydraDirectives
-import hydra.core.ingest.{CorrelationIdBuilder, RequestParams}
-import hydra.core.marshallers.{GenericError, HydraJsonSupport, TopicCreationMetadata}
-import hydra.core.protocol.InitiateHttpRequest
+import hydra.core.marshallers.{GenericError, HydraJsonSupport, TopicMetadataRequest}
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
-import hydra.ingest.bootstrap.RequestFactories.createRequest
-import hydra.ingest.services.TopicBootstrapActor.{InitiateTopicBootstrap, TopicMetadataRequest}
+import hydra.ingest.services.TopicBootstrapActor.{InitiateTopicBootstrap}
 import hydra.ingest.services._
 
 import scala.concurrent.ExecutionContext
@@ -62,9 +58,9 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
           handleExceptions(exceptionHandler) {
             post {
               requestEntityPresent {
-                entity(as[TopicMetadataRequest]) { topicCreationMetadataRequest =>
+                entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
                   imperativelyComplete { ctx =>
-                    bootstrapActor ! InitiateTopicBootstrap(topicCreationMetadataRequest, ctx)
+                    bootstrapActor ! InitiateTopicBootstrap(topicMetadataRequest, ctx)
                   }
                 }
                   }
@@ -73,15 +69,9 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
             }
           } ~ complete(BadRequest, "This endpoint requires a payload.")
 
-  private def publishRequest = parameter("correlationId" ?) { cIdOpt =>
-
-  }
-
 
   private def exceptionHandler = ExceptionHandler {
     case e: IllegalArgumentException => complete(400, GenericError(400, e.getMessage))
   }
 
 }
-
-case object DeleteDirectiveNotAllowedRejection extends Rejection
