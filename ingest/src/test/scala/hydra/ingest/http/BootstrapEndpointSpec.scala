@@ -16,7 +16,7 @@ class BootstrapEndpointSpec extends Matchers
   private implicit val timeout = RouteTestTimeout(10.seconds)
 
 
-  val bootstrapRoute = new BootstrapEndpoint().route
+  private val bootstrapRoute = new BootstrapEndpoint().route
 
   override def afterAll = {
     super.afterAll()
@@ -24,36 +24,37 @@ class BootstrapEndpointSpec extends Matchers
   }
 
   "The bootstrap endpoint" should {
-
-
     "forwards topic metadata to the appropriate handler" in {
-      val request = HttpEntity(ContentTypes.`application/json`, """{
-                                                                  |	"streamName": "exp.dataplatform.testsubject",
-                                                                  |	"streamType": "Historical",
-                                                                  |	"streamSubType": "Source Of Truth",
-                                                                  |	"dataClassification": "Public",
-                                                                  |	"dataSourceOwner": "BARTON",
-                                                                  |	"dataSourceContact": "slackity slack dont talk back",
-                                                                  |	"psDataLake": "false",
-                                                                  |	"dataDocPath": "akka://some/path/here.jpggifyo",
-                                                                  |	"dataOwnerNotes": "here are some notes topkek",
-                                                                  |	"streamSchema": {
-                                                                  |	  "namespace": "exp.assessment",
-                                                                  |	  "name": "SkillAssessmentTopicsScored",
-                                                                  |	  "type": "record",
-                                                                  |	  "version": 1,
-                                                                  |	  "fields": [
-                                                                  |	    {
-                                                                  |	      "name": "test-field",
-                                                                  |	      "type": "string"
-                                                                  |	    }
-                                                                  |	  ]
-                                                                  |	}
-                                                                  |}""")
+      val testEntity = HttpEntity(
+        ContentTypes.`application/json`,
+        """{
+          |	"streamName": "exp.dataplatform.testsubject",
+          |	"streamType": "Historical",
+          |	"streamSubType": "Source Of Truth",
+          |	"dataClassification": "Public",
+          |	"dataSourceOwner": "BARTON",
+          |	"dataSourceContact": "slackity slack dont talk back",
+          |	"psDataLake": false,
+          |	"dataDocPath": "akka://some/path/here.jpggifyo",
+          |	"dataOwnerNotes": "here are some notes topkek",
+          |	"streamSchema": {
+          |	  "namespace": "exp.assessment",
+          |	  "name": "SkillAssessmentTopicsScored",
+          |	  "type": "record",
+          |	  "version": 1,
+          |	  "fields": [
+          |	    {
+          |	      "name": "test-field",
+          |	      "type": "string"
+          |	    }
+          |	  ]
+          |	}
+          |}""".stripMargin)
 
-      Post("/topics", request) ~> bootstrapRoute ~> check {
+      Post("/topics", testEntity) ~> bootstrapRoute ~> check {
         status shouldBe StatusCodes.OK
       }
+
       val badRequest = Post("/topics")
       badRequest ~> bootstrapRoute ~> check {
         status shouldBe StatusCodes.BadRequest
@@ -62,9 +63,33 @@ class BootstrapEndpointSpec extends Matchers
   }
 
   "rejects requests with invalid topic names" in {
-    val request = HttpEntity(ContentTypes.`application/json`, """{"streamName": "invalid"}""")
+    val testEntity = HttpEntity(
+      ContentTypes.`application/json`,
+      """{
+        |	"streamName": "invalid",
+        |	"streamType": "Historical",
+        |	"streamSubType": "Source Of Truth",
+        |	"dataClassification": "Public",
+        |	"dataSourceOwner": "BARTON",
+        |	"dataSourceContact": "slackity slack dont talk back",
+        |	"psDataLake": false,
+        |	"dataDocPath": "akka://some/path/here.jpggifyo",
+        |	"dataOwnerNotes": "here are some notes topkek",
+        |	"streamSchema": {
+        |	  "namespace": "exp.assessment",
+        |	  "name": "SkillAssessmentTopicsScored",
+        |	  "type": "record",
+        |	  "version": 1,
+        |	  "fields": [
+        |	    {
+        |	      "name": "test-field",
+        |	      "type": "string"
+        |	    }
+        |	  ]
+        |	}
+        |}""".stripMargin)
 
-    Post("/topics", request) ~> bootstrapRoute ~> check {
+    Post("/topics", testEntity) ~> bootstrapRoute ~> check {
       status shouldBe StatusCodes.BadRequest
     }
   }

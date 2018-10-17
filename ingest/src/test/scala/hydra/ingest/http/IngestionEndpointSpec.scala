@@ -104,24 +104,5 @@ class IngestionEndpointSpec extends Matchers
         status shouldBe StatusCodes.OK
       }
     }
-
-    "forwards topic metadata to the appropriate handler" in {
-      val request = HttpEntity(ContentTypes.`application/json`, """{"topic": "exp.something.MyBC"}""")
-      Post("/topics", request) ~> ingestRoute ~> check {
-        status shouldBe StatusCodes.OK
-      }
-      val badRequest = Post("/topics")
-      badRequest ~> ingestRoute ~> check {
-        status shouldBe StatusCodes.BadRequest
-      }
-    }
-  }
-
-  "rejects requests with invalid topic names" in {
-    val request = HttpEntity(ContentTypes.`application/json`, """{"topic": "invalid"}""")
-
-    Post("/topics", request) ~> ingestRoute ~> check {
-      status shouldBe StatusCodes.BadRequest
-    }
   }
 }

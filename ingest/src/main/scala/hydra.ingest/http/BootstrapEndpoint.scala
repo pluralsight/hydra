@@ -55,17 +55,23 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
   override val route: Route =
     pathPrefix("topics") {
       pathEndOrSingleSlash {
-        post {
-          requestEntityPresent {
-              entity(as[TopicMetadataRequest]) {
-                topicMetadataRequest =>
-                  imperativelyComplete {
-                    ctx =>
-                      bootstrapActor ! InitiateTopicBootstrap(topicMetadataRequest, ctx)
-                  }
+        handleExceptions(exceptionHandler) {
+          post {
+            requestEntityPresent {
+              entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
+                imperativelyComplete {
+                  ctx => bootstrapActor ! InitiateTopicBootstrap(topicMetadataRequest, ctx)
+                }
               }
+            }
           }
         }
       }
     } ~ complete(BadRequest, "This endpoint requires a payload.")
+
+  private def exceptionHandler = ExceptionHandler {
+    case t: Throwable =>
+      log.error(s"Encountered $t while handling request in bootstrap endpoint...")
+      complete(400, GenericError(400, t.getMessage))
+  }
 }
