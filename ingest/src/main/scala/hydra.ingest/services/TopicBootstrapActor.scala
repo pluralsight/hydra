@@ -1,7 +1,7 @@
 package hydra.ingest.services
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import com.typesafe.config.Config
 import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.HydraRequest
@@ -29,7 +29,7 @@ class TopicBootstrapActor(
   private[ingest] def initiateBootstrap(topicMetadataReqest: TopicMetadataRequest, ctx: ImperativeRequestContext): Unit = {
     val result: BootstrapResult = validateTopicName(topicMetadataReqest)
     result match {
-      case BootstrapStepSuccess => ctx.complete(StatusCodes.OK, "Topic name has been validated.")
+      case BootstrapStepSuccess => ctx.complete(HttpResponse(StatusCodes.OK))
       case BootstrapStepFailure(reasons) => ctx.complete(StatusCodes.BadRequest, s"Topic name is invalid for the following reasons: $reasons")
     }
   }
@@ -47,7 +47,6 @@ class TopicBootstrapActor(
       case _ => BootstrapStepFailure("Couldn't find match on validateTopicName")
     }
   }
-
 }
 
 
