@@ -1,8 +1,8 @@
 package hydra.ingest.http
 
 import akka.actor.{Actor, Props}
+import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.model.{HttpMethods, StatusCodes}
 import akka.http.scaladsl.server.{MethodRejection, MissingHeaderRejection, RequestEntityExpectedRejection}
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.{TestActorRef, TestKit}
@@ -53,7 +53,6 @@ class IngestionEndpointSpec extends Matchers
       }
     }
 
-
     "rejects empty requests" in {
       Post("/ingest") ~> ingestRoute ~> check {
         rejection shouldEqual RequestEntityExpectedRejection
@@ -103,17 +102,6 @@ class IngestionEndpointSpec extends Matchers
       val request = Post("/ingest", "payload")
       request ~> ingestRoute ~> check {
         status shouldBe StatusCodes.OK
-      }
-    }
-
-    "forwards topic metadata to the appropriate handler" in {
-      val request = Post("/topics", "Some Stuffs")
-      request ~> ingestRoute ~> check {
-        status shouldBe StatusCodes.OK
-      }
-      val badRequest = Post("/topics")
-      badRequest ~> ingestRoute ~> check {
-        status shouldBe StatusCodes.BadRequest
       }
     }
   }

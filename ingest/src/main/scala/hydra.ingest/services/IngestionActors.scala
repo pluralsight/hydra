@@ -17,5 +17,6 @@ object IngestionActors extends ServiceProvider with ConfigSupport {
     Tuple2(ActorUtils.actorName[IngestionHandlerGateway], IngestionHandlerGateway.props(registryPath)),
     Tuple2(ActorUtils.actorName[TransportRegistrar], Props[TransportRegistrar]),
     Tuple2(ActorUtils.actorName[IngestorRegistry], Props[IngestorRegistry]),
-    Tuple2(ActorUtils.actorName[IngestorRegistrar], Props[IngestorRegistrar]))
+    Tuple2(ActorUtils.actorName[IngestorRegistrar], Props[IngestorRegistrar])
+  )
 }

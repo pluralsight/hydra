@@ -36,6 +36,9 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
   implicit val genericErrorFormat = jsonFormat2(GenericError)
 
+  implicit val topicCreationMetadataFormat = jsonFormat10(TopicMetadataRequest)
+
+
   implicit object StatusCodeJsonFormat extends JsonFormat[StatusCode] {
 
     override def write(t: StatusCode): JsValue =
@@ -133,4 +136,18 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
 case class GenericError(status: Int, errorMessage: String)
 
+case class TopicMetadataRequest(streamName: String,
+                                streamSchema: JsObject,
+                                streamType: String,
+                                streamSubType: String,
+                                dataClassification: String,
+                                dataSourceOwner: String,
+                                dataSourceContact: String,
+                                psDataLake: Option[Boolean],
+                                dataDocPath: Option[String],
+                                dataOwnerNotes: Option[String])
+
+case class TopicMetadata(streamId: UUID=UUID.randomUUID(),
+                         streamCreated: java.time.LocalDateTime = java.time.LocalDateTime.now(),
+                         topicCreationMetadataRequest: TopicMetadataRequest)
 
