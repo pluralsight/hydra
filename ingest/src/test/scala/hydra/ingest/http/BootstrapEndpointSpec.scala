@@ -30,7 +30,7 @@ class BootstrapEndpointSpec extends Matchers
       val request = HttpEntity(ContentTypes.`application/json`, """{
                                                                   |	"streamName": "exp.dataplatform.testsubject",
                                                                   |	"streamType": "Historical",
-                                                                  |	"streamSubtype": "Source Of Truth",
+                                                                  |	"streamSubType": "Source Of Truth",
                                                                   |	"dataClassification": "Public",
                                                                   |	"dataSourceOwner": "BARTON",
                                                                   |	"dataSourceContact": "slackity slack dont talk back",
@@ -50,6 +50,7 @@ class BootstrapEndpointSpec extends Matchers
                                                                   |	  ]
                                                                   |	}
                                                                   |}""")
+
       Post("/topics", request) ~> bootstrapRoute ~> check {
         status shouldBe StatusCodes.OK
       }

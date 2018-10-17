@@ -57,11 +57,13 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
       pathEndOrSingleSlash {
         post {
           requestEntityPresent {
-            entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
-              imperativelyComplete { ctx =>
-                bootstrapActor ! InitiateTopicBootstrap(topicMetadataRequest, ctx)
+              entity(as[TopicMetadataRequest]) {
+                topicMetadataRequest =>
+                  imperativelyComplete {
+                    ctx =>
+                      bootstrapActor ! InitiateTopicBootstrap(topicMetadataRequest, ctx)
+                  }
               }
-            }
           }
         }
       }
