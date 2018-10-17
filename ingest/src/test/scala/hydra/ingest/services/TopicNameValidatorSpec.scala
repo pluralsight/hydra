@@ -12,26 +12,26 @@ class TopicNameValidatorSpec extends FlatSpec
 
   it should "return Invalid for a topic name longer than 249 characters" in {
     TopicNameValidator.validate("exp.test." + "a" * 250) shouldBe
-      InvalidReport(Invalid(LengthError))
+      InvalidReport(Seq(Invalid(LengthError)))
   }
 
   it should "return Invalid for a topic containing invalid characters" in {
     TopicNameValidator.validate("exp.test.Test(Topic)") shouldBe
-      InvalidReport(Invalid(InvalidCharacterError))
+      InvalidReport(Seq(Invalid(InvalidCharacterError)))
   }
 
   it should "return invalid if doesn't start with a valid org prefix" in {
     TopicNameValidator.validate("false.test.TestTopic") shouldBe
-      InvalidReport(Invalid(BadOrgError))
+      InvalidReport(Seq(Invalid(BadOrgError)))
   }
 
   it should "be properly formatted by containing at least 3 segments" in {
     TopicNameValidator.validate("exp.TestTopic") shouldBe
-      InvalidReport(Invalid(BadTopicFormatError))
+      InvalidReport(Seq(Invalid(BadTopicFormatError)))
   }
 
   it should "return multiple errors if validation fails for multiple reasons" in {
     TopicNameValidator.validate("falsetestTestTopic") shouldBe
-      InvalidReport(Invalid(BadOrgError), Invalid(BadTopicFormatError))
+      InvalidReport(Seq(Invalid(BadOrgError), Invalid(BadTopicFormatError)))
   }
 }

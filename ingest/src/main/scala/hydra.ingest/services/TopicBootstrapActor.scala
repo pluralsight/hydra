@@ -3,7 +3,6 @@ package hydra.ingest.services
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.Config
-import hydra.core.akka.SchemaRegistryActor
 import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.HydraRequest
 import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
@@ -14,8 +13,8 @@ import hydra.ingest.services.TopicBootstrapActor._
 //then we post the schema
 class TopicBootstrapActor(
                          config: Config,
-                         schemaRegistryActor: SchemaRegistryActor,
-                         ingestionHandlerGateway: IngestionHandlerGateway,
+                         schemaRegistryActor: ActorRef,
+                         ingestionHandlerGateway: ActorRef,
                          ) extends Actor with HydraJsonSupport with ActorLogging {
 
 
@@ -45,6 +44,7 @@ class TopicBootstrapActor(
           .map("\t" + _)
           .mkString("\n")
         BootstrapStepFailure(invalidDisplayString)
+      case _ => BootstrapStepFailure("Couldn't find match on validateTopicName")
     }
   }
 
@@ -53,8 +53,7 @@ class TopicBootstrapActor(
 
 object TopicBootstrapActor {
 
-  def props(config: Config, schemaRegistryActor: ActorRef, ingestionHandlerGateway: ActorRef): Props = Props(
-    classOf[SchemaRegistryActor], config, schemaRegistryActor, ingestionHandlerGateway)
+  def props(config: Config, schemaRegistryActor: ActorRef, ingestionHandlerGateway: ActorRef): Props = Props(classOf[TopicBootstrapActor], config, schemaRegistryActor, ingestionHandlerGateway)
 
   sealed trait TopicBootstrapMessage
 
