@@ -81,7 +81,7 @@ You should see a 'this is a test' message transported (or replicated) to both th
 We provide a docker compose file that can be used to bootstrap Hydra.  
 
 ## Online Documentation
-We highly recommend checking out the project documentation [here.](www.pluralsight.com)  There you can find the latest documentation about the ingestion protocol, Akka actors, including examples, API endpoints, and a lot more info on how to get started.
+We highly recommend checking out the project documentation [here.](https://hydra-ps.atlassian.net/wiki/spaces/DES/overview)  There you can find the latest documentation about the ingestion protocol, Akka actors, including examples, API endpoints, and a lot more info on how to get started.
 
 This README file only contains basic definitions and set up instructions.
 
