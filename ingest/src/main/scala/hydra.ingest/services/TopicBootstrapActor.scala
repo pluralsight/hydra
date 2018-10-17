@@ -18,34 +18,33 @@ class TopicBootstrapActor(
                          ingestionHandlerGateway: IngestionHandlerGateway,
                          ) extends Actor with HydraJsonSupport with ActorLogging {
 
-  //actor could have multiple instances, need to refactor this
-  var ctx: ImperativeRequestContext = _
 
   override def receive: Receive = {
     //need to pass ctx forward to IngestionHandlerGateway
     case InitiateTopicBootstrap(topicMetadataRequest, ctx) => {
-      this.ctx = ctx
-      validateTopicName(topicMetadataRequest)
-    }
-    case TopicNameValidated => {
-      ctx.complete(StatusCodes.OK)
-    }
-    case TopicNameValidationError(reasons) => {
-      ctx.complete(StatusCodes.BadRequest, reasons)
+      initiateBootstrap(topicMetadataRequest, ctx)
     }
     case ForwardBootstrapPayload => {}
   }
 
-  private[ingest] def validateTopicName(topicMetadataRequest: TopicMetadataRequest): Unit = {
+  private[ingest] def initiateBootstrap(topicMetadataReqest: TopicMetadataRequest, ctx: ImperativeRequestContext): Unit = {
+    val result: BootstrapResult = validateTopicName(topicMetadataReqest)
+    result match {
+      case BootstrapStepSuccess => ctx.complete(StatusCodes.OK, "Topic name has been validated.")
+      case BootstrapStepFailure(reasons) => ctx.complete(StatusCodes.BadRequest, s"Topic name is invalid for the following reasons: $reasons")
+    }
+  }
+
+  private[ingest] def validateTopicName(topicMetadataRequest: TopicMetadataRequest): BootstrapResult = {
     val isValidOrErrorReport = TopicNameValidator.validate(topicMetadataRequest.streamName)
     isValidOrErrorReport match {
-      case Valid => self ! TopicNameValidated
+      case Valid => BootstrapStepSuccess
       case InvalidReport(reasons) =>
         val invalidDisplayString = reasons
           .map(_.reason)
           .map("\t" + _)
           .mkString("\n")
-        self ! TopicNameValidationError(invalidDisplayString)
+        BootstrapStepFailure(invalidDisplayString)
     }
   }
 
@@ -58,14 +57,15 @@ object TopicBootstrapActor {
     classOf[SchemaRegistryActor], config, schemaRegistryActor, ingestionHandlerGateway)
 
   sealed trait TopicBootstrapMessage
-  case object TopicNameValidated extends TopicBootstrapMessage
-
-
-  case class TopicNameValidationError(reasons: String) extends TopicBootstrapMessage
 
   case class InitiateTopicBootstrap(topicMetadata: TopicMetadataRequest, context: ImperativeRequestContext) extends TopicBootstrapMessage
 
   case class ForwardBootstrapPayload(request: HydraRequest) extends TopicBootstrapMessage
+
+
+  sealed trait BootstrapResult
+  case object BootstrapStepSuccess extends BootstrapResult
+  case class BootstrapStepFailure(reasons: String) extends BootstrapResult
 
 
 }
