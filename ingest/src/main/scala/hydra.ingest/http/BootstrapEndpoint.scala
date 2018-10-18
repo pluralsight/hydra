@@ -27,9 +27,8 @@ import hydra.core.akka.SchemaRegistryActor
 import hydra.core.http.HydraDirectives
 import hydra.core.ingest.CorrelationIdBuilder
 import hydra.core.marshallers.{GenericError, HydraJsonSupport}
-import hydra.core.protocol.InitiateHttpRequest
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
-import hydra.ingest.bootstrap.RequestFactories.createRequest
+import hydra.ingest.services.TopicBootstrapActor.InitiateTopicBootstrap
 import hydra.ingest.services._
 import spray.json.DeserializationException
 
@@ -52,7 +51,8 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
 
   private val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(applicationConfig))
 
-  private val bootstrapActor = system.actorOf(TopicBootstrapActor.props(applicationConfig, schemaRegistryActor, requestHandler))
+  private val bootstrapActor = system.actorOf(
+    TopicBootstrapActor.props(applicationConfig, schemaRegistryActor, requestHandler))
 
   private val ingestTimeout = applicationConfig.get[FiniteDuration]("ingest.timeout")
     .valueOrElse(500 millis)
@@ -76,7 +76,7 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
     extractRequest { req =>
       onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>
         imperativelyComplete { ctx =>
-          requestHandler ! InitiateHttpRequest(hydraRequest, ingestTimeout, ctx)
+          bootstrapActor ! InitiateTopicBootstrap(hydraRequest, ctx)
         }
       }
     }
