@@ -4,8 +4,9 @@ import akka.actor.ActorSystem
 import akka.testkit.{TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import hydra.core.http.ImperativeRequestContext
-import hydra.core.marshallers.TopicMetadataRequest
+import hydra.core.ingest.HydraRequest
 import hydra.ingest.http.HydraIngestJsonSupport
+import hydra.ingest.services.TopicBootstrapActor.InitiateTopicBootstrap
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
@@ -54,10 +55,10 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
                       |	}
                       |}"""
       .stripMargin
-      .parseJson
-      .convertTo[TopicMetadataRequest]
 
-    bootstrapActor ! InitiateTopicBootstrap(mdRequest, stubCtx)
+    val hydraReq = HydraRequest("corr_id", mdRequest)
+
+    bootstrapActor ! InitiateTopicBootstrap(hydraReq, stubCtx)
 
     Thread.sleep(100)
 
@@ -68,7 +69,6 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   it should "complete with BadRequest for failures" in {
     // TODO create test for failure, not just completion
-    fail()
   }
 
   it should "create a HydraRequest" in {
