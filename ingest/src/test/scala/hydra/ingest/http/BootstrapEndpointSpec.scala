@@ -1,6 +1,7 @@
 package hydra.ingest.http
 
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.server.{MethodRejection, RequestEntityExpectedRejection}
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.TestKit
 import org.scalatest.{Matchers, WordSpecLike}
@@ -20,10 +21,23 @@ class BootstrapEndpointSpec extends Matchers
 
   override def afterAll = {
     super.afterAll()
-    TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10 seconds)
+    TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10.seconds)
   }
 
   "The bootstrap endpoint" should {
+
+    "rejects a GET request" in {
+      Get("/topics") ~> bootstrapRoute ~> check {
+        rejections should contain allElementsOf Seq(MethodRejection(HttpMethods.POST))
+      }
+    }
+
+    "rejects empty requests" in {
+      Post("/topics") ~> bootstrapRoute ~> check {
+        rejection shouldEqual RequestEntityExpectedRejection
+      }
+    }
+
     "forwards topic metadata to the appropriate handler" in {
       val testEntity = HttpEntity(
         ContentTypes.`application/json`,

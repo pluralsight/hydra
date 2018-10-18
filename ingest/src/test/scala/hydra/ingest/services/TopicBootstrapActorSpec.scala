@@ -6,7 +6,6 @@ import com.typesafe.config.ConfigFactory
 import hydra.core.http.ImperativeRequestContext
 import hydra.core.marshallers.TopicMetadataRequest
 import hydra.ingest.http.HydraIngestJsonSupport
-import hydra.ingest.services.TopicBootstrapActor.InitiateTopicBootstrap
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
@@ -63,7 +62,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     Thread.sleep(100)
 
     (stubCtx.complete _)
-      .verify(*)
+      .verify(*) // TODO figure out if we can mock ToResponseMarshallable
       .once
   }
 
@@ -71,4 +70,10 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     // TODO create test for failure, not just completion
     fail()
   }
+
+  it should "create a HydraRequest" in {
+
+  }
+
+  it should ""
 }

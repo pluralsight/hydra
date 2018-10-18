@@ -6,7 +6,11 @@ import com.typesafe.config.Config
 import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.HydraRequest
 import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
+import hydra.core.protocol.InitiateHttpRequest
 import hydra.ingest.services.TopicBootstrapActor._
+import spray.json._
+
+import scala.concurrent.duration._
 
 //first we make sure topic name is valid
 //first we need to try and create the topic
@@ -20,17 +24,19 @@ class TopicBootstrapActor(
 
   override def receive: Receive = {
     //need to pass ctx forward to IngestionHandlerGateway
-    case InitiateTopicBootstrap(topicMetadataRequest, ctx) => {
-      initiateBootstrap(topicMetadataRequest, ctx)
+    case InitiateTopicBootstrap(httpRequest, ctx) => {
+      initiateBootstrap(httpRequest, ctx)
     }
     case ForwardBootstrapPayload => {}
   }
 
-  private[ingest] def initiateBootstrap(topicMetadataReqest: TopicMetadataRequest, ctx: ImperativeRequestContext): Unit = {
-    val result: BootstrapResult = validateTopicName(topicMetadataReqest)
+  private[ingest] def initiateBootstrap(hydraRequest: HydraRequest, ctx: ImperativeRequestContext): Unit = {
+    val mdRequest = hydraRequest.payload.parseJson.convertTo[TopicMetadataRequest]
+    val result: BootstrapResult = validateTopicName(mdRequest)
     result match {
-      case BootstrapStepSuccess => ctx.complete(HttpResponse(StatusCodes.OK))
-      case BootstrapStepFailure(reasons) => ctx.complete(StatusCodes.BadRequest, s"Topic name is invalid for the following reasons: $reasons")
+      case BootstrapStepSuccess => ingestionHandlerGateway ! InitiateHttpRequest(hydraRequest, 100.millis, ctx)
+      case BootstrapStepFailure(reasons) => ctx.complete(StatusCodes.BadRequest,
+        s"Topic name is invalid for the following reasons: $reasons")
     }
   }
 
@@ -52,11 +58,13 @@ class TopicBootstrapActor(
 
 object TopicBootstrapActor {
 
-  def props(config: Config, schemaRegistryActor: ActorRef, ingestionHandlerGateway: ActorRef): Props = Props(classOf[TopicBootstrapActor], config, schemaRegistryActor, ingestionHandlerGateway)
+  def props(config: Config, schemaRegistryActor: ActorRef, ingestionHandlerGateway: ActorRef): Props =
+    Props(classOf[TopicBootstrapActor], config, schemaRegistryActor, ingestionHandlerGateway)
 
   sealed trait TopicBootstrapMessage
 
-  case class InitiateTopicBootstrap(topicMetadata: TopicMetadataRequest, context: ImperativeRequestContext) extends TopicBootstrapMessage
+  case class InitiateTopicBootstrap(hydraRequest: HydraRequest,
+                                    context: ImperativeRequestContext) extends TopicBootstrapMessage
 
   case class ForwardBootstrapPayload(request: HydraRequest) extends TopicBootstrapMessage
 
@@ -64,6 +72,4 @@ object TopicBootstrapActor {
   sealed trait BootstrapResult
   case object BootstrapStepSuccess extends BootstrapResult
   case class BootstrapStepFailure(reasons: String) extends BootstrapResult
-
-
 }
