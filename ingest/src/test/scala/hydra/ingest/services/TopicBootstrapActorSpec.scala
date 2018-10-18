@@ -1,16 +1,20 @@
 package hydra.ingest.services
 
-import akka.actor.ActorSystem
+import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.http.scaladsl.model.StatusCodes
 import akka.testkit.{TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.HydraRequest
+import hydra.core.protocol.InitiateHttpRequest
 import hydra.ingest.http.HydraIngestJsonSupport
 import hydra.ingest.services.TopicBootstrapActor.InitiateTopicBootstrap
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import spray.json._
+
+import scala.concurrent.duration._
 
 class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor-spec"))
   with FlatSpecLike
@@ -29,7 +33,18 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     val probe = TestProbe()
 
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(config, probe.ref, probe.ref))
+    val testHandlerGateway: ActorRef = system.actorOf(Props(
+      new Actor {
+
+        override def receive = {
+          case InitiateHttpRequest(req, duration, ctx) => {
+            ctx.complete(StatusCodes.OK)
+          }
+        }
+      }
+    ))
+
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(config, probe.ref, testHandlerGateway))
 
     val mdRequest = """{
                       |	"streamName": "exp.dataplatform.testsubject",
@@ -60,7 +75,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     bootstrapActor ! InitiateTopicBootstrap(hydraReq, stubCtx)
 
-    Thread.sleep(100)
+    Thread.sleep(500)
 
     (stubCtx.complete _)
       .verify(*) // TODO figure out if we can mock ToResponseMarshallable

@@ -1,7 +1,7 @@
 package hydra.ingest.services
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
+import akka.http.scaladsl.model.{StatusCodes}
 import com.typesafe.config.Config
 import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.HydraRequest
