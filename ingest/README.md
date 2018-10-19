@@ -5,7 +5,7 @@
 The HTTP ingest endpoint allows the streaming of discrete requests using the HTTP protocol.
 
 ### Request Metadata
-All HTTP headers specified in the request are converted into HydraRequestMetadata objects and supplied as part of the request to all ingestors.
+All HTTP headers specified in the request are converted into metadata and supplied as part of the request to all ingestors.
 
 
 ### Resource Format
