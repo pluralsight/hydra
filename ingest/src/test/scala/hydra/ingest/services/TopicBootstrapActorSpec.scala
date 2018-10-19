@@ -164,7 +164,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     probe.expectMsgPF() {
       case InitiateHttpRequest(req, _, _) =>
-        req.metadata.contains(HYDRA_KAFKA_TOPIC_PARAM)
+        req.metadata should contain(HYDRA_KAFKA_TOPIC_PARAM -> "hydra.metadata-topic")
     }
   }
 
