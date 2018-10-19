@@ -12,22 +12,16 @@ import spray.json._
 
 import scala.concurrent.duration._
 
-//first we make sure topic name is valid
-//first we need to try and create the topic
-//then we post the schema
 class TopicBootstrapActor(
                          config: Config,
                          schemaRegistryActor: ActorRef,
                          ingestionHandlerGateway: ActorRef,
                          ) extends Actor with HydraJsonSupport with ActorLogging {
 
-
   override def receive: Receive = {
-    //need to pass ctx forward to IngestionHandlerGateway
     case InitiateTopicBootstrap(httpRequest, ctx) => {
       initiateBootstrap(httpRequest, ctx)
     }
-    case ForwardBootstrapPayload => {}
   }
 
   private[ingest] def initiateBootstrap(hydraRequest: HydraRequest, ctx: ImperativeRequestContext): Unit = {

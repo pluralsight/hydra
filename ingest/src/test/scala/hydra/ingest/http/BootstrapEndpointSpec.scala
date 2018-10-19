@@ -68,11 +68,6 @@ class BootstrapEndpointSpec extends Matchers
       Post("/topics", testEntity) ~> bootstrapRoute ~> check {
         status shouldBe StatusCodes.OK
       }
-
-      val badRequest = Post("/topics")
-      badRequest ~> bootstrapRoute ~> check {
-        status shouldBe StatusCodes.BadRequest
-      }
     }
   }
 
