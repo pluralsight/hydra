@@ -12,9 +12,6 @@ import hydra.ingest.services.TopicBootstrapActor.InitiateTopicBootstrap
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
-import spray.json._
-
-import scala.concurrent.duration._
 
 class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor-spec"))
   with FlatSpecLike
@@ -37,14 +34,15 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       new Actor {
 
         override def receive = {
-          case InitiateHttpRequest(req, duration, ctx) => {
+          case msg @ InitiateHttpRequest(req, duration, ctx) =>
             ctx.complete(StatusCodes.OK)
-          }
+            probe.ref forward msg
         }
       }
     ))
 
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(config, probe.ref, testHandlerGateway))
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(config, probe.ref,
+      testHandlerGateway))
 
     val mdRequest = """{
                       |	"streamName": "exp.dataplatform.testsubject",
@@ -75,10 +73,10 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     bootstrapActor ! InitiateTopicBootstrap(hydraReq, stubCtx)
 
-    Thread.sleep(500)
+    probe.expectMsgType[InitiateHttpRequest]
 
     (stubCtx.complete _)
-      .verify(*) // TODO figure out if we can mock ToResponseMarshallable
+      .verify(*)
       .once
   }
 

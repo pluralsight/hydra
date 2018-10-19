@@ -34,9 +34,11 @@ class TopicBootstrapActor(
     val mdRequest = hydraRequest.payload.parseJson.convertTo[TopicMetadataRequest]
     val result: BootstrapResult = validateTopicName(mdRequest)
     result match {
-      case BootstrapStepSuccess => ingestionHandlerGateway ! InitiateHttpRequest(hydraRequest, 100.millis, ctx)
-      case BootstrapStepFailure(reasons) => ctx.complete(StatusCodes.BadRequest,
-        s"Topic name is invalid for the following reasons: $reasons")
+      case BootstrapStepSuccess =>
+        ingestionHandlerGateway ! InitiateHttpRequest(hydraRequest, 100.millis, ctx)
+      case BootstrapStepFailure(reasons) =>
+        ctx.complete(StatusCodes.BadRequest,
+          s"Topic name is invalid for the following reasons: $reasons")
     }
   }
 
