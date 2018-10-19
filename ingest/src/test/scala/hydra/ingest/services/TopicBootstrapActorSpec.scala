@@ -13,6 +13,7 @@ import hydra.ingest.services.TopicBootstrapActor.InitiateTopicBootstrap
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
 
 class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor-spec"))
   with FlatSpecLike
@@ -24,35 +25,35 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
 
+  val config = ConfigFactory.load()
+
+  val probe = TestProbe()
+
+  val testHandlerGateway: ActorRef = system.actorOf(Props(
+    new Actor {
+
+      override def receive = {
+        case msg @ InitiateHttpRequest(req, duration, ctx) =>
+          ctx.complete(StatusCodes.OK)
+          probe.ref forward msg
+      }
+    }
+  ))
+
+  val ctx = new ImperativeRequestContext {
+    var completed: ToResponseMarshallable = _
+    var error: Throwable = _
+
+    override def complete(obj: ToResponseMarshallable): Unit = completed = obj
+
+    override def failWith(error: Throwable): Unit = this.error = error
+  }
+
+  val bootstrapActor = system.actorOf(TopicBootstrapActor.props(config, probe.ref,
+    testHandlerGateway))
+
   "A TopicBootstrapActor" should "initiate a topic bootstrap" in {
 
-
-    val ctx = new ImperativeRequestContext {
-      var completed: ToResponseMarshallable = _
-      var error: Throwable = _
-
-      override def complete(obj: ToResponseMarshallable): Unit = completed = obj
-
-      override def failWith(error: Throwable): Unit = this.error = error
-    }
-
-    val config = ConfigFactory.load()
-
-    val probe = TestProbe()
-
-    val testHandlerGateway: ActorRef = system.actorOf(Props(
-      new Actor {
-
-        override def receive = {
-          case msg @ InitiateHttpRequest(req, duration, ctx) =>
-            ctx.complete(StatusCodes.OK)
-            probe.ref forward msg
-        }
-      }
-    ))
-
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(config, probe.ref,
-      testHandlerGateway))
 
     val mdRequest = """{
                       |	"streamName": "exp.dataplatform.testsubject",
@@ -88,35 +89,10 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     eventually {
       ctx.completed.value shouldBe StatusCodes.OK
     }
+
   }
 
   it should "complete with BadRequest for failures" in {
-    val ctx = new ImperativeRequestContext {
-      var completed: ToResponseMarshallable = _
-      var error: Throwable = _
-
-      override def complete(obj: ToResponseMarshallable): Unit = completed = obj
-
-      override def failWith(error: Throwable): Unit = this.error = error
-    }
-
-    val config = ConfigFactory.load()
-
-    val probe = TestProbe()
-
-    val testHandlerGateway: ActorRef = system.actorOf(Props(
-      new Actor {
-
-        override def receive = {
-          case msg @ InitiateHttpRequest(req, duration, ctx) =>
-            ctx.complete(StatusCodes.OK)
-            probe.ref forward msg
-        }
-      }
-    ))
-
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(config, probe.ref,
-      testHandlerGateway))
 
     val mdRequest = """{
                       |	"streamName": "invalid",
@@ -154,4 +130,42 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       }
     }
   }
+
+  it should "enrich a hydra request with the appropriate metadata" in {
+
+    val mdRequest = """{
+                      |	"streamName": "exp.dataplatform.testsubject",
+                      |	"streamType": "Historical",
+                      |	"streamSubType": "Source Of Truth",
+                      |	"dataClassification": "Public",
+                      |	"dataSourceOwner": "BARTON",
+                      |	"dataSourceContact": "slackity slack dont talk back",
+                      |	"psDataLake": false,
+                      |	"dataDocPath": "akka://some/path/here.jpggifyo",
+                      |	"dataOwnerNotes": "here are some notes topkek",
+                      |	"streamSchema": {
+                      |	  "namespace": "exp.assessment",
+                      |	  "name": "SkillAssessmentTopicsScored",
+                      |	  "type": "record",
+                      |	  "version": 1,
+                      |	  "fields": [
+                      |	    {
+                      |	      "name": "test-field",
+                      |	      "type": "string"
+                      |	    }
+                      |	  ]
+                      |	}
+                      |}"""
+      .stripMargin
+
+    val hydraReq = HydraRequest("corr_id", mdRequest)
+
+    bootstrapActor ! InitiateTopicBootstrap(hydraReq, ctx)
+
+    probe.expectMsgPF() {
+      case InitiateHttpRequest(req, _, _) =>
+        req.metadata.contains(HYDRA_KAFKA_TOPIC_PARAM)
+    }
+  }
+
 }
