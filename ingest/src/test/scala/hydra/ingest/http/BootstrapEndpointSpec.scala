@@ -4,14 +4,9 @@ import akka.actor.{Actor, Props}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.{MethodRejection, RequestEntityExpectedRejection}
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
-import akka.testkit.{TestActorRef, TestKit, TestProbe}
-import hydra.avro.registry.ConfluentSchemaRegistry
+import akka.testkit.{TestKit, TestProbe}
 import hydra.common.config.ConfigSupport
-import hydra.common.util.ActorUtils
-import hydra.ingest.IngestorInfo
-import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
-import hydra.ingest.test.TestIngestor
-import org.joda.time.DateTime
+import hydra.core.protocol.{Ingest, IngestorCompleted}
 import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.concurrent.duration._
@@ -26,19 +21,16 @@ class BootstrapEndpointSpec extends Matchers
 
   //because actors within this endpoint are private, we need to create test instances of them like below.
   private implicit val timeout = RouteTestTimeout(10.seconds)
-  val probe = system.actorOf(Props[TestIngestor])
-  val ingestorInfo = IngestorInfo(ActorUtils.actorName(probe), "test", probe.path, DateTime.now)
-  val registry = TestActorRef(new Actor {
+
+  class TestKafkaIngestor extends Actor {
     override def receive = {
-      case FindByName(name) if name == "tester" => sender ! LookupResult(Seq(ingestorInfo))
-      case FindByName(name) if name == "error" => throw new IllegalArgumentException("RAR")
-      case FindByName(_) => sender ! LookupResult(Seq.empty)
-      case FindAll => sender ! LookupResult(Seq(ingestorInfo))
+      case Ingest(_, _) => sender ! IngestorCompleted
     }
-  }, "ingestor_registry").underlyingActor
+  }
 
+  val ingestorRegistryProbe = TestProbe("ingestor_registry")
 
-  val ingestorProbe = TestProbe("kafka_ingestor")
+  val ingestorProbe = ingestorRegistryProbe.childActorOf(Props[TestKafkaIngestor], "kafka_ingestor")
 
   private val bootstrapRoute = new BootstrapEndpoint().route
 

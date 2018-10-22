@@ -9,11 +9,9 @@ import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.HydraRequest
 import hydra.core.protocol.InitiateHttpRequest
 import hydra.ingest.http.HydraIngestJsonSupport
-import hydra.ingest.services.TopicBootstrapActor.InitiateTopicBootstrap
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
-import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
 
 class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor-spec"))
   with FlatSpecLike
@@ -130,6 +128,4 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       }
     }
   }
-
-
 }
