@@ -131,41 +131,5 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     }
   }
 
-//  it should "enrich a hydra request with the appropriate metadata" in {
-//
-//    val mdRequest = """{
-//                      |	"streamName": "exp.dataplatform.testsubject",
-//                      |	"streamType": "Historical",
-//                      |	"streamSubType": "Source Of Truth",
-//                      |	"dataClassification": "Public",
-//                      |	"dataSourceOwner": "BARTON",
-//                      |	"dataSourceContact": "slackity slack dont talk back",
-//                      |	"psDataLake": false,
-//                      |	"dataDocPath": "akka://some/path/here.jpggifyo",
-//                      |	"dataOwnerNotes": "here are some notes topkek",
-//                      |	"streamSchema": {
-//                      |	  "namespace": "exp.assessment",
-//                      |	  "name": "SkillAssessmentTopicsScored",
-//                      |	  "type": "record",
-//                      |	  "version": 1,
-//                      |	  "fields": [
-//                      |	    {
-//                      |	      "name": "test-field",
-//                      |	      "type": "string"
-//                      |	    }
-//                      |	  ]
-//                      |	}
-//                      |}"""
-//      .stripMargin
-//
-//    val hydraReq = HydraRequest("corr_id", mdRequest)
-//
-//    bootstrapActor ! InitiateTopicBootstrap(hydraReq, ctx)
-//
-//    probe.expectMsgPF() {
-//      case InitiateHttpRequest(req, _, _) =>
-//        req.metadata.contains(HYDRA_KAFKA_TOPIC_PARAM)
-//    }
-//  }
 
 }
