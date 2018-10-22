@@ -4,7 +4,7 @@ import akka.actor.{Actor, Props}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.{MethodRejection, RequestEntityExpectedRejection}
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
-import akka.testkit.{TestActorRef, TestKit}
+import akka.testkit.{TestActorRef, TestKit, TestProbe}
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
@@ -37,8 +37,10 @@ class BootstrapEndpointSpec extends Matchers
     }
   }, "ingestor_registry").underlyingActor
 
+
+  val ingestorProbe = TestProbe("kafka_ingestor")
+
   private val bootstrapRoute = new BootstrapEndpoint().route
-  private val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
 
   override def afterAll = {
     super.afterAll()

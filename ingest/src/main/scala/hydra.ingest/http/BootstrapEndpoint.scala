@@ -27,6 +27,7 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.http.HydraDirectives
 import hydra.core.marshallers.{GenericError, HydraJsonSupport, TopicMetadataRequest}
+import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.TopicBootstrapActor.{ActorInitializing, BootstrapFailure, BootstrapSuccess, InitiateTopicBootstrap}
 import hydra.ingest.services._
 import spray.json.DeserializationException
@@ -41,7 +42,9 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
 
   implicit val mat = ActorMaterializer()
 
-  private val kafkaIngestor = system.actorSelection("kafka_ingestor")
+  private val registryPath = HydraIngestorRegistryClient.registryPath(applicationConfig)
+
+  private val kafkaIngestor = system.actorSelection(s"$registryPath/kafka_ingestor")
 
   private val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(applicationConfig))
 
