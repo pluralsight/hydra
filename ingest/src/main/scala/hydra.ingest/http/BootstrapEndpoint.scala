@@ -64,11 +64,10 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
         handleExceptions(exceptionHandler) {
           post {
             requestEntityPresent {
-              entity(as[TopicMetadataRequest]) {
-                topicMetadataRequest =>
-                  onSuccess(bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)) {
-                    case _ => complete(StatusCodes.OK)
-                  }
+              entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
+                onSuccess(bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)) {
+                  case _ => complete(StatusCodes.OK)
+                }
               }
             }
           }

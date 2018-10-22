@@ -1,7 +1,7 @@
 package hydra.ingest.services
 
 import akka.actor.Status.Failure
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSelection, Props}
 import akka.http.scaladsl.model.StatusCodes
 import akka.pattern.ask
 import akka.util.Timeout
@@ -11,15 +11,19 @@ import hydra.avro.resource.SchemaResource
 import hydra.core.akka.SchemaRegistryActor.{FetchSchemaResponse, RegisterSchemaRequest}
 import hydra.core.ingest.{HydraRequest, RequestParams}
 import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
-import hydra.core.protocol.InitiateHttpRequest
-import hydra.ingest.services.TopicBootstrapActor._
+import hydra.core.protocol.{Ingest, InitiateHttpRequest}
+import hydra.core.transport.{AckStrategy, ValidationStrategy}
+import hydra.ingest.services.TopicBootstrapActor.{BootstrapSuccess, _}
+import hydra.kafka.producer.{AvroRecord, AvroRecordFactory}
+import spray.json._
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class TopicBootstrapActor(
-                         config: Config,
-                         schemaRegistryActor: ActorRef,
-                         ingestionHandlerGateway: ActorRef,
+                           config: Config,
+                           schemaRegistryActor: ActorRef,
+                           kafkaIngestor: ActorRef
                          ) extends Actor with HydraJsonSupport with ActorLogging {
 
   implicit val ec = context.dispatcher
@@ -29,9 +33,9 @@ class TopicBootstrapActor(
   override def receive: Receive = initializing
 
   override def preStart(): Unit = {
-    (schemaRegistryActor ? RegisterSchemaRequest()) foreach {
-      case FetchSchemaResponse(schema) => context.become(active(schema))
-      case Failure(ex) => context.become(failed)
+    (schemaRegistryActor ? RegisterSchemaRequest("")) foreach {
+      case FetchSchemaResponse(_) => context.become(active)
+      case Failure(ex) => context.become(failed(ex))
     }
   }
 
@@ -39,8 +43,8 @@ class TopicBootstrapActor(
     case _ => sender ! ActorInitializing
   }
 
-  def active(schema: SchemaResource): Receive = {
-    case InitiateTopicBootstrap(topicMetadataRequest) =>
+  def active: Receive = {
+    case InitiateTopicBootstrap(topicMetadataRequest) => initiateBootstrap(topicMetadataRequest)
   }
 
   def failed(ex: Throwable): Receive = {
@@ -49,15 +53,15 @@ class TopicBootstrapActor(
   }
 
   private[ingest] def initiateBootstrap(topicMetadataRequest: TopicMetadataRequest): Unit = {
-    val enrichedRequest = enrichRequest(topicMetadataRequest)
     val result: BootstrapResult = validateTopicName(topicMetadataRequest)
     result match {
-      case BootstrapSuccess =>
-        ingestionHandlerGateway ! InitiateHttpRequest(enrichedRequest, 100.millis, ctx)
-      case BootstrapFailure(reasons) =>
-        ctx.complete(StatusCodes.BadRequest,
-          s"Topic name is invalid for the following reasons: $reasons")
+      case BootstrapSuccess => buildAvroRecord(topicMetadataRequest).foreach {
+        case avro: AvroRecord => kafkaIngestor ! Ingest(avro, avro.ackStrategy)
+        case _ => BootstrapFailure()
+      }
     }
+
+
   }
 
   private[ingest] def validateTopicName(topicMetadataRequest: TopicMetadataRequest): BootstrapResult = {
@@ -74,14 +78,21 @@ class TopicBootstrapActor(
     }
   }
 
-  private[ingest] def buildHydraRequest(topicMetadataRequest: TopicMetadataRequest): HydraRequest = {
+  private[ingest] def buildAvroRecord(topicMetadataRequest: TopicMetadataRequest): Future[AvroRecord] = {
     //convert topicMetadataRequest back to payload string?
     //set ack level, validation, and kafka topic here
-
-  }
-
-  private[ingest] def enrichRequest(hydraRequest: HydraRequest) = {
-    hydraRequest.copy(metadata = Map(RequestParams.HYDRA_KAFKA_TOPIC_PARAM -> config.get[String]("hydra-metadata-topic-name").value))
+    val jsonString = topicMetadataRequest.toJson.toString
+    new AvroRecordFactory(schemaRegistryActor).build(
+      HydraRequest(
+        "0",
+        jsonString,
+        metadata = Map(
+          RequestParams.HYDRA_KAFKA_TOPIC_PARAM ->
+            config.get[String]("hydra-metadata-topic-name").value),
+        ackStrategy = AckStrategy.Replicated,
+        validationStrategy = ValidationStrategy.Strict
+      )
+    )
   }
 }
 
@@ -104,4 +115,5 @@ object TopicBootstrapActor {
   case class BootstrapFailure(reasons: String) extends BootstrapResult
 
   case object ActorInitializing extends BootstrapResult
+
 }
