@@ -59,8 +59,9 @@ class TopicBootstrapActor(
         case avro: AvroRecord => kafkaIngestor ! Ingest(avro, avro.ackStrategy)
         case _ => sender ! BootstrapFailure("Failed to build avro record for metadata request.")
       }
+      case failureMsg: BootstrapFailure => sender ! failureMsg
+      case _ =>
     }
-
   }
 
   private[ingest] def validateTopicName(topicMetadataRequest: TopicMetadataRequest): BootstrapResult = {

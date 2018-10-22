@@ -21,6 +21,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
+import akka.util.Timeout
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
@@ -39,6 +40,7 @@ import scala.concurrent.duration.{FiniteDuration, _}
 class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: ExecutionContext)
   extends RoutedEndpoints with LoggingAdapter with HydraJsonSupport with HydraDirectives {
 
+  implicit val timeout = Timeout(10.seconds)
 
   implicit val mat = ActorMaterializer()
 
