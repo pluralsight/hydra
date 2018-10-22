@@ -17,19 +17,17 @@
 package hydra.ingest.http
 
 import akka.actor._
-import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
+import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.http.HydraDirectives
-import hydra.core.ingest.CorrelationIdBuilder
 import hydra.core.marshallers.{GenericError, HydraJsonSupport, TopicMetadataRequest}
-import hydra.ingest.bootstrap.HydraIngestorRegistryClient
-import hydra.ingest.services.TopicBootstrapActor.InitiateTopicBootstrap
-import akka.pattern.ask
+import hydra.ingest.services.TopicBootstrapActor.{ActorInitializing, BootstrapFailure, BootstrapSuccess, InitiateTopicBootstrap}
 import hydra.ingest.services._
 import spray.json.DeserializationException
 
@@ -40,20 +38,15 @@ import scala.concurrent.duration.{FiniteDuration, _}
 class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: ExecutionContext)
   extends RoutedEndpoints with LoggingAdapter with HydraJsonSupport with HydraDirectives {
 
-  import hydra.ingest.bootstrap.RequestFactories._
 
   implicit val mat = ActorMaterializer()
 
-  //for performance reasons, we give this endpoint its own instance of the gateway
-  private val registryPath = HydraIngestorRegistryClient.registryPath(applicationConfig)
-
-  private val requestHandler = system.actorOf(IngestionHandlerGateway.props(registryPath),
-    "ingestion_Http_handler_gateway")
+  private val kafkaIngestor = system.actorSelection("kafka_ingestor")
 
   private val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(applicationConfig))
 
   private val bootstrapActor = system.actorOf(
-    TopicBootstrapActor.props(applicationConfig, schemaRegistryActor, requestHandler))
+    TopicBootstrapActor.props(applicationConfig, schemaRegistryActor, kafkaIngestor))
 
   private val ingestTimeout = applicationConfig.get[FiniteDuration]("ingest.timeout")
     .valueOrElse(500 millis)
@@ -66,7 +59,10 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
             requestEntityPresent {
               entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
                 onSuccess(bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)) {
-                  case _ => complete(StatusCodes.OK)
+                  case BootstrapSuccess => complete(StatusCodes.OK)
+                  case BootstrapFailure(reasons) => complete(StatusCodes.BadRequest, reasons)
+                  case ActorInitializing => complete(StatusCodes.InternalServerError, "Please try again later....")
+                  case _ => complete(StatusCodes.InternalServerError, "Unknown exception occurred")
                 }
               }
             }

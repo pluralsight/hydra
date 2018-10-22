@@ -2,16 +2,14 @@ package hydra.ingest.services
 
 import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSelection, Props}
-import akka.http.scaladsl.model.StatusCodes
 import akka.pattern.ask
 import akka.util.Timeout
 import com.typesafe.config.Config
 import configs.syntax._
-import hydra.avro.resource.SchemaResource
 import hydra.core.akka.SchemaRegistryActor.{FetchSchemaResponse, RegisterSchemaRequest}
 import hydra.core.ingest.{HydraRequest, RequestParams}
 import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
-import hydra.core.protocol.{Ingest, InitiateHttpRequest}
+import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.ingest.services.TopicBootstrapActor.{BootstrapSuccess, _}
 import hydra.kafka.producer.{AvroRecord, AvroRecordFactory}
@@ -23,7 +21,7 @@ import scala.concurrent.duration._
 class TopicBootstrapActor(
                            config: Config,
                            schemaRegistryActor: ActorRef,
-                           kafkaIngestor: ActorRef
+                           kafkaIngestor: ActorSelection
                          ) extends Actor with HydraJsonSupport with ActorLogging {
 
   implicit val ec = context.dispatcher
@@ -45,6 +43,8 @@ class TopicBootstrapActor(
 
   def active: Receive = {
     case InitiateTopicBootstrap(topicMetadataRequest) => initiateBootstrap(topicMetadataRequest)
+    case IngestorCompleted => sender ! BootstrapSuccess
+    case IngestorError(ex) => sender ! BootstrapFailure(ex.getMessage)
   }
 
   def failed(ex: Throwable): Receive = {
@@ -57,10 +57,9 @@ class TopicBootstrapActor(
     result match {
       case BootstrapSuccess => buildAvroRecord(topicMetadataRequest).foreach {
         case avro: AvroRecord => kafkaIngestor ! Ingest(avro, avro.ackStrategy)
-        case _ => BootstrapFailure()
+        case _ => sender ! BootstrapFailure("Failed to build avro record for metadata request.")
       }
     }
-
 
   }
 
@@ -79,8 +78,6 @@ class TopicBootstrapActor(
   }
 
   private[ingest] def buildAvroRecord(topicMetadataRequest: TopicMetadataRequest): Future[AvroRecord] = {
-    //convert topicMetadataRequest back to payload string?
-    //set ack level, validation, and kafka topic here
     val jsonString = topicMetadataRequest.toJson.toString
     new AvroRecordFactory(schemaRegistryActor).build(
       HydraRequest(
@@ -99,8 +96,8 @@ class TopicBootstrapActor(
 
 object TopicBootstrapActor {
 
-  def props(config: Config, schemaRegistryActor: ActorRef, ingestionHandlerGateway: ActorRef): Props =
-    Props(classOf[TopicBootstrapActor], config, schemaRegistryActor, ingestionHandlerGateway)
+  def props(config: Config, schemaRegistryActor: ActorRef, kafkaIngestor: ActorSelection): Props =
+    Props(classOf[TopicBootstrapActor], config, schemaRegistryActor, kafkaIngestor)
 
   sealed trait TopicBootstrapMessage
 
