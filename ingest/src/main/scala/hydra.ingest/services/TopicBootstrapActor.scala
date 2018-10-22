@@ -9,6 +9,7 @@ import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
 import hydra.core.protocol.InitiateHttpRequest
 import hydra.ingest.services.TopicBootstrapActor._
 import spray.json._
+import akka.pattern.ask
 
 import scala.concurrent.duration._
 import configs.syntax._
@@ -20,13 +21,16 @@ class TopicBootstrapActor(
                          ) extends Actor with HydraJsonSupport with ActorLogging {
 
   override def receive: Receive = {
-    case InitiateTopicBootstrap(hydraRequest, ctx) => {
-      initiateBootstrap(hydraRequest, ctx)
+    case InitiateTopicBootstrap(topicMetadataRequest) => {
+      initiateBootstrap(topicMetadataRequest)
     }
   }
 
-  private[ingest] def initiateBootstrap(hydraRequest: HydraRequest, ctx: ImperativeRequestContext): Unit = {
-    val mdRequest = hydraRequest.payload.parseJson.convertTo[TopicMetadataRequest]
+  override def preStart(): Unit = {
+    schemaRegistryActor ?
+  }
+
+  private[ingest] def initiateBootstrap(topicMetadataRequest: TopicMetadataRequest): Unit = {
     val enrichedRequest = enrichRequest(hydraRequest)
     val result: BootstrapResult = validateTopicName(mdRequest)
     result match {
@@ -52,6 +56,12 @@ class TopicBootstrapActor(
     }
   }
 
+  private[ingest] def buildHydraRequest(topicMetadataRequest: TopicMetadataRequest): HydraRequest = {
+    //convert topicMetadataRequest back to payload string?
+    //set ack level, validation, and kafka topic here
+
+  }
+
   private[ingest] def enrichRequest(hydraRequest: HydraRequest) = {
     hydraRequest.copy(metadata = Map(RequestParams.HYDRA_KAFKA_TOPIC_PARAM -> config.get[String]("hydra-metadata-topic-name").value))
   }
@@ -65,8 +75,7 @@ object TopicBootstrapActor {
 
   sealed trait TopicBootstrapMessage
 
-  case class InitiateTopicBootstrap(hydraRequest: HydraRequest,
-                                    context: ImperativeRequestContext) extends TopicBootstrapMessage
+  case class InitiateTopicBootstrap(topicMetadataRequest: TopicMetadataRequest) extends TopicBootstrapMessage
 
   case class ForwardBootstrapPayload(request: HydraRequest) extends TopicBootstrapMessage
 

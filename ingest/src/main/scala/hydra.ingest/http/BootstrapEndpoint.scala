@@ -17,7 +17,7 @@
 package hydra.ingest.http
 
 import akka.actor._
-import akka.http.scaladsl.model.HttpRequest
+import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.stream.ActorMaterializer
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
@@ -26,9 +26,10 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.http.HydraDirectives
 import hydra.core.ingest.CorrelationIdBuilder
-import hydra.core.marshallers.{GenericError, HydraJsonSupport}
+import hydra.core.marshallers.{GenericError, HydraJsonSupport, TopicMetadataRequest}
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.TopicBootstrapActor.InitiateTopicBootstrap
+import akka.pattern.ask
 import hydra.ingest.services._
 import spray.json.DeserializationException
 
@@ -63,24 +64,17 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
         handleExceptions(exceptionHandler) {
           post {
             requestEntityPresent {
-              publishRequest
+              entity(as[TopicMetadataRequest]) {
+                topicMetadataRequest =>
+                  onSuccess(bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)) {
+                    case _ => complete(StatusCodes.OK)
+                  }
+              }
             }
           }
         }
       }
     }
-
-  private def cId = CorrelationIdBuilder.generate()
-
-  private def publishRequest = parameter("correlationId" ?) { cIdOpt =>
-    extractRequest { req =>
-      onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>
-        imperativelyComplete { ctx =>
-          bootstrapActor ! InitiateTopicBootstrap(hydraRequest, ctx)
-        }
-      }
-    }
-  }
 
   private def exceptionHandler = ExceptionHandler {
     case e: DeserializationException =>
