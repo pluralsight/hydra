@@ -35,12 +35,50 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   val testSchemaResource = SchemaResource(1, 1, new Schema.Parser().parse(
     """
       |{
-      |  "name": "Test",
+      |  "namespace": "hydra.metadata",
+      |  "name": "topic",
       |  "type": "record",
+      |  "version": 1,
       |  "fields": [
       |    {
-      |      "name": "id",
-      |      "type": "int"
+      |      "name": "streamName",
+      |      "type": "string"
+      |    },
+      |    {
+      |      "name": "streamType",
+      |      "type": "string"
+      |    },
+      |    {
+      |      "name": "streamSubType",
+      |      "type": "string"
+      |    },
+      |    {
+      |      "name": "dataClassification",
+      |      "type": "string"
+      |    },
+      |    {
+      |      "name": "dataSourceOwner",
+      |      "type": "string"
+      |    },
+      |    {
+      |      "name": "dataSourceContact",
+      |      "type": "string"
+      |    },
+      |    {
+      |      "name": "psDataLake",
+      |      "type": "boolean"
+      |    },
+      |    {
+      |      "name": "dataDocPath",
+      |      "type": "string"
+      |    },
+      |    {
+      |    	"name": "dataOwnerNotes",
+      |    	"type": "string"
+      |    },
+      |    {
+      |    	"name": "streamSchema",
+      |    	"type": "string"
       |    }
       |  ]
       |}
@@ -64,7 +102,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     new Actor {
       override def receive = {
         case msg: Ingest[String, GenericRecord] =>
-          sender ! IngestorCompleted
+          probe.ref forward msg
       }
     }
   ), "kafka_ingestor")
@@ -99,7 +137,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       .convertTo[TopicMetadataRequest]
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(config, testSchemaRegistry,
-      system.actorSelection("kafka_ingestor")))
+      system.actorSelection("/user/kafka_ingestor")))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -109,11 +147,13 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     // TODO I think the test is failing in the convert portion of the AvroRecordFactory.
     probe.expectMsgPF() {
-      case msg => println(s"Received $msg")
+
       case Ingest(msg: HydraRecord[String, GenericRecord], ack) =>
         msg shouldBe an[AvroRecord]
-        msg.payload.getSchema.getName shouldBe "Test"
+        msg.payload.getSchema.getName shouldBe "topic"
         ack shouldBe AckStrategy.Replicated
+
+      case _ => println(s"WASNT AN INGEST MESSSAGE!!!")
     }
   }
 

@@ -52,15 +52,17 @@ class TopicBootstrapActor(
 
   private[ingest] def initiateBootstrap(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
     val result = TopicNameValidator.validate(topicMetadataRequest.streamName)
-      result.map { _ =>
-        (kafkaIngestor ? buildAvroRecord(topicMetadataRequest).map(avro => Ingest(avro, avro.ackStrategy))).map {
+    result.map { _ =>
+      buildAvroRecord(topicMetadataRequest).flatMap { avroRecord =>
+        (kafkaIngestor ? Ingest(avroRecord, avroRecord.ackStrategy)).map {
           case IngestorCompleted => BootstrapSuccess
           case IngestorError(ex) => BootstrapFailure(Seq(ex.getMessage))
-          case _ => throw new RuntimeException("Ingestor is fucced son")
+          case _ => throw new RuntimeException("Ingestor is fukt son")
         }
-      }.recover {
-        case e: TopicNameValidatorException => Future(BootstrapFailure(e.reasons))
-      }.get
+      }
+    }.recover {
+      case e: TopicNameValidatorException => Future(BootstrapFailure(e.reasons))
+    }.get
   }
 
 
