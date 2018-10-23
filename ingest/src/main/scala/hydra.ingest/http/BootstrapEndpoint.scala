@@ -17,7 +17,7 @@
 package hydra.ingest.http
 
 import akka.actor._
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
@@ -67,7 +67,8 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
                   case BootstrapSuccess => complete(StatusCodes.OK)
                   case BootstrapFailure(reasons) => complete(StatusCodes.BadRequest, reasons)
                   case ActorInitializing => complete(StatusCodes.InternalServerError, "Please try again later....")
-                  case _ => complete(StatusCodes.InternalServerError, "Unknown exception occurred")
+                  case e:Exception =>
+                    complete(HttpResponse(StatusCodes.InternalServerError, entity=e.getMessage))
                 }
               }
             }

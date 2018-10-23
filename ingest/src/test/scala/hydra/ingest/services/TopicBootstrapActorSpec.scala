@@ -145,7 +145,6 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     probe.expectMsgType[FetchSchemaRequest]
 
-    // TODO I think the test is failing in the convert portion of the AvroRecordFactory.
     probe.expectMsgPF() {
 
       case Ingest(msg: HydraRecord[String, GenericRecord], ack) =>

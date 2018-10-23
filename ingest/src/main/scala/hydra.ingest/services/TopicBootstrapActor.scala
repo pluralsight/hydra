@@ -57,7 +57,7 @@ class TopicBootstrapActor(
         (kafkaIngestor ? Ingest(avroRecord, avroRecord.ackStrategy)).map {
           case IngestorCompleted => BootstrapSuccess
           case IngestorError(ex) => BootstrapFailure(Seq(ex.getMessage))
-          case _ => throw new RuntimeException("Ingestor is fukt son")
+          case _ => throw new RuntimeException("Kafka Ingestior is unable to respond to requests. Please Try again later.")
         }
       }
     }.recover {

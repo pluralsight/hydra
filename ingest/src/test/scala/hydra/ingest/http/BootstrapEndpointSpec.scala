@@ -1,12 +1,15 @@
 package hydra.ingest.http
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.{MethodRejection, RequestEntityExpectedRejection}
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.{TestKit, TestProbe}
+import hydra.avro.registry.ConfluentSchemaRegistry
+import hydra.avro.resource.SchemaResource
 import hydra.common.config.ConfigSupport
 import hydra.core.protocol.{Ingest, IngestorCompleted}
+import org.apache.avro.Schema
 import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.concurrent.duration._
@@ -34,6 +37,60 @@ class BootstrapEndpointSpec extends Matchers
   val ingestorRegistryProbe = TestProbe("ingestor_registry")
 
   val ingestorProbe = ingestorRegistryProbe.childActorOf(Props(new TestKafkaIngestor), "kafka_ingestor")
+
+  val testSchemaResource = SchemaResource(1, 1, new Schema.Parser().parse(
+    """
+      |{
+      |  "namespace": "hydra.metadata",
+      |  "name": "topic",
+      |  "type": "record",
+      |  "version": 1,
+      |  "fields": [
+      |    {
+      |      "name": "streamName",
+      |      "type": "string"
+      |    },
+      |    {
+      |      "name": "streamType",
+      |      "type": "string"
+      |    },
+      |    {
+      |      "name": "streamSubType",
+      |      "type": "string"
+      |    },
+      |    {
+      |      "name": "dataClassification",
+      |      "type": "string"
+      |    },
+      |    {
+      |      "name": "dataSourceOwner",
+      |      "type": "string"
+      |    },
+      |    {
+      |      "name": "dataSourceContact",
+      |      "type": "string"
+      |    },
+      |    {
+      |      "name": "psDataLake",
+      |      "type": "boolean"
+      |    },
+      |    {
+      |      "name": "dataDocPath",
+      |      "type": "string"
+      |    },
+      |    {
+      |    	"name": "dataOwnerNotes",
+      |    	"type": "string"
+      |    },
+      |    {
+      |    	"name": "streamSchema",
+      |    	"type": "string"
+      |    }
+      |  ]
+      |}
+    """.stripMargin))
+
+  val schemaRegistry: ConfluentSchemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
 
   private val bootstrapRoute = new BootstrapEndpoint().route
 
