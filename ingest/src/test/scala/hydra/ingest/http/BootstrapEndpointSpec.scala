@@ -25,12 +25,15 @@ class BootstrapEndpointSpec extends Matchers
   class TestKafkaIngestor extends Actor {
     override def receive = {
       case Ingest(_, _) => sender ! IngestorCompleted
+
     }
+    def props: Props = Props()
+
   }
 
   val ingestorRegistryProbe = TestProbe("ingestor_registry")
 
-  val ingestorProbe = ingestorRegistryProbe.childActorOf(Props[TestKafkaIngestor], "kafka_ingestor")
+  val ingestorProbe = ingestorRegistryProbe.childActorOf(Props(new TestKafkaIngestor), "kafka_ingestor")
 
   private val bootstrapRoute = new BootstrapEndpoint().route
 

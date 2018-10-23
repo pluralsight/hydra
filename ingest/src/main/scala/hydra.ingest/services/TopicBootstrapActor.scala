@@ -2,7 +2,7 @@ package hydra.ingest.services
 
 import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSelection, Props}
-import akka.pattern.ask
+import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import com.typesafe.config.Config
 import configs.syntax._
@@ -42,41 +42,27 @@ class TopicBootstrapActor(
   }
 
   def active: Receive = {
-    case InitiateTopicBootstrap(topicMetadataRequest) => initiateBootstrap(topicMetadataRequest)
-    case IngestorCompleted => sender ! BootstrapSuccess
-    case IngestorError(ex) => sender ! BootstrapFailure(ex.getMessage)
+    case InitiateTopicBootstrap(topicMetadataRequest) => initiateBootstrap(topicMetadataRequest) pipeTo sender
   }
 
   def failed(ex: Throwable): Receive = {
     case _ =>
-      BootstrapFailure(s"TopicBootstrapActor is in an errored state due to ${ex.getCause.getMessage}")
+      BootstrapFailure(Seq(ex.getMessage))
   }
 
-  private[ingest] def initiateBootstrap(topicMetadataRequest: TopicMetadataRequest): Unit = {
-    val result: BootstrapResult = validateTopicName(topicMetadataRequest)
-    result match {
-      case BootstrapSuccess => buildAvroRecord(topicMetadataRequest).foreach {
-        case avro: AvroRecord => kafkaIngestor ! Ingest(avro, avro.ackStrategy)
-        case _ => sender ! BootstrapFailure("Failed to build avro record for metadata request.")
-      }
-      case failureMsg: BootstrapFailure => sender ! failureMsg
-      case _ =>
-    }
+  private[ingest] def initiateBootstrap(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
+    val result = TopicNameValidator.validate(topicMetadataRequest.streamName)
+      result.map { _ =>
+        (kafkaIngestor ? buildAvroRecord(topicMetadataRequest).map(avro => Ingest(avro, avro.ackStrategy))).map {
+          case IngestorCompleted => BootstrapSuccess
+          case IngestorError(ex) => BootstrapFailure(Seq(ex.getMessage))
+          case _ => throw new RuntimeException("Ingestor is fucced son")
+        }
+      }.recover {
+        case e: TopicNameValidatorException => Future(BootstrapFailure(e.reasons))
+      }.get
   }
 
-  private[ingest] def validateTopicName(topicMetadataRequest: TopicMetadataRequest): BootstrapResult = {
-    val isValidOrErrorReport = TopicNameValidator.validate(topicMetadataRequest.streamName)
-    isValidOrErrorReport match {
-      case Valid => BootstrapSuccess
-      case InvalidReport(reasons) =>
-        val invalidDisplayString = reasons
-          .map(_.reason)
-          .map("\t" + _)
-          .mkString("\n")
-        BootstrapFailure(invalidDisplayString)
-      case _ => BootstrapFailure("Couldn't find match on validateTopicName")
-    }
-  }
 
   private[ingest] def buildAvroRecord(topicMetadataRequest: TopicMetadataRequest): Future[AvroRecord] = {
     val jsonString = topicMetadataRequest.toJson.toString
@@ -110,7 +96,7 @@ object TopicBootstrapActor {
 
   case object BootstrapSuccess extends BootstrapResult
 
-  case class BootstrapFailure(reasons: String) extends BootstrapResult
+  case class BootstrapFailure(reasons: Seq[String]) extends BootstrapResult
 
   case object ActorInitializing extends BootstrapResult
 
