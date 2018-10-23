@@ -1,6 +1,6 @@
 package hydra.ingest.services
 
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 
 object TopicNameValidator {
@@ -20,7 +20,7 @@ object TopicNameValidator {
       .collect {
         case r: Invalid => r
       } match {
-      case respSeq: Seq[ValidationResponse] if respSeq.nonEmpty => throw TopicNameValidatorException(respSeq.map(invalid => invalid.reason))
+      case respSeq: Seq[ValidationResponse] if respSeq.nonEmpty => Failure(TopicNameValidatorException(respSeq.map(invalid => invalid.reason)))
       case _ => scala.util.Success(Valid)
     }
   }
