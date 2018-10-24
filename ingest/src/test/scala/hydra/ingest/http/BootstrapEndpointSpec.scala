@@ -1,14 +1,13 @@
 package hydra.ingest.http
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, Props}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.{MethodRejection, RequestEntityExpectedRejection}
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
-import akka.testkit.{TestKit, TestProbe}
-import hydra.avro.resource.SchemaResource
+import akka.testkit.TestKit
 import hydra.common.config.ConfigSupport
-import hydra.core.protocol.{Ingest, IngestorCompleted}
-import org.apache.avro.Schema
+import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
+import hydra.kafka.producer.AvroRecord
 import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.concurrent.duration._
@@ -26,68 +25,15 @@ class BootstrapEndpointSpec extends Matchers
 
   class TestKafkaIngestor extends Actor {
     override def receive = {
+      case Ingest(hydraRecord, _) if hydraRecord.asInstanceOf[AvroRecord].payload.get("streamName") == "exp.dataplatform.failed" =>
+        sender ! IngestorError(new Exception("oh noes!"))
       case Ingest(_, _) => sender ! IngestorCompleted
-
     }
     def props: Props = Props()
 
   }
 
-  val ingestorRegistryProbe = TestProbe("ingestor_registry")
-
-  val ingestorProbe = ingestorRegistryProbe.childActorOf(Props(new TestKafkaIngestor), "kafka_ingestor")
-
-  val testSchemaResource = SchemaResource(1, 1, new Schema.Parser().parse(
-    """
-      |{
-      |  "namespace": "hydra.metadata",
-      |  "name": "topic",
-      |  "type": "record",
-      |  "version": 1,
-      |  "fields": [
-      |    {
-      |      "name": "streamName",
-      |      "type": "string"
-      |    },
-      |    {
-      |      "name": "streamType",
-      |      "type": "string"
-      |    },
-      |    {
-      |      "name": "streamSubType",
-      |      "type": "string"
-      |    },
-      |    {
-      |      "name": "dataClassification",
-      |      "type": "string"
-      |    },
-      |    {
-      |      "name": "dataSourceOwner",
-      |      "type": "string"
-      |    },
-      |    {
-      |      "name": "dataSourceContact",
-      |      "type": "string"
-      |    },
-      |    {
-      |      "name": "psDataLake",
-      |      "type": "boolean"
-      |    },
-      |    {
-      |      "name": "dataDocPath",
-      |      "type": "string"
-      |    },
-      |    {
-      |    	"name": "dataOwnerNotes",
-      |    	"type": "string"
-      |    },
-      |    {
-      |    	"name": "streamSchema",
-      |    	"type": "string"
-      |    }
-      |  ]
-      |}
-    """.stripMargin))
+  val kafkaIngestor = system.actorOf(Props(new TestKafkaIngestor), "kafka_ingestor")
 
   private val bootstrapRoute = new BootstrapEndpoint().route
 
@@ -143,6 +89,38 @@ class BootstrapEndpointSpec extends Matchers
     }
   }
 
+  "returns the correct response when the ingestor fails" in {
+    val testEntity = HttpEntity(
+      ContentTypes.`application/json`,
+      """{
+        |	"streamName": "exp.dataplatform.failed",
+        |	"streamType": "Historical",
+        |	"streamSubType": "Source Of Truth",
+        |	"dataClassification": "Public",
+        |	"dataSourceOwner": "BARTON",
+        |	"dataSourceContact": "slackity slack dont talk back",
+        |	"psDataLake": false,
+        |	"dataDocPath": "akka://some/path/here.jpggifyo",
+        |	"dataOwnerNotes": "here are some notes topkek",
+        |	"streamSchema": {
+        |	  "namespace": "exp.assessment",
+        |	  "name": "SkillAssessmentTopicsScored",
+        |	  "type": "record",
+        |	  "version": 1,
+        |	  "fields": [
+        |	    {
+        |	      "name": "test-field",
+        |	      "type": "string"
+        |	    }
+        |	  ]
+        |	}
+        |}""".stripMargin)
+
+    Post("/topics", testEntity) ~> bootstrapRoute ~> check {
+      status shouldBe StatusCodes.BadRequest
+    }
+  }
+
   "rejects requests with invalid topic names" in {
     val testEntity = HttpEntity(
       ContentTypes.`application/json`,
@@ -174,5 +152,4 @@ class BootstrapEndpointSpec extends Matchers
       status shouldBe StatusCodes.BadRequest
     }
   }
-
 }

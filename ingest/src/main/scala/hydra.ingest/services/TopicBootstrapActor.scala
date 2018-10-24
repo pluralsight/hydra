@@ -6,7 +6,7 @@ import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import com.typesafe.config.Config
 import configs.syntax._
-import hydra.core.akka.SchemaRegistryActor.{FetchSchemaResponse, RegisterSchemaRequest}
+import hydra.core.akka.SchemaRegistryActor.{RegisterSchemaRequest, RegisterSchemaResponse}
 import hydra.core.ingest.{HydraRequest, RequestParams}
 import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
@@ -32,12 +32,11 @@ class TopicBootstrapActor(
   override def receive: Receive = initializing
 
   override def preStart(): Unit = {
-    val schema = Source.fromResource("HydraMetadataTopic.avsc").toString
+    val schema = Source.fromResource("HydraMetadataTopic.avsc").mkString
     (schemaRegistryActor ? RegisterSchemaRequest(schema))
     .foreach {
-      case FetchSchemaResponse(_) => context.become(active)
+      case RegisterSchemaResponse(_) => context.become(active)
       case Failure(ex) => context.become(failed(ex))
-      case e@_ => println(s"wow didn't match!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! $e")
     }
   }
 

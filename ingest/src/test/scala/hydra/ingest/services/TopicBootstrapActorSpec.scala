@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import hydra.avro.resource.SchemaResource
-import hydra.core.akka.SchemaRegistryActor.{FetchSchemaRequest, FetchSchemaResponse, RegisterSchemaRequest}
+import hydra.core.akka.SchemaRegistryActor.{FetchSchemaRequest, FetchSchemaResponse, RegisterSchemaRequest, RegisterSchemaResponse}
 import hydra.core.marshallers.TopicMetadataRequest
 import hydra.core.protocol.Ingest
 import hydra.core.transport.{AckStrategy, HydraRecord}
@@ -97,7 +97,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
               probe.ref forward msg
 
             case msg: RegisterSchemaRequest =>
-              sender ! FetchSchemaResponse(testSchemaResource)
+              sender ! RegisterSchemaResponse(testSchemaResource)
               probe.ref forward msg
           }
         }

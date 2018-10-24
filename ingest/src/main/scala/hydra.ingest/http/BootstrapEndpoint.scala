@@ -67,8 +67,8 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
                   case BootstrapSuccess => complete(StatusCodes.OK)
                   case BootstrapFailure(reasons) => complete(StatusCodes.BadRequest, reasons)
                   case ActorInitializing => complete(StatusCodes.InternalServerError, "Please try again later....")
-                  case e:Exception =>
-                    complete(HttpResponse(StatusCodes.InternalServerError, entity=e.getMessage))
+                  case e: Exception =>
+                    complete(StatusCodes.InternalServerError, e.getMessage)
                 }
               }
             }
