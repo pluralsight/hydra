@@ -17,6 +17,7 @@ import spray.json._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.io.Source
 
 class TopicBootstrapActor(
                            config: Config,
@@ -31,7 +32,9 @@ class TopicBootstrapActor(
   override def receive: Receive = initializing
 
   override def preStart(): Unit = {
-    (schemaRegistryActor ? RegisterSchemaRequest("")) foreach {
+    (schemaRegistryActor ? RegisterSchemaRequest(
+      Source.fromResource("HydraMetadataTopic.avsc").toString))
+    .foreach {
       case FetchSchemaResponse(_) => context.become(active)
       case Failure(ex) => context.become(failed(ex))
     }
@@ -42,12 +45,12 @@ class TopicBootstrapActor(
   }
 
   def active: Receive = {
-    case InitiateTopicBootstrap(topicMetadataRequest) => initiateBootstrap(topicMetadataRequest) pipeTo sender
+    case InitiateTopicBootstrap(topicMetadataRequest) =>
+      initiateBootstrap(topicMetadataRequest) pipeTo sender
   }
 
   def failed(ex: Throwable): Receive = {
-    case _ =>
-      BootstrapFailure(Seq(ex.getMessage))
+    case _ => Future.failed(ex) pipeTo sender
   }
 
   private[ingest] def initiateBootstrap(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
@@ -57,14 +60,14 @@ class TopicBootstrapActor(
         (kafkaIngestor ? Ingest(avroRecord, avroRecord.ackStrategy)).map {
           case IngestorCompleted => BootstrapSuccess
           case IngestorError(ex) => BootstrapFailure(Seq(ex.getMessage))
-          case _ => throw new RuntimeException("Kafka Ingestior is unable to respond to requests. Please Try again later.")
+          case _ => throw new RuntimeException(
+            "Kafka Ingestor is unable to respond to requests. Please try again later.")
         }
       }
     }.recover {
       case e: TopicNameValidatorException => Future(BootstrapFailure(e.reasons))
     }.get
   }
-
 
   private[ingest] def buildAvroRecord(topicMetadataRequest: TopicMetadataRequest): Future[AvroRecord] = {
     val jsonString = topicMetadataRequest.toJson.toString
@@ -81,7 +84,6 @@ class TopicBootstrapActor(
     )
   }
 }
-
 
 object TopicBootstrapActor {
 

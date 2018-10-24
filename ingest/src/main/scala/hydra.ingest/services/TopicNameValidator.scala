@@ -20,7 +20,8 @@ object TopicNameValidator {
       .collect {
         case r: Invalid => r
       } match {
-      case respSeq: Seq[ValidationResponse] if respSeq.nonEmpty => Failure(TopicNameValidatorException(respSeq.map(invalid => invalid.reason)))
+      case respSeq: Seq[ValidationResponse] if respSeq.nonEmpty =>
+        Failure(TopicNameValidatorException(respSeq.map(invalid => invalid.reason)))
       case _ => scala.util.Success(Valid)
     }
   }

@@ -1,15 +1,15 @@
 package hydra.ingest.services
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
-import akka.testkit.{TestKit, TestProbe}
+import akka.actor.{Actor, ActorSystem, Props}
+import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import hydra.avro.resource.SchemaResource
 import hydra.core.akka.SchemaRegistryActor.{FetchSchemaRequest, FetchSchemaResponse, RegisterSchemaRequest}
 import hydra.core.marshallers.TopicMetadataRequest
-import hydra.core.protocol.{Ingest, IngestorCompleted}
+import hydra.core.protocol.Ingest
 import hydra.core.transport.{AckStrategy, HydraRecord}
 import hydra.ingest.http.HydraIngestJsonSupport
-import hydra.ingest.services.TopicBootstrapActor.InitiateTopicBootstrap
+import hydra.ingest.services.TopicBootstrapActor.{BootstrapFailure, InitiateTopicBootstrap}
 import hydra.kafka.producer.AvroRecord
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
@@ -24,13 +24,14 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   with BeforeAndAfterAll
   with MockFactory
   with HydraIngestJsonSupport
-  with Eventually {
+  with Eventually
+  with ImplicitSender {
+
+  import hydra.ingest.services.ErrorMessages._
 
   override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
 
   val config = ConfigFactory.load()
-
-  val probe = TestProbe()
 
   val testSchemaResource = SchemaResource(1, 1, new Schema.Parser().parse(
     """
@@ -84,28 +85,36 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       |}
     """.stripMargin))
 
-  val testSchemaRegistry: ActorRef = system.actorOf(Props(
-    new Actor {
-      override def receive: Receive = {
-        case msg: FetchSchemaRequest =>
-          probe.ref forward msg
-          sender ! FetchSchemaResponse(testSchemaResource)
+  def fixture(key: String) = {
+    val probe = TestProbe()
 
-        case msg: RegisterSchemaRequest =>
-          probe.ref forward msg
-          sender ! FetchSchemaResponse(testSchemaResource)
-      }
-    }
-  ))
+    val schemaRegistryActor = system.actorOf(
+      Props(
+        new Actor {
+          override def receive: Receive = {
+            case msg: FetchSchemaRequest =>
+              sender ! FetchSchemaResponse(testSchemaResource)
+              probe.ref forward msg
 
-  val successfulTestKafkaIngestor: ActorRef = system.actorOf(Props(
-    new Actor {
-      override def receive = {
-        case msg: Ingest[String, GenericRecord] =>
-          probe.ref forward msg
+            case msg: RegisterSchemaRequest =>
+              sender ! FetchSchemaResponse(testSchemaResource)
+              probe.ref forward msg
+          }
+        }
+      )
+    )
+
+    val kafkaIngestor = system.actorOf(Props(
+      new Actor {
+        override def receive = {
+          case msg: Ingest[String, GenericRecord] =>
+            probe.ref forward msg
+        }
       }
-    }
-  ), "kafka_ingestor")
+    ), s"kafka_ingestor_$key")
+
+    (probe, schemaRegistryActor, kafkaIngestor)
+  }
 
   "A TopicBootstrapActor" should "process metadata and send an Ingest message to the kafka ingestor" in {
 
@@ -136,8 +145,10 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       .parseJson
       .convertTo[TopicMetadataRequest]
 
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(config, testSchemaRegistry,
-      system.actorSelection("/user/kafka_ingestor")))
+    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test1")
+
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(config, schemaRegistryActor,
+      system.actorSelection("/user/kafka_ingestor_test1")))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -159,7 +170,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   it should "respond with the appropriate metadata failure message" in {
 
     val mdRequest = """{
-                      |	"streamName": "invalid",
+                      |	"streamName": "exp",
                       |	"streamType": "Historical",
                       |	"streamSubType": "Source Of Truth",
                       |	"dataClassification": "Public",
@@ -185,9 +196,18 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       .parseJson
       .convertTo[TopicMetadataRequest]
 
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(config, testSchemaRegistry,
-      system.actorSelection("kafka_ingestor")))
+    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test2")
+
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(config, schemaRegistryActor,
+      system.actorSelection("kafka_ingestor_test2")))
+
+    probe.expectMsgType[RegisterSchemaRequest]
 
     bootstrapActor ! InitiateTopicBootstrap(mdRequest)
+
+    expectMsgPF() {
+      case BootstrapFailure(reasons) =>
+        reasons should contain(BadTopicFormatError)
+    }
   }
 }
