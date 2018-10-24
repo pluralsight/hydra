@@ -32,11 +32,12 @@ class TopicBootstrapActor(
   override def receive: Receive = initializing
 
   override def preStart(): Unit = {
-    (schemaRegistryActor ? RegisterSchemaRequest(
-      Source.fromResource("HydraMetadataTopic.avsc").toString))
+    val schema = Source.fromResource("HydraMetadataTopic.avsc").toString
+    (schemaRegistryActor ? RegisterSchemaRequest(schema))
     .foreach {
       case FetchSchemaResponse(_) => context.become(active)
       case Failure(ex) => context.become(failed(ex))
+      case e@_ => println(s"wow didn't match!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! $e")
     }
   }
 

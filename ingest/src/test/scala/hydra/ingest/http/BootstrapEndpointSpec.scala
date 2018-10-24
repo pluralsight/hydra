@@ -5,7 +5,6 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.{MethodRejection, RequestEntityExpectedRejection}
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.{TestKit, TestProbe}
-import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.avro.resource.SchemaResource
 import hydra.common.config.ConfigSupport
 import hydra.core.protocol.{Ingest, IngestorCompleted}
@@ -89,8 +88,6 @@ class BootstrapEndpointSpec extends Matchers
       |  ]
       |}
     """.stripMargin))
-
-  val schemaRegistry: ConfluentSchemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
 
   private val bootstrapRoute = new BootstrapEndpoint().route
 
