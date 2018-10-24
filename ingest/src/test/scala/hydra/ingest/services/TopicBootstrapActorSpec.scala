@@ -29,7 +29,10 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   import hydra.ingest.services.ErrorMessages._
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  override def afterAll(): Unit = {
+    super.afterAll()
+    TestKit.shutdownActorSystem(system)
+  }
 
   val config = ConfigFactory.load()
 

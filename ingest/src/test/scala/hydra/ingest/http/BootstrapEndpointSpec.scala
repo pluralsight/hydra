@@ -7,6 +7,7 @@ import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.TestKit
 import hydra.common.config.ConfigSupport
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
+import hydra.ingest.services.IngestorRegistry
 import hydra.kafka.producer.AvroRecord
 import org.scalatest.{Matchers, WordSpecLike}
 
@@ -33,7 +34,15 @@ class BootstrapEndpointSpec extends Matchers
 
   }
 
-  val kafkaIngestor = system.actorOf(Props(new TestKafkaIngestor), "kafka_ingestor")
+  class IngestorRegistry extends Actor {
+    context.actorOf(Props(new TestKafkaIngestor), "kafka_ingestor")
+
+    override def receive: Receive = {
+      case _ =>
+    }
+  }
+
+  val ingestorRegistry = system.actorOf(Props(new IngestorRegistry), "ingestor_registry")
 
   private val bootstrapRoute = new BootstrapEndpoint().route
 
