@@ -9,8 +9,12 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
-class RequestFactoriesSpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike
-  with BeforeAndAfterAll with ScalaFutures {
+class RequestFactoriesSpec extends TestKit(ActorSystem("RequestFactoriesSpec"))
+  with Matchers
+  with FunSpecLike
+  with BeforeAndAfterAll
+  with ScalaFutures {
+
   override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10.seconds)
 
   import RequestFactories._

@@ -1,7 +1,7 @@
 package hydra.ingest.services
 
 import akka.actor.Status.Failure
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSelection, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSelection, Props, Stash}
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import com.typesafe.config.Config
@@ -19,11 +19,12 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.io.Source
 
-class TopicBootstrapActor(
-                           config: Config,
-                           schemaRegistryActor: ActorRef,
-                           kafkaIngestor: ActorSelection
-                         ) extends Actor with HydraJsonSupport with ActorLogging {
+class TopicBootstrapActor(config: Config,
+                          schemaRegistryActor: ActorRef,
+                          kafkaIngestor: ActorSelection) extends Actor
+  with HydraJsonSupport
+  with ActorLogging
+  with Stash {
 
   implicit val ec = context.dispatcher
 
@@ -33,15 +34,17 @@ class TopicBootstrapActor(
 
   override def preStart(): Unit = {
     val schema = Source.fromResource("HydraMetadataTopic.avsc").mkString
-    (schemaRegistryActor ? RegisterSchemaRequest(schema))
-    .foreach {
-      case RegisterSchemaResponse(_) => context.become(active)
-      case Failure(ex) => context.become(failed(ex))
-    }
+    pipe(schemaRegistryActor ? RegisterSchemaRequest(schema)) to self
   }
 
   def initializing: Receive = {
-    case _ => sender ! ActorInitializing
+    case RegisterSchemaResponse(_) =>
+      context.become(active)
+      unstashAll()
+    case Failure(ex) =>
+      unstashAll()
+      context.become(failed(ex))
+    case _ => stash()
   }
 
   def active: Receive = {

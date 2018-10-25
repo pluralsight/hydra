@@ -7,7 +7,6 @@ import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.TestKit
 import hydra.common.config.ConfigSupport
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
-import hydra.ingest.services.IngestorRegistry
 import hydra.kafka.producer.AvroRecord
 import org.scalatest.{Matchers, WordSpecLike}
 
@@ -52,20 +51,19 @@ class BootstrapEndpointSpec extends Matchers
   }
 
   "The bootstrap endpoint" should {
-
     "rejects a GET request" in {
       Get("/topics") ~> bootstrapRoute ~> check {
         rejections should contain allElementsOf Seq(MethodRejection(HttpMethods.POST))
       }
     }
 
-    "rejects empty requests" in {
+    "reject empty requests" in {
       Post("/topics") ~> bootstrapRoute ~> check {
         rejection shouldEqual RequestEntityExpectedRejection
       }
     }
 
-    "forwards topic metadata to the appropriate handler" in {
+    "forward topic metadata to the appropriate handler" in {
       val testEntity = HttpEntity(
         ContentTypes.`application/json`,
         """{
@@ -98,7 +96,7 @@ class BootstrapEndpointSpec extends Matchers
     }
   }
 
-  "returns the correct response when the ingestor fails" in {
+  "return the correct response when the ingestor fails" in {
     val testEntity = HttpEntity(
       ContentTypes.`application/json`,
       """{
@@ -130,7 +128,7 @@ class BootstrapEndpointSpec extends Matchers
     }
   }
 
-  "rejects requests with invalid topic names" in {
+  "reject requests with invalid topic names" in {
     val testEntity = HttpEntity(
       ContentTypes.`application/json`,
       """{

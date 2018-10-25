@@ -17,13 +17,12 @@
 package hydra.ingest.http
 
 import akka.actor._
-import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
-import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.http.HydraDirectives
@@ -34,15 +33,15 @@ import hydra.ingest.services._
 import spray.json.DeserializationException
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.{FiniteDuration, _}
+import scala.concurrent.duration._
 
 
 class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: ExecutionContext)
   extends RoutedEndpoints with LoggingAdapter with HydraJsonSupport with HydraDirectives {
 
-  implicit val timeout = Timeout(10.seconds)
+  private implicit val timeout = Timeout(10.seconds)
 
-  implicit val mat = ActorMaterializer()
+  private implicit val mat = ActorMaterializer()
 
   private val registryPath = HydraIngestorRegistryClient.registryPath(applicationConfig)
 
@@ -53,9 +52,6 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
   private val bootstrapActor = system.actorOf(
     TopicBootstrapActor.props(applicationConfig, schemaRegistryActor, kafkaIngestor))
 
-  private val ingestTimeout = applicationConfig.get[FiniteDuration]("ingest.timeout")
-    .valueOrElse(500 millis)
-
   override val route: Route =
     pathPrefix("topics") {
       pathEndOrSingleSlash {
@@ -64,10 +60,15 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
             requestEntityPresent {
               entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
                 onSuccess(bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)) {
-                  case BootstrapSuccess => complete(StatusCodes.OK)
-                  case BootstrapFailure(reasons) => complete(StatusCodes.BadRequest, reasons)
-                  case ActorInitializing => complete(StatusCodes.InternalServerError, "Please try again later....")
+                  case BootstrapSuccess =>
+                    complete(StatusCodes.OK)
+                  case BootstrapFailure(reasons) =>
+                    complete(StatusCodes.BadRequest, reasons)
+                  case ActorInitializing =>
+                    println("ACTOR INITIALIZING")
+                    complete(StatusCodes.InternalServerError, "Please try again later....")
                   case e: Exception =>
+                    log.error("Unexpected error in BootstrapEndpoint", e)
                     complete(StatusCodes.InternalServerError, e.getMessage)
                 }
               }
@@ -77,7 +78,7 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
       }
     }
 
-  private def exceptionHandler = ExceptionHandler {
+  private val exceptionHandler = ExceptionHandler {
     case e: DeserializationException =>
       log.error(s"Payload failed deserialization, please check metadata structure")
       complete(400, e)

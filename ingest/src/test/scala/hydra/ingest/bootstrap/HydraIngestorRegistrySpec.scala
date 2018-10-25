@@ -14,8 +14,12 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
-class HydraIngestorRegistrySpec extends TestKit(ActorSystem("test")) with Matchers
-  with FunSpecLike with BeforeAndAfterAll with ImplicitSender with ScalaFutures {
+class HydraIngestorRegistrySpec extends TestKit(ActorSystem("HydraIngestorRegistrySpec"))
+  with Matchers
+  with FunSpecLike
+  with BeforeAndAfterAll
+  with ImplicitSender
+  with ScalaFutures {
 
   override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true,
     duration = 10.seconds)
@@ -33,7 +37,7 @@ class HydraIngestorRegistrySpec extends TestKit(ActorSystem("test")) with Matche
   expectMsgType[IngestorInfo]
 
   describe("The Ingestor Registry") {
-    it ("uses the default registry if no config") {
+    it("uses the default registry if no config") {
       val path = HydraIngestorRegistryClient.registryPath(ConfigFactory.empty())
       path shouldBe s"/user/service/${ActorUtils.actorName(classOf[IngestorRegistry])}"
     }
