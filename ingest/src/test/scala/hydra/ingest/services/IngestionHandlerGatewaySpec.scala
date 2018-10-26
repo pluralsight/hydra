@@ -62,6 +62,7 @@ class IngestionHandlerGatewaySpec extends TestKit(ActorSystem("hydra")) with Mat
 
       override def failWith(error: Throwable): Unit = this.error = error
     }
+
     val request = HydraRequest("123", "test payload")
     gateway ! InitiateHttpRequest(request, 1 second, ctx)
     eventually {

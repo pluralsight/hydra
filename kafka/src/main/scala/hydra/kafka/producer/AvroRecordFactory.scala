@@ -51,7 +51,12 @@ class AvroRecordFactory(schemaResourceLoader: ActorRef)
     val converter = new JsonConverter[GenericRecord](
       schemaResource.schema,
       request.validationStrategy == Strict)
-    Future(converter.convert(request.payload))
-      .recover { case ex => throw AvroUtils.improveException(ex, schemaResource) }
+    Future({
+      val converted = converter.convert(request.payload)
+      converted
+    })
+      .recover {
+        case ex => throw AvroUtils.improveException(ex, schemaResource)
+      }
   }
 }

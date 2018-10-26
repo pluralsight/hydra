@@ -62,14 +62,16 @@ class SchemasEndpointSpec extends Matchers
 
     "returns a list of schemas" in {
       Get("/schemas") ~> schemasRoute ~> check {
-        responseAs[Seq[String]] shouldBe Seq("hydra.test.Tester")
+        responseAs[Seq[String]] should contain("hydra.test.Tester")
       }
     }
 
     "returns a single schema by name" in {
       Get("/schemas/hydra.test.Tester") ~> schemasRoute ~> check {
         val rep = responseAs[SchemasEndpointResponse]
-        rep.id shouldBe 2
+        val id = schemaRegistry.registryClient
+          .getId("hydra.test.Tester-value", new Schema.Parser().parse(rep.schema))
+        rep.id shouldBe id
         rep.version shouldBe 2
         new Schema.Parser().parse(rep.schema) shouldBe schemaEvolved
       }
@@ -78,7 +80,9 @@ class SchemasEndpointSpec extends Matchers
     "evolves a schema" in {
       Get("/schemas/hydra.test.Tester") ~> schemasRoute ~> check {
         val rep = responseAs[SchemasEndpointResponse]
-        rep.id shouldBe 2
+        val id = schemaRegistry.registryClient
+          .getId("hydra.test.Tester-value", new Schema.Parser().parse(rep.schema))
+        rep.id shouldBe id
         rep.version shouldBe 2
         new Schema.Parser().parse(rep.schema) shouldBe schemaEvolved
       }

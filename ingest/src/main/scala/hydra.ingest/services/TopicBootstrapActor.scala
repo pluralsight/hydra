@@ -1,69 +1,121 @@
 package hydra.ingest.services
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
+import akka.actor.Status.{Failure => AkkaFailure}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSelection, Props, Stash}
+import akka.pattern.{ask, pipe}
+import akka.util.Timeout
 import com.typesafe.config.Config
-import hydra.core.http.ImperativeRequestContext
-import hydra.core.ingest.HydraRequest
+import configs.syntax._
+import hydra.core.akka.SchemaRegistryActor.{RegisterSchemaRequest, RegisterSchemaResponse}
+import hydra.core.ingest.{HydraRequest, RequestParams}
 import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
-import hydra.ingest.services.TopicBootstrapActor._
+import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
+import hydra.core.transport.{AckStrategy, ValidationStrategy}
+import hydra.ingest.services.TopicBootstrapActor.{BootstrapSuccess, _}
+import hydra.kafka.producer.{AvroRecord, AvroRecordFactory}
+import spray.json._
 
-//first we make sure topic name is valid
-//first we need to try and create the topic
-//then we post the schema
-class TopicBootstrapActor(
-                         config: Config,
-                         schemaRegistryActor: ActorRef,
-                         ingestionHandlerGateway: ActorRef,
-                         ) extends Actor with HydraJsonSupport with ActorLogging {
+import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.io.Source
+import scala.util.{Failure, Success}
 
+class TopicBootstrapActor(config: Config,
+                          schemaRegistryActor: ActorRef,
+                          kafkaIngestor: ActorSelection) extends Actor
+  with HydraJsonSupport
+  with ActorLogging
+  with Stash {
 
-  override def receive: Receive = {
-    //need to pass ctx forward to IngestionHandlerGateway
-    case InitiateTopicBootstrap(topicMetadataRequest, ctx) => {
-      initiateBootstrap(topicMetadataRequest, ctx)
-    }
-    case ForwardBootstrapPayload => {}
+  implicit val ec = context.dispatcher
+
+  implicit val timeout = Timeout(10.seconds)
+
+  override def receive: Receive = initializing
+
+  override def preStart(): Unit = {
+    val schema = Source.fromResource("HydraMetadataTopic.avsc").mkString
+    pipe(schemaRegistryActor ? RegisterSchemaRequest(schema)) to self
   }
 
-  private[ingest] def initiateBootstrap(topicMetadataReqest: TopicMetadataRequest, ctx: ImperativeRequestContext): Unit = {
-    val result: BootstrapResult = validateTopicName(topicMetadataReqest)
-    result match {
-      case BootstrapStepSuccess => ctx.complete(HttpResponse(StatusCodes.OK))
-      case BootstrapStepFailure(reasons) => ctx.complete(StatusCodes.BadRequest, s"Topic name is invalid for the following reasons: $reasons")
+  def initializing: Receive = {
+    case RegisterSchemaResponse(_) =>
+      context.become(active)
+      unstashAll()
+    case AkkaFailure(ex) =>
+      log.error(s"TopicBootstrapActor entering failed state due to: ${ex.getMessage}")
+      unstashAll()
+      context.become(failed(ex))
+    case _ => stash()
+  }
+
+  def active: Receive = {
+    case InitiateTopicBootstrap(topicMetadataRequest) =>
+      TopicNameValidator.validate(topicMetadataRequest.streamName) match {
+        case Success(_) =>
+          initiateBootstrap(topicMetadataRequest) pipeTo sender
+
+        case Failure(ex: TopicNameValidatorException) =>
+          Future(BootstrapFailure(ex.reasons)) pipeTo sender
+      }
+  }
+
+  def failed(ex: Throwable): Receive = {
+    case _ =>
+      val failureMessage = s"TopicBootstrapActor is in a failed state due to cause: ${ex.getMessage}"
+      Future.failed(new Exception(failureMessage)) pipeTo sender
+  }
+
+  private[ingest] def initiateBootstrap(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
+    buildAvroRecord(topicMetadataRequest).flatMap { avroRecord =>
+      (kafkaIngestor ? Ingest(avroRecord, avroRecord.ackStrategy)).map {
+        case IngestorCompleted => BootstrapSuccess
+        case IngestorError(ex) =>
+          val errorMessage = ex.getMessage
+          log.error(
+            s"TopicBootstrapActor received an IngestorError from KafkaIngestor: $errorMessage")
+          BootstrapFailure(Seq(errorMessage))
+      }
+    }.recover {
+      case ex: Throwable =>
+        val errorMessage = ex.getMessage
+        log.error(s"Unexpected error occurred during initiateBootstrap: $errorMessage")
+        BootstrapFailure(Seq(ex.getMessage))
     }
   }
 
-  private[ingest] def validateTopicName(topicMetadataRequest: TopicMetadataRequest): BootstrapResult = {
-    val isValidOrErrorReport = TopicNameValidator.validate(topicMetadataRequest.streamName)
-    isValidOrErrorReport match {
-      case Valid => BootstrapStepSuccess
-      case InvalidReport(reasons) =>
-        val invalidDisplayString = reasons
-          .map(_.reason)
-          .map("\t" + _)
-          .mkString("\n")
-        BootstrapStepFailure(invalidDisplayString)
-      case _ => BootstrapStepFailure("Couldn't find match on validateTopicName")
-    }
+  private[ingest] def buildAvroRecord(topicMetadataRequest: TopicMetadataRequest): Future[AvroRecord] = {
+    val jsonString = topicMetadataRequest.toJson.toString
+    new AvroRecordFactory(schemaRegistryActor).build(
+      HydraRequest(
+        "0",
+        jsonString,
+        metadata = Map(
+          RequestParams.HYDRA_KAFKA_TOPIC_PARAM ->
+            config.get[String]("hydra-metadata-topic-name")
+              .valueOrElse("hydra.metadata.topic")),
+        ackStrategy = AckStrategy.Replicated,
+        validationStrategy = ValidationStrategy.Strict
+      )
+    )
   }
 }
 
-
 object TopicBootstrapActor {
 
-  def props(config: Config, schemaRegistryActor: ActorRef, ingestionHandlerGateway: ActorRef): Props = Props(classOf[TopicBootstrapActor], config, schemaRegistryActor, ingestionHandlerGateway)
+  def props(config: Config, schemaRegistryActor: ActorRef, kafkaIngestor: ActorSelection): Props =
+    Props(classOf[TopicBootstrapActor], config, schemaRegistryActor, kafkaIngestor)
 
   sealed trait TopicBootstrapMessage
 
-  case class InitiateTopicBootstrap(topicMetadata: TopicMetadataRequest, context: ImperativeRequestContext) extends TopicBootstrapMessage
+  case class InitiateTopicBootstrap(topicMetadataRequest: TopicMetadataRequest) extends TopicBootstrapMessage
 
   case class ForwardBootstrapPayload(request: HydraRequest) extends TopicBootstrapMessage
 
-
   sealed trait BootstrapResult
-  case object BootstrapStepSuccess extends BootstrapResult
-  case class BootstrapStepFailure(reasons: String) extends BootstrapResult
 
+  case object BootstrapSuccess extends BootstrapResult
+
+  case class BootstrapFailure(reasons: Seq[String]) extends BootstrapResult
 
 }

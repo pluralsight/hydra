@@ -17,61 +17,65 @@
 package hydra.ingest.http
 
 import akka.actor._
-import akka.http.scaladsl.model.StatusCodes.BadRequest
-import akka.http.scaladsl.server.{ExceptionHandler, Route}
+import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.server.Route
+import akka.pattern.ask
 import akka.stream.ActorMaterializer
+import akka.util.Timeout
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
-import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.http.HydraDirectives
-import hydra.core.marshallers.{GenericError, HydraJsonSupport, TopicMetadataRequest}
+import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
-import hydra.ingest.services.TopicBootstrapActor.{InitiateTopicBootstrap}
+import hydra.ingest.services.TopicBootstrapActor.{BootstrapFailure, BootstrapSuccess, InitiateTopicBootstrap}
 import hydra.ingest.services._
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.{FiniteDuration, _}
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 
 class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: ExecutionContext)
   extends RoutedEndpoints with LoggingAdapter with HydraJsonSupport with HydraDirectives {
 
-  implicit val mat = ActorMaterializer()
+  private implicit val timeout = Timeout(10.seconds)
 
-  //for performance reasons, we give this endpoint its own instance of the gateway
+  private implicit val mat = ActorMaterializer()
+
   private val registryPath = HydraIngestorRegistryClient.registryPath(applicationConfig)
 
-  private val requestHandler = system.actorOf(IngestionHandlerGateway.props(registryPath),
-    "ingestion_Http_handler_gateway")
+  private val kafkaIngestor = system.actorSelection(s"$registryPath/kafka_ingestor")
 
   private val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(applicationConfig))
 
-  private val bootstrapActor = system.actorOf(TopicBootstrapActor.props(applicationConfig, schemaRegistryActor, requestHandler))
-
-  private val ingestTimeout = applicationConfig.get[FiniteDuration]("ingest.timeout")
-    .valueOrElse(500 millis)
+  private val bootstrapActor = system.actorOf(
+    TopicBootstrapActor.props(applicationConfig, schemaRegistryActor, kafkaIngestor))
 
   override val route: Route =
     pathPrefix("topics") {
       pathEndOrSingleSlash {
-        handleExceptions(exceptionHandler) {
-          post {
-            requestEntityPresent {
-              entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
-                imperativelyComplete {
-                  ctx => bootstrapActor ! InitiateTopicBootstrap(topicMetadataRequest, ctx)
+        post {
+          requestEntityPresent {
+            entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
+              onComplete(bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)) {
+                case Success(message) => message match {
+                  case BootstrapSuccess =>
+                    complete(StatusCodes.OK)
+                  case BootstrapFailure(reasons) =>
+                    complete(StatusCodes.BadRequest, reasons)
+                  case e: Exception =>
+                    log.error("Unexpected error in TopicBootstrapActor", e)
+                    complete(StatusCodes.InternalServerError, e.getMessage)
                 }
+
+                case Failure(ex) =>
+                  log.error("Unexpected error in BootstrapEndpoint", ex)
+                  complete(StatusCodes.InternalServerError, ex.getMessage)
               }
             }
           }
         }
       }
-    } ~ complete(BadRequest, "This endpoint requires a payload.")
-
-  private def exceptionHandler = ExceptionHandler {
-    case t: Throwable =>
-      log.error(s"Encountered $t while handling request in bootstrap endpoint...")
-      complete(400, GenericError(400, t.getMessage))
-  }
+    }
 }

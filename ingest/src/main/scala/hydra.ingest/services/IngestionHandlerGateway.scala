@@ -39,16 +39,23 @@ class IngestionHandlerGateway(registryPath: String) extends Actor with ActorLogg
 
   override def receive = {
     case InitiateRequest(request, timeout, requestorOpt) =>
-      val fs = requestorOpt getOrElse sender
-      ingest(r => DefaultIngestionHandler.props(request, r, fs, timeout), fs)
+      val requestor = requestorOpt getOrElse sender
+      ingest(
+        registryRef => DefaultIngestionHandler.props(request, registryRef, requestor, timeout),
+        requestor
+      )
 
     case InitiateHttpRequest(request, timeout, ctx) =>
-      val fs = sender
-      ingest(r => HttpIngestionHandler.props(request, timeout, ctx, r), fs)
+      val requestor = sender
+      ingest(
+        registryRef => HttpIngestionHandler.props(request, timeout, ctx, registryRef),
+        requestor
+      )
   }
 
-  private def ingest(props: (ActorRef) => Props, requestor: ActorRef) = {
-    registry.map(r => context.actorOf(props(r))).recover { case e: Exception => requestor ! e }
+  private def ingest(props: ActorRef => Props, requestor: ActorRef) = {
+    registry.map(registryRef => context.actorOf(props(registryRef)))
+      .recover { case e: Exception => requestor ! e }
   }
 
 

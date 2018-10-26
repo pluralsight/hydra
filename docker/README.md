@@ -1,11 +1,27 @@
-# Running Hydra on Docker
+# Getting Started Hydra on Docker
 
 ## Services needed to run Hydra 
-- Kafka 0.10.2.0
-- Confluent Schema Registry 3.2.0
+- Kafka 2.0.0
+- Confluent Schema Registry 5.0.0
 - Zookeeper (3.x +)
 
-This documentation walks through setting up all of them.
+This documentation walks through setting up the core basic components of Hydra.
+
+## Create a VirtualBox instance
+
+```docker-machine create --driver virtualbox --virtualbox-memory 6000 hydra
+```
+
+## Configure Terminal to attach to the new machine
+
+```docker-machine env hydra
+```
+
+## Create a Docker network
+
+```
+docker network create hydra
+```
 
 ## Start Zookeeper
 

@@ -10,11 +10,16 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
+
 /**
   * Created by alexsilva on 3/9/17.
   */
-class IngestorRegistrySpec extends TestKit(ActorSystem("hydra")) with Matchers
-  with FunSpecLike with ImplicitSender with Eventually with BeforeAndAfterAll {
+class IngestorRegistrySpec extends TestKit(ActorSystem("IngestorRegistrySpec"))
+  with Matchers
+  with FunSpecLike
+  with ImplicitSender
+  with Eventually
+  with BeforeAndAfterAll {
 
   override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true,
     duration = 10 seconds)
@@ -86,11 +91,11 @@ class IngestorRegistrySpec extends TestKit(ActorSystem("hydra")) with Matchers
         case LookupResult(i) =>
           i.size shouldBe 1
           i(0).name shouldBe "terminator"
-          system.actorSelection("akka://hydra/user/registry/terminator") ! PoisonPill
+          system.actorSelection("akka://IngestorRegistrySpec/user/registry/terminator") ! PoisonPill
 
           eventually {
             listenerActor ! "ingestor"
-            expectMsg("akka://hydra/user/registry/terminator")
+            expectMsg("akka://IngestorRegistrySpec/user/registry/terminator")
           }
       }
     }
