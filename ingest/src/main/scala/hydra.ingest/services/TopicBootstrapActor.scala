@@ -104,7 +104,4 @@ object TopicBootstrapActor {
   case object BootstrapSuccess extends BootstrapResult
 
   case class BootstrapFailure(reasons: Seq[String]) extends BootstrapResult
-
-  case object ActorInitializing extends BootstrapResult
-
 }

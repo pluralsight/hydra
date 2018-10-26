@@ -37,12 +37,12 @@
       "type": "string"
     },
     {
-    	"name": "dataOwnerNotes",
-    	"type": "string"
+      "name": "dataOwnerNotes",
+      "type": "string"
     },
     {
-    	"name": "streamSchema",
-    	"type": "string"
+      "name": "streamSchema",
+      "type": "string"
     }
   ]
 }

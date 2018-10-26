@@ -1,6 +1,7 @@
 package hydra.ingest.http
 
 import akka.actor.{Actor, Props}
+import akka.http.javadsl.server.MalformedRequestContentRejection
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.{MethodRejection, RequestEntityExpectedRejection}
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
@@ -19,8 +20,6 @@ class BootstrapEndpointSpec extends Matchers
   with HydraIngestJsonSupport
   with ConfigSupport {
 
-
-  //because actors within this endpoint are private, we need to create test instances of them like below.
   private implicit val timeout = RouteTestTimeout(10.seconds)
 
   class TestKafkaIngestor extends Actor {
@@ -157,6 +156,36 @@ class BootstrapEndpointSpec extends Matchers
 
     Post("/topics", testEntity) ~> bootstrapRoute ~> check {
       status shouldBe StatusCodes.BadRequest
+    }
+  }
+
+  "return a BadRequest for invalid metadata payloads" in {
+    val testEntity = HttpEntity(
+      ContentTypes.`application/json`,
+      """{
+        |	"streamName": "invalid",
+        |	"streamType": "Historical",
+        |	"dataSourceOwner": "BARTON",
+        |	"dataSourceContact": "slackity slack dont talk back",
+        |	"psDataLake": false,
+        |	"dataDocPath": "akka://some/path/here.jpggifyo",
+        |	"dataOwnerNotes": "here are some notes topkek",
+        |	"streamSchema": {
+        |	  "namespace": "exp.assessment",
+        |	  "name": "SkillAssessmentTopicsScored",
+        |	  "type": "record",
+        |	  "version": 1,
+        |	  "fields": [
+        |	    {
+        |	      "name": "test-field",
+        |	      "type": "string"
+        |	    }
+        |	  ]
+        |	}
+        |}""".stripMargin)
+
+    Post("/topics", testEntity) ~> bootstrapRoute ~> check {
+      rejection shouldBe a[MalformedRequestContentRejection]
     }
   }
 }
