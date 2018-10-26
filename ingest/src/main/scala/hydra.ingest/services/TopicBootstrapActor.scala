@@ -1,6 +1,6 @@
 package hydra.ingest.services
 
-import akka.actor.Status.Failure
+import akka.actor.Status.{Failure => AkkaFailure}
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSelection, Props, Stash}
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
@@ -18,6 +18,7 @@ import spray.json._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.io.Source
+import scala.util.{Failure, Success}
 
 class TopicBootstrapActor(config: Config,
                           schemaRegistryActor: ActorRef,
@@ -41,7 +42,8 @@ class TopicBootstrapActor(config: Config,
     case RegisterSchemaResponse(_) =>
       context.become(active)
       unstashAll()
-    case Failure(ex) =>
+    case AkkaFailure(ex) =>
+      log.error(s"TopicBootstrapActor entering failed state due to: ${ex.getMessage}")
       unstashAll()
       context.become(failed(ex))
     case _ => stash()
@@ -49,27 +51,37 @@ class TopicBootstrapActor(config: Config,
 
   def active: Receive = {
     case InitiateTopicBootstrap(topicMetadataRequest) =>
-      initiateBootstrap(topicMetadataRequest) pipeTo sender
+      TopicNameValidator.validate(topicMetadataRequest.streamName) match {
+        case Success(_) =>
+          initiateBootstrap(topicMetadataRequest) pipeTo sender
+
+        case Failure(ex: TopicNameValidatorException) =>
+          Future(BootstrapFailure(ex.reasons)) pipeTo sender
+      }
   }
 
   def failed(ex: Throwable): Receive = {
-    case _ => Future.failed(ex) pipeTo sender
+    case _ =>
+      val failureMessage = s"TopicBootstrapActor is in a failed state due to cause: ${ex.getMessage}"
+      Future.failed(new Exception(failureMessage)) pipeTo sender
   }
 
   private[ingest] def initiateBootstrap(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
-    val result = TopicNameValidator.validate(topicMetadataRequest.streamName)
-    result.map { _ =>
-      buildAvroRecord(topicMetadataRequest).flatMap { avroRecord =>
-        (kafkaIngestor ? Ingest(avroRecord, avroRecord.ackStrategy)).map {
-          case IngestorCompleted => BootstrapSuccess
-          case IngestorError(ex) => BootstrapFailure(Seq(ex.getMessage))
-          case _ => throw new RuntimeException(
-            "Kafka Ingestor is unable to respond to requests. Please try again later.")
-        }
+    buildAvroRecord(topicMetadataRequest).flatMap { avroRecord =>
+      (kafkaIngestor ? Ingest(avroRecord, avroRecord.ackStrategy)).map {
+        case IngestorCompleted => BootstrapSuccess
+        case IngestorError(ex) =>
+          val errorMessage = ex.getMessage
+          log.error(
+            s"TopicBootstrapActor received an IngestorError from KafkaIngestor: $errorMessage")
+          BootstrapFailure(Seq(errorMessage))
       }
     }.recover {
-      case e: TopicNameValidatorException => Future(BootstrapFailure(e.reasons))
-    }.get
+      case ex: Throwable =>
+        val errorMessage = ex.getMessage
+        log.error(s"Unexpected error occurred during initiateBootstrap: $errorMessage")
+        BootstrapFailure(Seq(ex.getMessage))
+    }
   }
 
   private[ingest] def buildAvroRecord(topicMetadataRequest: TopicMetadataRequest): Future[AvroRecord] = {
@@ -80,7 +92,8 @@ class TopicBootstrapActor(config: Config,
         jsonString,
         metadata = Map(
           RequestParams.HYDRA_KAFKA_TOPIC_PARAM ->
-            config.get[String]("hydra-metadata-topic-name").value),
+            config.get[String]("hydra-metadata-topic-name")
+              .valueOrElse("hydra.metadata.topic")),
         ackStrategy = AckStrategy.Replicated,
         validationStrategy = ValidationStrategy.Strict
       )
@@ -104,4 +117,5 @@ object TopicBootstrapActor {
   case object BootstrapSuccess extends BootstrapResult
 
   case class BootstrapFailure(reasons: Seq[String]) extends BootstrapResult
+
 }

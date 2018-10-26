@@ -159,7 +159,7 @@ class BootstrapEndpointSpec extends Matchers
     }
   }
 
-  "return a BadRequest for invalid metadata payloads" in {
+  "reject invalid metadata payloads" in {
     val testEntity = HttpEntity(
       ContentTypes.`application/json`,
       """{

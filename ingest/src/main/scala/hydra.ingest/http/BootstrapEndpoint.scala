@@ -33,6 +33,7 @@ import hydra.ingest.services._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 
 class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: ExecutionContext)
@@ -57,14 +58,20 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
         post {
           requestEntityPresent {
             entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
-              onSuccess(bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)) {
-                case BootstrapSuccess =>
-                  complete(StatusCodes.OK)
-                case BootstrapFailure(reasons) =>
-                  complete(StatusCodes.BadRequest, reasons)
-                case e: Exception =>
-                  log.error("Unexpected error in BootstrapEndpoint", e)
-                  complete(StatusCodes.InternalServerError, e.getMessage)
+              onComplete(bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)) {
+                case Success(message) => message match {
+                  case BootstrapSuccess =>
+                    complete(StatusCodes.OK)
+                  case BootstrapFailure(reasons) =>
+                    complete(StatusCodes.BadRequest, reasons)
+                  case e: Exception =>
+                    log.error("Unexpected error in TopicBootstrapActor", e)
+                    complete(StatusCodes.InternalServerError, e.getMessage)
+                }
+
+                case Failure(ex) =>
+                  log.error("Unexpected error in BootstrapEndpoint", ex)
+                  complete(StatusCodes.InternalServerError, ex.getMessage)
               }
             }
           }

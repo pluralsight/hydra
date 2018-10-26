@@ -19,7 +19,6 @@ object Main extends App with BootstrappingSupport with LoggingAdapter {
     }
 
     containerService.start()
-
   } catch {
     case e: Throwable => {
       log.error("Unhandled exception.  Shutting down actor system.", e)
