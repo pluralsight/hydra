@@ -67,6 +67,7 @@ class TopicBootstrapActor(config: Config,
   }
 
   private[ingest] def initiateBootstrap(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
+    // TODO Add behavior to register the schema and create the topic
     buildAvroRecord(topicMetadataRequest).flatMap { avroRecord =>
       (kafkaIngestor ? Ingest(avroRecord, avroRecord.ackStrategy)).map {
         case IngestorCompleted => BootstrapSuccess
