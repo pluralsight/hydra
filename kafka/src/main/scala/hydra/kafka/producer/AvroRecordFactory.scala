@@ -28,7 +28,7 @@ import hydra.core.transport.ValidationStrategy.Strict
 import org.apache.avro.generic.GenericRecord
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * Created by alexsilva on 1/11/17.
@@ -54,9 +54,9 @@ class AvroRecordFactory(schemaResourceLoader: ActorRef)
     Future({
       val converted = converter.convert(request.payload)
       converted
-    }
-    )
+    })
       .recover {
-        case ex => throw AvroUtils.improveException(ex, schemaResource) }
+        case ex => throw AvroUtils.improveException(ex, schemaResource)
+      }
   }
 }
