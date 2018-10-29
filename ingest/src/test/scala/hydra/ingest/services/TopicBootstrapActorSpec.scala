@@ -42,7 +42,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   val config = ConfigFactory.load()
 
-  val testSchemaResource = SchemaResource(1, 1, new Schema.Parser().parse(
+  val testJson =
     """
       |{
       |  "namespace": "hydra.metadata",
@@ -92,7 +92,9 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       |    }
       |  ]
       |}
-    """.stripMargin))
+    """.stripMargin
+
+  val testSchemaResource = SchemaResource(1, 1, new Schema.Parser().parse(testJson))
 
   def fixture(key: String, kafkaShouldFail: Boolean = false,
               schemaRegistryShouldFail: Boolean = false) = {
@@ -172,16 +174,17 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     bootstrapActor ! InitiateTopicBootstrap(mdRequest)
 
-    probe.expectMsgType[FetchSchemaRequest]
+    probe.receiveWhile(messages = 2) {
+      case RegisterSchemaRequest(schemaJson) => schemaJson should
+        include("SkillAssessmentTopicsScored")
+      case FetchSchemaRequest(schemaName) => schemaName shouldEqual "hydra.metadata.topic"
+    }
 
     probe.expectMsgPF() {
-
       case Ingest(msg: HydraRecord[_, GenericRecord], ack) =>
         msg shouldBe an[AvroRecord]
         msg.payload.getSchema.getName shouldBe "topic"
         ack shouldBe AckStrategy.Replicated
-
-      case _ => println(s"WASNT AN INGEST MESSSAGE!!!")
     }
   }
 
@@ -311,7 +314,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     bootstrapActor ! InitiateTopicBootstrap(mdRequest)
 
     expectMsgPF() {
-      case BootstrapFailure(reasons) => reasons should contain("Kafka ingestor failed expectedly!")
+      case BootstrapFailure(reasons) =>
+        reasons should contain("Kafka ingestor failed expectedly!")
     }
   }
 }

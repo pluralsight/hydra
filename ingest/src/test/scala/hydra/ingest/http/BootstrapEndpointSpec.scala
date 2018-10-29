@@ -28,6 +28,7 @@ class BootstrapEndpointSpec extends Matchers
         sender ! IngestorError(new Exception("oh noes!"))
       case Ingest(_, _) => sender ! IngestorCompleted
     }
+
     def props: Props = Props()
 
   }
@@ -93,99 +94,99 @@ class BootstrapEndpointSpec extends Matchers
         status shouldBe StatusCodes.OK
       }
     }
-  }
 
-  "return the correct response when the ingestor fails" in {
-    val testEntity = HttpEntity(
-      ContentTypes.`application/json`,
-      """{
-        |	"streamName": "exp.dataplatform.failed",
-        |	"streamType": "Historical",
-        |	"streamSubType": "Source Of Truth",
-        |	"dataClassification": "Public",
-        |	"dataSourceOwner": "BARTON",
-        |	"dataSourceContact": "slackity slack dont talk back",
-        |	"psDataLake": false,
-        |	"dataDocPath": "akka://some/path/here.jpggifyo",
-        |	"dataOwnerNotes": "here are some notes topkek",
-        |	"streamSchema": {
-        |	  "namespace": "exp.assessment",
-        |	  "name": "SkillAssessmentTopicsScored",
-        |	  "type": "record",
-        |	  "version": 1,
-        |	  "fields": [
-        |	    {
-        |	      "name": "test-field",
-        |	      "type": "string"
-        |	    }
-        |	  ]
-        |	}
-        |}""".stripMargin)
+    "return the correct response when the ingestor fails" in {
+      val testEntity = HttpEntity(
+        ContentTypes.`application/json`,
+        """{
+          |	"streamName": "exp.dataplatform.failed",
+          |	"streamType": "Historical",
+          |	"streamSubType": "Source Of Truth",
+          |	"dataClassification": "Public",
+          |	"dataSourceOwner": "BARTON",
+          |	"dataSourceContact": "slackity slack dont talk back",
+          |	"psDataLake": false,
+          |	"dataDocPath": "akka://some/path/here.jpggifyo",
+          |	"dataOwnerNotes": "here are some notes topkek",
+          |	"streamSchema": {
+          |	  "namespace": "exp.assessment",
+          |	  "name": "SkillAssessmentTopicsScored",
+          |	  "type": "record",
+          |	  "version": 1,
+          |	  "fields": [
+          |	    {
+          |	      "name": "test-field",
+          |	      "type": "string"
+          |	    }
+          |	  ]
+          |	}
+          |}""".stripMargin)
 
-    Post("/topics", testEntity) ~> bootstrapRoute ~> check {
-      status shouldBe StatusCodes.BadRequest
+      Post("/topics", testEntity) ~> bootstrapRoute ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
     }
-  }
 
-  "reject requests with invalid topic names" in {
-    val testEntity = HttpEntity(
-      ContentTypes.`application/json`,
-      """{
-        |	"streamName": "invalid",
-        |	"streamType": "Historical",
-        |	"streamSubType": "Source Of Truth",
-        |	"dataClassification": "Public",
-        |	"dataSourceOwner": "BARTON",
-        |	"dataSourceContact": "slackity slack dont talk back",
-        |	"psDataLake": false,
-        |	"dataDocPath": "akka://some/path/here.jpggifyo",
-        |	"dataOwnerNotes": "here are some notes topkek",
-        |	"streamSchema": {
-        |	  "namespace": "exp.assessment",
-        |	  "name": "SkillAssessmentTopicsScored",
-        |	  "type": "record",
-        |	  "version": 1,
-        |	  "fields": [
-        |	    {
-        |	      "name": "test-field",
-        |	      "type": "string"
-        |	    }
-        |	  ]
-        |	}
-        |}""".stripMargin)
+    "reject requests with invalid topic names" in {
+      val testEntity = HttpEntity(
+        ContentTypes.`application/json`,
+        """{
+          |	"streamName": "invalid",
+          |	"streamType": "Historical",
+          |	"streamSubType": "Source Of Truth",
+          |	"dataClassification": "Public",
+          |	"dataSourceOwner": "BARTON",
+          |	"dataSourceContact": "slackity slack dont talk back",
+          |	"psDataLake": false,
+          |	"dataDocPath": "akka://some/path/here.jpggifyo",
+          |	"dataOwnerNotes": "here are some notes topkek",
+          |	"streamSchema": {
+          |	  "namespace": "exp.assessment",
+          |	  "name": "SkillAssessmentTopicsScored",
+          |	  "type": "record",
+          |	  "version": 1,
+          |	  "fields": [
+          |	    {
+          |	      "name": "test-field",
+          |	      "type": "string"
+          |	    }
+          |	  ]
+          |	}
+          |}""".stripMargin)
 
-    Post("/topics", testEntity) ~> bootstrapRoute ~> check {
-      status shouldBe StatusCodes.BadRequest
+      Post("/topics", testEntity) ~> bootstrapRoute ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
     }
-  }
 
-  "reject invalid metadata payloads" in {
-    val testEntity = HttpEntity(
-      ContentTypes.`application/json`,
-      """{
-        |	"streamName": "invalid",
-        |	"streamType": "Historical",
-        |	"dataSourceOwner": "BARTON",
-        |	"dataSourceContact": "slackity slack dont talk back",
-        |	"psDataLake": false,
-        |	"dataDocPath": "akka://some/path/here.jpggifyo",
-        |	"dataOwnerNotes": "here are some notes topkek",
-        |	"streamSchema": {
-        |	  "namespace": "exp.assessment",
-        |	  "name": "SkillAssessmentTopicsScored",
-        |	  "type": "record",
-        |	  "version": 1,
-        |	  "fields": [
-        |	    {
-        |	      "name": "test-field",
-        |	      "type": "string"
-        |	    }
-        |	  ]
-        |	}
-        |}""".stripMargin)
+    "reject invalid metadata payloads" in {
+      val testEntity = HttpEntity(
+        ContentTypes.`application/json`,
+        """{
+          |	"streamName": "invalid",
+          |	"streamType": "Historical",
+          |	"dataSourceOwner": "BARTON",
+          |	"dataSourceContact": "slackity slack dont talk back",
+          |	"psDataLake": false,
+          |	"dataDocPath": "akka://some/path/here.jpggifyo",
+          |	"dataOwnerNotes": "here are some notes topkek",
+          |	"streamSchema": {
+          |	  "namespace": "exp.assessment",
+          |	  "name": "SkillAssessmentTopicsScored",
+          |	  "type": "record",
+          |	  "version": 1,
+          |	  "fields": [
+          |	    {
+          |	      "name": "test-field",
+          |	      "type": "string"
+          |	    }
+          |	  ]
+          |	}
+          |}""".stripMargin)
 
-    Post("/topics", testEntity) ~> bootstrapRoute ~> check {
-      rejection shouldBe a[MalformedRequestContentRejection]
+      Post("/topics", testEntity) ~> bootstrapRoute ~> check {
+        rejection shouldBe a[MalformedRequestContentRejection]
+      }
     }
   }
 }

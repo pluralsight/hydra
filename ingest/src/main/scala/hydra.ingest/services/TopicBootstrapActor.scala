@@ -35,7 +35,7 @@ class TopicBootstrapActor(config: Config,
 
   override def preStart(): Unit = {
     val schema = Source.fromResource("HydraMetadataTopic.avsc").mkString
-    pipe(schemaRegistryActor ? RegisterSchemaRequest(schema)) to self
+    pipe(registerSchema(schema)) to self
   }
 
   def initializing: Receive = {
@@ -51,9 +51,23 @@ class TopicBootstrapActor(config: Config,
 
   def active: Receive = {
     case InitiateTopicBootstrap(topicMetadataRequest) =>
+      val requestor = sender
+
       TopicNameValidator.validate(topicMetadataRequest.streamName) match {
         case Success(_) =>
-          initiateBootstrap(topicMetadataRequest) pipeTo sender
+          val ingestFuture = ingestMetadata(topicMetadataRequest)
+
+          val registerSchemaFuture = registerSchema(topicMetadataRequest.streamSchema.compactPrint)
+
+          val result = for {
+            r1 <- ingestFuture
+            r2 <- registerSchemaFuture
+          } yield {}
+
+          result.onComplete {
+            case Success(value) => requestor ! BootstrapSuccess
+            case Failure(exception) => requestor ! BootstrapFailure(Seq(exception.getMessage))
+          }
 
         case Failure(ex: TopicNameValidatorException) =>
           Future(BootstrapFailure(ex.reasons)) pipeTo sender
@@ -66,8 +80,11 @@ class TopicBootstrapActor(config: Config,
       Future.failed(new Exception(failureMessage)) pipeTo sender
   }
 
-  private[ingest] def initiateBootstrap(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
-    // TODO Add behavior to register the schema and create the topic
+  private[ingest] def registerSchema(schemaJson: String): Future[RegisterSchemaResponse] = {
+    (schemaRegistryActor ? RegisterSchemaRequest(schemaJson)).mapTo[RegisterSchemaResponse]
+  }
+
+  private[ingest] def ingestMetadata(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
     buildAvroRecord(topicMetadataRequest).flatMap { avroRecord =>
       (kafkaIngestor ? Ingest(avroRecord, avroRecord.ackStrategy)).map {
         case IngestorCompleted => BootstrapSuccess
@@ -75,13 +92,13 @@ class TopicBootstrapActor(config: Config,
           val errorMessage = ex.getMessage
           log.error(
             s"TopicBootstrapActor received an IngestorError from KafkaIngestor: $errorMessage")
-          BootstrapFailure(Seq(errorMessage))
+          throw ex
       }
     }.recover {
       case ex: Throwable =>
         val errorMessage = ex.getMessage
         log.error(s"Unexpected error occurred during initiateBootstrap: $errorMessage")
-        BootstrapFailure(Seq(ex.getMessage))
+        throw ex
     }
   }
 
@@ -119,4 +136,5 @@ object TopicBootstrapActor {
 
   case class BootstrapFailure(reasons: Seq[String]) extends BootstrapResult
 
+  case class BootstrapStep[A](stepResult: A) extends BootstrapResult
 }
