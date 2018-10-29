@@ -42,6 +42,7 @@ class TopicBootstrapActor(config: Config,
     case RegisterSchemaResponse(_) =>
       context.become(active)
       unstashAll()
+
     case AkkaFailure(ex) =>
       log.error(s"TopicBootstrapActor entering failed state due to: ${ex.getMessage}")
       unstashAll()

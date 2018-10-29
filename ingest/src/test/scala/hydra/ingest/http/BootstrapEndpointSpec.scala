@@ -83,7 +83,7 @@ class BootstrapEndpointSpec extends Matchers
           |	  "version": 1,
           |	  "fields": [
           |	    {
-          |	      "name": "test-field",
+          |	      "name": "testField",
           |	      "type": "string"
           |	    }
           |	  ]
@@ -115,7 +115,7 @@ class BootstrapEndpointSpec extends Matchers
           |	  "version": 1,
           |	  "fields": [
           |	    {
-          |	      "name": "test-field",
+          |	      "name": "testField",
           |	      "type": "string"
           |	    }
           |	  ]
@@ -147,7 +147,7 @@ class BootstrapEndpointSpec extends Matchers
           |	  "version": 1,
           |	  "fields": [
           |	    {
-          |	      "name": "test-field",
+          |	      "name": "testField",
           |	      "type": "string"
           |	    }
           |	  ]
@@ -177,7 +177,7 @@ class BootstrapEndpointSpec extends Matchers
           |	  "version": 1,
           |	  "fields": [
           |	    {
-          |	      "name": "test-field",
+          |	      "name": "testField",
           |	      "type": "string"
           |	    }
           |	  ]
