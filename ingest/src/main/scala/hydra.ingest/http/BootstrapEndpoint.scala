@@ -60,10 +60,13 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
             entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
               onComplete(bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)) {
                 case Success(message) => message match {
+
                   case BootstrapSuccess =>
                     complete(StatusCodes.OK)
+
                   case BootstrapFailure(reasons) =>
                     complete(StatusCodes.BadRequest, reasons)
+
                   case e: Exception =>
                     log.error("Unexpected error in TopicBootstrapActor", e)
                     complete(StatusCodes.InternalServerError, e.getMessage)
