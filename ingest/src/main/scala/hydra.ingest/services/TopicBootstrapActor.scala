@@ -52,8 +52,6 @@ class TopicBootstrapActor(config: Config,
 
   def active: Receive = {
     case InitiateTopicBootstrap(topicMetadataRequest) =>
-      val requestor = sender
-
       TopicNameValidator.validate(topicMetadataRequest.streamName) match {
         case Success(_) =>
           val ingestFuture = ingestMetadata(topicMetadataRequest)
@@ -67,7 +65,7 @@ class TopicBootstrapActor(config: Config,
 
           pipe(result.recover {
             case t: Throwable => BootstrapFailure(Seq(t.getMessage))}
-          ) to requestor
+          ) to sender
 
         case Failure(ex: TopicNameValidatorException) =>
           Future(BootstrapFailure(ex.reasons)) pipeTo sender
