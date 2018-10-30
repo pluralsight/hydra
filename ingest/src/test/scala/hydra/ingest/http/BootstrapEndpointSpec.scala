@@ -67,16 +67,16 @@ class BootstrapEndpointSpec extends Matchers
       val testEntity = HttpEntity(
         ContentTypes.`application/json`,
         """{
-          |	"streamName": "exp.dataplatform.testsubject",
-          |	"streamType": "Historical",
-          |	"streamSubType": "Source Of Truth",
+          |	"subject": "exp.dataplatform.testsubject",
+          |	"streamType": "Notification",
+          | "derived": false,
           |	"dataClassification": "Public",
           |	"dataSourceOwner": "BARTON",
-          |	"dataSourceContact": "slackity slack dont talk back",
+          |	"contact": "slackity slack dont talk back",
           |	"psDataLake": false,
-          |	"dataDocPath": "akka://some/path/here.jpggifyo",
-          |	"dataOwnerNotes": "here are some notes topkek",
-          |	"streamSchema": {
+          |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+          |	"notes": "here are some notes topkek",
+          |	"schema": {
           |	  "namespace": "exp.assessment",
           |	  "name": "SkillAssessmentTopicsScored",
           |	  "type": "record",
@@ -99,16 +99,16 @@ class BootstrapEndpointSpec extends Matchers
       val testEntity = HttpEntity(
         ContentTypes.`application/json`,
         """{
-          |	"streamName": "exp.dataplatform.failed",
-          |	"streamType": "Historical",
-          |	"streamSubType": "Source Of Truth",
+          |	"subject": "exp.dataplatform.failed",
+          |	"streamType": "Notification",
+          | "derived": false,
           |	"dataClassification": "Public",
           |	"dataSourceOwner": "BARTON",
-          |	"dataSourceContact": "slackity slack dont talk back",
+          |	"contact": "slackity slack dont talk back",
           |	"psDataLake": false,
-          |	"dataDocPath": "akka://some/path/here.jpggifyo",
-          |	"dataOwnerNotes": "here are some notes topkek",
-          |	"streamSchema": {
+          |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+          |	"notes": "here are some notes topkek",
+          |	"schema": {
           |	  "namespace": "exp.assessment",
           |	  "name": "SkillAssessmentTopicsScored",
           |	  "type": "record",
@@ -131,16 +131,16 @@ class BootstrapEndpointSpec extends Matchers
       val testEntity = HttpEntity(
         ContentTypes.`application/json`,
         """{
-          |	"streamName": "invalid",
-          |	"streamType": "Historical",
-          |	"streamSubType": "Source Of Truth",
+          |	"subject": "invalid",
+          |	"streamType": "Notification",
+          | "derived": false,
           |	"dataClassification": "Public",
           |	"dataSourceOwner": "BARTON",
-          |	"dataSourceContact": "slackity slack dont talk back",
+          |	"contact": "slackity slack dont talk back",
           |	"psDataLake": false,
-          |	"dataDocPath": "akka://some/path/here.jpggifyo",
-          |	"dataOwnerNotes": "here are some notes topkek",
-          |	"streamSchema": {
+          |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+          |	"notes": "here are some notes topkek",
+          |	"schema": {
           |	  "namespace": "exp.assessment",
           |	  "name": "SkillAssessmentTopicsScored",
           |	  "type": "record",

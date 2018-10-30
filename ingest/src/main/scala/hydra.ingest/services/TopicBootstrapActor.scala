@@ -52,11 +52,11 @@ class TopicBootstrapActor(config: Config,
 
   def active: Receive = {
     case InitiateTopicBootstrap(topicMetadataRequest) =>
-      TopicNameValidator.validate(topicMetadataRequest.streamName) match {
+      TopicNameValidator.validate(topicMetadataRequest.subject) match {
         case Success(_) =>
           val ingestFuture = ingestMetadata(topicMetadataRequest)
 
-          val registerSchemaFuture = registerSchema(topicMetadataRequest.streamSchema.compactPrint)
+          val registerSchemaFuture = registerSchema(topicMetadataRequest.schema.compactPrint)
 
           val result = for {
             bootstrapResult <- ingestFuture
