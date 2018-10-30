@@ -8,7 +8,7 @@ import com.typesafe.config.Config
 import configs.syntax._
 import hydra.core.akka.SchemaRegistryActor.{RegisterSchemaRequest, RegisterSchemaResponse}
 import hydra.core.ingest.{HydraRequest, RequestParams}
-import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
+import hydra.core.marshallers.{HydraJsonSupport, TopicMetadata, TopicMetadataRequest}
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.ingest.services.TopicBootstrapActor.{BootstrapSuccess, _}
@@ -52,9 +52,10 @@ class TopicBootstrapActor(config: Config,
 
   def active: Receive = {
     case InitiateTopicBootstrap(topicMetadataRequest) =>
+      val topicMetadata = TopicMetadata(topicMetadataRequest = topicMetadataRequest)
       TopicNameValidator.validate(topicMetadataRequest.subject) match {
         case Success(_) =>
-          val ingestFuture = ingestMetadata(topicMetadataRequest)
+          val ingestFuture = ingestMetadata(topicMetadata)
 
           val registerSchemaFuture = registerSchema(topicMetadataRequest.schema.compactPrint)
 
@@ -82,8 +83,8 @@ class TopicBootstrapActor(config: Config,
     (schemaRegistryActor ? RegisterSchemaRequest(schemaJson)).mapTo[RegisterSchemaResponse]
   }
 
-  private[ingest] def ingestMetadata(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
-    buildAvroRecord(topicMetadataRequest).flatMap { avroRecord =>
+  private[ingest] def ingestMetadata(topicMetadata: TopicMetadata): Future[BootstrapResult] = {
+    buildAvroRecord(topicMetadata).flatMap { avroRecord =>
       (kafkaIngestor ? Ingest(avroRecord, avroRecord.ackStrategy)).map {
         case IngestorCompleted => BootstrapSuccess
         case IngestorError(ex) =>
@@ -100,8 +101,8 @@ class TopicBootstrapActor(config: Config,
     }
   }
 
-  private[ingest] def buildAvroRecord(topicMetadataRequest: TopicMetadataRequest): Future[AvroRecord] = {
-    val jsonString = topicMetadataRequest.toJson.toString
+  private[ingest] def buildAvroRecord(topicMetadata: TopicMetadata): Future[AvroRecord] = {
+    val jsonString = topicMetadata.toJson.toString
     new AvroRecordFactory(schemaRegistryActor).build(
       HydraRequest(
         "0",
