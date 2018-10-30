@@ -61,14 +61,13 @@ class TopicBootstrapActor(config: Config,
           val registerSchemaFuture = registerSchema(topicMetadataRequest.streamSchema.compactPrint)
 
           val result = for {
-            r1 <- ingestFuture
-            r2 <- registerSchemaFuture
-          } yield {}
+            bootstrapResult <- ingestFuture
+            _ <- registerSchemaFuture
+          } yield bootstrapResult
 
-          result.onComplete {
-            case Success(value) => requestor ! BootstrapSuccess
-            case Failure(exception) => requestor ! BootstrapFailure(Seq(exception.getMessage))
-          }
+          pipe(result.recover {
+            case t: Throwable => BootstrapFailure(Seq(t.getMessage))}
+          ) to requestor
 
         case Failure(ex: TopicNameValidatorException) =>
           Future(BootstrapFailure(ex.reasons)) pipeTo sender
