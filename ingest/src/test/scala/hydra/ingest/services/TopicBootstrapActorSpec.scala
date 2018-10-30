@@ -21,6 +21,7 @@ import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import spray.json._
 
 import scala.concurrent.Future
+import scala.io.Source
 
 class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor-spec"))
   with FlatSpecLike
@@ -42,57 +43,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   val config = ConfigFactory.load()
 
-  val testJson =
-    """
-      |{
-      |  "namespace": "hydra.metadata",
-      |  "name": "topic",
-      |  "type": "record",
-      |  "version": 1,
-      |  "fields": [
-      |    {
-      |      "name": "streamName",
-      |      "type": "string"
-      |    },
-      |    {
-      |      "name": "streamType",
-      |      "type": "string"
-      |    },
-      |    {
-      |      "name": "streamSubType",
-      |      "type": "string"
-      |    },
-      |    {
-      |      "name": "dataClassification",
-      |      "type": "string"
-      |    },
-      |    {
-      |      "name": "dataSourceOwner",
-      |      "type": "string"
-      |    },
-      |    {
-      |      "name": "dataSourceContact",
-      |      "type": "string"
-      |    },
-      |    {
-      |      "name": "psDataLake",
-      |      "type": "boolean"
-      |    },
-      |    {
-      |      "name": "dataDocPath",
-      |      "type": "string"
-      |    },
-      |    {
-      |    	"name": "dataOwnerNotes",
-      |    	"type": "string"
-      |    },
-      |    {
-      |    	"name": "streamSchema",
-      |    	"type": "string"
-      |    }
-      |  ]
-      |}
-    """.stripMargin
+  val testJson = Source.fromResource("HydraMetadataTopic.avsc").mkString
 
   val testSchemaResource = SchemaResource(1, 1, new Schema.Parser().parse(testJson))
 
@@ -139,23 +90,23 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   "A TopicBootstrapActor" should "process metadata and send an Ingest message to the kafka ingestor" in {
 
     val mdRequest = """{
-                      |	"streamName": "exp.dataplatform.testsubject",
-                      |	"streamType": "Historical",
-                      |	"streamSubType": "Source Of Truth",
+                      |	"subject": "exp.dataplatform.testsubject",
+                      |	"streamType": "Notification",
+                      | "derived": false,
                       |	"dataClassification": "Public",
                       |	"dataSourceOwner": "BARTON",
-                      |	"dataSourceContact": "slackity slack dont talk back",
+                      |	"contact": "slackity slack dont talk back",
                       |	"psDataLake": false,
-                      |	"dataDocPath": "akka://some/path/here.jpggifyo",
-                      |	"dataOwnerNotes": "here are some notes topkek",
-                      |	"streamSchema": {
+                      |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+                      |	"notes": "here are some notes topkek",
+                      |	"schema": {
                       |	  "namespace": "exp.assessment",
                       |	  "name": "SkillAssessmentTopicsScored",
                       |	  "type": "record",
                       |	  "version": 1,
                       |	  "fields": [
                       |	    {
-                      |	      "name": "test-field",
+                      |	      "name": "testField",
                       |	      "type": "string"
                       |	    }
                       |	  ]
@@ -190,23 +141,23 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   it should "respond with the error that caused the failed actor state" in {
     val mdRequest = """{
-                      |	"streamName": "exp",
-                      |	"streamType": "Historical",
-                      |	"streamSubType": "Source Of Truth",
+                      |	"subject": "exp.dataplatform.testsubject",
+                      |	"streamType": "Notification",
+                      | "derived": false,
                       |	"dataClassification": "Public",
                       |	"dataSourceOwner": "BARTON",
-                      |	"dataSourceContact": "slackity slack dont talk back",
+                      |	"contact": "slackity slack dont talk back",
                       |	"psDataLake": false,
-                      |	"dataDocPath": "akka://some/path/here.jpggifyo",
-                      |	"dataOwnerNotes": "here are some notes topkek",
-                      |	"streamSchema": {
+                      |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+                      |	"notes": "here are some notes topkek",
+                      |	"schema": {
                       |	  "namespace": "exp.assessment",
                       |	  "name": "SkillAssessmentTopicsScored",
                       |	  "type": "record",
                       |	  "version": 1,
                       |	  "fields": [
                       |	    {
-                      |	      "name": "test-field",
+                      |	      "name": "testField",
                       |	      "type": "string"
                       |	    }
                       |	  ]
@@ -235,23 +186,23 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   it should "respond with the appropriate metadata failure message" in {
 
     val mdRequest = """{
-                      |	"streamName": "exp",
-                      |	"streamType": "Historical",
-                      |	"streamSubType": "Source Of Truth",
+                      |	"subject": "exp....",
+                      |	"streamType": "Notification",
+                      | "derived": false,
                       |	"dataClassification": "Public",
                       |	"dataSourceOwner": "BARTON",
-                      |	"dataSourceContact": "slackity slack dont talk back",
+                      |	"contact": "slackity slack dont talk back",
                       |	"psDataLake": false,
-                      |	"dataDocPath": "akka://some/path/here.jpggifyo",
-                      |	"dataOwnerNotes": "here are some notes topkek",
-                      |	"streamSchema": {
+                      |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+                      |	"notes": "here are some notes topkek",
+                      |	"schema": {
                       |	  "namespace": "exp.assessment",
                       |	  "name": "SkillAssessmentTopicsScored",
                       |	  "type": "record",
                       |	  "version": 1,
                       |	  "fields": [
                       |	    {
-                      |	      "name": "test-field",
+                      |	      "name": "testField",
                       |	      "type": "string"
                       |	    }
                       |	  ]
@@ -278,23 +229,23 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   it should "respond with the appropriate failure when the KafkaIngestor returns an exception" in {
     val mdRequest = """{
-                      |	"streamName": "exp.something.something",
-                      |	"streamType": "Historical",
-                      |	"streamSubType": "Source Of Truth",
+                      |	"subject": "exp.dataplatform.testsubject",
+                      |	"streamType": "Notification",
+                      | "derived": false,
                       |	"dataClassification": "Public",
                       |	"dataSourceOwner": "BARTON",
-                      |	"dataSourceContact": "slackity slack dont talk back",
+                      |	"contact": "slackity slack dont talk back",
                       |	"psDataLake": false,
-                      |	"dataDocPath": "akka://some/path/here.jpggifyo",
-                      |	"dataOwnerNotes": "here are some notes topkek",
-                      |	"streamSchema": {
+                      |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+                      |	"notes": "here are some notes topkek",
+                      |	"schema": {
                       |	  "namespace": "exp.assessment",
                       |	  "name": "SkillAssessmentTopicsScored",
                       |	  "type": "record",
                       |	  "version": 1,
                       |	  "fields": [
                       |	    {
-                      |	      "name": "test-field",
+                      |	      "name": "testField",
                       |	      "type": "string"
                       |	    }
                       |	  ]
