@@ -72,5 +72,9 @@ class HydraJsonSupportSpec extends Matchers with FunSpecLike with HydraJsonSuppo
         JsNumber(1).convertTo[DateTime]
       }
     }
+
+    it("converts TopicMetadata into de-nested JSON") {
+
+    }
   }
 }
