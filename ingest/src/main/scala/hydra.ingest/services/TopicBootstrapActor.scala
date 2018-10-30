@@ -102,7 +102,7 @@ class TopicBootstrapActor(config: Config,
   }
 
   private[ingest] def buildAvroRecord(topicMetadata: TopicMetadata): Future[AvroRecord] = {
-    val jsonString = topicMetadata.toJson.toString
+    val jsonString = topicMetadata.toJson.compactPrint
     new AvroRecordFactory(schemaRegistryActor).build(
       HydraRequest(
         "0",

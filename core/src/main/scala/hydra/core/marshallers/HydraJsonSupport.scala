@@ -135,13 +135,15 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
   implicit object TopicMetadataFormat extends RootJsonFormat[TopicMetadata] {
     override def write(obj: TopicMetadata) = {
+      val fields: Map[String, JsValue] = obj.topicMetadataRequest.toJson.asJsObject.fields +
+        ("id" -> JsString(obj.id.toString)) +
+        ("createdDate" -> JsString(obj.createdDate.toString))
       JsObject(
-        "id" -> JsString(obj.id.toString),
-        "streamCreated" -> JsString(obj.streamCreated.toString)
+        fields
       )
     }
     override def read(json: JsValue) = {
-      super.read(json)
+      json.convertTo[TopicMetadata]
     }
   }
 }
@@ -158,6 +160,6 @@ case class TopicMetadataRequest(subject: String,
                                 notes: Option[String])
 
 case class TopicMetadata(id: UUID=UUID.randomUUID(),
-                         streamCreated: java.time.LocalDateTime = java.time.LocalDateTime.now(),
+                         createdDate: java.time.LocalDateTime = java.time.LocalDateTime.now(),
                          topicMetadataRequest: TopicMetadataRequest)
 

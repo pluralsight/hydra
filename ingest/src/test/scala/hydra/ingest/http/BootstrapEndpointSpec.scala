@@ -24,7 +24,7 @@ class BootstrapEndpointSpec extends Matchers
 
   class TestKafkaIngestor extends Actor {
     override def receive = {
-      case Ingest(hydraRecord, _) if hydraRecord.asInstanceOf[AvroRecord].payload.get("streamName") == "exp.dataplatform.failed" =>
+      case Ingest(hydraRecord, _) if hydraRecord.asInstanceOf[AvroRecord].payload.get("subject") == "exp.dataplatform.failed" =>
         sender ! IngestorError(new Exception("oh noes!"))
       case Ingest(_, _) => sender ! IngestorCompleted
     }
