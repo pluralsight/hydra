@@ -145,6 +145,6 @@ case class TopicMetadataRequest(subject: String,
                                 contact: String,
                                 additionalDocumentation: Option[String],
                                 notes: Option[String],
-                                id: Option[UUID] = Some(UUID.randomUUID()),
-                                createdDate: Option[org.joda.time.DateTime] = Some(org.joda.time.DateTime.now()))
+                                id: Option[UUID],
+                                createdDate: Option[org.joda.time.DateTime])
 
