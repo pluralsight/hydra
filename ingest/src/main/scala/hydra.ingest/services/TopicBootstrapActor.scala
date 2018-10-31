@@ -13,6 +13,8 @@ import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.ingest.services.TopicBootstrapActor.{BootstrapSuccess, _}
 import hydra.kafka.producer.{AvroRecord, AvroRecordFactory}
+import hydra.kafka.util.IKafkaUtils
+import org.apache.kafka.clients.admin.CreateTopicsResult
 import spray.json._
 
 import scala.concurrent.Future
@@ -22,7 +24,8 @@ import scala.util.{Failure, Success}
 
 class TopicBootstrapActor(config: Config,
                           schemaRegistryActor: ActorRef,
-                          kafkaIngestor: ActorSelection) extends Actor
+                          kafkaIngestor: ActorSelection,
+                          kafkaUtils: IKafkaUtils) extends Actor
   with HydraJsonSupport
   with ActorLogging
   with Stash {
@@ -116,6 +119,11 @@ class TopicBootstrapActor(config: Config,
       )
     )
   }
+
+  private[ingest] def createKafkaTopic(): Future[CreateTopicsResult] = {
+    Future.successful(CreateTopicsResult)
+  }
+
 }
 
 object TopicBootstrapActor {

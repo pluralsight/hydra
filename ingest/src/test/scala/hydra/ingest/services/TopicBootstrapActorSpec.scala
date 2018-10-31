@@ -269,4 +269,10 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
         reasons should contain("Kafka ingestor failed expectedly!")
     }
   }
+
+  it should "create a kafka topic based on the supplied topic name" in {
+    //TODO implement
+  }
+
+
 }

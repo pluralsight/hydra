@@ -19,10 +19,21 @@ import scala.collection.immutable.Map
 import scala.concurrent.Future
 import scala.util.Try
 
-/**
-  * Created by alexsilva on 5/17/17.
-  */
-case class KafkaUtils(config: Map[String, AnyRef]) extends LoggingAdapter
+
+trait IKafkaUtils {
+
+  def createTopic(topic: String, details: TopicDetails, timeout: Int): Future[CreateTopicsResult]
+
+  def createTopics(topics: Map[String, TopicDetails], timeout: Int): Future[CreateTopicsResult]
+
+  def topicNames(): Try[Seq[String]]
+
+  private[kafka] def withClient[T](body: AdminClient => T): Try[T]
+
+}
+
+case class KafkaUtils(config: Map[String, AnyRef]) extends IKafkaUtils
+  with LoggingAdapter
   with ConfigSupport {
 
   private[kafka] def withClient[T](body: AdminClient => T): Try[T] = {
