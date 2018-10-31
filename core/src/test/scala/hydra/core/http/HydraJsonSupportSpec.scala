@@ -5,7 +5,7 @@ import java.util.UUID
 import akka.actor.ActorPath
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import hydra.core.marshallers.{HydraJsonSupport, TopicMetadata, TopicMetadataRequest}
+import hydra.core.marshallers.HydraJsonSupport
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 import org.scalatest.{FunSpecLike, Matchers}
@@ -71,13 +71,6 @@ class HydraJsonSupportSpec extends Matchers with FunSpecLike with HydraJsonSuppo
       intercept[DeserializationException] {
         JsNumber(1).convertTo[DateTime]
       }
-    }
-
-    it("converts TopicMetadata into de-nested JSON") {
-      val mockRequest = TopicMetadataRequest("sub", JsObject("fool" -> JsString("fool")), "its a type", derived=false, "yup", "yup", None, None)
-      val metadata = TopicMetadata(topicMetadataRequest = mockRequest)
-      metadata.toJson.asJsObject.getFields(Seq("createdDate", "id"): _*).nonEmpty shouldBe true
-
     }
   }
 }
