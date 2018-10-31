@@ -120,8 +120,8 @@ class TopicBootstrapActor(config: Config,
     )
   }
 
-  private[ingest] def createKafkaTopic(): Future[CreateTopicsResult] = {
-    Future.successful(CreateTopicsResult)
+  private[ingest] def createKafkaTopic(topicMetadata: TopicMetadata): Future[CreateTopicsResult] = {
+    kafkaUtils.createTopic(topicMetadata.topicMetadataRequest.subject, )
   }
 
 }
