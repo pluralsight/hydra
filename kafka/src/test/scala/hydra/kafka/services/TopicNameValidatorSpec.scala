@@ -1,6 +1,6 @@
-package hydra.ingest.services
+package hydra.kafka.services
 
-import hydra.ingest.services.ErrorMessages._
+import hydra.kafka.services.ErrorMessages._
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.util.{Failure, Success}

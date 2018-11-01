@@ -1,4 +1,4 @@
-package hydra.ingest.services
+package hydra.kafka.services
 
 import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorSystem, Props}
@@ -10,9 +10,10 @@ import hydra.core.akka.SchemaRegistryActor.{FetchSchemaRequest, FetchSchemaRespo
 import hydra.core.marshallers.TopicMetadataRequest
 import hydra.core.protocol.Ingest
 import hydra.core.transport.{AckStrategy, HydraRecord}
-import hydra.ingest.http.HydraIngestJsonSupport
-import hydra.ingest.services.TopicBootstrapActor.{BootstrapFailure, BootstrapSuccess, InitiateTopicBootstrap}
+import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.producer.AvroRecord
+import hydra.kafka.services.TopicBootstrapActor.{BootstrapFailure, BootstrapSuccess, InitiateTopicBootstrap}
+import net.manub.embeddedkafka.EmbeddedKafka
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
 import org.scalamock.scalatest.MockFactory
@@ -29,11 +30,11 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   with BeforeAndAfterAll
   with MockFactory
   with EmbeddedKafka
-  with HydraIngestJsonSupport
+  with HydraKafkaJsonSupport
   with Eventually
   with ImplicitSender {
 
-  import hydra.ingest.services.ErrorMessages._
+  import hydra.kafka.services.ErrorMessages._
 
   implicit val ec = system.dispatcher
 
@@ -274,10 +275,6 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   it should "create a kafka topic based on the supplied topic name" in {
     val expectedTopic = "exp.dataplatform.testsubject"
     val expectedTimeout = 3000
-    val kafkaUtils = stub[IKafkaUtils]
-    (kafkaUtils.createTopic _)
-      .when(*, *, *)
-      .returns(Future.successful(BootstrapSuccess))
 
     val mdRequest = s"""{
                        |	"subject": "$expectedTopic",
@@ -316,9 +313,5 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     bootstrapActor ! InitiateTopicBootstrap(mdRequest)
 
     expectMsg(BootstrapSuccess)
-
-    (kafkaUtils.createTopic _)
-      .verify(expectedTopic, *, 3000)
-      .once
   }
 }
