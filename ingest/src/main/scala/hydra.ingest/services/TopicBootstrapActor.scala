@@ -1,5 +1,7 @@
 package hydra.ingest.services
 
+import java.util.UUID
+
 import akka.actor.Status.{Failure => AkkaFailure}
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSelection, Props, Stash}
 import akka.pattern.{ask, pipe}
@@ -35,13 +37,14 @@ class TopicBootstrapActor(config: Config,
 
   override def preStart(): Unit = {
     val schema = Source.fromResource("HydraMetadataTopic.avsc").mkString
-    pipe(schemaRegistryActor ? RegisterSchemaRequest(schema)) to self
+    pipe(registerSchema(schema)) to self
   }
 
   def initializing: Receive = {
     case RegisterSchemaResponse(_) =>
       context.become(active)
       unstashAll()
+
     case AkkaFailure(ex) =>
       log.error(s"TopicBootstrapActor entering failed state due to: ${ex.getMessage}")
       unstashAll()
@@ -51,9 +54,20 @@ class TopicBootstrapActor(config: Config,
 
   def active: Receive = {
     case InitiateTopicBootstrap(topicMetadataRequest) =>
-      TopicNameValidator.validate(topicMetadataRequest.streamName) match {
+      TopicNameValidator.validate(topicMetadataRequest.subject) match {
         case Success(_) =>
-          initiateBootstrap(topicMetadataRequest) pipeTo sender
+          val ingestFuture = ingestMetadata(topicMetadataRequest)
+
+          val registerSchemaFuture = registerSchema(topicMetadataRequest.schema.compactPrint)
+
+          val result = for {
+            bootstrapResult <- ingestFuture
+            _ <- registerSchemaFuture
+          } yield bootstrapResult
+
+          pipe(result.recover {
+            case t: Throwable => BootstrapFailure(Seq(t.getMessage))}
+          ) to sender
 
         case Failure(ex: TopicNameValidatorException) =>
           Future(BootstrapFailure(ex.reasons)) pipeTo sender
@@ -66,7 +80,11 @@ class TopicBootstrapActor(config: Config,
       Future.failed(new Exception(failureMessage)) pipeTo sender
   }
 
-  private[ingest] def initiateBootstrap(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
+  private[ingest] def registerSchema(schemaJson: String): Future[RegisterSchemaResponse] = {
+    (schemaRegistryActor ? RegisterSchemaRequest(schemaJson)).mapTo[RegisterSchemaResponse]
+  }
+
+  private[ingest] def ingestMetadata(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
     buildAvroRecord(topicMetadataRequest).flatMap { avroRecord =>
       (kafkaIngestor ? Ingest(avroRecord, avroRecord.ackStrategy)).map {
         case IngestorCompleted => BootstrapSuccess
@@ -74,18 +92,21 @@ class TopicBootstrapActor(config: Config,
           val errorMessage = ex.getMessage
           log.error(
             s"TopicBootstrapActor received an IngestorError from KafkaIngestor: $errorMessage")
-          BootstrapFailure(Seq(errorMessage))
+          throw ex
       }
     }.recover {
       case ex: Throwable =>
         val errorMessage = ex.getMessage
         log.error(s"Unexpected error occurred during initiateBootstrap: $errorMessage")
-        BootstrapFailure(Seq(ex.getMessage))
+        throw ex
     }
   }
 
   private[ingest] def buildAvroRecord(topicMetadataRequest: TopicMetadataRequest): Future[AvroRecord] = {
-    val jsonString = topicMetadataRequest.toJson.toString
+    val enrichedReq = topicMetadataRequest
+      .copy(createdDate = Some(org.joda.time.DateTime.now()), id = Some(UUID.randomUUID()))
+
+    val jsonString = enrichedReq.toJson.compactPrint
     new AvroRecordFactory(schemaRegistryActor).build(
       HydraRequest(
         "0",
@@ -118,4 +139,5 @@ object TopicBootstrapActor {
 
   case class BootstrapFailure(reasons: Seq[String]) extends BootstrapResult
 
+  case class BootstrapStep[A](stepResult: A) extends BootstrapResult
 }

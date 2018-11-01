@@ -3,46 +3,60 @@
   "name": "topic",
   "type": "record",
   "version": 1,
+  "hydra.key": "subject",
   "fields": [
     {
-      "name": "streamName",
+      "name": "id",
+      "type": "string"
+    },
+    {
+      "name": "createdDate",
+      "type": {
+        "type": "string",
+        "logicalType": "iso-datetime"
+      }
+    },
+    {
+      "name": "subject",
       "type": "string"
     },
     {
       "name": "streamType",
-      "type": "string"
-    },
-    {
-      "name": "streamSubType",
-      "type": "string"
+      "type": {
+        "name": "streamTypeEnum",
+        "type": "enum",
+        "symbols": ["Notification", "CurrentState", "History"]
+      }
     },
     {
       "name": "dataClassification",
-      "type": "string"
+      "type": {
+        "name": "dataClassificationEnum",
+        "type": "enum",
+        "symbols": ["Public", "InternalUseOnly", "ConfidentialPII", "ConfidentialFinancial"]
+      }
     },
     {
-      "name": "dataSourceOwner",
-      "type": "string"
-    },
-    {
-      "name": "dataSourceContact",
-      "type": "string"
-    },
-    {
-      "name": "psDataLake",
+      "name": "derived",
       "type": "boolean"
     },
     {
-      "name": "dataDocPath",
+      "name": "contact",
       "type": "string"
     },
     {
-    	"name": "dataOwnerNotes",
-    	"type": "string"
+      "name": "additionalDocumentation",
+      "type": ["null", "string"],
+      "default": null
     },
     {
-    	"name": "streamSchema",
-    	"type": "string"
+      "name": "notes",
+      "type": ["null", "string"],
+      "default": null
+    },
+    {
+      "name": "schema",
+      "type": "string"
     }
   ]
 }

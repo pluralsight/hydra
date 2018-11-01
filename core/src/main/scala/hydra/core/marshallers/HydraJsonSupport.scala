@@ -34,10 +34,6 @@ import scala.util.{Failure, Success, Try}
   */
 trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
-  implicit val genericErrorFormat = jsonFormat2(GenericError)
-
-  implicit val topicCreationMetadataFormat = jsonFormat10(TopicMetadataRequest)
-
 
   implicit object StatusCodeJsonFormat extends JsonFormat[StatusCode] {
 
@@ -132,22 +128,23 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
       }
     }
   }
+
+  implicit val genericErrorFormat = jsonFormat2(GenericError)
+
+  implicit val topicCreationMetadataFormat = jsonFormat10(TopicMetadataRequest)
+
 }
 
 case class GenericError(status: Int, errorMessage: String)
 
-case class TopicMetadataRequest(streamName: String,
-                                streamSchema: JsObject,
+case class TopicMetadataRequest(subject: String,
+                                schema: JsObject,
                                 streamType: String,
-                                streamSubType: String,
+                                derived: Boolean,
                                 dataClassification: String,
-                                dataSourceOwner: String,
-                                dataSourceContact: String,
-                                psDataLake: Option[Boolean],
-                                dataDocPath: Option[String],
-                                dataOwnerNotes: Option[String])
-
-case class TopicMetadata(streamId: UUID=UUID.randomUUID(),
-                         streamCreated: java.time.LocalDateTime = java.time.LocalDateTime.now(),
-                         topicCreationMetadataRequest: TopicMetadataRequest)
+                                contact: String,
+                                additionalDocumentation: Option[String],
+                                notes: Option[String],
+                                id: Option[UUID],
+                                createdDate: Option[org.joda.time.DateTime])
 
