@@ -8,6 +8,7 @@ import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.TestKit
 import hydra.common.config.ConfigSupport
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
+import hydra.kafka.endpoints.BootstrapEndpoint
 import hydra.kafka.producer.AvroRecord
 import org.scalatest.{Matchers, WordSpecLike}
 

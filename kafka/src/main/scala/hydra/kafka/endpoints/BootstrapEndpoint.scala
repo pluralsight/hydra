@@ -14,7 +14,7 @@
  *
  */
 
-package hydra.ingest.http
+package hydra.kafka.endpoints
 
 import akka.actor._
 import akka.http.scaladsl.model.StatusCodes
@@ -27,9 +27,8 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.http.HydraDirectives
 import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
-import hydra.ingest.bootstrap.HydraIngestorRegistryClient
-import hydra.ingest.services.TopicBootstrapActor.{BootstrapFailure, BootstrapSuccess, InitiateTopicBootstrap}
-import hydra.ingest.services._
+import hydra.kafka.services.TopicBootstrapActor
+import hydra.kafka.services.TopicBootstrapActor.{BootstrapFailure, BootstrapSuccess, InitiateTopicBootstrap}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
