@@ -1,6 +1,8 @@
 package hydra.ingest.services
 
+import java.util
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 import akka.actor.Status.{Failure => AkkaFailure}
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSelection, Props, Stash}
@@ -15,10 +17,11 @@ import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.ingest.services.TopicBootstrapActor.{BootstrapSuccess, _}
 import hydra.kafka.producer.{AvroRecord, AvroRecordFactory}
-import hydra.kafka.util.IKafkaUtils
-import org.apache.kafka.clients.admin.CreateTopicsResult
+import hydra.kafka.util.KafkaUtils
+import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 import spray.json._
 
+import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.io.Source
@@ -27,7 +30,7 @@ import scala.util.{Failure, Success}
 class TopicBootstrapActor(config: Config,
                           schemaRegistryActor: ActorRef,
                           kafkaIngestor: ActorSelection,
-                          kafkaUtils: IKafkaUtils) extends Actor
+                          kafkaUtils: KafkaUtils) extends Actor
   with HydraJsonSupport
   with ActorLogging
   with Stash {
@@ -42,6 +45,13 @@ class TopicBootstrapActor(config: Config,
     val schema = Source.fromResource("HydraMetadataTopic.avsc").mkString
     pipe(registerSchema(schema)) to self
   }
+
+  val boostrapKafkaConfig: Config = config.getConfig("bootstrap-kafka-config")
+  val topicDetailsConfig: util.Map[String, String] = Map[String, String]().empty.asJava
+  val topicDetails = new TopicDetails(
+    boostrapKafkaConfig.getInt("partitions"),
+    boostrapKafkaConfig.getInt("replication-factor").toShort,
+    topicDetailsConfig)
 
   def initializing: Receive = {
     case RegisterSchemaResponse(_) =>
@@ -69,8 +79,8 @@ class TopicBootstrapActor(config: Config,
           } yield bootstrapResult
 
           pipe(result.recover {
-            case t: Throwable => BootstrapFailure(Seq(t.getMessage))}
-          ) to sender
+            case t: Throwable => BootstrapFailure(Seq(t.getMessage))
+          }) to sender
 
         case Failure(ex: TopicNameValidatorException) =>
           Future(BootstrapFailure(ex.reasons)) pipeTo sender
@@ -124,10 +134,17 @@ class TopicBootstrapActor(config: Config,
     )
   }
 
-  private[ingest] def createKafkaTopic(topicMetadata: TopicMetadata): Future[CreateTopicsResult] = {
-    kafkaUtils.createTopic(topicMetadata.topicMetadataRequest.subject, )
-  }
+  private[ingest] def createKafkaTopic(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
+    val timeoutMillis = 3000
 
+    kafkaUtils.createTopic(topicMetadataRequest.subject, topicDetails, timeout = timeoutMillis).map { r =>
+      r.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
+    }.map { _ =>
+      BootstrapSuccess
+    } recover {
+      case e: Exception => BootstrapFailure(e.getMessage :: Nil)
+    }
+  }
 }
 
 object TopicBootstrapActor {
@@ -148,4 +165,5 @@ object TopicBootstrapActor {
   case class BootstrapFailure(reasons: Seq[String]) extends BootstrapResult
 
   case class BootstrapStep[A](stepResult: A) extends BootstrapResult
+
 }

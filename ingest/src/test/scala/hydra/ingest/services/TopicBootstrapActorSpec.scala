@@ -11,7 +11,7 @@ import hydra.core.marshallers.TopicMetadataRequest
 import hydra.core.protocol.Ingest
 import hydra.core.transport.{AckStrategy, HydraRecord}
 import hydra.ingest.http.HydraIngestJsonSupport
-import hydra.ingest.services.TopicBootstrapActor.{BootstrapFailure, InitiateTopicBootstrap}
+import hydra.ingest.services.TopicBootstrapActor.{BootstrapFailure, BootstrapSuccess, InitiateTopicBootstrap}
 import hydra.kafka.producer.AvroRecord
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
@@ -28,6 +28,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   with Matchers
   with BeforeAndAfterAll
   with MockFactory
+  with EmbeddedKafka
   with HydraIngestJsonSupport
   with Eventually
   with ImplicitSender {
@@ -271,8 +272,53 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   }
 
   it should "create a kafka topic based on the supplied topic name" in {
-    //TODO implement
+    val expectedTopic = "exp.dataplatform.testsubject"
+    val expectedTimeout = 3000
+    val kafkaUtils = stub[IKafkaUtils]
+    (kafkaUtils.createTopic _)
+      .when(*, *, *)
+      .returns(Future.successful(BootstrapSuccess))
+
+    val mdRequest = s"""{
+                       |	"subject": "$expectedTopic",
+                       |	"streamType": "Notification",
+                       | "derived": false,
+                       |	"dataClassification": "Public",
+                       |	"dataSourceOwner": "BARTON",
+                       |	"contact": "slackity slack dont talk back",
+                       |	"psDataLake": false,
+                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+                       |	"notes": "here are some notes topkek",
+                       |	"schema": {
+                       |	  "namespace": "exp.assessment",
+                       |	  "name": "SkillAssessmentTopicsScored",
+                       |	  "type": "record",
+                       |	  "version": 1,
+                       |	  "fields": [
+                       |	    {
+                       |	      "name": "testField",
+                       |	      "type": "string"
+                       |	    }
+                       |	  ]
+                       |	}
+                       |}"""
+      .stripMargin
+      .parseJson
+      .convertTo[TopicMetadataRequest]
+
+    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test5")
+
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(config, schemaRegistryActor,
+      system.actorSelection("/user/kafka_ingestor_test5")))
+
+    probe.expectMsgType[RegisterSchemaRequest]
+
+    bootstrapActor ! InitiateTopicBootstrap(mdRequest)
+
+    expectMsg(BootstrapSuccess)
+
+    (kafkaUtils.createTopic _)
+      .verify(expectedTopic, *, 3000)
+      .once
   }
-
-
 }

@@ -20,20 +20,7 @@ import scala.concurrent.Future
 import scala.util.Try
 
 
-trait IKafkaUtils {
-
-  def createTopic(topic: String, details: TopicDetails, timeout: Int): Future[CreateTopicsResult]
-
-  def createTopics(topics: Map[String, TopicDetails], timeout: Int): Future[CreateTopicsResult]
-
-  def topicNames(): Try[Seq[String]]
-
-  private[kafka] def withClient[T](body: AdminClient => T): Try[T]
-
-}
-
-case class KafkaUtils(config: Map[String, AnyRef]) extends IKafkaUtils
-  with LoggingAdapter
+case class KafkaUtils(config: Map[String, AnyRef]) extends LoggingAdapter
   with ConfigSupport {
 
   private[kafka] def withClient[T](body: AdminClient => T): Try[T] = {
