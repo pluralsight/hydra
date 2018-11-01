@@ -131,21 +131,8 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
   implicit val genericErrorFormat = jsonFormat2(GenericError)
 
-  implicit val topicCreationMetadataFormat = jsonFormat8(TopicMetadataRequest)
+  implicit val topicCreationMetadataFormat = jsonFormat10(TopicMetadataRequest)
 
-  implicit object TopicMetadataFormat extends RootJsonFormat[TopicMetadata] {
-    override def write(obj: TopicMetadata) = {
-      val fields: Map[String, JsValue] = obj.topicMetadataRequest.toJson.asJsObject.fields +
-        ("id" -> JsString(obj.id.toString)) +
-        ("createdDate" -> JsString(obj.createdDate.toString))
-      JsObject(
-        fields
-      )
-    }
-    override def read(json: JsValue) = {
-      json.convertTo[TopicMetadata]
-    }
-  }
 }
 
 case class GenericError(status: Int, errorMessage: String)
@@ -157,9 +144,7 @@ case class TopicMetadataRequest(subject: String,
                                 dataClassification: String,
                                 contact: String,
                                 additionalDocumentation: Option[String],
-                                notes: Option[String])
-
-case class TopicMetadata(id: UUID=UUID.randomUUID(),
-                         createdDate: java.time.LocalDateTime = java.time.LocalDateTime.now(),
-                         topicMetadataRequest: TopicMetadataRequest)
+                                notes: Option[String],
+                                id: Option[UUID],
+                                createdDate: Option[org.joda.time.DateTime])
 

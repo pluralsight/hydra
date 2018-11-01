@@ -46,11 +46,13 @@
     },
     {
       "name": "additionalDocumentation",
-      "type": "string"
+      "type": ["null", "string"],
+      "default": null
     },
     {
       "name": "notes",
-      "type": "string"
+      "type": ["null", "string"],
+      "default": null
     },
     {
       "name": "schema",

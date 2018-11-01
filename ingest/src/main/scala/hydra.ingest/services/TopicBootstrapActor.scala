@@ -1,5 +1,7 @@
 package hydra.ingest.services
 
+import java.util.UUID
+
 import akka.actor.Status.{Failure => AkkaFailure}
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSelection, Props, Stash}
 import akka.pattern.{ask, pipe}
@@ -8,7 +10,7 @@ import com.typesafe.config.Config
 import configs.syntax._
 import hydra.core.akka.SchemaRegistryActor.{RegisterSchemaRequest, RegisterSchemaResponse}
 import hydra.core.ingest.{HydraRequest, RequestParams}
-import hydra.core.marshallers.{HydraJsonSupport, TopicMetadata, TopicMetadataRequest}
+import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.ingest.services.TopicBootstrapActor.{BootstrapSuccess, _}
@@ -55,10 +57,9 @@ class TopicBootstrapActor(config: Config,
 
   def active: Receive = {
     case InitiateTopicBootstrap(topicMetadataRequest) =>
-      val topicMetadata = TopicMetadata(topicMetadataRequest = topicMetadataRequest)
       TopicNameValidator.validate(topicMetadataRequest.subject) match {
         case Success(_) =>
-          val ingestFuture = ingestMetadata(topicMetadata)
+          val ingestFuture = ingestMetadata(topicMetadataRequest)
 
           val registerSchemaFuture = registerSchema(topicMetadataRequest.schema.compactPrint)
 
@@ -86,8 +87,8 @@ class TopicBootstrapActor(config: Config,
     (schemaRegistryActor ? RegisterSchemaRequest(schemaJson)).mapTo[RegisterSchemaResponse]
   }
 
-  private[ingest] def ingestMetadata(topicMetadata: TopicMetadata): Future[BootstrapResult] = {
-    buildAvroRecord(topicMetadata).flatMap { avroRecord =>
+  private[ingest] def ingestMetadata(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
+    buildAvroRecord(topicMetadataRequest).flatMap { avroRecord =>
       (kafkaIngestor ? Ingest(avroRecord, avroRecord.ackStrategy)).map {
         case IngestorCompleted => BootstrapSuccess
         case IngestorError(ex) =>
@@ -104,8 +105,11 @@ class TopicBootstrapActor(config: Config,
     }
   }
 
-  private[ingest] def buildAvroRecord(topicMetadata: TopicMetadata): Future[AvroRecord] = {
-    val jsonString = topicMetadata.toJson.compactPrint
+  private[ingest] def buildAvroRecord(topicMetadataRequest: TopicMetadataRequest): Future[AvroRecord] = {
+    val enrichedReq = topicMetadataRequest
+      .copy(createdDate = Some(org.joda.time.DateTime.now()), id = Some(UUID.randomUUID()))
+
+    val jsonString = enrichedReq.toJson.compactPrint
     new AvroRecordFactory(schemaRegistryActor).build(
       HydraRequest(
         "0",
