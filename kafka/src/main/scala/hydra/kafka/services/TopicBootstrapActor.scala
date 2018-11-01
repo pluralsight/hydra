@@ -28,8 +28,8 @@ import scala.util.{Failure, Success}
 
 class TopicBootstrapActor(config: Config,
                           schemaRegistryActor: ActorRef,
-                          kafkaIngestor: ActorSelection,
-                          kafkaUtils: KafkaUtils) extends Actor
+                          kafkaIngestor: ActorSelection
+                         ) extends Actor
   with HydraJsonSupport
   with ActorLogging
   with Stash {
@@ -46,6 +46,8 @@ class TopicBootstrapActor(config: Config,
     val schema = Source.fromResource("HydraMetadataTopic.avsc").mkString
     pipe(registerSchema(schema)) to self
   }
+
+  val kafkaUtils = KafkaUtils()
 
   val boostrapKafkaConfig: Config = config.getConfig("bootstrap-kafka-config")
   val topicDetailsConfig: util.Map[String, String] = Map[String, String]().empty.asJava

@@ -72,7 +72,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
           }
         }
       )
-    )
+    , s"test-schema-regsitry-$key")
 
     val kafkaIngestor = system.actorOf(Props(
       new Actor {
@@ -270,48 +270,5 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       case BootstrapFailure(reasons) =>
         reasons should contain("Kafka ingestor failed expectedly!")
     }
-  }
-
-  it should "create a kafka topic based on the supplied topic name" in {
-    val expectedTopic = "exp.dataplatform.testsubject"
-    val expectedTimeout = 3000
-
-    val mdRequest = s"""{
-                       |	"subject": "$expectedTopic",
-                       |	"streamType": "Notification",
-                       | "derived": false,
-                       |	"dataClassification": "Public",
-                       |	"dataSourceOwner": "BARTON",
-                       |	"contact": "slackity slack dont talk back",
-                       |	"psDataLake": false,
-                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
-                       |	"notes": "here are some notes topkek",
-                       |	"schema": {
-                       |	  "namespace": "exp.assessment",
-                       |	  "name": "SkillAssessmentTopicsScored",
-                       |	  "type": "record",
-                       |	  "version": 1,
-                       |	  "fields": [
-                       |	    {
-                       |	      "name": "testField",
-                       |	      "type": "string"
-                       |	    }
-                       |	  ]
-                       |	}
-                       |}"""
-      .stripMargin
-      .parseJson
-      .convertTo[TopicMetadataRequest]
-
-    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test5")
-
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(config, schemaRegistryActor,
-      system.actorSelection("/user/kafka_ingestor_test5")))
-
-    probe.expectMsgType[RegisterSchemaRequest]
-
-    bootstrapActor ! InitiateTopicBootstrap(mdRequest)
-
-    expectMsg(BootstrapSuccess)
   }
 }
