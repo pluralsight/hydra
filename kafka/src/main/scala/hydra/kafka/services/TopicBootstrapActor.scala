@@ -77,13 +77,14 @@ class TopicBootstrapActor(
           val ingestFuture = ingestMetadata(topicMetadataRequest)
 
           val registerSchemaFuture = registerSchema(topicMetadataRequest.schema.compactPrint)
-
+          val createTopicK = createKafkaTopic(topicMetadataRequest)
           val result = for {
-            bootstrapResult <- ingestFuture
+            _ <- ingestFuture
             _ <- registerSchemaFuture
+            bootstrapResult <- createTopicK
           } yield bootstrapResult
-
-          pipe(result.recover {
+          pipe(
+            result.recover {
             case t: Throwable => BootstrapFailure(Seq(t.getMessage))
           }) to sender
 

@@ -10,7 +10,7 @@ import hydra.common.config.ConfigSupport
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.producer.AvroRecord
-import net.manub.embeddedkafka.EmbeddedKafka
+import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.concurrent.duration._
@@ -24,6 +24,9 @@ class BootstrapEndpointSpec extends Matchers
   with EmbeddedKafka {
 
   private implicit val timeout = RouteTestTimeout(10.seconds)
+
+  implicit val embeddedKafkaConfig = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
+    customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
 
   class TestKafkaIngestor extends Actor {
     override def receive = {
@@ -48,9 +51,15 @@ class BootstrapEndpointSpec extends Matchers
 
   private val bootstrapRoute = new BootstrapEndpoint().route
 
+
+  override def beforeAll: Unit = {
+    EmbeddedKafka.start()
+  }
+
   override def afterAll = {
     super.afterAll()
     TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10.seconds)
+    EmbeddedKafka.stop()
   }
 
   "The bootstrap endpoint" should {
