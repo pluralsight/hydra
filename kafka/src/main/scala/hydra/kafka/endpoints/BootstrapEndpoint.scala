@@ -29,6 +29,7 @@ import hydra.core.http.HydraDirectives
 import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
 import hydra.kafka.services.TopicBootstrapActor
 import hydra.kafka.services.TopicBootstrapActor.{BootstrapFailure, BootstrapSuccess, InitiateTopicBootstrap}
+import org.apache.commons.lang3.ClassUtils
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -42,11 +43,10 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
 
   private implicit val mat = ActorMaterializer()
 
-  private val registryPath = HydraIngestorRegistryClient.registryPath(applicationConfig)
 
-  private val kafkaIngestor = system.actorSelection(s"$registryPath/kafka_ingestor")
+  private val kafkaIngestor = system.actorSelection("/user/service/ingestor_registry/kafka_ingestor")
 
-  private val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(applicationConfig))
+  private val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(applicationConfig), name = ClassUtils.getSimpleName(SchemaRegistryActor.getClass))
 
   private val bootstrapActor = system.actorOf(
     TopicBootstrapActor.props(applicationConfig, schemaRegistryActor, kafkaIngestor))

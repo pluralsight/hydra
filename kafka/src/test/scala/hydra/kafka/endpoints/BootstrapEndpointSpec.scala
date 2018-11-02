@@ -1,4 +1,4 @@
-package hydra.ingest.http
+package hydra.kafka.endpoints
 
 import akka.actor.{Actor, Props}
 import akka.http.javadsl.server.MalformedRequestContentRejection
@@ -8,8 +8,9 @@ import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.TestKit
 import hydra.common.config.ConfigSupport
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
-import hydra.kafka.endpoints.BootstrapEndpoint
+import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.producer.AvroRecord
+import net.manub.embeddedkafka.EmbeddedKafka
 import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.concurrent.duration._
@@ -18,8 +19,9 @@ import scala.concurrent.duration._
 class BootstrapEndpointSpec extends Matchers
   with WordSpecLike
   with ScalatestRouteTest
-  with HydraIngestJsonSupport
-  with ConfigSupport {
+  with HydraKafkaJsonSupport
+  with ConfigSupport
+  with EmbeddedKafka {
 
   private implicit val timeout = RouteTestTimeout(10.seconds)
 
