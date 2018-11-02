@@ -10,6 +10,7 @@ import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import com.typesafe.config.Config
 import configs.syntax._
+import hydra.common.config.ConfigSupport
 import hydra.core.akka.SchemaRegistryActor.{RegisterSchemaRequest, RegisterSchemaResponse}
 import hydra.core.ingest.{HydraRequest, RequestParams}
 import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
@@ -26,12 +27,13 @@ import scala.concurrent.duration._
 import scala.io.Source
 import scala.util.{Failure, Success}
 
-class TopicBootstrapActor(config: Config,
+class TopicBootstrapActor(
                           schemaRegistryActor: ActorRef,
                           kafkaIngestor: ActorSelection
                          ) extends Actor
   with HydraJsonSupport
   with ActorLogging
+  with ConfigSupport
   with Stash {
 
   import TopicBootstrapActor._
@@ -49,7 +51,7 @@ class TopicBootstrapActor(config: Config,
 
   val kafkaUtils = KafkaUtils()
 
-  val boostrapKafkaConfig: Config = config.getConfig("bootstrap-kafka-config")
+  val boostrapKafkaConfig: Config = applicationConfig.getConfig("bootstrap-kafka-config")
   val topicDetailsConfig: util.Map[String, String] = Map[String, String]().empty.asJava
   val topicDetails = new TopicDetails(
     boostrapKafkaConfig.getInt("partitions"),
@@ -129,7 +131,7 @@ class TopicBootstrapActor(config: Config,
         jsonString,
         metadata = Map(
           RequestParams.HYDRA_KAFKA_TOPIC_PARAM ->
-            config.get[String]("hydra-metadata-topic-name")
+            applicationConfig.get[String]("metadata-topic-name")
               .valueOrElse("hydra.metadata.topic")),
         ackStrategy = AckStrategy.Replicated,
         validationStrategy = ValidationStrategy.Strict
@@ -152,8 +154,8 @@ class TopicBootstrapActor(config: Config,
 
 object TopicBootstrapActor {
 
-  def props(config: Config, schemaRegistryActor: ActorRef, kafkaIngestor: ActorSelection): Props =
-    Props(classOf[TopicBootstrapActor], config, schemaRegistryActor, kafkaIngestor)
+  def props(schemaRegistryActor: ActorRef, kafkaIngestor: ActorSelection): Props =
+    Props(classOf[TopicBootstrapActor], schemaRegistryActor, kafkaIngestor)
 
   sealed trait TopicBootstrapMessage
 
