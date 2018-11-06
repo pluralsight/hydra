@@ -1,4 +1,4 @@
-package hydra.ingest.services
+package hydra.kafka.services
 
 import scala.util.{Failure, Try}
 

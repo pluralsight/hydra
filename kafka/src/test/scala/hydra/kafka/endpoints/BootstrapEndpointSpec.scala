@@ -1,4 +1,4 @@
-package hydra.ingest.http
+package hydra.kafka.endpoints
 
 import akka.actor.{Actor, Props}
 import akka.http.javadsl.server.MalformedRequestContentRejection
@@ -8,7 +8,9 @@ import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.TestKit
 import hydra.common.config.ConfigSupport
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
+import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.producer.AvroRecord
+import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.concurrent.duration._
@@ -17,10 +19,14 @@ import scala.concurrent.duration._
 class BootstrapEndpointSpec extends Matchers
   with WordSpecLike
   with ScalatestRouteTest
-  with HydraIngestJsonSupport
-  with ConfigSupport {
+  with HydraKafkaJsonSupport
+  with ConfigSupport
+  with EmbeddedKafka {
 
   private implicit val timeout = RouteTestTimeout(10.seconds)
+
+  implicit val embeddedKafkaConfig = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
+    customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
 
   class TestKafkaIngestor extends Actor {
     override def receive = {
@@ -45,9 +51,15 @@ class BootstrapEndpointSpec extends Matchers
 
   private val bootstrapRoute = new BootstrapEndpoint().route
 
+
+  override def beforeAll: Unit = {
+    EmbeddedKafka.start()
+  }
+
   override def afterAll = {
     super.afterAll()
     TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10.seconds)
+    EmbeddedKafka.stop()
   }
 
   "The bootstrap endpoint" should {
@@ -63,7 +75,7 @@ class BootstrapEndpointSpec extends Matchers
       }
     }
 
-    "forward topic metadata to the appropriate handler" in {
+    "complete all 3 steps (ingest metadata, register schema, create topic) for valid requests" in {
       val testEntity = HttpEntity(
         ContentTypes.`application/json`,
         """{

@@ -19,9 +19,7 @@ import scala.collection.immutable.Map
 import scala.concurrent.Future
 import scala.util.Try
 
-/**
-  * Created by alexsilva on 5/17/17.
-  */
+
 case class KafkaUtils(config: Map[String, AnyRef]) extends LoggingAdapter
   with ConfigSupport {
 

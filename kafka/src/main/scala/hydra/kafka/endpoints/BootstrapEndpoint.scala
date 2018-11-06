@@ -14,7 +14,7 @@
  *
  */
 
-package hydra.ingest.http
+package hydra.kafka.endpoints
 
 import akka.actor._
 import akka.http.scaladsl.model.StatusCodes
@@ -27,9 +27,8 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.http.HydraDirectives
 import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
-import hydra.ingest.bootstrap.HydraIngestorRegistryClient
-import hydra.ingest.services.TopicBootstrapActor.{BootstrapFailure, BootstrapSuccess, InitiateTopicBootstrap}
-import hydra.ingest.services._
+import hydra.kafka.services.TopicBootstrapActor
+import hydra.kafka.services.TopicBootstrapActor.{BootstrapFailure, BootstrapSuccess, InitiateTopicBootstrap}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -43,14 +42,14 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
 
   private implicit val mat = ActorMaterializer()
 
-  private val registryPath = HydraIngestorRegistryClient.registryPath(applicationConfig)
 
-  private val kafkaIngestor = system.actorSelection(s"$registryPath/kafka_ingestor")
+  private val kafkaIngestor = system.actorSelection(
+    path = applicationConfig.getString("kafka-ingestor-path"))
 
   private val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(applicationConfig))
 
   private val bootstrapActor = system.actorOf(
-    TopicBootstrapActor.props(applicationConfig, schemaRegistryActor, kafkaIngestor))
+    TopicBootstrapActor.props(schemaRegistryActor, kafkaIngestor))
 
   override val route: Route =
     pathPrefix("topics") {
