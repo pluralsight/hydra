@@ -49,8 +49,7 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
   private val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(applicationConfig))
 
   private val bootstrapActor = system.actorOf(
-    TopicBootstrapActor.props(
-      applicationConfig.getConfig("bootstrap-config"), schemaRegistryActor, kafkaIngestor))
+    TopicBootstrapActor.props(schemaRegistryActor, kafkaIngestor))
 
   override val route: Route =
     pathPrefix("topics") {
