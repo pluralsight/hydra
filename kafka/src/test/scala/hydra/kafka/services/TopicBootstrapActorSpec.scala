@@ -31,8 +31,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   with MockFactory
   with EmbeddedKafka
   with HydraKafkaJsonSupport
-  with Eventually
-  with ImplicitSender {
+  with Eventually {
 
   import hydra.kafka.services.ErrorMessages._
 
@@ -100,7 +99,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   "A TopicBootstrapActor" should "process metadata and send an Ingest message to the kafka ingestor" in {
 
     val mdRequest = """{
-                      |	"subject": "exp.dataplatform.testsubject",
+                      |	"subject": "exp.dataplatform.testsubject1",
                       |	"streamType": "Notification",
                       | "derived": false,
                       |	"dataClassification": "Public",
@@ -151,7 +150,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   it should "respond with the error that caused the failed actor state" in {
     val mdRequest = """{
-                      |	"subject": "exp.dataplatform.testsubject",
+                      |	"subject": "exp.dataplatform.testsubject2",
                       |	"streamType": "Notification",
                       | "derived": false,
                       |	"dataClassification": "Public",
@@ -185,9 +184,11 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     probe.expectMsgType[RegisterSchemaRequest]
 
-    bootstrapActor ! InitiateTopicBootstrap(mdRequest)
+    val senderProbe = TestProbe()
 
-    expectMsgPF() {
+    bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
+
+    senderProbe.expectMsgPF() {
       case Failure(ex) => ex.getMessage shouldEqual
         "TopicBootstrapActor is in a failed state due to cause: Schema registry actor failed expectedly!"
     }
@@ -229,9 +230,11 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     probe.expectMsgType[RegisterSchemaRequest]
 
-    bootstrapActor ! InitiateTopicBootstrap(mdRequest)
+    val senderProbe = TestProbe()
 
-    expectMsgPF() {
+    bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
+
+    senderProbe.expectMsgPF() {
       case BootstrapFailure(reasons) =>
         reasons should contain(BadTopicFormatError)
     }
@@ -239,7 +242,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   it should "respond with the appropriate failure when the KafkaIngestor returns an exception" in {
     val mdRequest = """{
-                      |	"subject": "exp.dataplatform.testsubject",
+                      |	"subject": "exp.dataplatform.testsubject4",
                       |	"streamType": "Notification",
                       | "derived": false,
                       |	"dataClassification": "Public",
@@ -272,9 +275,11 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     probe.expectMsgType[RegisterSchemaRequest]
 
-    bootstrapActor ! InitiateTopicBootstrap(mdRequest)
+    val senderProbe = TestProbe()
 
-    expectMsgPF() {
+    bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
+
+    senderProbe.expectMsgPF() {
       case BootstrapFailure(reasons) =>
         reasons should contain("Kafka ingestor failed expectedly!")
     }
@@ -378,6 +383,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
         |{
         |  partitions = 3
         |  replication-factor = 3
+        |  timeout = 300
         |}
       """.stripMargin)
 
@@ -410,5 +416,66 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
         reasons.nonEmpty shouldBe true
         reasons.head should include("Replication factor: 3 larger than available brokers: 1.")
     }
+  }
+
+  it should "not fail due to a topic already existing" in {
+    val subject = "exp.dataplatform.testsubject7"
+
+    val mdRequest = s"""{
+                       |	"subject": "$subject",
+                       |	"streamType": "Notification",
+                       | "derived": false,
+                       |	"dataClassification": "Public",
+                       |	"dataSourceOwner": "BARTON",
+                       |	"contact": "slackity slack dont talk back",
+                       |	"psDataLake": false,
+                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+                       |	"notes": "here are some notes topkek",
+                       |	"schema": {
+                       |	  "namespace": "exp.assessment",
+                       |	  "name": "SkillAssessmentTopicsScored",
+                       |	  "type": "record",
+                       |	  "version": 1,
+                       |	  "fields": [
+                       |	    {
+                       |	      "name": "testField",
+                       |	      "type": "string"
+                       |	    }
+                       |	  ]
+                       |	}
+                       |}"""
+      .stripMargin
+      .parseJson
+      .convertTo[TopicMetadataRequest]
+
+    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test7")
+
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
+      system.actorSelection("/user/kafka_ingestor_test7")))
+
+    probe.expectMsgType[RegisterSchemaRequest]
+
+    val senderProbe = TestProbe()
+
+    bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
+
+    probe.receiveWhile(messages = 2) {
+      case RegisterSchemaRequest(schemaJson) => schemaJson should
+        include("SkillAssessmentTopicsScored")
+      case FetchSchemaRequest(schemaName) => schemaName shouldEqual "hydra.metadata.topic"
+    }
+
+    probe.expectMsgPF() {
+      case Ingest(msg: HydraRecord[_, GenericRecord], ack) =>
+        msg shouldBe an[AvroRecord]
+        msg.payload.getSchema.getName shouldBe "topic"
+        ack shouldBe AckStrategy.Replicated
+    }
+
+    senderProbe.expectMsg(BootstrapSuccess)
+
+    bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
+
+    senderProbe.expectMsg(BootstrapSuccess)
   }
 }

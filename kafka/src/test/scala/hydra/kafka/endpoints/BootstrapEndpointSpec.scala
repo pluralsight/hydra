@@ -75,7 +75,7 @@ class BootstrapEndpointSpec extends Matchers
       }
     }
 
-    "forward topic metadata to the appropriate handler" in {
+    "complete all 3 steps (ingest metadata, register schema, create topic) for valid requests" in {
       val testEntity = HttpEntity(
         ContentTypes.`application/json`,
         """{

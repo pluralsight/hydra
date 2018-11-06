@@ -30,7 +30,7 @@ import scala.util.{Failure, Success}
 class TopicBootstrapActor(
                            schemaRegistryActor: ActorRef,
                            kafkaIngestor: ActorSelection,
-                           config: Option[Config] = None
+                           bootstrapConfig: Option[Config] = None
                          ) extends Actor
   with HydraJsonSupport
   with ActorLogging
@@ -52,7 +52,7 @@ class TopicBootstrapActor(
 
   val kafkaUtils = KafkaUtils()
 
-  val bootstrapKafkaConfig: Config = config getOrElse
+  val bootstrapKafkaConfig: Config = bootstrapConfig getOrElse
     applicationConfig.getConfig("bootstrap-config")
 
   val topicDetailsConfig: util.Map[String, String] = Map[String, String]().empty.asJava
@@ -146,18 +146,27 @@ class TopicBootstrapActor(
   }
 
   private[kafka] def createKafkaTopic(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
-    val timeoutMillis = 3000
+    val timeoutMillis = bootstrapKafkaConfig.getInt("timeout")
 
-    kafkaUtils.createTopic(topicMetadataRequest.subject, topicDetails, timeout = timeoutMillis)
-      .map { r =>
-        r.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
-      }
-      .map { _ =>
-        BootstrapSuccess
-      }
-      .recover {
-        case e: Exception => BootstrapFailure(e.getMessage :: Nil)
-      }
+    val topicExists = kafkaUtils.topicExists(topicMetadataRequest.subject) match {
+      case Success(value) => value
+      case Failure(exception) => return Future.failed(exception)
+    }
+
+    // Don't fail when topic already exists
+    if (topicExists) { Future.successful(BootstrapSuccess) }
+    else {
+      kafkaUtils.createTopic(topicMetadataRequest.subject, topicDetails, timeout = timeoutMillis)
+        .map { r =>
+          r.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
+        }
+        .map { _ =>
+          BootstrapSuccess
+        }
+        .recover {
+          case e: Exception => BootstrapFailure(e.getMessage :: Nil)
+        }
+    }
   }
 }
 
