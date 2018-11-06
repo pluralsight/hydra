@@ -3,7 +3,7 @@ package hydra.kafka.services
 import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.pattern.pipe
-import akka.testkit.{ImplicitSender, TestKit, TestProbe}
+import akka.testkit.{TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import hydra.avro.resource.SchemaResource
 import hydra.core.akka.SchemaRegistryActor._
@@ -50,9 +50,9 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   val config = ConfigFactory.load().getConfig("hydra_kafka.bootstrap-config")
 
-  val testJson = Source.fromResource("HydraMetadataTopic.avsc").mkString
+  val topicMetadataJson = Source.fromResource("HydraMetadataTopic.avsc").mkString
 
-  val testSchemaResource = SchemaResource(1, 1, new Schema.Parser().parse(testJson))
+  val testSchemaResource = SchemaResource(1, 1, new Schema.Parser().parse(topicMetadataJson))
 
   def fixture(key: String, kafkaShouldFail: Boolean = false,
               schemaRegistryShouldFail: Boolean = false) = {
@@ -76,8 +76,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
               }
           }
         }
-      )
-      , s"test-schema-registry-$key")
+      ), s"test-schema-registry-$key")
 
     val kafkaIngestor = system.actorOf(Props(
       new Actor {
@@ -289,28 +288,28 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val subject = "exp.dataplatform.testsubject5"
 
     val mdRequest = s"""{
-                      |	"subject": "$subject",
-                      |	"streamType": "Notification",
-                      | "derived": false,
-                      |	"dataClassification": "Public",
-                      |	"dataSourceOwner": "BARTON",
-                      |	"contact": "slackity slack dont talk back",
-                      |	"psDataLake": false,
-                      |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
-                      |	"notes": "here are some notes topkek",
-                      |	"schema": {
-                      |	  "namespace": "exp.assessment",
-                      |	  "name": "SkillAssessmentTopicsScored",
-                      |	  "type": "record",
-                      |	  "version": 1,
-                      |	  "fields": [
-                      |	    {
-                      |	      "name": "testField",
-                      |	      "type": "string"
-                      |	    }
-                      |	  ]
-                      |	}
-                      |}"""
+                       |	"subject": "$subject",
+                       |	"streamType": "Notification",
+                       | "derived": false,
+                       |	"dataClassification": "Public",
+                       |	"dataSourceOwner": "BARTON",
+                       |	"contact": "slackity slack dont talk back",
+                       |	"psDataLake": false,
+                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+                       |	"notes": "here are some notes topkek",
+                       |	"schema": {
+                       |	  "namespace": "exp.assessment",
+                       |	  "name": "SkillAssessmentTopicsScored",
+                       |	  "type": "record",
+                       |	  "version": 1,
+                       |	  "fields": [
+                       |	    {
+                       |	      "name": "testField",
+                       |	      "type": "string"
+                       |	    }
+                       |	  ]
+                       |	}
+                       |}"""
       .stripMargin
       .parseJson
       .convertTo[TopicMetadataRequest]
