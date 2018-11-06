@@ -29,7 +29,8 @@ import scala.util.{Failure, Success}
 
 class TopicBootstrapActor(
                            schemaRegistryActor: ActorRef,
-                           kafkaIngestor: ActorSelection
+                           kafkaIngestor: ActorSelection,
+                           config: Option[Config] = None
                          ) extends Actor
   with HydraJsonSupport
   with ActorLogging
@@ -51,7 +52,9 @@ class TopicBootstrapActor(
 
   val kafkaUtils = KafkaUtils()
 
-  val bootstrapKafkaConfig: Config = applicationConfig.getConfig("bootstrap-config")
+  val bootstrapKafkaConfig: Config = config getOrElse
+    applicationConfig.getConfig("bootstrap-config")
+
   val topicDetailsConfig: util.Map[String, String] = Map[String, String]().empty.asJava
   val topicDetails = new TopicDetails(
     bootstrapKafkaConfig.getInt("partitions"),
@@ -157,8 +160,9 @@ class TopicBootstrapActor(
 
 object TopicBootstrapActor {
 
-  def props(schemaRegistryActor: ActorRef, kafkaIngestor: ActorSelection): Props =
-    Props(classOf[TopicBootstrapActor], schemaRegistryActor, kafkaIngestor)
+  def props(schemaRegistryActor: ActorRef, kafkaIngestor: ActorSelection,
+            config: Option[Config] = None): Props =
+    Props(classOf[TopicBootstrapActor], schemaRegistryActor, kafkaIngestor, config)
 
   sealed trait TopicBootstrapMessage
 
