@@ -148,13 +148,19 @@ class TopicBootstrapActor(
   private[kafka] def createKafkaTopic(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
     val timeoutMillis = bootstrapKafkaConfig.getInt("timeout")
 
-    val topicExists = kafkaUtils.topicExists(topicMetadataRequest.subject) match {
+    val topic = topicMetadataRequest.subject
+
+    val topicExists = kafkaUtils.topicExists(topic) match {
       case Success(value) => value
-      case Failure(exception) => return Future.failed(exception)
+      case Failure(exception) =>
+        log.error(s"Unable to determine if topic exists: ${exception.getMessage}")
+        return Future.failed(exception)
     }
 
     // Don't fail when topic already exists
-    if (topicExists) { Future.successful(BootstrapSuccess) }
+    if (topicExists) {
+      log.info(s"Topic $topic already exists, proceeding anyway...")
+      Future.successful(BootstrapSuccess)}
     else {
       kafkaUtils.createTopic(topicMetadataRequest.subject, topicDetails, timeout = timeoutMillis)
         .map { r =>
