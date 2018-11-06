@@ -148,13 +148,16 @@ class TopicBootstrapActor(
   private[kafka] def createKafkaTopic(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
     val timeoutMillis = 3000
 
-    kafkaUtils.createTopic(topicMetadataRequest.subject, topicDetails, timeout = timeoutMillis).map { r =>
-      r.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
-    }.map { _ =>
-      BootstrapSuccess
-    } recover {
-      case e: Exception => BootstrapFailure(e.getMessage :: Nil)
-    }
+    kafkaUtils.createTopic(topicMetadataRequest.subject, topicDetails, timeout = timeoutMillis)
+      .map { r =>
+        r.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
+      }
+      .map { _ =>
+        BootstrapSuccess
+      }
+      .recover {
+        case e: Exception => BootstrapFailure(e.getMessage :: Nil)
+      }
   }
 }
 

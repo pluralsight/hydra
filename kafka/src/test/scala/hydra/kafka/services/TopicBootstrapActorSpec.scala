@@ -45,10 +45,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   }
 
   override def afterAll(): Unit = {
-    super.afterAll()
-    EmbeddedKafka.stopZooKeeper()
     EmbeddedKafka.stop()
-    TestKit.shutdownActorSystem(system)
+    TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
   }
 
   val config = ConfigFactory.load().getConfig("hydra_kafka.bootstrap-config")
@@ -319,7 +317,9 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     probe.expectMsgType[RegisterSchemaRequest]
 
-    bootstrapActor ! InitiateTopicBootstrap(mdRequest)
+    val senderProbe = TestProbe()
+
+    bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
 
     probe.receiveWhile(messages = 2) {
       case RegisterSchemaRequest(schemaJson) => schemaJson should
@@ -334,7 +334,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
         ack shouldBe AckStrategy.Replicated
     }
 
-    expectMsg(BootstrapSuccess)
+    senderProbe.expectMsg(BootstrapSuccess)
 
     val expectedMessage = "I'm expected!"
 
@@ -388,7 +388,9 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     probe.expectMsgType[RegisterSchemaRequest]
 
-    bootstrapActor ! InitiateTopicBootstrap(mdRequest)
+    val senderProbe = TestProbe()
+
+    bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
 
     probe.receiveWhile(messages = 2) {
       case RegisterSchemaRequest(schemaJson) => schemaJson should
@@ -403,12 +405,10 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
         ack shouldBe AckStrategy.Replicated
     }
 
-    expectMsgPF() {
+    senderProbe.expectMsgPF() {
       case BootstrapFailure(reasons) =>
         reasons.nonEmpty shouldBe true
         reasons.head should include("Replication factor: 3 larger than available brokers: 1.")
-
-      case msg => println(s"Received $msg")
     }
   }
 }
