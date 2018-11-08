@@ -62,6 +62,8 @@ class TopicBootstrapActor(
     topicDetailsConfig
   )
 
+  private val failureRetryMillis = bootstrapKafkaConfig.get[Int]("failure-retry-millis")
+
   def initializing: Receive = {
     case RegisterSchemaResponse(_) =>
       context.become(active)
@@ -71,6 +73,7 @@ class TopicBootstrapActor(
       log.error(s"TopicBootstrapActor entering failed state due to: ${ex.getMessage}")
       unstashAll()
       context.become(failed(ex))
+
     case _ => stash()
   }
 

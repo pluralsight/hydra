@@ -477,4 +477,52 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     senderProbe.expectMsg(BootstrapSuccess)
   }
+
+  it should "retry after a configurable interval when the schema registration fails" in {
+    val mdRequest = """{
+                      |	"subject": "exp.dataplatform.testsubject8",
+                      |	"streamType": "Notification",
+                      | "derived": false,
+                      |	"dataClassification": "Public",
+                      |	"dataSourceOwner": "BARTON",
+                      |	"contact": "slackity slack dont talk back",
+                      |	"psDataLake": false,
+                      |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+                      |	"notes": "here are some notes topkek",
+                      |	"schema": {
+                      |	  "namespace": "exp.assessment",
+                      |	  "name": "SkillAssessmentTopicsScored",
+                      |	  "type": "record",
+                      |	  "version": 1,
+                      |	  "fields": [
+                      |	    {
+                      |	      "name": "testField",
+                      |	      "type": "string"
+                      |	    }
+                      |	  ]
+                      |	}
+                      |}"""
+      .stripMargin
+      .parseJson
+      .convertTo[TopicMetadataRequest]
+
+    val (probe, schemaRegistryActor, _) = fixture("test8",
+      schemaRegistryShouldFail = true)
+
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
+      system.actorSelection("kafka_ingestor_test8")))
+
+    probe.expectMsgType[RegisterSchemaRequest]
+
+    val senderProbe = TestProbe()
+
+    bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
+
+    senderProbe.expectMsgPF() {
+      case Failure(ex) => ex.getMessage shouldEqual
+        "TopicBootstrapActor is in a failed state due to cause: Schema registry actor failed expectedly!"
+    }
+
+    probe.expectMsgType[RegisterSchemaRequest]
+  }
 }
