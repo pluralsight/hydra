@@ -5,7 +5,7 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 import akka.actor.Status.{Failure => AkkaFailure}
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSelection, Props, Stash}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSelection, Props, Stash, Timers}
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import com.typesafe.config.Config
@@ -35,7 +35,8 @@ class TopicBootstrapActor(
   with HydraJsonSupport
   with ActorLogging
   with ConfigSupport
-  with Stash {
+  with Stash
+  with Timers {
 
   import TopicBootstrapActor._
 
@@ -43,10 +44,9 @@ class TopicBootstrapActor(
 
   implicit val timeout = Timeout(10.seconds)
 
-  override def receive: Receive = initializing
+  val schema = Source.fromResource("HydraMetadataTopic.avsc").mkString
 
   override def preStart(): Unit = {
-    val schema = Source.fromResource("HydraMetadataTopic.avsc").mkString
     pipe(registerSchema(schema)) to self
   }
 
@@ -62,7 +62,11 @@ class TopicBootstrapActor(
     topicDetailsConfig
   )
 
-  private val failureRetryMillis = bootstrapKafkaConfig.get[Int]("failure-retry-millis")
+  private val failureRetryInterval = bootstrapKafkaConfig
+    .get[Int]("failure-retry-millis")
+    .value
+
+  override def receive: Receive = initializing
 
   def initializing: Receive = {
     case RegisterSchemaResponse(_) =>
@@ -72,6 +76,7 @@ class TopicBootstrapActor(
     case AkkaFailure(ex) =>
       log.error(s"TopicBootstrapActor entering failed state due to: ${ex.getMessage}")
       unstashAll()
+      timers.startSingleTimer("retry-failure", Retry, failureRetryInterval.millis)
       context.become(failed(ex))
 
     case _ => stash()
@@ -102,6 +107,11 @@ class TopicBootstrapActor(
   }
 
   def failed(ex: Throwable): Receive = {
+    case Retry =>
+      log.info("Retrying metadata schema registration...")
+      pipe(registerSchema(schema))
+      context.become(initializing)
+
     case _ =>
       val failureMessage = s"TopicBootstrapActor is in a failed state due to cause: ${ex.getMessage}"
       Future.failed(new Exception(failureMessage)) pipeTo sender
@@ -198,5 +208,7 @@ object TopicBootstrapActor {
   case class BootstrapFailure(reasons: Seq[String]) extends BootstrapResult
 
   case class BootstrapStep[A](stepResult: A) extends BootstrapResult
+
+  case object Retry
 
 }

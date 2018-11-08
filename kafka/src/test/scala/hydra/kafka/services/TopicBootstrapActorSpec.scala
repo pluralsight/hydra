@@ -383,6 +383,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
         |  partitions = 3
         |  replication-factor = 3
         |  timeout = 300
+        |  failure-retry-millis = 3000
         |}
       """.stripMargin)
 
