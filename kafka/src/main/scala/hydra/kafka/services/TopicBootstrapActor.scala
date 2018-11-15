@@ -109,8 +109,8 @@ class TopicBootstrapActor(
   def failed(ex: Throwable): Receive = {
     case Retry =>
       log.info("Retrying metadata schema registration...")
-      pipe(registerSchema(schema))
       context.become(initializing)
+      pipe(registerSchema(schema)) to self
 
     case _ =>
       val failureMessage = s"TopicBootstrapActor is in a failed state due to cause: ${ex.getMessage}"

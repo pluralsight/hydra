@@ -525,5 +525,14 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     }
 
     probe.expectMsgType[RegisterSchemaRequest]
+
+    // Check a second time to make sure we made it back to the initializing state and failed again
+
+    bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
+
+    senderProbe.expectMsgPF() {
+      case Failure(ex) => ex.getMessage shouldEqual
+        "TopicBootstrapActor is in a failed state due to cause: Schema registry actor failed expectedly!"
+    }
   }
 }
