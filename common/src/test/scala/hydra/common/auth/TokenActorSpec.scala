@@ -1,8 +1,7 @@
 package hydra.common.auth
 
 import akka.actor.Status.Failure
-import akka.actor.{Actor, ActorSystem, Props}
-import akka.pattern.pipe
+import akka.actor.{ActorSystem, Props}
 import akka.testkit.{TestKit, TestProbe}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
@@ -35,8 +34,6 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
     // call to insert into cache
     tokenActor.tell(GetToken(token), listener.ref)
 
-    // assert repoStub was called
-
     (repoStub.retrieveTokenInfo _)
       .verify(token)
       .once
@@ -59,8 +56,6 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
     // call to insert into cache
     tokenActor.tell(GetToken(token), listener.ref)
 
-    // assert repoStub was called
-
     (repoStub.retrieveTokenInfo _)
       .verify(token)
       .once
@@ -70,25 +65,3 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
     }
   }
 }
-
-class TokenActor(val tokenRepository: ITokenRepository) extends Actor {
-
-  val cache = Map[String, TokenInfo]()
-  private implicit val ec = context.dispatcher
-
-  override def receive: Receive = {
-    case GetToken(token) => {
-      cache.get(token) match {
-        case Some(tokenInfo) => sender ! tokenInfo
-        case None => tokenRepository.retrieveTokenInfo(token) pipeTo sender
-      }
-    }
-  }
-}
-
-trait ITokenRepository {
-  def retrieveTokenInfo(token:String): Future[TokenInfo]
-}
-
-case class TokenInfo(token:String)
-case class GetToken(token:String)
