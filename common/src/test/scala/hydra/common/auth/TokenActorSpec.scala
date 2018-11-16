@@ -14,50 +14,52 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
   with BeforeAndAfterAll
   with MockFactory {
 
+  implicit val ec = system.dispatcher
+
   override def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)
   }
 
   "A TokenActor" should "should get token from repo if not in cache" in {
-    val token = "token"
+    val tokenInfo = TokenGenerator.generateTokenInfo
 
     val listener = TestProbe()
 
-    val repoStub = stub[ITokenRepository]
+    val repoStub = stub[ITokenInfoRepository]
 
-    (repoStub.retrieveTokenInfo _)
-      .when(token)
-      .returning(Future.successful(TokenInfo(token)))
+    (repoStub.getByToken _)
+      .when(tokenInfo.token)
+      .returning(Future.successful(tokenInfo))
 
     val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
 
     // call to insert into cache
-    tokenActor.tell(GetToken(token), listener.ref)
+    tokenActor.tell(GetToken(tokenInfo.token), listener.ref)
 
-    (repoStub.retrieveTokenInfo _)
-      .verify(token)
+    (repoStub.getByToken _)
+      .verify(tokenInfo.token)
       .once
 
-    listener.expectMsg(TokenInfo(token))
+    listener.expectMsg(tokenInfo)
   }
   "A TokenActor" should "return a failed future if a token can't be found in the cache or db" in {
-    val token = "token"
+    val tokenInfo = TokenGenerator.generateTokenInfo
 
     val listener = TestProbe()
 
-    val repoStub = stub[ITokenRepository]
+    val repoStub = stub[ITokenInfoRepository]
 
-    (repoStub.retrieveTokenInfo _)
-      .when(token)
+    (repoStub.getByToken _)
+      .when(*)
       .returning(Future.failed(new RuntimeException()))
 
     val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
 
     // call to insert into cache
-    tokenActor.tell(GetToken(token), listener.ref)
+    tokenActor.tell(GetToken(tokenInfo.token), listener.ref)
 
-    (repoStub.retrieveTokenInfo _)
-      .verify(token)
+    (repoStub.getByToken _)
+      .verify(tokenInfo.token)
       .once
 
     listener.expectMsgPF() {

@@ -48,7 +48,12 @@ object Dependencies {
     val embeddedKafka = "net.manub" %% "scalatest-embedded-kafka" % "2.0.0"
 
     val sdNotify = "info.faljse" % "SDNotify" % "1.1"
-
+    
+    lazy val slick = Seq(
+      "com.typesafe.slick" %% "slick" % "3.2.0",
+      "org.slf4j" % "slf4j-nop" % "1.6.4"
+    )
+    
     lazy val kamon = Seq(
       "io.kamon" %% "kamon-core" % kamonVersion,
       "io.kamon" %% "kamon-scala-future" % kamonPVersion,
@@ -149,7 +154,9 @@ object Dependencies {
   val testDeps = Seq(scalaTest, junit, scalaMock, easyMock, embeddedConsul, embeddedPostgres) ++
     powerMock ++ akkaTest
 
-  val baseDeps = akka ++ logging ++ Seq(scalaz, scalaConfigs, avro) ++ joda ++ testDeps
+  val sqlDeps = logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
+
+  val baseDeps = akka ++ slick ++ Seq(scalaz, scalaConfigs, avro) ++ logging ++ joda ++ testDeps 
 
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
@@ -157,8 +164,6 @@ object Dependencies {
     Seq(guavacache, reflections, serviceContainer, akkaKryo, sdNotify) ++ confluent ++ kamon
 
   val ingestDeps = coreDeps
-
-  val sqlDeps = logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
 
   val rabbitDeps = logging ++ Seq(scalaConfigs) ++ joda ++ opRabbit ++ testDeps
 

@@ -2,8 +2,9 @@ package hydra.common.auth
 
 import akka.actor.Actor
 import akka.pattern.pipe
+import org.joda.time.DateTime
 
-class TokenActor(val tokenRepository: ITokenRepository) extends Actor {
+class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
 
   private val cache = Map[String, TokenInfo]()
   private implicit val ec = context.dispatcher
@@ -12,11 +13,12 @@ class TokenActor(val tokenRepository: ITokenRepository) extends Actor {
     case GetToken(token) => {
       cache.get(token) match {
         case Some(tokenInfo) => sender ! tokenInfo
-        case None => tokenRepository.retrieveTokenInfo(token) pipeTo sender
+        case None => tokenInfoRepository.getByToken(token) pipeTo sender
       }
     }
   }
 }
 
-case class TokenInfo(token:String)
-case class GetToken(token:String)
+case class TokenInfo(token: String, insertDate: DateTime, groups: Seq[String])
+
+case class GetToken(token: String)
