@@ -2,7 +2,6 @@ package hydra.common.auth
 
 import akka.actor.Actor
 import akka.pattern.pipe
-import org.joda.time.DateTime
 
 class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
 
@@ -19,6 +18,6 @@ class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
   }
 }
 
-case class TokenInfo(token: String, insertDate: DateTime, groups: Seq[String])
+case class TokenInfo(token: String, resources: Set[String])
 
 case class GetToken(token: String)
