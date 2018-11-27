@@ -1,12 +1,11 @@
-package hydra.common.auth
+package hydra.auth.persistence
 
 import java.sql.Timestamp
 
 import org.joda.time.DateTime
-
 import slick.jdbc.PostgresProfile.api._
 
-object RepositoryComponents {
+object RepositoryModels {
   implicit def dateTime = MappedColumnType.base[DateTime, Timestamp](
     dt => new Timestamp(dt.getMillis),
     ts => new DateTime(ts))
@@ -24,7 +23,7 @@ object RepositoryComponents {
 
     def groupId = column[Int]("group_id")
 
-    def * = (id, createdDate, modifiedDate, token, groupId)
+    def * = (id, createdDate, modifiedDate, token, groupId) <> (Token)
 
     def groupConstraint = foreignKey("tokens_groups_fk", groupId, groups)(_.id)
   }
@@ -60,4 +59,12 @@ object RepositoryComponents {
 
     def groupConstraint = foreignKey("resources_groups_fk", groupId, groups)(_.id)
   }
+
+  // Corresponding case classes
+  case class Token(id: Int, createdDate: DateTime, modifiedDate: DateTime, token: String,
+                   groupId: String)
+
+  case class Group(id: Int, name: String, createdDate: DateTime, modifiedDate: DateTime)
+
+  case class Resource(id: Int, name: String, groupId: Int)
 }

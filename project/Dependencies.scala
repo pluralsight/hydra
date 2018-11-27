@@ -34,6 +34,7 @@ object Dependencies {
   val kamonPVersion = "1.0.0"
   val akkaKryoVersion = "0.5.2"
   val akkaManagementVersion = "0.15.0"
+  val flywayVersion = "5.0.7"
 
   object Compile {
 
@@ -69,6 +70,10 @@ object Dependencies {
       "io.confluent" % "kafka-avro-serializer" % confluentVersion).map(_.excludeAll(
       ExclusionRule(organization = "org.codehaus.jackson"),
       ExclusionRule(organization = "com.fasterxml.jackson.core")))
+    
+    val flyway = Seq(
+      "org.flywaydb" % "flyway-core" % flywayVersion % "test"
+    )
 
     val logging = Seq(
       "org.apache.logging.log4j" % "log4j-slf4j-impl" % log4jVersion,
@@ -152,11 +157,13 @@ object Dependencies {
   import Test._
 
   val testDeps = Seq(scalaTest, junit, scalaMock, easyMock, embeddedConsul, embeddedPostgres) ++
-    powerMock ++ akkaTest
-
-  val sqlDeps = logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
-
-  val baseDeps = akka ++ slick ++ Seq(scalaz, scalaConfigs, avro) ++ logging ++ joda ++ testDeps 
+    powerMock ++ akkaTest ++ flyway
+  
+  val sqlDeps = logging ++ slick ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
+  
+  val authDeps = akka ++ sqlDeps ++ Seq(guavacache)
+  
+  val baseDeps = akka ++ Seq(scalaz, scalaConfigs, avro) ++ logging ++ joda ++ testDeps 
 
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
@@ -171,6 +178,6 @@ object Dependencies {
 
   val sandboxDeps = kafkaDeps ++ sqlDeps ++
     Seq("com.h2database" % "h2" % "1.4.196") ++ Seq(embeddedKafka)
-
+  
   val overrides = Set(logging, typesafeConfig, joda)
 }

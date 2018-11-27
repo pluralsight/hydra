@@ -1,12 +1,12 @@
-package hydra.common.auth
+package hydra.auth.persistence
 
-import org.joda.time.DateTime
 import slick.jdbc.PostgresProfile.api._
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class TokenInfoRepository extends ITokenInfoRepository {
-  import RepositoryComponents._
+  import RepositoryModels._
+  import TokenInfoRepository._
 
   val db = Database.forConfig("db")
 
@@ -17,16 +17,15 @@ class TokenInfoRepository extends ITokenInfoRepository {
     val query = (tokens join groups on (_.groupId === _.id)).map {
       case (t, g) =>
         (t.id, t.createdDate, t.modifiedDate, t.token, g.name) <>
-          (TokenInfo.tupled, TokenInfo.unapply _)
+          (TokenInfo.tupled, TokenInfo.unapply)
     }.result
 
     val x = db.run(query)
   }
 }
 
-case class Token(id: Int, createdDate: DateTime, modifiedDate: DateTime, token: String,
-                 groupId: String)
+object TokenInfoRepository {
+  case class TokenInfo(token: String, resources: Set[String])
+}
 
-case class Group(id: Int, name: String, createdDate: DateTime, modifiedDate: DateTime)
 
-case class Resource(id: Int, name: String, groupId: Int)
