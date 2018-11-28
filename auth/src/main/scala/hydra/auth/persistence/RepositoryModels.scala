@@ -2,17 +2,21 @@ package hydra.auth.persistence
 
 import java.sql.Timestamp
 
+import hydra.core.persistence.PersistenceDelegate
 import org.joda.time.DateTime
-import slick.jdbc.PostgresProfile.api._
 
-object RepositoryModels {
+trait RepositoryModels {
+  val persistenceDelegate: PersistenceDelegate
+
+  import persistenceDelegate.profile.api._
+
   implicit def dateTime = MappedColumnType.base[DateTime, Timestamp](
     dt => new Timestamp(dt.getMillis),
     ts => new DateTime(ts))
 
-  type Token = (Int, DateTime, DateTime, String, Int)
+  type TokenType = (Int, DateTime, DateTime, String, Int)
 
-  class Tokens(tag: Tag) extends Table[Token](tag, "tokens") {
+  class TokenTable(tag: Tag) extends Table[TokenType](tag, "token") {
     def id = column[Int]("id", O.PrimaryKey, O.AutoInc)
 
     def createdDate = column[DateTime]("created_date")
@@ -23,16 +27,16 @@ object RepositoryModels {
 
     def groupId = column[Int]("group_id")
 
-    def * = (id, createdDate, modifiedDate, token, groupId) <> (Token)
+    def * = (id, createdDate, modifiedDate, token, groupId)
 
-    def groupConstraint = foreignKey("tokens_groups_fk", groupId, groups)(_.id)
+    def groupConstraint = foreignKey("token_group_fk", groupId, groupTable)(_.id)
   }
 
-  lazy val tokens = TableQuery[Tokens]
+  lazy val tokenTable = TableQuery[TokenTable]
 
-  type Group = (Int, String, DateTime, DateTime)
+  type GroupType = (Int, String, DateTime, DateTime)
 
-  class Groups(tag: Tag) extends Table[Group](tag, "groups") {
+  class GroupTable(tag: Tag) extends Table[GroupType](tag, "group") {
     def id = column[Int]("id", O.PrimaryKey, O.AutoInc)
 
     def name = column[String]("name")
@@ -44,11 +48,11 @@ object RepositoryModels {
     def * = (id, name, createdDate, modifiedDate)
   }
 
-  lazy val groups = TableQuery[Groups]
+  lazy val groupTable = TableQuery[GroupTable]
 
-  type Resource = (Int, String, Int)
+  type ResourceType = (Int, String, Int)
 
-  class Resources(tag: Tag) extends Table[Resource](tag, "resources") {
+  class ResourceTable(tag: Tag) extends Table[ResourceType](tag, "resource") {
     def id = column[Int]("id", O.PrimaryKey, O.AutoInc)
 
     def name = column[String]("name")
@@ -57,12 +61,14 @@ object RepositoryModels {
 
     def * = (id, name, groupId)
 
-    def groupConstraint = foreignKey("resources_groups_fk", groupId, groups)(_.id)
+    def groupConstraint = foreignKey("resources_groups_fk", groupId, groupTable)(_.id)
   }
+
+  lazy val resourceTable = TableQuery[ResourceTable]
 
   // Corresponding case classes
   case class Token(id: Int, createdDate: DateTime, modifiedDate: DateTime, token: String,
-                   groupId: String)
+                   groupId: Int)
 
   case class Group(id: Int, name: String, createdDate: DateTime, modifiedDate: DateTime)
 

@@ -1,30 +1,28 @@
 package hydra.auth.persistence
 
-import slick.jdbc.PostgresProfile.api._
+import hydra.core.persistence.PersistenceDelegate
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class TokenInfoRepository extends ITokenInfoRepository {
-  import RepositoryModels._
+class TokenInfoRepository(val persistenceDelegate: PersistenceDelegate) extends ITokenInfoRepository
+  with RepositoryModels {
+
   import TokenInfoRepository._
 
-  val db = Database.forConfig("db")
+  import persistenceDelegate.profile.api._
 
-  import slick.jdbc.PostgresProfile.api._
+  val db = persistenceDelegate.db
 
   def getByToken(token: String)
                 (implicit ec: ExecutionContext): Future[TokenInfo] = {
-    val query = (tokens join groups on (_.groupId === _.id)).map {
-      case (t, g) =>
-        (t.id, t.createdDate, t.modifiedDate, t.token, g.name) <>
-          (TokenInfo.tupled, TokenInfo.unapply)
-    }.result
-
-    val x = db.run(query)
+    Future.successful(TokenInfo("", Set()))
   }
 }
 
 object TokenInfoRepository {
+  def apply(persistenceDelegate: PersistenceDelegate): TokenInfoRepository =
+    new TokenInfoRepository(persistenceDelegate)
+
   case class TokenInfo(token: String, resources: Set[String])
 }
 

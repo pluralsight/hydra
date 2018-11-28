@@ -1,37 +1,43 @@
 package hydra.auth.persistence
 
-import com.opentable.db.postgres.embedded.EmbeddedPostgres
-import hydra.auth.util.TokenGenerator
-import org.flywaydb.core.Flyway
+import com.typesafe.config.ConfigFactory
+import hydra.auth.persistence.TokenInfoRepository.TokenInfo
+import hydra.common.logging.LoggingAdapter
+import hydra.core.persistence.{FlywaySupport, H2PersistenceComponent}
+import org.joda.time.DateTime
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.Try
 
-// TODO add h2 support for test, create any necessary abstractions like in streams
 class TokenRepositoryISpec extends FlatSpec
   with Matchers
   with BeforeAndAfterAll
-  with ScalaFutures {
+  with ScalaFutures
+  with LoggingAdapter
+  with RepositoryModels {
 
-  val expectedTokenInfo = TokenGenerator.generateTokenInfo
+  implicit val ec = scala.concurrent.ExecutionContext.global
 
-  lazy val pg = EmbeddedPostgres.start()
+  val persistenceDelegate = new H2PersistenceComponent(ec)
 
-  lazy val pgDb = pg.getPostgresDatabase()
+  val db = persistenceDelegate.db
 
-  override def beforeAll() = {
-    Flyway
-      .configure()
-      .dataSource()
+  private val expectedTokenInfo = TokenInfo("test-token", Set("resourceA", "resourceB"))
+
+  override def beforeAll(): Unit = {
+    FlywaySupport.migrate(ConfigFactory.load().getConfig("db"))
+    whenReady(db.run(tokenTable += (1, DateTime.now(), DateTime.now(), "test-token", 1))) { _ =>
+      log.info("Data inserted into database")
+    }
   }
 
   override def afterAll(): Unit = {
-    pg.close()
+    Try(db.close()).recover{case _ => log.warn("Unable to shut down database")}
   }
 
   "A TokenRepository" should "retrieve token info from a storage backend" in {
-    val tokenInfoRepo = new TokenInfoRepository
+    val tokenInfoRepo = new TokenInfoRepository(persistenceDelegate)
 
     whenReady(tokenInfoRepo.getByToken(expectedTokenInfo.token)) { actualTokenInfo =>
       actualTokenInfo shouldEqual expectedTokenInfo

@@ -35,6 +35,7 @@ object Dependencies {
   val akkaKryoVersion = "0.5.2"
   val akkaManagementVersion = "0.15.0"
   val flywayVersion = "5.2.3"
+  val slickVersion = "3.2.0"
 
   object Compile {
 
@@ -51,7 +52,8 @@ object Dependencies {
     val sdNotify = "info.faljse" % "SDNotify" % "1.1"
     
     lazy val slick = Seq(
-      "com.typesafe.slick" %% "slick" % "3.2.0",
+      "com.typesafe.slick" %% "slick" % slickVersion,
+      "com.typesafe.slick" %% "slick-hikaricp" % slickVersion,
       "org.slf4j" % "slf4j-nop" % "1.6.4"
     )
     
@@ -158,13 +160,13 @@ object Dependencies {
 
   val testDeps = Seq(scalaTest, junit, scalaMock, easyMock, embeddedConsul, embeddedPostgres) ++
     powerMock ++ akkaTest ++ flyway
+
+  val baseDeps = akka ++ Seq(scalaz, scalaConfigs, avro) ++ logging ++ joda ++ testDeps
+
+  val authDeps = baseDeps ++ slick ++ flyway ++ Seq(guavacache)
   
   val sqlDeps = logging ++ slick ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
   
-  val authDeps = akka ++ sqlDeps ++ Seq(guavacache)
-  
-  val baseDeps = akka ++ Seq(scalaz, scalaConfigs, avro) ++ logging ++ joda ++ testDeps 
-
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
   val coreDeps = akka ++ baseDeps ++ 
