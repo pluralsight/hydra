@@ -67,7 +67,7 @@ object SchemaWrapper {
     * @param primaryKeys A sequence where the values are field names to be used as primary keys.
     *                    This will override the `hydra.keys` schema property.
     *                    For streaming materialization jobs where no primary key is to be used,
-    *                    an empty sequence should be used.
+    *                    an empty sequence should be provided as this method's argument.
     * @return a SchemaWrapper instance
     */
   def from(schema: Schema, primaryKeys: Seq[String]): SchemaWrapper = {
