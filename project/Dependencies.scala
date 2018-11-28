@@ -34,7 +34,7 @@ object Dependencies {
   val kamonPVersion = "1.0.0"
   val akkaKryoVersion = "0.5.2"
   val akkaManagementVersion = "0.15.0"
-  val flywayVersion = "5.0.7"
+  val flywayVersion = "5.2.3"
 
   object Compile {
 
@@ -72,7 +72,7 @@ object Dependencies {
       ExclusionRule(organization = "com.fasterxml.jackson.core")))
     
     val flyway = Seq(
-      "org.flywaydb" % "flyway-core" % flywayVersion % "test"
+      "org.flywaydb" % "flyway-core" % flywayVersion
     )
 
     val logging = Seq(
@@ -167,8 +167,9 @@ object Dependencies {
 
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
-  val coreDeps = akka ++ baseDeps ++
-    Seq(guavacache, reflections, serviceContainer, akkaKryo, sdNotify) ++ confluent ++ kamon
+  val coreDeps = akka ++ baseDeps ++ 
+    Seq(guavacache, reflections, serviceContainer, akkaKryo, sdNotify) ++
+    confluent ++ kamon ++ slick ++ flyway
 
   val ingestDeps = coreDeps
 

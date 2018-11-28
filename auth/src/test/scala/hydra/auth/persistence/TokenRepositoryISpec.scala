@@ -2,11 +2,13 @@ package hydra.auth.persistence
 
 import com.opentable.db.postgres.embedded.EmbeddedPostgres
 import hydra.auth.util.TokenGenerator
+import org.flywaydb.core.Flyway
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
+// TODO add h2 support for test, create any necessary abstractions like in streams
 class TokenRepositoryISpec extends FlatSpec
   with Matchers
   with BeforeAndAfterAll
@@ -18,7 +20,11 @@ class TokenRepositoryISpec extends FlatSpec
 
   lazy val pgDb = pg.getPostgresDatabase()
 
-  override def beforeAll() = {}
+  override def beforeAll() = {
+    Flyway
+      .configure()
+      .dataSource()
+  }
 
   override def afterAll(): Unit = {
     pg.close()
