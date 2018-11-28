@@ -7,8 +7,6 @@ import hydra.core.persistence.{FlywaySupport, H2PersistenceComponent}
 import org.joda.time.DateTime
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
-import slick.lifted
-import slick.lifted.TableQuery
 
 import scala.util.Try
 

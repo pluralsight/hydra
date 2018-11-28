@@ -53,8 +53,7 @@ object Dependencies {
     
     lazy val slick = Seq(
       "com.typesafe.slick" %% "slick" % slickVersion,
-      "com.typesafe.slick" %% "slick-hikaricp" % slickVersion,
-      "org.slf4j" % "slf4j-nop" % "1.6.4"
+      "com.typesafe.slick" %% "slick-hikaricp" % slickVersion
     )
     
     lazy val kamon = Seq(
@@ -163,10 +162,10 @@ object Dependencies {
 
   val baseDeps = akka ++ Seq(scalaz, scalaConfigs, avro) ++ logging ++ joda ++ testDeps
 
-  val authDeps = baseDeps ++ slick ++ flyway ++ Seq(guavacache)
-  
   val sqlDeps = logging ++ slick ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
-  
+
+  val authDeps = akka ++ sqlDeps ++ Seq(guavacache)
+
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
   val coreDeps = akka ++ baseDeps ++ 
