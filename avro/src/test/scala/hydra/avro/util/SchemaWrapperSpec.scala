@@ -223,7 +223,36 @@ class SchemaWrapperSpec extends Matchers with FlatSpecLike {
     val avro = new Schema.Parser().parse(schema)
 
     SchemaWrapper.from(avro).primaryKeys shouldBe Seq("id1", "id2")
+  }
 
+  it should "allow empty primary keys" in {
+    val schema =
+      """
+        |{
+        |	"type": "record",
+        |	"name": "User",
+        |	"namespace": "hydra",
+        | "hydra.key": "id1, id2",
+        |	"fields": [{
+        |			"name": "id1",
+        |			"type": "int",
+        |			"doc": "doc"
+        |		},
+        |  {
+        |			"name": "id2",
+        |			"type": "int",
+        |			"doc": "doc"
+        |		},
+        |		{
+        |			"name": "username",
+        |			"type": ["null", "string"]
+        |		}
+        |	]
+        |}""".stripMargin
+
+    val avro = new Schema.Parser().parse(schema)
+
+    SchemaWrapper.from(avro, Seq.empty).primaryKeys shouldBe Seq.empty
   }
 
 }
