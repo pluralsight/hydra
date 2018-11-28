@@ -7,6 +7,8 @@ import hydra.core.persistence.{FlywaySupport, H2PersistenceComponent}
 import org.joda.time.DateTime
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
+import slick.lifted
+import slick.lifted.TableQuery
 
 import scala.util.Try
 
@@ -20,13 +22,15 @@ class TokenRepositoryISpec extends FlatSpec
   implicit val ec = scala.concurrent.ExecutionContext.global
 
   val persistenceDelegate = new H2PersistenceComponent(ec)
-
+  import persistenceDelegate.profile.api._
   val db = persistenceDelegate.db
 
   private val expectedTokenInfo = TokenInfo("test-token", Set("resourceA", "resourceB"))
 
+
   override def beforeAll(): Unit = {
-    FlywaySupport.migrate(ConfigFactory.load().getConfig("db"))
+    val config = ConfigFactory.load()
+    FlywaySupport.migrate(ConfigFactory.load().getConfig("h2-db"))
     whenReady(db.run(tokenTable += (1, DateTime.now(), DateTime.now(), "test-token", 1))) { _ =>
       log.info("Data inserted into database")
     }
