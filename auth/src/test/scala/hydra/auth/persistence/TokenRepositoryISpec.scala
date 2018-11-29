@@ -4,7 +4,6 @@ import com.typesafe.config.ConfigFactory
 import hydra.auth.persistence.TokenInfoRepository.TokenInfo
 import hydra.common.logging.LoggingAdapter
 import hydra.core.persistence.{FlywaySupport, H2PersistenceComponent}
-import org.joda.time.DateTime
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
@@ -20,7 +19,6 @@ class TokenRepositoryISpec extends FlatSpec
   implicit val ec = scala.concurrent.ExecutionContext.global
 
   val persistenceDelegate = new H2PersistenceComponent(ec)
-  import persistenceDelegate.profile.api._
   val db = persistenceDelegate.db
 
   private val expectedTokenInfo = TokenInfo("test-token", Set("resourceA", "resourceB"))
@@ -29,9 +27,6 @@ class TokenRepositoryISpec extends FlatSpec
   override def beforeAll(): Unit = {
     val config = ConfigFactory.load()
     FlywaySupport.migrate(ConfigFactory.load().getConfig("h2-db"))
-    whenReady(db.run(tokenTable += (1, DateTime.now(), DateTime.now(), "test-token", 1))) { _ =>
-      log.info("Data inserted into database")
-    }
   }
 
   override def afterAll(): Unit = {
