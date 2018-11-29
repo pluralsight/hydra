@@ -16,12 +16,12 @@ object FlywaySupport {
     val migrateLocations = config.getString("flyway.locations")
     (urlConfig, userConfig, passwordConfig) match {
       case (Some(url), Some(user), Some(password)) =>
-        val flyway = new Flyway()
-        //todo: is there a way to get a datasource from slick?
-        flyway.setDataSource(url, user, password)
-        flyway.setLocations(migrateLocations)
-        flyway.setBaselineOnMigrate(false)
-        flyway.migrate()
+        Flyway
+          .configure()
+          .locations(migrateLocations)
+          .dataSource(url, user, password)
+          .load()
+          .migrate()
 
       case _ => flogger.debug("Won't migrate database: Not configured properly; " +
         "url, user and password are required.")
