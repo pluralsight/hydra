@@ -15,7 +15,7 @@ class TokenInfoRepository(val persistenceDelegate: PersistenceDelegate) extends 
 
   def getByToken(token: String)
                 (implicit ec: ExecutionContext): Future[TokenInfo] = {
-    Future.successful(TokenInfo("", Set()))
+
   }
 }
 

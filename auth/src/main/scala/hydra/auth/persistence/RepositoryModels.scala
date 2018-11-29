@@ -57,6 +57,8 @@ trait RepositoryModels {
 
     def name = column[String]("name")
 
+    def resourceType = column[String]("type")
+
     def groupId = column[Int]("group_id")
 
     def * = (id, name, groupId)
@@ -72,5 +74,5 @@ trait RepositoryModels {
 
   case class Group(id: Int, name: String, createdDate: DateTime, modifiedDate: DateTime)
 
-  case class Resource(id: Int, name: String, groupId: Int)
+  case class Resource(id: Int, name: String, resourceType: String, groupId: Int)
 }
