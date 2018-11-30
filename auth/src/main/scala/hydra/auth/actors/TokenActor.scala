@@ -9,7 +9,7 @@ class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
   import TokenActor._
 
   // TODO add scalacache
-  private val cache = Map[String, TokenInfo]()
+  private val cache = scala.collection.mutable.Map[String, TokenInfo]()
   private implicit val ec = context.dispatcher
 
   override def receive: Receive = {
@@ -17,10 +17,11 @@ class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
       cache.get(token) match {
         case Some(tokenInfo) => sender ! tokenInfo
         case None => {
+          val s = sender
           tokenInfoRepository.getByToken(token).map {
-            token =>
-              cache + (token.token -> token)
-              sender ! token
+            tokenInfo =>
+              cache += (tokenInfo.token -> tokenInfo)
+              s ! tokenInfo
           }
         }
       }
