@@ -1,6 +1,6 @@
 package hydra.auth.actors
 
-import akka.actor.Actor
+import akka.actor.{Actor, Props}
 import akka.pattern.pipe
 import hydra.auth.persistence.ITokenInfoRepository
 import hydra.auth.persistence.TokenInfoRepository.TokenInfo
@@ -23,4 +23,6 @@ class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
 
 object TokenActor {
   case class GetToken(token: String)
+  def props(): Props =
+    Props(classOf[TokenActor])
 }
