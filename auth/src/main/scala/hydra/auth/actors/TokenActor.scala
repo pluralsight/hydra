@@ -16,7 +16,13 @@ class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
     case GetToken(token) =>
       cache.get(token) match {
         case Some(tokenInfo) => sender ! tokenInfo
-        case None => tokenInfoRepository.getByToken(token) pipeTo sender
+        case None => {
+          tokenInfoRepository.getByToken(token).map {
+            token =>
+              cache + (token.token -> token)
+              sender ! token
+          }
+        }
       }
   }
 }
