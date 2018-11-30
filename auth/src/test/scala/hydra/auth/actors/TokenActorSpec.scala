@@ -97,6 +97,6 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
   }
 
   it should "invalidate a token in the cache" in {
-
+    succeed
   }
 }

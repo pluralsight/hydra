@@ -30,6 +30,7 @@ class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
 
 object TokenActor {
   case class GetToken(token: String)
+  case class InvalidateToken(token: String)
   def props(tokenInfoRepo: ITokenInfoRepository): Props =
     Props(classOf[TokenActor], tokenInfoRepo)
 }
