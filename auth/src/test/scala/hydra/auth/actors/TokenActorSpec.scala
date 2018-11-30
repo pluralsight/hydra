@@ -9,7 +9,7 @@ import hydra.auth.util.TokenGenerator
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
   with FlatSpecLike
@@ -30,8 +30,8 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val repoStub = stub[ITokenInfoRepository]
 
-    (repoStub.getByToken _)
-      .when(tokenInfo.token)
+    (repoStub.getByToken(_: String)(_: ExecutionContext))
+      .when(tokenInfo.token, *)
       .returning(Future.successful(tokenInfo))
 
     val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
@@ -39,8 +39,8 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
     // call to insert into cache
     tokenActor.tell(GetToken(tokenInfo.token), listener.ref)
 
-    (repoStub.getByToken _)
-      .verify(tokenInfo.token)
+    (repoStub.getByToken(_: String)(_: ExecutionContext))
+      .verify(tokenInfo.token, *)
       .once
 
     listener.expectMsg(tokenInfo)
@@ -52,8 +52,8 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val repoStub = stub[ITokenInfoRepository]
 
-    (repoStub.getByToken _)
-      .when(*)
+    (repoStub.getByToken(_: String)(_: ExecutionContext))
+      .when(*, *)
       .returning(Future.failed(new RuntimeException()))
 
     val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
@@ -61,12 +61,39 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
     // call to insert into cache
     tokenActor.tell(GetToken(tokenInfo.token), listener.ref)
 
-    (repoStub.getByToken _)
-      .verify(tokenInfo.token)
+    (repoStub.getByToken(_: String)(_: ExecutionContext))
+      .verify(tokenInfo.token, *)
       .once
 
     listener.expectMsgPF() {
       case Failure(ex) => ex.isInstanceOf[RuntimeException]
     }
+  }
+
+  it should "return a token from the cache when it is present" in {
+    //call it once to hit the db, return the token
+    //call it again and make sure the db isn't hit again (is returned by the cache instead)
+    val tokenInfo = TokenGenerator.generateTokenInfo
+
+    val listener = TestProbe()
+
+    val repoStub = stub[ITokenInfoRepository]
+
+    val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
+
+    (repoStub.getByToken(_: String)(_: ExecutionContext))
+      .when(tokenInfo.token, *)
+      .returning(Future.successful(tokenInfo))
+
+    tokenActor.tell(GetToken(tokenInfo.token), listener.ref)
+
+    (repoStub.getByToken(_: String)(_: ExecutionContext))
+      .verify(tokenInfo.token, *)
+      .once
+
+    val info = listener.expectMsg(tokenInfo)
+
+    tokenActor.tell(GetToken(info.token), listener.ref)
+
   }
 }
