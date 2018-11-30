@@ -1,9 +1,9 @@
 package hydra.auth.actors
 
 import akka.actor.{Actor, Props}
-import akka.pattern.pipe
 import hydra.auth.persistence.ITokenInfoRepository
 import hydra.auth.persistence.TokenInfoRepository.TokenInfo
+import akka.pattern.pipe
 
 class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
   import TokenActor._
@@ -21,8 +21,8 @@ class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
           tokenInfoRepository.getByToken(token).map {
             tokenInfo =>
               cache += (tokenInfo.token -> tokenInfo)
-              s ! tokenInfo
-          }
+              tokenInfo
+          } pipeTo s
         }
       }
   }

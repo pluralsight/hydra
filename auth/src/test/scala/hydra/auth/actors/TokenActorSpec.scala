@@ -71,8 +71,7 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
   }
 
   it should "return a token from the cache when it is present" in {
-    //call it once to hit the db, return the token
-    //call it again and make sure the db isn't hit again (is returned by the cache instead)
+
     val tokenInfo = TokenGenerator.generateTokenInfo
 
     val listener = TestProbe()
@@ -94,6 +93,10 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
     val info = listener.expectMsg(tokenInfo)
 
     tokenActor.tell(GetToken(info.token), listener.ref)
+
+  }
+
+  it should "invalidate a token in the cache" in {
 
   }
 }
