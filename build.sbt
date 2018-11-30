@@ -62,7 +62,7 @@ lazy val root = Project(
 lazy val auth = Project(
   id = "auth",
   base = file("auth")
-).dependsOn(core % "compile->compile;test->test")
+).dependsOn(core)
   .settings(moduleSettings,
     crossScalaVersions := Seq("2.11.8", "2.12.3"),
     name := "hydra-auth",

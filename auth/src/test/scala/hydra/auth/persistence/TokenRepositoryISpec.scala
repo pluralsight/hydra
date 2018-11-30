@@ -23,9 +23,7 @@ class TokenRepositoryISpec extends FlatSpec
 
   private val expectedTokenInfo = TokenInfo("test-token", Set("resourceA", "resourceB"))
 
-
   override def beforeAll(): Unit = {
-    val config = ConfigFactory.load()
     FlywaySupport.migrate(ConfigFactory.load().getConfig("h2-db"))
   }
 
