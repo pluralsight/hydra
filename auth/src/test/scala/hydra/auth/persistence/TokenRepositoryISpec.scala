@@ -38,4 +38,5 @@ class TokenRepositoryISpec extends FlatSpec
       actualTokenInfo shouldEqual expectedTokenInfo
     }
   }
+
 }
