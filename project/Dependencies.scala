@@ -22,7 +22,7 @@ object Dependencies {
   val akkaHTTPVersion = "10.1.5"
   val akkaKafkaStreamVersion = "0.14"
   val scalazVersion = "7.2.9"
-  val scalaMockVersion = "3.5.0"
+  val scalaMockVersion = "4.1.0"
   val serviceContainerVersion = "2.0.7"
   val scalaCacheVersion = "0.23.0"
   val commonsDbcpVersion = "1.4"
@@ -132,7 +132,7 @@ object Dependencies {
       "org.powermock" % "powermock-module-junit4" % powerMockVersion % "test"
     )
 
-    val scalaMock = "org.scalamock" %% "scalamock-scalatest-support" % scalaMockVersion % "test"
+    val scalaMock = "org.scalamock" %% "scalamock" % scalaMockVersion % "test"
     val junit = "junit" % "junit" % "4.12" % "test"
 
     val h2db = "com.h2database" % "h2" % "1.4.196" % "test"
