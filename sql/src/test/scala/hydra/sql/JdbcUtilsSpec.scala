@@ -1,12 +1,14 @@
 package hydra.sql
 
-import java.sql.{DriverManager, JDBCType}
 import java.sql.JDBCType._
+import java.sql.{DriverManager, JDBCType}
 
+import hydra.avro.convert.AvroUuid
 import hydra.avro.util.SchemaWrapper
 import hydra.common.util.TryWith
-import org.apache.avro.Schema
+import org.apache.avro.LogicalTypes.LogicalTypeFactory
 import org.apache.avro.Schema.Type
+import org.apache.avro.{LogicalType, LogicalTypes, Schema}
 import org.h2.jdbc.JdbcSQLException
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
@@ -24,6 +26,10 @@ class JdbcUtilsSpec extends Matchers
   val provider = new DriverManagerConnectionProvider("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1",
     "", "", 1, 1.millis)
 
+
+  LogicalTypes.register(AvroUuid.AvroUuidLogicalTypeName, new LogicalTypeFactory {
+    override def fromSchema(schema: Schema): LogicalType = AvroUuid
+  })
 
   override def afterAll() = provider.connection.close()
 
@@ -315,6 +321,13 @@ class JdbcUtilsSpec extends Matchers
           |			"name": "username",
           |			"type": "string"
           |		},
+          |  		{
+          |			"name": "uuidTest",
+          |			"type": {
+          |				"type": "string",
+          |				"logicalType": "uuid"
+          |			}
+          |		},
           |  {
           |			"name": "testEnum",
           |			"type": {
@@ -330,7 +343,8 @@ class JdbcUtilsSpec extends Matchers
       val avro = new Schema.Parser().parse(schema)
 
       val stmt = JdbcUtils.schemaString(SchemaWrapper.from((avro)), "User", PostgresDialect)
-      stmt shouldBe "\"id\" INTEGER NOT NULL,\"username\" TEXT NOT NULL,\"testEnum\" TEXT NOT NULL,CONSTRAINT \"User_PK\" PRIMARY KEY (\"id\")"
+      stmt shouldBe "\"id\" INTEGER NOT NULL,\"username\" TEXT NOT NULL,\"uuidTest\"" +
+        " UUID NOT NULL,\"testEnum\" TEXT NOT NULL,CONSTRAINT \"User_PK\" PRIMARY KEY (\"id\")"
     }
 
     it("Generates the correct ddl statement with composite primary  keys") {
