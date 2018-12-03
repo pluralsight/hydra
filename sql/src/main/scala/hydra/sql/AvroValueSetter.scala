@@ -9,6 +9,7 @@ import com.google.common.collect.Lists
 import hydra.avro.convert.{ISODateConverter, IsoDate}
 import hydra.avro.util.SchemaWrapper
 import hydra.sql.JdbcUtils.{getJdbcType, isLogicalType}
+import org.apache.avro.Conversions.UUIDConversion
 import org.apache.avro.LogicalTypes.Decimal
 import org.apache.avro.Schema.Field
 import org.apache.avro.Schema.Type.LONG
@@ -24,6 +25,8 @@ import scala.collection.JavaConverters._
 private[sql] class AvroValueSetter(schema: SchemaWrapper, dialect: JdbcDialect) {
 
   private val pk = schema.primaryKeys
+
+  private lazy val uc = new UUIDConversion
 
   private val fields = if (pk.isEmpty) schema.getFields else dialect.upsertFields(schema)
 
@@ -65,6 +68,8 @@ private[sql] class AvroValueSetter(schema: SchemaWrapper, dialect: JdbcDialect) 
           pstmt.setTimestamp(idx,
             new Timestamp(new ISODateConverter()
               .fromCharSequence(value.toString, schema, IsoDate).toInstant.toEpochMilli))
+        case Schema.Type.STRING if isLogicalType(schema, uc.getLogicalTypeName) =>
+          pstmt.setObject(idx, uc.fromCharSequence(value.toString, schema, IsoDate))
         case Schema.Type.STRING =>
           pstmt.setString(idx, value.toString)
         case Schema.Type.BOOLEAN =>

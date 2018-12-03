@@ -6,6 +6,7 @@ import hydra.avro.convert.IsoDate
 import hydra.avro.util.SchemaWrapper
 import hydra.common.logging.LoggingAdapter
 import hydra.sql.JdbcUtils.isLogicalType
+import org.apache.avro.Conversions.UUIDConversion
 import org.apache.avro.LogicalTypes.Decimal
 import org.apache.avro.Schema.Type.{BYTES, UNION}
 import org.apache.avro.Schema.{Field, Type}
@@ -19,6 +20,8 @@ private[sql] object PostgresDialect extends JdbcDialect with LoggingAdapter {
   override val jsonPlaceholder = "to_json(?::json)"
 
   override def canHandle(url: String): Boolean = url.startsWith("jdbc:postgresql")
+
+  private val uc = new UUIDConversion
 
   override def getJDBCType(schema: Schema): Option[JdbcType] = schema.getType match {
     case Type.STRING => logicalStringTypes(schema)
@@ -35,7 +38,10 @@ private[sql] object PostgresDialect extends JdbcDialect with LoggingAdapter {
   private def logicalStringTypes(schema: Schema) = {
     if (isLogicalType(schema, IsoDate.IsoDateLogicalTypeName)) {
       Some(JdbcType("TIMESTAMP", JDBCType.TIMESTAMP))
-    } else {
+    } else if (isLogicalType(schema, uc.getLogicalTypeName)) {
+      Some(JdbcType("UUID", JDBCType.OTHER))
+    }
+    else {
       Some(JdbcType("TEXT", JDBCType.VARCHAR))
     }
   }

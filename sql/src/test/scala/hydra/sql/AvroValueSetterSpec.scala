@@ -4,12 +4,14 @@ import java.math.{MathContext, RoundingMode}
 import java.nio.ByteBuffer
 import java.sql._
 import java.time.{LocalDate, ZoneId}
+import java.util.UUID
 
 import com.google.common.collect.Lists
 import com.pluralsight.hydra.avro.JsonConverter
 import com.pluralsight.hydra.sql.MockArray
-import hydra.avro.convert.{ISODateConverter, IsoDate}
+import hydra.avro.convert.{AvroUuid, ISODateConverter, IsoDate}
 import hydra.avro.util.SchemaWrapper
+import org.apache.avro.Conversions.UUIDConversion
 import org.apache.avro.LogicalTypes.LogicalTypeFactory
 import org.apache.avro.generic.{GenericData, GenericRecord}
 import org.apache.avro.{LogicalType, LogicalTypes, Schema}
@@ -124,6 +126,13 @@ class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       |			}
       |		},
       |  {
+      |			"name": "uuid",
+      |			"type": {
+      |				"type": "string",
+      |				"logicalType": "uuid"
+      |			}
+      |		},
+      |  {
       |      "name": "authors",
       |      "type": {
       |        "type": "array",
@@ -159,6 +168,10 @@ class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       val isoDate = new ISODateConverter().fromCharSequence("2015-07-28T19:55:57.693217+00:00",
         Schema.create(Schema.Type.STRING), IsoDate).toInstant.toEpochMilli
 
+      val uuid = UUID.randomUUID()
+      val uuidV = new UUIDConversion().fromCharSequence(uuid.toString,
+        Schema.create(Schema.Type.STRING), AvroUuid)
+
       val mockedStmt = mock[PreparedStatement]
       val connection = mock[Connection]
       val friends = Lists.newArrayList("friend1", "friend2")
@@ -181,7 +194,8 @@ class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       (mockedStmt.setLong _).expects(14, 12342134223L)
       (mockedStmt.setBytes _).expects(15, *) //todo: how to verify the contents of an array in scala mock?
       (mockedStmt.setTimestamp(_: Int, _: Timestamp)).expects(16, new Timestamp(isoDate))
-      (mockedStmt.setString _).expects(17, """[{"id": "authorId", "authorHandle": "theHandle"}]""")
+      (mockedStmt.setObject(_: Int, _: Any)).expects(17, *)
+      (mockedStmt.setString _).expects(18, """[{"id": "authorId", "authorHandle": "theHandle"}]""")
       (mockedStmt.addBatch _).expects()
 
       val avroSchema = schema.schema
@@ -224,6 +238,7 @@ class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       author.put("authorHandle", "theHandle")
       authors.add(author)
       record.put("authors", authors)
+      record.put("uuid", uuid.toString)
       valueSetter.bind(record, mockedStmt)
     }
 

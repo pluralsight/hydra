@@ -27,11 +27,9 @@ import scala.concurrent.duration._
 import scala.io.Source
 import scala.util.{Failure, Success}
 
-class TopicBootstrapActor(
-                           schemaRegistryActor: ActorRef,
-                           kafkaIngestor: ActorSelection,
-                           bootstrapConfig: Option[Config] = None
-                         ) extends Actor
+class TopicBootstrapActor(schemaRegistryActor: ActorRef,
+                          kafkaIngestor: ActorSelection,
+                          bootstrapConfig: Option[Config] = None) extends Actor
   with HydraJsonSupport
   with ActorLogging
   with ConfigSupport
@@ -56,11 +54,11 @@ class TopicBootstrapActor(
     applicationConfig.getConfig("bootstrap-config")
 
   val topicDetailsConfig: util.Map[String, String] = Map[String, String]().empty.asJava
+
   val topicDetails = new TopicDetails(
     bootstrapKafkaConfig.getInt("partitions"),
     bootstrapKafkaConfig.getInt("replication-factor").toShort,
-    topicDetailsConfig
-  )
+    topicDetailsConfig)
 
   private val failureRetryInterval = bootstrapKafkaConfig
     .get[Int]("failure-retry-millis")
@@ -173,7 +171,8 @@ class TopicBootstrapActor(
     // Don't fail when topic already exists
     if (topicExists) {
       log.info(s"Topic $topic already exists, proceeding anyway...")
-      Future.successful(BootstrapSuccess)}
+      Future.successful(BootstrapSuccess)
+    }
     else {
       kafkaUtils.createTopic(topicMetadataRequest.subject, topicDetails, timeout = timeoutMillis)
         .map { r =>
