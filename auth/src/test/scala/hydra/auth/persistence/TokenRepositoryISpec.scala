@@ -1,7 +1,7 @@
 package hydra.auth.persistence
 
 import com.typesafe.config.ConfigFactory
-import hydra.auth.persistence.TokenInfoRepository.TokenInfo
+import hydra.auth.persistence.TokenInfoRepository.{MissingTokenException, TokenInfo}
 import hydra.common.logging.LoggingAdapter
 import hydra.core.persistence.{FlywaySupport, H2PersistenceComponent}
 import org.scalatest.concurrent.ScalaFutures
@@ -23,13 +23,15 @@ class TokenRepositoryISpec extends FlatSpec
 
   private val expectedTokenInfo = TokenInfo("test-token", Set("resourceA", "resourceB"))
 
+  private val toDeleteToken = "to-delete-token"
+
   override def beforeAll(): Unit = {
     // This migration also inserts test data into the db.
     FlywaySupport.migrate(ConfigFactory.load().getConfig("h2-db"))
   }
 
   override def afterAll(): Unit = {
-    Try(db.close()).recover{case _ => log.warn("Unable to shut down database")}
+    Try(db.close()).recover { case _ => log.warn("Unable to shut down database") }
   }
 
   "A TokenRepository" should "retrieve token info" in {
@@ -40,12 +42,19 @@ class TokenRepositoryISpec extends FlatSpec
     }
   }
 
-  it should "remove a token" in {
-//    val tokenInfoRepo = new TokenInfoRepository(persistenceDelegate)
-//
-//    for {
-//      _ <- tokenInfoRepo.removeToken(expectedTokenInfo.token)
-//    }
+  it should "return a failure for missing tokens" in {
+    val tokenInfoRepo = new TokenInfoRepository(persistenceDelegate)
+
+    whenReady(tokenInfoRepo.getByToken("does-not-exist").failed) { e =>
+      e shouldBe a[MissingTokenException]
+    }
   }
 
+  it should "remove a token" in {
+    val tokenInfoRepo = new TokenInfoRepository(persistenceDelegate)
+
+    whenReady(tokenInfoRepo.removeToken(toDeleteToken)) { result =>
+      result shouldEqual true
+    }
+  }
 }

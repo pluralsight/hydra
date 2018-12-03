@@ -28,10 +28,23 @@ class TokenInfoRepository(val persistenceDelegate: PersistenceDelegate) extends 
         case ((t, g), r) => (t.token, r.name)
       }
     }.filter(_._1 === token)
-      .result
 
-    db.run(query).map { resultTup =>
-      TokenInfo(token, resultTup.map(_._2).toSet)
+    db.run(query.result).map { resultTup =>
+      if (resultTup.nonEmpty) {
+        TokenInfo(token, resultTup.map(_._2).toSet)
+      }
+      else {
+        throw new MissingTokenException(s"$token not found.")
+      }
+    }
+  }
+
+  def removeToken(token: String)
+                 (implicit ec: ExecutionContext): Future[Boolean] = {
+    val delete = tokenTable.filter(_.token === token).delete
+    db.run(delete).map {
+      case 0 => false
+      case _ => true
     }
   }
 }
@@ -41,6 +54,8 @@ object TokenInfoRepository {
     new TokenInfoRepository(persistenceDelegate)
 
   case class TokenInfo(token: String, resources: Set[String])
+
+  class MissingTokenException(msg: String) extends RuntimeException(msg)
 
 }
 
