@@ -97,6 +97,17 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
   }
 
   it should "invalidate a token in the cache" in {
-    succeed
+    val tokenInfo = TokenGenerator.generateTokenInfo
+
+    val listener = TestProbe()
+
+    val repoStub = stub[ITokenInfoRepository]
+
+    val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
+
+    tokenActor.tell(InvalidateToken(tokenInfo.token), listener.ref)
+
+    listener.expectMsg(TokenInvalidated)
+
   }
 }

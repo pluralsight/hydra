@@ -25,12 +25,17 @@ class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
           } pipeTo s
         }
       }
+
+    case InvalidateToken(token) =>
+      cache.remove(token)
+      sender ! TokenInvalidated
   }
 }
 
 object TokenActor {
   case class GetToken(token: String)
   case class InvalidateToken(token: String)
+  case object TokenInvalidated
   def props(tokenInfoRepo: ITokenInfoRepository): Props =
     Props(classOf[TokenActor], tokenInfoRepo)
 }
