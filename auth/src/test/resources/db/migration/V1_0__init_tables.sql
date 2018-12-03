@@ -30,4 +30,6 @@ INSERT INTO resource (name, resource_type, group_id) VALUES
     ('resourceB', 'topic', 1);
 
 INSERT INTO token (created_date, modified_date, token, group_id) VALUES
-    ('2018-11-29 00:00:00', '2018-11-29 00:00:00', 'test-token', 1);
+    ('2018-11-29 00:00:00', '2018-11-29 00:00:00', 'test-token', 1),
+    ('2018-11-29 00:00:00', '2018-11-29 00:00:00', 'nope-token', 1),
+    ('2018-11-29 00:00:00', '2018-11-29 00:00:00', 'to-delete-token', 1);

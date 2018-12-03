@@ -24,6 +24,7 @@ class TokenRepositoryISpec extends FlatSpec
   private val expectedTokenInfo = TokenInfo("test-token", Set("resourceA", "resourceB"))
 
   override def beforeAll(): Unit = {
+    // This migration also inserts test data into the db.
     FlywaySupport.migrate(ConfigFactory.load().getConfig("h2-db"))
   }
 
@@ -31,12 +32,20 @@ class TokenRepositoryISpec extends FlatSpec
     Try(db.close()).recover{case _ => log.warn("Unable to shut down database")}
   }
 
-  "A TokenRepository" should "retrieve token info from a storage backend" in {
+  "A TokenRepository" should "retrieve token info" in {
     val tokenInfoRepo = new TokenInfoRepository(persistenceDelegate)
 
     whenReady(tokenInfoRepo.getByToken(expectedTokenInfo.token)) { actualTokenInfo =>
       actualTokenInfo shouldEqual expectedTokenInfo
     }
+  }
+
+  it should "remove a token" in {
+//    val tokenInfoRepo = new TokenInfoRepository(persistenceDelegate)
+//
+//    for {
+//      _ <- tokenInfoRepo.removeToken(expectedTokenInfo.token)
+//    }
   }
 
 }
