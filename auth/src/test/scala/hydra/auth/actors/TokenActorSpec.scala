@@ -3,7 +3,7 @@ package hydra.auth.actors
 import akka.actor.Status.Failure
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{TestKit, TestProbe}
-import hydra.auth.actors.TokenActor.GetToken
+import hydra.auth.actors.TokenActor.{GetToken, InvalidateToken, TokenInvalidated}
 import hydra.auth.persistence.ITokenInfoRepository
 import hydra.auth.util.TokenGenerator
 import org.scalamock.scalatest.MockFactory

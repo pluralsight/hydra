@@ -8,7 +8,6 @@ import akka.pattern.pipe
 class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
   import TokenActor._
 
-  // TODO add scalacache
   private val cache = scala.collection.mutable.Map[String, TokenInfo]()
   private implicit val ec = context.dispatcher
 
