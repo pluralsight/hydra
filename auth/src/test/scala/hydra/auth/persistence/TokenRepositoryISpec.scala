@@ -41,7 +41,7 @@ class TokenRepositoryISpec extends FlatSpec
   "A TokenRepository" should "retrieve token info" in {
     val tokenInfoRepo = new TokenInfoRepository(persistenceDelegate)
 
-    whenReady(tokenInfoRepo.getByToken(expectedTokenInfo.token)) { actualTokenInfo =>
+    whenReady(tokenInfoRepo.getTokenInfo(expectedTokenInfo.token)) { actualTokenInfo =>
       actualTokenInfo shouldEqual expectedTokenInfo
     }
   }
@@ -58,7 +58,7 @@ class TokenRepositoryISpec extends FlatSpec
 
     val f = for {
       x <- tokenInfoRepo.insertToken(token)
-      y <- tokenInfoRepo.getByToken(token.token)
+      y <- tokenInfoRepo.getTokenInfo(token.token)
     } yield (x, y)
 
     whenReady(f, Timeout(Span(500, Millis))) {
@@ -71,7 +71,7 @@ class TokenRepositoryISpec extends FlatSpec
   it should "return a failure for missing tokens" in {
     val tokenInfoRepo = new TokenInfoRepository(persistenceDelegate)
 
-    whenReady(tokenInfoRepo.getByToken("does-not-exist").failed) { e =>
+    whenReady(tokenInfoRepo.getTokenInfo("does-not-exist").failed) { e =>
       e shouldBe a[MissingTokenException]
     }
   }

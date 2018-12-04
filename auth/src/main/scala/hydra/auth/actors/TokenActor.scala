@@ -23,12 +23,17 @@ class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
 
   override def receive: Receive = {
     case AddTokenToDB(token) =>
+      tokenInfoRepository.insertToken(token).flatMap{ _ =>
+        tokenInfoRepository.getTokenInfo(token.token).map { tokenInfo =>
+          mediator ! Publish(mediatorTag, TokenActor.AddTokenToCache(tokenInfo))
 
-    case AddTokenToCache(token) =>
-
+        }
+      } pipeTo sender
+    case AddTokenToCache(tokenInfo) =>
+      cache.put(tokenInfo.token)(tokenInfo)
     case GetTokenFromDB(token) =>
       cache.cachingF(token)(None) {
-        tokenInfoRepository.getByToken(token)
+        tokenInfoRepository.getTokenInfo(token)
       } pipeTo sender
 
     case RemoveTokenFromCache(token) =>
@@ -50,7 +55,7 @@ object TokenActor {
 
   case class AddTokenToDB(token: Token)
 
-  case class AddTokenToCache(token: String)
+  case class AddTokenToCache(tokenInfo: TokenInfo)
 
   case class GetTokenFromDB(token: String)
 

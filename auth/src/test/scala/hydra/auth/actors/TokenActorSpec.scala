@@ -32,7 +32,7 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val repoStub = stub[ITokenInfoRepository]
 
-    (repoStub.getByToken(_: String)(_: ExecutionContext))
+    (repoStub.getTokenInfo(_: String)(_: ExecutionContext))
       .when(tokenInfo.token, *)
       .returning(Future.successful(tokenInfo))
 
@@ -41,7 +41,7 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
     // call to insert into cache
     tokenActor.tell(GetTokenFromDB(tokenInfo.token), listener.ref)
 
-    (repoStub.getByToken(_: String)(_: ExecutionContext))
+    (repoStub.getTokenInfo(_: String)(_: ExecutionContext))
       .verify(tokenInfo.token, *)
       .once
 
@@ -55,7 +55,7 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val repoStub = stub[ITokenInfoRepository]
 
-    (repoStub.getByToken(_: String)(_: ExecutionContext))
+    (repoStub.getTokenInfo(_: String)(_: ExecutionContext))
       .when(*, *)
       .returning(Future.failed(new RuntimeException()))
 
@@ -64,7 +64,7 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
     // call to insert into cache
     tokenActor.tell(GetTokenFromDB(tokenInfo.token), listener.ref)
 
-    (repoStub.getByToken(_: String)(_: ExecutionContext))
+    (repoStub.getTokenInfo(_: String)(_: ExecutionContext))
       .verify(tokenInfo.token, *)
       .once
 
@@ -83,13 +83,13 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
 
-    (repoStub.getByToken(_: String)(_: ExecutionContext))
+    (repoStub.getTokenInfo(_: String)(_: ExecutionContext))
       .when(tokenInfo.token, *)
       .returning(Future.successful(tokenInfo))
 
     tokenActor.tell(GetTokenFromDB(tokenInfo.token), listener.ref)
 
-    (repoStub.getByToken(_: String)(_: ExecutionContext))
+    (repoStub.getTokenInfo(_: String)(_: ExecutionContext))
       .verify(tokenInfo.token, *)
       .once
 

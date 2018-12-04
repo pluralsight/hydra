@@ -14,8 +14,8 @@ class TokenInfoRepository(val persistenceDelegate: PersistenceDelegate) extends 
 
   val db = persistenceDelegate.db
 
-  def getByToken(token: String)
-                (implicit ec: ExecutionContext): Future[TokenInfo] = {
+  def getTokenInfo(token: String)
+                  (implicit ec: ExecutionContext): Future[TokenInfo] = {
     /*
      * The group table has a 1:M relationship with both token and resource, so use it as a bridge to
      * return the token and its associated resources.
