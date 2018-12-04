@@ -2,8 +2,10 @@ package hydra.auth.actors
 
 import akka.actor.Status.Failure
 import akka.actor.{ActorSystem, Props}
+import akka.cluster.pubsub.DistributedPubSub
+import akka.cluster.pubsub.DistributedPubSubMediator.Subscribe
 import akka.testkit.{TestKit, TestProbe}
-import hydra.auth.actors.TokenActor.{GetToken, InvalidateToken, TokenInvalidated}
+import hydra.auth.actors.TokenActor.{GetTokenFromDB, RemoveTokenFromCache, RemoveTokenFromDB, TokenInvalidated}
 import hydra.auth.persistence.ITokenInfoRepository
 import hydra.auth.util.TokenGenerator
 import org.scalamock.scalatest.MockFactory
@@ -37,7 +39,7 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
     val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
 
     // call to insert into cache
-    tokenActor.tell(GetToken(tokenInfo.token), listener.ref)
+    tokenActor.tell(GetTokenFromDB(tokenInfo.token), listener.ref)
 
     (repoStub.getByToken(_: String)(_: ExecutionContext))
       .verify(tokenInfo.token, *)
@@ -45,7 +47,8 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     listener.expectMsg(tokenInfo)
   }
-  "A TokenActor" should "return a failed future if a token can't be found in the cache or db" in {
+
+  it should "return a failed future if a token can't be found in the cache or db" in {
     val tokenInfo = TokenGenerator.generateTokenInfo
 
     val listener = TestProbe()
@@ -59,7 +62,7 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
     val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
 
     // call to insert into cache
-    tokenActor.tell(GetToken(tokenInfo.token), listener.ref)
+    tokenActor.tell(GetTokenFromDB(tokenInfo.token), listener.ref)
 
     (repoStub.getByToken(_: String)(_: ExecutionContext))
       .verify(tokenInfo.token, *)
@@ -84,7 +87,7 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
       .when(tokenInfo.token, *)
       .returning(Future.successful(tokenInfo))
 
-    tokenActor.tell(GetToken(tokenInfo.token), listener.ref)
+    tokenActor.tell(GetTokenFromDB(tokenInfo.token), listener.ref)
 
     (repoStub.getByToken(_: String)(_: ExecutionContext))
       .verify(tokenInfo.token, *)
@@ -92,7 +95,7 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val info = listener.expectMsg(tokenInfo)
 
-    tokenActor.tell(GetToken(info.token), listener.ref)
+    tokenActor.tell(GetTokenFromDB(info.token), listener.ref)
 
   }
 
@@ -105,9 +108,33 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
 
-    tokenActor.tell(InvalidateToken(tokenInfo.token), listener.ref)
+    tokenActor.tell(RemoveTokenFromCache(tokenInfo.token), listener.ref)
 
     listener.expectMsg(TokenInvalidated)
 
   }
+
+  it should "remove a token from db and broadcast cluster message to remove cached tokens" in {
+    val mediator = DistributedPubSub(system).mediator
+    val probiño = TestProbe()
+    mediator ! Subscribe(TokenActor.mediatorTag, probiño.ref)
+
+    val tokenInfo = TokenGenerator.generateTokenInfo
+
+    val repoStub = stub[ITokenInfoRepository]
+    (repoStub.removeToken(_: String)(_: ExecutionContext))
+      .when(tokenInfo.token, *)
+      .returning(Future.successful(true))
+
+    val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
+
+    tokenActor.tell(RemoveTokenFromDB(tokenInfo.token), probiño.ref)
+
+    probiño.expectMsgAllOf(RemoveTokenFromCache(tokenInfo.token), true)
+
+    (repoStub.removeToken(_: String)(_: ExecutionContext))
+      .verify(tokenInfo.token, *)
+      .once
+  }
+
 }

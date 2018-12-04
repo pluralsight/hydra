@@ -23,7 +23,7 @@ object FlywaySupport {
           .load()
           .migrate()
 
-      case _ => flogger.debug("Won't migrate database: Not configured properly; " +
+      case _ => flogger.debug("Won't migration database: Not configured properly; " +
         "url, user and password are required.")
     }
   }

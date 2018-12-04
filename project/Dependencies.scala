@@ -169,7 +169,7 @@ object Dependencies {
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
   val coreDeps = akka ++ baseDeps ++ 
-    Seq(guavacache, reflections, serviceContainer, akkaKryo, sdNotify) ++
+    Seq(guavacache, reflections, serviceContainer, akkaKryo, sdNotify, h2db) ++
     confluent ++ kamon ++ slick ++ flyway
 
   val ingestDeps = coreDeps

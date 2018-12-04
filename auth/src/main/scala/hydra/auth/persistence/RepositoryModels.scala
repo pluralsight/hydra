@@ -67,7 +67,9 @@ trait RepositoryModels {
   }
 
   lazy val resourceTable = TableQuery[ResourceTable]
+}
 
+object RepositoryModels {
   // Corresponding case classes
   case class Token(id: Int, createdDate: DateTime, modifiedDate: DateTime, token: String,
                    groupId: Int)

@@ -1,10 +1,14 @@
 package hydra.auth.persistence
 
 import com.typesafe.config.ConfigFactory
+import hydra.auth.persistence.RepositoryModels.Token
 import hydra.auth.persistence.TokenInfoRepository.{MissingTokenException, TokenInfo}
 import hydra.common.logging.LoggingAdapter
 import hydra.core.persistence.{FlywaySupport, H2PersistenceComponent}
+import org.joda.time.DateTime
+import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.time.{Millis, Span}
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 import scala.util.Try
@@ -39,6 +43,28 @@ class TokenRepositoryISpec extends FlatSpec
 
     whenReady(tokenInfoRepo.getByToken(expectedTokenInfo.token)) { actualTokenInfo =>
       actualTokenInfo shouldEqual expectedTokenInfo
+    }
+  }
+
+  it should "insert a new token" in {
+    val tokenInfoRepo = new TokenInfoRepository(persistenceDelegate)
+    val token = Token(
+      111,
+      DateTime.parse("2000-03-15"),
+      DateTime.parse("2000-03-15"),
+      "insert-token",
+      1
+    )
+
+    val f = for {
+      x <- tokenInfoRepo.insertToken(token)
+      y <- tokenInfoRepo.getByToken(token.token)
+    } yield (x, y)
+
+    whenReady(f, Timeout(Span(500, Millis))) {
+      case (x, y) =>
+        x shouldBe true
+        y shouldEqual TokenInfo("insert-token", Set("resourceA", "resourceB"))
     }
   }
 
