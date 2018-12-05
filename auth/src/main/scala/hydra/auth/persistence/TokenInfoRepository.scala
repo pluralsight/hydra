@@ -41,21 +41,13 @@ class TokenInfoRepository(val persistenceDelegate: PersistenceDelegate) extends 
   }
 
   def insertToken(token: Token)
-                 (implicit ec: ExecutionContext): Future[Boolean] = {
-    runAction(tokenTable += Token.unapply(token).get)
+                 (implicit ec: ExecutionContext): Future[Token] = {
+    db.run(tokenTable += Token.unapply(token).get).map(_ => token)
   }
 
   def removeToken(token: String)
-                 (implicit ec: ExecutionContext): Future[Boolean] = {
-    runAction(tokenTable.filter(_.token === token).delete)
-  }
-
-  private[persistence] def runAction[R](action: DBIOAction[R, NoStream, Nothing])
-                                       (implicit ec: ExecutionContext): Future[Boolean] = {
-    db.run(action).map {
-      case 0 => false
-      case _ => true
-    }
+                 (implicit ec: ExecutionContext): Future[String] = {
+    db.run(tokenTable.filter(_.token === token).delete).map(_ => token)
   }
 }
 

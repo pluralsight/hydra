@@ -151,7 +151,7 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     (repoStub.insertToken(_: Token)(_: ExecutionContext))
       .when(token, *)
-      .returning(Future.successful(true))
+      .returning(Future.successful(token))
 
     (repoStub.getTokenInfo(_: String)(_: ExecutionContext))
       .when(token.token, *)
@@ -161,7 +161,7 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     tokenActor.tell(AddTokenToDB(token), listener.ref)
 
-    listener.expectMsgAllOf(AddTokenInfoToCache(tokenInfo), true)
+    listener.expectMsgAllOf(AddTokenInfoToCache(tokenInfo), token)
 
     (repoStub.insertToken(_: Token)(_: ExecutionContext))
       .verify(token, *)
@@ -181,13 +181,13 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     (repoStub.removeToken(_: String)(_: ExecutionContext))
       .when(tokenInfo.token, *)
-      .returning(Future.successful(true))
+      .returning(Future.successful(tokenInfo.token))
 
     val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
 
     tokenActor.tell(RemoveTokenFromDB(tokenInfo.token), probiño.ref)
 
-    probiño.expectMsgAllOf(RemoveTokenInfoFromCache(tokenInfo.token), true)
+    probiño.expectMsgAllOf(RemoveTokenInfoFromCache(tokenInfo.token), tokenInfo.token)
 
     (repoStub.removeToken(_: String)(_: ExecutionContext))
       .verify(tokenInfo.token, *)

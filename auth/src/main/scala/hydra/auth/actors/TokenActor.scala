@@ -10,11 +10,14 @@ import hydra.auth.persistence.RepositoryModels.Token
 import scalacache.modes.scalaFuture._
 import scalacache.guava._
 
+import scala.concurrent.ExecutionContextExecutor
+
 class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
+
   import TokenActor._
 
   private val cache = GuavaCache[TokenInfo]
-  private implicit val ec = context.dispatcher
+  private implicit val ec: ExecutionContextExecutor = context.dispatcher
 
   private val mediator = DistributedPubSub(context.system).mediator
 
@@ -24,16 +27,17 @@ class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
 
   override def receive: Receive = {
     case AddTokenToDB(token) =>
-      val addFuture = for {
-        insert <- tokenInfoRepository.insertToken(token)
+      val dbInsert = for {
+        tokenString <- tokenInfoRepository.insertToken(token)
         tokenInfo <- tokenInfoRepository.getTokenInfo(token.token)
-      } yield (insert, tokenInfo)
+      } yield (tokenString, tokenInfo)
 
-      addFuture.map {
-        case (insertResult, tokenInfo: TokenInfo) =>
+      dbInsert.map(_._1) pipeTo sender
+
+      dbInsert.foreach {
+        case (_, tokenInfo: TokenInfo) =>
           mediator ! Publish(mediatorTag, TokenActor.AddTokenInfoToCache(tokenInfo))
-          insertResult
-      } pipeTo sender
+      }
 
     case AddTokenInfoToCache(tokenInfo) =>
       cache.put(tokenInfo.token)(tokenInfo)
@@ -49,10 +53,13 @@ class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
       sender ! TokenInvalidated(tokenString)
 
     case RemoveTokenFromDB(tokenString) =>
-      tokenInfoRepository.removeToken(tokenString).map { result =>
+      val dbDelete = tokenInfoRepository.removeToken(tokenString)
+
+      dbDelete pipeTo sender
+
+      dbDelete.foreach { _ =>
         mediator ! Publish(mediatorTag, RemoveTokenInfoFromCache(tokenString))
-        result
-      } pipeTo sender
+      }
   }
 }
 

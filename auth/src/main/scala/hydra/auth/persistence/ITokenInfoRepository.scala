@@ -10,8 +10,8 @@ trait ITokenInfoRepository {
                   (implicit ec: ExecutionContext): Future[TokenInfo]
 
   def insertToken(token: Token)
-                 (implicit ec: ExecutionContext): Future[Boolean]
+                 (implicit ec: ExecutionContext): Future[Token]
 
   def removeToken(token: String)
-                 (implicit ec: ExecutionContext): Future[Boolean]
+                 (implicit ec: ExecutionContext): Future[String]
 }
