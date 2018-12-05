@@ -11,41 +11,48 @@ import scalacache.modes.scalaFuture._
 import scalacache.guava._
 
 class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
-
   import TokenActor._
-  // Todo distributed pub sub for broadcasting
 
   private val cache = GuavaCache[TokenInfo]
   private implicit val ec = context.dispatcher
 
-  val mediator = DistributedPubSub(context.system).mediator
-  mediator ! Subscribe(mediatorTag, self)
+  private val mediator = DistributedPubSub(context.system).mediator
+
+  override def preStart(): Unit = {
+    mediator ! Subscribe(mediatorTag, self)
+  }
 
   override def receive: Receive = {
     case AddTokenToDB(token) =>
-      tokenInfoRepository.insertToken(token).flatMap{ _ =>
-        tokenInfoRepository.getTokenInfo(token.token).map { tokenInfo =>
-          mediator ! Publish(mediatorTag, TokenActor.AddTokenToCache(tokenInfo))
+      val addFuture = for {
+        insert <- tokenInfoRepository.insertToken(token)
+        tokenInfo <- tokenInfoRepository.getTokenInfo(token.token)
+      } yield (insert, tokenInfo)
 
-        }
+      addFuture.map {
+        case (insertResult, tokenInfo: TokenInfo) =>
+          mediator ! Publish(mediatorTag, TokenActor.AddTokenInfoToCache(tokenInfo))
+          insertResult
       } pipeTo sender
-    case AddTokenToCache(tokenInfo) =>
+
+    case AddTokenInfoToCache(tokenInfo) =>
       cache.put(tokenInfo.token)(tokenInfo)
-    case GetTokenFromDB(token) =>
-      cache.cachingF(token)(None) {
-        tokenInfoRepository.getTokenInfo(token)
+      sender ! TokenCached(tokenInfo.token)
+
+    case GetTokenFromDB(tokenString) =>
+      cache.cachingF(tokenString)(None) {
+        tokenInfoRepository.getTokenInfo(tokenString)
       } pipeTo sender
 
-    case RemoveTokenFromCache(token) =>
-      cache.remove(token)
-      sender ! TokenInvalidated
+    case RemoveTokenInfoFromCache(tokenString) =>
+      cache.remove(tokenString)
+      sender ! TokenInvalidated(tokenString)
 
-    case RemoveTokenFromDB(token) =>
-      tokenInfoRepository.removeToken(token).map{ result =>
-        mediator ! Publish(mediatorTag, RemoveTokenFromCache(token))
+    case RemoveTokenFromDB(tokenString) =>
+      tokenInfoRepository.removeToken(tokenString).map { result =>
+        mediator ! Publish(mediatorTag, RemoveTokenInfoFromCache(tokenString))
         result
       } pipeTo sender
-
   }
 }
 
@@ -55,15 +62,17 @@ object TokenActor {
 
   case class AddTokenToDB(token: Token)
 
-  case class AddTokenToCache(tokenInfo: TokenInfo)
+  case class AddTokenInfoToCache(tokenInfo: TokenInfo)
+
+  case class TokenCached(token: String)
 
   case class GetTokenFromDB(token: String)
 
-  case class RemoveTokenFromCache(token: String)
+  case class RemoveTokenInfoFromCache(token: String)
 
   case class RemoveTokenFromDB(token: String)
 
-  case object TokenInvalidated
+  case class TokenInvalidated(token: String)
 
   def props(tokenInfoRepo: ITokenInfoRepository): Props =
     Props(classOf[TokenActor], tokenInfoRepo)
