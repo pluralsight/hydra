@@ -128,6 +128,8 @@ object Dependencies {
         ExclusionRule(organization = "ch.qos.logback"),
         ExclusionRule(organization = "org.slf4j")
       )
+    
+    val postgres = "org.postgresql" % "postgresql" % "42.2.4"
   }
 
   object Test {
@@ -151,7 +153,6 @@ object Dependencies {
     val embeddedConsul = "com.pszymczyk.consul" % "embedded-consul" % "1.1.1" % "test"
 
     val embeddedPostgres = "com.opentable.components" % "otj-pg-embedded" % "0.12.0" % "test"
-
   }
 
   import Compile._
@@ -169,7 +170,7 @@ object Dependencies {
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
   val coreDeps = akka ++ baseDeps ++ 
-    Seq(guavacache, reflections, serviceContainer, akkaKryo, sdNotify, h2db) ++
+    Seq(guavacache, reflections, serviceContainer, akkaKryo, sdNotify, postgres, h2db) ++
     confluent ++ kamon ++ slick ++ flyway
 
   val ingestDeps = coreDeps

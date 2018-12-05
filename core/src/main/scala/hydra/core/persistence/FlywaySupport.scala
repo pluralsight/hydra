@@ -16,12 +16,14 @@ object FlywaySupport {
     val migrateLocations = config.getString("flyway.locations")
     (urlConfig, userConfig, passwordConfig) match {
       case (Some(url), Some(user), Some(password)) =>
-        Flyway
+        val flyway = Flyway
           .configure()
           .locations(migrateLocations)
           .dataSource(url, user, password)
           .load()
-          .migrate()
+
+        flyway.baseline()
+        flyway.migrate()
 
       case _ => flogger.debug("Won't migration database: Not configured properly; " +
         "url, user and password are required.")
