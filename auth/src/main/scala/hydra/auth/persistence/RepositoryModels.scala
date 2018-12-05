@@ -16,7 +16,7 @@ trait RepositoryModels {
 
   type TokenType = (Int, DateTime, DateTime, String, Int)
 
-  class TokenTable(tag: Tag) extends Table[TokenType](tag, "token") {
+  class TokenTable(tag: Tag) extends Table[TokenType](tag, Some("ingest"), "token") {
     def id = column[Int]("id", O.PrimaryKey, O.AutoInc)
 
     def createdDate = column[DateTime]("created_date")
@@ -36,7 +36,7 @@ trait RepositoryModels {
 
   type GroupType = (Int, String, DateTime, DateTime)
 
-  class GroupTable(tag: Tag) extends Table[GroupType](tag, "group") {
+  class GroupTable(tag: Tag) extends Table[GroupType](tag, Some("ingest"), "group") {
     def id = column[Int]("id", O.PrimaryKey, O.AutoInc)
 
     def name = column[String]("name")
@@ -52,7 +52,7 @@ trait RepositoryModels {
 
   type ResourceType = (Int, String, Int)
 
-  class ResourceTable(tag: Tag) extends Table[ResourceType](tag, "resource") {
+  class ResourceTable(tag: Tag) extends Table[ResourceType](tag, Some("ingest"), "resource") {
     def id = column[Int]("id", O.PrimaryKey, O.AutoInc)
 
     def name = column[String]("name")
