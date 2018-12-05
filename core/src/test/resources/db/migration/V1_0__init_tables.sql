@@ -1,0 +1,6 @@
+CREATE TABLE test (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(255) NOT NULL,
+  created_date TIMESTAMP NOT NULL,
+  modified_date TIMESTAMP NOT NULL
+);

@@ -59,6 +59,15 @@ lazy val root = Project(
 ).settings(defaultSettings).aggregate(common, core, avro, ingest, kafka, sql, jdbc, rabbitmq,
   sandbox)
 
+lazy val auth = Project(
+  id = "auth",
+  base = file("auth")
+).dependsOn(core)
+  .settings(moduleSettings,
+    crossScalaVersions := Seq("2.11.8", "2.12.3"),
+    name := "hydra-auth",
+    libraryDependencies ++= Dependencies.authDeps)
+
 lazy val common = Project(
   id = "common",
   base = file("common")
