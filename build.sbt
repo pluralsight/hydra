@@ -125,7 +125,7 @@ lazy val sandbox = Project(
 lazy val ingest = Project(
   id = "ingest",
   base = file("ingest")
-).dependsOn(core, kafka)
+).dependsOn(core, kafka, auth)
   .settings(moduleSettings ++ dockerSettings,
     name := "hydra-ingest", libraryDependencies ++= Dependencies.ingestDeps)
   .enablePlugins(JavaAppPackaging, sbtdocker.DockerPlugin)

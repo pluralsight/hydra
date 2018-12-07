@@ -1,4 +1,4 @@
-package hydra.core.listeners
+package hydra.auth.listeners
 
 import com.github.vonnagy.service.container.listener.ContainerLifecycleListener
 import com.github.vonnagy.service.container.service.ContainerService
