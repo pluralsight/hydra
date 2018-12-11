@@ -1,8 +1,8 @@
 package hydra.auth.persistence
 
 import com.typesafe.config.ConfigFactory
-import hydra.auth.persistence.RepositoryModels.Token
-import hydra.auth.persistence.TokenInfoRepository.{MissingTokenException, TokenInfo}
+import hydra.auth.persistence.RepositoryModels.{Resource, Token}
+import hydra.auth.persistence.AuthRepository.{MissingTokenException, TokenInfo}
 import hydra.common.logging.LoggingAdapter
 import hydra.core.persistence.{FlywaySupport, H2PersistenceComponent}
 import org.joda.time.DateTime
@@ -13,7 +13,7 @@ import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 import scala.util.Try
 
-class TokenRepositoryISpec extends FlatSpec
+class AuthRepositoryISpec extends FlatSpec
   with Matchers
   with BeforeAndAfterAll
   with ScalaFutures
@@ -39,15 +39,15 @@ class TokenRepositoryISpec extends FlatSpec
   }
 
   "A TokenRepository" should "retrieve token info" in {
-    val tokenInfoRepo = new TokenInfoRepository(persistenceDelegate)
+    val authRepo = new AuthRepository(persistenceDelegate)
 
-    whenReady(tokenInfoRepo.getTokenInfo(expectedTokenInfo.token)) { actualTokenInfo =>
+    whenReady(authRepo.getTokenInfo(expectedTokenInfo.token)) { actualTokenInfo =>
       actualTokenInfo shouldEqual expectedTokenInfo
     }
   }
 
   it should "insert a new token" in {
-    val tokenInfoRepo = new TokenInfoRepository(persistenceDelegate)
+    val authRepo = new AuthRepository(persistenceDelegate)
     val token = Token(
       111,
       DateTime.parse("2000-03-15"),
@@ -57,30 +57,40 @@ class TokenRepositoryISpec extends FlatSpec
     )
 
     val f = for {
-      x <- tokenInfoRepo.insertToken(token)
-      y <- tokenInfoRepo.getTokenInfo(token.token)
+      x <- authRepo.insertToken(token)
+      y <- authRepo.getTokenInfo(token.token)
     } yield (x, y)
 
     whenReady(f, Timeout(Span(500, Millis))) {
       case (x, y) =>
-        x shouldBe true
+        x shouldBe token
         y shouldEqual TokenInfo("insert-token", Set("resourceA", "resourceB"))
     }
   }
 
   it should "return a failure for missing tokens" in {
-    val tokenInfoRepo = new TokenInfoRepository(persistenceDelegate)
+    val authRepo = new AuthRepository(persistenceDelegate)
 
-    whenReady(tokenInfoRepo.getTokenInfo("does-not-exist").failed) { e =>
+    whenReady(authRepo.getTokenInfo("does-not-exist").failed) { e =>
       e shouldBe a[MissingTokenException]
     }
   }
 
   it should "remove a token" in {
-    val tokenInfoRepo = new TokenInfoRepository(persistenceDelegate)
+    val authRepo = new AuthRepository(persistenceDelegate)
 
-    whenReady(tokenInfoRepo.removeToken(toDeleteToken)) { result =>
-      result shouldEqual true
+    whenReady(authRepo.removeToken(toDeleteToken)) { result =>
+      result shouldEqual toDeleteToken
     }
   }
+
+  it should "insert a resource" in {
+    val authRepo = new AuthRepository(persistenceDelegate)
+    val resource = Resource(1, "test-res", "test-type", 1)
+
+    whenReady(authRepo.insertResource(resource)) { result =>
+      result shouldEqual resource
+    }
+  }
+
 }

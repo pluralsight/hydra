@@ -1,14 +1,14 @@
 package hydra.auth.persistence
 
-import hydra.auth.persistence.RepositoryModels.Token
+import hydra.auth.persistence.RepositoryModels.{Resource, Token}
 import hydra.core.persistence.PersistenceDelegate
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class TokenInfoRepository(val persistenceDelegate: PersistenceDelegate) extends ITokenInfoRepository
+class AuthRepository(val persistenceDelegate: PersistenceDelegate) extends IAuthRepository
   with RepositoryModels {
 
-  import TokenInfoRepository._
+  import AuthRepository._
 
   import persistenceDelegate.profile.api._
 
@@ -49,11 +49,15 @@ class TokenInfoRepository(val persistenceDelegate: PersistenceDelegate) extends 
                  (implicit ec: ExecutionContext): Future[String] = {
     db.run(tokenTable.filter(_.token === token).delete).map(_ => token)
   }
+
+  def insertResource(resource: Resource)(implicit ec: ExecutionContext): Future[Resource] = {
+    db.run(resourceTable += Resource.unapply(resource).get).map(_ => resource)
+  }
 }
 
-object TokenInfoRepository {
-  def apply(persistenceDelegate: PersistenceDelegate): TokenInfoRepository =
-    new TokenInfoRepository(persistenceDelegate)
+object AuthRepository {
+  def apply(persistenceDelegate: PersistenceDelegate): AuthRepository =
+    new AuthRepository(persistenceDelegate)
 
   case class TokenInfo(token: String, resources: Set[String])
 

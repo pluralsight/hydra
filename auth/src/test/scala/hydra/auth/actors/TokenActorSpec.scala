@@ -6,7 +6,7 @@ import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.Subscribe
 import akka.testkit.{TestKit, TestProbe}
 import hydra.auth.actors.TokenActor._
-import hydra.auth.persistence.ITokenInfoRepository
+import hydra.auth.persistence.IAuthRepository
 import hydra.auth.persistence.RepositoryModels.Token
 import hydra.auth.util.TokenGenerator
 import org.joda.time.DateTime
@@ -32,7 +32,7 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val listener = TestProbe()
 
-    val repoStub = stub[ITokenInfoRepository]
+    val repoStub = stub[IAuthRepository]
 
     (repoStub.getTokenInfo(_: String)(_: ExecutionContext))
       .when(tokenInfo.token, *)
@@ -55,7 +55,7 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val listener = TestProbe()
 
-    val repoStub = stub[ITokenInfoRepository]
+    val repoStub = stub[IAuthRepository]
 
     (repoStub.getTokenInfo(_: String)(_: ExecutionContext))
       .when(*, *)
@@ -81,7 +81,7 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val listener = TestProbe()
 
-    val repoStub = stub[ITokenInfoRepository]
+    val repoStub = stub[IAuthRepository]
 
     val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
 
@@ -106,7 +106,7 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val listener = TestProbe()
 
-    val repoStub = stub[ITokenInfoRepository]
+    val repoStub = stub[IAuthRepository]
 
     val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
 
@@ -120,7 +120,7 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val listener = TestProbe()
 
-    val repoStub = stub[ITokenInfoRepository]
+    val repoStub = stub[IAuthRepository]
 
     val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
 
@@ -147,7 +147,7 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     mediator ! Subscribe(TokenActor.mediatorTag, listener.ref)
 
-    val repoStub = stub[ITokenInfoRepository]
+    val repoStub = stub[IAuthRepository]
 
     (repoStub.insertToken(_: Token)(_: ExecutionContext))
       .when(token, *)
@@ -177,7 +177,7 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val tokenInfo = TokenGenerator.generateTokenInfo
 
-    val repoStub = stub[ITokenInfoRepository]
+    val repoStub = stub[IAuthRepository]
 
     (repoStub.removeToken(_: String)(_: ExecutionContext))
       .when(tokenInfo.token, *)

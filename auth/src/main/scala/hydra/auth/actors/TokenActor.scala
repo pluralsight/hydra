@@ -3,8 +3,8 @@ package hydra.auth.actors
 import akka.actor.{Actor, Props}
 import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.{Publish, Subscribe}
-import hydra.auth.persistence.ITokenInfoRepository
-import hydra.auth.persistence.TokenInfoRepository.TokenInfo
+import hydra.auth.persistence.IAuthRepository
+import hydra.auth.persistence.AuthRepository.TokenInfo
 import akka.pattern.pipe
 import hydra.auth.persistence.RepositoryModels.Token
 import scalacache.modes.scalaFuture._
@@ -12,7 +12,7 @@ import scalacache.guava._
 
 import scala.concurrent.ExecutionContextExecutor
 
-class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
+class TokenActor(val authRepository: IAuthRepository) extends Actor {
 
   import TokenActor._
 
@@ -28,8 +28,8 @@ class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
   override def receive: Receive = {
     case AddTokenToDB(token) =>
       val dbInsert = for {
-        tokenString <- tokenInfoRepository.insertToken(token)
-        tokenInfo <- tokenInfoRepository.getTokenInfo(token.token)
+        tokenString <- authRepository.insertToken(token)
+        tokenInfo <- authRepository.getTokenInfo(token.token)
       } yield (tokenString, tokenInfo)
 
       dbInsert.map(_._1) pipeTo sender
@@ -45,7 +45,7 @@ class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
 
     case GetTokenFromDB(tokenString) =>
       cache.cachingF(tokenString)(None) {
-        tokenInfoRepository.getTokenInfo(tokenString)
+        authRepository.getTokenInfo(tokenString)
       } pipeTo sender
 
     case RemoveTokenInfoFromCache(tokenString) =>
@@ -53,7 +53,7 @@ class TokenActor(val tokenInfoRepository: ITokenInfoRepository) extends Actor {
       sender ! TokenInvalidated(tokenString)
 
     case RemoveTokenFromDB(tokenString) =>
-      val dbDelete = tokenInfoRepository.removeToken(tokenString)
+      val dbDelete = authRepository.removeToken(tokenString)
 
       dbDelete pipeTo sender
 
@@ -81,6 +81,6 @@ object TokenActor {
 
   case class TokenInvalidated(token: String)
 
-  def props(tokenInfoRepo: ITokenInfoRepository): Props =
+  def props(tokenInfoRepo: IAuthRepository): Props =
     Props(classOf[TokenActor], tokenInfoRepo)
 }
