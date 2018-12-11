@@ -11,6 +11,7 @@ import scalacache.modes.scalaFuture._
 import scalacache.guava._
 
 import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.duration._
 
 class TokenActor(val authRepository: IAuthRepository) extends Actor {
 
@@ -44,7 +45,7 @@ class TokenActor(val authRepository: IAuthRepository) extends Actor {
       sender ! TokenCached(tokenInfo.token)
 
     case GetTokenFromDB(tokenString) =>
-      cache.cachingF(tokenString)(None) {
+      cache.cachingF(tokenString)(Some(1.second)) {
         authRepository.getTokenInfo(tokenString)
       } pipeTo sender
 

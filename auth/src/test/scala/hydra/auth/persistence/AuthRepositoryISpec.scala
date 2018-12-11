@@ -25,7 +25,7 @@ class AuthRepositoryISpec extends FlatSpec
   val persistenceDelegate = new H2PersistenceComponent(ec)
   val db = persistenceDelegate.db
 
-  private val expectedTokenInfo = TokenInfo("test-token", Set("resourceA", "resourceB"))
+  private val expectedTokenInfo = TokenInfo("test-token", 1, Set("resourceA", "resourceB"))
 
   private val toDeleteToken = "to-delete-token"
 
@@ -64,7 +64,7 @@ class AuthRepositoryISpec extends FlatSpec
     whenReady(f, Timeout(Span(500, Millis))) {
       case (x, y) =>
         x shouldBe token
-        y shouldEqual TokenInfo("insert-token", Set("resourceA", "resourceB"))
+        y shouldEqual TokenInfo("insert-token", 1, Set("resourceA", "resourceB"))
     }
   }
 

@@ -26,13 +26,14 @@ class AuthRepository(val persistenceDelegate: PersistenceDelegate) extends IAuth
       } join resourceTable on {
         case ((_, g), r) => g.id === r.groupId
       } map {
-        case ((t, g), r) => (t.token, r.name)
+        case ((t, g), r) => (t.token, g.id, r.name)
       }
     }.filter(_._1 === token)
 
     db.run(query.result).map { resultTup =>
       if (resultTup.nonEmpty) {
-        TokenInfo(token, resultTup.map(_._2).toSet)
+        //careful, potentially multiple groups returned when query by token
+        TokenInfo(token, resultTup.map(_._2).head, resultTup.map(_._3).toSet)
       }
       else {
         throw new MissingTokenException(s"$token not found.")
@@ -59,7 +60,7 @@ object AuthRepository {
   def apply(persistenceDelegate: PersistenceDelegate): AuthRepository =
     new AuthRepository(persistenceDelegate)
 
-  case class TokenInfo(token: String, resources: Set[String])
+  case class TokenInfo(token: String, groupId: Int, resources: Set[String])
 
   class MissingTokenException(msg: String) extends RuntimeException(msg)
 
