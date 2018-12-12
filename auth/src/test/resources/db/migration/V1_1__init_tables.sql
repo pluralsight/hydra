@@ -1,11 +1,13 @@
-CREATE TABLE "group" (
+CREATE SCHEMA ingest;
+
+CREATE TABLE ingest."group" (
   id INT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(255) NOT NULL,
   created_date TIMESTAMP NOT NULL,
   modified_date TIMESTAMP NOT NULL
 );
 
-CREATE TABLE resource (
+CREATE TABLE ingest.resource (
   id INT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(255) NOT NULL,
   resource_type VARCHAR(255) NOT NULL,
@@ -13,7 +15,7 @@ CREATE TABLE resource (
   FOREIGN KEY (group_id) references "group"(id)
 );
 
-CREATE TABLE token (
+CREATE TABLE ingest.token (
    id INT PRIMARY KEY AUTO_INCREMENT,
    created_date TIMESTAMP NOT NULL,
    modified_date TIMESTAMP,
@@ -22,14 +24,14 @@ CREATE TABLE token (
    FOREIGN KEY (group_id) references "group"(id)
  );
 
-INSERT INTO "group" (name, created_date, modified_date) VALUES
+INSERT INTO ingest."group" (name, created_date, modified_date) VALUES
     ('test-group', '2018-11-29 00:00:00', '2018-11-29 00:00:00');
 
-INSERT INTO resource (name, resource_type, group_id) VALUES
+INSERT INTO ingest.resource (name, resource_type, group_id) VALUES
     ('resourceA', 'topic', 1),
     ('resourceB', 'topic', 1);
 
-INSERT INTO token (created_date, modified_date, token, group_id) VALUES
+INSERT INTO ingest.token (created_date, modified_date, token, group_id) VALUES
     ('2018-11-29 00:00:00', '2018-11-29 00:00:00', 'test-token', 1),
     ('2018-11-29 00:00:00', '2018-11-29 00:00:00', 'nope-token', 1),
     ('2018-11-29 00:00:00', '2018-11-29 00:00:00', 'to-delete-token', 1);

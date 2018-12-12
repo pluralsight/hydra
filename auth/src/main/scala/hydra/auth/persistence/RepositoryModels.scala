@@ -50,18 +50,18 @@ trait RepositoryModels {
 
   lazy val groupTable = TableQuery[GroupTable]
 
-  type ResourceType = (Int, String, Int)
+  type ResourceType = (Int, String, String, Int)
 
   class ResourceTable(tag: Tag) extends Table[ResourceType](tag, Some("ingest"), "resource") {
     def id = column[Int]("id", O.PrimaryKey, O.AutoInc)
 
     def name = column[String]("name")
 
-    def resourceType = column[String]("type")
+    def resourceType = column[String]("resource_type")
 
     def groupId = column[Int]("group_id")
 
-    def * = (id, name, groupId)
+    def * = (id, name, resourceType, groupId)
 
     def groupConstraint = foreignKey("resources_groups_fk", groupId, groupTable)(_.id)
   }

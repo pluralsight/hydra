@@ -1,14 +1,14 @@
 package hydra.auth.persistence
 
-import hydra.auth.persistence.RepositoryModels.Token
+import hydra.auth.persistence.RepositoryModels.{Resource, Token}
 import hydra.core.persistence.PersistenceDelegate
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class TokenInfoRepository(val persistenceDelegate: PersistenceDelegate) extends ITokenInfoRepository
+class AuthRepository(val persistenceDelegate: PersistenceDelegate) extends IAuthRepository
   with RepositoryModels {
 
-  import TokenInfoRepository._
+  import AuthRepository._
 
   import persistenceDelegate.profile.api._
 
@@ -26,13 +26,20 @@ class TokenInfoRepository(val persistenceDelegate: PersistenceDelegate) extends 
       } join resourceTable on {
         case ((_, g), r) => g.id === r.groupId
       } map {
-        case ((t, g), r) => (t.token, r.name)
+        case ((t, g), r) => (t.token, g.id, r.name)
       }
     }.filter(_._1 === token)
 
     db.run(query.result).map { resultTup =>
       if (resultTup.nonEmpty) {
-        TokenInfo(token, resultTup.map(_._2).toSet)
+        /*
+        Since the token is not the primary key for the token table, it is in theory possible to have
+         duplicate tokens which would result in multiple rows being returned for this query.  We
+         are pulling off just the head result, which could lead to unexpected behavior.  Unlikely,
+         but a potential gotcha if you are ever debugging this code wondering why your result looks
+         weird.
+         */
+        TokenInfo(token, resultTup.map(_._2).head, resultTup.map(_._3).toSet)
       }
       else {
         throw new MissingTokenException(s"$token not found.")
@@ -49,13 +56,17 @@ class TokenInfoRepository(val persistenceDelegate: PersistenceDelegate) extends 
                  (implicit ec: ExecutionContext): Future[String] = {
     db.run(tokenTable.filter(_.token === token).delete).map(_ => token)
   }
+
+  def insertResource(resource: Resource)(implicit ec: ExecutionContext): Future[Resource] = {
+    db.run(resourceTable += Resource.unapply(resource).get).map(_ => resource)
+  }
 }
 
-object TokenInfoRepository {
-  def apply(persistenceDelegate: PersistenceDelegate): TokenInfoRepository =
-    new TokenInfoRepository(persistenceDelegate)
+object AuthRepository {
+  def apply(persistenceDelegate: PersistenceDelegate): AuthRepository =
+    new AuthRepository(persistenceDelegate)
 
-  case class TokenInfo(token: String, resources: Set[String])
+  case class TokenInfo(token: String, groupId: Int, resources: Set[String])
 
   class MissingTokenException(msg: String) extends RuntimeException(msg)
 

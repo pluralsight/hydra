@@ -5,9 +5,9 @@ import akka.actor.{ActorSystem, Props}
 import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.Subscribe
 import akka.testkit.{TestKit, TestProbe}
-import hydra.auth.actors.TokenActor._
-import hydra.auth.persistence.ITokenInfoRepository
-import hydra.auth.persistence.RepositoryModels.Token
+import hydra.auth.actors.AuthenticationCacheActor._
+import hydra.auth.persistence.IAuthRepository
+import hydra.auth.persistence.RepositoryModels.{Resource, Token}
 import hydra.auth.util.TokenGenerator
 import org.joda.time.DateTime
 import org.scalamock.scalatest.MockFactory
@@ -15,7 +15,7 @@ import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
+class AuthenticationCacheActorSpec extends TestKit(ActorSystem("token-actor-spec"))
   with FlatSpecLike
   with Matchers
   with BeforeAndAfterAll
@@ -32,16 +32,16 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val listener = TestProbe()
 
-    val repoStub = stub[ITokenInfoRepository]
+    val repoStub = stub[IAuthRepository]
 
     (repoStub.getTokenInfo(_: String)(_: ExecutionContext))
       .when(tokenInfo.token, *)
       .returning(Future.successful(tokenInfo))
 
-    val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
+    val tokenActor = system.actorOf(Props(classOf[AuthenticationCacheActor], repoStub))
 
     // call to insert into cache
-    tokenActor.tell(GetTokenFromDB(tokenInfo.token), listener.ref)
+    tokenActor.tell(GetTokenInfo(tokenInfo.token), listener.ref)
 
     (repoStub.getTokenInfo(_: String)(_: ExecutionContext))
       .verify(tokenInfo.token, *)
@@ -55,16 +55,16 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val listener = TestProbe()
 
-    val repoStub = stub[ITokenInfoRepository]
+    val repoStub = stub[IAuthRepository]
 
     (repoStub.getTokenInfo(_: String)(_: ExecutionContext))
       .when(*, *)
       .returning(Future.failed(new RuntimeException()))
 
-    val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
+    val tokenActor = system.actorOf(Props(classOf[AuthenticationCacheActor], repoStub))
 
     // call to insert into cache
-    tokenActor.tell(GetTokenFromDB(tokenInfo.token), listener.ref)
+    tokenActor.tell(GetTokenInfo(tokenInfo.token), listener.ref)
 
     (repoStub.getTokenInfo(_: String)(_: ExecutionContext))
       .verify(tokenInfo.token, *)
@@ -81,15 +81,15 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val listener = TestProbe()
 
-    val repoStub = stub[ITokenInfoRepository]
+    val repoStub = stub[IAuthRepository]
 
-    val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
+    val tokenActor = system.actorOf(Props(classOf[AuthenticationCacheActor], repoStub))
 
     (repoStub.getTokenInfo(_: String)(_: ExecutionContext))
       .when(tokenInfo.token, *)
       .returning(Future.successful(tokenInfo))
 
-    tokenActor.tell(GetTokenFromDB(tokenInfo.token), listener.ref)
+    tokenActor.tell(GetTokenInfo(tokenInfo.token), listener.ref)
 
     (repoStub.getTokenInfo(_: String)(_: ExecutionContext))
       .verify(tokenInfo.token, *)
@@ -97,7 +97,7 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val info = listener.expectMsg(tokenInfo)
 
-    tokenActor.tell(GetTokenFromDB(info.token), listener.ref)
+    tokenActor.tell(GetTokenInfo(info.token), listener.ref)
 
   }
 
@@ -106,11 +106,11 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val listener = TestProbe()
 
-    val repoStub = stub[ITokenInfoRepository]
+    val repoStub = stub[IAuthRepository]
 
-    val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
+    val tokenActor = system.actorOf(Props(classOf[AuthenticationCacheActor], repoStub))
 
-    tokenActor.tell(AddTokenInfoToCache(tokenInfo), listener.ref)
+    tokenActor.tell(AddTokenToCache(tokenInfo), listener.ref)
 
     listener.expectMsg(TokenCached(tokenInfo.token))
   }
@@ -120,11 +120,11 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val listener = TestProbe()
 
-    val repoStub = stub[ITokenInfoRepository]
+    val repoStub = stub[IAuthRepository]
 
-    val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
+    val tokenActor = system.actorOf(Props(classOf[AuthenticationCacheActor], repoStub))
 
-    tokenActor.tell(RemoveTokenInfoFromCache(tokenInfo.token), listener.ref)
+    tokenActor.tell(RemoveTokenFromCache(tokenInfo.token), listener.ref)
 
     listener.expectMsg(TokenInvalidated(tokenInfo.token))
 
@@ -145,9 +145,9 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val listener = TestProbe()
 
-    mediator ! Subscribe(TokenActor.mediatorTag, listener.ref)
+    mediator ! Subscribe(AuthenticationCacheActor.MediatorTag, listener.ref)
 
-    val repoStub = stub[ITokenInfoRepository]
+    val repoStub = stub[IAuthRepository]
 
     (repoStub.insertToken(_: Token)(_: ExecutionContext))
       .when(token, *)
@@ -157,11 +157,11 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
       .when(token.token, *)
       .returning(Future.successful(tokenInfo))
 
-    val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
+    val tokenActor = system.actorOf(Props(classOf[AuthenticationCacheActor], repoStub))
 
     tokenActor.tell(AddTokenToDB(token), listener.ref)
 
-    listener.expectMsgAllOf(AddTokenInfoToCache(tokenInfo), token)
+    listener.expectMsgAllOf(AddTokenToCache(tokenInfo), token)
 
     (repoStub.insertToken(_: Token)(_: ExecutionContext))
       .verify(token, *)
@@ -173,24 +173,61 @@ class TokenActorSpec extends TestKit(ActorSystem("token-actor-spec"))
 
     val probiño = TestProbe()
 
-    mediator ! Subscribe(TokenActor.mediatorTag, probiño.ref)
+    mediator ! Subscribe(AuthenticationCacheActor.MediatorTag, probiño.ref)
 
     val tokenInfo = TokenGenerator.generateTokenInfo
 
-    val repoStub = stub[ITokenInfoRepository]
+    val repoStub = stub[IAuthRepository]
 
     (repoStub.removeToken(_: String)(_: ExecutionContext))
       .when(tokenInfo.token, *)
       .returning(Future.successful(tokenInfo.token))
 
-    val tokenActor = system.actorOf(Props(classOf[TokenActor], repoStub))
+    val tokenActor = system.actorOf(Props(classOf[AuthenticationCacheActor], repoStub))
 
     tokenActor.tell(RemoveTokenFromDB(tokenInfo.token), probiño.ref)
 
-    probiño.expectMsgAllOf(RemoveTokenInfoFromCache(tokenInfo.token), tokenInfo.token)
+    probiño.expectMsgAllOf(RemoveTokenFromCache(tokenInfo.token), tokenInfo.token)
 
     (repoStub.removeToken(_: String)(_: ExecutionContext))
       .verify(tokenInfo.token, *)
+      .once
+  }
+
+  it should "add a resource to the db and broadcast a message to the cluster to update caches" in {
+    val mediator = DistributedPubSub(system).mediator
+
+    val probiña = TestProbe()
+
+    mediator ! Subscribe(AuthenticationCacheActor.MediatorTag, probiña.ref)
+
+    val tokenInfo = TokenGenerator.generateTokenInfo
+
+    val resource = Resource(0, "test-resource", "topic", 1)
+
+    val repoStub = stub[IAuthRepository]
+
+    (repoStub.insertResource(_: Resource)(_: ExecutionContext))
+      .when(resource, *)
+      .returning(Future.successful(resource))
+
+    val expectedTokenInfo = tokenInfo.copy(resources = tokenInfo.resources ++ Set(resource.name))
+
+    (repoStub.getTokenInfo(_: String)(_: ExecutionContext))
+      .when(*, *)
+      .returning(Future.successful(expectedTokenInfo))
+
+    val tokenActor = system.actorOf(Props(classOf[AuthenticationCacheActor], repoStub))
+
+    tokenActor.tell(
+      AddResourceToDB(tokenInfo.token, resource),
+      probiña.ref
+    )
+
+    probiña.expectMsgAllOf(AddTokenToCache(expectedTokenInfo), resource)
+
+    (repoStub.insertResource(_: Resource)(_: ExecutionContext))
+      .verify(resource, *)
       .once
   }
 }
