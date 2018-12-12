@@ -3,19 +3,19 @@ package hydra.auth.actors
 import akka.actor.{Actor, Props}
 import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.{Publish, Subscribe}
-import hydra.auth.persistence.IAuthRepository
-import hydra.auth.persistence.AuthRepository.TokenInfo
 import akka.pattern.pipe
-import hydra.auth.persistence.RepositoryModels.Token
-import scalacache.modes.scalaFuture._
+import hydra.auth.persistence.AuthRepository.TokenInfo
+import hydra.auth.persistence.IAuthRepository
+import hydra.auth.persistence.RepositoryModels.{Resource, Token}
 import scalacache.guava._
+import scalacache.modes.scalaFuture._
 
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 
-class TokenActor(val authRepository: IAuthRepository) extends Actor {
+class AuthenticationCacheActor(val authRepository: IAuthRepository) extends Actor {
 
-  import TokenActor._
+  import AuthenticationCacheActor._
 
   private val cache = GuavaCache[TokenInfo]
   private implicit val ec: ExecutionContextExecutor = context.dispatcher
@@ -23,7 +23,7 @@ class TokenActor(val authRepository: IAuthRepository) extends Actor {
   private val mediator = DistributedPubSub(context.system).mediator
 
   override def preStart(): Unit = {
-    mediator ! Subscribe(mediatorTag, self)
+    mediator ! Subscribe(MediatorTag, self)
   }
 
   override def receive: Receive = {
@@ -37,19 +37,19 @@ class TokenActor(val authRepository: IAuthRepository) extends Actor {
 
       dbInsert.foreach {
         case (_, tokenInfo: TokenInfo) =>
-          mediator ! Publish(mediatorTag, TokenActor.AddTokenInfoToCache(tokenInfo))
+          mediator ! Publish(MediatorTag, AuthenticationCacheActor.AddTokenInfoToCache(tokenInfo))
       }
 
     case AddTokenInfoToCache(tokenInfo) =>
       cache.put(tokenInfo.token)(tokenInfo)
       sender ! TokenCached(tokenInfo.token)
 
-    case GetTokenFromDB(tokenString) =>
+    case GetTokenInfo(tokenString) =>
       cache.cachingF(tokenString)(Some(1.second)) {
         authRepository.getTokenInfo(tokenString)
       } pipeTo sender
 
-    case RemoveTokenInfoFromCache(tokenString) =>
+    case RemoveTokenFromCache(tokenString) =>
       cache.remove(tokenString)
       sender ! TokenInvalidated(tokenString)
 
@@ -59,29 +59,41 @@ class TokenActor(val authRepository: IAuthRepository) extends Actor {
       dbDelete pipeTo sender
 
       dbDelete.foreach { _ =>
-        mediator ! Publish(mediatorTag, RemoveTokenInfoFromCache(tokenString))
+        mediator ! Publish(MediatorTag, RemoveTokenFromCache(tokenString))
+      }
+
+    case AddResourceToDB(tokenString, resource) =>
+      val insertFuture = authRepository.insertResource(resource)
+
+      insertFuture pipeTo sender()
+
+      for {
+        tokenInfo <- cache.get(tokenString)
+        result <- cache.put(tokenString)(tokenInfo)
       }
   }
 }
 
-object TokenActor {
+object AuthenticationCacheActor {
 
-  val mediatorTag = "token-actor"
+  val MediatorTag = "token-actor"
 
   case class AddTokenToDB(token: Token)
+
+  case class AddResourceToDB(token: String, resource: Resource)
 
   case class AddTokenInfoToCache(tokenInfo: TokenInfo)
 
   case class TokenCached(token: String)
 
-  case class GetTokenFromDB(token: String)
+  case class GetTokenInfo(token: String)
 
-  case class RemoveTokenInfoFromCache(token: String)
+  case class RemoveTokenFromCache(token: String)
 
   case class RemoveTokenFromDB(token: String)
 
   case class TokenInvalidated(token: String)
 
   def props(tokenInfoRepo: IAuthRepository): Props =
-    Props(classOf[TokenActor], tokenInfoRepo)
+    Props(classOf[AuthenticationCacheActor], tokenInfoRepo)
 }

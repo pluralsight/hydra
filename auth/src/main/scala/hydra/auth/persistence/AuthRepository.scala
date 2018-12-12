@@ -32,7 +32,13 @@ class AuthRepository(val persistenceDelegate: PersistenceDelegate) extends IAuth
 
     db.run(query.result).map { resultTup =>
       if (resultTup.nonEmpty) {
-        //careful, potentially multiple groups returned when query by token
+        /*
+        Since the token is not the primary key for the token table, it is in theory possible to have
+         duplicate tokens which would result in multiple rows being returned for this query.  We
+         are pulling off just the head result, which could lead to unexpected behavior.  Unlikely,
+         but a potential gotcha if you are ever debugging this code wondering why your result looks
+         weird.
+         */
         TokenInfo(token, resultTup.map(_._2).head, resultTup.map(_._3).toSet)
       }
       else {

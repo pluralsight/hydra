@@ -1,6 +1,6 @@
 package hydra.auth.persistence
 
-import hydra.auth.persistence.RepositoryModels.Token
+import hydra.auth.persistence.RepositoryModels.{Resource, Token}
 import hydra.auth.persistence.AuthRepository.TokenInfo
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -14,4 +14,7 @@ trait IAuthRepository {
 
   def removeToken(token: String)
                  (implicit ec: ExecutionContext): Future[String]
+
+  def insertResource(resource: Resource)
+                    (implicit ec: ExecutionContext): Future[Resource]
 }
