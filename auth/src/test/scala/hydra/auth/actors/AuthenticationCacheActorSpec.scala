@@ -6,7 +6,6 @@ import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.Subscribe
 import akka.testkit.{TestKit, TestProbe}
 import hydra.auth.actors.AuthenticationCacheActor._
-import hydra.auth.persistence.AuthRepository.TokenInfo
 import hydra.auth.persistence.IAuthRepository
 import hydra.auth.persistence.RepositoryModels.{Resource, Token}
 import hydra.auth.util.TokenGenerator

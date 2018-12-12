@@ -26,8 +26,16 @@ class AuthenticationCacheActor(val authRepository: IAuthRepository) extends Acto
     mediator ! Subscribe(MediatorTag, self)
   }
 
-  //noinspection ScalaStyle
-  override def receive: Receive = {
+  override def receive: Receive =
+    insertOps orElse
+      deleteOps orElse {
+      case GetTokenInfo(tokenString) =>
+        cache.cachingF(tokenString)(Some(1.second)) {
+          authRepository.getTokenInfo(tokenString)
+        } pipeTo sender
+    }
+
+  def insertOps: Receive = {
     case AddTokenToDB(token) =>
       val dbInsert = for {
         tokenString <- authRepository.insertToken(token)
@@ -45,11 +53,19 @@ class AuthenticationCacheActor(val authRepository: IAuthRepository) extends Acto
       cache.put(tokenInfo.token)(tokenInfo)
       sender ! TokenCached(tokenInfo.token)
 
-    case GetTokenInfo(tokenString) =>
-      cache.cachingF(tokenString)(Some(1.second)) {
-        authRepository.getTokenInfo(tokenString)
-      } pipeTo sender
+    case AddResourceToDB(tokenString, resource) =>
+      val dbFuture = for {
+        rsc <- authRepository.insertResource(resource)
+        tokenInfo <- authRepository.getTokenInfo(tokenString)
+      } yield (rsc, tokenInfo)
 
+      dbFuture.map(_._1) pipeTo sender()
+      dbFuture.foreach { case (_, tokenInfo: TokenInfo) =>
+        mediator ! Publish(MediatorTag, AddTokenInfoToCache(tokenInfo))
+      }
+  }
+
+  def deleteOps: Receive = {
     case RemoveTokenFromCache(tokenString) =>
       cache.remove(tokenString)
       sender ! TokenInvalidated(tokenString)
@@ -61,17 +77,6 @@ class AuthenticationCacheActor(val authRepository: IAuthRepository) extends Acto
 
       dbDelete.foreach { _ =>
         mediator ! Publish(MediatorTag, RemoveTokenFromCache(tokenString))
-      }
-
-    case AddResourceToDB(tokenString, resource) =>
-      val dbFuture = for {
-        rsc <- authRepository.insertResource(resource)
-        tokenInfo <- authRepository.getTokenInfo(tokenString)
-      } yield (rsc, tokenInfo)
-
-      dbFuture.map(_._1) pipeTo sender()
-      dbFuture.foreach { case (_, tokenInfo: TokenInfo) =>
-        mediator ! Publish(MediatorTag, AddTokenInfoToCache(tokenInfo))
       }
   }
 }
