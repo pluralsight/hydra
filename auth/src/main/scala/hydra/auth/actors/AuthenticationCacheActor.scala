@@ -26,6 +26,7 @@ class AuthenticationCacheActor(val authRepository: IAuthRepository) extends Acto
     mediator ! Subscribe(MediatorTag, self)
   }
 
+  //noinspection ScalaStyle
   override def receive: Receive = {
     case AddTokenToDB(token) =>
       val dbInsert = for {
@@ -63,13 +64,14 @@ class AuthenticationCacheActor(val authRepository: IAuthRepository) extends Acto
       }
 
     case AddResourceToDB(tokenString, resource) =>
-      val insertFuture = authRepository.insertResource(resource)
+      val dbFuture = for {
+        rsc <- authRepository.insertResource(resource)
+        tokenInfo <- authRepository.getTokenInfo(tokenString)
+      } yield (rsc, tokenInfo)
 
-      insertFuture pipeTo sender()
-
-      for {
-        tokenInfo <- cache.get(tokenString)
-        result <- cache.put(tokenString)(tokenInfo)
+      dbFuture.map(_._1) pipeTo sender()
+      dbFuture.foreach { case (_, tokenInfo: TokenInfo) =>
+        mediator ! Publish(MediatorTag, AddTokenInfoToCache(tokenInfo))
       }
   }
 }

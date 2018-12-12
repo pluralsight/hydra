@@ -212,15 +212,18 @@ class AuthenticationCacheActorSpec extends TestKit(ActorSystem("token-actor-spec
       .when(resource, *)
       .returning(Future.successful(resource))
 
+    val expectedTokenInfo = tokenInfo.copy(resources = tokenInfo.resources ++ Set(resource.name))
+
+    (repoStub.getTokenInfo(_: String)(_: ExecutionContext))
+      .when(*, *)
+      .returning(Future.successful(expectedTokenInfo))
+
     val tokenActor = system.actorOf(Props(classOf[AuthenticationCacheActor], repoStub))
 
     tokenActor.tell(
       AddResourceToDB(tokenInfo.token, resource),
       probiña.ref
     )
-
-    val expectedTokenInfo = TokenInfo(tokenInfo.token, tokenInfo.groupId,
-      tokenInfo.resources ++ Set(resource.name))
 
     probiña.expectMsgAllOf(AddTokenInfoToCache(expectedTokenInfo), resource)
 
