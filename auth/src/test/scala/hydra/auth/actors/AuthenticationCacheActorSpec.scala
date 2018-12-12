@@ -110,7 +110,7 @@ class AuthenticationCacheActorSpec extends TestKit(ActorSystem("token-actor-spec
 
     val tokenActor = system.actorOf(Props(classOf[AuthenticationCacheActor], repoStub))
 
-    tokenActor.tell(AddTokenInfoToCache(tokenInfo), listener.ref)
+    tokenActor.tell(AddTokenToCache(tokenInfo), listener.ref)
 
     listener.expectMsg(TokenCached(tokenInfo.token))
   }
@@ -161,7 +161,7 @@ class AuthenticationCacheActorSpec extends TestKit(ActorSystem("token-actor-spec
 
     tokenActor.tell(AddTokenToDB(token), listener.ref)
 
-    listener.expectMsgAllOf(AddTokenInfoToCache(tokenInfo), token)
+    listener.expectMsgAllOf(AddTokenToCache(tokenInfo), token)
 
     (repoStub.insertToken(_: Token)(_: ExecutionContext))
       .verify(token, *)
@@ -224,7 +224,7 @@ class AuthenticationCacheActorSpec extends TestKit(ActorSystem("token-actor-spec
       probiña.ref
     )
 
-    probiña.expectMsgAllOf(AddTokenInfoToCache(expectedTokenInfo), resource)
+    probiña.expectMsgAllOf(AddTokenToCache(expectedTokenInfo), resource)
 
     (repoStub.insertResource(_: Resource)(_: ExecutionContext))
       .verify(resource, *)

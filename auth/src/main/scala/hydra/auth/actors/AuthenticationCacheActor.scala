@@ -46,10 +46,10 @@ class AuthenticationCacheActor(val authRepository: IAuthRepository) extends Acto
 
       dbInsert.foreach {
         case (_, tokenInfo: TokenInfo) =>
-          mediator ! Publish(MediatorTag, AuthenticationCacheActor.AddTokenInfoToCache(tokenInfo))
+          mediator ! Publish(MediatorTag, AuthenticationCacheActor.AddTokenToCache(tokenInfo))
       }
 
-    case AddTokenInfoToCache(tokenInfo) =>
+    case AddTokenToCache(tokenInfo) =>
       cache.put(tokenInfo.token)(tokenInfo)
       sender ! TokenCached(tokenInfo.token)
 
@@ -61,7 +61,7 @@ class AuthenticationCacheActor(val authRepository: IAuthRepository) extends Acto
 
       dbFuture.map(_._1) pipeTo sender()
       dbFuture.foreach { case (_, tokenInfo: TokenInfo) =>
-        mediator ! Publish(MediatorTag, AddTokenInfoToCache(tokenInfo))
+        mediator ! Publish(MediatorTag, AddTokenToCache(tokenInfo))
       }
   }
 
@@ -89,7 +89,7 @@ object AuthenticationCacheActor {
 
   case class AddResourceToDB(token: String, resource: Resource)
 
-  case class AddTokenInfoToCache(tokenInfo: TokenInfo)
+  case class AddTokenToCache(tokenInfo: TokenInfo)
 
   case class TokenCached(token: String)
 
