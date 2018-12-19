@@ -170,7 +170,7 @@ class PostgresDialectSpec extends Matchers
       PostgresDialect.getSchemaQuery("table") shouldBe "SELECT * FROM table WHERE 1=0"
     }
 
-    it("uses a json column") {
+    it("uses a json column for records") {
       val schema =
         """
           |{
@@ -193,6 +193,36 @@ class PostgresDialectSpec extends Matchers
           |       "fields": [
           |         {"name": "streetAddress", "type": "string"}
           |       ]}
+          |    }
+          |	]
+          |}""".stripMargin
+
+      val avro = new Schema.Parser().parse(schema)
+
+      PostgresDialect.insertStatement("table", avro,
+        UnderscoreSyntax) shouldBe "INSERT INTO table (\"id\",\"username\",\"address\") VALUES (?,?,to_json(?::json))"
+    }
+
+    it("uses a json column for maps") {
+      val schema =
+        """
+          |{
+          |	"type": "record",
+          |	"name": "User",
+          |	"namespace": "hydra",
+          | "hydra.key": "id",
+          |	"fields": [{
+          |			"name": "id",
+          |			"type": "int",
+          |			"doc": "doc"
+          |		},
+          |		{
+          |			"name": "username",
+          |			"type": ["null", "string"]
+          |		},
+          |      {"name": "address", "type":
+          |      {"type": "map",
+          |       "values": "string"}
           |    }
           |	]
           |}""".stripMargin

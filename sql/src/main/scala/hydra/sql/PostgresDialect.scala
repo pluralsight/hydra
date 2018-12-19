@@ -23,6 +23,7 @@ private[sql] object PostgresDialect extends JdbcDialect with LoggingAdapter {
 
   private val uc = new UUIDConversion
 
+  //noinspection ScalaStyle
   override def getJDBCType(schema: Schema): Option[JdbcType] = schema.getType match {
     case Type.STRING => logicalStringTypes(schema)
     case BYTES => bytesType(schema)
@@ -32,6 +33,7 @@ private[sql] object PostgresDialect extends JdbcDialect with LoggingAdapter {
     case UNION => unionType(schema)
     case Type.RECORD => Some(JdbcType("JSON", JDBCType.VARCHAR))
     case Type.ARRAY => getArrayType(schema)
+    case Type.MAP => Some(JdbcType("JSON", JDBCType.VARCHAR))
     case _ => None
   }
 
