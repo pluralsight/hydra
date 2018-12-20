@@ -55,8 +55,8 @@
       "default": null
     },
     {
-      "name": "schema",
-      "type": "string"
+      "name": "schemaId",
+      "type": "int"
     }
   ]
 }

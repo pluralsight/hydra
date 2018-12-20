@@ -11,7 +11,7 @@ import hydra.common.logging.LoggingAdapter
 import hydra.common.util.TryWith
 import hydra.kafka.config.KafkaConfigSupport
 import org.apache.kafka.clients.admin.{AdminClient, CreateTopicsResult, NewTopic}
-import org.apache.kafka.clients.consumer.ConsumerConfig
+import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer}
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 
 import scala.collection.JavaConverters._
@@ -114,21 +114,6 @@ object KafkaUtils extends ConfigSupport {
     clientConfig.atKey("kafka-clients").withFallback(akkaConfig)
   }
 
-
-  private[kafka] def requestAndReceive(buffer: Array[Byte], address: String,
-                                       port: Int): Try[Array[Byte]] = {
-    TryWith(new Socket(address, port)) { socket =>
-      val dos = new DataOutputStream(socket.getOutputStream)
-      val dis = new DataInputStream(socket.getInputStream)
-
-      dos.writeInt(buffer.length)
-      dos.write(buffer)
-      dos.flush()
-      val resp = new Array[Byte](dis.readInt)
-      dis.readFully(resp)
-      resp
-    }
-  }
 
   def apply(config: Config): KafkaUtils = KafkaUtils(ConfigSupport.toMap(config))
 

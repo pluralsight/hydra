@@ -15,7 +15,6 @@ import hydra.kafka.producer.AvroRecord
 import hydra.kafka.services.TopicBootstrapActor.{BootstrapFailure, BootstrapSuccess, InitiateTopicBootstrap}
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.avro.Schema
-import org.apache.avro.generic.GenericRecord
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
@@ -140,8 +139,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     }
 
     probe.expectMsgPF() {
-      case Ingest(msg: HydraRecord[_, GenericRecord], ack) =>
-        msg shouldBe an[AvroRecord]
+      case Ingest(msg: AvroRecord, ack) =>
         msg.payload.getSchema.getName shouldBe "topic"
         ack shouldBe AckStrategy.Replicated
     }
@@ -332,8 +330,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     }
 
     probe.expectMsgPF() {
-      case Ingest(msg: HydraRecord[_, GenericRecord], ack) =>
-        msg shouldBe an[AvroRecord]
+      case Ingest(msg: AvroRecord, ack) =>
         msg.payload.getSchema.getName shouldBe "topic"
         ack shouldBe AckStrategy.Replicated
     }
@@ -405,8 +402,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     }
 
     probe.expectMsgPF() {
-      case Ingest(msg: HydraRecord[_, GenericRecord], ack) =>
-        msg shouldBe an[AvroRecord]
+      case Ingest(msg: AvroRecord, ack) =>
         msg.payload.getSchema.getName shouldBe "topic"
         ack shouldBe AckStrategy.Replicated
     }
@@ -466,8 +462,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     }
 
     probe.expectMsgPF() {
-      case Ingest(msg: HydraRecord[_, GenericRecord], ack) =>
-        msg shouldBe an[AvroRecord]
+      case Ingest(msg: AvroRecord, ack) =>
         msg.payload.getSchema.getName shouldBe "topic"
         ack shouldBe AckStrategy.Replicated
     }

@@ -1,7 +1,19 @@
 package hydra.kafka.model
 
+import java.util.UUID
+
+import spray.json.JsObject
+
 /**
   * Created by alexsilva on 3/30/17.
   */
-case class TopicMetadata(name: String, description: String, organization: String, team: String, contact: String,
-                         schema: String, tags: Seq[String] = Seq.empty)
+case class TopicMetadata(subject: String,
+                         schemaId: Int,
+                         streamType: String,
+                         derived: Boolean,
+                         dataClassification: String,
+                         contact: String,
+                         additionalDocumentation: Option[String],
+                         notes: Option[String],
+                         id: UUID,
+                         createdDate: org.joda.time.DateTime)

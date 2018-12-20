@@ -1,8 +1,8 @@
 package hydra.kafka.services
 
-import java.util
-import java.util.UUID
 import java.util.concurrent.TimeUnit
+import java.util.{Arrays, UUID}
+import java.{time, util}
 
 import akka.actor.Status.{Failure => AkkaFailure}
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSelection, Props, Stash, Timers}
@@ -16,27 +16,32 @@ import hydra.core.ingest.{HydraRequest, RequestParams}
 import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
+import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.{AvroRecord, AvroRecordFactory}
 import hydra.kafka.util.KafkaUtils
+import hydra.kafka.util.KafkaUtils.loadConsumerSettings
+import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
-import spray.json._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.io.Source
-import scala.util.{Failure, Success}
+import scala.util._
 
 class TopicBootstrapActor(schemaRegistryActor: ActorRef,
                           kafkaIngestor: ActorSelection,
                           bootstrapConfig: Option[Config] = None) extends Actor
-  with HydraJsonSupport
   with ActorLogging
   with ConfigSupport
+  with HydraJsonSupport
   with Stash
   with Timers {
 
   import TopicBootstrapActor._
+  import spray.json._
+
+  implicit val metadataFormat = jsonFormat10(TopicMetadata)
 
   implicit val ec = context.dispatcher
 
@@ -44,14 +49,26 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
 
   val schema = Source.fromResource("HydraMetadataTopic.avsc").mkString
 
-  override def preStart(): Unit = {
-    pipe(registerSchema(schema)) to self
-  }
-
-  val kafkaUtils = KafkaUtils()
+  private val kafkaUtils = KafkaUtils()
 
   val bootstrapKafkaConfig: Config = bootstrapConfig getOrElse
     applicationConfig.getConfig("bootstrap-config")
+
+  private val metadataTopicName = bootstrapKafkaConfig.get[String]("metadata-topic-name")
+    .valueOrElse("__hydra.metadata.topic")
+
+  private lazy val consumer = {
+    val c = loadConsumerSettings[String, Object](rootConfig, self.path.name).createKafkaConsumer()
+    c.subscribe(Arrays.asList(metadataTopicName))
+    val partitions = c.partitionsFor(metadataTopicName).asScala
+    c.seekToBeginning(partitions.map(i => new TopicPartition(metadataTopicName, i.partition)).asJava)
+    c
+  }
+
+
+  override def preStart(): Unit = {
+    pipe(registerSchema(schema)) to self
+  }
 
   val topicDetailsConfig: util.Map[String, String] = Map[String, String]().empty.asJava
 
@@ -84,13 +101,12 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     case InitiateTopicBootstrap(topicMetadataRequest) =>
       TopicNameValidator.validate(topicMetadataRequest.subject) match {
         case Success(_) =>
-          val ingestFuture = ingestMetadata(topicMetadataRequest)
-
-          val registerSchemaFuture = registerSchema(topicMetadataRequest.schema.compactPrint)
+          val registerAndIngest = registerSchema(topicMetadataRequest.schema.compactPrint).map { r =>
+            ingestMetadata(topicMetadataRequest, r.schemaResource.id)
+          }
 
           val result = for {
-            _ <- ingestFuture
-            _ <- registerSchemaFuture
+            _ <- registerAndIngest
             bootstrapResult <- createKafkaTopic(topicMetadataRequest)
           } yield bootstrapResult
 
@@ -102,6 +118,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
         case Failure(ex: TopicNameValidatorException) =>
           Future(BootstrapFailure(ex.reasons)) pipeTo sender
       }
+
   }
 
   def failed(ex: Throwable): Receive = {
@@ -119,8 +136,9 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     (schemaRegistryActor ? RegisterSchemaRequest(schemaJson)).mapTo[RegisterSchemaResponse]
   }
 
-  private[kafka] def ingestMetadata(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
-    buildAvroRecord(topicMetadataRequest).flatMap { avroRecord =>
+  private[kafka] def ingestMetadata(topicMetadataRequest: TopicMetadataRequest,
+                                    schemaId: Int): Future[BootstrapResult] = {
+    buildAvroRecord(topicMetadataRequest, schemaId).flatMap { avroRecord =>
       (kafkaIngestor ? Ingest(avroRecord, avroRecord.ackStrategy)).map {
         case IngestorCompleted => BootstrapSuccess
         case IngestorError(ex) =>
@@ -137,19 +155,27 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     }
   }
 
-  private[kafka] def buildAvroRecord(topicMetadataRequest: TopicMetadataRequest): Future[AvroRecord] = {
-    val enrichedReq = topicMetadataRequest
-      .copy(createdDate = Some(org.joda.time.DateTime.now()), id = Some(UUID.randomUUID()))
+  private[kafka] def buildAvroRecord(req: TopicMetadataRequest, schemaId: Int): Future[AvroRecord] = {
 
-    val jsonString = enrichedReq.toJson.compactPrint
+    val metadata = TopicMetadata(
+      req.subject,
+      schemaId,
+      req.streamType,
+      req.derived,
+      req.dataClassification,
+      req.contact,
+      req.additionalDocumentation,
+      req.notes,
+      UUID.randomUUID(),
+      org.joda.time.DateTime.now())
+
+    val jsonString = metadata.toJson.compactPrint
     new AvroRecordFactory(schemaRegistryActor).build(
       HydraRequest(
         "0",
         jsonString,
         metadata = Map(
-          RequestParams.HYDRA_KAFKA_TOPIC_PARAM ->
-            bootstrapKafkaConfig.get[String]("metadata-topic-name")
-              .valueOrElse("hydra.metadata.topic")),
+          RequestParams.HYDRA_KAFKA_TOPIC_PARAM -> metadataTopicName),
         ackStrategy = AckStrategy.Replicated,
         validationStrategy = ValidationStrategy.Strict
       )
@@ -186,6 +212,11 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
         }
     }
   }
+
+  override def postStop(): Unit = {
+    Try(consumer.close(time.Duration.ofSeconds(5)))
+  }
+
 }
 
 object TopicBootstrapActor {
@@ -207,6 +238,10 @@ object TopicBootstrapActor {
   case class BootstrapFailure(reasons: Seq[String]) extends BootstrapResult
 
   case class BootstrapStep[A](stepResult: A) extends BootstrapResult
+
+  case object GetTopicList extends TopicBootstrapMessage
+
+  case class MetadataListResponse(metadata: Seq[String]) extends BootstrapResult
 
   case object Retry
 
