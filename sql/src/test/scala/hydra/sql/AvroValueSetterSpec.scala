@@ -133,6 +133,13 @@ class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       |			}
       |		},
       |  {
+      |    "name": "map",
+      |    "type": {
+      |      "type": "map",
+      |      "values": "string"
+      |    }
+      |  },
+      |  {
       |      "name": "authors",
       |      "type": {
       |        "type": "array",
@@ -272,6 +279,28 @@ class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       val binder = new AvroValueSetter(sch, PostgresDialect)
       binder.fieldTypes shouldBe PostgresDialect.upsertFields(sch)
         .map(f => f -> JdbcUtils.getJdbcType(f.schema(), PostgresDialect)).toMap
+    }
+
+    // TODO finish this test!  Might just need to add on to the monster at the top of the file
+    it("converts avro maps to json") {
+      val schema = new Schema.Parser().parse(
+        """
+          | {"type": "record",
+          |          "name": "authors_record",
+          |          "fields": [
+          |            {
+          |              "name": "id",
+          |              "type": "string"
+          |            },
+          |            {
+          |              "name": "authorAttrs",
+          |              "type": {"type": "map", "values": "string"}
+          |            }]}
+        """.stripMargin)
+
+      val schemaWrapper = SchemaWrapper.from(schema)
+      val binder = new AvroValueSetter(schemaWrapper, PostgresDialect)
+      fail("Finish this test!")
     }
 
     it("works with json arrays") {

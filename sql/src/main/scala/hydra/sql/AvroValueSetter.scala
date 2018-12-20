@@ -89,6 +89,7 @@ private[sql] class AvroValueSetter(schema: SchemaWrapper, dialect: JdbcDialect) 
         case Schema.Type.BYTES => byteValue(value, schema, pstmt, idx)
         case Schema.Type.ENUM => pstmt.setString(idx, value.toString)
         case Schema.Type.RECORD => pstmt.setString(idx, value.toString)
+        case Schema.Type.MAP => pstmt.setString(idx, value.toString)
         case Schema.Type.NULL =>
           pstmt.setNull(idx, jdbcType.targetSqlType.getVendorTypeNumber.intValue())
         case _ => throw new IllegalArgumentException(s"Type ${schema.getType} is not supported.")
