@@ -3,7 +3,7 @@ package hydra.kafka.services
 import java.util.UUID
 
 import akka.NotUsed
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{Actor, ActorRef, Props}
 import akka.kafka.scaladsl.Consumer
 import akka.kafka.scaladsl.Consumer.Control
 import akka.kafka.{ConsumerSettings, Subscriptions}
@@ -22,7 +22,9 @@ import org.joda.time.format.ISODateTimeFormat
 
 import scala.concurrent.ExecutionContext
 
-class MetadataConsumerActor(consumerConfig: Config, schemaRegistryClient: SchemaRegistryClient,
+class MetadataConsumerActor(consumerConfig: Config,
+                            bootstrapServers: String,
+                            schemaRegistryClient: SchemaRegistryClient,
                             metadataTopicName: String) extends Actor
   with ConfigSupport {
 
@@ -34,18 +36,19 @@ class MetadataConsumerActor(consumerConfig: Config, schemaRegistryClient: Schema
 
   private implicit val materializer: Materializer = ActorMaterializer()
 
-  private val stream = MetadataConsumerActor.createStream(consumerConfig, schemaRegistryClient, metadataTopicName, self)
+  private val stream = MetadataConsumerActor.createStream(consumerConfig, bootstrapServers,
+    schemaRegistryClient, metadataTopicName, self)
 
   override def receive: Receive = Actor.emptyBehavior
 
   override def preStart(): Unit = {
-    context.become(streaming(stream.run()(ActorMaterializer())))
+    context.become(streaming(stream.run()))
   }
 
 
   def streaming(stream: (Control, NotUsed)): Receive = {
     case GetMetadata =>
-      sender ! GetMetadataResponse(null)
+      sender ! GetMetadataResponse(metadataMap.toMap)
 
     case t: TopicMetadata =>
       metadataMap.put(t.id.toString, t)
@@ -61,13 +64,14 @@ object MetadataConsumerActor {
 
   case object GetMetadata
 
-  case class GetMetadataResponse(resp: Map[String, TopicMetadata])
+  case class GetMetadataResponse(metadata: Map[String, TopicMetadata])
 
   case object StopStream
 
   case object StreamStopped
 
   private[services] def createStream[K, V](config: Config,
+                                           bootstrapSevers: String,
                                            schemaRegistryClient: SchemaRegistryClient,
                                            metadataTopicName: String,
                                            destination: ActorRef)
@@ -77,7 +81,7 @@ object MetadataConsumerActor {
 
     val settings = ConsumerSettings(config, new StringDeserializer,
       new KafkaAvroDeserializer(schemaRegistryClient))
-      .withBootstrapServers("localhost:8092")
+      .withBootstrapServers(bootstrapSevers)
       .withGroupId("metadata-consumer-actor")
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
 
@@ -97,6 +101,14 @@ object MetadataConsumerActor {
           formatter.parseDateTime(record.get("createdDate").toString),
         )
       }.toMat(Sink.actorRef(destination, StreamStopped))(Keep.both)
+  }
+
+
+  def props(consumerConfig: Config,
+            bootstrapServers: String,
+            schemaRegistryClient: SchemaRegistryClient,
+            metadataTopicName: String) = {
+    Props(classOf[MetadataConsumerActor], consumerConfig, bootstrapServers, schemaRegistryClient, metadataTopicName)
   }
 }
 

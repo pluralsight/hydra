@@ -60,6 +60,8 @@ object KafkaUtils extends ConfigSupport {
 
   private val _consumerSettings = consumerSettings(rootConfig)
 
+  val BootstrapServers:String = applicationConfig.getString("kafka.producer.bootstrap.servers")
+
   val stringConsumerSettings: ConsumerSettings[String, String] =
     consumerSettings[String, String]("string", rootConfig)
 

@@ -16,6 +16,8 @@
 
 package hydra.common.config
 
+import java.util.Properties
+
 import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
 import configs.syntax._
 
@@ -65,5 +67,13 @@ object ConfigSupport {
     cfg.entrySet().asScala.map({ entry =>
       entry.getKey -> entry.getValue.unwrapped()
     })(collection.breakOut)
+  }
+
+  implicit def toProps(map: Map[String, AnyRef]): Properties = {
+    (new Properties /: map) {
+      case (a, (k, v)) =>
+        a.put(k, v)
+        a
+    }
   }
 }

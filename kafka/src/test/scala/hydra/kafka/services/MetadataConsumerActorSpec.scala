@@ -5,7 +5,6 @@ import akka.stream.ActorMaterializer
 import akka.testkit.{TestKit, TestProbe}
 import com.pluralsight.hydra.avro.JsonConverter
 import com.typesafe.config.ConfigFactory
-import hydra.core.marshallers.TopicMetadataRequest
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadata
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
@@ -20,7 +19,6 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import spray.json._
 
-import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.io.Source
 
@@ -138,7 +136,7 @@ class MetadataConsumerActorSpec extends TestKit(ActorSystem("metadata-stream-act
     publishRecord()
     val probe = TestProbe()
 
-    val stream = MetadataConsumerActor.createStream(kafkaConfig, srClient,
+    val stream = MetadataConsumerActor.createStream(kafkaConfig, "localhost:8092", srClient,
       "hydra.metadata.topic", probe.ref)(system.dispatcher, ActorMaterializer())
 
     val s = stream.run()(ActorMaterializer())

@@ -2,8 +2,6 @@ package hydra.kafka.model
 
 import java.util.UUID
 
-import spray.json.JsObject
-
 /**
   * Created by alexsilva on 3/30/17.
   */

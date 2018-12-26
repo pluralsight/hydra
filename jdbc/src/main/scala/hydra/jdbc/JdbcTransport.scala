@@ -51,8 +51,7 @@ class JdbcTransport extends Transport with ConfigSupport with LoggingAdapter {
     applicationConfig.getOrElse[Config]("transports.jdbc.profiles", ConfigFactory.empty).map { cfg =>
       cfg.root().entrySet().asScala.foreach { e =>
         Try {
-          val props = new Properties
-          props.putAll(ConfigSupport.toMap(e.getValue.asInstanceOf[ConfigObject].toConfig).asJava)
+          val props = ConfigSupport.toMap(e.getValue.asInstanceOf[ConfigObject].toConfig)
           val settings = JdbcWriterSettings(e.getValue.asInstanceOf[ConfigObject].toConfig)
           dbProfiles.put(e.getKey, new DbProfile(e.getKey, props, settings))
         }.recover { case ex => log.error(s"Unable to load db profile ${e.getKey()}.", ex) }
@@ -68,7 +67,9 @@ class JdbcTransport extends Transport with ConfigSupport with LoggingAdapter {
   }
 }
 
-class DbProfile(val name: String, props: Properties, val settings: JdbcWriterSettings) {
+class DbProfile(val name: String, props: Map[String, AnyRef], val settings: JdbcWriterSettings) {
+
+  import ConfigSupport._
 
   private val hcfg = new HikariConfig(props)
 

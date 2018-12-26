@@ -1,8 +1,11 @@
 package hydra.common.config
 
+import java.util.Properties
+
 import com.typesafe.config.{ConfigException, ConfigFactory}
 import org.scalatest.{FunSpecLike, Matchers}
 import ConfigSupport._
+
 import scala.collection.JavaConverters._
 
 /**
@@ -54,6 +57,15 @@ class ConfigSupportSpec extends Matchers with FunSpecLike with ConfigSupport {
 
       ConfigSupport.toMap(ConfigFactory.parseMap(map.asJava).root()) shouldBe map
 
+    }
+
+    it("converts a map to a java properties") {
+      val map = Map[String, AnyRef](
+        "test-key" -> "test-value",
+        "test-number" -> "1",
+        "test.boolean" -> "false"
+      )
+      (map: Properties).getProperty("test.boolean") shouldBe "false"
     }
 
   }

@@ -27,8 +27,9 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.http.HydraDirectives
 import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
+import hydra.kafka.model.TopicMetadata
 import hydra.kafka.services.TopicBootstrapActor
-import hydra.kafka.services.TopicBootstrapActor.{BootstrapFailure, BootstrapSuccess, InitiateTopicBootstrap}
+import hydra.kafka.services.TopicBootstrapActor._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -42,6 +43,7 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
 
   private implicit val mat = ActorMaterializer()
 
+  private implicit val topicMetadataFormat = jsonFormat10(TopicMetadata)
 
   private val kafkaIngestor = system.actorSelection(
     path = applicationConfig.getString("kafka-ingestor-path"))
@@ -52,7 +54,7 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
     TopicBootstrapActor.props(schemaRegistryActor, kafkaIngestor))
 
   override val route: Route =
-    pathPrefix("topics") {
+    pathPrefix("streams") {
       pathEndOrSingleSlash {
         post {
           requestEntityPresent {
@@ -60,8 +62,8 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
               onComplete(bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)) {
                 case Success(message) => message match {
 
-                  case BootstrapSuccess =>
-                    complete(StatusCodes.OK)
+                  case BootstrapSuccess(metadata) =>
+                    complete(StatusCodes.OK, metadata)
 
                   case BootstrapFailure(reasons) =>
                     complete(StatusCodes.BadRequest, reasons)
@@ -77,7 +79,19 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
               }
             }
           }
-        }
+        } ~ get(getAllStreams)
       }
     }
+
+  private def getAllStreams: Route = {
+    onSuccess(bootstrapActor ? GetStreams) {
+      case GetStreamsResponse(metadata) =>
+        complete(StatusCodes.OK, metadata)
+      case Failure(ex) =>
+        throw ex
+      case x =>
+        log.error("Unexpected error in BootstrapEndpoint", x)
+        complete(StatusCodes.InternalServerError, "Unknown error")
+    }
+  }
 }

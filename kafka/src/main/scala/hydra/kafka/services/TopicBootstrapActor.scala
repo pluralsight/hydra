@@ -1,8 +1,8 @@
 package hydra.kafka.services
 
+import java.util
+import java.util.UUID
 import java.util.concurrent.TimeUnit
-import java.util.{Arrays, UUID}
-import java.{time, util}
 
 import akka.actor.Status.{Failure => AkkaFailure}
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSelection, Props, Stash, Timers}
@@ -10,6 +10,7 @@ import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import com.typesafe.config.Config
 import configs.syntax._
+import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.core.akka.SchemaRegistryActor.{RegisterSchemaRequest, RegisterSchemaResponse}
 import hydra.core.ingest.{HydraRequest, RequestParams}
@@ -18,9 +19,8 @@ import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.{AvroRecord, AvroRecordFactory}
+import hydra.kafka.services.MetadataConsumerActor.{GetMetadata, GetMetadataResponse}
 import hydra.kafka.util.KafkaUtils
-import hydra.kafka.util.KafkaUtils.loadConsumerSettings
-import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 
 import scala.collection.JavaConverters._
@@ -54,17 +54,13 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
   val bootstrapKafkaConfig: Config = bootstrapConfig getOrElse
     applicationConfig.getConfig("bootstrap-config")
 
+
   private val metadataTopicName = bootstrapKafkaConfig.get[String]("metadata-topic-name")
     .valueOrElse("__hydra.metadata.topic")
 
-  private lazy val consumer = {
-    val c = loadConsumerSettings[String, Object](rootConfig, self.path.name).createKafkaConsumer()
-    c.subscribe(Arrays.asList(metadataTopicName))
-    val partitions = c.partitionsFor(metadataTopicName).asScala
-    c.seekToBeginning(partitions.map(i => new TopicPartition(metadataTopicName, i.partition)).asJava)
-    c
-  }
-
+  private val metadataStreamActor = context.actorOf(MetadataConsumerActor.props(bootstrapKafkaConfig,
+    KafkaUtils.BootstrapServers,
+    ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient, metadataTopicName))
 
   override def preStart(): Unit = {
     pipe(registerSchema(schema)) to self
@@ -101,13 +97,10 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     case InitiateTopicBootstrap(topicMetadataRequest) =>
       TopicNameValidator.validate(topicMetadataRequest.subject) match {
         case Success(_) =>
-          val registerAndIngest = registerSchema(topicMetadataRequest.schema.compactPrint).map { r =>
-            ingestMetadata(topicMetadataRequest, r.schemaResource.id)
-          }
-
           val result = for {
-            _ <- registerAndIngest
-            bootstrapResult <- createKafkaTopic(topicMetadataRequest)
+            schema <- registerSchema(topicMetadataRequest.schema.compactPrint)
+            topicMetadata <- ingestMetadata(topicMetadataRequest, schema.schemaResource.id)
+            bootstrapResult <- createKafkaTopic(topicMetadata)
           } yield bootstrapResult
 
           pipe(
@@ -119,6 +112,9 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
           Future(BootstrapFailure(ex.reasons)) pipeTo sender
       }
 
+    case GetStreams =>
+      pipe((metadataStreamActor ? GetMetadata).mapTo[GetMetadataResponse]
+        .map(x => GetStreamsResponse(x.metadata.values.toSeq))) to sender
   }
 
   def failed(ex: Throwable): Receive = {
@@ -137,10 +133,23 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
   }
 
   private[kafka] def ingestMetadata(topicMetadataRequest: TopicMetadataRequest,
-                                    schemaId: Int): Future[BootstrapResult] = {
-    buildAvroRecord(topicMetadataRequest, schemaId).flatMap { avroRecord =>
-      (kafkaIngestor ? Ingest(avroRecord, avroRecord.ackStrategy)).map {
-        case IngestorCompleted => BootstrapSuccess
+                                    schemaId: Int): Future[TopicMetadata] = {
+
+    val topicMetadata = TopicMetadata(
+      topicMetadataRequest.subject,
+      schemaId,
+      topicMetadataRequest.streamType,
+      topicMetadataRequest.derived,
+      topicMetadataRequest.dataClassification,
+      topicMetadataRequest.contact,
+      topicMetadataRequest.additionalDocumentation,
+      topicMetadataRequest.notes,
+      UUID.randomUUID(),
+      org.joda.time.DateTime.now())
+
+    buildAvroRecord(topicMetadata).flatMap { record =>
+      (kafkaIngestor ? Ingest(record, record.ackStrategy)).map {
+        case IngestorCompleted => topicMetadata
         case IngestorError(ex) =>
           val errorMessage = ex.getMessage
           log.error(
@@ -155,19 +164,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     }
   }
 
-  private[kafka] def buildAvroRecord(req: TopicMetadataRequest, schemaId: Int): Future[AvroRecord] = {
-
-    val metadata = TopicMetadata(
-      req.subject,
-      schemaId,
-      req.streamType,
-      req.derived,
-      req.dataClassification,
-      req.contact,
-      req.additionalDocumentation,
-      req.notes,
-      UUID.randomUUID(),
-      org.joda.time.DateTime.now())
+  private[kafka] def buildAvroRecord(metadata: TopicMetadata): Future[AvroRecord] = {
 
     val jsonString = metadata.toJson.compactPrint
     new AvroRecordFactory(schemaRegistryActor).build(
@@ -182,10 +179,10 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     )
   }
 
-  private[kafka] def createKafkaTopic(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
+  private[kafka] def createKafkaTopic(metadata: TopicMetadata): Future[BootstrapResult] = {
     val timeoutMillis = bootstrapKafkaConfig.getInt("timeout")
 
-    val topic = topicMetadataRequest.subject
+    val topic = metadata.subject
 
     val topicExists = kafkaUtils.topicExists(topic) match {
       case Success(value) => value
@@ -197,26 +194,21 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     // Don't fail when topic already exists
     if (topicExists) {
       log.info(s"Topic $topic already exists, proceeding anyway...")
-      Future.successful(BootstrapSuccess)
+      Future.successful(BootstrapSuccess(metadata))
     }
     else {
-      kafkaUtils.createTopic(topicMetadataRequest.subject, topicDetails, timeout = timeoutMillis)
+      kafkaUtils.createTopic(metadata.subject, topicDetails, timeout = timeoutMillis)
         .map { r =>
           r.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
         }
         .map { _ =>
-          BootstrapSuccess
+          BootstrapSuccess(metadata)
         }
         .recover {
           case e: Exception => BootstrapFailure(e.getMessage :: Nil)
         }
     }
   }
-
-  override def postStop(): Unit = {
-    Try(consumer.close(time.Duration.ofSeconds(5)))
-  }
-
 }
 
 object TopicBootstrapActor {
@@ -233,15 +225,15 @@ object TopicBootstrapActor {
 
   sealed trait BootstrapResult
 
-  case object BootstrapSuccess extends BootstrapResult
+  case class BootstrapSuccess(metadata: TopicMetadata) extends BootstrapResult
 
   case class BootstrapFailure(reasons: Seq[String]) extends BootstrapResult
 
   case class BootstrapStep[A](stepResult: A) extends BootstrapResult
 
-  case object GetTopicList extends TopicBootstrapMessage
+  case object GetStreams extends TopicBootstrapMessage
 
-  case class MetadataListResponse(metadata: Seq[String]) extends BootstrapResult
+  case class GetStreamsResponse(metadata: Seq[TopicMetadata]) extends BootstrapResult
 
   case object Retry
 
