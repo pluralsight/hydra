@@ -10,7 +10,7 @@ import org.scalatest.time.{Millis, Seconds, Span}
 import scalacache.guava.GuavaCache
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.Random
+import scala.util.{Random, Try}
 
 
 class HydraMetricsSpec extends Matchers
@@ -33,7 +33,7 @@ class HydraMetricsSpec extends Matchers
     histogramsCache.removeAll()
   }
 
-  override def afterAll = Kamon.stopAllReporters()
+  override def afterAll = Try(Kamon.stopAllReporters())
 
   val lookup = "lookup.xyz"
   val lookup2 = "lookup.abc"

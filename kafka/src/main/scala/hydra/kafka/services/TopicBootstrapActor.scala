@@ -19,7 +19,7 @@ import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.{AvroRecord, AvroRecordFactory}
-import hydra.kafka.services.MetadataConsumerActor.{GetMetadata, GetMetadataResponse}
+import hydra.kafka.services.MetadataConsumerActor.{GetMetadata, GetMetadataResponse, StopStream}
 import hydra.kafka.util.KafkaUtils
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 
@@ -56,7 +56,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
 
 
   private val metadataTopicName = bootstrapKafkaConfig.get[String]("metadata-topic-name")
-    .valueOrElse("__hydra.metadata.topic")
+    .valueOrElse("_hydra.metadata.topic")
 
   private val metadataStreamActor = context.actorOf(MetadataConsumerActor.props(bootstrapKafkaConfig,
     KafkaUtils.BootstrapServers,
@@ -64,6 +64,10 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
 
   override def preStart(): Unit = {
     pipe(registerSchema(schema)) to self
+  }
+
+  override def postStop():Unit = {
+    metadataStreamActor ! StopStream
   }
 
   val topicDetailsConfig: util.Map[String, String] = Map[String, String]().empty.asJava

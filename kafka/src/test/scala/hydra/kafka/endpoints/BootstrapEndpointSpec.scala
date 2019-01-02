@@ -3,7 +3,7 @@ package hydra.kafka.endpoints
 import akka.actor.{Actor, Props}
 import akka.http.javadsl.server.MalformedRequestContentRejection
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.server.{MethodRejection, RequestEntityExpectedRejection}
+import akka.http.scaladsl.server.RequestEntityExpectedRejection
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.TestKit
 import com.pluralsight.hydra.avro.JsonConverter
@@ -13,7 +13,6 @@ import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.AvroRecord
-import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
 import io.confluent.kafka.serializers.KafkaAvroSerializer
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.avro.Schema
@@ -22,10 +21,10 @@ import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{Matchers, WordSpecLike}
+import spray.json._
 
 import scala.concurrent.duration._
 import scala.io.Source
-import spray.json._
 
 class BootstrapEndpointSpec extends Matchers
   with WordSpecLike
@@ -70,13 +69,13 @@ class BootstrapEndpointSpec extends Matchers
 
   override def beforeAll: Unit = {
     EmbeddedKafka.start()
-    EmbeddedKafka.createCustomTopic("hydra.metadata.topic")
+    EmbeddedKafka.createCustomTopic("_hydra.metadata.topic")
   }
 
   override def afterAll = {
     super.afterAll()
-    TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10.seconds)
     EmbeddedKafka.stop()
+    TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10.seconds)
   }
 
   "The bootstrap endpoint" should {
@@ -105,7 +104,7 @@ class BootstrapEndpointSpec extends Matchers
 
       val record: Object = new JsonConverter[GenericRecord](schema).convert(json.toJson.compactPrint)
       implicit val deserializer = new KafkaAvroSerializer(ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient)
-      EmbeddedKafka.publishToKafka("hydra.metadata.topic", record)
+      EmbeddedKafka.publishToKafka("_hydra.metadata.topic", record)
 
       eventually {
         Get("/streams") ~> bootstrapRoute ~> check {

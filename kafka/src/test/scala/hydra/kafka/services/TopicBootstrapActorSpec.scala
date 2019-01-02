@@ -11,6 +11,7 @@ import hydra.core.marshallers.TopicMetadataRequest
 import hydra.core.protocol.{Ingest, IngestorCompleted}
 import hydra.core.transport.{AckStrategy, HydraRecord}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
+import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.AvroRecord
 import hydra.kafka.services.TopicBootstrapActor.{BootstrapFailure, BootstrapSuccess, InitiateTopicBootstrap}
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
@@ -135,7 +136,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     probe.receiveWhile(messages = 2) {
       case RegisterSchemaRequest(schemaJson) => schemaJson should
         include("SkillAssessmentTopicsScored")
-      case FetchSchemaRequest(schemaName) => schemaName shouldEqual "hydra.metadata.topic"
+      case FetchSchemaRequest(schemaName) => schemaName shouldEqual "_hydra.metadata.topic"
     }
 
     probe.expectMsgPF() {
@@ -326,7 +327,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     probe.receiveWhile(messages = 2) {
       case RegisterSchemaRequest(schemaJson) => schemaJson should
         include("SkillAssessmentTopicsScored")
-      case FetchSchemaRequest(schemaName) => schemaName shouldEqual "hydra.metadata.topic"
+      case FetchSchemaRequest(schemaName) => schemaName shouldEqual "_hydra.metadata.topic"
     }
 
     probe.expectMsgPF() {
@@ -335,7 +336,12 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
         ack shouldBe AckStrategy.Replicated
     }
 
-    senderProbe.expectMsg(BootstrapSuccess)
+    senderProbe.expectMsgPF() {
+      case BootstrapSuccess(tm) =>
+        tm.schemaId should be > 0
+        tm.derived shouldBe false
+        tm.subject shouldBe subject
+    }
 
     val expectedMessage = "I'm expected!"
 
@@ -398,7 +404,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     probe.receiveWhile(messages = 2) {
       case RegisterSchemaRequest(schemaJson) => schemaJson should
         include("SkillAssessmentTopicsScored")
-      case FetchSchemaRequest(schemaName) => schemaName shouldEqual "hydra.metadata.topic"
+      case FetchSchemaRequest(schemaName) => schemaName shouldEqual "_hydra.metadata.topic"
     }
 
     probe.expectMsgPF() {
@@ -458,7 +464,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     probe.receiveWhile(messages = 2) {
       case RegisterSchemaRequest(schemaJson) => schemaJson should
         include("SkillAssessmentTopicsScored")
-      case FetchSchemaRequest(schemaName) => schemaName shouldEqual "hydra.metadata.topic"
+      case FetchSchemaRequest(schemaName) => schemaName shouldEqual "_hydra.metadata.topic"
     }
 
     probe.expectMsgPF() {
@@ -467,11 +473,21 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
         ack shouldBe AckStrategy.Replicated
     }
 
-    senderProbe.expectMsg(BootstrapSuccess)
+    senderProbe.expectMsgPF() {
+      case BootstrapSuccess(tm) =>
+        tm.schemaId should be > 0
+        tm.derived shouldBe false
+        tm.subject shouldBe subject
+    }
 
     bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
 
-    senderProbe.expectMsg(BootstrapSuccess)
+    senderProbe.expectMsgPF() {
+      case BootstrapSuccess(tm) =>
+        tm.schemaId should be > 0
+        tm.derived shouldBe false
+        tm.subject shouldBe subject
+    }
   }
 
   it should "retry after a configurable interval when the schema registration fails" in {

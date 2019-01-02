@@ -16,7 +16,7 @@ object Dependencies {
   val jodaTimeVersion = "2.9.9"
   val jodaConvertVersion = "1.8.1"
   val confluentVersion = "5.0.0"
-  val sprayJsonVersion = "1.3.c2"
+  val sprayJsonVersion = "1.3.5"
   val kafkaVersion = "2.0.0"
   val reflectionsVersion = "0.9.11"
   val akkaHTTPVersion = "10.1.5"
@@ -33,7 +33,7 @@ object Dependencies {
   val kamonVersion = "1.1.0"
   val kamonPVersion = "1.0.0"
   val akkaKryoVersion = "0.5.2"
-  val akkaManagementVersion = "0.15.0"
+  val akkaManagementVersion = "0.20.0"
 
   object Compile {
 
@@ -71,12 +71,15 @@ object Dependencies {
       "org.apache.logging.log4j" % "log4j-api" % log4jVersion,
       "org.apache.logging.log4j" % "log4j-1.2-api" % log4jVersion)
 
+    val akkaManagement = ("com.lightbend.akka.management" %%
+      "akka-management-cluster-bootstrap" % akkaManagementVersion) exclude("com.fasterxml.jackson.core", "jackson-core")
+
     val akka = Seq("com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
       "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaManagementVersion,
       "com.lightbend.akka.discovery" %% "akka-discovery-consul" % akkaManagementVersion,
       "com.lightbend.akka.discovery" %% "akka-discovery-dns" % akkaManagementVersion,
-      "com.lightbend.akka.management" %% "akka-management-cluster-http" % akkaManagementVersion,
+      akkaManagement,
       "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,

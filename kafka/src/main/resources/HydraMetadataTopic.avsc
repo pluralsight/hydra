@@ -1,5 +1,5 @@
 {
-  "namespace": "hydra.metadata",
+  "namespace": "_hydra.metadata",
   "name": "topic",
   "type": "record",
   "version": 1,

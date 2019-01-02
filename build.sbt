@@ -18,7 +18,6 @@ lazy val defaultSettings = Seq(
   scalacOptions ++= Seq("-encoding", "UTF-8", "-feature", "-language:_", "-deprecation", "-unchecked"),
   javacOptions in Compile ++= Seq("-encoding", "UTF-8", "-source", JDK, "-target", JDK,
     "-Xlint:unchecked", "-Xlint:deprecation", "-Xlint:-options"),
-
   resolvers += Resolver.mavenLocal,
   resolvers += "Scalaz Bintray Repo" at "https://dl.bintray.com/scalaz/releases",
   resolvers += "Confluent Maven Repo" at "http://packages.confluent.io/maven/",
