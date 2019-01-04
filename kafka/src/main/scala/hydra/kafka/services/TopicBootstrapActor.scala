@@ -66,7 +66,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     pipe(registerSchema(schema)) to self
   }
 
-  override def postStop():Unit = {
+  override def postStop(): Unit = {
     metadataStreamActor ! StopStream
   }
 
@@ -116,9 +116,14 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
           Future(BootstrapFailure(ex.reasons)) pipeTo sender
       }
 
-    case GetStreams =>
-      pipe((metadataStreamActor ? GetMetadata).mapTo[GetMetadataResponse]
-        .map(x => GetStreamsResponse(x.metadata.values.toSeq))) to sender
+    case GetStreams(subject) =>
+      val streams: Future[GetStreamsResponse] = (metadataStreamActor ? GetMetadata).mapTo[GetMetadataResponse]
+        .map { x =>
+          val resp = subject.map(s => x.metadata.values.filter(p => p.subject == s)) getOrElse x.metadata.values
+          GetStreamsResponse(resp.toSeq)
+        }
+
+      pipe(streams) to sender
   }
 
   def failed(ex: Throwable): Receive = {
@@ -235,7 +240,12 @@ object TopicBootstrapActor {
 
   case class BootstrapStep[A](stepResult: A) extends BootstrapResult
 
-  case object GetStreams extends TopicBootstrapMessage
+  /**
+    * Filter by subject is the only supported.
+    *
+    * @param subject
+    */
+  case class GetStreams(subject: Option[String]) extends TopicBootstrapMessage
 
   case class GetStreamsResponse(metadata: Seq[TopicMetadata]) extends BootstrapResult
 

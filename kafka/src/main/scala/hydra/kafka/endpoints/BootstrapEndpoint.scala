@@ -27,7 +27,7 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.http.HydraDirectives
 import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
-import hydra.kafka.model.TopicMetadata
+import hydra.kafka.model.{TopicMetadata, TopicMetadataAdapter}
 import hydra.kafka.services.TopicBootstrapActor
 import hydra.kafka.services.TopicBootstrapActor._
 
@@ -37,13 +37,11 @@ import scala.util.{Failure, Success}
 
 
 class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: ExecutionContext)
-  extends RoutedEndpoints with LoggingAdapter with HydraJsonSupport with HydraDirectives {
+  extends RoutedEndpoints with LoggingAdapter with TopicMetadataAdapter with HydraDirectives {
 
   private implicit val timeout = Timeout(10.seconds)
 
   private implicit val mat = ActorMaterializer()
-
-  private implicit val topicMetadataFormat = jsonFormat10(TopicMetadata)
 
   private val kafkaIngestor = system.actorSelection(
     path = applicationConfig.getString("kafka-ingestor-path"))
@@ -63,7 +61,7 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
                 case Success(message) => message match {
 
                   case BootstrapSuccess(metadata) =>
-                    complete(StatusCodes.OK, metadata)
+                    complete(StatusCodes.OK, toResource(metadata))
 
                   case BootstrapFailure(reasons) =>
                     complete(StatusCodes.BadRequest, reasons)
@@ -80,13 +78,13 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
             }
           }
         } ~ get(getAllStreams)
-      }
+      }p
     }
 
   private def getAllStreams: Route = {
     onSuccess(bootstrapActor ? GetStreams) {
       case GetStreamsResponse(metadata) =>
-        complete(StatusCodes.OK, metadata)
+        complete(StatusCodes.OK, metadata.map(toResource))
       case Failure(ex) =>
         throw ex
       case x =>

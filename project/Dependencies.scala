@@ -35,6 +35,9 @@ object Dependencies {
   val akkaKryoVersion = "0.5.2"
   val akkaManagementVersion = "0.20.0"
 
+  val akkaHTTPHal = ProjectRef(uri("https://github.com/marcuslange/akka-http-hal.git"),
+    "akka-http-hal")
+
   object Compile {
 
     val scalaConfigs = "com.github.kxbmap" %% "configs" % kxbmapConfigVersion

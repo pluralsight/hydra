@@ -20,6 +20,7 @@ import java.io.{PrintWriter, StringWriter}
 import java.util.UUID
 
 import akka.actor.ActorPath
+import akka.http.rest.hal.Link
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.StatusCode
 import hydra.common.util.Resource._
@@ -86,6 +87,8 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
       case _ => deserializationError(s"'${json.toString()}' is not a valid UUID.")
     }
   }
+
+  def schemaLink(subject: String) = "hydra-schema" -> Link(href = s"/schemas/$subject")
 
 
   implicit object DateTimeFormat extends RootJsonFormat[DateTime] {

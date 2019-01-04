@@ -4,18 +4,23 @@ import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.pattern.pipe
 import akka.testkit.{TestKit, TestProbe}
+import com.pluralsight.hydra.avro.JsonConverter
 import com.typesafe.config.ConfigFactory
 import hydra.avro.resource.SchemaResource
 import hydra.core.akka.SchemaRegistryActor._
 import hydra.core.marshallers.TopicMetadataRequest
 import hydra.core.protocol.{Ingest, IngestorCompleted}
-import hydra.core.transport.{AckStrategy, HydraRecord}
+import hydra.core.transport.AckStrategy
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.AvroRecord
-import hydra.kafka.services.TopicBootstrapActor.{BootstrapFailure, BootstrapSuccess, InitiateTopicBootstrap}
+import hydra.kafka.services.TopicBootstrapActor.{BootstrapFailure, BootstrapSuccess, GetStreams, InitiateTopicBootstrap}
+import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
+import io.confluent.kafka.serializers.KafkaAvroSerializer
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.avro.Schema
+import org.apache.avro.generic.GenericRecord
+import org.joda.time.DateTime
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
@@ -94,6 +99,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     (probe, schemaRegistryActor, kafkaIngestor)
   }
+
 
   "A TopicBootstrapActor" should "process metadata and send an Ingest message to the kafka ingestor" in {
 
@@ -488,6 +494,22 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
         tm.derived shouldBe false
         tm.subject shouldBe subject
     }
+  }
+
+  it should "retrieve all streams" in {
+    val (probe, schemaRegistryActor, _) = fixture("test-stream",
+      schemaRegistryShouldFail = false)
+
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
+      system.actorSelection("kafka_ingestor_test-stream")))
+
+    probe.expectMsgType[RegisterSchemaRequest]
+
+    val senderProbe = TestProbe()
+
+    bootstrapActor.tell(GetStreams(None), senderProbe.ref)
+
+    senderProbe.expectMsg("OK")
   }
 
   it should "retry after a configurable interval when the schema registration fails" in {
