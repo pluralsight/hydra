@@ -1,7 +1,5 @@
 package hydra.common.auth
 
-import java.security.Principal
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.server.directives.{AuthenticationDirective, SecurityDirectives}
 import hydra.common.Settings
