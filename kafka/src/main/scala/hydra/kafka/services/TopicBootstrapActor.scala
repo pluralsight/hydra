@@ -215,6 +215,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
         }
     }
   }
+
 }
 
 object TopicBootstrapActor {
