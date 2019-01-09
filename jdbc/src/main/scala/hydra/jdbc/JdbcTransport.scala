@@ -1,7 +1,5 @@
 package hydra.jdbc
 
-import java.util.Properties
-
 import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
 import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
 import configs.syntax._
