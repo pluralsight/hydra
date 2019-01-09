@@ -1,7 +1,9 @@
 package hydra.kafka.services
 
+import java.util.concurrent.TimeUnit
+
 import akka.NotUsed
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorLogging, Props}
 import akka.kafka.scaladsl.Consumer.Control
 import akka.pattern.pipe
 import akka.stream.{ActorMaterializer, Materializer}
@@ -9,13 +11,21 @@ import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.kafka.model.TopicMetadata
 import hydra.kafka.services.CompactedTopicManagerActor.{CreateCompactedStream, CreateCompactedTopic}
+import hydra.kafka.services.TopicBootstrapActor.{BootstrapFailure, BootstrapSuccess}
+import hydra.kafka.util.KafkaUtils
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
+
+import scala.concurrent.Future
+import scala.util.{Failure, Success}
+import scalacache.LoggingSupport
 
 class CompactedTopicManagerActor(consumerConfig: Config,
                             bootstrapServers: String,
                             schemaRegistryClient: SchemaRegistryClient,
-                            metadataTopicName: String) extends Actor
-  with ConfigSupport {
+                            metadataTopicName: String,
+                                 kafkaUtils: KafkaUtils) extends Actor
+  with ConfigSupport
+  with ActorLogging {
 
   import MetadataConsumerActor._
 
@@ -47,6 +57,35 @@ class CompactedTopicManagerActor(consumerConfig: Config,
 
     case StopStream =>
       pipe(stream._1.shutdown().map(_ => StreamStopped)) to sender
+  }
+
+  private[kafka] def createCompactedTopic(topicName: String) = {
+
+    val topicExists = kafkaUtils.topicExists(topicName) match {
+      case Success(value) => value
+      case Failure(exception) =>
+        log.error(s"Unable to determine if topic exists: ${exception.getMessage}")
+        return Future.failed(exception)
+    }
+
+    // Don't fail when topic already exists
+    if (topicExists) {
+      log.info(s"Topic $topicName already exists, proceeding anyway...")
+      Future.successful(BootstrapSuccess(metadata))
+    }
+    else {
+      kafkaUtils.createTopic(metadata.subject, topicDetails, timeout = timeoutMillis)
+        .map { r =>
+          r.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
+        }
+        .map { _ =>
+          BootstrapSuccess(metadata)
+        }
+        .recover {
+          case e: Exception => BootstrapFailure(e.getMessage :: Nil)
+        }
+    }
+  }
   }
 }
 
