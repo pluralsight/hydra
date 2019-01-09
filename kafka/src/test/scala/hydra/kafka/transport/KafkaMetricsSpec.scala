@@ -25,8 +25,8 @@ class KafkaMetricsSpec extends TestKit(ActorSystem("hydra"))
       "offsets.topic.replication.factor" -> "1"))
 
   override def afterAll() = {
-    EmbeddedKafka.stop()
     super.afterAll()
+    EmbeddedKafka.stop()
     TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
   }
 

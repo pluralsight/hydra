@@ -100,6 +100,7 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra"))
           |    parallelism = 100
           |    close-timeout = 60s
           |    use-dispatcher = test
+          |    eos-commit-interval=100ms
           |    kafka-clients {
           |    }
           |  }

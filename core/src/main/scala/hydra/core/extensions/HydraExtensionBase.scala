@@ -109,7 +109,8 @@ abstract class HydraExtensionBase(val extName: String, val extConfig: Config)(im
         childName = moduleName,
         minBackoff = 1.seconds,
         maxBackoff = 30.seconds,
-        randomFactor = 0.2))
+        randomFactor = 0.2,
+        maxNrOfRetries = -1))
   }
 
   private def getDispatcher(moduleId: String) = {

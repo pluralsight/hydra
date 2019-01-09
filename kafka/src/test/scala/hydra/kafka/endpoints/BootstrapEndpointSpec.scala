@@ -3,30 +3,45 @@ package hydra.kafka.endpoints
 import akka.actor.{Actor, Props}
 import akka.http.javadsl.server.MalformedRequestContentRejection
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.server.{MethodRejection, RequestEntityExpectedRejection}
+import akka.http.scaladsl.server.RequestEntityExpectedRejection
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.TestKit
+import com.pluralsight.hydra.avro.JsonConverter
+import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
+import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.AvroRecord
+import io.confluent.kafka.serializers.KafkaAvroSerializer
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
+import org.apache.avro.Schema
+import org.apache.avro.generic.GenericRecord
+import org.joda.time.DateTime
+import org.joda.time.format.ISODateTimeFormat
+import org.scalatest.concurrent.Eventually
 import org.scalatest.{Matchers, WordSpecLike}
+import spray.json._
 
 import scala.concurrent.duration._
-
+import scala.io.Source
 
 class BootstrapEndpointSpec extends Matchers
   with WordSpecLike
   with ScalatestRouteTest
   with HydraKafkaJsonSupport
   with ConfigSupport
-  with EmbeddedKafka {
+  with EmbeddedKafka
+  with Eventually {
 
   private implicit val timeout = RouteTestTimeout(10.seconds)
 
   implicit val embeddedKafkaConfig = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
     customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
+
+  override implicit val patienceConfig = PatienceConfig(
+    timeout = scaled(5000 millis),
+    interval = scaled(100 millis))
 
   class TestKafkaIngestor extends Actor {
     override def receive = {
@@ -36,7 +51,6 @@ class BootstrapEndpointSpec extends Matchers
     }
 
     def props: Props = Props()
-
   }
 
   class IngestorRegistry extends Actor {
@@ -51,26 +65,94 @@ class BootstrapEndpointSpec extends Matchers
 
   private val bootstrapRoute = new BootstrapEndpoint().route
 
+  implicit val f = jsonFormat10(TopicMetadata)
 
   override def beforeAll: Unit = {
     EmbeddedKafka.start()
+    EmbeddedKafka.createCustomTopic("_hydra.metadata.topic")
   }
 
   override def afterAll = {
     super.afterAll()
-    TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10.seconds)
     EmbeddedKafka.stop()
+    TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10.seconds)
   }
 
   "The bootstrap endpoint" should {
-    "rejects a GET request" in {
-      Get("/topics") ~> bootstrapRoute ~> check {
-        rejections should contain allElementsOf Seq(MethodRejection(HttpMethods.POST))
+    "list streams" in {
+
+      val json =
+        s"""{
+           |	"id":"79a1627e-04a6-11e9-8eb2-f2801f1b9fd1",
+           | "createdDate":"${ISODateTimeFormat.basicDateTimeNoMillis().print(DateTime.now)}",
+           | "subject": "exp.assessment.SkillAssessmentTopicsScored",
+           |	"streamType": "Notification",
+           | "derived": false,
+           |	"dataClassification": "Public",
+           |	"contact": "slackity slack dont talk back",
+           |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+           |	"notes": "here are some notes topkek",
+           |	"schemaId": 2
+           |}"""
+          .stripMargin
+          .parseJson
+          .convertTo[TopicMetadata]
+
+      val topicMetadataJson = Source.fromResource("HydraMetadataTopic.avsc").mkString
+
+      val schema = new Schema.Parser().parse(topicMetadataJson)
+
+      val record: Object = new JsonConverter[GenericRecord](schema).convert(json.toJson.compactPrint)
+      implicit val deserializer = new KafkaAvroSerializer(ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient)
+      EmbeddedKafka.publishToKafka("_hydra.metadata.topic", record)
+
+      eventually {
+        Get("/streams") ~> bootstrapRoute ~> check {
+          val r = responseAs[Seq[TopicMetadata]]
+          r.length should be >= 1
+          r(0).id.toString shouldBe "79a1627e-04a6-11e9-8eb2-f2801f1b9fd1"
+        }
+      }
+    }
+
+    "get a stream by subject" in {
+
+      val json =
+        s"""{
+           |	"id":"79a1627e-04a6-11e9-8eb2-f2801f1b9fd1",
+           | "createdDate":"${ISODateTimeFormat.basicDateTimeNoMillis().print(DateTime.now)}",
+           | "subject": "exp.assessment.SkillAssessmentTopicsScored1",
+           |	"streamType": "Notification",
+           | "derived": false,
+           |	"dataClassification": "Public",
+           |	"contact": "slackity slack dont talk back",
+           |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+           |	"notes": "here are some notes topkek",
+           |	"schemaId": 2
+           |}"""
+          .stripMargin
+          .parseJson
+          .convertTo[TopicMetadata]
+
+      val topicMetadataJson = Source.fromResource("HydraMetadataTopic.avsc").mkString
+
+      val schema = new Schema.Parser().parse(topicMetadataJson)
+
+      val record: Object = new JsonConverter[GenericRecord](schema).convert(json.toJson.compactPrint)
+      implicit val deserializer = new KafkaAvroSerializer(ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient)
+      EmbeddedKafka.publishToKafka("_hydra.metadata.topic", record)
+
+      eventually {
+        Get("/streams/exp.assessment.SkillAssessmentTopicsScored1") ~> bootstrapRoute ~> check {
+          val r = responseAs[Seq[TopicMetadata]]
+          r.length should be >= 1
+          r(0).id.toString shouldBe "79a1627e-04a6-11e9-8eb2-f2801f1b9fd1"
+        }
       }
     }
 
     "reject empty requests" in {
-      Post("/topics") ~> bootstrapRoute ~> check {
+      Post("/streams") ~> bootstrapRoute ~> check {
         rejection shouldEqual RequestEntityExpectedRejection
       }
     }
@@ -102,8 +184,10 @@ class BootstrapEndpointSpec extends Matchers
           |	}
           |}""".stripMargin)
 
-      Post("/topics", testEntity) ~> bootstrapRoute ~> check {
+      Post("/streams", testEntity) ~> bootstrapRoute ~> check {
         status shouldBe StatusCodes.OK
+        val r = responseAs[TopicMetadata]
+        r.streamType shouldBe "Notification"
       }
     }
 
@@ -134,7 +218,7 @@ class BootstrapEndpointSpec extends Matchers
           |	}
           |}""".stripMargin)
 
-      Post("/topics", testEntity) ~> bootstrapRoute ~> check {
+      Post("/streams", testEntity) ~> bootstrapRoute ~> check {
         status shouldBe StatusCodes.BadRequest
       }
     }
@@ -166,7 +250,7 @@ class BootstrapEndpointSpec extends Matchers
           |	}
           |}""".stripMargin)
 
-      Post("/topics", testEntity) ~> bootstrapRoute ~> check {
+      Post("/streams", testEntity) ~> bootstrapRoute ~> check {
         status shouldBe StatusCodes.BadRequest
       }
     }
@@ -196,7 +280,7 @@ class BootstrapEndpointSpec extends Matchers
           |	}
           |}""".stripMargin)
 
-      Post("/topics", testEntity) ~> bootstrapRoute ~> check {
+      Post("/streams", testEntity) ~> bootstrapRoute ~> check {
         rejection shouldBe a[MalformedRequestContentRejection]
       }
     }

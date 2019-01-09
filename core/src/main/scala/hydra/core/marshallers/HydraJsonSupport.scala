@@ -20,6 +20,7 @@ import java.io.{PrintWriter, StringWriter}
 import java.util.UUID
 
 import akka.actor.ActorPath
+import akka.http.rest.hal.Link
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.StatusCode
 import hydra.common.util.Resource._
@@ -87,6 +88,8 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
     }
   }
 
+  def schemaLink(subject: String) = "hydra-schema" -> Link(href = s"/schemas/$subject")
+
 
   implicit object DateTimeFormat extends RootJsonFormat[DateTime] {
     val formatter = ISODateTimeFormat.basicDateTimeNoMillis()
@@ -131,7 +134,7 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
   implicit val genericErrorFormat = jsonFormat2(GenericError)
 
-  implicit val topicCreationMetadataFormat = jsonFormat10(TopicMetadataRequest)
+  implicit val topicCreationMetadataFormat = jsonFormat8(TopicMetadataRequest)
 
 }
 
@@ -144,7 +147,6 @@ case class TopicMetadataRequest(subject: String,
                                 dataClassification: String,
                                 contact: String,
                                 additionalDocumentation: Option[String],
-                                notes: Option[String],
-                                id: Option[UUID],
-                                createdDate: Option[org.joda.time.DateTime])
+                                notes: Option[String])
+
 

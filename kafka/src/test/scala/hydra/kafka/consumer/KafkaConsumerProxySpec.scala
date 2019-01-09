@@ -41,8 +41,8 @@ class KafkaConsumerProxySpec extends TestKit(ActorSystem("test")) with Matchers 
 
   override def afterAll() = {
     super.afterAll()
-    TestKit.shutdownActorSystem(system)
     EmbeddedKafka.stop()
+    TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
   }
 
   lazy val kafkaProxy = system.actorOf(Props[KafkaConsumerProxy])

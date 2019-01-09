@@ -1,5 +1,7 @@
 package hydra.kafka.services
 
+import java.util.UUID
+
 import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.pattern.pipe
@@ -9,13 +11,15 @@ import hydra.avro.resource.SchemaResource
 import hydra.core.akka.SchemaRegistryActor._
 import hydra.core.marshallers.TopicMetadataRequest
 import hydra.core.protocol.{Ingest, IngestorCompleted}
-import hydra.core.transport.{AckStrategy, HydraRecord}
+import hydra.core.transport.AckStrategy
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
+import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.AvroRecord
-import hydra.kafka.services.TopicBootstrapActor.{BootstrapFailure, BootstrapSuccess, InitiateTopicBootstrap}
+import hydra.kafka.services.MetadataConsumerActor.{GetMetadata, GetMetadataResponse}
+import hydra.kafka.services.TopicBootstrapActor._
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.avro.Schema
-import org.apache.avro.generic.GenericRecord
+import org.joda.time.DateTime
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
@@ -95,6 +99,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     (probe, schemaRegistryActor, kafkaIngestor)
   }
 
+
   "A TopicBootstrapActor" should "process metadata and send an Ingest message to the kafka ingestor" in {
 
     val mdRequest = """{
@@ -126,8 +131,9 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test1")
 
+
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("/user/kafka_ingestor_test1")))
+      system.actorSelection("/user/kafka_ingestor_test1"), Props[MockConsumer]))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -136,12 +142,11 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     probe.receiveWhile(messages = 2) {
       case RegisterSchemaRequest(schemaJson) => schemaJson should
         include("SkillAssessmentTopicsScored")
-      case FetchSchemaRequest(schemaName) => schemaName shouldEqual "hydra.metadata.topic"
+      case FetchSchemaRequest(schemaName) => schemaName shouldEqual "_hydra.metadata.topic"
     }
 
     probe.expectMsgPF() {
-      case Ingest(msg: HydraRecord[_, GenericRecord], ack) =>
-        msg shouldBe an[AvroRecord]
+      case Ingest(msg: AvroRecord, ack) =>
         msg.payload.getSchema.getName shouldBe "topic"
         ack shouldBe AckStrategy.Replicated
     }
@@ -179,7 +184,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       schemaRegistryShouldFail = true)
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("kafka_ingestor_test2")))
+      system.actorSelection("kafka_ingestor_test2"), Props[MockConsumer]))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -225,7 +230,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test3")
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("kafka_ingestor_test3")))
+      system.actorSelection("kafka_ingestor_test3"), Props[MockConsumer]))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -270,7 +275,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test4", kafkaShouldFail = true)
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("/user/kafka_ingestor_test4")))
+      system.actorSelection("/user/kafka_ingestor_test4"), Props[MockConsumer]))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -317,7 +322,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test5")
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("/user/kafka_ingestor_test5")))
+      system.actorSelection("/user/kafka_ingestor_test5"), Props[MockConsumer]))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -328,17 +333,21 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     probe.receiveWhile(messages = 2) {
       case RegisterSchemaRequest(schemaJson) => schemaJson should
         include("SkillAssessmentTopicsScored")
-      case FetchSchemaRequest(schemaName) => schemaName shouldEqual "hydra.metadata.topic"
+      case FetchSchemaRequest(schemaName) => schemaName shouldEqual "_hydra.metadata.topic"
     }
 
     probe.expectMsgPF() {
-      case Ingest(msg: HydraRecord[_, GenericRecord], ack) =>
-        msg shouldBe an[AvroRecord]
+      case Ingest(msg: AvroRecord, ack) =>
         msg.payload.getSchema.getName shouldBe "topic"
         ack shouldBe AckStrategy.Replicated
     }
 
-    senderProbe.expectMsg(BootstrapSuccess)
+    senderProbe.expectMsgPF() {
+      case BootstrapSuccess(tm) =>
+        tm.schemaId should be > 0
+        tm.derived shouldBe false
+        tm.subject shouldBe subject
+    }
 
     val expectedMessage = "I'm expected!"
 
@@ -390,7 +399,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test6")
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("/user/kafka_ingestor_test6"), Some(testConfig)))
+      system.actorSelection("/user/kafka_ingestor_test6"), Props[MockConsumer], Some(testConfig)))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -401,12 +410,11 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     probe.receiveWhile(messages = 2) {
       case RegisterSchemaRequest(schemaJson) => schemaJson should
         include("SkillAssessmentTopicsScored")
-      case FetchSchemaRequest(schemaName) => schemaName shouldEqual "hydra.metadata.topic"
+      case FetchSchemaRequest(schemaName) => schemaName shouldEqual "_hydra.metadata.topic"
     }
 
     probe.expectMsgPF() {
-      case Ingest(msg: HydraRecord[_, GenericRecord], ack) =>
-        msg shouldBe an[AvroRecord]
+      case Ingest(msg: AvroRecord, ack) =>
         msg.payload.getSchema.getName shouldBe "topic"
         ack shouldBe AckStrategy.Replicated
     }
@@ -451,7 +459,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test7")
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("/user/kafka_ingestor_test7")))
+      system.actorSelection("/user/kafka_ingestor_test7"), Props[MockConsumer]))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -462,21 +470,70 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     probe.receiveWhile(messages = 2) {
       case RegisterSchemaRequest(schemaJson) => schemaJson should
         include("SkillAssessmentTopicsScored")
-      case FetchSchemaRequest(schemaName) => schemaName shouldEqual "hydra.metadata.topic"
+      case FetchSchemaRequest(schemaName) => schemaName shouldEqual "_hydra.metadata.topic"
     }
 
     probe.expectMsgPF() {
-      case Ingest(msg: HydraRecord[_, GenericRecord], ack) =>
-        msg shouldBe an[AvroRecord]
+      case Ingest(msg: AvroRecord, ack) =>
         msg.payload.getSchema.getName shouldBe "topic"
         ack shouldBe AckStrategy.Replicated
     }
 
-    senderProbe.expectMsg(BootstrapSuccess)
+    senderProbe.expectMsgPF() {
+      case BootstrapSuccess(tm) =>
+        tm.schemaId should be > 0
+        tm.derived shouldBe false
+        tm.subject shouldBe subject
+    }
 
     bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
 
-    senderProbe.expectMsg(BootstrapSuccess)
+    senderProbe.expectMsgPF() {
+      case BootstrapSuccess(tm) =>
+        tm.schemaId should be > 0
+        tm.derived shouldBe false
+        tm.subject shouldBe subject
+    }
+  }
+
+  it should "get all streams" in {
+    val (probe, schemaRegistryActor, _) = fixture("test-get-stream",
+      schemaRegistryShouldFail = false)
+
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
+      system.actorSelection("kafka_ingestor_test-get-stream"), Props[MockConsumer]))
+
+    probe.expectMsgType[RegisterSchemaRequest]
+
+    val senderProbe = TestProbe()
+
+    bootstrapActor.tell(GetStreams(None), senderProbe.ref)
+
+    senderProbe.expectMsgPF() {
+      case GetStreamsResponse(md) => md.exists(m => m.subject == "test-md-subject") shouldBe true
+    }
+  }
+
+  it should "get a stream by its subject" in {
+    val (probe, schemaRegistryActor, _) = fixture("test-get-stream-subject",
+      schemaRegistryShouldFail = false)
+
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
+      system.actorSelection("kafka_ingestor_test-get-stream-subject"), Props[MockConsumer]))
+
+    probe.expectMsgType[RegisterSchemaRequest]
+
+    val senderProbe = TestProbe()
+
+    bootstrapActor.tell(GetStreams(Some("unknown")), senderProbe.ref)
+
+    senderProbe.expectMsg(GetStreamsResponse(Seq.empty))
+
+    bootstrapActor.tell(GetStreams(Some("test-md-subject")), senderProbe.ref)
+
+    senderProbe.expectMsgPF() {
+      case GetStreamsResponse(md) => md.exists(m => m.subject == "test-md-subject") shouldBe true
+    }
   }
 
   it should "retry after a configurable interval when the schema registration fails" in {
@@ -511,7 +568,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       schemaRegistryShouldFail = true)
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("kafka_ingestor_test8")))
+      system.actorSelection("kafka_ingestor_test8"), Props[MockConsumer]))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -534,5 +591,15 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       case Failure(ex) => ex.getMessage shouldEqual
         "TopicBootstrapActor is in a failed state due to cause: Schema registry actor failed expectedly!"
     }
+  }
+}
+
+
+class MockConsumer extends Actor {
+  val tm = TopicMetadata("test-md-subject", 1, "entity", false, "private", "alex",
+    None, None, UUID.randomUUID(), DateTime.now())
+
+  override def receive: Receive = {
+    case GetMetadata => sender ! GetMetadataResponse(Map("test-md-subject" -> tm))
   }
 }

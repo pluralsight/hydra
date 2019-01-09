@@ -4,7 +4,7 @@ import akka.actor.Actor
 import akka.pattern.pipe
 import hydra.kafka.consumer.KafkaConsumerProxy._
 import hydra.kafka.util.KafkaUtils
-import org.apache.kafka.clients.consumer.KafkaConsumer
+import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.common.{PartitionInfo, TopicPartition}
 
 import scala.collection.JavaConverters._
@@ -13,7 +13,7 @@ import scala.concurrent.Future
 
 class KafkaConsumerProxy extends Actor {
 
-  private var _defaultConsumer: KafkaConsumer[String, String] = _
+  private var _defaultConsumer: Consumer[String, String] = _
 
   private implicit val ec = context.dispatcher
 

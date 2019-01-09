@@ -4,7 +4,6 @@ import akka.http.scaladsl.marshalling.{Marshaller, Marshalling}
 import akka.http.scaladsl.model.ContentTypes
 import akka.util.ByteString
 import hydra.core.marshallers.HydraJsonSupport
-import hydra.kafka.model.TopicMetadata
 import org.apache.kafka.common.{Node, PartitionInfo}
 import spray.json.{JsNumber, JsObject, JsString, JsValue, JsonFormat}
 
@@ -14,8 +13,6 @@ import scala.concurrent.Future
   * Created by alexsilva on 3/19/17.
   */
 trait HydraKafkaJsonSupport extends HydraJsonSupport {
-
-  implicit val topicMetadataFormat = jsonFormat7(TopicMetadata)
 
   implicit object NodeJsonFormat extends JsonFormat[Node] {
     override def write(node: Node): JsValue = {

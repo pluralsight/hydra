@@ -51,6 +51,7 @@ class KafkaUtilsSpec extends WordSpec
       |    parallelism = 100
       |    close-timeout = 60s
       |    use-dispatcher = test
+      |    eos-commit-interval = 100ms
       |    kafka-clients {
       |       linger.ms = 10
       |    }
@@ -86,6 +87,10 @@ class KafkaUtilsSpec extends WordSpec
 
     "return a list of topics" in {
       ku.topicNames().get.indexOf("test-kafka-utils") should be > -1
+    }
+
+    "return the correct boostrap servers config" in {
+      KafkaUtils.BootstrapServers shouldBe "localhost:8092"
     }
 
     "loads default consumer" in {

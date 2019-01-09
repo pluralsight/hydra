@@ -23,12 +23,15 @@ import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
+import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.http.HydraDirectives
-import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
-import hydra.kafka.services.TopicBootstrapActor
-import hydra.kafka.services.TopicBootstrapActor.{BootstrapFailure, BootstrapSuccess, InitiateTopicBootstrap}
+import hydra.core.marshallers.TopicMetadataRequest
+import hydra.kafka.model.TopicMetadataAdapter
+import hydra.kafka.services.TopicBootstrapActor._
+import hydra.kafka.services.{MetadataConsumerActor, TopicBootstrapActor}
+import hydra.kafka.util.KafkaUtils
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -36,23 +39,28 @@ import scala.util.{Failure, Success}
 
 
 class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: ExecutionContext)
-  extends RoutedEndpoints with LoggingAdapter with HydraJsonSupport with HydraDirectives {
+  extends RoutedEndpoints with LoggingAdapter with TopicMetadataAdapter with HydraDirectives {
 
   private implicit val timeout = Timeout(10.seconds)
 
   private implicit val mat = ActorMaterializer()
-
 
   private val kafkaIngestor = system.actorSelection(
     path = applicationConfig.getString("kafka-ingestor-path"))
 
   private val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(applicationConfig))
 
+  private val bootstrapKafkaConfig = applicationConfig.getConfig("bootstrap-config")
+
+  private val consumerProps = MetadataConsumerActor.props(bootstrapKafkaConfig,
+    KafkaUtils.BootstrapServers, ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient,
+    TopicBootstrapActor.getMetadataTopicName(bootstrapKafkaConfig))
+
   private val bootstrapActor = system.actorOf(
-    TopicBootstrapActor.props(schemaRegistryActor, kafkaIngestor))
+    TopicBootstrapActor.props(schemaRegistryActor, kafkaIngestor, consumerProps))
 
   override val route: Route =
-    pathPrefix("topics") {
+    pathPrefix("streams") {
       pathEndOrSingleSlash {
         post {
           requestEntityPresent {
@@ -60,8 +68,8 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
               onComplete(bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)) {
                 case Success(message) => message match {
 
-                  case BootstrapSuccess =>
-                    complete(StatusCodes.OK)
+                  case BootstrapSuccess(metadata) =>
+                    complete(StatusCodes.OK, toResource(metadata))
 
                   case BootstrapFailure(reasons) =>
                     complete(StatusCodes.BadRequest, reasons)
@@ -78,6 +86,21 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
             }
           }
         }
+      } ~ get {
+        pathEndOrSingleSlash(getAllStreams(None)) ~
+          path(Segment)(subject => getAllStreams(Some(subject)))
       }
     }
+
+  private def getAllStreams(subject: Option[String]): Route = {
+    onSuccess(bootstrapActor ? GetStreams(subject)) {
+      case GetStreamsResponse(metadata) =>
+        complete(StatusCodes.OK, metadata.map(toResource))
+      case Failure(ex) =>
+        throw ex
+      case x =>
+        log.error("Unexpected error in BootstrapEndpoint", x)
+        complete(StatusCodes.InternalServerError, "Unknown error")
+    }
+  }
 }
