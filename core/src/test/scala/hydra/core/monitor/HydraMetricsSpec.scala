@@ -60,19 +60,6 @@ class HydraMetricsSpec extends Matchers
   }
 
   it should
-    "create a new histogram" in {
-    histogramsCache.get(lookup).map { result =>
-      result shouldBe None
-    }
-
-    recordToHistogram(lookup, "histogram.metric", 100, generateTags)
-
-    histogramsCache.get(lookup).map { result =>
-      result shouldBe a[Some[_]]
-    }
-  }
-
-  it should
     "lookup an existing histogram" in {
     val f = recordToHistogram _
 

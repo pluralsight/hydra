@@ -23,13 +23,15 @@ import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
+import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.http.HydraDirectives
-import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
-import hydra.kafka.model.{TopicMetadata, TopicMetadataAdapter}
-import hydra.kafka.services.TopicBootstrapActor
+import hydra.core.marshallers.TopicMetadataRequest
+import hydra.kafka.model.TopicMetadataAdapter
 import hydra.kafka.services.TopicBootstrapActor._
+import hydra.kafka.services.{MetadataConsumerActor, TopicBootstrapActor}
+import hydra.kafka.util.KafkaUtils
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -48,8 +50,14 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
 
   private val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(applicationConfig))
 
+  private val bootstrapKafkaConfig = applicationConfig.getConfig("bootstrap-config")
+
+  private val consumerProps = MetadataConsumerActor.props(bootstrapKafkaConfig,
+    KafkaUtils.BootstrapServers, ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient,
+    TopicBootstrapActor.getMetadataTopicName(bootstrapKafkaConfig))
+
   private val bootstrapActor = system.actorOf(
-    TopicBootstrapActor.props(schemaRegistryActor, kafkaIngestor))
+    TopicBootstrapActor.props(schemaRegistryActor, kafkaIngestor, consumerProps))
 
   override val route: Route =
     pathPrefix("streams") {
@@ -77,12 +85,15 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
               }
             }
           }
-        } ~ get(getAllStreams)
-      }p
+        }
+      } ~ get {
+        pathEndOrSingleSlash(getAllStreams(None)) ~
+          path(Segment)(subject => getAllStreams(Some(subject)))
+      }
     }
 
-  private def getAllStreams: Route = {
-    onSuccess(bootstrapActor ? GetStreams) {
+  private def getAllStreams(subject: Option[String]): Route = {
+    onSuccess(bootstrapActor ? GetStreams(subject)) {
       case GetStreamsResponse(metadata) =>
         complete(StatusCodes.OK, metadata.map(toResource))
       case Failure(ex) =>

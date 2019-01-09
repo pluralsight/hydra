@@ -24,7 +24,8 @@ lazy val defaultSettings = Seq(
   resolvers += "jitpack" at "https://jitpack.io",
   resolvers += Resolver.bintrayRepo("hseeberger", "maven"),
   ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet,
-  parallelExecution in sbt.Test := false
+  parallelExecution in sbt.Test := false,
+  javaOptions in Universal += "-Dorg.aspectj.tracing.factory=default"
 )
 
 lazy val restartSettings = Seq(
@@ -57,6 +58,8 @@ lazy val root = Project(
   base = file(".")
 ).settings(defaultSettings).aggregate(common, core, avro, ingest, kafka, sql, jdbc, rabbitmq,
   sandbox)
+
+
 
 lazy val auth = Project(
   id = "auth",
@@ -126,8 +129,9 @@ lazy val ingest = Project(
   base = file("ingest")
 ).dependsOn(core, kafka)
   .settings(moduleSettings ++ dockerSettings,
+    javaAgents += "org.aspectj" % "aspectjweaver" % "1.8.13",
     name := "hydra-ingest", libraryDependencies ++= Dependencies.ingestDeps)
-  .enablePlugins(JavaAppPackaging, sbtdocker.DockerPlugin)
+  .enablePlugins(JavaAppPackaging, JavaAgent, sbtdocker.DockerPlugin)
 
 //scala style
 lazy val testScalastyle = taskKey[Unit]("testScalastyle")

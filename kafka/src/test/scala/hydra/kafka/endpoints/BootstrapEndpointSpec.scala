@@ -115,6 +115,42 @@ class BootstrapEndpointSpec extends Matchers
       }
     }
 
+    "get a stream by subject" in {
+
+      val json =
+        s"""{
+           |	"id":"79a1627e-04a6-11e9-8eb2-f2801f1b9fd1",
+           | "createdDate":"${ISODateTimeFormat.basicDateTimeNoMillis().print(DateTime.now)}",
+           | "subject": "exp.assessment.SkillAssessmentTopicsScored1",
+           |	"streamType": "Notification",
+           | "derived": false,
+           |	"dataClassification": "Public",
+           |	"contact": "slackity slack dont talk back",
+           |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+           |	"notes": "here are some notes topkek",
+           |	"schemaId": 2
+           |}"""
+          .stripMargin
+          .parseJson
+          .convertTo[TopicMetadata]
+
+      val topicMetadataJson = Source.fromResource("HydraMetadataTopic.avsc").mkString
+
+      val schema = new Schema.Parser().parse(topicMetadataJson)
+
+      val record: Object = new JsonConverter[GenericRecord](schema).convert(json.toJson.compactPrint)
+      implicit val deserializer = new KafkaAvroSerializer(ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient)
+      EmbeddedKafka.publishToKafka("_hydra.metadata.topic", record)
+
+      eventually {
+        Get("/streams/exp.assessment.SkillAssessmentTopicsScored1") ~> bootstrapRoute ~> check {
+          val r = responseAs[Seq[TopicMetadata]]
+          r.length should be >= 1
+          r(0).id.toString shouldBe "79a1627e-04a6-11e9-8eb2-f2801f1b9fd1"
+        }
+      }
+    }
+
     "reject empty requests" in {
       Post("/streams") ~> bootstrapRoute ~> check {
         rejection shouldEqual RequestEntityExpectedRejection
