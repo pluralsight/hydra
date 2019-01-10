@@ -10,14 +10,15 @@ import akka.stream.{ActorMaterializer, Materializer}
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.kafka.model.TopicMetadata
-import hydra.kafka.services.CompactedTopicManagerActor.{CreateCompactedStream, CreateCompactedTopic}
+import hydra.kafka.services.CompactedTopicManagerActor.{CompactedTopicManagerResult, _}
 import hydra.kafka.services.TopicBootstrapActor.{BootstrapFailure, BootstrapSuccess}
 import hydra.kafka.util.KafkaUtils
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
+import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 
+import scala.concurrent.duration._
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
-import scalacache.LoggingSupport
 
 class CompactedTopicManagerActor(consumerConfig: Config,
                             bootstrapServers: String,
@@ -40,7 +41,7 @@ class CompactedTopicManagerActor(consumerConfig: Config,
 
   override def receive: Receive = {
     case CreateCompactedStream(topicName) => //create the compacted stream if it doesn't exist already
-    case CreateCompactedTopic(topicName) => //create the compacted topic if it doesn't exist already
+    case CreateCompactedTopic(topicName, topicDetails) => //create the compacted topic if it doesn't exist already
   }
 
   override def preStart(): Unit = {
@@ -59,8 +60,9 @@ class CompactedTopicManagerActor(consumerConfig: Config,
       pipe(stream._1.shutdown().map(_ => StreamStopped)) to sender
   }
 
-  private[kafka] def createCompactedTopic(topicName: String) = {
+  private[kafka] def createCompactedTopic(topicName: String, topicDetails: TopicDetails): Future[Unit] = {
 
+    val timeout = 2000
     val topicExists = kafkaUtils.topicExists(topicName) match {
       case Success(value) => value
       case Failure(exception) =>
@@ -71,28 +73,31 @@ class CompactedTopicManagerActor(consumerConfig: Config,
     // Don't fail when topic already exists
     if (topicExists) {
       log.info(s"Topic $topicName already exists, proceeding anyway...")
-      Future.successful(BootstrapSuccess(metadata))
+      Future.successful(())
     }
+
     else {
-      kafkaUtils.createTopic(metadata.subject, topicDetails, timeout = timeoutMillis)
+      kafkaUtils.createTopic(topicName, topicDetails, timeout)
         .map { r =>
-          r.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
+          r.all.get(timeout, TimeUnit.MILLISECONDS)
         }
         .map { _ =>
-          BootstrapSuccess(metadata)
+          ()
         }
         .recover {
-          case e: Exception => BootstrapFailure(e.getMessage :: Nil)
+          case e: Exception => throw e
         }
     }
   }
-  }
+
 }
 
 object CompactedTopicManagerActor {
 
   case class CreateCompactedStream(topicName: String)
   case class CreateCompactedTopic(topicName: String)
+
+  sealed trait CompactedTopicManagerResult
 
   def props(consumerConfig: Config,
             bootstrapServers: String,

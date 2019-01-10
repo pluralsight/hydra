@@ -1,17 +1,27 @@
 package hydra.kafka.services
 
+import java.util.UUID
+
 import akka.NotUsed
 import akka.actor.{Actor, Props}
+import akka.kafka.{ConsumerSettings, ProducerMessage, ProducerSettings, Subscriptions}
+import akka.kafka.scaladsl.{Consumer, Producer}
 import akka.kafka.scaladsl.Consumer.Control
 import akka.pattern.pipe
-import akka.stream.scaladsl.RunnableGraph
+import akka.stream.scaladsl.{Keep, RunnableGraph}
 import akka.stream.{ActorMaterializer, Materializer}
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.kafka.model.TopicMetadata
 import hydra.kafka.services.CompactedTopicManagerActor.CreateCompactedStream
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
+import org.apache.avro.generic.GenericRecord
+import org.apache.kafka.clients.consumer.ConsumerConfig
+import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.StringDeserializer
+import org.joda.time.format.ISODateTimeFormat
+
+import scala.concurrent.ExecutionContext
 
 class CompactedTopicStreamActor(topicName: String) extends Actor
   with ConfigSupport {
@@ -62,34 +72,25 @@ object CompactedTopicStreamActor {
 
   private[services] def createStream[K, V](config: Config,
                                            bootstrapSevers: String,
-                                           schemaRegistryClient: SchemaRegistryClient,
                                            topicName: String,
-                                           destination: ActorRef)
+                                           destinationTopic: String)
                                           (implicit ec: ExecutionContext, mat: Materializer): Stream = {
 
     val formatter = ISODateTimeFormat.basicDateTimeNoMillis()
 
-    val settings = ConsumerSettings(config, new StringDeserializer,
-      .withBootstrapServers(bootstrapSevers)
-      .withGroupId("metadata-consumer-actor")
-      .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
+    val consumerSettings = ConsumerSettings(config, None, None)
+    val producerSettings = ProducerSettings(config, None, None)
 
-    Consumer.plainSource(settings, Subscriptions.topics(topicName))
+//    val settings = ConsumerSettings(config, keyDesnew StringDeserializer,
+//      .withBootstrapServers(bootstrapSevers)
+//      .withGroupId("metadata-consumer-actor")
+//      .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
+
+    Consumer.plainSource(consumerSettings, Subscriptions.topics(topicName))
       .map { msg =>
-        val record = msg.value.asInstanceOf[GenericRecord]
-        TopicMetadata(
-          record.get("subject").toString,
-          record.get("schemaId").toString.toInt,
-          record.get("streamType").toString,
-          record.get("derived").toString.toBoolean,
-          record.get("dataClassification").toString,
-          record.get("contact").toString,
-          Option(record.get("additionalDocumentation")).map(_.toString),
-          Option(record.get("notes")).map(_.toString),
-          UUID.fromString(record.get("id").toString),
-          formatter.parseDateTime(record.get("createdDate").toString),
-        )
-      }.toMat(Sink.actorRef(destination, StreamStopped))(Keep.both)
+         ProducerMessage.single(new ProducerRecord(destinationTopic, msg.key(), msg.value())
+         )
+      }.toMat(Producer.commitableSink(producerSettings))(Keep.both)
   }
 
   /*
