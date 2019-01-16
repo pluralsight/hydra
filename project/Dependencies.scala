@@ -160,9 +160,7 @@ object Dependencies {
   val baseDeps = akka ++ Seq(scalaz, scalaConfigs, avro) ++ logging ++ joda ++ testDeps
 
   val sqlDeps = logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
-
-  val authDeps = akka ++ sqlDeps ++ Seq(guavacache)
-
+  
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
   val coreDeps = akka ++ baseDeps ++ 
