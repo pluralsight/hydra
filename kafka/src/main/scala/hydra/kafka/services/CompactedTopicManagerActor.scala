@@ -3,6 +3,7 @@ package hydra.kafka.services
 import java.util.concurrent.TimeUnit
 
 import akka.actor.{Actor, ActorLogging, Props}
+import akka.pattern.pipe
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.kafka.services.CompactedTopicManagerActor._
@@ -10,9 +11,8 @@ import hydra.kafka.util.KafkaUtils
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 import scala.util.{Failure, Success}
-import akka.pattern.pipe
 
 class CompactedTopicManagerActor(consumerConfig: Config,
                             bootstrapServers: String,
@@ -75,7 +75,8 @@ class CompactedTopicManagerActor(consumerConfig: Config,
 
   private[kafka] def createCompactedStream(topicName: String): Future[Unit] = {
     //do we want to return a future unit? how do we signal to the client that compacted was successful?
-    val compactedActor = context.actorOf()
+    context.actorOf(CompactedTopicStreamActor.props(topicName, this.COMPACTED_PREFIX + topicName, KafkaUtils.BootstrapServers, consumerConfig))
+    Future.successful()
   }
 
 }

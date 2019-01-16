@@ -1,10 +1,10 @@
 package hydra.kafka.services
 
-import akka.NotUsed
+import akka.Done
 import akka.actor.{Actor, Props}
-import akka.kafka.scaladsl.Consumer.Control
-import akka.kafka.scaladsl.{Consumer, Producer}
-import akka.kafka.{ConsumerSettings, ProducerMessage, ProducerSettings, Subscriptions}
+import akka.kafka._
+import akka.kafka.scaladsl.Consumer.DrainingControl
+import akka.kafka.scaladsl.{Committer, Consumer, Producer}
 import akka.stream.scaladsl.{Keep, RunnableGraph}
 import akka.stream.{ActorMaterializer, Materializer}
 import com.typesafe.config.Config
@@ -33,7 +33,7 @@ class CompactedTopicStreamActor(fromTopic: String, toTopic: String, bootstrapSer
     context.become(streaming(stream.run()))
   }
 
-  def streaming(stream: (Control, NotUsed)): Receive = {
+  def streaming(stream: Consumer.DrainingControl[Done]): Receive = {
     Actor.emptyBehavior
   }
 
@@ -41,7 +41,7 @@ class CompactedTopicStreamActor(fromTopic: String, toTopic: String, bootstrapSer
 
 object CompactedTopicStreamActor {
 
-  private type Stream = RunnableGraph[(Control, NotUsed)]
+  private type Stream = RunnableGraph[DrainingControl[Done]]
 
   case class CreateCompactedStream(topicName: String)
 
@@ -63,13 +63,20 @@ object CompactedTopicStreamActor {
       .withGroupId(toTopic)
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
     val producerSettings = ProducerSettings(config, None, None)
+    val committerSettings = CommitterSettings(config)
 
-
-    Consumer.plainSource(consumerSettings, Subscriptions.topics(fromTopic))
+    val stream: RunnableGraph[DrainingControl[Done]] = Consumer.committableSource(consumerSettings, Subscriptions.topics(fromTopic))
       .map { msg =>
-         ProducerMessage.single(new ProducerRecord(toTopic, msg.key(), msg.value())
-         )
-      }.toMat(Producer.commitableSink(producerSettings))(Keep.both)
+        ProducerMessage.single(new ProducerRecord(toTopic, msg.record.key, msg.record.value),
+          passThrough = msg.committableOffset
+        )
+      }
+      .via(Producer.flexiFlow(producerSettings))
+      .map(_.passThrough)
+      .toMat(Committer.sink(committerSettings))(Keep.both)
+      .mapMaterializedValue(DrainingControl.apply)
+
+    stream
   }
 
 
