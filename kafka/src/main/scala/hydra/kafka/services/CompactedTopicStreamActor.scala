@@ -11,6 +11,7 @@ import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerRecord
+import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer, StringDeserializer, StringSerializer}
 import org.joda.time.format.ISODateTimeFormat
 
 import scala.concurrent.ExecutionContext
@@ -58,11 +59,12 @@ object CompactedTopicStreamActor {
 
     val formatter = ISODateTimeFormat.basicDateTimeNoMillis()
 
-    val consumerSettings = ConsumerSettings(config, None, None)
+    val consumerSettings = ConsumerSettings(config, new StringDeserializer, new ByteArrayDeserializer)
       .withBootstrapServers(bootstrapSevers)
       .withGroupId(toTopic)
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
-    val producerSettings = ProducerSettings(config, None, None)
+
+    val producerSettings = ProducerSettings(config, new StringSerializer, new ByteArraySerializer)
     val committerSettings = CommitterSettings(config)
 
     val stream: RunnableGraph[DrainingControl[Done]] = Consumer.committableSource(consumerSettings, Subscriptions.topics(fromTopic))

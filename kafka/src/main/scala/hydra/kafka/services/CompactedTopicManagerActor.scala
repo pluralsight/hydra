@@ -4,6 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import akka.actor.{Actor, ActorLogging, Props}
 import akka.pattern.pipe
+import akka.stream.{ActorMaterializer, Materializer}
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.kafka.services.CompactedTopicManagerActor._
@@ -25,6 +26,8 @@ class CompactedTopicManagerActor(consumerConfig: Config,
   //maintains map of actorRefs, we can use the actorRef to query the actor and get its status?
   private val compactedStreamsMap = new collection.mutable.HashMap[String, String]()
   private final val COMPACTED_PREFIX = "_compacted."
+  private implicit val ec = context.dispatcher
+  private implicit val materializer: Materializer = ActorMaterializer()
 
   override def receive: Receive = {
 
