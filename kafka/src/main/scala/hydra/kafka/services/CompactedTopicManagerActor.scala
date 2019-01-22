@@ -1,5 +1,6 @@
 package hydra.kafka.services
 
+import java.util
 import java.util.concurrent.TimeUnit
 
 import akka.actor.{Actor, ActorLogging, Props}
@@ -9,7 +10,6 @@ import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.kafka.services.CompactedTopicManagerActor._
 import hydra.kafka.util.KafkaUtils
-import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 
 import scala.concurrent.Future
@@ -59,7 +59,14 @@ class CompactedTopicManagerActor(consumerConfig: Config,
     }
 
     else {
-      kafkaUtils.createTopic(topicName, topicDetails, timeout)
+
+      import scala.collection.JavaConverters._
+      val topicDetailsConfig: util.Map[String, String] = Map[String, String]().empty.asJava
+      topicDetailsConfig.put("log.cleanup.policy", "compact")
+
+      val compactedDetails = new TopicDetails(topicDetails.numPartitions, topicDetails.replicationFactor, topicDetailsConfig)
+
+      kafkaUtils.createTopic(topicName, compactedDetails, timeout)
         .map { r =>
           r.all.get(timeout, TimeUnit.MILLISECONDS)
         }

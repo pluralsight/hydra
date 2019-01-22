@@ -31,7 +31,6 @@ class CompactedTopicStreamActor(fromTopic: String, toTopic: String, bootstrapSer
   }
 
   override def preStart(): Unit = {
-    println(stream)
     context.become(streaming(stream.run()))
   }
 

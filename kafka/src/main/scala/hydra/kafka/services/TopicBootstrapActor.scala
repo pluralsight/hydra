@@ -10,7 +10,6 @@ import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import com.typesafe.config.Config
 import configs.syntax._
-import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.core.akka.SchemaRegistryActor.{RegisterSchemaRequest, RegisterSchemaResponse}
 import hydra.core.ingest.{HydraRequest, RequestParams}
@@ -104,10 +103,8 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
             schema <- registerSchema(topicMetadataRequest.schema.compactPrint)
             topicMetadata <- ingestMetadata(topicMetadataRequest, schema.schemaResource.id)
             bootstrapResult <- createKafkaTopic(topicMetadata)
+            _ <- tryCreateCompactedTopic(topicMetadataRequest)
           } yield bootstrapResult
-
-          //create the compacted topic, this actor handles turning on compaction
-          compactedTopicManagerActor ! CreateCompactedTopic(topicMetadataRequest.subject, topicDetails)
 
           pipe(
             result.recover {
@@ -126,6 +123,13 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
         }
 
       pipe(streams) to sender
+  }
+
+  private[kafka] def tryCreateCompactedTopic(topicMetadataRequest: TopicMetadataRequest): Future[Unit] = {
+    if (topicMetadataRequest.schema.fields.contains("hydra.key")) {
+      compactedTopicManagerActor ! CreateCompactedTopic(topicMetadataRequest.subject, topicDetails)
+    }
+    Future.successful()
   }
 
   def failed(ex: Throwable): Receive = {
@@ -201,7 +205,6 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
         log.error(s"Unable to determine if topic exists: ${exception.getMessage}")
         return Future.failed(exception)
     }
-
     // Don't fail when topic already exists
     if (topicExists) {
       log.info(s"Topic $topic already exists, proceeding anyway...")
