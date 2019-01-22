@@ -74,7 +74,7 @@ class CompactedTopicManagerActor(consumerConfig: Config,
 
   private[kafka] def createCompactedStream(topicName: String): Future[Unit] = {
     //do we want to return a future unit? how do we signal to the client that compacted was successful?
-    context.actorOf(CompactedTopicStreamActor.props(topicName, this.COMPACTED_PREFIX + topicName, KafkaUtils.BootstrapServers, consumerConfig))
+    val streamActor = context.actorOf(CompactedTopicStreamActor.props(topicName, this.COMPACTED_PREFIX + topicName, KafkaUtils.BootstrapServers, consumerConfig))
     Future.successful()
   }
 

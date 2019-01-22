@@ -31,6 +31,7 @@ class CompactedTopicStreamActor(fromTopic: String, toTopic: String, bootstrapSer
   }
 
   override def preStart(): Unit = {
+    println(stream)
     context.become(streaming(stream.run()))
   }
 
@@ -64,8 +65,10 @@ object CompactedTopicStreamActor {
       .withGroupId(toTopic)
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
 
-    val producerSettings = ProducerSettings(config, new StringSerializer, new ByteArraySerializer)
+    val producerSettings = ProducerSettings(config, new StringSerializer, new ByteArraySerializer).withBootstrapServers(bootstrapSevers)
     val committerSettings = CommitterSettings(config)
+
+    println("HERES THE BOOTSTRAPS\n\n\n\n" + bootstrapSevers + "\n\n\n" )
 
     val stream: RunnableGraph[DrainingControl[Done]] = Consumer.committableSource(consumerSettings, Subscriptions.topics(fromTopic))
       .map { msg =>
