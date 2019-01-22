@@ -19,6 +19,7 @@ import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.{AvroRecord, AvroRecordFactory}
+import hydra.kafka.services.CompactedTopicManagerActor.CreateCompactedTopic
 import hydra.kafka.services.MetadataConsumerActor.{GetMetadata, GetMetadataResponse, StopStream}
 import hydra.kafka.util.KafkaUtils
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
@@ -30,6 +31,7 @@ import scala.io.Source
 import scala.util._
 
 class TopicBootstrapActor(schemaRegistryActor: ActorRef,
+                          compactedTopicManagerActor: ActorRef,
                           kafkaIngestor: ActorSelection,
                           bootstrapConfig: Option[Config] = None,
                           consumerProps: Props) extends Actor
@@ -103,6 +105,9 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
             topicMetadata <- ingestMetadata(topicMetadataRequest, schema.schemaResource.id)
             bootstrapResult <- createKafkaTopic(topicMetadata)
           } yield bootstrapResult
+
+          //create the compacted topic, this actor handles turning on compaction
+          compactedTopicManagerActor ! CreateCompactedTopic(topicMetadataRequest.subject, topicDetails)
 
           pipe(
             result.recover {
@@ -223,10 +228,10 @@ object TopicBootstrapActor {
   def getMetadataTopicName(c: Config) = c.get[String]("metadata-topic-name")
     .valueOrElse("_hydra.metadata.topic")
 
-  def props(schemaRegistryActor: ActorRef, kafkaIngestor: ActorSelection,
+  def props(schemaRegistryActor: ActorRef, compactedTopicManagerActor: ActorRef, kafkaIngestor: ActorSelection,
             consumerProps: Props,
             config: Option[Config] = None): Props =
-    Props(classOf[TopicBootstrapActor], schemaRegistryActor, kafkaIngestor, config, consumerProps)
+    Props(classOf[TopicBootstrapActor], schemaRegistryActor, compactedTopicManagerActor, kafkaIngestor, config, consumerProps)
 
   sealed trait TopicBootstrapMessage
 

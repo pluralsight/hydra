@@ -23,8 +23,6 @@ class CompactedTopicManagerActor(consumerConfig: Config,
   with ConfigSupport
   with ActorLogging {
 
-  //maintains map of actorRefs, we can use the actorRef to query the actor and get its status?
-  private val compactedStreamsMap = new collection.mutable.HashMap[String, String]()
   private final val COMPACTED_PREFIX = "_compacted."
   private implicit val ec = context.dispatcher
   private implicit val materializer: Materializer = ActorMaterializer()
@@ -32,7 +30,7 @@ class CompactedTopicManagerActor(consumerConfig: Config,
   override def receive: Receive = {
 
     case CreateCompactedTopic(topicName, topicDetails) => {
-      createCompactedTopic(topicName, topicDetails).map { _ =>
+      createCompactedTopic(this.COMPACTED_PREFIX + topicName, topicDetails).map { _ =>
         self ! CreateCompactedStream(topicName)
       }.recover {
         case e: Exception => throw e
