@@ -103,8 +103,9 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
             schema <- registerSchema(topicMetadataRequest.schema.compactPrint)
             topicMetadata <- ingestMetadata(topicMetadataRequest, schema.schemaResource.id)
             bootstrapResult <- createKafkaTopic(topicMetadata)
-            _ <- tryCreateCompactedTopic(topicMetadataRequest)
           } yield bootstrapResult
+
+          tryCreateCompactedTopic(topicMetadataRequest)
 
           pipe(
             result.recover {
