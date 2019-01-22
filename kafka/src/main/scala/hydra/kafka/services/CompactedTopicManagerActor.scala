@@ -17,8 +17,6 @@ import scala.util.{Failure, Success}
 
 class CompactedTopicManagerActor(consumerConfig: Config,
                             bootstrapServers: String,
-                            schemaRegistryClient: SchemaRegistryClient,
-                            metadataTopicName: String,
                                  kafkaUtils: KafkaUtils) extends Actor
   with ConfigSupport
   with ActorLogging {
@@ -91,9 +89,8 @@ object CompactedTopicManagerActor {
 
   def props(consumerConfig: Config,
             bootstrapServers: String,
-            schemaRegistryClient: SchemaRegistryClient,
-            metadataTopicName: String) = {
-    Props(classOf[CompactedTopicManagerActor], consumerConfig, bootstrapServers, schemaRegistryClient, metadataTopicName)
+            kafkaUtils: KafkaUtils) = {
+    Props(classOf[CompactedTopicManagerActor], consumerConfig, bootstrapServers, kafkaUtils)
   }
 
 }
