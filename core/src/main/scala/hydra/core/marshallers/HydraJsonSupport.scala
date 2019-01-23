@@ -137,7 +137,12 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
       case JsString("Notification") => Notification
       case JsString("History") => History
       case JsString("CurrentState") => CurrentState
-      case _ => throw new DeserializationException(s"expected a streamType of (CurrentState, Notification, History), but got $json")
+      case _ => {
+        import scala.reflect.runtime.{universe => ru}
+        val tpe = ru.typeOf[StreamType]
+        val clazz = tpe.typeSymbol.asClass
+        throw new DeserializationException(s"expected a streamType of ${clazz.knownDirectSubclasses}, but got $json")
+      }
     }
 
     override def write(obj: StreamType): JsValue = {
