@@ -61,8 +61,7 @@ class CompactedTopicManagerActor(consumerConfig: Config,
     else {
 
       import scala.collection.JavaConverters._
-      val topicDetailsConfig: util.Map[String, String] = Map[String, String]().empty.asJava
-      topicDetailsConfig.put("log.cleanup.policy", "compact")
+      val topicDetailsConfig: util.Map[String, String] = Map[String, String]("log.cleanup.policy" -> "compact").asJava
 
       val compactedDetails = new TopicDetails(topicDetails.numPartitions, topicDetails.replicationFactor, topicDetailsConfig)
 

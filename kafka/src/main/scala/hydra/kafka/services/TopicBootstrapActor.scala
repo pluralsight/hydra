@@ -13,7 +13,7 @@ import configs.syntax._
 import hydra.common.config.ConfigSupport
 import hydra.core.akka.SchemaRegistryActor.{RegisterSchemaRequest, RegisterSchemaResponse}
 import hydra.core.ingest.{HydraRequest, RequestParams}
-import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
+import hydra.core.marshallers.{History, HydraJsonSupport, TopicMetadataRequest}
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.kafka.model.TopicMetadata
@@ -127,7 +127,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
   }
 
   private[kafka] def tryCreateCompactedTopic(topicMetadataRequest: TopicMetadataRequest): Future[Unit] = {
-    if (topicMetadataRequest.schema.fields.contains("hydra.key")) {
+    if (topicMetadataRequest.schema.fields.contains("hydra.key") && topicMetadataRequest.streamType == History) {
       compactedTopicManagerActor ! CreateCompactedTopic(topicMetadataRequest.subject, topicDetails)
     }
     Future.successful()
@@ -154,7 +154,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     val topicMetadata = TopicMetadata(
       topicMetadataRequest.subject,
       schemaId,
-      topicMetadataRequest.streamType,
+      topicMetadataRequest.streamType.toString,
       topicMetadataRequest.derived,
       topicMetadataRequest.dataClassification,
       topicMetadataRequest.contact,
