@@ -2,11 +2,12 @@ package hydra.kafka.services
 
 import akka.Done
 import akka.actor.{Actor, Props}
+import akka.event.Logging
 import akka.kafka._
 import akka.kafka.scaladsl.Consumer.DrainingControl
 import akka.kafka.scaladsl.{Committer, Consumer, Producer}
 import akka.stream.scaladsl.{Keep, RunnableGraph}
-import akka.stream.{ActorMaterializer, Materializer}
+import akka.stream.{ActorMaterializer, Attributes, Materializer}
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -57,8 +58,6 @@ object CompactedTopicStreamActor {
                                            toTopic: String)
                                           (implicit ec: ExecutionContext, mat: Materializer): Stream = {
 
-    val formatter = ISODateTimeFormat.basicDateTimeNoMillis()
-
     val consumerSettings = ConsumerSettings(config, new StringDeserializer, new ByteArrayDeserializer)
       .withBootstrapServers(bootstrapSevers)
       .withGroupId(toTopic)
@@ -67,14 +66,21 @@ object CompactedTopicStreamActor {
     val producerSettings = ProducerSettings(config, new StringSerializer, new ByteArraySerializer).withBootstrapServers(bootstrapSevers)
     val committerSettings = CommitterSettings(config)
 
-    println("HERES THE BOOTSTRAPS\n\n\n\n" + bootstrapSevers + "\n\n\n" )
 
     val stream: RunnableGraph[DrainingControl[Done]] = Consumer.committableSource(consumerSettings, Subscriptions.topics(fromTopic))
-      .map { msg =>
+      .map({ msg =>
         ProducerMessage.single(new ProducerRecord(toTopic, msg.record.key, msg.record.value),
           passThrough = msg.committableOffset
         )
-      }
+      })
+      .log(s"compacted stream logging: $fromTopic")
+        .withAttributes(
+          Attributes.logLevels(
+            onElement = Logging.WarningLevel,
+            onFinish = Logging.InfoLevel,
+            onFailure = Logging.DebugLevel
+          )
+        )
       .via(Producer.flexiFlow(producerSettings))
       .map(_.passThrough)
       .toMat(Committer.sink(committerSettings))(Keep.both)
