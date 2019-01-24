@@ -15,7 +15,7 @@ import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-class CompactedTopicManagerActor(consumerConfig: Config,
+class CompactedTopicManagerActor(compactedStreamConfig: Config,
                             bootstrapServers: String,
                                  kafkaUtils: KafkaUtils) extends Actor
   with ConfigSupport
@@ -54,14 +54,19 @@ class CompactedTopicManagerActor(consumerConfig: Config,
 
     // Don't fail when topic already exists
     if (topicExists) {
-      log.info(s"Topic $topicName already exists, proceeding anyway...")
+      log.info(s"Compacted Topic $topicName already exists, proceeding anyway...")
       Future.successful(())
     }
 
     else {
 
       import scala.collection.JavaConverters._
-      val topicDetailsConfig: util.Map[String, String] = Map[String, String]("cleanup.policy" -> "compact").asJava
+      val topicConfig = compactedStreamConfig.getConfig("topic-settings")
+      val topicDetailsConfig: util.Map[String, String] = Map[String, String]("cleanup.policy" -> topicConfig.getString("cleanup.policy")).asJava
+
+      if (topicConfig.hasPath("segment.size")) {
+        topicDetailsConfig.put("segment.size", topicConfig.getString("segment.size"))
+      }
 
       val compactedDetails = new TopicDetails(topicDetails.numPartitions, topicDetails.replicationFactor, topicDetailsConfig)
 
@@ -73,7 +78,7 @@ class CompactedTopicManagerActor(consumerConfig: Config,
           ()
         }
         .recover {
-          case e: Exception => println("WHATTTSS", e); throw e
+          case e: Exception => throw e
         }
       topicFut
     }
@@ -82,7 +87,7 @@ class CompactedTopicManagerActor(consumerConfig: Config,
   private[kafka] def createCompactedStream(topicName: String): Future[Unit] = {
     //do we want to return a future unit? how do we signal to the client that compacted was successful?
     log.info(s"Attempting to create compacted stream from $topicName to ${topicName+this.COMPACTED_PREFIX}")
-    val streamActor = context.actorOf(CompactedTopicStreamActor.props(topicName, this.COMPACTED_PREFIX + topicName, KafkaUtils.BootstrapServers, consumerConfig))
+    val streamActor = context.actorOf(CompactedTopicStreamActor.props(topicName, this.COMPACTED_PREFIX + topicName, KafkaUtils.BootstrapServers, compactedStreamConfig))
     Future.successful()
   }
 
@@ -95,10 +100,10 @@ object CompactedTopicManagerActor {
 
   sealed trait CompactedTopicManagerResult
 
-  def props(consumerConfig: Config,
+  def props(compactedStreamConfig: Config,
             bootstrapServers: String,
             kafkaUtils: KafkaUtils) = {
-    Props(classOf[CompactedTopicManagerActor], consumerConfig, bootstrapServers, kafkaUtils)
+    Props(classOf[CompactedTopicManagerActor], compactedStreamConfig, bootstrapServers, kafkaUtils)
   }
 
 }

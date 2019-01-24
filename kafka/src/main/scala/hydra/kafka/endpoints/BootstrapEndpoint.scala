@@ -52,12 +52,13 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
   private val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(applicationConfig))
 
   private val bootstrapKafkaConfig = applicationConfig.getConfig("bootstrap-config")
+  private val compactedStreamConfig = bootstrapKafkaConfig.getConfig("compacted-streams")
 
   private val consumerProps = MetadataConsumerActor.props(bootstrapKafkaConfig,
     KafkaUtils.BootstrapServers, ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient,
     TopicBootstrapActor.getMetadataTopicName(bootstrapKafkaConfig))
 
-  private val compactedTopicManager = system.actorOf(CompactedTopicManagerActor.props(bootstrapKafkaConfig, KafkaUtils.BootstrapServers, KafkaUtils()))
+  private val compactedTopicManager = system.actorOf(CompactedTopicManagerActor.props(compactedStreamConfig, KafkaUtils.BootstrapServers, KafkaUtils()))
 
   private val bootstrapActor = system.actorOf(
     TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManager, kafkaIngestor, consumerProps))
