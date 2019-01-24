@@ -61,11 +61,11 @@ class CompactedTopicManagerActor(consumerConfig: Config,
     else {
 
       import scala.collection.JavaConverters._
-      val topicDetailsConfig: util.Map[String, String] = Map[String, String]("log.cleanup.policy" -> "compact").asJava
+      val topicDetailsConfig: util.Map[String, String] = Map[String, String]("cleanup.policy" -> "compact").asJava
 
       val compactedDetails = new TopicDetails(topicDetails.numPartitions, topicDetails.replicationFactor, topicDetailsConfig)
 
-      kafkaUtils.createTopic(topicName, compactedDetails, timeout)
+      val topicFut = kafkaUtils.createTopic(topicName, compactedDetails, timeout)
         .map { r =>
           r.all.get(timeout, TimeUnit.MILLISECONDS)
         }
@@ -73,13 +73,15 @@ class CompactedTopicManagerActor(consumerConfig: Config,
           ()
         }
         .recover {
-          case e: Exception => throw e
+          case e: Exception => println("WHATTTSS", e); throw e
         }
+      topicFut
     }
   }
 
   private[kafka] def createCompactedStream(topicName: String): Future[Unit] = {
     //do we want to return a future unit? how do we signal to the client that compacted was successful?
+    log.info(s"Attempting to create compacted stream from $topicName to ${topicName+this.COMPACTED_PREFIX}")
     val streamActor = context.actorOf(CompactedTopicStreamActor.props(topicName, this.COMPACTED_PREFIX + topicName, KafkaUtils.BootstrapServers, consumerConfig))
     Future.successful()
   }

@@ -103,9 +103,8 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
             schema <- registerSchema(topicMetadataRequest.schema.compactPrint)
             topicMetadata <- ingestMetadata(topicMetadataRequest, schema.schemaResource.id)
             bootstrapResult <- createKafkaTopic(topicMetadata)
+            _ <- tryCreateCompactedTopic(topicMetadataRequest)
           } yield bootstrapResult
-
-          tryCreateCompactedTopic(topicMetadataRequest)
 
           pipe(
             result.recover {
@@ -128,6 +127,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
 
   private[kafka] def tryCreateCompactedTopic(topicMetadataRequest: TopicMetadataRequest): Future[Unit] = {
     if (topicMetadataRequest.schema.fields.contains("hydra.key") && topicMetadataRequest.streamType == History) {
+      log.debug("Historical Stream with hydra.key found, creating topic...")
       compactedTopicManagerActor ! CreateCompactedTopic(topicMetadataRequest.subject, topicDetails)
     }
     Future.successful()

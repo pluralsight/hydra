@@ -1,7 +1,7 @@
 package hydra.kafka.services
 
 import akka.Done
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorLogging, Props}
 import akka.event.Logging
 import akka.kafka._
 import akka.kafka.scaladsl.Consumer.DrainingControl
@@ -13,12 +13,12 @@ import hydra.common.config.ConfigSupport
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer, StringDeserializer, StringSerializer}
-import org.joda.time.format.ISODateTimeFormat
 
 import scala.concurrent.ExecutionContext
 
 class CompactedTopicStreamActor(fromTopic: String, toTopic: String, bootstrapServers: String, config: Config) extends Actor
-  with ConfigSupport {
+  with ConfigSupport
+  with ActorLogging {
 
 
   private implicit val ec = context.dispatcher
@@ -32,6 +32,7 @@ class CompactedTopicStreamActor(fromTopic: String, toTopic: String, bootstrapSer
   }
 
   override def preStart(): Unit = {
+    log.debug(s"Starting compacted topic actor for ${toTopic}")
     context.become(streaming(stream.run()))
   }
 
@@ -76,7 +77,7 @@ object CompactedTopicStreamActor {
       .log(s"compacted stream logging: $fromTopic")
         .withAttributes(
           Attributes.logLevels(
-            onElement = Logging.WarningLevel,
+            onElement = Logging.InfoLevel,
             onFinish = Logging.InfoLevel,
             onFailure = Logging.DebugLevel
           )
