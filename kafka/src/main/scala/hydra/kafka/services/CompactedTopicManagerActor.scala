@@ -15,7 +15,7 @@ import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-class CompactedTopicManagerActor(compactedStreamConfig: Config,
+class CompactedTopicManagerActor(kafkaConfig: Config,
                             bootstrapServers: String,
                                  kafkaUtils: KafkaUtils) extends Actor
   with ConfigSupport
@@ -61,12 +61,8 @@ class CompactedTopicManagerActor(compactedStreamConfig: Config,
     else {
 
       import scala.collection.JavaConverters._
-      val topicConfig = compactedStreamConfig.getConfig("topic-settings")
-      val topicDetailsConfig: util.Map[String, String] = Map[String, String]("cleanup.policy" -> topicConfig.getString("cleanup.policy")).asJava
 
-      if (topicConfig.hasPath("segment.size")) {
-        topicDetailsConfig.put("segment.size", topicConfig.getString("segment.size"))
-      }
+      val topicDetailsConfig: util.Map[String, String] = Map[String, String]("cleanup.policy" -> "compact").asJava
 
       val compactedDetails = new TopicDetails(topicDetails.numPartitions, topicDetails.replicationFactor, topicDetailsConfig)
 
@@ -87,7 +83,7 @@ class CompactedTopicManagerActor(compactedStreamConfig: Config,
   private[kafka] def createCompactedStream(topicName: String): Future[Unit] = {
     //do we want to return a future unit? how do we signal to the client that compacted was successful?
     log.info(s"Attempting to create compacted stream from $topicName to ${topicName+this.COMPACTED_PREFIX}")
-    val streamActor = context.actorOf(CompactedTopicStreamActor.props(topicName, this.COMPACTED_PREFIX + topicName, KafkaUtils.BootstrapServers, compactedStreamConfig))
+    val streamActor = context.actorOf(CompactedTopicStreamActor.props(topicName, this.COMPACTED_PREFIX + topicName, KafkaUtils.BootstrapServers, kafkaConfig))
     Future.successful()
   }
 
@@ -100,10 +96,10 @@ object CompactedTopicManagerActor {
 
   sealed trait CompactedTopicManagerResult
 
-  def props(compactedStreamConfig: Config,
+  def props(kafkaConfig: Config,
             bootstrapServers: String,
             kafkaUtils: KafkaUtils) = {
-    Props(classOf[CompactedTopicManagerActor], compactedStreamConfig, bootstrapServers, kafkaUtils)
+    Props(classOf[CompactedTopicManagerActor], kafkaConfig, bootstrapServers, kafkaUtils)
   }
 
 }
