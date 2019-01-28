@@ -61,9 +61,7 @@ class CompactedTopicManagerActor(kafkaConfig: Config,
     else {
 
       import scala.collection.JavaConverters._
-
       val topicDetailsConfig: util.Map[String, String] = Map[String, String]("cleanup.policy" -> "compact").asJava
-
       val compactedDetails = new TopicDetails(topicDetails.numPartitions, topicDetails.replicationFactor, topicDetailsConfig)
 
       val topicFut = kafkaUtils.createTopic(topicName, compactedDetails, timeout)
