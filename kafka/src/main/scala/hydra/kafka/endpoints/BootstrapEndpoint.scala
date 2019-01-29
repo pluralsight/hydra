@@ -57,10 +57,14 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
     KafkaUtils.BootstrapServers, ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient,
     TopicBootstrapActor.getMetadataTopicName(bootstrapKafkaConfig))
 
-  private val compactedTopicManager = system.actorOf(CompactedTopicManagerActor.props(bootstrapKafkaConfig, KafkaUtils.BootstrapServers, KafkaUtils()))
+  private val metadataStreamActor = system.actorOf(consumerProps)
 
   private val bootstrapActor = system.actorOf(
-    TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManager, kafkaIngestor, consumerProps))
+    TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManager, metadataStreamActor, kafkaIngestor, consumerProps))
+
+  private val compactedTopicManager = system.actorOf(CompactedTopicManagerActor.props(metadataStreamActor,
+    bootstrapKafkaConfig, KafkaUtils.BootstrapServers, KafkaUtils()))
+
 
   override val route: Route =
     pathPrefix("streams") {

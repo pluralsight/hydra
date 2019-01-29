@@ -3,27 +3,43 @@ package hydra.kafka.services
 import java.util
 import java.util.concurrent.TimeUnit
 
-import akka.actor.{Actor, ActorLogging, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.pattern.pipe
 import akka.stream.{ActorMaterializer, Materializer}
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.kafka.services.CompactedTopicManagerActor._
+import hydra.kafka.services.MetadataConsumerActor.{GetMetadata, GetMetadataResponse}
+import hydra.kafka.services.TopicBootstrapActor.GetStreams
 import hydra.kafka.util.KafkaUtils
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
+import akka.pattern.ask
 
-class CompactedTopicManagerActor(kafkaConfig: Config,
-                            bootstrapServers: String,
-                                 kafkaUtils: KafkaUtils) extends Actor
+class CompactedTopicManagerActor(metadataConsumerActor: ActorRef,
+                                  kafkaConfig: Config,
+                                  bootstrapServers: String,
+                                  kafkaUtils: KafkaUtils) extends Actor
   with ConfigSupport
   with ActorLogging {
 
   private final val COMPACTED_PREFIX = "_compacted."
   private implicit val ec = context.dispatcher
   private implicit val materializer: Materializer = ActorMaterializer()
+
+
+  //start all streams from existing metadata
+  override def preStart(): Unit = {
+    (metadataConsumerActor ? GetMetadata).mapTo[GetMetadataResponse].map {
+      gmr =>
+        gmr.metadata.map {
+          case (key, topicMetadata) => createCompactedStream(this.COMPACTED_PREFIX + topicMetadata.subject)
+        }
+    }
+    super.preStart()
+  }
 
   override def receive: Receive = {
 
@@ -95,10 +111,11 @@ object CompactedTopicManagerActor {
 
   sealed trait CompactedTopicManagerResult
 
-  def props(kafkaConfig: Config,
+  def props(metadataConsumerActor: ActorRef,
+             kafkaConfig: Config,
             bootstrapServers: String,
             kafkaUtils: KafkaUtils) = {
-    Props(classOf[CompactedTopicManagerActor], kafkaConfig, bootstrapServers, kafkaUtils)
+    Props(classOf[CompactedTopicManagerActor], metadataConsumerActor, kafkaConfig, bootstrapServers, kafkaUtils)
   }
 
 }

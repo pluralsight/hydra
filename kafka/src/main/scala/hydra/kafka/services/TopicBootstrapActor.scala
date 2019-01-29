@@ -31,9 +31,10 @@ import scala.util._
 
 class TopicBootstrapActor(schemaRegistryActor: ActorRef,
                           compactedTopicManagerActor: ActorRef,
+                          metadataStreamActor: ActorRef,
                           kafkaIngestor: ActorSelection,
-                          bootstrapConfig: Option[Config] = None,
-                          consumerProps: Props) extends Actor
+                          bootstrapConfig: Option[Config] = None
+                          ) extends Actor
   with ActorLogging
   with ConfigSupport
   with HydraJsonSupport
@@ -58,7 +59,6 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
 
   private val metadataTopicName = getMetadataTopicName(bootstrapKafkaConfig)
 
-  private val metadataStreamActor = context.actorOf(consumerProps)
 
   override def preStart(): Unit = {
     pipe(registerSchema(schema)) to self
@@ -232,10 +232,10 @@ object TopicBootstrapActor {
   def getMetadataTopicName(c: Config) = c.get[String]("metadata-topic-name")
     .valueOrElse("_hydra.metadata.topic")
 
-  def props(schemaRegistryActor: ActorRef, compactedTopicManagerActor: ActorRef, kafkaIngestor: ActorSelection,
+  def props(schemaRegistryActor: ActorRef, compactedTopicManagerActor: ActorRef, metadataStreamActor: ActorRef, kafkaIngestor: ActorSelection,
             consumerProps: Props,
             config: Option[Config] = None): Props =
-    Props(classOf[TopicBootstrapActor], schemaRegistryActor, compactedTopicManagerActor, kafkaIngestor, config, consumerProps)
+    Props(classOf[TopicBootstrapActor], schemaRegistryActor, compactedTopicManagerActor, metadataStreamActor, kafkaIngestor, config, consumerProps)
 
   sealed trait TopicBootstrapMessage
 
