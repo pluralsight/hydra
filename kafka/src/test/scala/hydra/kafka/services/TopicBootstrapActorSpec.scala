@@ -62,6 +62,10 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     override def receive: Receive = {Actor.emptyBehavior}
   }))
 
+  val metadataStreamActor = system.actorOf(Props(new Actor {
+    override def receive: Receive = {Actor.emptyBehavior}
+  }))
+
   def fixture(key: String, kafkaShouldFail: Boolean = false,
               schemaRegistryShouldFail: Boolean = false) = {
     val probe = TestProbe()
@@ -138,8 +142,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test1")
 
 
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor,
-      system.actorSelection("/user/kafka_ingestor_test1"), Props[MockConsumer]))
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor, metadataStreamActor,
+      system.actorSelection("/user/kafka_ingestor_test1")))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -189,8 +193,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val (probe, schemaRegistryActor, _) = fixture("test2",
       schemaRegistryShouldFail = true)
 
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor,
-      system.actorSelection("kafka_ingestor_test2"), Props[MockConsumer]))
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor, metadataStreamActor,
+      system.actorSelection("kafka_ingestor_test2")))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -235,8 +239,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test3")
 
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor,
-      system.actorSelection("kafka_ingestor_test3"), Props[MockConsumer]))
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor, metadataStreamActor,
+      system.actorSelection("kafka_ingestor_test3")))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -280,8 +284,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test4", kafkaShouldFail = true)
 
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor,
-      system.actorSelection("/user/kafka_ingestor_test4"), Props[MockConsumer]))
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor, metadataStreamActor,
+      system.actorSelection("/user/kafka_ingestor_test4")))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -327,8 +331,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test5")
 
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor,
-      system.actorSelection("/user/kafka_ingestor_test5"), Props[MockConsumer]))
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor, metadataStreamActor,
+      system.actorSelection("/user/kafka_ingestor_test5")))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -404,8 +408,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test6")
 
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor,
-      system.actorSelection("/user/kafka_ingestor_test6"), Props[MockConsumer], Some(testConfig)))
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor, metadataStreamActor,
+      system.actorSelection("/user/kafka_ingestor_test6"), Some(testConfig)))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -464,8 +468,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test7")
 
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor,
-      system.actorSelection("/user/kafka_ingestor_test7"), Props[MockConsumer]))
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor, metadataStreamActor,
+      system.actorSelection("/user/kafka_ingestor_test7")))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -506,8 +510,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val (probe, schemaRegistryActor, _) = fixture("test-get-stream",
       schemaRegistryShouldFail = false)
 
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor,
-      system.actorSelection("kafka_ingestor_test-get-stream"), Props[MockConsumer]))
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor, metadataStreamActor,
+      system.actorSelection("kafka_ingestor_test-get-stream")))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -524,8 +528,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val (probe, schemaRegistryActor, _) = fixture("test-get-stream-subject",
       schemaRegistryShouldFail = false)
 
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor,
-      system.actorSelection("kafka_ingestor_test-get-stream-subject"), Props[MockConsumer]))
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor, metadataStreamActor,
+      system.actorSelection("kafka_ingestor_test-get-stream-subject")))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -573,8 +577,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val (probe, schemaRegistryActor, _) = fixture("test8",
       schemaRegistryShouldFail = true)
 
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor,
-      system.actorSelection("kafka_ingestor_test8"), Props[MockConsumer]))
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, compactedTopicManagerActor, metadataStreamActor,
+      system.actorSelection("kafka_ingestor_test8")))
 
     probe.expectMsgType[RegisterSchemaRequest]
 

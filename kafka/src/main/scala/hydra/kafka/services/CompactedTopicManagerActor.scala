@@ -17,6 +17,10 @@ import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 import akka.pattern.ask
+import akka.util.Timeout
+import hydra.kafka.model.TopicMetadata
+
+import scala.concurrent.duration._
 
 class CompactedTopicManagerActor(metadataConsumerActor: ActorRef,
                                   kafkaConfig: Config,
@@ -28,15 +32,17 @@ class CompactedTopicManagerActor(metadataConsumerActor: ActorRef,
   private final val COMPACTED_PREFIX = "_compacted."
   private implicit val ec = context.dispatcher
   private implicit val materializer: Materializer = ActorMaterializer()
-
+  implicit val timeout = Timeout(10.seconds)
 
   //start all streams from existing metadata
   override def preStart(): Unit = {
-    (metadataConsumerActor ? GetMetadata).mapTo[GetMetadataResponse].map {
-      gmr =>
-        gmr.metadata.map {
-          case (key, topicMetadata) => createCompactedStream(this.COMPACTED_PREFIX + topicMetadata.subject)
-        }
+    //Thread.sleep(5000)
+    val _: Future[Unit] = (metadataConsumerActor ? GetMetadata).mapTo[GetMetadataResponse].map { getMetadataResponse =>
+      getMetadataResponse.metadata.foreach({
+        case (key, tm) => createCompactedStream(tm.subject)
+      })
+    }.recover {
+      case e: Exception => log.info("Couldn't start compacted stream!!")
     }
     super.preStart()
   }
@@ -54,6 +60,8 @@ class CompactedTopicManagerActor(metadataConsumerActor: ActorRef,
     case CreateCompactedStream(topicName) => {
       pipe(createCompactedStream(topicName)) to sender
     }
+
+    case CreateCompactedStreamsFromMetadata
 
 
   }
@@ -97,7 +105,7 @@ class CompactedTopicManagerActor(metadataConsumerActor: ActorRef,
   private[kafka] def createCompactedStream(topicName: String): Future[Unit] = {
     //do we want to return a future unit? how do we signal to the client that compacted was successful?
     Future {
-      log.info(s"Attempting to create compacted stream from $topicName to ${topicName+this.COMPACTED_PREFIX}")
+      log.info(s"Attempting to create compacted stream from $topicName to ${topicName + this.COMPACTED_PREFIX}")
       context.actorOf(CompactedTopicStreamActor.props(topicName, this.COMPACTED_PREFIX + topicName, KafkaUtils.BootstrapServers, kafkaConfig))
     }
   }

@@ -53,6 +53,7 @@ class MetadataConsumerActor(consumerConfig: Config,
     case t: TopicMetadata =>
       metadataMap.put(t.id.toString, t)
 
+
     case StopStream =>
       pipe(stream._1.shutdown().map(_ => StreamStopped)) to sender
   }

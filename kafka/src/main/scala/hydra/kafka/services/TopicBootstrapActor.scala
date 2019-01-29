@@ -233,9 +233,8 @@ object TopicBootstrapActor {
     .valueOrElse("_hydra.metadata.topic")
 
   def props(schemaRegistryActor: ActorRef, compactedTopicManagerActor: ActorRef, metadataStreamActor: ActorRef, kafkaIngestor: ActorSelection,
-            consumerProps: Props,
             config: Option[Config] = None): Props =
-    Props(classOf[TopicBootstrapActor], schemaRegistryActor, compactedTopicManagerActor, metadataStreamActor, kafkaIngestor, config, consumerProps)
+    Props(classOf[TopicBootstrapActor], schemaRegistryActor, compactedTopicManagerActor, metadataStreamActor, kafkaIngestor, config)
 
   sealed trait TopicBootstrapMessage
 
