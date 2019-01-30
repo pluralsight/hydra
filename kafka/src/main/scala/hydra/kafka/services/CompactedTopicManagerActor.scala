@@ -6,23 +6,23 @@ import java.util.concurrent.TimeUnit
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.pattern.pipe
 import akka.stream.{ActorMaterializer, Materializer}
+import akka.util.Timeout
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
+import hydra.kafka.model.TopicMetadata
 import hydra.kafka.services.CompactedTopicManagerActor._
-import hydra.kafka.services.MetadataConsumerActor.{GetMetadata, GetMetadataResponse}
-import hydra.kafka.services.TopicBootstrapActor.GetStreams
 import hydra.kafka.util.KafkaUtils
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
+import org.apache.avro.Schema
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 
 import scala.concurrent.Future
-import scala.util.{Failure, Success}
-import akka.pattern.ask
-import akka.util.Timeout
-import hydra.kafka.model.TopicMetadata
-
 import scala.concurrent.duration._
+import scala.collection.JavaConverters._
+import scala.util.{Failure, Success}
 
 class CompactedTopicManagerActor(metadataConsumerActor: ActorRef,
+                                 schemaRegistryClient: SchemaRegistryClient,
                                   kafkaConfig: Config,
                                   bootstrapServers: String,
                                   kafkaUtils: KafkaUtils) extends Actor
@@ -34,23 +34,18 @@ class CompactedTopicManagerActor(metadataConsumerActor: ActorRef,
   private implicit val materializer: Materializer = ActorMaterializer()
   implicit val timeout = Timeout(10.seconds)
 
-  //start all streams from existing metadata
-  override def preStart(): Unit = {
-    //Thread.sleep(5000)
-    val _: Future[Unit] = (metadataConsumerActor ? GetMetadata).mapTo[GetMetadataResponse].map { getMetadataResponse =>
-      getMetadataResponse.metadata.foreach({
-        case (key, tm) => createCompactedStream(tm.subject)
-      })
-    }.recover {
-      case e: Exception => log.info("Couldn't start compacted stream!!")
-    }
-    super.preStart()
-  }
+
+  private val topicDetailsConfig: util.Map[String, String] = Map[String, String]("cleanup.policy" -> "compact").asJava
+  private final val topicDetails = new TopicDetails(
+    kafkaConfig.getInt("partitions"),
+    kafkaConfig.getInt("replication-factor").toShort,
+    topicDetailsConfig)
+
 
   override def receive: Receive = {
 
-    case CreateCompactedTopic(topicName, topicDetails) => {
-      createCompactedTopic(this.COMPACTED_PREFIX + topicName, topicDetails).map { _ =>
+    case CreateCompactedTopic(topicName) => {
+      createCompactedTopic(topicName + this.COMPACTED_PREFIX).map { _ =>
         self ! CreateCompactedStream(topicName)
       }.recover {
         case e: Exception => throw e
@@ -61,15 +56,28 @@ class CompactedTopicManagerActor(metadataConsumerActor: ActorRef,
       pipe(createCompactedStream(topicName)) to sender
     }
 
-    case CreateCompactedStreamsFromMetadata
-
+    case MetadataTopicCreated(topicMetadata) =>
 
   }
 
-  private[kafka] def createCompactedTopic(topicName: String, topicDetails: TopicDetails): Future[Unit] = {
+  private[kafka] def shouldCreateCompacted(topicMetadata: TopicMetadata): Boolean  = {
+    val schema: Schema = schemaRegistryClient.getById(topicMetadata.schemaId)
+    if schema.fields
+  }
+
+  private[kafka] def tryCreateCompactedTopic(topicMetadataRequest: TopicMetadataRequest): Future[Unit] = {
+    if (topicMetadataRequest.schema.fields.contains("hydra.key") && topicMetadataRequest.streamType == History) {
+      log.debug("Historical Stream with hydra.key found, creating topic...")
+      compactedTopicManagerActor ! CreateCompactedTopic(topicMetadataRequest.subject)
+    }
+    Future.successful()
+  }
+
+  private[kafka] def createCompactedTopic(compactedTopic: String): Future[Unit] = {
 
     val timeout = 2000
-    val topicExists = kafkaUtils.topicExists(topicName) match {
+
+    val topicExists = kafkaUtils.topicExists(compactedTopic) match {
       case Success(value) => value
       case Failure(exception) =>
         log.error(s"Unable to determine if topic exists: ${exception.getMessage}")
@@ -78,17 +86,13 @@ class CompactedTopicManagerActor(metadataConsumerActor: ActorRef,
 
     // Don't fail when topic already exists
     if (topicExists) {
-      log.info(s"Compacted Topic $topicName already exists, proceeding anyway...")
+      log.info(s"Compacted Topic $compactedTopic already exists, proceeding anyway...")
       Future.successful(())
     }
 
     else {
 
-      import scala.collection.JavaConverters._
-      val topicDetailsConfig: util.Map[String, String] = Map[String, String]("cleanup.policy" -> "compact").asJava
-      val compactedDetails = new TopicDetails(topicDetails.numPartitions, topicDetails.replicationFactor, topicDetailsConfig)
-
-      val topicFut = kafkaUtils.createTopic(topicName, compactedDetails, timeout)
+      val topicFut = kafkaUtils.createTopic(compactedTopic, topicDetails, timeout)
         .map { r =>
           r.all.get(timeout, TimeUnit.MILLISECONDS)
         }
@@ -115,7 +119,7 @@ class CompactedTopicManagerActor(metadataConsumerActor: ActorRef,
 object CompactedTopicManagerActor {
 
   case class CreateCompactedStream(topicName: String)
-  case class CreateCompactedTopic(topicName: String, topicDetails: TopicDetails)
+  case class CreateCompactedTopic(topicName: String)
 
   sealed trait CompactedTopicManagerResult
 

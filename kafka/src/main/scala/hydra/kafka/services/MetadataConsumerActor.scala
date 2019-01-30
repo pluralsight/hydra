@@ -13,6 +13,7 @@ import akka.stream.{ActorMaterializer, Materializer}
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.kafka.model.TopicMetadata
+import hydra.kafka.services.CompactedTopicManagerActor.CreateCompactedTopic
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import io.confluent.kafka.serializers.KafkaAvroDeserializer
 import org.apache.avro.generic.GenericRecord
@@ -22,7 +23,8 @@ import org.joda.time.format.ISODateTimeFormat
 
 import scala.concurrent.ExecutionContext
 
-class MetadataConsumerActor(consumerConfig: Config,
+class MetadataConsumerActor(compactedTopicManager: ActorRef,
+                             consumerConfig: Config,
                             bootstrapServers: String,
                             schemaRegistryClient: SchemaRegistryClient,
                             metadataTopicName: String) extends Actor
@@ -52,7 +54,7 @@ class MetadataConsumerActor(consumerConfig: Config,
 
     case t: TopicMetadata =>
       metadataMap.put(t.id.toString, t)
-
+      compactedTopicManager ! CreateCompactedTopic(t.subject)
 
     case StopStream =>
       pipe(stream._1.shutdown().map(_ => StreamStopped)) to sender
@@ -86,6 +88,7 @@ object MetadataConsumerActor {
       .withGroupId("metadata-consumer-actor")
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
 
+
     Consumer.plainSource(settings, Subscriptions.topics(metadataTopicName))
       .map { msg =>
         val record = msg.value.asInstanceOf[GenericRecord]
@@ -105,11 +108,12 @@ object MetadataConsumerActor {
   }
 
 
-  def props(consumerConfig: Config,
+  def props(compactedTopicManagerActor: ActorRef,
+            consumerConfig: Config,
             bootstrapServers: String,
             schemaRegistryClient: SchemaRegistryClient,
             metadataTopicName: String) = {
-    Props(classOf[MetadataConsumerActor], consumerConfig, bootstrapServers, schemaRegistryClient, metadataTopicName)
+    Props(classOf[MetadataConsumerActor], compactedTopicManagerActor, consumerConfig, bootstrapServers, schemaRegistryClient, metadataTopicName)
   }
 }
 

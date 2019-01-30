@@ -125,13 +125,6 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
       pipe(streams) to sender
   }
 
-  private[kafka] def tryCreateCompactedTopic(topicMetadataRequest: TopicMetadataRequest): Future[Unit] = {
-    if (topicMetadataRequest.schema.fields.contains("hydra.key") && topicMetadataRequest.streamType == History) {
-      log.debug("Historical Stream with hydra.key found, creating topic...")
-      compactedTopicManagerActor ! CreateCompactedTopic(topicMetadataRequest.subject, topicDetails)
-    }
-    Future.successful()
-  }
 
   def failed(ex: Throwable): Receive = {
     case Retry =>
