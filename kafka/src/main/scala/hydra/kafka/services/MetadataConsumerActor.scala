@@ -102,7 +102,7 @@ object MetadataConsumerActor {
           Option(record.get("additionalDocumentation")).map(_.toString),
           Option(record.get("notes")).map(_.toString),
           UUID.fromString(record.get("id").toString),
-          formatter.parseDateTime(record.get("createdDate").toString),
+          formatter.parseDateTime(record.get("createdDate").toString)
         )
       }.toMat(Sink.actorRef(destination, StreamStopped))(Keep.both)
   }

@@ -9,6 +9,7 @@ import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
+import hydra.core.marshallers.{History, TopicMetadataRequest}
 import hydra.kafka.model.TopicMetadata
 import hydra.kafka.services.CompactedTopicManagerActor._
 import hydra.kafka.util.KafkaUtils
@@ -29,7 +30,7 @@ class CompactedTopicManagerActor(metadataConsumerActor: ActorRef,
   with ConfigSupport
   with ActorLogging {
 
-  private final val COMPACTED_PREFIX = "_compacted."
+
   private implicit val ec = context.dispatcher
   private implicit val materializer: Materializer = ActorMaterializer()
   implicit val timeout = Timeout(10.seconds)
@@ -56,22 +57,8 @@ class CompactedTopicManagerActor(metadataConsumerActor: ActorRef,
       pipe(createCompactedStream(topicName)) to sender
     }
 
-    case MetadataTopicCreated(topicMetadata) =>
-
   }
 
-  private[kafka] def shouldCreateCompacted(topicMetadata: TopicMetadata): Boolean  = {
-    val schema: Schema = schemaRegistryClient.getById(topicMetadata.schemaId)
-    if schema.fields
-  }
-
-  private[kafka] def tryCreateCompactedTopic(topicMetadataRequest: TopicMetadataRequest): Future[Unit] = {
-    if (topicMetadataRequest.schema.fields.contains("hydra.key") && topicMetadataRequest.streamType == History) {
-      log.debug("Historical Stream with hydra.key found, creating topic...")
-      compactedTopicManagerActor ! CreateCompactedTopic(topicMetadataRequest.subject)
-    }
-    Future.successful()
-  }
 
   private[kafka] def createCompactedTopic(compactedTopic: String): Future[Unit] = {
 
@@ -124,10 +111,11 @@ object CompactedTopicManagerActor {
   sealed trait CompactedTopicManagerResult
 
   def props(metadataConsumerActor: ActorRef,
+            schemaRegistryClient: SchemaRegistryClient,
              kafkaConfig: Config,
             bootstrapServers: String,
             kafkaUtils: KafkaUtils) = {
-    Props(classOf[CompactedTopicManagerActor], metadataConsumerActor, kafkaConfig, bootstrapServers, kafkaUtils)
+    Props(classOf[CompactedTopicManagerActor], metadataConsumerActor, schemaRegistryClient, kafkaConfig, bootstrapServers, kafkaUtils)
   }
 
 }

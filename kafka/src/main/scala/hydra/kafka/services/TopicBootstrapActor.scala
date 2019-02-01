@@ -21,6 +21,7 @@ import hydra.kafka.producer.{AvroRecord, AvroRecordFactory}
 import hydra.kafka.services.CompactedTopicManagerActor.CreateCompactedTopic
 import hydra.kafka.services.MetadataConsumerActor.{GetMetadata, GetMetadataResponse, StopStream}
 import hydra.kafka.util.KafkaUtils
+import org.apache.avro.Schema
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 
 import scala.collection.JavaConverters._
@@ -59,15 +60,6 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
 
   private val metadataTopicName = getMetadataTopicName(bootstrapKafkaConfig)
 
-
-  override def preStart(): Unit = {
-    pipe(registerSchema(schema)) to self
-  }
-
-  override def postStop(): Unit = {
-    metadataStreamActor ! StopStream
-  }
-
   val topicDetailsConfig: util.Map[String, String] = Map[String, String]().empty.asJava
 
   val topicDetails = new TopicDetails(
@@ -78,6 +70,22 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
   private val failureRetryInterval = bootstrapKafkaConfig
     .get[Int]("failure-retry-millis")
     .value
+
+  private final val COMPACTED_PREFIX = "_compacted."
+  private val compactedDetailsConfig: util.Map[String, String] = Map[String, String]("cleanup.policy" -> "compact").asJava
+  private final val compactedDetails = new TopicDetails(
+    bootstrapKafkaConfig.getInt("partitions"),
+    bootstrapKafkaConfig.getInt("replication-factor").toShort,
+    compactedDetailsConfig)
+
+
+  override def preStart(): Unit = {
+    pipe(registerSchema(schema)) to self
+  }
+
+  override def postStop(): Unit = {
+    metadataStreamActor ! StopStream
+  }
 
   override def receive: Receive = initializing
 
@@ -102,10 +110,15 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
           val result = for {
             schema <- registerSchema(topicMetadataRequest.schema.compactPrint)
             topicMetadata <- ingestMetadata(topicMetadataRequest, schema.schemaResource.id)
-            bootstrapResult <- createKafkaTopic(topicMetadata)
-            _ <- tryCreateCompactedTopic(topicMetadataRequest)
-          } yield bootstrapResult
+            topicCreateResult <- createKafkaTopic(topicMetadataRequest.subject, topicDetails)
+            compactedCreateResult <- if(shouldCreateCompactedTopic(topicMetadataRequest)) {
+              createKafkaTopic(this.COMPACTED_PREFIX + topicMetadataRequest.subject, compactedDetails) }
+              else {
+              BootstrapSuccess
+            }
+          } yield (topicCreateResult, compactedCreateResult, topicMetadata)
 
+          val res = result.map(resTuple => BootstrapSuccess())
           pipe(
             result.recover {
               case t: Throwable => BootstrapFailure(Seq(t.getMessage))
@@ -135,6 +148,10 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     case _ =>
       val failureMessage = s"TopicBootstrapActor is in a failed state due to cause: ${ex.getMessage}"
       Future.failed(new Exception(failureMessage)) pipeTo sender
+  }
+
+  private[kafka] def shouldCreateCompactedTopic(topicMetadataRequest: TopicMetadataRequest): Boolean  = {
+    topicMetadataRequest.schema.fields.contains("hydra.key") && topicMetadataRequest.streamType == History
   }
 
   private[kafka] def registerSchema(schemaJson: String): Future[RegisterSchemaResponse] = {
@@ -188,33 +205,63 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     )
   }
 
-  private[kafka] def createKafkaTopic(metadata: TopicMetadata): Future[BootstrapResult] = {
+  private[kafka] def createKafkaTopic(topicName: String, topicDetails: TopicDetails): Future[BootstrapResult] = {
     val timeoutMillis = bootstrapKafkaConfig.getInt("timeout")
 
-    val topic = metadata.subject
-
-    val topicExists = kafkaUtils.topicExists(topic) match {
-      case Success(value) => value
+    val topicExists = kafkaUtils.topicExists(topicName) match {
+      case Success(exists) => {
+        exists
+      }
       case Failure(exception) =>
         log.error(s"Unable to determine if topic exists: ${exception.getMessage}")
         return Future.failed(exception)
     }
     // Don't fail when topic already exists
     if (topicExists) {
-      log.info(s"Topic $topic already exists, proceeding anyway...")
-      Future.successful(BootstrapSuccess(metadata))
+      log.info(s"Topic $topicName already exists, proceeding anyway...")
+      Future.successful(BootstrapSuccess)
     }
     else {
-      kafkaUtils.createTopic(metadata.subject, topicDetails, timeout = timeoutMillis)
+      val topicFut = kafkaUtils.createTopic(topicName, topicDetails, timeout = timeoutMillis)
         .map { r =>
           r.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
-        }
-        .map { _ =>
-          BootstrapSuccess(metadata)
-        }
+        }.map { _ => BootstrapSuccess }
         .recover {
           case e: Exception => BootstrapFailure(e.getMessage :: Nil)
         }
+      topicFut
+    }
+  }
+
+  private[kafka] def createCompactedTopic(compactedTopic: String): Future[Unit] = {
+
+    val timeout = 2000
+
+    val topicExists = kafkaUtils.topicExists(compactedTopic) match {
+      case Success(value) => value
+      case Failure(exception) =>
+        log.error(s"Unable to determine if topic exists: ${exception.getMessage}")
+        return Future.failed(exception)
+    }
+
+    // Don't fail when topic already exists
+    if (topicExists) {
+      log.info(s"Compacted Topic $compactedTopic already exists, proceeding anyway...")
+      Future.successful(())
+    }
+
+    else {
+      val topicFut = kafkaUtils.createTopic(compactedTopic, topicDetails, timeout)
+        .map { r =>
+          r.all.get(timeout, TimeUnit.MILLISECONDS)
+        }
+        .map { _ =>
+          ()
+        }
+        .recover {
+          case e: Exception => throw e
+        }
+      topicFut
     }
   }
 
@@ -242,6 +289,9 @@ object TopicBootstrapActor {
   case class BootstrapFailure(reasons: Seq[String]) extends BootstrapResult
 
   case class BootstrapStep[A](stepResult: A) extends BootstrapResult
+
+  case object BootstrapSuccess extends BootstrapResult
+  case object BootstrapFailure extends BootstrapResult
 
   /**
     * Filter by subject is the only supported.
