@@ -3,7 +3,7 @@ package hydra.kafka.services
 import java.util.UUID
 
 import akka.NotUsed
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.kafka.scaladsl.Consumer
 import akka.kafka.scaladsl.Consumer.Control
 import akka.kafka.{ConsumerSettings, Subscriptions}
@@ -12,14 +12,17 @@ import akka.stream.scaladsl.{Keep, RunnableGraph, Sink}
 import akka.stream.{ActorMaterializer, Materializer}
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
+import hydra.core.marshallers.{History, HydraJsonSupport}
 import hydra.kafka.model.TopicMetadata
 import hydra.kafka.services.CompactedTopicManagerActor.CreateCompactedTopic
+import hydra.kafka.util.KafkaUtils
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import io.confluent.kafka.serializers.KafkaAvroDeserializer
 import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.joda.time.format.ISODateTimeFormat
+import spray.json._
 
 import scala.concurrent.ExecutionContext
 
@@ -28,23 +31,24 @@ class MetadataConsumerActor(compactedTopicManager: ActorRef,
                             bootstrapServers: String,
                             schemaRegistryClient: SchemaRegistryClient,
                             metadataTopicName: String) extends Actor
-  with ConfigSupport {
+  with ConfigSupport
+  with HydraJsonSupport
+  with ActorLogging {
 
   import MetadataConsumerActor._
-
-  private val metadataMap = new collection.mutable.HashMap[String, TopicMetadata]()
-
   private implicit val ec = context.dispatcher
-
   private implicit val materializer: Materializer = ActorMaterializer()
 
-  private val stream = MetadataConsumerActor.createStream(consumerConfig, bootstrapServers,
+  private val metadataMap = new collection.mutable.HashMap[String, TopicMetadata]()
+  private val metadataStream = MetadataConsumerActor.createMetadataStream(consumerConfig, bootstrapServers,
     schemaRegistryClient, metadataTopicName, self)
+
+  private val COMPACTED_PREFIX = "_compacted."
 
   override def receive: Receive = Actor.emptyBehavior
 
   override def preStart(): Unit = {
-    context.become(streaming(stream.run()))
+    context.become(streaming(metadataStream.run()))
   }
 
 
@@ -54,11 +58,23 @@ class MetadataConsumerActor(compactedTopicManager: ActorRef,
 
     case t: TopicMetadata =>
       metadataMap.put(t.id.toString, t)
-      compactedTopicManager ! CreateCompactedTopic(t.subject)
+      maybeCreateCompactedStream(t)
 
     case StopStream =>
       pipe(stream._1.shutdown().map(_ => StreamStopped)) to sender
   }
+
+
+  private[kafka] def maybeCreateCompactedStream(metadata: TopicMetadata): Unit = {
+    if(StreamTypeFormat.read(metadata.streamType.toJson) == History) {
+      val schema = schemaRegistryClient.getById(metadata.schemaId)
+      if (schema.getFields.contains("hydra.key")) {
+        log.info(s"Attempting to create compacted stream for $metadata")
+        context.actorOf(CompactedTopicStreamActor.props(metadata.subject, COMPACTED_PREFIX+metadata.subject, KafkaUtils.BootstrapServers, consumerConfig))
+      }
+    }
+  }
+
 }
 
 object MetadataConsumerActor {
@@ -73,7 +89,7 @@ object MetadataConsumerActor {
 
   case object StreamStopped
 
-  private[services] def createStream[K, V](config: Config,
+  private[services] def createMetadataStream[K, V](config: Config,
                                            bootstrapSevers: String,
                                            schemaRegistryClient: SchemaRegistryClient,
                                            metadataTopicName: String,

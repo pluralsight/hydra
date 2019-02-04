@@ -31,8 +31,7 @@ import scala.io.Source
 import scala.util._
 
 class TopicBootstrapActor(schemaRegistryActor: ActorRef,
-                          compactedTopicManagerActor: ActorRef,
-                          metadataStreamActor: ActorRef,
+                          metadataStreamActor: Props,
                           kafkaIngestor: ActorSelection,
                           bootstrapConfig: Option[Config] = None
                           ) extends Actor
@@ -71,12 +70,15 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     .get[Int]("failure-retry-millis")
     .value
 
-  private final val COMPACTED_PREFIX = "_compacted."
+
   private val compactedDetailsConfig: util.Map[String, String] = Map[String, String]("cleanup.policy" -> "compact").asJava
   private final val compactedDetails = new TopicDetails(
     bootstrapKafkaConfig.getInt("partitions"),
     bootstrapKafkaConfig.getInt("replication-factor").toShort,
     compactedDetailsConfig)
+
+
+  private val metadataMap = new collection.mutable.HashMap[String, TopicMetadata]()
 
 
   override def preStart(): Unit = {
@@ -110,17 +112,12 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
           val result = for {
             schema <- registerSchema(topicMetadataRequest.schema.compactPrint)
             topicMetadata <- ingestMetadata(topicMetadataRequest, schema.schemaResource.id)
-            topicCreateResult <- createKafkaTopic(topicMetadataRequest.subject, topicDetails)
-            compactedCreateResult <- if(shouldCreateCompactedTopic(topicMetadataRequest)) {
-              createKafkaTopic(this.COMPACTED_PREFIX + topicMetadataRequest.subject, compactedDetails) }
-              else {
-              BootstrapSuccess
-            }
+            topicCreateResult <- createKafkaTopic(topicMetadataRequest)
           } yield (topicCreateResult, compactedCreateResult, topicMetadata)
 
-          val res = result.map(resTuple => BootstrapSuccess())
+          val res = result.map(resTuple => BootstrapSuccess(resTuple._3))
           pipe(
-            result.recover {
+            res.recover {
               case t: Throwable => BootstrapFailure(Seq(t.getMessage))
             }) to sender
 
@@ -150,9 +147,6 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
       Future.failed(new Exception(failureMessage)) pipeTo sender
   }
 
-  private[kafka] def shouldCreateCompactedTopic(topicMetadataRequest: TopicMetadataRequest): Boolean  = {
-    topicMetadataRequest.schema.fields.contains("hydra.key") && topicMetadataRequest.streamType == History
-  }
 
   private[kafka] def registerSchema(schemaJson: String): Future[RegisterSchemaResponse] = {
     (schemaRegistryActor ? RegisterSchemaRequest(schemaJson)).mapTo[RegisterSchemaResponse]
@@ -205,65 +199,37 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     )
   }
 
-  private[kafka] def createKafkaTopic(topicName: String, topicDetails: TopicDetails): Future[BootstrapResult] = {
+  private[kafka] def shouldCreateCompactedTopic(topicMetadataRequest: TopicMetadataRequest): Boolean = {
+    topicMetadataRequest.streamType == History && topicMetadataRequest.schema.fields.contains("hydra.key")
+  }
+
+  private[kafka] def createKafkaTopic(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
     val timeoutMillis = bootstrapKafkaConfig.getInt("timeout")
+    val topicName = topicMetadataRequest.subject
 
-    val topicExists = kafkaUtils.topicExists(topicName) match {
-      case Success(exists) => {
-        exists
+    var topicMap: scala.collection.mutable.Map[String, TopicDetails] = scala.collection.mutable.Map(topicName -> topicDetails)
+
+    if(shouldCreateCompactedTopic(topicMetadataRequest)) {
+      val compactedPrefix =
+      topicMap +=
+    }
+    val compactedPrefix = bootstrapKafkaConfig.get[String]("compacted-topic-prefix").valueOrElse("_compacted.")
+
+
+
+    kafkaUtils.createTopic(topicName, topicDetails, timeout = timeoutMillis)
+      .map { r =>
+        r.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
+      }.map { _ => BootstrapSuccess }
+      .recover {
+        case illegalArg: IllegalArgumentException => {
+          log.info(s"Topic $topicName already exists, proceeding anyway...")
+          BootstrapSuccess
+        }
+        case e: Exception => BootstrapFailure(e.getMessage :: Nil)
       }
-      case Failure(exception) =>
-        log.error(s"Unable to determine if topic exists: ${exception.getMessage}")
-        return Future.failed(exception)
-    }
-    // Don't fail when topic already exists
-    if (topicExists) {
-      log.info(s"Topic $topicName already exists, proceeding anyway...")
-      Future.successful(BootstrapSuccess)
-    }
-    else {
-      val topicFut = kafkaUtils.createTopic(topicName, topicDetails, timeout = timeoutMillis)
-        .map { r =>
-          r.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
-        }.map { _ => BootstrapSuccess }
-        .recover {
-          case e: Exception => BootstrapFailure(e.getMessage :: Nil)
-        }
-      topicFut
-    }
-  }
 
-  private[kafka] def createCompactedTopic(compactedTopic: String): Future[Unit] = {
-
-    val timeout = 2000
-
-    val topicExists = kafkaUtils.topicExists(compactedTopic) match {
-      case Success(value) => value
-      case Failure(exception) =>
-        log.error(s"Unable to determine if topic exists: ${exception.getMessage}")
-        return Future.failed(exception)
     }
-
-    // Don't fail when topic already exists
-    if (topicExists) {
-      log.info(s"Compacted Topic $compactedTopic already exists, proceeding anyway...")
-      Future.successful(())
-    }
-
-    else {
-      val topicFut = kafkaUtils.createTopic(compactedTopic, topicDetails, timeout)
-        .map { r =>
-          r.all.get(timeout, TimeUnit.MILLISECONDS)
-        }
-        .map { _ =>
-          ()
-        }
-        .recover {
-          case e: Exception => throw e
-        }
-      topicFut
-    }
-  }
 
 }
 
