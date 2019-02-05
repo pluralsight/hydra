@@ -22,7 +22,7 @@ import spray.json._
 import scala.concurrent.duration._
 import scala.io.Source
 
-class MetadataConsumerActorSpec extends TestKit(ActorSystem("metadata-stream-actor-spec"))
+class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor-spec"))
   with FlatSpecLike
   with Matchers
   with BeforeAndAfterAll
@@ -136,7 +136,7 @@ class MetadataConsumerActorSpec extends TestKit(ActorSystem("metadata-stream-act
     publishRecord()
     val probe = TestProbe()
 
-    val stream = MetadataConsumerActor.createStream(kafkaConfig, "localhost:8092", srClient,
+    val stream = StreamsManagerActor.createStream(kafkaConfig, "localhost:8092", srClient,
       "hydra.metadata.topic", probe.ref)(system.dispatcher, ActorMaterializer())
 
     val s = stream.run()(ActorMaterializer())

@@ -18,8 +18,7 @@ import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.{AvroRecord, AvroRecordFactory}
-import hydra.kafka.services.CompactedTopicManagerActor.CreateCompactedTopic
-import hydra.kafka.services.MetadataConsumerActor.{GetMetadata, GetMetadataResponse, StopStream}
+import hydra.kafka.services.StreamsManagerActor.{GetMetadata, GetMetadataResponse, StopStream}
 import hydra.kafka.util.KafkaUtils
 import org.apache.avro.Schema
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
@@ -31,8 +30,8 @@ import scala.io.Source
 import scala.util._
 
 class TopicBootstrapActor(schemaRegistryActor: ActorRef,
-                          metadataStreamActor: Props,
                           kafkaIngestor: ActorSelection,
+                          streamsManagerProps: Props,
                           bootstrapConfig: Option[Config] = None
                           ) extends Actor
   with ActorLogging
@@ -57,8 +56,6 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
   val bootstrapKafkaConfig: Config = bootstrapConfig getOrElse
     applicationConfig.getConfig("bootstrap-config")
 
-  private val metadataTopicName = getMetadataTopicName(bootstrapKafkaConfig)
-
   val topicDetailsConfig: util.Map[String, String] = Map[String, String]().empty.asJava
 
   val topicDetails = new TopicDetails(
@@ -78,7 +75,8 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     compactedDetailsConfig)
 
 
-  private val metadataMap = new collection.mutable.HashMap[String, TopicMetadata]()
+  private val metadataStreamActor = context.actorOf(streamsManagerProps)
+
 
 
   override def preStart(): Unit = {
@@ -112,10 +110,10 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
           val result = for {
             schema <- registerSchema(topicMetadataRequest.schema.compactPrint)
             topicMetadata <- ingestMetadata(topicMetadataRequest, schema.schemaResource.id)
-            topicCreateResult <- createKafkaTopic(topicMetadataRequest)
-          } yield (topicCreateResult, compactedCreateResult, topicMetadata)
+            topicCreateResult <- createKafkaTopics(topicMetadataRequest)
+          } yield (topicCreateResult, topicMetadata)
 
-          val res = result.map(resTuple => BootstrapSuccess(resTuple._3))
+          val res = result.map(resTuple => BootstrapSuccess(resTuple._2))
           pipe(
             res.recover {
               case t: Throwable => BootstrapFailure(Seq(t.getMessage))
@@ -187,6 +185,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
   private[kafka] def buildAvroRecord(metadata: TopicMetadata): Future[AvroRecord] = {
 
     val jsonString = metadata.toJson.compactPrint
+    val metadataTopicName = bootstrapKafkaConfig.get[String]("metadata-topic-name").valueOrElse("_hydra.metadata.topic")
     new AvroRecordFactory(schemaRegistryActor).build(
       HydraRequest(
         "0",
@@ -203,21 +202,18 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     topicMetadataRequest.streamType == History && topicMetadataRequest.schema.fields.contains("hydra.key")
   }
 
-  private[kafka] def createKafkaTopic(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
+  private[kafka] def createKafkaTopics(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
     val timeoutMillis = bootstrapKafkaConfig.getInt("timeout")
     val topicName = topicMetadataRequest.subject
 
-    var topicMap: scala.collection.mutable.Map[String, TopicDetails] = scala.collection.mutable.Map(topicName -> topicDetails)
+    var topicMap: Map[String, TopicDetails] = Map(topicName -> topicDetails)
 
     if(shouldCreateCompactedTopic(topicMetadataRequest)) {
-      val compactedPrefix =
-      topicMap +=
+      val compactedPrefix = bootstrapKafkaConfig.get[String]("compacted-topic-prefix").valueOrElse("_compacted.")
+      topicMap += (compactedPrefix+topicName -> compactedDetails)
     }
-    val compactedPrefix = bootstrapKafkaConfig.get[String]("compacted-topic-prefix").valueOrElse("_compacted.")
 
-
-
-    kafkaUtils.createTopic(topicName, topicDetails, timeout = timeoutMillis)
+    kafkaUtils.createTopics(topicMap, timeout = timeoutMillis)
       .map { r =>
         r.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
       }.map { _ => BootstrapSuccess }
@@ -235,12 +231,10 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
 
 object TopicBootstrapActor {
 
-  def getMetadataTopicName(c: Config) = c.get[String]("metadata-topic-name")
-    .valueOrElse("_hydra.metadata.topic")
 
-  def props(schemaRegistryActor: ActorRef, compactedTopicManagerActor: ActorRef, metadataStreamActor: ActorRef, kafkaIngestor: ActorSelection,
+  def props(schemaRegistryActor: ActorRef, kafkaIngestor: ActorSelection, streamsManagerProps: Props,
             config: Option[Config] = None): Props =
-    Props(classOf[TopicBootstrapActor], schemaRegistryActor, compactedTopicManagerActor, metadataStreamActor, kafkaIngestor, config)
+    Props(classOf[TopicBootstrapActor], schemaRegistryActor, kafkaIngestor, streamsManagerProps, config)
 
   sealed trait TopicBootstrapMessage
 

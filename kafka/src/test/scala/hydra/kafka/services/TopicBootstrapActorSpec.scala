@@ -15,7 +15,7 @@ import hydra.core.transport.AckStrategy
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.AvroRecord
-import hydra.kafka.services.MetadataConsumerActor.{GetMetadata, GetMetadataResponse}
+import hydra.kafka.services.StreamsManagerActor.{GetMetadata, GetMetadataResponse}
 import hydra.kafka.services.TopicBootstrapActor._
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.avro.Schema

@@ -31,7 +31,7 @@ import hydra.core.http.HydraDirectives
 import hydra.core.marshallers.TopicMetadataRequest
 import hydra.kafka.model.TopicMetadataAdapter
 import hydra.kafka.services.TopicBootstrapActor._
-import hydra.kafka.services.{CompactedTopicManagerActor, MetadataConsumerActor, TopicBootstrapActor}
+import hydra.kafka.services.{CompactedTopicManagerActor, StreamsManagerActor, TopicBootstrapActor}
 import hydra.kafka.util.KafkaUtils
 
 import scala.concurrent.ExecutionContext
@@ -53,7 +53,7 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
 
   private val bootstrapKafkaConfig = applicationConfig.getConfig("bootstrap-config")
 
-  private val metadataStreamActor = system.actorOf(MetadataConsumerActor.props(bootstrapKafkaConfig,
+  private val metadataStreamActor = system.actorOf(StreamsManagerActor.props(bootstrapKafkaConfig,
     KafkaUtils.BootstrapServers, ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient,
     TopicBootstrapActor.getMetadataTopicName(bootstrapKafkaConfig)))
 
