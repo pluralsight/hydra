@@ -65,8 +65,8 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
 
   private[kafka] def maybeCreateCompactedStream(metadata: TopicMetadata): Unit = {
     if(StreamTypeFormat.read(metadata.streamType.toJson) == History) {
-      val schema = schemaRegistryClient.getById(metadata.schemaId)
-      if (schema.getFields.contains("hydra.key")) {
+      val schema = schemaRegistryClient.getById(metadata.schemaId).toString()
+      if (schema.contains("hydra.key")) {
         val compactedPrefix = bootstrapKafkaConfig.get[String]("compacted-topic-prefix").valueOrElse("_compacted.")
         log.info(s"Attempting to create compacted stream for $metadata")
         context.actorOf(CompactedTopicStreamActor.props(metadata.subject, compactedPrefix+metadata.subject, bootstrapServers, bootstrapKafkaConfig))

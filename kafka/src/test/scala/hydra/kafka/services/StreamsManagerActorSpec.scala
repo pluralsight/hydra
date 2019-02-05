@@ -136,7 +136,7 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
     publishRecord()
     val probe = TestProbe()
 
-    val stream = StreamsManagerActor.createStream(kafkaConfig, "localhost:8092", srClient,
+    val stream = StreamsManagerActor.createMetadataStream(kafkaConfig, "localhost:8092", srClient,
       "hydra.metadata.topic", probe.ref)(system.dispatcher, ActorMaterializer())
 
     val s = stream.run()(ActorMaterializer())
