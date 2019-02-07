@@ -108,8 +108,8 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
         case Success(_) =>
           val result = for {
             schema <- registerSchema(topicMetadataRequest.schema.compactPrint)
-            _ <- createKafkaTopics(topicMetadataRequest)
             topicMetadata <- ingestMetadata(topicMetadataRequest, schema.schemaResource.id)
+            _ <- createKafkaTopics(topicMetadataRequest)
           } yield topicMetadata
 
           pipe(result.recover{
