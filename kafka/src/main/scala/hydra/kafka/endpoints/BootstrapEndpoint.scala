@@ -29,7 +29,7 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.http.HydraDirectives
 import hydra.core.marshallers.TopicMetadataRequest
-import hydra.kafka.model.TopicMetadataAdapter
+import hydra.kafka.model.{TopicMetadata, TopicMetadataAdapter}
 import hydra.kafka.services.TopicBootstrapActor._
 import hydra.kafka.services.{StreamsManagerActor, TopicBootstrapActor}
 import hydra.kafka.util.KafkaUtils
@@ -70,7 +70,7 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
               onComplete(bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)) {
                 case Success(message) => message match {
 
-                  case BootstrapSuccess(metadata) =>
+                  case metadata: TopicMetadata =>
                     complete(StatusCodes.OK, toResource(metadata))
 
                   case BootstrapFailure(reasons) =>

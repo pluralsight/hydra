@@ -110,13 +110,11 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
             schema <- registerSchema(topicMetadataRequest.schema.compactPrint)
             topicMetadata <- ingestMetadata(topicMetadataRequest, schema.schemaResource.id)
             topicCreateResult <- createKafkaTopics(topicMetadataRequest)
-          } yield (topicCreateResult, topicMetadata)
+          } yield topicMetadata
 
-          val res = result.map(resTuple => BootstrapSuccess(resTuple._2))
-          pipe(
-            res.recover {
-              case t: Throwable => BootstrapFailure(Seq(t.getMessage))
-            }) to sender
+          pipe(result.recover{
+            case e => BootstrapFailure(Seq(e.getMessage))
+          }) to sender
 
         case Failure(ex: TopicNameValidatorException) =>
           Future(BootstrapFailure(ex.reasons)) pipeTo sender
@@ -221,7 +219,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
           log.info(s"Topic $topicName already exists, proceeding anyway...")
           BootstrapSuccess
         }
-        case e: Exception => BootstrapFailure(e.getMessage :: Nil)
+        case e: Exception => throw e
       }
 
     }
@@ -243,12 +241,7 @@ object TopicBootstrapActor {
 
   sealed trait BootstrapResult
 
-  case class BootstrapSuccess(metadata: TopicMetadata) extends BootstrapResult
-
   case class BootstrapFailure(reasons: Seq[String]) extends BootstrapResult
-
-  case class BootstrapStep[A](stepResult: A) extends BootstrapResult
-
   case object BootstrapSuccess extends BootstrapResult
   case object BootstrapFailure extends BootstrapResult
 
