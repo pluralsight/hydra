@@ -510,7 +510,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val (probe, schemaRegistryActor, _) = fixture("test-get-stream",
       schemaRegistryShouldFail = false)
 
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, system.actorSelection("kafka_ingestor_test-get-stream"), streamManagerProps
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, system.actorSelection("kafka_ingestor_test-get-stream"), Props(new MockStreamsManagerActor())
     ))
 
     probe.expectMsgType[RegisterSchemaRequest]
@@ -528,7 +528,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val (probe, schemaRegistryActor, _) = fixture("test-get-stream-subject",
       schemaRegistryShouldFail = false)
 
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, system.actorSelection("kafka_ingestor_test-get-stream-subject"), streamManagerProps
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor, system.actorSelection("kafka_ingestor_test-get-stream-subject"), Props(new MockStreamsManagerActor())
     ))
 
     probe.expectMsgType[RegisterSchemaRequest]
@@ -604,7 +604,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 }
 
 
-class MockConsumer extends Actor {
+class MockStreamsManagerActor extends Actor {
   val tm = TopicMetadata("test-md-subject", 1, "entity", false, "private", "alex",
     None, None, UUID.randomUUID(), DateTime.now())
 

@@ -74,7 +74,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     compactedDetailsConfig)
 
 
-  private val metadataStreamActor = context.actorOf(streamsManagerProps)
+  private val streamsManagerActor = context.actorOf(streamsManagerProps)
 
 
 
@@ -83,7 +83,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
   }
 
   override def postStop(): Unit = {
-    metadataStreamActor ! StopStream
+    streamsManagerActor ! StopStream
   }
 
   override def receive: Receive = initializing
@@ -123,7 +123,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
       }
 
     case GetStreams(subject) =>
-      val streams: Future[GetStreamsResponse] = (metadataStreamActor ? GetMetadata).mapTo[GetMetadataResponse]
+      val streams: Future[GetStreamsResponse] = (streamsManagerActor ? GetMetadata).mapTo[GetMetadataResponse]
         .map { x =>
           val resp = subject.map(s => x.metadata.values.filter(p => p.subject == s)) getOrElse x.metadata.values
           GetStreamsResponse(resp.toSeq)
