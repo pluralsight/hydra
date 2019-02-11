@@ -19,7 +19,7 @@ import hydra.kafka.services.StreamsManagerActor.{GetMetadata, GetMetadataRespons
 import hydra.kafka.services.TopicBootstrapActor._
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.avro.Schema
-import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
 import org.joda.time.DateTime
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
@@ -611,7 +611,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   it should "create a compacted topic if a hydra key exists and the stream type is historic" in {
 
-      val subject = "exp.dataplatform.testsubject5"
+      val subject = "exp.dataplatform.testsbject5"
 
       val mdRequest = s"""{
                          |	"subject": "$subject",
@@ -641,10 +641,10 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
         .parseJson
         .convertTo[TopicMetadataRequest]
 
-      val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test5")
+      val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test12")
 
       val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-        system.actorSelection("/user/kafka_ingestor_test5"), Props(new MockStreamsManagerActor())
+        system.actorSelection("/user/kafka_ingestor_test12"), Props(new MockStreamsManagerActor())
       ))
 
       probe.expectMsgType[RegisterSchemaRequest]
@@ -654,11 +654,12 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
 
 
-      val expectedMessage = "I'm expected!"
+      val expectedMessage = "message"
+      val consumeSubject = "_compacted.exp.dataplatform.testsbject5"
 
-      publishStringMessageToKafka(subject, expectedMessage)
-      import scala.concurrent.duration._
-      consumeNumberMessagesFromTopics(Set("_compacted."+subject), 1, timeout = 10.seconds)
+      //need to publish a KEY and VALUE here, otherwise kafka throws an exception for the compacted topic
+      publishToKafka(consumeSubject, expectedMessage, expectedMessage)(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
+      consumeFirstStringMessageFrom(consumeSubject) shouldEqual expectedMessage
 
   }
 }
