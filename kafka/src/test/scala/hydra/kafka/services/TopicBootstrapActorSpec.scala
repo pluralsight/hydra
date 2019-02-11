@@ -17,12 +17,13 @@ import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.AvroRecord
 import hydra.kafka.services.StreamsManagerActor.{GetMetadata, GetMetadataResponse}
 import hydra.kafka.services.TopicBootstrapActor._
-import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
+import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig, KafkaUnavailableException}
 import org.apache.avro.Schema
 import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
 import org.joda.time.DateTime
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
+import org.scalatest.time.{Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers, WordSpecLike}
 import spray.json._
 
@@ -653,14 +654,64 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
       bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
 
-
       val expectedMessage = "message"
       val consumeSubject = "_compacted.exp.dataplatform.testsbject5"
 
       //need to publish a KEY and VALUE here, otherwise kafka throws an exception for the compacted topic
       publishToKafka(consumeSubject, expectedMessage, expectedMessage)(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
-      consumeFirstStringMessageFrom(consumeSubject) shouldEqual expectedMessage
+      consumeFirstStringMessageFrom(subject) shouldEqual expectedMessage
+  }
 
+  it should "not create a compacted topic if hydra.key is not present" in {
+
+    val subject = "exp.dataplatform.testsbject5"
+
+    val mdRequest = s"""{
+                       |	"subject": "$subject",
+                       |	"streamType": "History",
+                       |  "derived": false,
+                       |	"dataClassification": "Public",
+                       |	"dataSourceOwner": "BARTON",
+                       |	"contact": "slackity slack dont talk back",
+                       |	"psDataLake": false,
+                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+                       |	"notes": "here are some notes topkek",
+                       |	"schema": {
+                       |	  "namespace": "exp.assessment",
+                       |	  "name": "SkillAssessmentTopicsScored",
+                       |	  "type": "record",
+                       |	  "version": 1,
+                       |	  "fields": [
+                       |	    {
+                       |	      "name": "testField",
+                       |	      "type": "string"
+                       |	    }
+                       |	  ]
+                       |	}
+                       |}"""
+      .stripMargin
+      .parseJson
+      .convertTo[TopicMetadataRequest]
+
+    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test13")
+
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
+      system.actorSelection("/user/kafka_ingestor_test13"), Props(new MockStreamsManagerActor())
+    ))
+
+    probe.expectMsgType[RegisterSchemaRequest]
+
+    val senderProbe = TestProbe()
+
+    bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
+
+    val expectedMessage = "message"
+    val consumeSubject = "_compacted.exp.dataplatform.testsbject5"
+
+    //need to publish a KEY and VALUE here, otherwise kafka throws an exception for the compacted topic
+    assertThrows[KafkaUnavailableException]{
+      publishToKafka(consumeSubject, expectedMessage, expectedMessage)(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
+    }
   }
 }
 
