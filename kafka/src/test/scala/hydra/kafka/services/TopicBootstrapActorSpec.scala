@@ -19,12 +19,11 @@ import hydra.kafka.services.StreamsManagerActor.{GetMetadata, GetMetadataRespons
 import hydra.kafka.services.TopicBootstrapActor._
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig, KafkaUnavailableException}
 import org.apache.avro.Schema
-import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
+import org.apache.kafka.common.serialization.StringSerializer
 import org.joda.time.DateTime
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
-import org.scalatest.time.{Seconds, Span}
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers, WordSpecLike}
+import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import spray.json._
 
 import scala.concurrent.Future

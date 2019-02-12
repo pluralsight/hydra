@@ -1,21 +1,16 @@
 package hydra.kafka.services
 
-import akka.actor.Status.Success
-import akka.actor.{ActorIdentity, ActorNotFound, ActorRef, ActorSelection, ActorSystem, Identify}
+import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.testkit.{TestKit, TestProbe}
 import akka.util.Timeout
 import com.pluralsight.hydra.avro.JsonConverter
 import com.typesafe.config.ConfigFactory
-import hydra.avro.registry.ConfluentSchemaRegistry
-import hydra.common.config.ConfigSupport
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadata
-import hydra.kafka.services.StreamsManagerActor.{GetStreamActor, GetStreamActorResponse}
 import hydra.kafka.util.KafkaUtils
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
 import io.confluent.kafka.serializers.KafkaAvroSerializer
-import jdk.nashorn.internal.runtime.regexp.joni.exception.ValueException
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
@@ -23,14 +18,11 @@ import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
-import org.scalatest.exceptions.TestFailedException
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import spray.json._
 
-import scala.concurrent.{Future, TimeoutException}
 import scala.concurrent.duration._
 import scala.io.Source
-import scala.util.Try
 
 class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor-spec"))
   with FlatSpecLike
