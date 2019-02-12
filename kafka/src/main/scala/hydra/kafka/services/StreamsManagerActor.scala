@@ -23,11 +23,12 @@ import org.apache.kafka.common.serialization.StringDeserializer
 import org.joda.time.format.ISODateTimeFormat
 import spray.json._
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 class StreamsManagerActor(bootstrapKafkaConfig: Config,
                           bootstrapServers: String,
-                          schemaRegistryClient: SchemaRegistryClient) extends Actor
+                          schemaRegistryClient: SchemaRegistryClient,
+                          ) extends Actor
   with ConfigSupport
   with HydraJsonSupport
   with ActorLogging {
@@ -37,6 +38,7 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
   private implicit val materializer: Materializer = ActorMaterializer()
 
   private val metadataTopicName = bootstrapKafkaConfig.get[String]("metadata-topic-name").valueOrElse("_hydra.metadata.topic")
+  private val compactedPrefix = bootstrapKafkaConfig.get[String]("compacted-topic-prefix").valueOrElse("_compacted.")
 
   private val metadataMap = new collection.mutable.HashMap[String, TopicMetadata]()
   private val metadataStream = StreamsManagerActor.createMetadataStream(bootstrapKafkaConfig, bootstrapServers,
@@ -60,6 +62,10 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
 
     case StopStream =>
       pipe(stream._1.shutdown().map(_ => StreamStopped)) to sender
+
+    case GetStreamActor(actorName: String) =>
+      val s = sender()
+      pipe(Future{GetStreamActorResponse(context.child(actorName))}) to s
   }
 
 
@@ -67,12 +73,12 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
     if(StreamTypeFormat.read(metadata.streamType.toJson) == History) {
       val schema = schemaRegistryClient.getById(metadata.schemaId).toString()
       if (schema.contains("hydra.key")) {
-        val compactedPrefix = bootstrapKafkaConfig.get[String]("compacted-topic-prefix").valueOrElse("_compacted.")
         val compactedName = compactedPrefix+metadata.subject
         log.info(s"Attempting to create compacted stream for $metadata")
         context.actorOf(CompactedTopicStreamActor.props(metadata.subject, compactedName, bootstrapServers, bootstrapKafkaConfig), name = compactedName)
       }
     }
+
   }
 
 }
@@ -83,7 +89,9 @@ object StreamsManagerActor {
 
   case object GetMetadata
 
+  case class GetStreamActor(actorName: String)
   case class GetMetadataResponse(metadata: Map[String, TopicMetadata])
+  case class GetStreamActorResponse(actor: Option[ActorRef])
 
   case object StopStream
 

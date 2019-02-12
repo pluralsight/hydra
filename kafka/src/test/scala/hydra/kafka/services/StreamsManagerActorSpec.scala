@@ -1,7 +1,7 @@
 package hydra.kafka.services
 
 import akka.actor.Status.Success
-import akka.actor.{ActorIdentity, ActorNotFound, ActorRef, ActorSystem, Identify}
+import akka.actor.{ActorIdentity, ActorNotFound, ActorRef, ActorSelection, ActorSystem, Identify}
 import akka.stream.ActorMaterializer
 import akka.testkit.{TestKit, TestProbe}
 import akka.util.Timeout
@@ -11,9 +11,11 @@ import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadata
+import hydra.kafka.services.StreamsManagerActor.{GetStreamActor, GetStreamActorResponse}
 import hydra.kafka.util.KafkaUtils
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
 import io.confluent.kafka.serializers.KafkaAvroSerializer
+import jdk.nashorn.internal.runtime.regexp.joni.exception.ValueException
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
@@ -21,12 +23,14 @@ import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import org.scalatest.exceptions.TestFailedException
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import spray.json._
 
-import scala.concurrent.TimeoutException
+import scala.concurrent.{Future, TimeoutException}
 import scala.concurrent.duration._
 import scala.io.Source
+import scala.util.Try
 
 class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor-spec"))
   with FlatSpecLike
@@ -49,8 +53,8 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
 
 
   override implicit val patienceConfig = PatienceConfig(
-    timeout = scaled(5000 millis),
-    interval = scaled(100 millis))
+    timeout = scaled(50000 millis),
+    interval = scaled(1000 millis))
 
   val config = ConfigFactory.load().getConfig("hydra_kafka.bootstrap-config")
 
@@ -196,21 +200,24 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
         .parseJson
         .convertTo[TopicMetadata]
 
-    publishRecord(metadata)
-
     val streamsManagerActor = system.actorOf(StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient), name = "stream_manager")
     val compactedTopic = "_compacted.exp.assessment.SkillAssessmentTopicsScored"
-    val shouldBeName = s"/user/stream_manager/$compactedTopic"
-    implicit val timeout = Timeout(10.seconds)
-    whenReady(system.actorSelection(shouldBeName).resolveOne()) { _ =>
-      succeed
+    val shouldBeName = s"akka://metadata-stream-actor-spec/user/stream_manager/$compactedTopic"
+
+    streamsManagerActor ! metadata
+
+    implicit val timeout = Timeout(3.seconds)
+    eventually {
+      whenReady(system.actorSelection(shouldBeName).resolveOne()) { _ =>
+        succeed
+      }
     }
+  }
+
+
 
   }
 
-  it should "not create a compacted stream if not necessary" in  {
-
-  }
 
 }
 
