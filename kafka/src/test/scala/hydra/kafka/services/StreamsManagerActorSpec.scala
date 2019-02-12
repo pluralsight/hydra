@@ -215,10 +215,6 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
   }
 
 
-
-  }
-
-
 }
 
 
