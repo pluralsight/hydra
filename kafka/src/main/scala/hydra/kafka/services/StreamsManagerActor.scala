@@ -68,8 +68,9 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
       val schema = schemaRegistryClient.getById(metadata.schemaId).toString()
       if (schema.contains("hydra.key")) {
         val compactedPrefix = bootstrapKafkaConfig.get[String]("compacted-topic-prefix").valueOrElse("_compacted.")
+        val compactedName = compactedPrefix+metadata.subject
         log.info(s"Attempting to create compacted stream for $metadata")
-        context.actorOf(CompactedTopicStreamActor.props(metadata.subject, compactedPrefix+metadata.subject, bootstrapServers, bootstrapKafkaConfig))
+        context.actorOf(CompactedTopicStreamActor.props(metadata.subject, compactedName, bootstrapServers, bootstrapKafkaConfig), name = compactedName)
       }
     }
   }
