@@ -29,6 +29,22 @@ class ISODateConverterSpec extends Matchers with FlatSpecLike {
     dt.getNano shouldBe 693217000
   }
 
+  it should "parse valid dates that don't contain an offset" in {
+    val c = new ISODateConverter()
+    c.getConvertedType shouldBe classOf[ZonedDateTime]
+    c.getLogicalTypeName shouldBe "iso-datetime"
+    val dt = c.fromCharSequence("2015-07-28T19:55:57.693217",
+      Schema.create(Schema.Type.STRING), IsoDate)
+
+    dt.getYear shouldBe 2015
+    dt.getMonthValue shouldBe 7
+    dt.getDayOfMonth shouldBe 28
+    dt.getHour shouldBe 19
+    dt.getMinute shouldBe 55
+    dt.getSecond shouldBe 57
+    dt.getNano shouldBe 693217000
+  }
+
   it should "return the epoch on bad formed dates" in {
     val c = new ISODateConverter()
     c.fromCharSequence("2015-07-281",
