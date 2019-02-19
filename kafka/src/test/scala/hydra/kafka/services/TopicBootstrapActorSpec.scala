@@ -658,12 +658,12 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
       //need to publish a KEY and VALUE here, otherwise kafka throws an exception for the compacted topic
       publishToKafka(consumeSubject, expectedMessage, expectedMessage)(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
-      consumeFirstStringMessageFrom(subject) shouldEqual expectedMessage
+      consumeFirstStringMessageFrom(consumeSubject) shouldEqual expectedMessage
   }
 
   it should "not create a compacted topic if hydra.key is not present" in {
 
-    val subject = "exp.dataplatform.testsbject5"
+    val subject = "exp.dataplatform.testsbject6"
 
     val mdRequest = s"""{
                        |	"subject": "$subject",
@@ -705,7 +705,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
 
     val expectedMessage = "message"
-    val consumeSubject = "_compacted.exp.dataplatform.testsbject5"
+    val consumeSubject = "_compacted.exp.dataplatform.testsbject6"
 
     //need to publish a KEY and VALUE here, otherwise kafka throws an exception for the compacted topic
     assertThrows[KafkaUnavailableException]{
