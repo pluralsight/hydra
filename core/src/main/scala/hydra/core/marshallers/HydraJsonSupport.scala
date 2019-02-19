@@ -133,7 +133,7 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
   }
 
   implicit object StreamTypeFormat extends RootJsonFormat[StreamType] {
-    override def read(json: JsValue): StreamType = json match {
+     def read(json: JsValue): StreamType = json match {
       case JsString("Notification") => Notification
       case JsString("History") => History
       case JsString("CurrentState") => CurrentState
@@ -145,7 +145,7 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
       }
     }
 
-    override def write(obj: StreamType): JsValue = {
+     def write(obj: StreamType): JsValue = {
       JsString(obj.toString)
     }
   }
@@ -153,8 +153,6 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val genericErrorFormat = jsonFormat2(GenericError)
 
   implicit val topicCreationMetadataFormat = jsonFormat8(TopicMetadataRequest)
-
-  implicit val streamFormat = StreamTypeFormat
 
 }
 

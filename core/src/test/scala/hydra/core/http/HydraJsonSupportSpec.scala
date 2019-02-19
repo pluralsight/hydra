@@ -5,7 +5,7 @@ import java.util.UUID
 import akka.actor.ActorPath
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import hydra.core.marshallers.HydraJsonSupport
+import hydra.core.marshallers._
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 import org.scalatest.{FunSpecLike, Matchers}
@@ -71,6 +71,18 @@ class HydraJsonSupportSpec extends Matchers with FunSpecLike with HydraJsonSuppo
       intercept[DeserializationException] {
         JsNumber(1).convertTo[DateTime]
       }
+    }
+
+    it("converts StreamType objects") {
+
+      val hist = JsString("History")
+      hist.convertTo[StreamType] shouldBe History
+      val curr = JsString("CurrentState")
+      curr.convertTo[StreamType] shouldBe CurrentState
+      val notf = JsString("Notification")
+      notf.convertTo[StreamType] shouldBe Notification
+
+
     }
   }
 }
