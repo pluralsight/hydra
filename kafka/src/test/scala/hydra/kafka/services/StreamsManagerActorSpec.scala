@@ -8,6 +8,7 @@ import com.pluralsight.hydra.avro.JsonConverter
 import com.typesafe.config.ConfigFactory
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadata
+import hydra.kafka.services.StreamsManagerActor.{GetStreamActor, GetStreamActorResponse}
 import hydra.kafka.util.KafkaUtils
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
 import io.confluent.kafka.serializers.KafkaAvroSerializer
@@ -45,7 +46,7 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
 
 
   override implicit val patienceConfig = PatienceConfig(
-    timeout = scaled(50000 millis),
+    timeout = scaled(5000 millis),
     interval = scaled(1000 millis))
 
   val config = ConfigFactory.load().getConfig("hydra_kafka.bootstrap-config")
@@ -204,6 +205,112 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
         succeed
       }
     }
+  }
+
+  it should "not create a compacted topic stream if hydra.key is missing" in {
+    val schemaWithKey = new Schema.Parser().parse(
+      """
+        |{
+        |	  "namespace": "exp.assessment",
+        |	  "name": "SkillAssessmentTopicsScored",
+        |	  "type": "record",
+
+        |	  "version": 1,
+        |	  "fields": [
+        |	    {
+        |	      "name": "testField",
+        |	      "type": "string"
+        |	    }
+        |	  ]
+        |	}
+      """.stripMargin)
+
+    val schemaWKeyId = srClient.register("exp.assessment.SkillAssessmentTopicsScored", schemaWithKey)
+
+    val metadata =
+      s"""{
+         |	"id":"79a1627e-04a6-11e9-8eb2-f2801f1b9fd1",
+         | "createdDate":"${formatter.print(DateTime.now)}",
+         | "subject": "exp.assessment.SkillAssessmentTopicsScored",
+         |	"streamType": "History",
+         | "derived": false,
+         |	"dataClassification": "Public",
+         |	"contact": "slackity slack dont talk back",
+         |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+         |	"notes": "here are some notes topkek",
+         |	"schemaId": $schemaWKeyId
+         |}"""
+        .stripMargin
+        .parseJson
+        .convertTo[TopicMetadata]
+
+    val streamsManagerActor = system.actorOf(StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient), name = "stream_manager2")
+    val compactedTopic = "_compacted.exp.assessment.SkillAssessmentTopicsScored"
+
+    streamsManagerActor ! metadata
+
+    import akka.pattern.ask
+
+    implicit val timeout = Timeout(3.seconds)
+
+
+    whenReady(streamsManagerActor ? GetStreamActor(compactedTopic)) {
+      res => res shouldBe GetStreamActorResponse(None)
+    }
+
+  }
+
+  it should "not create a compacted topic stream if streamType isn't History from the metadata payload" in {
+    val schemaWithKey = new Schema.Parser().parse(
+      """
+        |{
+        |	  "namespace": "exp.assessment",
+        |	  "name": "SkillAssessmentTopicsScored",
+        |	  "type": "record",
+        |   "hydra.key": "testField",
+        |	  "version": 1,
+        |	  "fields": [
+        |	    {
+        |	      "name": "testField",
+        |	      "type": "string"
+        |	    }
+        |	  ]
+        |	}
+      """.stripMargin)
+
+    val schemaWKeyId = srClient.register("exp.assessment.SkillAssessmentTopicsScored", schemaWithKey)
+
+    val metadata =
+      s"""{
+         |	"id":"79a1627e-04a6-11e9-8eb2-f2801f1b9fd1",
+         | "createdDate":"${formatter.print(DateTime.now)}",
+         | "subject": "exp.assessment.SkillAssessmentTopicsScored",
+         |	"streamType": "CurrentState",
+         | "derived": false,
+         |	"dataClassification": "Public",
+         |	"contact": "slackity slack dont talk back",
+         |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+         |	"notes": "here are some notes topkek",
+         |	"schemaId": $schemaWKeyId
+         |}"""
+        .stripMargin
+        .parseJson
+        .convertTo[TopicMetadata]
+
+    val streamsManagerActor = system.actorOf(StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient), name = "stream_manager3")
+    val compactedTopic = "_compacted.exp.assessment.SkillAssessmentTopicsScored"
+
+    streamsManagerActor ! metadata
+
+    import akka.pattern.ask
+
+    implicit val timeout = Timeout(3.seconds)
+
+
+    whenReady(streamsManagerActor ? GetStreamActor(compactedTopic)) {
+      res => res shouldBe GetStreamActorResponse(None)
+    }
+
   }
 
 

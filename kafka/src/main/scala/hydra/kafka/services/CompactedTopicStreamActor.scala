@@ -33,7 +33,6 @@ class CompactedTopicStreamActor(fromTopic: String, toTopic: String, bootstrapSer
 
   override def preStart(): Unit = {
     log.debug(s"Starting compacted topic actor for $toTopic")
-    println("we're created!!!!")
     context.become(streaming(stream.run()))
   }
 
