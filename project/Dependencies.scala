@@ -85,10 +85,11 @@ object Dependencies {
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
       "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
-      "com.github.marcuslange" % "akka-http-hal" % "1.2.0",
       "ch.megard" %% "akka-http-cors" % akkaHTTPCorsVersion,
       "org.iq80.leveldb" % "leveldb" % "0.7",
       "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8")
+    
+    val akkaHttpHal = Seq("com.github.marcuslange" % "akka-http-hal" % "1.2.0")
 
     val serviceContainer = ("com.github.vonnagy" %% "service-container" % serviceContainerVersion)
       .excludeAll(
@@ -158,18 +159,18 @@ object Dependencies {
   val baseDeps = akka ++ Seq(scalaz, scalaConfigs, avro) ++ logging ++ joda ++ testDeps
 
   val sqlDeps = logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
-
+  
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
   val coreDeps = akka ++ baseDeps ++
     Seq(guavacache, reflections, akkaKryo, serviceContainer, sdNotify, postgres, h2db) ++
     confluent ++ kamon
 
-  val ingestDeps = coreDeps
+  val ingestDeps = coreDeps ++ akkaHttpHal
 
   val rabbitDeps = logging ++ Seq(scalaConfigs) ++ joda ++ opRabbit ++ testDeps
 
-  val kafkaDeps = coreDeps ++ Seq(akkaKafkaStream, jsonLenses) ++ kafka
+  val kafkaDeps = coreDeps ++ Seq(akkaKafkaStream, jsonLenses) ++ kafka ++ akkaHttpHal
 
   val sandboxDeps = kafkaDeps ++ sqlDeps ++
     Seq("com.h2database" % "h2" % "1.4.196") ++ Seq(embeddedKafka)
