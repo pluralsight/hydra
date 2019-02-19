@@ -69,7 +69,7 @@ lazy val common = Project(
 lazy val core = Project(
   id = "core",
   base = file("core")
-).dependsOn(avro, Dependencies.akkaHTTPHal)
+).dependsOn(avro)
   .settings(moduleSettings, name := "hydra-core", libraryDependencies ++= Dependencies.coreDeps)
 
 

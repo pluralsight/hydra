@@ -36,9 +36,6 @@ object Dependencies {
   val h2DbVersion = "1.4.196"
   val akkaManagementVersion = "0.15.0"
 
-  val akkaHTTPHal = ProjectRef(uri("https://github.com/marcuslange/akka-http-hal.git"),
-    "akka-http-hal")
-
   object Compile {
 
     val scalaConfigs = "com.github.kxbmap" %% "configs" % kxbmapConfigVersion
@@ -52,7 +49,7 @@ object Dependencies {
     val embeddedKafka = "net.manub" %% "scalatest-embedded-kafka" % "2.0.0"
 
     val sdNotify = "info.faljse" % "SDNotify" % "1.1"
-    
+
     lazy val kamon = Seq(
       "io.kamon" %% "kamon-core" % kamonVersion,
       "io.kamon" %% "kamon-scala-future" % kamonPVersion,
@@ -88,9 +85,16 @@ object Dependencies {
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
       "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
+      "com.github.marcuslange" % "akka-http-hal" % "1.2.0",
       "ch.megard" %% "akka-http-cors" % akkaHTTPCorsVersion,
       "org.iq80.leveldb" % "leveldb" % "0.7",
       "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8")
+
+    val serviceContainer = ("com.github.vonnagy" %% "service-container" % serviceContainerVersion)
+      .excludeAll(
+        ExclusionRule(organization = "ch.qos.logback"),
+        ExclusionRule(organization = "org.slf4j")
+      )
 
     val akkaKryo = "com.github.romix.akka" %% "akka-kryo-serialization" % akkaKryoVersion
 
@@ -119,12 +123,6 @@ object Dependencies {
       "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion
     )
 
-    val serviceContainer = ("com.github.vonnagy" %% "service-container" % serviceContainerVersion)
-      .excludeAll(
-        ExclusionRule(organization = "ch.qos.logback"),
-        ExclusionRule(organization = "org.slf4j")
-      )
-    
     val postgres = "org.postgresql" % "postgresql" % "42.2.4"
   }
 
@@ -145,7 +143,7 @@ object Dependencies {
     val junit = "junit" % "junit" % "4.12" % "test"
 
     val h2db = "com.h2database" % "h2" % h2DbVersion % "test"
-    
+
     val embeddedConsul = "com.pszymczyk.consul" % "embedded-consul" % "1.1.1" % "test"
 
     val embeddedPostgres = "com.opentable.components" % "otj-pg-embedded" % "0.12.0" % "test"
@@ -160,11 +158,11 @@ object Dependencies {
   val baseDeps = akka ++ Seq(scalaz, scalaConfigs, avro) ++ logging ++ joda ++ testDeps
 
   val sqlDeps = logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
-  
+
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
-  val coreDeps = akka ++ baseDeps ++ 
-    Seq(guavacache, reflections, serviceContainer, akkaKryo, sdNotify, postgres, h2db) ++
+  val coreDeps = akka ++ baseDeps ++
+    Seq(guavacache, reflections, akkaKryo, serviceContainer, sdNotify, postgres, h2db) ++
     confluent ++ kamon
 
   val ingestDeps = coreDeps
@@ -175,6 +173,6 @@ object Dependencies {
 
   val sandboxDeps = kafkaDeps ++ sqlDeps ++
     Seq("com.h2database" % "h2" % "1.4.196") ++ Seq(embeddedKafka)
-  
+
   val overrides = Set(logging, typesafeConfig, joda)
 }
