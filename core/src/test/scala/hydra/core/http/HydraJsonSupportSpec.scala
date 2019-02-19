@@ -82,6 +82,9 @@ class HydraJsonSupportSpec extends Matchers with FunSpecLike with HydraJsonSuppo
       val notf = JsString("Notification")
       notf.convertTo[StreamType] shouldBe Notification
 
+      intercept[DeserializationException] {
+        JsString("dummy").convertTo[StreamType] shouldBe History
+      }
 
     }
   }
