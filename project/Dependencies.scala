@@ -23,6 +23,7 @@ object Dependencies {
   val akkaKafkaStreamVersion = "1.0-M1"
   val scalazVersion = "7.2.9"
   val scalaMockVersion = "4.1.0"
+  val serviceContainerVersion = "2.0.7"
   val scalaCacheVersion = "0.23.0"
   val commonsDbcpVersion = "1.4"
   val hikariCPVersion = "2.6.2"
@@ -88,6 +89,12 @@ object Dependencies {
       "ch.megard" %% "akka-http-cors" % akkaHTTPCorsVersion,
       "org.iq80.leveldb" % "leveldb" % "0.7",
       "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8")
+
+    val serviceContainer = ("com.github.vonnagy" %% "service-container" % serviceContainerVersion)
+      .excludeAll(
+        ExclusionRule(organization = "ch.qos.logback"),
+        ExclusionRule(organization = "org.slf4j")
+      )
 
     val akkaKryo = "com.github.romix.akka" %% "akka-kryo-serialization" % akkaKryoVersion
 
@@ -155,7 +162,7 @@ object Dependencies {
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
   val coreDeps = akka ++ baseDeps ++
-    Seq(guavacache, reflections, akkaKryo, sdNotify, postgres, h2db) ++
+    Seq(guavacache, reflections, akkaKryo, serviceContainer, sdNotify, postgres, h2db) ++
     confluent ++ kamon
 
   val ingestDeps = coreDeps
