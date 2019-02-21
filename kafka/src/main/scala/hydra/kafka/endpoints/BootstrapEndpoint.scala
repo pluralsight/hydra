@@ -60,7 +60,7 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
     TopicBootstrapActor.props(schemaRegistryActor, kafkaIngestor, consumerProps))
 
   override val route: Route =
-    pathPrefix("streams") {
+    pathPrefix("streams" | "topics") {
       pathEndOrSingleSlash {
         post {
           requestEntityPresent {
