@@ -34,7 +34,7 @@ object Dependencies {
   val kamonPVersion = "1.0.0"
   val akkaKryoVersion = "0.5.2"
   val h2DbVersion = "1.4.196"
-  val akkaManagementVersion = "0.15.0"
+  val akkaManagementVersion = "1.0.0-RC3"
 
   object Compile {
 
@@ -79,7 +79,6 @@ object Dependencies {
       "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
       "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaManagementVersion,
       "com.lightbend.akka.discovery" %% "akka-discovery-consul" % akkaManagementVersion,
-      "com.lightbend.akka.discovery" %% "akka-discovery-dns" % akkaManagementVersion,
       akkaManagement,
       "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
