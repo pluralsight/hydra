@@ -12,6 +12,8 @@ lazy val defaultSettings = Seq(
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
   excludeDependencies += "org.slf4j" % "slf4j-log4j12",
   excludeDependencies += "log4j" % "log4j",
+  excludeDependencies += "com.fasterxml.jackson.core" % "jackson-core",
+  excludeDependencies += "jackson-databind" % "jackson-databind",
   packageOptions in(Compile, packageBin) +=
     Package.ManifestAttributes("Implementation-Build" -> buildNumber),
   logLevel := Level.Info,
