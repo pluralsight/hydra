@@ -79,7 +79,6 @@ object Dependencies {
       "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
       "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaManagementVersion,
       "com.lightbend.akka.discovery" %% "akka-discovery-consul" % akkaManagementVersion,
-      "com.lightbend.akka.discovery" %% "akka-discovery" % akkaManagementVersion,
       akkaManagement,
       "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
