@@ -66,21 +66,21 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
         isWebSocketUpgrade shouldEqual true
 
         wsClient.sendMessage("-c SET hydra-kafka-topic = test.Topic")
-        wsClient.expectMessage("""{"status":200,"message":"OK[HYDRA-KAFKA-TOPIC=test.Topic]"}""")
+        wsClient.expectMessage("""{"message":"OK[HYDRA-KAFKA-TOPIC=test.Topic]","status":200}""")
         wsClient.sendMessage("-c SET hydra-ack = explicit")
-        wsClient.expectMessage("""{"status":400,"message":"BAD REQUEST[hydra-ack=explicit] is not a valid ack strategy."}""")
+        wsClient.expectMessage("""{"message":"BAD REQUEST[hydra-ack=explicit] is not a valid ack strategy.","status":400}""")
 
         wsClient.sendMessage("-c SET hydra-ack = replicated")
-        wsClient.expectMessage("""{"status":200,"message":"OK[hydra-ack=replicated]"}""")
+        wsClient.expectMessage("""{"message":"OK[hydra-ack=replicated]","status":200}""")
 
         wsClient.sendMessage("-c WHAT")
-        wsClient.expectMessage("""{"status":400,"message":"BAD_REQUEST:Not a valid message. Use 'HELP' for help."}""")
+        wsClient.expectMessage("""{"message":"BAD_REQUEST:Not a valid message. Use 'HELP' for help.","status":400}""")
 
         wsClient.sendMessage("-c SET")
-        wsClient.expectMessage("""{"status":200,"message":"HYDRA-KAFKA-TOPIC -> test.Topic;hydra-ack -> Replicated"}""")
+        wsClient.expectMessage("""{"message":"HYDRA-KAFKA-TOPIC -> test.Topic;hydra-ack -> Replicated","status":200}""")
 
         wsClient.sendMessage("-c HELP")
-        wsClient.expectMessage("""{"status":200,"message":"Set metadata: --set (name)=(value)"}""")
+        wsClient.expectMessage("""{"message":"Set metadata: --set (name)=(value)","status":200}""")
 
 
         wsClient.sendMessage("""{"name":"test","value":"test"}""")
@@ -105,9 +105,9 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
         isWebSocketUpgrade shouldEqual true
 
         wsClient.sendMessage("-c SET hydra-delivery-strategy = at-most-once")
-        wsClient.expectMessage("""{"status":200,"message":"OK[HYDRA-DELIVERY-STRATEGY=at-most-once]"}""")
+        wsClient.expectMessage("""{"message":"OK[HYDRA-DELIVERY-STRATEGY=at-most-once]","status":200}""")
         wsClient.sendMessage("-c SET hydra-client-id = test-client")
-        wsClient.expectMessage("""{"status":200,"message":"OK[HYDRA-CLIENT-ID=test-client]"}""")
+        wsClient.expectMessage("""{"message":"OK[HYDRA-CLIENT-ID=test-client]","status":200}""")
 
         wsClient.sendMessage("""-i 122 {"name":"test","value":"test"}""")
         wsClient.expectMessage("""{"correlationId":"122","ingestors":{"test_ingestor":{"code":200,"message":"OK"}}}""")
