@@ -32,6 +32,9 @@ class ConsulRegistrationListenerSpec extends TestKit(ActorSystem("ConsulRegistra
     hydra.getNode shouldBe "hydra-ingest"
     hydra.getServicePort shouldBe 8558
     hydra.getServiceTags.asScala should contain allOf("system:ConsulRegistrationListenerSpec", "akka-management-port:8558")
+    val healthCheck = consulClient.healthClient().getNodeChecks("hydra-ingest").getResponse.get(0)
+    healthCheck.getServiceId.get shouldBe "hydra"
+    healthCheck.getNode shouldBe "hydra-ingest"
 
     listener.onShutdown(container)
     val dr = consulClient.catalogClient().getService("hydra")
