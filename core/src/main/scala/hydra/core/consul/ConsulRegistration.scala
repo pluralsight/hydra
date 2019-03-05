@@ -12,9 +12,10 @@ object ConsulRegistration {
 
   private def check(consulSettings: ConsulSettings) = ImmutableCheck.builder()
     .interval("10s")
-    .id("health-check")
-    .name("health check")
-    .http(consulSettings.healthEndpoint.toString())
+    .id(s"${consulSettings.serviceId}-health-check")
+    .serviceId(consulSettings.serviceId)
+    .name(s"Health endpoint on ${consulSettings.healthEndpoint}")
+    .http(consulSettings.healthEndpoint.toString)
     .build()
 
   def createService(consulSettings: ConsulSettings, systemName: String) = ImmutableService.builder()

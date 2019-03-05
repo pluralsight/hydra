@@ -4,7 +4,7 @@ import sbt.{ExclusionRule, _}
 
 object Dependencies {
 
-  val akkaVersion = "2.5.17"
+  val akkaVersion = "2.5.21"
   val scalaTestVersion = "3.0.5"
   val easyMockVersion = "3.5" //needed for mocking static java methods
   val powerMockVersion = "2.0.0-beta.5" //needed for mocking static java methods
@@ -19,7 +19,7 @@ object Dependencies {
   val sprayJsonVersion = "1.3.5"
   val kafkaVersion = "2.0.0"
   val reflectionsVersion = "0.9.11"
-  val akkaHTTPVersion = "10.1.5"
+  val akkaHTTPVersion = "10.1.7"
   val akkaKafkaStreamVersion = "1.0-M1"
   val scalazVersion = "7.2.9"
   val scalaMockVersion = "4.1.0"
@@ -34,10 +34,7 @@ object Dependencies {
   val kamonPVersion = "1.0.0"
   val akkaKryoVersion = "0.5.2"
   val h2DbVersion = "1.4.196"
-  val akkaManagementVersion = "0.15.0"
-
-  val akkaHTTPHal = ProjectRef(uri("https://github.com/marcuslange/akka-http-hal.git"),
-    "akka-http-hal")
+  val akkaManagementVersion = "1.0.0-RC3"
 
   object Compile {
 
@@ -52,7 +49,7 @@ object Dependencies {
     val embeddedKafka = "net.manub" %% "scalatest-embedded-kafka" % "2.0.0"
 
     val sdNotify = "info.faljse" % "SDNotify" % "1.1"
-    
+
     lazy val kamon = Seq(
       "io.kamon" %% "kamon-core" % kamonVersion,
       "io.kamon" %% "kamon-scala-future" % kamonPVersion,
@@ -76,13 +73,14 @@ object Dependencies {
       "org.apache.logging.log4j" % "log4j-1.2-api" % log4jVersion)
 
     val akkaManagement = ("com.lightbend.akka.management" %%
-      "akka-management-cluster-bootstrap" % akkaManagementVersion) exclude("com.fasterxml.jackson.core", "jackson-core")
+      "akka-management-cluster-bootstrap" % akkaManagementVersion)
+      .excludeAll(ExclusionRule("io.spray"))
+      .exclude("com.fasterxml.jackson.core", "jackson-core")
 
     val akka = Seq("com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
       "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaManagementVersion,
       "com.lightbend.akka.discovery" %% "akka-discovery-consul" % akkaManagementVersion,
-      "com.lightbend.akka.discovery" %% "akka-discovery-dns" % akkaManagementVersion,
       akkaManagement,
       "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
@@ -91,6 +89,15 @@ object Dependencies {
       "ch.megard" %% "akka-http-cors" % akkaHTTPCorsVersion,
       "org.iq80.leveldb" % "leveldb" % "0.7",
       "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8")
+
+    val akkaHttpHal = Seq(("com.github.marcuslange" % "akka-http-hal" % "1.2.1")
+      .excludeAll(ExclusionRule(organization = "io.spray")))
+
+    val serviceContainer = ("com.github.vonnagy" %% "service-container" % serviceContainerVersion)
+      .excludeAll(
+        ExclusionRule(organization = "ch.qos.logback"),
+        ExclusionRule(organization = "org.slf4j")
+      )
 
     val akkaKryo = "com.github.romix.akka" %% "akka-kryo-serialization" % akkaKryoVersion
 
@@ -119,12 +126,6 @@ object Dependencies {
       "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion
     )
 
-    val serviceContainer = ("com.github.vonnagy" %% "service-container" % serviceContainerVersion)
-      .excludeAll(
-        ExclusionRule(organization = "ch.qos.logback"),
-        ExclusionRule(organization = "org.slf4j")
-      )
-    
     val postgres = "org.postgresql" % "postgresql" % "42.2.4"
   }
 
@@ -145,7 +146,7 @@ object Dependencies {
     val junit = "junit" % "junit" % "4.12" % "test"
 
     val h2db = "com.h2database" % "h2" % h2DbVersion % "test"
-    
+
     val embeddedConsul = "com.pszymczyk.consul" % "embedded-consul" % "1.1.1" % "test"
 
     val embeddedPostgres = "com.opentable.components" % "otj-pg-embedded" % "0.12.0" % "test"
@@ -160,21 +161,21 @@ object Dependencies {
   val baseDeps = akka ++ Seq(scalaz, scalaConfigs, avro) ++ logging ++ joda ++ testDeps
 
   val sqlDeps = logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
-  
+
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
-  val coreDeps = akka ++ baseDeps ++ 
-    Seq(guavacache, reflections, serviceContainer, akkaKryo, sdNotify, postgres, h2db) ++
+  val coreDeps = akka ++ baseDeps ++
+    Seq(guavacache, reflections, akkaKryo, serviceContainer, sdNotify, postgres, h2db) ++
     confluent ++ kamon
 
-  val ingestDeps = coreDeps
+  val ingestDeps = coreDeps ++ akkaHttpHal
 
   val rabbitDeps = logging ++ Seq(scalaConfigs) ++ joda ++ opRabbit ++ testDeps
 
-  val kafkaDeps = coreDeps ++ Seq(akkaKafkaStream, jsonLenses) ++ kafka
+  val kafkaDeps = coreDeps ++ Seq(akkaKafkaStream, jsonLenses) ++ kafka ++ akkaHttpHal
 
   val sandboxDeps = kafkaDeps ++ sqlDeps ++
     Seq("com.h2database" % "h2" % "1.4.196") ++ Seq(embeddedKafka)
-  
+
   val overrides = Set(logging, typesafeConfig, joda)
 }

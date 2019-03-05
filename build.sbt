@@ -2,12 +2,12 @@ import sbt.Resolver
 
 val JDK = "1.8"
 val buildNumber = scala.util.Properties.envOrNone("version").map(v => "." + v).getOrElse("")
-val hydraVersion = "0.11.1" + buildNumber
+val hydraVersion = "0.11.2" + buildNumber
 
 lazy val defaultSettings = Seq(
   organization := "pluralsight",
   version := hydraVersion,
-  scalaVersion := "2.12.3",
+  scalaVersion := "2.12.8",
   description := "Hydra",
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
   excludeDependencies += "org.slf4j" % "slf4j-log4j12",
@@ -63,13 +63,13 @@ lazy val common = Project(
   id = "common",
   base = file("common")
 ).settings(moduleSettings,
-  crossScalaVersions := Seq("2.11.8", "2.12.3"),
+  crossScalaVersions := Seq("2.11.8", "2.12.8"),
   name := "hydra-common", libraryDependencies ++= Dependencies.baseDeps)
 
 lazy val core = Project(
   id = "core",
   base = file("core")
-).dependsOn(avro, Dependencies.akkaHTTPHal)
+).dependsOn(avro)
   .settings(moduleSettings, name := "hydra-core", libraryDependencies ++= Dependencies.coreDeps)
 
 
@@ -83,7 +83,7 @@ lazy val avro = Project(
   base = file("avro")
 ).dependsOn(common)
   .settings(moduleSettings,
-    crossScalaVersions := Seq("2.11.8", "2.12.3"),
+    crossScalaVersions := Seq("2.11.8", "2.12.8"),
     name := "hydra-avro", libraryDependencies ++= Dependencies.avroDeps)
 
 lazy val sql = Project(
@@ -91,7 +91,7 @@ lazy val sql = Project(
   base = file("sql")
 ).dependsOn(avro)
   .settings(moduleSettings,
-    crossScalaVersions := Seq("2.11.8", "2.12.3"),
+    crossScalaVersions := Seq("2.11.8", "2.12.8"),
     name := "hydra-sql", libraryDependencies ++= Dependencies.sqlDeps)
 
 lazy val jdbc = Project(

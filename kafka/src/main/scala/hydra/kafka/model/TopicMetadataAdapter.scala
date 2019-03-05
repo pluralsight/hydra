@@ -14,6 +14,8 @@ trait TopicMetadataAdapter extends HydraJsonSupport {
 
   def streamLink(rel: String, id: String) = rel -> Link(href = s"/streams/$id")
 
+  def schemaLink(subject: String) = "hydra-schema" -> Link(href = s"/schemas/$subject")
+
   def toResource(tm: TopicMetadata): JsValue = ResourceBuilder(
     withData = Some(tm.toJson),
     withLinks = Some(Map(streamLink("self", tm.id.toString), schemaLink(tm.subject)))).build

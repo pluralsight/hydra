@@ -23,11 +23,13 @@ class ISODateConverter extends Conversion[ZonedDateTime] with LoggingAdapter {
   override def fromCharSequence(value: CharSequence,
                                 schema: Schema, `type`: LogicalType): ZonedDateTime = {
     Try(OffsetDateTime.parse(value).toInstant)
-      .recover {
-        case e: Throwable =>
-          log.error(e.getMessage, e)
-          Instant.EPOCH
-      }.map(_.atZone(utc))
+      .orElse {
+        Try(LocalDateTime.parse(value).toInstant(ZoneOffset.UTC))
+      }.recover {
+      case e: Throwable =>
+        log.error(e.getMessage, e)
+        Instant.EPOCH
+    }.map(_.atZone(utc))
       .get
   }
 }
