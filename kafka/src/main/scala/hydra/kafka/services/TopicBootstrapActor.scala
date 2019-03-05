@@ -112,7 +112,10 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
             _ <- createKafkaTopics(topicMetadataRequest)
           } yield topicMetadata
 
-          pipe(result.recover{
+          pipe(result.map{
+            metadata => BootstrapSuccess(metadata)
+          }.
+            recover{
             case e => BootstrapFailure(Seq(e.getMessage))
           }) to sender
 
@@ -243,6 +246,7 @@ object TopicBootstrapActor {
   sealed trait BootstrapResult
 
   case class BootstrapFailure(reasons: Seq[String]) extends BootstrapResult
+  case class BootstrapSuccess(metadata: TopicMetadata) extends BootstrapResult
   case object BootstrapSuccess extends BootstrapResult
   case object BootstrapFailure extends BootstrapResult
 

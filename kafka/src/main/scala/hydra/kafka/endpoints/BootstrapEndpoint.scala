@@ -70,7 +70,7 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
               onComplete(bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)) {
                 case Success(message) => message match {
 
-                  case metadata: TopicMetadata =>
+                  case BootstrapSuccess(metadata) =>
                     complete(StatusCodes.OK, toResource(metadata))
 
                   case BootstrapFailure(reasons) =>
