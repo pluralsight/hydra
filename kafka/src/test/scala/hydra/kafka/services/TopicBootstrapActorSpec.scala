@@ -355,7 +355,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     }
 
     senderProbe.expectMsgPF() {
-      case tm: TopicMetadata =>
+      case BootstrapSuccess(tm) =>
         tm.schemaId should be > 0
         tm.derived shouldBe false
         tm.subject shouldBe subject
@@ -494,7 +494,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     }
 
     senderProbe.expectMsgPF() {
-      case tm: TopicMetadata =>
+      case BootstrapSuccess(tm) =>
         tm.schemaId should be > 0
         tm.derived shouldBe false
         tm.subject shouldBe subject
@@ -503,7 +503,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
 
     senderProbe.expectMsgPF() {
-      case tm: TopicMetadata =>
+      case BootstrapSuccess(tm) =>
         tm.schemaId should be > 0
         tm.derived shouldBe false
         tm.subject shouldBe subject
