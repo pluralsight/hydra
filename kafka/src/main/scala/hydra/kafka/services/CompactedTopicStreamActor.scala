@@ -36,14 +36,6 @@ class CompactedTopicStreamActor(fromTopic: String, toTopic: String, bootstrapSer
     context.become(streaming(stream.run()))
   }
 
-  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    message match {
-      case Some(msg) => log.error(s"compacted topic actor $toTopic failed for $msg, attempting to restart...")
-      case None => log.error(s"compacted topic actor failed for unknown reason, attempting restart...")
-    }
-    super.preRestart(reason, message)
-  }
-
   def streaming(stream: Consumer.DrainingControl[Done]): Receive = {
     Actor.emptyBehavior
 
