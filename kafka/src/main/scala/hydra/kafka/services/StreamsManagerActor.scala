@@ -58,7 +58,11 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
 
     case t: TopicMetadata =>
       metadataMap.put(t.id.toString, t)
-      maybeCreateCompactedStream(t)
+      if(!metadataMap.contains(t.subject)) {
+       buildCompactedProps(t).map { compactedProps =>
+         context.actorOf(compactedProps, name = compactedPrefix + t.subject)
+       }
+      }
 
     case StopStream =>
       pipe(stream._1.shutdown().map(_ => StreamStopped)) to sender
@@ -69,16 +73,15 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
   }
 
 
-  private[kafka] def maybeCreateCompactedStream(metadata: TopicMetadata): Unit = {
+  private[kafka] def buildCompactedProps(metadata: TopicMetadata): Option[Props] = {
     if(StreamTypeFormat.read(metadata.streamType.toJson) == History) {
       val schema = schemaRegistryClient.getById(metadata.schemaId).toString()
       if (schema.contains("hydra.key")) {
-        val compactedName = compactedPrefix+metadata.subject
         log.info(s"Attempting to create compacted stream for $metadata")
-        context.actorOf(CompactedTopicStreamActor.props(metadata.subject, compactedName, bootstrapServers, bootstrapKafkaConfig), name = compactedName)
+        Some(CompactedTopicStreamActor.props(metadata.subject, compactedPrefix+metadata.subject, bootstrapServers, bootstrapKafkaConfig))
       }
     }
-
+    None
   }
 
 }
