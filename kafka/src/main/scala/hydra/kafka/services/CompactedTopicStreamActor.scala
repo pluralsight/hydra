@@ -46,6 +46,7 @@ class CompactedTopicStreamActor(fromTopic: String, toTopic: String, bootstrapSer
 
   def streaming(stream: Consumer.DrainingControl[Done]): Receive = {
     Actor.emptyBehavior
+
   }
 
 }

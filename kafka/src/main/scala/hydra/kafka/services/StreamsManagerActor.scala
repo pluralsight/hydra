@@ -3,7 +3,7 @@ package hydra.kafka.services
 import java.util.UUID
 
 import akka.NotUsed
-import akka.actor.{Actor, ActorLogging, ActorRef, InvalidActorNameException, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.kafka.scaladsl.Consumer
 import akka.kafka.scaladsl.Consumer.Control
 import akka.kafka.{ConsumerSettings, Subscriptions}
@@ -24,7 +24,7 @@ import org.joda.time.format.ISODateTimeFormat
 import spray.json._
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Try}
+import scala.util.Try
 
 class StreamsManagerActor(bootstrapKafkaConfig: Config,
                           bootstrapServers: String,
@@ -68,13 +68,11 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
 
        }
 
-
     case StopStream =>
       pipe(stream._1.shutdown().map(_ => StreamStopped)) to sender
 
     case GetStreamActor(actorName: String) =>
-      val s = sender()
-      pipe(Future{GetStreamActorResponse(context.child(actorName))}) to s
+      pipe(Future{GetStreamActorResponse(context.child(actorName))}) to sender
   }
 
 
