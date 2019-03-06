@@ -3,7 +3,7 @@ package hydra.kafka.services
 import java.util.UUID
 
 import akka.NotUsed
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, InvalidActorNameException, Props}
 import akka.kafka.scaladsl.Consumer
 import akka.kafka.scaladsl.Consumer.Control
 import akka.kafka.{ConsumerSettings, Subscriptions}
@@ -24,6 +24,7 @@ import org.joda.time.format.ISODateTimeFormat
 import spray.json._
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Try}
 
 class StreamsManagerActor(bootstrapKafkaConfig: Config,
                           bootstrapServers: String,
@@ -58,11 +59,15 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
 
     case t: TopicMetadata =>
       metadataMap.put(t.id.toString, t)
-      if(!metadataMap.contains(t.subject)) {
-       buildCompactedProps(t).map { compactedProps =>
-         context.actorOf(compactedProps, name = compactedPrefix + t.subject)
+       buildCompactedProps(t).foreach { compactedProps =>
+         Try(
+           context.actorOf(compactedProps, name = compactedPrefix + t.subject)
+         ).recover {
+           case e: Throwable => log.info(s"attemped to create existing compacted topic stream actor $e")
+         }
+
        }
-      }
+
 
     case StopStream =>
       pipe(stream._1.shutdown().map(_ => StreamStopped)) to sender
@@ -78,7 +83,7 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
       val schema = schemaRegistryClient.getById(metadata.schemaId).toString()
       if (schema.contains("hydra.key")) {
         log.info(s"Attempting to create compacted stream for $metadata")
-        Some(CompactedTopicStreamActor.props(metadata.subject, compactedPrefix+metadata.subject, bootstrapServers, bootstrapKafkaConfig))
+        return Some(CompactedTopicStreamActor.props(metadata.subject, compactedPrefix+metadata.subject, bootstrapServers, bootstrapKafkaConfig))
       }
     }
     None
