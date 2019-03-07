@@ -77,15 +77,17 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
 
 
   private[kafka] def buildCompactedProps(metadata: TopicMetadata): Option[Props] = {
-    if(StreamTypeFormat.read(metadata.streamType.toJson) == History) {
+
+    booleanToOption[Props](StreamTypeFormat.read(metadata.streamType.toJson) == History) { ()=>
       val schema = schemaRegistryClient.getById(metadata.schemaId).toString()
-      if (schema.contains("hydra.key")) {
+      booleanToOption[Props](schema.contains("hydra.key")) { ()=>
         log.info(s"Attempting to create compacted stream for $metadata")
-        return Some(CompactedTopicStreamActor.props(metadata.subject, compactedPrefix+metadata.subject, bootstrapServers, bootstrapKafkaConfig))
+         Some(CompactedTopicStreamActor.props(metadata.subject, compactedPrefix+metadata.subject, bootstrapServers, bootstrapKafkaConfig))
       }
     }
-    None
   }
+
+  private def booleanToOption[A](check:Boolean)(body:()=>Option[A]):Option[A] = if (check) body.apply else None
 
 }
 
