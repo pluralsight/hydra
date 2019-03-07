@@ -24,7 +24,6 @@ import org.joda.time.format.ISODateTimeFormat
 import spray.json._
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
 
 class StreamsManagerActor(bootstrapKafkaConfig: Config,
                           bootstrapServers: String,
