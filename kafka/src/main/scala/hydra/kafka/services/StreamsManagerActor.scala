@@ -60,12 +60,10 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
     case t: TopicMetadata =>
       metadataMap.put(t.id.toString, t)
        buildCompactedProps(t).foreach { compactedProps =>
-         Try(
-           context.actorOf(compactedProps, name = compactedPrefix + t.subject)
-         ).recover {
-           case e: Throwable => log.info(s"attemped to create existing compacted topic stream actor $e")
+         val childName = compactedPrefix + t.subject
+         if(context.child(childName).isEmpty) {
+           context.actorOf(compactedProps, name = childName)
          }
-
        }
 
     case StopStream =>
