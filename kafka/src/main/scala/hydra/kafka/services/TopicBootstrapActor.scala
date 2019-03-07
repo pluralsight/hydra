@@ -10,16 +10,15 @@ import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import com.typesafe.config.Config
 import configs.syntax._
-import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.core.akka.SchemaRegistryActor.{RegisterSchemaRequest, RegisterSchemaResponse}
 import hydra.core.ingest.{HydraRequest, RequestParams}
-import hydra.core.marshallers.{HydraJsonSupport, TopicMetadataRequest}
+import hydra.core.marshallers.{History, HydraJsonSupport, TopicMetadataRequest}
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.{AvroRecord, AvroRecordFactory}
-import hydra.kafka.services.MetadataConsumerActor.{GetMetadata, GetMetadataResponse, StopStream}
+import hydra.kafka.services.StreamsManagerActor.{GetMetadata, GetMetadataResponse, StopStream}
 import hydra.kafka.util.KafkaUtils
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 
@@ -31,8 +30,9 @@ import scala.util._
 
 class TopicBootstrapActor(schemaRegistryActor: ActorRef,
                           kafkaIngestor: ActorSelection,
-                          bootstrapConfig: Option[Config] = None,
-                          consumerProps: Props) extends Actor
+                          streamsManagerProps: Props,
+                          bootstrapConfig: Option[Config] = None
+                          ) extends Actor
   with ActorLogging
   with ConfigSupport
   with HydraJsonSupport
@@ -55,18 +55,6 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
   val bootstrapKafkaConfig: Config = bootstrapConfig getOrElse
     applicationConfig.getConfig("bootstrap-config")
 
-  private val metadataTopicName = getMetadataTopicName(bootstrapKafkaConfig)
-
-  private val metadataStreamActor = context.actorOf(consumerProps)
-
-  override def preStart(): Unit = {
-    pipe(registerSchema(schema)) to self
-  }
-
-  override def postStop(): Unit = {
-    metadataStreamActor ! StopStream
-  }
-
   val topicDetailsConfig: util.Map[String, String] = Map[String, String]().empty.asJava
 
   val topicDetails = new TopicDetails(
@@ -77,6 +65,26 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
   private val failureRetryInterval = bootstrapKafkaConfig
     .get[Int]("failure-retry-millis")
     .value
+
+
+  private val compactedDetailsConfig: util.Map[String, String] = Map[String, String]("cleanup.policy" -> "compact").asJava
+  private final val compactedDetails = new TopicDetails(
+    bootstrapKafkaConfig.getInt("partitions"),
+    bootstrapKafkaConfig.getInt("replication-factor").toShort,
+    compactedDetailsConfig)
+
+
+  private val streamsManagerActor = context.actorOf(streamsManagerProps)
+
+
+
+  override def preStart(): Unit = {
+    pipe(registerSchema(schema)) to self
+  }
+
+  override def postStop(): Unit = {
+    streamsManagerActor ! StopStream
+  }
 
   override def receive: Receive = initializing
 
@@ -101,20 +109,22 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
           val result = for {
             schema <- registerSchema(topicMetadataRequest.schema.compactPrint)
             topicMetadata <- ingestMetadata(topicMetadataRequest, schema.schemaResource.id)
-            bootstrapResult <- createKafkaTopic(topicMetadata)
-          } yield bootstrapResult
+            _ <- createKafkaTopics(topicMetadataRequest)
+          } yield topicMetadata
 
-          pipe(
-            result.recover {
-              case t: Throwable => BootstrapFailure(Seq(t.getMessage))
-            }) to sender
+          pipe(result.map{
+            metadata => BootstrapSuccess(metadata)
+          }.
+            recover{
+            case e => BootstrapFailure(Seq(e.getMessage))
+          }) to sender
 
         case Failure(ex: TopicNameValidatorException) =>
           Future(BootstrapFailure(ex.reasons)) pipeTo sender
       }
 
     case GetStreams(subject) =>
-      val streams: Future[GetStreamsResponse] = (metadataStreamActor ? GetMetadata).mapTo[GetMetadataResponse]
+      val streams: Future[GetStreamsResponse] = (streamsManagerActor ? GetMetadata).mapTo[GetMetadataResponse]
         .map { x =>
           val resp = subject.map(s => x.metadata.values.filter(p => p.subject == s)) getOrElse x.metadata.values
           GetStreamsResponse(resp.toSeq)
@@ -122,6 +132,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
 
       pipe(streams) to sender
   }
+
 
   def failed(ex: Throwable): Receive = {
     case Retry =>
@@ -134,6 +145,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
       Future.failed(new Exception(failureMessage)) pipeTo sender
   }
 
+
   private[kafka] def registerSchema(schemaJson: String): Future[RegisterSchemaResponse] = {
     (schemaRegistryActor ? RegisterSchemaRequest(schemaJson)).mapTo[RegisterSchemaResponse]
   }
@@ -144,7 +156,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     val topicMetadata = TopicMetadata(
       topicMetadataRequest.subject,
       schemaId,
-      topicMetadataRequest.streamType,
+      topicMetadataRequest.streamType.toString,
       topicMetadataRequest.derived,
       topicMetadataRequest.dataClassification,
       topicMetadataRequest.contact,
@@ -173,6 +185,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
   private[kafka] def buildAvroRecord(metadata: TopicMetadata): Future[AvroRecord] = {
 
     val jsonString = metadata.toJson.compactPrint
+    val metadataTopicName = bootstrapKafkaConfig.get[String]("metadata-topic-name").valueOrElse("_hydra.metadata.topic")
     new AvroRecordFactory(schemaRegistryActor).build(
       HydraRequest(
         "0",
@@ -185,47 +198,44 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     )
   }
 
-  private[kafka] def createKafkaTopic(metadata: TopicMetadata): Future[BootstrapResult] = {
-    val timeoutMillis = bootstrapKafkaConfig.getInt("timeout")
-
-    val topic = metadata.subject
-
-    val topicExists = kafkaUtils.topicExists(topic) match {
-      case Success(value) => value
-      case Failure(exception) =>
-        log.error(s"Unable to determine if topic exists: ${exception.getMessage}")
-        return Future.failed(exception)
-    }
-
-    // Don't fail when topic already exists
-    if (topicExists) {
-      log.info(s"Topic $topic already exists, proceeding anyway...")
-      Future.successful(BootstrapSuccess(metadata))
-    }
-    else {
-      kafkaUtils.createTopic(metadata.subject, topicDetails, timeout = timeoutMillis)
-        .map { r =>
-          r.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
-        }
-        .map { _ =>
-          BootstrapSuccess(metadata)
-        }
-        .recover {
-          case e: Exception => BootstrapFailure(e.getMessage :: Nil)
-        }
-    }
+  private[kafka] def shouldCreateCompactedTopic(topicMetadataRequest: TopicMetadataRequest): Boolean = {
+    topicMetadataRequest.streamType == History && topicMetadataRequest.schema.fields.contains("hydra.key")
   }
+
+  private[kafka] def createKafkaTopics(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
+    val timeoutMillis = bootstrapKafkaConfig.getInt("timeout")
+    val topicName = topicMetadataRequest.subject
+
+    var topicMap: Map[String, TopicDetails] = Map(topicName -> topicDetails)
+
+    if(shouldCreateCompactedTopic(topicMetadataRequest)) {
+      val compactedPrefix = bootstrapKafkaConfig.get[String]("compacted-topic-prefix").valueOrElse("_compacted.")
+      log.info(s"adding $compactedPrefix to creation...")
+      topicMap += (compactedPrefix+topicName -> compactedDetails)
+    }
+
+    kafkaUtils.createTopics(topicMap, timeout = timeoutMillis)
+      .map { r =>
+        r.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
+      }.map { _ => BootstrapSuccess }
+      .recover {
+        case illegalArg: IllegalArgumentException => {
+          log.info(s"Topic $topicName already exists, proceeding anyway...")
+          BootstrapSuccess
+        }
+        case e: Exception => throw e
+      }
+
+    }
+
 }
 
 object TopicBootstrapActor {
 
-  def getMetadataTopicName(c: Config) = c.get[String]("metadata-topic-name")
-    .valueOrElse("_hydra.metadata.topic")
 
-  def props(schemaRegistryActor: ActorRef, kafkaIngestor: ActorSelection,
-            consumerProps: Props,
+  def props(schemaRegistryActor: ActorRef, kafkaIngestor: ActorSelection, streamsManagerProps: Props,
             config: Option[Config] = None): Props =
-    Props(classOf[TopicBootstrapActor], schemaRegistryActor, kafkaIngestor, config, consumerProps)
+    Props(classOf[TopicBootstrapActor], schemaRegistryActor, kafkaIngestor, streamsManagerProps, config)
 
   sealed trait TopicBootstrapMessage
 
@@ -235,11 +245,10 @@ object TopicBootstrapActor {
 
   sealed trait BootstrapResult
 
-  case class BootstrapSuccess(metadata: TopicMetadata) extends BootstrapResult
-
   case class BootstrapFailure(reasons: Seq[String]) extends BootstrapResult
-
-  case class BootstrapStep[A](stepResult: A) extends BootstrapResult
+  case class BootstrapSuccess(metadata: TopicMetadata) extends BootstrapResult
+  case object BootstrapSuccess extends BootstrapResult
+  case object BootstrapFailure extends BootstrapResult
 
   /**
     * Filter by subject is the only supported.

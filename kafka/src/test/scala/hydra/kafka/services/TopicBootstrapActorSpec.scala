@@ -15,10 +15,11 @@ import hydra.core.transport.AckStrategy
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.AvroRecord
-import hydra.kafka.services.MetadataConsumerActor.{GetMetadata, GetMetadataResponse}
+import hydra.kafka.services.StreamsManagerActor.{GetMetadata, GetMetadataResponse}
 import hydra.kafka.services.TopicBootstrapActor._
-import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
+import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig, KafkaUnavailableException}
 import org.apache.avro.Schema
+import org.apache.kafka.common.serialization.StringSerializer
 import org.joda.time.DateTime
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
@@ -43,7 +44,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   implicit val embeddedKafkaConfig = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
     customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
 
-  override def beforeAll: Unit = {
+  override def beforeAll(): Unit = {
     EmbeddedKafka.start()
   }
 
@@ -58,6 +59,10 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   val testSchemaResource = SchemaResource(1, 1, new Schema.Parser().parse(topicMetadataJson))
 
+  val compactedTopicManagerActor = system.actorOf(Props(new Actor {
+    override def receive: Receive = {Actor.emptyBehavior}
+  }))
+  
   def fixture(key: String, kafkaShouldFail: Boolean = false,
               schemaRegistryShouldFail: Boolean = false) = {
     val probe = TestProbe()
@@ -96,6 +101,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       }
     ), s"kafka_ingestor_$key")
 
+
+
     (probe, schemaRegistryActor, kafkaIngestor)
   }
 
@@ -133,7 +140,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("/user/kafka_ingestor_test1"), Props[MockConsumer]))
+      system.actorSelection("/user/kafka_ingestor_test1"), Props(new MockStreamsManagerActor())
+      ))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -184,7 +192,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       schemaRegistryShouldFail = true)
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("kafka_ingestor_test2"), Props[MockConsumer]))
+      system.actorSelection("/user/kafka_ingestor_test2"), Props(new MockStreamsManagerActor())
+    ))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -230,7 +239,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test3")
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("kafka_ingestor_test3"), Props[MockConsumer]))
+      system.actorSelection("/user/kafka_ingestor_test3"), Props(new MockStreamsManagerActor())
+    ))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -275,7 +285,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test4", kafkaShouldFail = true)
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("/user/kafka_ingestor_test4"), Props[MockConsumer]))
+      system.actorSelection("/user/kafka_ingestor_test4"), Props(new MockStreamsManagerActor())
+    ))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -322,7 +333,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test5")
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("/user/kafka_ingestor_test5"), Props[MockConsumer]))
+      system.actorSelection("/user/kafka_ingestor_test5"), Props(new MockStreamsManagerActor())
+    ))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -399,7 +411,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test6")
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("/user/kafka_ingestor_test6"), Props[MockConsumer], Some(testConfig)))
+      system.actorSelection("/user/kafka_ingestor_test6"), Props(new MockStreamsManagerActor()), Some(testConfig)
+    ))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -459,7 +472,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test7")
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("/user/kafka_ingestor_test7"), Props[MockConsumer]))
+      system.actorSelection("/user/kafka_ingestor_test7"), Props(new MockStreamsManagerActor())
+    ))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -501,7 +515,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       schemaRegistryShouldFail = false)
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("kafka_ingestor_test-get-stream"), Props[MockConsumer]))
+      system.actorSelection("kafka_ingestor_test-get-stream"), Props(new MockStreamsManagerActor())
+    ))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -519,7 +534,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       schemaRegistryShouldFail = false)
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("kafka_ingestor_test-get-stream-subject"), Props[MockConsumer]))
+      system.actorSelection("kafka_ingestor_test-get-stream-subject"), Props(new MockStreamsManagerActor())
+    ))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
@@ -568,8 +584,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       schemaRegistryShouldFail = true)
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("kafka_ingestor_test8"), Props[MockConsumer]))
-
+      system.actorSelection("/user/kafka_ingestor_test8"), Props(new MockStreamsManagerActor())
+    ))
     probe.expectMsgType[RegisterSchemaRequest]
 
     val senderProbe = TestProbe()
@@ -592,10 +608,114 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
         "TopicBootstrapActor is in a failed state due to cause: Schema registry actor failed expectedly!"
     }
   }
+
+  it should "create a compacted topic if a hydra key exists and the stream type is historic" in {
+
+      val subject = "exp.dataplatform.testsbject5"
+
+      val mdRequest = s"""{
+                         |	"subject": "$subject",
+                         |	"streamType": "History",
+                         |  "derived": false,
+                         |	"dataClassification": "Public",
+                         |	"dataSourceOwner": "BARTON",
+                         |	"contact": "slackity slack dont talk back",
+                         |	"psDataLake": false,
+                         |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+                         |	"notes": "here are some notes topkek",
+                         |	"schema": {
+                         |	  "namespace": "exp.assessment",
+                         |	  "name": "SkillAssessmentTopicsScored",
+                         |    "hydra.key": "testField",
+                         |	  "type": "record",
+                         |	  "version": 1,
+                         |	  "fields": [
+                         |	    {
+                         |	      "name": "testField",
+                         |	      "type": "string"
+                         |	    }
+                         |	  ]
+                         |	}
+                         |}"""
+        .stripMargin
+        .parseJson
+        .convertTo[TopicMetadataRequest]
+
+      val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test12")
+
+      val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
+        system.actorSelection("/user/kafka_ingestor_test12"), Props(new MockStreamsManagerActor())
+      ))
+
+      probe.expectMsgType[RegisterSchemaRequest]
+
+      val senderProbe = TestProbe()
+
+      bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
+
+      val expectedMessage = "message"
+      val consumeSubject = "_compacted.exp.dataplatform.testsbject5"
+
+      //need to publish a KEY and VALUE here, otherwise kafka throws an exception for the compacted topic
+      publishToKafka(consumeSubject, expectedMessage, expectedMessage)(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
+      consumeFirstStringMessageFrom(consumeSubject) shouldEqual expectedMessage
+  }
+
+  it should "not create a compacted topic if hydra.key is not present" in {
+
+    val subject = "exp.dataplatform.testsbject6"
+
+    val mdRequest = s"""{
+                       |	"subject": "$subject",
+                       |	"streamType": "History",
+                       |  "derived": false,
+                       |	"dataClassification": "Public",
+                       |	"dataSourceOwner": "BARTON",
+                       |	"contact": "slackity slack dont talk back",
+                       |	"psDataLake": false,
+                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+                       |	"notes": "here are some notes topkek",
+                       |	"schema": {
+                       |	  "namespace": "exp.assessment",
+                       |	  "name": "SkillAssessmentTopicsScored",
+                       |	  "type": "record",
+                       |	  "version": 1,
+                       |	  "fields": [
+                       |	    {
+                       |	      "name": "testField",
+                       |	      "type": "string"
+                       |	    }
+                       |	  ]
+                       |	}
+                       |}"""
+      .stripMargin
+      .parseJson
+      .convertTo[TopicMetadataRequest]
+
+    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test13")
+
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
+      system.actorSelection("/user/kafka_ingestor_test13"), Props(new MockStreamsManagerActor())
+    ))
+
+    probe.expectMsgType[RegisterSchemaRequest]
+
+    val senderProbe = TestProbe()
+
+    bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
+
+    val expectedMessage = "message"
+    val consumeSubject = "_compacted.exp.dataplatform.testsbject6"
+
+    //need to publish a KEY and VALUE here, otherwise kafka throws an exception for the compacted topic
+    assertThrows[KafkaUnavailableException]{
+      publishToKafka(consumeSubject, expectedMessage, expectedMessage)(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
+    }
+  }
 }
 
 
-class MockConsumer extends Actor {
+class MockStreamsManagerActor extends Actor {
   val tm = TopicMetadata("test-md-subject", 1, "entity", false, "private", "alex",
     None, None, UUID.randomUUID(), DateTime.now())
 

@@ -128,6 +128,24 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
     }
   }
 
+  implicit object StreamTypeFormat extends RootJsonFormat[StreamType] {
+     def read(json: JsValue): StreamType = json match {
+      case JsString("Notification") => Notification
+      case JsString("History") => History
+      case JsString("CurrentState") => CurrentState
+      case _ => {
+        import scala.reflect.runtime.{universe => ru}
+        val tpe = ru.typeOf[StreamType]
+        val clazz = tpe.typeSymbol.asClass
+        throw new DeserializationException(s"expected a streamType of ${clazz.knownDirectSubclasses}, but got $json")
+      }
+    }
+
+     def write(obj: StreamType): JsValue = {
+      JsString(obj.toString)
+    }
+  }
+
   implicit val genericErrorFormat = jsonFormat2(GenericError)
 
   implicit val topicCreationMetadataFormat = jsonFormat8(TopicMetadataRequest)
@@ -138,11 +156,16 @@ case class GenericError(status: Int, errorMessage: String)
 
 case class TopicMetadataRequest(subject: String,
                                 schema: JsObject,
-                                streamType: String,
+                                streamType: StreamType,
                                 derived: Boolean,
                                 dataClassification: String,
                                 contact: String,
                                 additionalDocumentation: Option[String],
                                 notes: Option[String])
+
+sealed trait StreamType
+case object Notification extends StreamType
+case object CurrentState extends StreamType
+case object History extends StreamType
 
 
