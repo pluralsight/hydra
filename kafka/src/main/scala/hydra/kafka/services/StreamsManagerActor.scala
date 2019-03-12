@@ -57,7 +57,7 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
       sender ! GetMetadataResponse(metadataMap.toMap)
 
     case t: TopicMetadata =>
-      metadataMap.put(t.id.toString, t)
+      metadataMap.put(t.schemaId.toString, t)
        buildCompactedProps(t).foreach { compactedProps =>
          val childName = compactedPrefix + t.subject
          if(context.child(childName).isEmpty) {
