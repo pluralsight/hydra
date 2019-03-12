@@ -48,17 +48,23 @@ class CompactedTopicStreamActor(fromTopic: String, toTopic: String, bootstrapSer
 
   override def preStart(): Unit = {
     log.debug(s"Starting compacted topic actor for $toTopic")
-    kafkaUtils.topicExists(self.path.name).map { _ =>
-      context.become(streaming(stream.run()))
-    }.recover { case _ =>
-      val timeoutMillis = kafkaConfig.getInt("timeout")
-      kafkaUtils.createTopic(self.path.name, compactedDetails, timeoutMillis).map {
-        result => result.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
-      }.map { _ =>
+    kafkaUtils.topicExists(self.path.name).collect {
+      case true => {
         context.become(streaming(stream.run()))
-      }.recover {
-        case e => throw CompactedTopicCreationException("Couldn't create compacted topic, but was needed for compacted stream...", e)
       }
+      case false => {
+        val timeoutMillis = kafkaConfig.getInt("timeout")
+        println(self.path.name)
+        kafkaUtils.createTopic(self.path.name, compactedDetails, timeoutMillis).map {
+          result => result.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
+        }.map { _ =>
+          context.become(streaming(stream.run()))
+        }.recover {
+          case e => throw CompactedTopicCreationException("Couldn't create compacted topic, but was needed for compacted stream...", e)
+        }
+      }
+    }.recover {
+      case e => throw e
     }
 
   }

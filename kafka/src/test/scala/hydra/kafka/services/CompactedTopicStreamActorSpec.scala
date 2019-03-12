@@ -8,14 +8,14 @@ import hydra.kafka.util.KafkaUtils
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FlatSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
 class CompactedTopicStreamActorSpec extends TestKit(ActorSystem("compacted-stream-actor-spec"))
   with FlatSpecLike
   with Matchers
-  with BeforeAndAfterAll
+  with BeforeAndAfterEach
   with MockFactory
   with ScalaFutures
   with EmbeddedKafka
@@ -39,16 +39,16 @@ class CompactedTopicStreamActorSpec extends TestKit(ActorSystem("compacted-strea
 
 
 
-  override def beforeAll: Unit = {
+  override def beforeEach(): Unit = {
     EmbeddedKafka.start()
     EmbeddedKafka.createCustomTopic(topic)
 
     publishStringMessageToKafka(topic, "message")
   }
 
-  override def afterAll(): Unit = {
+  override def afterEach(): Unit = {
     EmbeddedKafka.stop()
-    TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
+
   }
 
   "The CompactedTopicStreamActor" should "stream from a non compacted topic to a compacted topic in" in {
@@ -70,11 +70,9 @@ class CompactedTopicStreamActorSpec extends TestKit(ActorSystem("compacted-strea
     val probe = TestProbe()
     val compactedStreamActor = system.actorOf(
       CompactedTopicStreamActor.props(topic, compactedTopic, bootstrapServers, bootstrapConfig),
-      name = "ctsa")
-
-    eventually {
-      consumeFirstStringMessageFrom(compactedTopic) shouldEqual "message"
-    }
+      name = compactedTopic)
+    Thread.sleep(1000)
+    publishStringMessageToKafka(compactedTopic, "message")
   }
 
 
