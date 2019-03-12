@@ -125,8 +125,8 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
 
     case GetStreams(subject) =>
       val streams: Future[GetStreamsResponse] = (streamsManagerActor ? GetMetadata).mapTo[GetMetadataResponse]
-        .map { x =>
-          val resp = subject.map(s => x.metadata.values.filter(p => p.subject == s)) getOrElse x.metadata.values
+        .map { metadataResponse =>
+          val resp = subject.map(s => metadataResponse.metadata.values.filter(p => p.subject == s)) getOrElse metadataResponse.metadata.values
           GetStreamsResponse(resp.toSeq)
         }
 

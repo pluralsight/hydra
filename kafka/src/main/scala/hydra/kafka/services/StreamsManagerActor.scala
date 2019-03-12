@@ -116,17 +116,16 @@ object StreamsManagerActor {
 
     val formatter = ISODateTimeFormat.basicDateTimeNoMillis()
 
-    val maybeAddress = Try {
-      val localhost: InetAddress = InetAddress.getLocalHost
-      val localIpAddress: String = localhost.getHostAddress
-      localIpAddress
-    }.getOrElse(UUID.randomUUID())
+    val maybeHost = Try {
+      InetAddress.getLocalHost.getHostName.split("\\.")(0)
+    }.getOrElse(UUID.randomUUID().toString)
 
     val settings = ConsumerSettings(config, new StringDeserializer,
       new KafkaAvroDeserializer(schemaRegistryClient))
       .withBootstrapServers(bootstrapSevers)
-      .withGroupId(s"metadata-consumer-actor-$maybeAddress")
+      .withGroupId(s"metadata-consumer-actor-$maybeHost")
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
+      .withProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false")
 
 
     Consumer.plainSource(settings, Subscriptions.topics(metadataTopicName))
