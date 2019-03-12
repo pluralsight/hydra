@@ -1,5 +1,6 @@
 package hydra.kafka.services
 
+import java.net.InetAddress
 import java.util.UUID
 
 import akka.NotUsed
@@ -24,6 +25,7 @@ import org.joda.time.format.ISODateTimeFormat
 import spray.json._
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 class StreamsManagerActor(bootstrapKafkaConfig: Config,
                           bootstrapServers: String,
@@ -114,10 +116,16 @@ object StreamsManagerActor {
 
     val formatter = ISODateTimeFormat.basicDateTimeNoMillis()
 
+    val maybeAddress = Try {
+      val localhost: InetAddress = InetAddress.getLocalHost
+      val localIpAddress: String = localhost.getHostAddress
+      localIpAddress
+    }.getOrElse(UUID.randomUUID())
+
     val settings = ConsumerSettings(config, new StringDeserializer,
       new KafkaAvroDeserializer(schemaRegistryClient))
       .withBootstrapServers(bootstrapSevers)
-      .withGroupId("metadata-consumer-actor")
+      .withGroupId(s"metadata-consumer-actor-$maybeAddress")
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
 
 
