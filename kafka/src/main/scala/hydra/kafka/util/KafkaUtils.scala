@@ -1,8 +1,5 @@
 package hydra.kafka.util
 
-import java.io.{DataInputStream, DataOutputStream}
-import java.net.Socket
-
 import akka.kafka.{ConsumerSettings, ProducerSettings}
 import com.typesafe.config.{Config, ConfigFactory}
 import configs.syntax._
@@ -11,7 +8,7 @@ import hydra.common.logging.LoggingAdapter
 import hydra.common.util.TryWith
 import hydra.kafka.config.KafkaConfigSupport
 import org.apache.kafka.clients.admin.{AdminClient, CreateTopicsResult, NewTopic}
-import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer}
+import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 
 import scala.collection.JavaConverters._

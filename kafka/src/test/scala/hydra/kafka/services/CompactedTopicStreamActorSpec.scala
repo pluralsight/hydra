@@ -42,7 +42,7 @@ class CompactedTopicStreamActorSpec extends TestKit(ActorSystem("compacted-strea
   override def beforeAll: Unit = {
     EmbeddedKafka.start()
     EmbeddedKafka.createCustomTopic(topic)
-    EmbeddedKafka.createCustomTopic(compactedTopic)
+
     publishStringMessageToKafka(topic, "message")
   }
 
@@ -52,6 +52,9 @@ class CompactedTopicStreamActorSpec extends TestKit(ActorSystem("compacted-strea
   }
 
   "The CompactedTopicStreamActor" should "stream from a non compacted topic to a compacted topic in" in {
+
+    EmbeddedKafka.createCustomTopic(compactedTopic)
+
     val probe = TestProbe()
     val compactedStreamActor = system.actorOf(
       CompactedTopicStreamActor.props(topic, compactedTopic, bootstrapServers, bootstrapConfig),
@@ -60,6 +63,18 @@ class CompactedTopicStreamActorSpec extends TestKit(ActorSystem("compacted-strea
     consumeFirstStringMessageFrom(compactedTopic) shouldEqual "message"
 
 
+  }
+
+  "The CompactedTopicStreamActor" should "create a compacted topic and stream if it doesn't exist already" in {
+
+    val probe = TestProbe()
+    val compactedStreamActor = system.actorOf(
+      CompactedTopicStreamActor.props(topic, compactedTopic, bootstrapServers, bootstrapConfig),
+      name = "ctsa")
+
+    eventually {
+      consumeFirstStringMessageFrom(compactedTopic) shouldEqual "message"
+    }
   }
 
 

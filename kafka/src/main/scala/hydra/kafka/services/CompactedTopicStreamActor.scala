@@ -14,7 +14,7 @@ import akka.stream.{ActorMaterializer, Attributes, Materializer}
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.core.HydraException
-import hydra.kafka.services.CompactedTopicStreamActor.{CompactedTopicCreationException, CreateTopic}
+import hydra.kafka.services.CompactedTopicStreamActor.CompactedTopicCreationException
 import hydra.kafka.util.KafkaUtils
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerRecord
@@ -51,17 +51,6 @@ class CompactedTopicStreamActor(fromTopic: String, toTopic: String, bootstrapSer
     kafkaUtils.topicExists(self.path.name).map { _ =>
       context.become(streaming(stream.run()))
     }.recover { case _ =>
-      context.become(creatingTopic(self.path.name, compactedDetails))
-    }
-  }
-
-  def streaming(stream: Consumer.DrainingControl[Done]): Receive = {
-    Actor.emptyBehavior
-  }
-
-  def creatingTopic(topicName: String, topicDetails: TopicDetails): Receive = {
-    case CreateTopic =>
-
       val timeoutMillis = kafkaConfig.getInt("timeout")
       kafkaUtils.createTopic(self.path.name, compactedDetails, timeoutMillis).map {
         result => result.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
@@ -70,7 +59,14 @@ class CompactedTopicStreamActor(fromTopic: String, toTopic: String, bootstrapSer
       }.recover {
         case e => throw CompactedTopicCreationException("Couldn't create compacted topic, but was needed for compacted stream...", e)
       }
+    }
+
   }
+
+  def streaming(stream: Consumer.DrainingControl[Done]): Receive = {
+    Actor.emptyBehavior
+  }
+
 
 }
 
@@ -79,8 +75,6 @@ object CompactedTopicStreamActor {
   private type Stream = RunnableGraph[DrainingControl[Done]]
 
   case class CreateCompactedStream(topicName: String)
-  sealed trait CompactedTopicStreamActorMessage
-  case object CreateTopic extends CompactedTopicStreamActorMessage
 
   case class CompactedTopicCreationException(message: String, e: Throwable) extends HydraException(message, e)
 
