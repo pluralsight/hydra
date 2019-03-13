@@ -6,9 +6,10 @@ import com.typesafe.config.ConfigFactory
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.util.KafkaUtils
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
+import org.apache.kafka.common.serialization.StringSerializer
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FlatSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterEach, FlatSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
@@ -71,8 +72,7 @@ class CompactedTopicStreamActorSpec extends TestKit(ActorSystem("compacted-strea
     val compactedStreamActor = system.actorOf(
       CompactedTopicStreamActor.props(topic, compactedTopic, bootstrapServers, bootstrapConfig),
       name = compactedTopic)
-    Thread.sleep(1000)
-    publishStringMessageToKafka(compactedTopic, "message")
+    publishToKafka(compactedTopic, "message", "message")(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
   }
 
 
