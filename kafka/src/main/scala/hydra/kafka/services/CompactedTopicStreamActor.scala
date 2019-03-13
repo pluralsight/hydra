@@ -58,12 +58,10 @@ class CompactedTopicStreamActor(fromTopic: String, toTopic: String, bootstrapSer
           result => result.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
         }.map { _ =>
           context.become(streaming(stream.run()))
-        }.recover {
-          case e => throw CompactedTopicCreationException("Couldn't create compacted topic, but was needed for compacted stream...", e)
+        }.recover { case _ =>
+          log.debug(s"Couldn't create compacted topic for ${self.path.name}, but was needed for stream...")
         }
       }
-    }.recover {
-      case e => throw e
     }
 
   }
@@ -80,8 +78,6 @@ object CompactedTopicStreamActor {
   private type Stream = RunnableGraph[DrainingControl[Done]]
 
   case class CreateCompactedStream(topicName: String)
-
-  case class CompactedTopicCreationException(message: String, e: Throwable) extends HydraException(message, e)
 
   def props(fromTopic: String, toTopic: String, bootstrapServers: String, config: Config) = {
     Props(classOf[CompactedTopicStreamActor], fromTopic, toTopic, bootstrapServers, config)
