@@ -13,8 +13,6 @@ import akka.stream.scaladsl.{Keep, RunnableGraph}
 import akka.stream.{ActorMaterializer, Attributes, Materializer}
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
-import hydra.core.HydraException
-import hydra.kafka.services.CompactedTopicStreamActor.CompactedTopicCreationException
 import hydra.kafka.util.KafkaUtils
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerRecord
