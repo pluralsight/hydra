@@ -56,8 +56,6 @@ class CompactedTopicStreamActor(fromTopic: String, toTopic: String, bootstrapSer
           result => result.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
         }.map { _ =>
           context.become(streaming(stream.run()))
-        }.recover { case _ =>
-          log.debug(s"Couldn't create compacted topic for ${self.path.name}, but was needed for stream...")
         }
       }
     }
