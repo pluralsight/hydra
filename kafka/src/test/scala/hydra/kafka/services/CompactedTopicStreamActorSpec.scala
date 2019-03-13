@@ -1,7 +1,7 @@
 package hydra.kafka.services
 
 import akka.actor.ActorSystem
-import akka.testkit.{TestKit, TestProbe}
+import akka.testkit.TestKit
 import com.typesafe.config.ConfigFactory
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.util.KafkaUtils
@@ -35,7 +35,6 @@ class CompactedTopicStreamActorSpec extends TestKit(ActorSystem("compacted-strea
     interval = scaled(1000 millis))
 
   val topic = "test.topic"
-  val compactedTopic = "_compacted.test.topic"
   val bootstrapServers = KafkaUtils.BootstrapServers
 
 
@@ -54,12 +53,11 @@ class CompactedTopicStreamActorSpec extends TestKit(ActorSystem("compacted-strea
 
   "The CompactedTopicStreamActor" should "stream from a non compacted topic to a compacted topic in" in {
 
+    val compactedTopic = "_compacted.test.topic1"
     EmbeddedKafka.createCustomTopic(compactedTopic)
-
-    val probe = TestProbe()
     val compactedStreamActor = system.actorOf(
       CompactedTopicStreamActor.props(topic, compactedTopic, bootstrapServers, bootstrapConfig),
-      name = "compacted_topic_stream_actor")
+      name = compactedTopic)
 
     consumeFirstStringMessageFrom(compactedTopic) shouldEqual "message"
 
@@ -68,7 +66,7 @@ class CompactedTopicStreamActorSpec extends TestKit(ActorSystem("compacted-strea
 
   "The CompactedTopicStreamActor" should "create a compacted topic and stream if it doesn't exist already" in {
 
-    val probe = TestProbe()
+    val compactedTopic = "_compacted.test.topic2"
     val compactedStreamActor = system.actorOf(
       CompactedTopicStreamActor.props(topic, compactedTopic, bootstrapServers, bootstrapConfig),
       name = compactedTopic)

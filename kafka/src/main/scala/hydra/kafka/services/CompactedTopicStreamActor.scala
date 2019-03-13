@@ -54,7 +54,6 @@ class CompactedTopicStreamActor(fromTopic: String, toTopic: String, bootstrapSer
       }
       case false => {
         val timeoutMillis = kafkaConfig.getInt("timeout")
-        println(self.path.name)
         kafkaUtils.createTopic(self.path.name, compactedDetails, timeoutMillis).map {
           result => result.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
         }.map { _ =>
