@@ -50,22 +50,22 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
   override def receive: Receive = Actor.emptyBehavior
 
   override def preStart(): Unit = {
-    context.become(streaming(metadataStream.run()))
+    context.become(streaming(metadataStream.run(), Map.empty))
   }
 
 
-  def streaming(stream: (Control, NotUsed)): Receive = {
+  def streaming(stream: (Control, NotUsed), metadataMap: Map[String, TopicMetadata]): Receive = {
     case GetMetadata =>
-      sender ! GetMetadataResponse(metadataMap.toMap)
+      sender ! GetMetadataResponse(metadataMap)
 
     case t: TopicMetadata =>
-      metadataMap.put(t.subject, t)
        buildCompactedProps(t).foreach { compactedProps =>
          val childName = compactedPrefix + t.subject
          if(context.child(childName).isEmpty) {
            context.actorOf(compactedProps, name = childName)
          }
        }
+      context.become(streaming(stream, metadataMap + (t.subject -> t)))
 
     case StopStream =>
       pipe(stream._1.shutdown().map(_ => StreamStopped)) to sender

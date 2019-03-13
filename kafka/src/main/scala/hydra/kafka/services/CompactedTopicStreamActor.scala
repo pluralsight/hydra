@@ -1,5 +1,8 @@
 package hydra.kafka.services
 
+import java.util
+import java.util.concurrent.TimeUnit
+
 import akka.Done
 import akka.actor.{Actor, ActorLogging, Props}
 import akka.event.Logging
@@ -10,13 +13,16 @@ import akka.stream.scaladsl.{Keep, RunnableGraph}
 import akka.stream.{ActorMaterializer, Attributes, Materializer}
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
+import hydra.kafka.util.KafkaUtils
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerRecord
+import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySerializer, StringDeserializer, StringSerializer}
 
+import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 
-class CompactedTopicStreamActor(fromTopic: String, toTopic: String, bootstrapServers: String, config: Config) extends Actor
+class CompactedTopicStreamActor(fromTopic: String, toTopic: String, bootstrapServers: String, kafkaConfig: Config) extends Actor
   with ConfigSupport
   with ActorLogging {
 
@@ -25,7 +31,14 @@ class CompactedTopicStreamActor(fromTopic: String, toTopic: String, bootstrapSer
 
   private implicit val materializer: Materializer = ActorMaterializer()
 
-  private val stream = CompactedTopicStreamActor.createStream(config, bootstrapServers, fromTopic, toTopic)
+  private val stream = CompactedTopicStreamActor.createStream(kafkaConfig, bootstrapServers, fromTopic, toTopic)
+  private val kafkaUtils = KafkaUtils()
+
+  private val compactedDetailsConfig: util.Map[String, String] = Map[String, String]("cleanup.policy" -> "compact").asJava
+  private final val compactedDetails = new TopicDetails(
+    kafkaConfig.getInt("partitions"),
+    kafkaConfig.getInt("replication-factor").toShort,
+    compactedDetailsConfig)
 
   override def receive: Receive = {
     Actor.emptyBehavior
@@ -33,13 +46,26 @@ class CompactedTopicStreamActor(fromTopic: String, toTopic: String, bootstrapSer
 
   override def preStart(): Unit = {
     log.debug(s"Starting compacted topic actor for $toTopic")
-    context.become(streaming(stream.run()))
+    kafkaUtils.topicExists(self.path.name).collect {
+      case true => {
+        context.become(streaming(stream.run()))
+      }
+      case false => {
+        val timeoutMillis = kafkaConfig.getInt("timeout")
+        kafkaUtils.createTopic(self.path.name, compactedDetails, timeoutMillis).map {
+          result => result.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
+        }.map { _ =>
+          context.become(streaming(stream.run()))
+        }
+      }
+    }
+
   }
 
   def streaming(stream: Consumer.DrainingControl[Done]): Receive = {
     Actor.emptyBehavior
-
   }
+
 
 }
 

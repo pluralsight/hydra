@@ -1,21 +1,22 @@
 package hydra.kafka.services
 
 import akka.actor.ActorSystem
-import akka.testkit.{TestKit, TestProbe}
+import akka.testkit.TestKit
 import com.typesafe.config.ConfigFactory
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.util.KafkaUtils
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
+import org.apache.kafka.common.serialization.StringSerializer
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterEach, FlatSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
 class CompactedTopicStreamActorSpec extends TestKit(ActorSystem("compacted-stream-actor-spec"))
   with FlatSpecLike
   with Matchers
-  with BeforeAndAfterAll
+  with BeforeAndAfterEach
   with MockFactory
   with ScalaFutures
   with EmbeddedKafka
@@ -34,32 +35,42 @@ class CompactedTopicStreamActorSpec extends TestKit(ActorSystem("compacted-strea
     interval = scaled(1000 millis))
 
   val topic = "test.topic"
-  val compactedTopic = "_compacted.test.topic"
   val bootstrapServers = KafkaUtils.BootstrapServers
 
 
 
-  override def beforeAll: Unit = {
+  override def beforeEach(): Unit = {
     EmbeddedKafka.start()
     EmbeddedKafka.createCustomTopic(topic)
-    EmbeddedKafka.createCustomTopic(compactedTopic)
+
     publishStringMessageToKafka(topic, "message")
   }
 
-  override def afterAll(): Unit = {
+  override def afterEach(): Unit = {
     EmbeddedKafka.stop()
-    TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
+
   }
 
   "The CompactedTopicStreamActor" should "stream from a non compacted topic to a compacted topic in" in {
-    val probe = TestProbe()
+
+    val compactedTopic = "_compacted.test.topic1"
+    EmbeddedKafka.createCustomTopic(compactedTopic)
     val compactedStreamActor = system.actorOf(
       CompactedTopicStreamActor.props(topic, compactedTopic, bootstrapServers, bootstrapConfig),
-      name = "compacted_topic_stream_actor")
+      name = compactedTopic)
 
     consumeFirstStringMessageFrom(compactedTopic) shouldEqual "message"
 
 
+  }
+
+  "The CompactedTopicStreamActor" should "create a compacted topic and stream if it doesn't exist already" in {
+
+    val compactedTopic = "_compacted.test.topic2"
+    val compactedStreamActor = system.actorOf(
+      CompactedTopicStreamActor.props(topic, compactedTopic, bootstrapServers, bootstrapConfig),
+      name = compactedTopic)
+    publishToKafka(compactedTopic, "message", "message")(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
   }
 
 
