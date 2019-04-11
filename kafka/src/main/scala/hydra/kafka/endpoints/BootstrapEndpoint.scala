@@ -22,14 +22,14 @@ import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
+import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
-import com.typesafe.config.Config
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
-import hydra.core.http.HydraDirectives
+import hydra.core.http.{CorsSupport, HydraDirectives}
 import hydra.core.marshallers.TopicMetadataRequest
-import hydra.kafka.model.{TopicMetadata, TopicMetadataAdapter}
+import hydra.kafka.model.TopicMetadataAdapter
 import hydra.kafka.services.TopicBootstrapActor._
 import hydra.kafka.services.{StreamsManagerActor, TopicBootstrapActor}
 import hydra.kafka.util.KafkaUtils
@@ -40,7 +40,11 @@ import scala.util.{Failure, Success}
 
 
 class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: ExecutionContext)
-  extends RoutedEndpoints with LoggingAdapter with TopicMetadataAdapter with HydraDirectives {
+  extends RoutedEndpoints
+    with LoggingAdapter
+    with TopicMetadataAdapter
+    with HydraDirectives
+    with CorsSupport {
 
   private implicit val timeout = Timeout(10.seconds)
 
@@ -61,7 +65,7 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
     TopicBootstrapActor.props(schemaRegistryActor, kafkaIngestor, streamsManagerProps, Some(bootstrapKafkaConfig)))
 
 
-  override val route: Route =
+  override val route: Route = cors(settings) {
     pathPrefix("streams" | "topics") {
       pathEndOrSingleSlash {
         post {
@@ -93,6 +97,7 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
           path(Segment)(subject => getAllStreams(Some(subject)))
       }
     }
+  }
 
   private def getAllStreams(subject: Option[String]): Route = {
     onSuccess(bootstrapActor ? GetStreams(subject)) {
