@@ -13,7 +13,9 @@ import hydra.avro.registry.{ConfluentSchemaRegistry, SchemaRegistryException}
 import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
 import hydra.common.logging.LoggingAdapter
 import hydra.common.Settings
+import hydra.common.util.MonadUtils
 import hydra.core.protocol.HydraApplicationError
+import org.apache.avro.Schema.Type
 import org.apache.avro.{Schema, SchemaParseException}
 
 /**
@@ -112,6 +114,15 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
       if (!isValidSchemaName(schema.getName)) {
         throw new SchemaParseException("Schema name may only contain letters and numbers.")
       }
+
+      val hydraKey = schema.getField("hydra.key")
+      if(hydraKey != null) {
+        val results = Seq(validateKeyExists(hydraKey.toString, schema), validateKeyField(hydraKey.toString, schema))
+        results.foreach({
+          case Failure(e) => throw e
+        })
+      }
+
       val subject = getSubject(schema)
       log.debug(s"Registering schema ${schema.getFullName}: $json")
       val schemaId = registry.registryClient.register(subject, schema)
@@ -197,4 +208,18 @@ object SchemaRegistryActor {
     case hasSuffix() => subject.dropRight(schemaSuffix.length)
     case _ => subject
   }
+
+
+  def validateKeyExists(keyField: String, schema: Schema): Try[Boolean] = {
+    if(schema.getField(keyField) == null) Success(true) else Failure(new SchemaParseException("Schema contains a specified hydra.key that doesn't exist as a field."))
+  }
+
+  def validateKeyField(keyField: String, schema:Schema): Try[Boolean] = {
+    val keyField = schema.getField(keyField)
+    val keyTypes = keyField.schema().getTypes
+    if(keyTypes.size > 1 && keyTypes.toString.contains("\"null\"")) Failure(new SchemaParseException("hydra.key specified on a field that is nullable.")) else Success(true)
+  }
+
+
+
 }

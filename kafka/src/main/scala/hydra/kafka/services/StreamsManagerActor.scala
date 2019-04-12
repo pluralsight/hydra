@@ -14,6 +14,7 @@ import akka.stream.{ActorMaterializer, Materializer}
 import com.typesafe.config.Config
 import configs.syntax._
 import hydra.common.config.ConfigSupport
+import hydra.common.util.MonadUtils.booleanToOption
 import hydra.core.marshallers.{History, HydraJsonSupport}
 import hydra.kafka.model.TopicMetadata
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
@@ -86,7 +87,7 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
     }
   }
 
-  private def booleanToOption[A](check:Boolean)(body:()=>Option[A]):Option[A] = if (check) body.apply else None
+
 
 }
 
