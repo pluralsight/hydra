@@ -11,6 +11,7 @@ import akka.pattern.{CircuitBreaker, pipe}
 import com.typesafe.config.Config
 import hydra.avro.registry.{ConfluentSchemaRegistry, SchemaRegistryException}
 import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
+import hydra.avro.util.SchemaWrapper
 import hydra.common.logging.LoggingAdapter
 import hydra.common.Settings
 import hydra.common.util.MonadUtils
@@ -115,13 +116,9 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
         throw new SchemaParseException("Schema name may only contain letters and numbers.")
       }
 
-      val hydraKey = schema.getField("hydra.key")
-      if(hydraKey != null) {
-        val results = Seq(validateKeyExists(hydraKey.toString, schema), validateKeyField(hydraKey.toString, schema))
-        results.foreach({
-          case Failure(e) => throw e
-        })
-      }
+      SchemaWrapper.from(schema).validate().recover({
+        case e => throw e
+      })
 
       val subject = getSubject(schema)
       log.debug(s"Registering schema ${schema.getFullName}: $json")
@@ -207,17 +204,6 @@ object SchemaRegistryActor {
   def removeSchemaSuffix(subject: String): String = subject match {
     case hasSuffix() => subject.dropRight(schemaSuffix.length)
     case _ => subject
-  }
-
-
-  def validateKeyExists(keyField: String, schema: Schema): Try[Boolean] = {
-    if(schema.getField(keyField) == null) Success(true) else Failure(new SchemaParseException("Schema contains a specified hydra.key that doesn't exist as a field."))
-  }
-
-  def validateKeyField(keyField: String, schema:Schema): Try[Boolean] = {
-    val keyField = schema.getField(keyField)
-    val keyTypes = keyField.schema().getTypes
-    if(keyTypes.size > 1 && keyTypes.toString.contains("\"null\"")) Failure(new SchemaParseException("hydra.key specified on a field that is nullable.")) else Success(true)
   }
 
 
