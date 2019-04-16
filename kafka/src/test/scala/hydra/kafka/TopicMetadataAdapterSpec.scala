@@ -29,7 +29,7 @@ class TopicMetadataAdapterSpec extends Matchers
 
     val resource = toResource(tm)
     val md = resource.asJsObject
-    md.fields("_links").asJsObject.fields("self").asJsObject.fields("href").convertTo[String] shouldBe s"/streams/${uuid.toString}"
+    md.fields("_links").asJsObject.fields("self").asJsObject.fields("href").convertTo[String] shouldBe s"/streams/${tm.subject}"
     md.fields("_links").asJsObject.fields("hydra-schema").asJsObject.fields("href").convertTo[String] shouldBe "/schemas/hydra-test"
   }
 }
