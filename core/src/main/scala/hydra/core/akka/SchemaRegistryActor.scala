@@ -63,7 +63,7 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
       breaker.withCircuitBreaker(futureResource, registryFailure) pipeTo sender
 
     case RegisterSchemaRequest(json: String) =>
-      val maybeRegister = tryHandleRegisterSchema((json))
+      val maybeRegister = tryHandleRegisterSchema(json)
       val registerSchema = Future.fromTry(maybeRegister)
       val registerSchemaRequest: Future[RegisterSchemaResponse] = breaker
         .withCircuitBreaker(registerSchema, registryFailure)

@@ -211,6 +211,58 @@ class SchemaRegistryActorSpec
     SchemaRegistryActor.removeSchemaSuffix(subjectWithoutSuffix) shouldEqual subjectWithoutSuffix
     SchemaRegistryActor.removeSchemaSuffix(subjectWithSuffix) shouldEqual subjectWithoutSuffix
   }
+
+
+  it should "fail registering the schema if hydra.key is a nullable field" in {
+    val (probe, schemaRegistryActor) = fixture
+
+    val invalid_schema =
+      """
+        |{
+        |  "type": "record",
+        |  "namespace": "exp.channels",
+        |  "name": "ChannelCreated",
+        |  "hydra.key": "description",
+        |  "fields": [
+        |    {
+        |      "name": "description",
+        |      "type": ["null", "string"],
+        |      "default": null
+        |    }
+        |  ]
+        |}
+      """.stripMargin
+    schemaRegistryActor.tell(RegisterSchemaRequest(invalid_schema), probe.ref)
+    probe.expectMsgPF() {
+      case e => e shouldBe a[Failure]
+    }
+  }
+
+  it should "fail registering the schema if hydra.key isn't an existing field" in {
+    val (probe, schemaRegistryActor) = fixture
+
+    val invalid_schema =
+      """
+        |{
+        |  "type": "record",
+        |  "namespace": "exp.channels",
+        |  "name": "ChannelCreated",
+        |  "hydra.key": "non-existing",
+        |  "fields": [
+        |    {
+        |      "name": "description",
+        |      "type": "string",
+        |      "default": null
+        |    }
+        |  ]
+        |}
+      """.stripMargin
+    schemaRegistryActor.tell(RegisterSchemaRequest(invalid_schema), probe.ref)
+    probe.expectMsgPF() {
+      case e => e shouldBe a[Failure]
+    }
+  }
+
 }
 
 object SchemaRegistryActorSpec {
