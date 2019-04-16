@@ -116,7 +116,10 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
         throw new SchemaParseException("Schema name may only contain letters and numbers.")
       }
 
-      val _ = SchemaWrapper.from(schema).validate().get
+      SchemaWrapper.from(schema).validate() match {
+        case Success(_) => Success
+        case Failure(e) => throw e
+      }
 
       val subject = getSubject(schema)
       log.debug(s"Registering schema ${schema.getFullName}: $json")
