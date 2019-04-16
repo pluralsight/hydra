@@ -77,7 +77,6 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
 
 
   private[kafka] def buildCompactedProps(metadata: TopicMetadata): Option[Props] = {
-
     booleanToOption[Props](StreamTypeFormat.read(metadata.streamType.toJson) == History) { ()=>
       val schema = schemaRegistryClient.getById(metadata.schemaId).toString()
       booleanToOption[Props](schema.contains("hydra.key")) { ()=>
