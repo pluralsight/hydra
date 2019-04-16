@@ -1,9 +1,5 @@
 package hydra.core.akka
 
-import scala.collection.JavaConverters._
-import scala.concurrent.Future
-import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
 import akka.actor.{Actor, Props}
 import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.{Publish, Subscribe}
@@ -11,10 +7,16 @@ import akka.pattern.{CircuitBreaker, pipe}
 import com.typesafe.config.Config
 import hydra.avro.registry.{ConfluentSchemaRegistry, SchemaRegistryException}
 import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
-import hydra.common.logging.LoggingAdapter
+import hydra.avro.util.SchemaWrapper
 import hydra.common.Settings
+import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol.HydraApplicationError
 import org.apache.avro.{Schema, SchemaParseException}
+
+import scala.collection.JavaConverters._
+import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 /**
   * This actor serves as an proxy between the handler registry
@@ -61,7 +63,8 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
       breaker.withCircuitBreaker(futureResource, registryFailure) pipeTo sender
 
     case RegisterSchemaRequest(json: String) =>
-      val registerSchema = Future.fromTry(tryHandleRegisterSchema(json))
+      val maybeRegister = tryHandleRegisterSchema(json)
+      val registerSchema = Future.fromTry(maybeRegister)
       val registerSchemaRequest: Future[RegisterSchemaResponse] = breaker
         .withCircuitBreaker(registerSchema, registryFailure)
 
@@ -112,6 +115,12 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
       if (!isValidSchemaName(schema.getName)) {
         throw new SchemaParseException("Schema name may only contain letters and numbers.")
       }
+
+      SchemaWrapper.from(schema).validate() match {
+        case Success(_) => Success
+        case Failure(e) => throw e
+      }
+
       val subject = getSubject(schema)
       log.debug(s"Registering schema ${schema.getFullName}: $json")
       val schemaId = registry.registryClient.register(subject, schema)
@@ -197,4 +206,7 @@ object SchemaRegistryActor {
     case hasSuffix() => subject.dropRight(schemaSuffix.length)
     case _ => subject
   }
+
+
+
 }

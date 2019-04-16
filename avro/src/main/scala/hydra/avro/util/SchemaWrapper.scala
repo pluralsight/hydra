@@ -25,7 +25,8 @@ case class SchemaWrapper(schema: Schema, primaryKeys: Seq[String]) {
 
   def validate(): Try[Unit] = {
     Try {
-      val errors = primaryKeys.map(k => k -> Option(schema.getField(k))).filter(_._2.isEmpty).toMap
+      val mappedKeys = primaryKeys.map(k => k -> Option(schema.getField(k)))
+      val errors = mappedKeys.filter(_._2.isEmpty).toMap
       if (!errors.isEmpty) {
         val err = s"The field(s) '${errors.keys.mkString(",")}' were specified as " +
           "primary keys, but they don't exist in the schema. " +

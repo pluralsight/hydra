@@ -1,7 +1,7 @@
 package hydra.avro.util
 
 import org.apache.avro.Schema
-import org.apache.avro.Schema.Field
+import org.apache.avro.Schema.{Field, Parser}
 import org.scalatest.{FlatSpecLike, Matchers}
 
 class SchemaWrapperSpec extends Matchers with FlatSpecLike {
@@ -253,6 +253,32 @@ class SchemaWrapperSpec extends Matchers with FlatSpecLike {
     val avro = new Schema.Parser().parse(schema)
 
     SchemaWrapper.from(avro, Seq.empty).primaryKeys shouldBe Seq.empty
+  }
+
+
+  it should "reject a schema when a primary key given does not exist" in {
+    val schema =
+      """
+        |{
+        |    "type": "record",
+        |    "name": "User",
+        |    "namespace": "hydra",
+        | "hydra.key": "doesnotexist",
+        |    "fields": [{
+        |            "name": "id",
+        |            "type": "int"
+        |        },
+        |        {
+        |            "name": "username",
+        |            "type": "string"
+        |        }
+        |    ]
+        |}
+      """.stripMargin
+    val testSchema = new Parser().parse(schema)
+    intercept[IllegalArgumentException] {
+      SchemaWrapper.from(testSchema).validate().get
+    }
   }
 
 }
