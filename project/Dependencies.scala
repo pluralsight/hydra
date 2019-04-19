@@ -34,7 +34,7 @@ object Dependencies {
   val kamonPVersion = "1.0.0"
   val akkaKryoVersion = "0.5.2"
   val h2DbVersion = "1.4.196"
-  val akkaManagementVersion = "1.0.0-RC3"
+  val akkaManagementVersion = "1.0.0"
 
   object Compile {
 
