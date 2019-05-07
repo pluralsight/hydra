@@ -7,9 +7,11 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.HydraException
 import hydra.core.akka.InitializingActor.{InitializationError, Initialized}
 import hydra.core.protocol.HydraMessage
+import retry.Success
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.util.control.NonFatal
 
 trait InitializingActor extends Actor with ActorConfigSupport with Stash with LoggingAdapter {
 
@@ -33,6 +35,16 @@ trait InitializingActor extends Actor with ActorConfigSupport with Stash with Lo
     composedReceive = next orElse baseReceive
   }
 
+  private val policy = retry.When {
+    case InitializationError(ex) =>
+      log.error("Error in initializing actor $thisActorName[${self.path}]. Retrying in one second...", ex)
+      retry.Pause.forever(1.second)
+    case NonFatal(e) =>
+      log.error("Error in initializing actor $thisActorName[${self.path}]. Retrying in one second...", e)
+      retry.Pause.forever(1.second)
+  }
+
+
   /**
     * This method is called upon initialization.  It should return one of the ingestor initialization messages:
     * `Initialized` or `InitializationError`
@@ -42,7 +54,8 @@ trait InitializingActor extends Actor with ActorConfigSupport with Stash with Lo
   def init: Future[HydraMessage] = Future.successful(Initialized)
 
   override def preStart(): Unit = {
-    pipe(init)(context.dispatcher) to self
+    implicit val ec = context.dispatcher
+    pipe(policy(init)(Success[HydraMessage](_ == Initialized), ec)) to self
   }
 
   def waitingForInitialization: Receive = {
@@ -53,7 +66,7 @@ trait InitializingActor extends Actor with ActorConfigSupport with Stash with Lo
       unstashAll()
 
     case err@InitializationError(ex) =>
-      log.error(ex.getMessage)
+      log.error(s"Unable to initialize actor  $thisActorName[${self.path}]", ex)
       initError(err)
 
     case ReceiveTimeout =>

@@ -1,13 +1,11 @@
 package hydra.core.ingest
 
-import akka.actor.ActorRef
 import configs.syntax._
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.InitializingActor.{InitializationError, Initialized}
 import hydra.core.protocol._
 import hydra.core.transport.{AckStrategy, HydraRecord}
-import retry.Success
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -36,11 +34,7 @@ trait TransportOps extends ConfigSupport with LoggingAdapter {
   private val transportPath = applicationConfig.get[String](s"transports.$transportName.path")
     .valueOrElse(s"/user/service/transport_registrar/${transportName}_transport")
 
-  private implicit val success = Success[ActorRef](_ => true)
-
-  lazy val transportActorFuture = retry.Backoff.forever(1 second).apply { () =>
-    context.actorSelection(transportPath).resolveOne()(500 millis)
-  }
+  lazy val transportActorFuture = context.actorSelection(transportPath).resolveOne()(initTimeout)
 
   /**
     * Overrides the init method to look up a transport
