@@ -46,13 +46,14 @@ object Dependencies {
 
     val scalaz = "org.scalaz" %% "scalaz-core" % scalazVersion
 
+    val retry = "com.softwaremill.retry" %% "retry" % "0.3.2"
+
     val embeddedKafka = "net.manub" %% "scalatest-embedded-kafka" % "2.0.0"
 
     val sdNotify = "info.faljse" % "SDNotify" % "1.1"
 
     lazy val kamon = Seq(
       "io.kamon" %% "kamon-core" % kamonVersion,
-      "io.kamon" %% "kamon-scala-future" % kamonPVersion,
       "io.kamon" %% "kamon-prometheus" % kamonPVersion
     )
 
@@ -165,7 +166,7 @@ object Dependencies {
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
 
   val coreDeps = akka ++ baseDeps ++
-    Seq(guavacache, reflections, akkaKryo, serviceContainer, sdNotify, postgres, h2db) ++
+    Seq(guavacache, reflections, akkaKryo, serviceContainer, sdNotify, postgres, h2db, retry) ++
     confluent ++ kamon
 
   val ingestDeps = coreDeps ++ akkaHttpHal

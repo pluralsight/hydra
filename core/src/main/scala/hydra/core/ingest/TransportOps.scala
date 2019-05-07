@@ -1,7 +1,5 @@
 package hydra.core.ingest
 
-import akka.actor.Scheduler
-import akka.pattern.after
 import configs.syntax._
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
@@ -9,8 +7,8 @@ import hydra.core.akka.InitializingActor.{InitializationError, Initialized}
 import hydra.core.protocol._
 import hydra.core.transport.{AckStrategy, HydraRecord}
 
-import scala.concurrent.duration.{FiniteDuration, _}
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
+import scala.concurrent.duration._
 
 /**
   * Encapsulates basic transport operations: Look up an existing transport and
@@ -25,6 +23,9 @@ trait TransportOps extends ConfigSupport with LoggingAdapter {
 
   implicit val ec = context.dispatcher
 
+  override def initTimeout = applicationConfig
+    .getOrElse[FiniteDuration](s"transports.$transportName.resolve-timeout", 30 seconds).value
+
   /**
     * Always override this with a def due to how Scala initializes val in subtraits.
     */
@@ -33,12 +34,7 @@ trait TransportOps extends ConfigSupport with LoggingAdapter {
   private val transportPath = applicationConfig.get[String](s"transports.$transportName.path")
     .valueOrElse(s"/user/service/transport_registrar/${transportName}_transport")
 
-  override def initTimeout = applicationConfig
-    .getOrElse[FiniteDuration](s"transports.$transportName.resolve-timeout", 30 seconds).value
-
-
-  lazy val transportActorFuture = retry(context.actorSelection(transportPath).resolveOne()(initTimeout),
-    2.seconds, 15)(ec, context.system.scheduler)
+  lazy val transportActorFuture = context.actorSelection(transportPath).resolveOne()(initTimeout)
 
   /**
     * Overrides the init method to look up a transport
@@ -46,7 +42,8 @@ trait TransportOps extends ConfigSupport with LoggingAdapter {
   override def init: Future[HydraMessage] = {
     transportActorFuture
       .map { _ =>
-        log.info("{}[{}] initialized", Seq(thisActorName, self.path): _*); Initialized }
+        log.info("{}[{}] initialized", Seq(thisActorName, self.path): _*); Initialized
+      }
       .recover {
         case e => InitializationError(new IllegalArgumentException(s"[$thisActorName]: No transport found " +
           s" at $transportPath", e))
@@ -58,11 +55,4 @@ trait TransportOps extends ConfigSupport with LoggingAdapter {
     transportActorFuture.foreach(_ ! Produce(record, supervisor, ack))
   }
 
-  /**
-    * Given an operation that produces a T, returns a Future containing the result of T, unless an exception is thrown,
-    * in which case the operation will be retried after _delay_ time, if there are more possible retries, which is configured through
-    * the _retries_ parameter. If the operation does not succeed and there is no retries left, the resulting Future will contain the last failure.
-    **/
-  def retry[T](op: => Future[T], delay: FiniteDuration, retries: Int)(implicit ec: ExecutionContext, s: Scheduler): Future[T] =
-    op recoverWith { case _ if retries > 0 => after(delay, s)(retry(op, delay, retries - 1)) }
 }

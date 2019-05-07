@@ -43,10 +43,7 @@ class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers
     it("won't initialize if transport can't be found") {
       val t = system.actorOf(Props[TestTransportIngestorError])
       t ! "hello"
-      expectMsgPF() {
-        case i: IngestorError =>
-          i.cause shouldBe a[ActorInitializationException]
-      }
+      expectNoMessage()
     }
 
     it("transports a record") {
@@ -63,6 +60,8 @@ class TestTransportIngestor(supervisor: ActorRef) extends Ingestor with Transpor
 
   override val recordFactory = TestRecordFactory
 
+  override def initTimeout = 500 millis
+
   ingest {
     case "hello" => sender ! "hi!"
     case req: HydraRequest =>
@@ -74,8 +73,6 @@ class TestTransportIngestor(supervisor: ActorRef) extends Ingestor with Transpor
 }
 
 class TestTransportIngestorError extends Ingestor with TransportOps {
-  override def initTimeout = 1.second
-
   override val recordFactory = TestRecordFactory
 
   override def transportName = "test-transport-unknown"

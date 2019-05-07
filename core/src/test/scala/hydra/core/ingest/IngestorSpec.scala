@@ -20,36 +20,21 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
   override def afterAll = TestKit.shutdownActorSystem(system)
 
   describe("ingestors") {
-    it("handle initialization") {
 
-      system.actorOf(Props(classOf[TestIngestor], false, false)) ! "hello"
-
-      expectMsgPF() {
-        case i: IngestorError =>
-          i.cause shouldBe a[ActorInitializationException]
-      }
-
-      system.actorOf(Props(classOf[TestIngestor], true, false)) ! "hello"
-
-      expectMsg("hi!")
-    }
-
-    it("handle initialization timeouts") {
+    it("handles delayed inits") {
+      //init takes longer than timeout
       val ct = system.actorOf(Props(classOf[TestIngestor], true, true))
       ct ! "hello"
-      expectMsgPF(max = 5.seconds) {
-        case i: IngestorError =>
-          i.cause shouldBe a[ActorInitializationException]
-          i.cause.asInstanceOf[ActorInitializationException].getActor.path shouldBe ct.path
-          ActorInitializationException
-            .unapply(i.cause.asInstanceOf[ActorInitializationException]) shouldBe Some(ct,
-            i.cause.getMessage, i.cause.getCause)
-      }
+      expectMsg(max = 5 seconds, "hi!")
     }
 
-    it("handle errors by restarting") {
-      system.actorOf(Props(classOf[TestIngestor], true, false)) ! "error"
+    it("retries errors on init") {
+      //init errors first time but then succeeds
+      val ct = system.actorOf(Props(classOf[SucceedAfterRetryIngestor], 2))
+      ct ! "test"
+      expectMsg("test")
     }
+
 
     it("allows for custom validation") {
       val ing = system.actorOf(Props(classOf[TestIngestor], true, false))
@@ -115,13 +100,14 @@ class TestIngestor(completeInit: Boolean, delayInit: Boolean) extends Ingestor {
 
   implicit val ec = context.dispatcher
 
-  override def initTimeout: FiniteDuration = 2.seconds
+  override def initTimeout: FiniteDuration = 1.seconds
 
   val err = ActorInitializationException(self, "ERROR")
 
   override val recordFactory = TestRecordFactory
 
   override def init: Future[HydraMessage] = {
+    log.debug("Trying init")
     Future {
       if (delayInit) Thread.sleep((initTimeout * 2).toMillis)
       if (!completeInit) InitializationError(err) else Initialized
@@ -131,6 +117,36 @@ class TestIngestor(completeInit: Boolean, delayInit: Boolean) extends Ingestor {
   ingest {
     case "hello" => sender ! "hi!"
     case "error" => throw new RuntimeException("ERROR!")
+  }
+
+  override def validateRequest(request: HydraRequest): Try[HydraRequest] = {
+    if (request.hasMetadata("invalid")) Failure(new IllegalArgumentException) else Success(request)
+  }
+}
+
+
+@DoNotScan
+class SucceedAfterRetryIngestor(retries: Int) extends Ingestor {
+
+  implicit val ec = context.dispatcher
+
+  override def initTimeout: FiniteDuration = 1.seconds
+
+  val err = ActorInitializationException(self, "ERROR")
+
+  override val recordFactory = TestRecordFactory
+
+  private var retryNo = 1
+
+  override def init: Future[HydraMessage] = {
+    retryNo += 1
+    Future {
+      if (retryNo < retries) InitializationError(err) else Initialized
+    }
+  }
+
+  ingest {
+    case msg => sender ! msg
   }
 
   override def validateRequest(request: HydraRequest): Try[HydraRequest] = {
