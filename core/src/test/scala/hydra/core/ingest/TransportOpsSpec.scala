@@ -74,8 +74,6 @@ class TestTransportIngestor(supervisor: ActorRef) extends Ingestor with Transpor
 }
 
 class TestTransportIngestorError extends Ingestor with TransportOps {
-  override def initTimeout = 1.second
-
   override val recordFactory = TestRecordFactory
 
   override def transportName = "test-transport-unknown"

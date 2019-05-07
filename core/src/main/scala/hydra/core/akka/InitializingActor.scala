@@ -57,9 +57,7 @@ trait InitializingActor extends Actor with ActorConfigSupport with Stash with Lo
       initError(err)
 
     case ReceiveTimeout =>
-      log.error(s"Ingestor $thisActorName[${self.path}] did not initialize in $initTimeout")
-      val err = ActorInitializationException(self, s"Ingestor did not initialize in $initTimeout.")
-      initError(InitializationError(err))
+      log.error(s"Ingestor $thisActorName[${self.path}] did not initialize in $initTimeout. Still waiting...")
 
     case msg =>
       log.debug(s"$thisActorName received message $msg while not initialized; stashing.")
