@@ -43,10 +43,7 @@ class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers
     it("won't initialize if transport can't be found") {
       val t = system.actorOf(Props[TestTransportIngestorError])
       t ! "hello"
-      expectMsgPF() {
-        case i: IngestorError =>
-          i.cause shouldBe a[ActorInitializationException]
-      }
+      expectNoMessage()
     }
 
     it("transports a record") {
@@ -62,6 +59,8 @@ class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers
 class TestTransportIngestor(supervisor: ActorRef) extends Ingestor with TransportOps {
 
   override val recordFactory = TestRecordFactory
+
+  override def initTimeout = 500 millis
 
   ingest {
     case "hello" => sender ! "hi!"
