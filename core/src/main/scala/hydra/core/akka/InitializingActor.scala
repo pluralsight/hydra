@@ -37,10 +37,12 @@ trait InitializingActor extends Actor with ActorConfigSupport with Stash with Lo
 
   private val policy = retry.When {
     case InitializationError(ex) =>
-      log.error("Error in initializing actor $thisActorName[${self.path}]. Retrying in one second...", ex)
+      log.error("Received InitializationError when" +
+        " initializing actor $thisActorName[${self.path}]. Retrying in one second...", ex)
       retry.Pause.forever(1.second)
     case NonFatal(e) =>
-      log.error("Error in initializing actor $thisActorName[${self.path}]. Retrying in one second...", e)
+      log.error("Initialization completed with exception for" +
+        " $thisActorName[${self.path}]. Retrying in one second...", e)
       retry.Pause.forever(1.second)
   }
 
