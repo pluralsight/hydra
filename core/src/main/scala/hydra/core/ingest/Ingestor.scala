@@ -53,7 +53,7 @@ trait Ingestor extends InitializingActor {
     */
   def validateRequest(request: HydraRequest): Try[HydraRequest] = Success(request)
 
-  final def doValidate(request: HydraRequest): Future[MessageValidationResult] = {
+  def doValidate(request: HydraRequest): Future[MessageValidationResult] = {
     Future.fromTry(validateRequest(request))
       .flatMap[MessageValidationResult] { r =>
       recordFactory.build(r).map { r =>
