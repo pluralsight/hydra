@@ -16,21 +16,18 @@
 
 package hydra.kafka.ingestors
 
-import akka.actor.Timers
+import akka.actor.{Props, Timers}
 import hydra.core.ingest.RequestParams._
 import hydra.core.ingest.{HydraRequest, Ingestor, RequestParams}
 import hydra.core.protocol._
-import hydra.kafka.ingestors.KafkaIngestor.TopicLookupResult
+import hydra.kafka.config.KafkaConfigSupport
+import hydra.kafka.ingestors.KafkaTopicActor.{GetTopicRequest, GetTopicResponse}
 import hydra.kafka.producer.{KafkaProducerSupport, KafkaRecordFactories}
-import hydra.kafka.util.KafkaUtils
-import org.joda.time.DateTime
-import scalacache._
-import scalacache.guava._
-import scalacache.modes.try_._
+import akka.pattern.ask
+import akka.util.Timeout
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{Success, Try}
 
 /**
   * Sends JSON messages to a topic in Kafka.  In order for this handler to be activated.
@@ -41,7 +38,10 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport with Timers {
 
   override val recordFactory = new KafkaRecordFactories(schemaRegistryActor)
 
-  KafkaUtils().topicNames().getOrElse(Seq.empty).foreach(t => KafkaIngestor.cache.put(t)(t))
+  private implicit val timeout = Timeout(500 millis)
+
+  private val topicActor = context.
+    actorOf(KafkaTopicActor.props(KafkaConfigSupport.kafkaConfig.getConfig("kafka.producer")))
 
   ingest {
     case Publish(request) =>
@@ -52,22 +52,15 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport with Timers {
   }
 
   override def doValidate(request: HydraRequest): Future[MessageValidationResult] = {
-    super.doValidate(request) collect {
+    super.doValidate(request) flatMap {
       case vr: ValidRequest[_, _] =>
         val tp = request.metadataValue(RequestParams.HYDRA_KAFKA_TOPIC_PARAM).get
-        getTopic(tp).map(_.exists).map { e =>
-          if (e) vr else InvalidRequest(new IllegalArgumentException(s"Kafka topic '$tp' doesn't exist."))
-        }.get
+        (topicActor ? GetTopicRequest(tp)).mapTo[GetTopicResponse].map { r =>
+          if (r.exists) vr else InvalidRequest(new IllegalArgumentException(s"Kafka topic '$tp' doesn't exist."))
+        }
 
-      case iv: InvalidRequest => iv
+      case iv: InvalidRequest => Future(iv)
     }
-  }
 
-  private def getTopic(topic: String): Try[TopicLookupResult] = {
-    implicit val cache = KafkaIngestor.topicCache
-      cache.get(topic) match {
-        case Success(result) if result.
-        case None =>
-      }
   }
 }
