@@ -16,7 +16,6 @@
 
 package hydra.kafka.ingestors
 
-import akka.actor.Timers
 import akka.pattern.ask
 import akka.util.Timeout
 import hydra.core.ingest.RequestParams._
@@ -34,7 +33,7 @@ import scala.concurrent.duration._
   * a request param "Hydra-kafka-topic" must be present.
   *
   */
-class KafkaIngestor extends Ingestor with KafkaProducerSupport with Timers {
+class KafkaIngestor extends Ingestor with KafkaProducerSupport {
 
   override val recordFactory = new KafkaRecordFactories(schemaRegistryActor)
 
