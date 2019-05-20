@@ -45,6 +45,9 @@ class KafkaIngestorSpec
   override def beforeAll = {
     implicit val embeddedKafkaConfig = EmbeddedKafkaConfig(kafkaPort = 8092)
     EmbeddedKafka.start()
+    EmbeddedKafka.createCustomTopic("test-schema")
+    EmbeddedKafka.createCustomTopic("just-a-topic")
+    EmbeddedKafka.createCustomTopic("json-topic")
   }
 
   val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
@@ -55,6 +58,7 @@ class KafkaIngestorSpec
   val kafkaProducer = system.actorOf(Props(new ForwardActor(probe.ref)), "kafka_producer")
 
   val kafkaIngestor = probe.childActorOf(Props[KafkaIngestor])
+
 
   val KAFKA = "kafka_ingestor"
 
@@ -69,6 +73,17 @@ class KafkaIngestorSpec
       |     ]
       |} """.stripMargin
 
+  val schema2 =
+    """{
+      |     "type": "record",
+      |     "namespace": "com.example",
+      |     "name": "FullName2",
+      |     "fields": [
+      |       { "name": "first", "type": "string" },
+      |       { "name": "last", "type": "string" }
+      |     ]
+      |} """.stripMargin
+
   val avroSchema = new Schema.Parser().parse(schema)
 
   val record = new GenericRecordBuilder(avroSchema).set("first", "hydra").set("last", "hydra").build()
@@ -77,6 +92,7 @@ class KafkaIngestorSpec
   val json = """{"first":"hydra","last":"hydra"}"""
 
   registryClient.register("test-schema-value", new Parser().parse(schema))
+  registryClient.register("test-schema2-value", new Parser().parse(schema2))
 
   describe("when using the KafkaIngestor") {
     it("joins") {
@@ -120,7 +136,7 @@ class KafkaIngestorSpec
     kafkaIngestor ! Validate(request)
     expectMsgType[InvalidRequest]
   }
-  
+
   it("is valid with no schema if the topic can be resolved to a string") {
     val request = HydraRequest(
       "123",
@@ -147,6 +163,18 @@ class KafkaIngestorSpec
     kafkaIngestor ! Validate(request)
     val node = new ObjectMapper().reader().readTree("""{"first":"hydra","last":"hydra"}""")
     expectMsg(ValidRequest(JsonRecord("json-topic", None, node, AckStrategy.NoAck)))
+  }
+
+  it("is invalid if schema exists, but topic doesn't") {
+    val request = HydraRequest(
+      "123",
+      json, None,
+      Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema2"))
+    avroRecordFactory.getTopicAndSchemaSubject(request).get._2 shouldBe "test-schema2"
+    kafkaIngestor ! Validate(request)
+    expectMsgPF() {
+      case InvalidRequest(ex) => ex shouldBe an[IllegalArgumentException]
+    }
   }
 
 }
