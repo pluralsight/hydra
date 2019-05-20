@@ -5,7 +5,7 @@ import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.ConfigFactory
 import hydra.common.config.ConfigSupport
 import hydra.kafka.ingestors.KafkaTopicActor.{GetTopicRequest, GetTopicResponse}
-import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
+import net.manub.embeddedkafka.EmbeddedKafka
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
@@ -28,11 +28,11 @@ class KafkaTopicsActorSpec
     """.stripMargin)
 
 
-  implicit val patience = PatienceConfig(timeout = 10 seconds, interval = 1 second)
+  implicit val patience = PatienceConfig(timeout = 5 seconds, interval = 1 second)
 
   override def afterAll = {
-    EmbeddedKafka.stop()
     TestKit.shutdownActorSystem(system)
+    EmbeddedKafka.stop()
   }
 
   override def beforeAll = EmbeddedKafka.start()

@@ -16,15 +16,15 @@
 
 package hydra.kafka.ingestors
 
-import akka.actor.{Props, Timers}
+import akka.actor.Timers
+import akka.pattern.ask
+import akka.util.Timeout
 import hydra.core.ingest.RequestParams._
 import hydra.core.ingest.{HydraRequest, Ingestor, RequestParams}
 import hydra.core.protocol._
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.ingestors.KafkaTopicActor.{GetTopicRequest, GetTopicResponse}
 import hydra.kafka.producer.{KafkaProducerSupport, KafkaRecordFactories}
-import akka.pattern.ask
-import akka.util.Timeout
 
 import scala.concurrent.Future
 import scala.concurrent.duration._

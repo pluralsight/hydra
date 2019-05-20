@@ -15,6 +15,7 @@ import hydra.core.transport.AckStrategy.NoAck
 import hydra.kafka.producer
 import hydra.kafka.producer.{AvroRecord, AvroRecordFactory, JsonRecord}
 import hydra.kafka.test.TestRecordFactory
+import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Parser
 import org.apache.avro.generic.GenericRecordBuilder
@@ -24,18 +25,27 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
- * Created by alexsilva on 11/18/16.
- */
+  * Created by alexsilva on 11/18/16.
+  */
 class KafkaIngestorSpec
   extends TestKit(ActorSystem("kafka-ingestor-spec", config = ConfigFactory.parseString("akka.actor.provider=cluster")))
-  with Matchers
-  with FunSpecLike
-  with ImplicitSender
-  with ConfigSupport
-  with BeforeAndAfterAll
-  with ScalaFutures {
+    with Matchers
+    with FunSpecLike
+    with ImplicitSender
+    with ConfigSupport
+    with BeforeAndAfterAll
+    with ScalaFutures
+    with EmbeddedKafka {
 
-  override def afterAll = TestKit.shutdownActorSystem(system)
+  override def afterAll = {
+    TestKit.shutdownActorSystem(system)
+    EmbeddedKafka.stop()
+  }
+
+  override def beforeAll = {
+    implicit val embeddedKafkaConfig = EmbeddedKafkaConfig(kafkaPort = 8092)
+    EmbeddedKafka.start()
+  }
 
   val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
   val registryClient = schemaRegistry.registryClient
@@ -110,7 +120,7 @@ class KafkaIngestorSpec
     kafkaIngestor ! Validate(request)
     expectMsgType[InvalidRequest]
   }
-
+  
   it("is valid with no schema if the topic can be resolved to a string") {
     val request = HydraRequest(
       "123",

@@ -19,13 +19,13 @@ package hydra.kafka.ingestors
 import akka.actor.{Actor, Props, Stash, Timers}
 import com.typesafe.config.Config
 import hydra.common.logging.LoggingAdapter
-import hydra.kafka.ingestors.KafkaTopicActor.{GetTopicRequest, GetTopicResponse, RefreshTopicList, TopicsTImer}
+import hydra.kafka.ingestors.KafkaTopicActor.{GetTopicRequest, GetTopicResponse, RefreshTopicList, TopicsTimer}
 import hydra.kafka.util.KafkaUtils
 import org.joda.time.DateTime
 
 import scala.concurrent.duration._
 
-class KafkaTopicsActor(cfg: Config) extends Actor
+class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration) extends Actor
   with Timers
   with LoggingAdapter
   with Stash {
@@ -34,7 +34,7 @@ class KafkaTopicsActor(cfg: Config) extends Actor
 
   self ! RefreshTopicList
 
-  timers.startPeriodicTimer(TopicsTImer, RefreshTopicList, 1 seconds)
+  timers.startPeriodicTimer(TopicsTimer, RefreshTopicList, checkInterval)
 
   private def topics = kUtils.topicNames()
     .recover { case e => log.error("Unable to load Kafka topics.", e); Seq.empty }.get
@@ -46,25 +46,23 @@ class KafkaTopicsActor(cfg: Config) extends Actor
     case GetTopicRequest(_) => stash()
   }
 
-  private def withTopics(topics: Seq[String]): Receive = {
+  private def withTopics(topicList: Seq[String]): Receive = {
     case GetTopicRequest(topic) =>
       val topicR = topics.find(_ == topic)
       sender ! GetTopicResponse(topic, DateTime.now, topicR.isDefined)
 
-    case RefreshTopicList => println(kUtils.topicNames()
-      .recover { case e => log.error("Unable to load Kafka topics.", e); Seq.empty }.get);
-
+    case RefreshTopicList =>
       context.become(withTopics(topics))
   }
 
   override def postStop(): Unit = {
-    timers.cancel(TopicsTImer)
+    timers.cancel(TopicsTimer)
   }
 }
 
 object KafkaTopicActor {
 
-  case object TopicsTImer
+  case object TopicsTimer
 
   case object RefreshTopicList
 
@@ -72,7 +70,7 @@ object KafkaTopicActor {
 
   case class GetTopicResponse(topic: String, lookupDate: DateTime, exists: Boolean)
 
-  def props(config: Config) = Props(classOf[KafkaTopicsActor], config)
+  def props(cfg: Config, interval: FiniteDuration = 1 second) = Props(classOf[KafkaTopicsActor], cfg, interval)
 
 }
 
