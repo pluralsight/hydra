@@ -70,7 +70,7 @@ object KafkaTopicActor {
 
   case class GetTopicResponse(topic: String, lookupDate: DateTime, exists: Boolean)
 
-  def props(cfg: Config, interval: FiniteDuration = 1 second) = Props(classOf[KafkaTopicsActor], cfg, interval)
+  def props(cfg: Config, interval: FiniteDuration = 5 seconds) = Props(classOf[KafkaTopicsActor], cfg, interval)
 
 }
 
