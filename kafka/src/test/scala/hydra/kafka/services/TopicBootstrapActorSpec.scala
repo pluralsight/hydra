@@ -27,6 +27,7 @@ import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import spray.json._
 
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.io.Source
 
 class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor-spec"))
@@ -597,7 +598,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
         "TopicBootstrapActor is in a failed state due to cause: Schema registry actor failed expectedly!"
     }
 
-    probe.expectMsgType[RegisterSchemaRequest]
+    probe.expectMsgType[RegisterSchemaRequest](max=10 seconds)
 
     // Check a second time to make sure we made it back to the initializing state and failed again
 

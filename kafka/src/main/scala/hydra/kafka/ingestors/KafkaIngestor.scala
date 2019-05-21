@@ -16,10 +16,17 @@
 
 package hydra.kafka.ingestors
 
-import hydra.core.ingest.Ingestor
+import akka.pattern.ask
+import akka.util.Timeout
 import hydra.core.ingest.RequestParams._
+import hydra.core.ingest.{HydraRequest, Ingestor, RequestParams}
 import hydra.core.protocol._
+import hydra.kafka.config.KafkaConfigSupport
+import hydra.kafka.ingestors.KafkaTopicActor.{GetTopicRequest, GetTopicResponse}
 import hydra.kafka.producer.{KafkaProducerSupport, KafkaRecordFactories}
+
+import scala.concurrent.Future
+import scala.concurrent.duration._
 
 /**
   * Sends JSON messages to a topic in Kafka.  In order for this handler to be activated.
@@ -30,11 +37,29 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
 
   override val recordFactory = new KafkaRecordFactories(schemaRegistryActor)
 
+  private implicit val timeout = Timeout(500 millis)
+
+  private val topicActor = context.
+    actorOf(KafkaTopicActor.props(KafkaConfigSupport.kafkaConfig.getConfig("kafka.producer")))
+
   ingest {
     case Publish(request) =>
       val hasTopic = request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM).isDefined
       sender ! (if (hasTopic) Join else Ignore)
 
     case Ingest(record, ackStrategy) => transport(record, ackStrategy)
+  }
+
+  override def doValidate(request: HydraRequest): Future[MessageValidationResult] = {
+    super.doValidate(request) flatMap {
+      case vr: ValidRequest[_, _] =>
+        val tp = request.metadataValue(RequestParams.HYDRA_KAFKA_TOPIC_PARAM).get
+        (topicActor ? GetTopicRequest(tp)).mapTo[GetTopicResponse].map { r =>
+          if (r.exists) vr else InvalidRequest(new IllegalArgumentException(s"Kafka topic '$tp' doesn't exist."))
+        }
+
+      case iv: InvalidRequest => Future(iv)
+    }
+
   }
 }

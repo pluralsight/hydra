@@ -10,7 +10,8 @@ import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
 import hydra.avro.util.SchemaWrapper
 import hydra.common.Settings
 import hydra.common.logging.LoggingAdapter
-import hydra.core.protocol.HydraApplicationError
+import hydra.core.protocol.{HydraApplicationError, InvalidRequest}
+import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.{Schema, SchemaParseException}
 
 import scala.collection.JavaConverters._
@@ -57,10 +58,22 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
 
   def getSubject(schema: Schema): String = addSchemaSuffix(schema.getFullName)
 
+  private def errorHandler[U](schema: String): PartialFunction[Throwable, Future[U]] = {
+    case e: SchemaRegistryException
+      if e.getCause.isInstanceOf[RestClientException] && e.getCause.asInstanceOf[RestClientException].getErrorCode == 40401 =>
+      throw new IllegalArgumentException(s"Schema '$schema' doesnt exist. [Schema registry URL: ${registry.registryUrl}]")
+    case e: Throwable =>
+      throw e
+  }
+
+  private def fetchSchema(location: String) = {
+    loader.retrieveSchema(location).map(resource => FetchSchemaResponse(resource))
+      .recoverWith(errorHandler(location))
+  }
+
   override def receive = {
     case FetchSchemaRequest(location) =>
-      val futureResource = loader.retrieveSchema(location).map(resource => FetchSchemaResponse(resource))
-      breaker.withCircuitBreaker(futureResource, registryFailure) pipeTo sender
+      breaker.withCircuitBreaker(fetchSchema(location), registryFailure) pipeTo sender
 
     case RegisterSchemaRequest(json: String) =>
       val maybeRegister = tryHandleRegisterSchema(json)
@@ -206,7 +219,6 @@ object SchemaRegistryActor {
     case hasSuffix() => subject.dropRight(schemaSuffix.length)
     case _ => subject
   }
-
 
 
 }
