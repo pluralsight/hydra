@@ -15,11 +15,17 @@ import org.scalatest.time.{Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
+
 /**
   * Created by alexsilva on 3/9/17.
   */
-class IngestorRegistrarSpec extends TestKit(ActorSystem("hydra")) with Matchers
-  with FunSpecLike with ImplicitSender with ScalaFutures with BeforeAndAfterAll with Eventually {
+class IngestorRegistrarSpec extends TestKit(ActorSystem("IngestorRegistrarSpec"))
+  with Matchers
+  with FunSpecLike
+  with ImplicitSender
+  with ScalaFutures
+  with BeforeAndAfterAll
+  with Eventually {
 
   override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 

@@ -16,6 +16,8 @@
 
 package hydra.kafka.ingestors
 
+import java.util.concurrent.TimeUnit
+
 import akka.actor.{Actor, Props, Stash, Timers}
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
@@ -27,6 +29,7 @@ import org.joda.time.DateTime
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
+import scala.util.Try
 
 class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration) extends Actor
   with Timers
@@ -37,9 +40,11 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration) extends Actor
 
   timers.startPeriodicTimer(TopicsTimer, RefreshTopicList, checkInterval)
 
-  private def topics = {
-    TryWith(AdminClient.create(ConfigSupport.toMap(cfg).asJava)) { c =>
-      c.listTopics().names.get.asScala.toSeq
+  private def topics: Seq[String] = {
+    Try(AdminClient.create(ConfigSupport.toMap(cfg).asJava)).map { c =>
+      val t = c.listTopics().names.get(checkInterval.toSeconds.longValue / 2, TimeUnit.SECONDS).asScala.toSeq
+      Try(c.close(checkInterval.toSeconds.longValue / 2, TimeUnit.SECONDS))
+      t
     }
   }.recover { case e => log.error("Unable to load Kafka topics.", e); Seq.empty }.get
 
