@@ -14,6 +14,7 @@ import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.avro.resource.SchemaResource
 import hydra.core.akka.SchemaRegistryActor._
 import hydra.core.protocol.HydraApplicationError
+import org.apache.avro.Schema
 import org.apache.avro.Schema.Parser
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
@@ -129,13 +130,14 @@ class SchemaRegistryActorSpec
     schemaRegistryActor.tell(RegisterSchemaRequest(testSchemaString), probe.ref)
 
     mediatorListener.expectMsgPF() {
-      case SchemaRegistered(schemaResource) =>
-        schemaResource.schema shouldBe testSchema
+      case SchemaRegistered(_, _, schemaString) =>
+        new Schema.Parser().parse(schemaString) shouldBe testSchema
       case _ =>
         fail("Expected SchemaRegistered message through mediator")
     }
 
   }
+
   it should "NOT send a SchemaRegistered message to the mediator if NOT registered successfully" in {
     val config = ConfigFactory.parseString(
       """
@@ -163,7 +165,7 @@ class SchemaRegistryActorSpec
     val senderProbe = TestProbe()
 
     val expectedResource = SchemaResource(1, 1, testSchema)
-    schemaRegistryActor.tell(SchemaRegistered(expectedResource), senderProbe.ref)
+    schemaRegistryActor.tell(SchemaRegistered(1, 1, testSchemaString), senderProbe.ref)
     senderProbe.expectMsgPF() {
       case _ => {}
     }

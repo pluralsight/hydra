@@ -69,13 +69,15 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
         .withCircuitBreaker(registerSchema, registryFailure)
 
       registerSchemaRequest.foreach { registerSchemaResponse =>
-        val registeredResponse = SchemaRegistered(registerSchemaResponse.schemaResource)
+        val schemaResource = registerSchemaResponse.schemaResource
+        val registeredResponse = SchemaRegistered(schemaResource.id, schemaResource.version, schemaResource.schema.toString)
         mediator ! Publish(SchemaRegisteredTopic, registeredResponse)
       }
 
       pipe(registerSchemaRequest) to sender
 
-    case SchemaRegistered(schemaResource) =>
+    case SchemaRegistered(id, version, schemaString) =>
+      val schemaResource = SchemaResource(id, version, new Schema.Parser().parse(schemaString))
       loader.loadSchemaIntoCache(schemaResource) pipeTo sender
 
     case FetchAllSchemaVersionsRequest(subject: String) =>
@@ -85,7 +87,6 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
           loader.retrieveSchema(subject, versionNumber)
         })
       } yield FetchAllSchemaVersionsResponse(allVersions)
-
       breaker.withCircuitBreaker(allVersionsRequest, registryFailure) pipeTo sender
 
     case FetchSubjectsRequest =>
@@ -180,7 +181,7 @@ object SchemaRegistryActor {
 
   case class RegisterSchemaResponse(schemaResource: SchemaResource) extends SchemaRegistryResponse
 
-  case class SchemaRegistered(schemaResource: SchemaResource)
+  case class SchemaRegistered(id: Int, version: Int, schemaString: String)
 
   val SchemaRegisteredTopic = "hydra.core.akka.SchemaRegistryActor.SchemaRegistered"
 
