@@ -18,11 +18,14 @@ package hydra.kafka.ingestors
 
 import akka.actor.{Actor, Props, Stash, Timers}
 import com.typesafe.config.Config
+import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
+import hydra.common.util.TryWith
 import hydra.kafka.ingestors.KafkaTopicActor.{GetTopicRequest, GetTopicResponse, RefreshTopicList, TopicsTimer}
-import hydra.kafka.util.KafkaUtils
+import org.apache.kafka.clients.admin.AdminClient
 import org.joda.time.DateTime
 
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
 class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration) extends Actor
@@ -30,14 +33,15 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration) extends Actor
   with LoggingAdapter
   with Stash {
 
-  private val kUtils = KafkaUtils(cfg)
-
   self ! RefreshTopicList
 
   timers.startPeriodicTimer(TopicsTimer, RefreshTopicList, checkInterval)
 
-  private def topics = kUtils.topicNames()
-    .recover { case e => log.error("Unable to load Kafka topics.", e); Seq.empty }.get
+  private def topics = {
+    TryWith(AdminClient.create(ConfigSupport.toMap(cfg).asJava)) { c =>
+      c.listTopics().names.get.asScala.toSeq
+    }
+  }.recover { case e => log.error("Unable to load Kafka topics.", e); Seq.empty }.get
 
   override def receive: Receive = {
     case RefreshTopicList =>

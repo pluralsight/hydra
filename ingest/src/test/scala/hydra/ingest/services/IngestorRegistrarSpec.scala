@@ -21,7 +21,7 @@ import scala.concurrent.duration._
 class IngestorRegistrarSpec extends TestKit(ActorSystem("hydra")) with Matchers
   with FunSpecLike with ImplicitSender with ScalaFutures with BeforeAndAfterAll with Eventually {
 
-  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10 seconds)
+  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 
   implicit override val patienceConfig = PatienceConfig(timeout = Span(10, Seconds), interval = Span(1, Seconds))
 
