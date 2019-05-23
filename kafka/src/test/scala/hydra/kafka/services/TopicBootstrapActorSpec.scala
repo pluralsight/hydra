@@ -713,6 +713,171 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       publishToKafka(consumeSubject, expectedMessage, expectedMessage)(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
     }
   }
+
+  it should "create topics compacted topics that don't exist, but not error for topics that do exist" in {
+
+    val subject = "exp.dataplatform.testsbject5"
+
+    val mdRequest = s"""{
+                       |	"subject": "$subject",
+                       |	"streamType": "History",
+                       |  "derived": false,
+                       |	"dataClassification": "Public",
+                       |	"dataSourceOwner": "BARTON",
+                       |	"contact": "slackity slack dont talk back",
+                       |	"psDataLake": false,
+                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+                       |	"notes": "here are some notes topkek",
+                       |	"schema": {
+                       |	  "namespace": "exp.assessment",
+                       |	  "name": "SkillAssessmentTopicsScored",
+                       |    "hydra.key": "testField",
+                       |	  "type": "record",
+                       |	  "version": 1,
+                       |	  "fields": [
+                       |	    {
+                       |	      "name": "testField",
+                       |	      "type": "string"
+                       |	    }
+                       |	  ]
+                       |	}
+                       |}"""
+      .stripMargin
+      .parseJson
+      .convertTo[TopicMetadataRequest]
+
+    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test12")
+
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
+      system.actorSelection("/user/kafka_ingestor_test12"), Props(new MockStreamsManagerActor())
+    ))
+
+    probe.expectMsgType[RegisterSchemaRequest]
+
+    val senderProbe = TestProbe()
+
+    EmbeddedKafka.createCustomTopic("exp.dataplatform.testsbject5")
+
+    bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
+
+    val expectedMessage = "message"
+    val consumeSubject = "_compacted.exp.dataplatform.testsbject5"
+
+    //need to publish a KEY and VALUE here, otherwise kafka throws an exception for the compacted topic
+    publishToKafka(consumeSubject, expectedMessage, expectedMessage)(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
+    consumeFirstStringMessageFrom(consumeSubject) shouldEqual expectedMessage
+  }
+
+  it should "create topics historical topics that don't exist, but not error for compacted topics that do exist" in {
+
+    val subject = "exp.dataplatform.testsbject5"
+
+    val mdRequest = s"""{
+                       |	"subject": "$subject",
+                       |	"streamType": "History",
+                       |  "derived": false,
+                       |	"dataClassification": "Public",
+                       |	"dataSourceOwner": "BARTON",
+                       |	"contact": "slackity slack dont talk back",
+                       |	"psDataLake": false,
+                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+                       |	"notes": "here are some notes topkek",
+                       |	"schema": {
+                       |	  "namespace": "exp.assessment",
+                       |	  "name": "SkillAssessmentTopicsScored",
+                       |    "hydra.key": "testField",
+                       |	  "type": "record",
+                       |	  "version": 1,
+                       |	  "fields": [
+                       |	    {
+                       |	      "name": "testField",
+                       |	      "type": "string"
+                       |	    }
+                       |	  ]
+                       |	}
+                       |}"""
+      .stripMargin
+      .parseJson
+      .convertTo[TopicMetadataRequest]
+
+    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test12")
+
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
+      system.actorSelection("/user/kafka_ingestor_test12"), Props(new MockStreamsManagerActor())
+    ))
+
+    probe.expectMsgType[RegisterSchemaRequest]
+
+    val senderProbe = TestProbe()
+
+    EmbeddedKafka.createCustomTopic("_compacted.exp.dataplatform.testsbject5")
+
+    bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
+
+    val expectedMessage = "message"
+    val consumeSubject = "_compacted.exp.dataplatform.testsbject5"
+
+    //need to publish a KEY and VALUE here, otherwise kafka throws an exception for the compacted topic
+    publishToKafka(consumeSubject, expectedMessage, expectedMessage)(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
+    consumeFirstStringMessageFrom(consumeSubject) shouldEqual expectedMessage
+  }
+
+
+  it should "not error when topics already exist" in {
+
+    val subject = "exp.dataplatform.testsbject5"
+
+    val mdRequest = s"""{
+                       |	"subject": "$subject",
+                       |	"streamType": "History",
+                       |  "derived": false,
+                       |	"dataClassification": "Public",
+                       |	"dataSourceOwner": "BARTON",
+                       |	"contact": "slackity slack dont talk back",
+                       |	"psDataLake": false,
+                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+                       |	"notes": "here are some notes topkek",
+                       |	"schema": {
+                       |	  "namespace": "exp.assessment",
+                       |	  "name": "SkillAssessmentTopicsScored",
+                       |    "hydra.key": "testField",
+                       |	  "type": "record",
+                       |	  "version": 1,
+                       |	  "fields": [
+                       |	    {
+                       |	      "name": "testField",
+                       |	      "type": "string"
+                       |	    }
+                       |	  ]
+                       |	}
+                       |}"""
+      .stripMargin
+      .parseJson
+      .convertTo[TopicMetadataRequest]
+
+    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test12")
+
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
+      system.actorSelection("/user/kafka_ingestor_test12"), Props(new MockStreamsManagerActor())
+    ))
+
+    probe.expectMsgType[RegisterSchemaRequest]
+
+    val senderProbe = TestProbe()
+
+    EmbeddedKafka.createCustomTopic("_compacted.exp.dataplatform.testsbject5")
+    EmbeddedKafka.createCustomTopic("exp.dataplatform.testsbject5")
+
+    bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
+
+    val expectedMessage = "message"
+    val consumeSubject = "_compacted.exp.dataplatform.testsbject5"
+
+    //need to publish a KEY and VALUE here, otherwise kafka throws an exception for the compacted topic
+    publishToKafka(consumeSubject, expectedMessage, expectedMessage)(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
+    consumeFirstStringMessageFrom(consumeSubject) shouldEqual expectedMessage
+  }
+
 }
 
 
