@@ -214,15 +214,15 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
       topicMap += (compactedPrefix+topicName -> compactedDetails)
     }
 
-    kafkaUtils.createTopics(topicMap, timeout = timeoutMillis)
+    val createMap = topicMap.filterNot(nameDetails => {
+      kafkaUtils.topicExists(nameDetails._1).get
+    })
+
+    kafkaUtils.createTopics(createMap, timeout = timeoutMillis)
       .map { r =>
         r.all.get(timeoutMillis, TimeUnit.MILLISECONDS)
       }.map { _ => BootstrapSuccess }
       .recover {
-        case illegalArg: IllegalArgumentException => {
-          log.info(s"Topic $topicName already exists, proceeding anyway...")
-          BootstrapSuccess
-        }
         case e: Exception => throw e
       }
 
