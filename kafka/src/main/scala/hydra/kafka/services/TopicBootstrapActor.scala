@@ -210,7 +210,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
 
     if(shouldCreateCompactedTopic(topicMetadataRequest)) {
       val compactedPrefix = bootstrapKafkaConfig.get[String]("compacted-topic-prefix").valueOrElse("_compacted.")
-      log.info(s"adding $compactedPrefix to creation...")
+      log.info(s"adding $compactedPrefix to creation of $topicName....")
       topicMap += (compactedPrefix+topicName -> compactedDetails)
     }
 
