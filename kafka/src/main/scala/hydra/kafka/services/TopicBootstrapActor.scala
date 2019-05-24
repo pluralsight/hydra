@@ -214,9 +214,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
       topicMap += (compactedPrefix+topicName -> compactedDetails)
     }
 
-    val createMap = topicMap.filterNot(nameDetails => {
-      kafkaUtils.topicExists(nameDetails._1).get
-    })
+    val createMap = topicMap.filterNot(nameDetails => kafkaUtils.topicExists(nameDetails._1).get)
 
     kafkaUtils.createTopics(createMap, timeout = timeoutMillis)
       .map { r =>
