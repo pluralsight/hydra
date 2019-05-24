@@ -110,32 +110,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   "A TopicBootstrapActor" should "process metadata and send an Ingest message to the kafka ingestor" in {
 
-    val mdRequest = """{
-                      |	"subject": "exp.dataplatform.testsubject1",
-                      |	"streamType": "Notification",
-                      | "derived": false,
-                      |	"dataClassification": "Public",
-                      |	"dataSourceOwner": "BARTON",
-                      |	"contact": "slackity slack dont talk back",
-                      |	"psDataLake": false,
-                      |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
-                      |	"notes": "here are some notes topkek",
-                      |	"schema": {
-                      |	  "namespace": "exp.assessment",
-                      |	  "name": "SkillAssessmentTopicsScored",
-                      |	  "type": "record",
-                      |	  "version": 1,
-                      |	  "fields": [
-                      |	    {
-                      |	      "name": "testField",
-                      |	      "type": "string"
-                      |	    }
-                      |	  ]
-                      |	}
-                      |}"""
-      .stripMargin
-      .parseJson
-      .convertTo[TopicMetadataRequest]
+    val mdRequest = buildTestRequest("testsbject1", "exp.dataplatform")
 
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test1")
 
@@ -162,32 +137,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   }
 
   it should "respond with the error that caused the failed actor state" in {
-    val mdRequest = """{
-                      |	"subject": "exp.dataplatform.testsubject2",
-                      |	"streamType": "Notification",
-                      | "derived": false,
-                      |	"dataClassification": "Public",
-                      |	"dataSourceOwner": "BARTON",
-                      |	"contact": "slackity slack dont talk back",
-                      |	"psDataLake": false,
-                      |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
-                      |	"notes": "here are some notes topkek",
-                      |	"schema": {
-                      |	  "namespace": "exp.assessment",
-                      |	  "name": "SkillAssessmentTopicsScored",
-                      |	  "type": "record",
-                      |	  "version": 1,
-                      |	  "fields": [
-                      |	    {
-                      |	      "name": "testField",
-                      |	      "type": "string"
-                      |	    }
-                      |	  ]
-                      |	}
-                      |}"""
-      .stripMargin
-      .parseJson
-      .convertTo[TopicMetadataRequest]
+
+    val mdRequest = buildTestRequest("testsbject2", "exp.dataplatform")
 
     val (probe, schemaRegistryActor, _) = fixture("test2",
       schemaRegistryShouldFail = true)
@@ -210,32 +161,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   it should "respond with the appropriate metadata failure message" in {
 
-    val mdRequest = """{
-                      |	"subject": "exp....",
-                      |	"streamType": "Notification",
-                      | "derived": false,
-                      |	"dataClassification": "Public",
-                      |	"dataSourceOwner": "BARTON",
-                      |	"contact": "slackity slack dont talk back",
-                      |	"psDataLake": false,
-                      |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
-                      |	"notes": "here are some notes topkek",
-                      |	"schema": {
-                      |	  "namespace": "exp.assessment",
-                      |	  "name": "SkillAssessmentTopicsScored",
-                      |	  "type": "record",
-                      |	  "version": 1,
-                      |	  "fields": [
-                      |	    {
-                      |	      "name": "testField",
-                      |	      "type": "string"
-                      |	    }
-                      |	  ]
-                      |	}
-                      |}"""
-      .stripMargin
-      .parseJson
-      .convertTo[TopicMetadataRequest]
+    val mdRequest = buildTestRequest("", "exp....")
 
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test3")
 
@@ -256,32 +182,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   }
 
   it should "respond with the appropriate failure when the KafkaIngestor returns an exception" in {
-    val mdRequest = """{
-                      |	"subject": "exp.dataplatform.testsubject4",
-                      |	"streamType": "Notification",
-                      | "derived": false,
-                      |	"dataClassification": "Public",
-                      |	"dataSourceOwner": "BARTON",
-                      |	"contact": "slackity slack dont talk back",
-                      |	"psDataLake": false,
-                      |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
-                      |	"notes": "here are some notes topkek",
-                      |	"schema": {
-                      |	  "namespace": "exp.assessment",
-                      |	  "name": "SkillAssessmentTopicsScored",
-                      |	  "type": "record",
-                      |	  "version": 1,
-                      |	  "fields": [
-                      |	    {
-                      |	      "name": "testField",
-                      |	      "type": "string"
-                      |	    }
-                      |	  ]
-                      |	}
-                      |}"""
-      .stripMargin
-      .parseJson
-      .convertTo[TopicMetadataRequest]
+
+    val mdRequest = buildTestRequest("testsbject4", "exp.dataplatform")
 
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test4", kafkaShouldFail = true)
 
@@ -302,34 +204,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   }
 
   it should "create the kafka topic" in {
-    val subject = "exp.dataplatform.testsubject5"
 
-    val mdRequest = s"""{
-                       |	"subject": "$subject",
-                       |	"streamType": "Notification",
-                       | "derived": false,
-                       |	"dataClassification": "Public",
-                       |	"dataSourceOwner": "BARTON",
-                       |	"contact": "slackity slack dont talk back",
-                       |	"psDataLake": false,
-                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
-                       |	"notes": "here are some notes topkek",
-                       |	"schema": {
-                       |	  "namespace": "exp.assessment",
-                       |	  "name": "SkillAssessmentTopicsScored",
-                       |	  "type": "record",
-                       |	  "version": 1,
-                       |	  "fields": [
-                       |	    {
-                       |	      "name": "testField",
-                       |	      "type": "string"
-                       |	    }
-                       |	  ]
-                       |	}
-                       |}"""
-      .stripMargin
-      .parseJson
-      .convertTo[TopicMetadataRequest]
+    val mdRequest = buildTestRequest("testsbject5", "exp.dataplatform")
 
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test5")
 
@@ -359,45 +235,19 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       case BootstrapSuccess(tm) =>
         tm.schemaId should be > 0
         tm.derived shouldBe false
-        tm.subject shouldBe subject
+        tm.subject shouldBe mdRequest.subject
     }
 
     val expectedMessage = "I'm expected!"
 
-    publishStringMessageToKafka(subject, expectedMessage)
+    publishStringMessageToKafka(mdRequest.subject, expectedMessage)
 
-    consumeFirstStringMessageFrom(subject) shouldEqual expectedMessage
+    consumeFirstStringMessageFrom(mdRequest.subject) shouldEqual expectedMessage
   }
 
   it should "return a BootstrapFailure for failures while creating the kafka topic" in {
-    val subject = "exp.dataplatform.testsubject6"
 
-    val mdRequest = s"""{
-                       |	"subject": "$subject",
-                       |	"streamType": "Notification",
-                       | "derived": false,
-                       |	"dataClassification": "Public",
-                       |	"dataSourceOwner": "BARTON",
-                       |	"contact": "slackity slack dont talk back",
-                       |	"psDataLake": false,
-                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
-                       |	"notes": "here are some notes topkek",
-                       |	"schema": {
-                       |	  "namespace": "exp.assessment",
-                       |	  "name": "SkillAssessmentTopicsScored",
-                       |	  "type": "record",
-                       |	  "version": 1,
-                       |	  "fields": [
-                       |	    {
-                       |	      "name": "testField",
-                       |	      "type": "string"
-                       |	    }
-                       |	  ]
-                       |	}
-                       |}"""
-      .stripMargin
-      .parseJson
-      .convertTo[TopicMetadataRequest]
+    val mdRequest = buildTestRequest("testsbject6", "exp.dataplatform")
 
     val testConfig = ConfigFactory.parseString(
       """
@@ -441,34 +291,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   }
 
   it should "not fail due to a topic already existing" in {
-    val subject = "exp.dataplatform.testsubject7"
 
-    val mdRequest = s"""{
-                       |	"subject": "$subject",
-                       |	"streamType": "Notification",
-                       | "derived": false,
-                       |	"dataClassification": "Public",
-                       |	"dataSourceOwner": "BARTON",
-                       |	"contact": "slackity slack dont talk back",
-                       |	"psDataLake": false,
-                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
-                       |	"notes": "here are some notes topkek",
-                       |	"schema": {
-                       |	  "namespace": "exp.assessment",
-                       |	  "name": "SkillAssessmentTopicsScored",
-                       |	  "type": "record",
-                       |	  "version": 1,
-                       |	  "fields": [
-                       |	    {
-                       |	      "name": "testField",
-                       |	      "type": "string"
-                       |	    }
-                       |	  ]
-                       |	}
-                       |}"""
-      .stripMargin
-      .parseJson
-      .convertTo[TopicMetadataRequest]
+    val mdRequest = buildTestRequest("testsbject7", "exp.dataplatform")
 
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test7")
 
@@ -498,7 +322,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       case BootstrapSuccess(tm) =>
         tm.schemaId should be > 0
         tm.derived shouldBe false
-        tm.subject shouldBe subject
+        tm.subject shouldBe mdRequest.subject
     }
 
     bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
@@ -507,7 +331,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       case BootstrapSuccess(tm) =>
         tm.schemaId should be > 0
         tm.derived shouldBe false
-        tm.subject shouldBe subject
+        tm.subject shouldBe mdRequest.subject
     }
   }
 
@@ -554,32 +378,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   }
 
   it should "retry after a configurable interval when the schema registration fails" in {
-    val mdRequest = """{
-                      |	"subject": "exp.dataplatform.testsubject8",
-                      |	"streamType": "Notification",
-                      | "derived": false,
-                      |	"dataClassification": "Public",
-                      |	"dataSourceOwner": "BARTON",
-                      |	"contact": "slackity slack dont talk back",
-                      |	"psDataLake": false,
-                      |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
-                      |	"notes": "here are some notes topkek",
-                      |	"schema": {
-                      |	  "namespace": "exp.assessment",
-                      |	  "name": "SkillAssessmentTopicsScored",
-                      |	  "type": "record",
-                      |	  "version": 1,
-                      |	  "fields": [
-                      |	    {
-                      |	      "name": "testField",
-                      |	      "type": "string"
-                      |	    }
-                      |	  ]
-                      |	}
-                      |}"""
-      .stripMargin
-      .parseJson
-      .convertTo[TopicMetadataRequest]
+
+    val mdRequest = buildTestRequest("testsbject8", "exp.dataplatform")
 
     val (probe, schemaRegistryActor, _) = fixture("test8",
       schemaRegistryShouldFail = true)
@@ -612,35 +412,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   it should "create a compacted topic if a hydra key exists and the stream type is historic" in {
 
-      val subject = "exp.dataplatform.testsbject5"
-
-      val mdRequest = s"""{
-                         |	"subject": "$subject",
-                         |	"streamType": "History",
-                         |  "derived": false,
-                         |	"dataClassification": "Public",
-                         |	"dataSourceOwner": "BARTON",
-                         |	"contact": "slackity slack dont talk back",
-                         |	"psDataLake": false,
-                         |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
-                         |	"notes": "here are some notes topkek",
-                         |	"schema": {
-                         |	  "namespace": "exp.assessment",
-                         |	  "name": "SkillAssessmentTopicsScored",
-                         |    "hydra.key": "testField",
-                         |	  "type": "record",
-                         |	  "version": 1,
-                         |	  "fields": [
-                         |	    {
-                         |	      "name": "testField",
-                         |	      "type": "string"
-                         |	    }
-                         |	  ]
-                         |	}
-                         |}"""
-        .stripMargin
-        .parseJson
-        .convertTo[TopicMetadataRequest]
+    val mdRequest = buildTestRequest("testsbject5", "exp.dataplatform")
 
       val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test12")
 
@@ -664,34 +436,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   it should "not create a compacted topic if hydra.key is not present" in {
 
-    val subject = "exp.dataplatform.testsbject6"
-
-    val mdRequest = s"""{
-                       |	"subject": "$subject",
-                       |	"streamType": "History",
-                       |  "derived": false,
-                       |	"dataClassification": "Public",
-                       |	"dataSourceOwner": "BARTON",
-                       |	"contact": "slackity slack dont talk back",
-                       |	"psDataLake": false,
-                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
-                       |	"notes": "here are some notes topkek",
-                       |	"schema": {
-                       |	  "namespace": "exp.assessment",
-                       |	  "name": "SkillAssessmentTopicsScored",
-                       |	  "type": "record",
-                       |	  "version": 1,
-                       |	  "fields": [
-                       |	    {
-                       |	      "name": "testField",
-                       |	      "type": "string"
-                       |	    }
-                       |	  ]
-                       |	}
-                       |}"""
-      .stripMargin
-      .parseJson
-      .convertTo[TopicMetadataRequest]
+    val mdRequest = buildTestRequestWithoutHydraKey("testsbject6", "exp.dataplatform")
 
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test13")
 
@@ -716,35 +461,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   it should "create topics compacted topics that don't exist, but not error for topics that do exist" in {
 
-    val subject = "exp.dataplatform.testsbject5"
-
-    val mdRequest = s"""{
-                       |	"subject": "$subject",
-                       |	"streamType": "History",
-                       |  "derived": false,
-                       |	"dataClassification": "Public",
-                       |	"dataSourceOwner": "BARTON",
-                       |	"contact": "slackity slack dont talk back",
-                       |	"psDataLake": false,
-                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
-                       |	"notes": "here are some notes topkek",
-                       |	"schema": {
-                       |	  "namespace": "exp.assessment",
-                       |	  "name": "SkillAssessmentTopicsScored",
-                       |    "hydra.key": "testField",
-                       |	  "type": "record",
-                       |	  "version": 1,
-                       |	  "fields": [
-                       |	    {
-                       |	      "name": "testField",
-                       |	      "type": "string"
-                       |	    }
-                       |	  ]
-                       |	}
-                       |}"""
-      .stripMargin
-      .parseJson
-      .convertTo[TopicMetadataRequest]
+    val mdRequest = buildTestRequest("testsbject5", "exp.dataplatform")
 
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test12")
 
@@ -770,35 +487,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   it should "create topics historical topics that don't exist, but not error for compacted topics that do exist" in {
 
-    val subject = "exp.dataplatform.testsbject5"
-
-    val mdRequest = s"""{
-                       |	"subject": "$subject",
-                       |	"streamType": "History",
-                       |  "derived": false,
-                       |	"dataClassification": "Public",
-                       |	"dataSourceOwner": "BARTON",
-                       |	"contact": "slackity slack dont talk back",
-                       |	"psDataLake": false,
-                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
-                       |	"notes": "here are some notes topkek",
-                       |	"schema": {
-                       |	  "namespace": "exp.assessment",
-                       |	  "name": "SkillAssessmentTopicsScored",
-                       |    "hydra.key": "testField",
-                       |	  "type": "record",
-                       |	  "version": 1,
-                       |	  "fields": [
-                       |	    {
-                       |	      "name": "testField",
-                       |	      "type": "string"
-                       |	    }
-                       |	  ]
-                       |	}
-                       |}"""
-      .stripMargin
-      .parseJson
-      .convertTo[TopicMetadataRequest]
+    val mdRequest = buildTestRequest("testsbject5", "exp.dataplatform")
 
     val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test12")
 
@@ -825,10 +514,36 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   it should "not error when topics already exist" in {
 
-    val subject = "exp.dataplatform.testsbject5"
+    val mdRequest = buildTestRequest("testsbject5", "exp.dataplatform")
+
+    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test12")
+
+    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
+      system.actorSelection("/user/kafka_ingestor_test12"), Props(new MockStreamsManagerActor())
+    ))
+
+    probe.expectMsgType[RegisterSchemaRequest]
+
+    val senderProbe = TestProbe()
+
+    EmbeddedKafka.createCustomTopic("_compacted.exp.dataplatform.testsbject5")
+    EmbeddedKafka.createCustomTopic("exp.dataplatform.testsbject5")
+
+    bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
+
+    val expectedMessage = "message"
+    val consumeSubject = "_compacted.exp.dataplatform.testsbject5"
+
+    //need to publish a KEY and VALUE here, otherwise kafka throws an exception for the compacted topic
+    publishToKafka(consumeSubject, expectedMessage, expectedMessage)(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
+    consumeFirstStringMessageFrom(consumeSubject) shouldEqual expectedMessage
+  }
+
+
+  def buildTestRequest(name: String, namespace: String): TopicMetadataRequest = {
 
     val mdRequest = s"""{
-                       |	"subject": "$subject",
+                       |	"subject": "${namespace + "." + name}",
                        |	"streamType": "History",
                        |  "derived": false,
                        |	"dataClassification": "Public",
@@ -854,29 +569,40 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       .stripMargin
       .parseJson
       .convertTo[TopicMetadataRequest]
-
-    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test12")
-
-    val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("/user/kafka_ingestor_test12"), Props(new MockStreamsManagerActor())
-    ))
-
-    probe.expectMsgType[RegisterSchemaRequest]
-
-    val senderProbe = TestProbe()
-
-    EmbeddedKafka.createCustomTopic("_compacted.exp.dataplatform.testsbject5")
-    EmbeddedKafka.createCustomTopic("exp.dataplatform.testsbject5")
-
-    bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
-
-    val expectedMessage = "message"
-    val consumeSubject = "_compacted.exp.dataplatform.testsbject5"
-
-    //need to publish a KEY and VALUE here, otherwise kafka throws an exception for the compacted topic
-    publishToKafka(consumeSubject, expectedMessage, expectedMessage)(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
-    consumeFirstStringMessageFrom(consumeSubject) shouldEqual expectedMessage
+    mdRequest
   }
+
+  def buildTestRequestWithoutHydraKey(name: String, namespace: String): TopicMetadataRequest = {
+
+    val mdRequest = s"""{
+                       |	"subject": "${namespace + "." + name}",
+                       |	"streamType": "History",
+                       |  "derived": false,
+                       |	"dataClassification": "Public",
+                       |	"dataSourceOwner": "BARTON",
+                       |	"contact": "slackity slack dont talk back",
+                       |	"psDataLake": false,
+                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+                       |	"notes": "here are some notes topkek",
+                       |	"schema": {
+                       |	  "namespace": "exp.assessment",
+                       |	  "name": "SkillAssessmentTopicsScored",
+                       |	  "type": "record",
+                       |	  "version": 1,
+                       |	  "fields": [
+                       |	    {
+                       |	      "name": "testField",
+                       |	      "type": "string"
+                       |	    }
+                       |	  ]
+                       |	}
+                       |}"""
+      .stripMargin
+      .parseJson
+      .convertTo[TopicMetadataRequest]
+    mdRequest
+  }
+
 
 }
 
