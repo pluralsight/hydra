@@ -463,16 +463,15 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     val mdRequest = buildTestRequest("testsbject51", "exp.dataplatform")
 
-    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test16")
+    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test77")
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("/user/kafka_ingestor_test12"), Props(new MockStreamsManagerActor())
+      system.actorSelection("/user/kafka_ingestor_test77"), Props(new MockStreamsManagerActor())
     ))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
     val senderProbe = TestProbe()
-
     EmbeddedKafka.createCustomTopic("exp.dataplatform.testsbject51")
 
     bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
@@ -483,32 +482,34 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     //need to publish a KEY and VALUE here, otherwise kafka throws an exception for the compacted topic
     publishToKafka(consumeSubject, expectedMessage, expectedMessage)(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
     consumeFirstStringMessageFrom(consumeSubject) shouldEqual expectedMessage
+
+
   }
 
-  it should "create topics historical topics that don't exist, but not error for compacted topics that do exist" in {
+  it should "create historical topics that don't exist, but not error for compacted topics that do exist" in {
 
     val mdRequest = buildTestRequest("testsbject52", "exp.dataplatform")
 
-    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test337")
+    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test78")
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
-      system.actorSelection("/user/kafka_ingestor_test12"), Props(new MockStreamsManagerActor())
+      system.actorSelection("/user/kafka_ingestor_test78"), Props(new MockStreamsManagerActor())
     ))
 
     probe.expectMsgType[RegisterSchemaRequest]
 
     val senderProbe = TestProbe()
-
     EmbeddedKafka.createCustomTopic("_compacted.exp.dataplatform.testsbject52")
 
     bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
 
     val expectedMessage = "message"
-    val consumeSubject = "_compacted.exp.dataplatform.testsbject52"
+    val consumeSubject = "exp.dataplatform.testsbject52"
 
     //need to publish a KEY and VALUE here, otherwise kafka throws an exception for the compacted topic
     publishToKafka(consumeSubject, expectedMessage, expectedMessage)(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
     consumeFirstStringMessageFrom(consumeSubject) shouldEqual expectedMessage
+
   }
 
 
