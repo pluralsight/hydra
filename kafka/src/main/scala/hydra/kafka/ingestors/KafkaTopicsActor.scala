@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit
 
 import akka.actor.Status.Failure
 import akka.actor.{Actor, Props, Stash, Timers}
+import akka.dispatch.Futures
 import akka.pattern.pipe
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
@@ -45,18 +46,19 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration) extends Actor
 
   implicit val ec = context.dispatcher
 
-  private def fetchTopics(): Future[GetTopicsResponse] = {
-    Future.fromTry {
-      Try(AdminClient.create(ConfigSupport.toMap(cfg).asJava)).map { c =>
-        val t = c.listTopics().names.get(checkInterval.toSeconds.longValue / 2, TimeUnit.SECONDS).asScala.toSeq
-        Try(c.close(checkInterval.toSeconds.longValue / 2, TimeUnit.SECONDS))
-        GetTopicsResponse(t)
-      }
-    }
+  private def fetchTopics(currentList: Seq[String]): Future[GetTopicsResponse] = {
+    akka.pattern.after(1.second, using = context.system.scheduler)(
+      Future.fromTry {
+        Try(AdminClient.create(ConfigSupport.toMap(cfg).asJava)).map { c =>
+          val t = c.listTopics().names.get(checkInterval.toSeconds.longValue / 2, TimeUnit.SECONDS).asScala.toSeq
+          Try(c.close(checkInterval.toSeconds.longValue / 2, TimeUnit.SECONDS))
+          GetTopicsResponse(t)
+        }
+      })
   }
 
   override def receive: Receive = {
-    case RefreshTopicList => pipe(fetchTopics()) to self
+    case RefreshTopicList => pipe(fetchTopics(Seq.empty)) to self
 
     case GetTopicsResponse(topics) =>
       context.become(withTopics(topics))
@@ -73,7 +75,7 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration) extends Actor
       val topicR = topicList.find(_ == topic)
       sender ! GetTopicResponse(topic, DateTime.now, topicR.isDefined)
 
-    case RefreshTopicList => pipe(fetchTopics()) to self
+    case RefreshTopicList => pipe(fetchTopics(topicList)) to self
 
     case GetTopicsResponse(topics) =>
       context.become(withTopics(topics))
