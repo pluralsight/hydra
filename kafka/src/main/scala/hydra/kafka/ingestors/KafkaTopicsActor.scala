@@ -59,13 +59,12 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration) extends Actor
     case RefreshTopicList => pipe(fetchTopics()) to self
 
     case GetTopicsResponse(topics) =>
-      context.become(withTopics(topics))
+      context.become(withTopics(topics) orElse handleFailure)
       unstashAll()
 
     case GetTopicRequest(_) => stash()
 
-    case Failure(ex) =>
-      log.error(s"Error occurred while attempting to retrieve topics: ${ex.getMessage}")
+
   }
 
   private def withTopics(topicList: Seq[String]): Receive = {
@@ -76,10 +75,14 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration) extends Actor
     case RefreshTopicList => pipe(fetchTopics()) to self
 
     case GetTopicsResponse(topics) =>
-      context.become(withTopics(topics))
+      context.become(withTopics(topics) orElse handleFailure)
 
+  }
+
+  private def handleFailure: Receive  = {
     case Failure(ex) =>
       log.error(s"Error occurred while attempting to retrieve topics: ${ex.getMessage}")
+      context.system.eventStream.publish(GetTopicsFailure(ex))
   }
 
   override def postStop(): Unit = {
@@ -98,6 +101,8 @@ object KafkaTopicActor {
   case class GetTopicResponse(topic: String, lookupDate: DateTime, exists: Boolean)
 
   case class GetTopicsResponse(topics: Seq[String])
+
+  case class GetTopicsFailure(cause: Throwable)
 
   def props(cfg: Config, interval: FiniteDuration = 5 seconds) = Props(classOf[KafkaTopicsActor], cfg, interval)
 
