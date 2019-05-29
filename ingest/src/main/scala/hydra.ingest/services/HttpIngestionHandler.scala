@@ -29,7 +29,7 @@ import scala.concurrent.duration._
 class HttpIngestionHandler(val request: HydraRequest,
                            val timeout: FiniteDuration,
                            val registry: ActorRef,
-                             ctx: ImperativeRequestContext) extends Actor
+                           ctx: ImperativeRequestContext) extends Actor
   with IngestionHandler with HydraIngestJsonSupport {
 
   def complete(report: IngestionReport) = {

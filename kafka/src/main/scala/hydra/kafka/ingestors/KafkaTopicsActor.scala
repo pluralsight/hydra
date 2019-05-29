@@ -18,16 +18,18 @@ package hydra.kafka.ingestors
 
 import java.util.concurrent.TimeUnit
 
+import akka.actor.Status.Failure
 import akka.actor.{Actor, Props, Stash, Timers}
+import akka.dispatch.Futures
+import akka.pattern.pipe
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
-import hydra.common.util.TryWith
-import hydra.kafka.ingestors.KafkaTopicActor.{GetTopicRequest, GetTopicResponse, RefreshTopicList, TopicsTimer}
 import org.apache.kafka.clients.admin.AdminClient
 import org.joda.time.DateTime
 
 import scala.collection.JavaConverters._
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Try
 
@@ -36,32 +38,53 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration) extends Actor
   with LoggingAdapter
   with Stash {
 
+  import KafkaTopicActor._
+
   self ! RefreshTopicList
 
   timers.startPeriodicTimer(TopicsTimer, RefreshTopicList, checkInterval)
 
-  private def topics: Seq[String] = {
-    Try(AdminClient.create(ConfigSupport.toMap(cfg).asJava)).map { c =>
-      val t = c.listTopics().names.get(checkInterval.toSeconds.longValue / 2, TimeUnit.SECONDS).asScala.toSeq
-      Try(c.close(checkInterval.toSeconds.longValue / 2, TimeUnit.SECONDS))
-      t
-    }
-  }.recover { case e => log.error("Unable to load Kafka topics.", e); Seq.empty }.get
+  implicit val ec = context.dispatcher
+
+  private def fetchTopics(currentList: Seq[String]): Future[GetTopicsResponse] = {
+    akka.pattern.after(1.second, using = context.system.scheduler)(
+      Future.fromTry {
+        Try(AdminClient.create(ConfigSupport.toMap(cfg).asJava)).map { c =>
+          val t = c.listTopics().names.get(checkInterval.toSeconds.longValue / 2, TimeUnit.SECONDS).asScala.toSeq
+          Try(c.close(checkInterval.toSeconds.longValue / 2, TimeUnit.SECONDS))
+          GetTopicsResponse(t)
+        }
+      })
+  }
 
   override def receive: Receive = {
-    case RefreshTopicList =>
-      context.become(withTopics(topics))
+    case RefreshTopicList => pipe(fetchTopics(Seq.empty)) to self
+
+    case GetTopicsResponse(topics) =>
+      context.become(withTopics(topics) orElse handleFailure)
       unstashAll()
+
     case GetTopicRequest(_) => stash()
+
+
   }
 
   private def withTopics(topicList: Seq[String]): Receive = {
     case GetTopicRequest(topic) =>
-      val topicR = topics.find(_ == topic)
+      val topicR = topicList.find(_ == topic)
       sender ! GetTopicResponse(topic, DateTime.now, topicR.isDefined)
 
-    case RefreshTopicList =>
-      context.become(withTopics(topics))
+    case RefreshTopicList => pipe(fetchTopics(topicList)) to self
+
+    case GetTopicsResponse(topics) =>
+      context.become(withTopics(topics) orElse handleFailure)
+
+  }
+
+  private def handleFailure: Receive  = {
+    case Failure(ex) =>
+      log.error(s"Error occurred while attempting to retrieve topics: ${ex.getMessage}")
+      context.system.eventStream.publish(GetTopicsFailure(ex))
   }
 
   override def postStop(): Unit = {
@@ -79,8 +102,10 @@ object KafkaTopicActor {
 
   case class GetTopicResponse(topic: String, lookupDate: DateTime, exists: Boolean)
 
+  case class GetTopicsResponse(topics: Seq[String])
+
+  case class GetTopicsFailure(cause: Throwable)
+
   def props(cfg: Config, interval: FiniteDuration = 5 seconds) = Props(classOf[KafkaTopicsActor], cfg, interval)
 
 }
-
-
