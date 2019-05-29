@@ -18,13 +18,16 @@ class KafkaTopicsActorSpec
     with Eventually
     with EmbeddedKafka
     with BeforeAndAfterAll {
+      
   val config = ConfigFactory.parseString(
     """
       |  bootstrap.servers = "localhost:6001"
       |  zookeeper = "localhost:6000"
     """.stripMargin)
   implicit val patience = PatienceConfig(timeout = 5 seconds, interval = 1 second)
+      
   override def afterAll = TestKit.shutdownActorSystem(system)
+      
   "A KafkaTopicsActor" should "return topics that exist" in {
     withRunningKafka {
       createCustomTopic("topic-actor")
@@ -37,6 +40,7 @@ class KafkaTopicsActorSpec
       }
     }
   }
+      
   it should "not return topics that doesn't exist" in {
     withRunningKafka {
       val actor = system.actorOf(KafkaTopicActor.props(config))
@@ -48,6 +52,7 @@ class KafkaTopicsActorSpec
       }
     }
   }
+      
   it should "update its local cache" in {
     withRunningKafka {
       val actor = system.actorOf(KafkaTopicActor.props(config))
@@ -68,12 +73,14 @@ class KafkaTopicsActorSpec
       }
     }
   }
+      
   it should "publish an error if the first attempt to fetch topics fails" in {
     val actor = system.actorOf(KafkaTopicActor.props(config))
     val probinho = TestProbe()
     system.eventStream.subscribe(probinho.ref, classOf[GetTopicsFailure])
     probinho.expectMsgType[GetTopicsFailure]
   }
+      
   it should "publish an error if subsequent attempts to fetch topics fail" in {
     val probinho = TestProbe()
     val actor: ActorRef = system.actorOf(KafkaTopicActor.props(config))
