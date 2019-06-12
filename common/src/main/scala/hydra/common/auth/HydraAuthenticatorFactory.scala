@@ -10,7 +10,7 @@ class HydraAuthenticatorFactory(authEnabled: Boolean, authenticatorClassName: St
 }
 
 object HydraAuthenticatorFactory {
-  def apply(authEnabled: Boolean, authenticatorClassName: Option[String]): Option[HydraAuthenticator] = {
+  def apply(authEnabled: Boolean, authenticatorClassName: Option[String]): HydraAuthenticator = {
     if (authEnabled) {
       authenticatorClassName match {
         case Some(className) => getAuthenticator(className)
@@ -18,13 +18,13 @@ object HydraAuthenticatorFactory {
       }
     }
     else {
-      None
+      new NoSecurityAuthenticator
     }
   }
 
   private def getAuthenticator(authenticatorClassName: String) = {
     val Authenticator: HydraAuthenticator =
       Class.forName(authenticatorClassName).newInstance().asInstanceOf[HydraAuthenticator]
-    Some(Authenticator)
+    Authenticator
   }
 }
