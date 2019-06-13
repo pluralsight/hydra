@@ -7,6 +7,7 @@ package hydra.ingest.services
 import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorRef}
 import akka.http.scaladsl.model.StatusCodes
+import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
