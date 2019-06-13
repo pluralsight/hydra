@@ -22,7 +22,9 @@ import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.Flow
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
+import com.typesafe.config.{Config, ConfigFactory}
 import configs.syntax._
+import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
 import hydra.core.marshallers.GenericServiceResponse
@@ -44,7 +46,7 @@ class IngestionWebSocketEndpoint(implicit system: ActorSystem, implicit val e: E
 
   private val socketFactory = IngestSocketFactory.createSocket(system)
 
-  implicit val simpleOutgoingMessageFormat = jsonFormat2(SimpleOutgoingMessage)
+  implicit val simpleOutgoingMessageFormat: JsonFormat[SimpleOutgoingMessage] = jsonFormat2(SimpleOutgoingMessage)
 
   override val route: Route =
     path("ws-ingest") {
@@ -73,5 +75,11 @@ class IngestionWebSocketEndpoint(implicit system: ActorSystem, implicit val e: E
         case Failure(cause) => log.error(s"WS stream failed with $cause")
         case _ => //ignore
       }(e))
+
+}
+
+object IngestionWebSocketEndpoint extends ConfigSupport {
+
+  private[http] val maxNumberOfWSFrames: Int = rootConfig.get[Int]("hydra.ingest.websocket.max-frames").value
 
 }
