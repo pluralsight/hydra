@@ -43,7 +43,7 @@ object TopicNameValidator {
   }
 
   private def validOrg(topic: String): ValidationResponse = {
-    val validOrgs = Set("exp", "rev", "fin", "mkg", "pnp", "sbo", "dvs")
+    val validOrgs = Set("exp", "rev", "fin", "mkg", "pnp", "sbo", "dvs", "lgl")
 
     val orgOpt = topic.split("\\.").headOption
 
