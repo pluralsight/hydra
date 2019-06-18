@@ -56,25 +56,28 @@ class KafkaTopicsActorSpec
   }
       
   it should "update its local cache" in {
+    val newTopic = "new-topic"
+    val newTopic2 = "new-topic2"
+
     withRunningKafka {
+      createCustomTopic(newTopic2)
+
       val actor = system.actorOf(KafkaTopicsActor.props(config))
 
-      actor ! GetTopicRequest("new-topic")
+      actor ! GetTopicRequest(newTopic)
 
       expectMsgPF() {
         case GetTopicResponse(topic, _, exists) =>
-          topic shouldBe "new-topic"
+          topic shouldBe newTopic
           exists shouldBe false
       }
 
-      createCustomTopic("new-topic")
-
       eventually {
-        actor ! GetTopicRequest("new-topic")
+        actor ! GetTopicRequest(newTopic2)
 
         expectMsgPF() {
           case GetTopicResponse(topic, _, exists) =>
-            topic shouldBe "new-topic"
+            topic shouldBe newTopic2
             exists shouldBe true
         }
       }
