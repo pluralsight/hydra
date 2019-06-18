@@ -91,7 +91,7 @@ class KafkaTopicsActorSpec
   }
       
   it should "publish an error if the first attempt to fetch topics fails" in {
-    val actor = system.actorOf(KafkaTopicsActor.props(config))
+    val actor = system.actorOf(KafkaTopicsActor.props(config, kafkaTimeoutSeconds = 1))
     val probinho = TestProbe()
     system.eventStream.subscribe(probinho.ref, classOf[GetTopicsFailure])
     probinho.expectMsgType[GetTopicsFailure]
@@ -99,7 +99,7 @@ class KafkaTopicsActorSpec
       
   it should "publish an error if subsequent attempts to fetch topics fail" in {
     val probinho = TestProbe()
-    val actor: ActorRef = system.actorOf(KafkaTopicsActor.props(config))
+    val actor: ActorRef = system.actorOf(KafkaTopicsActor.props(config, kafkaTimeoutSeconds = 1))
     system.eventStream.subscribe(probinho.ref, classOf[GetTopicsFailure])
     probinho.expectMsgType[GetTopicsFailure]
     actor ! GetTopicsResponse(Seq("test-topic"))

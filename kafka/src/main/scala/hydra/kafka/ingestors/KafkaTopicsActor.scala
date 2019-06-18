@@ -32,8 +32,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Try
 
-class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration = 5.seconds,
-                       kafkaTimeout: FiniteDuration = 2.seconds) extends Actor
+class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration, kafkaTimeoutSeconds: Long) extends Actor
   with Timers
   with LoggingAdapter
   with Stash {
@@ -50,8 +49,8 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration = 5.seconds,
     akka.pattern.after(1.second, using = context.system.scheduler)(
       Future.fromTry {
         Try(AdminClient.create(ConfigSupport.toMap(cfg).asJava)).map { c =>
-          val t = c.listTopics().names.get(1, TimeUnit.SECONDS).asScala.toSeq
-          Try(c.close(1, TimeUnit.SECONDS))
+          val t = c.listTopics().names.get(kafkaTimeoutSeconds, TimeUnit.SECONDS).asScala.toSeq
+          Try(c.close(kafkaTimeoutSeconds, TimeUnit.SECONDS))
           GetTopicsResponse(t)
         }
       })
@@ -107,6 +106,7 @@ object KafkaTopicsActor {
 
   case class GetTopicsFailure(cause: Throwable)
 
-  def props(cfg: Config) = Props(new KafkaTopicsActor(cfg))
+  def props(cfg: Config, checkInterval: FiniteDuration = 5.seconds, kafkaTimeoutSeconds: Long = 2): Props =
+    Props(new KafkaTopicsActor(cfg, checkInterval, kafkaTimeoutSeconds))
 
 }
