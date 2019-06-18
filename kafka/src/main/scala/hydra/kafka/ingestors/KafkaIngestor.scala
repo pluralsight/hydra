@@ -39,7 +39,6 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
   override val recordFactory = new KafkaRecordFactories(schemaRegistryActor)
 
   private val timeoutDuration = applicationConfig
-    .withOnlyPath("hydra")
     .get[FiniteDuration]("kafka-ingestor-timeout")
     .valueOrElse(2.seconds)
 
