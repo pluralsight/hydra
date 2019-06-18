@@ -20,7 +20,6 @@ import java.util.concurrent.TimeUnit
 
 import akka.actor.Status.Failure
 import akka.actor.{Actor, Props, Stash, Timers}
-import akka.dispatch.Futures
 import akka.pattern.pipe
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
@@ -33,12 +32,12 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Try
 
-class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration) extends Actor
+class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration, kafkaTimeoutSeconds: Long) extends Actor
   with Timers
   with LoggingAdapter
   with Stash {
 
-  import KafkaTopicActor._
+  import KafkaTopicsActor._
 
   self ! RefreshTopicList
 
@@ -50,14 +49,14 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration) extends Actor
     akka.pattern.after(1.second, using = context.system.scheduler)(
       Future.fromTry {
         Try(AdminClient.create(ConfigSupport.toMap(cfg).asJava)).map { c =>
-          val t = c.listTopics().names.get(checkInterval.toSeconds.longValue / 2, TimeUnit.SECONDS).asScala.toSeq
-          Try(c.close(checkInterval.toSeconds.longValue / 2, TimeUnit.SECONDS))
+          val t = c.listTopics().names.get(kafkaTimeoutSeconds, TimeUnit.SECONDS).asScala.toSeq
+          Try(c.close(kafkaTimeoutSeconds, TimeUnit.SECONDS))
           GetTopicsResponse(t)
         }
       })
   }
 
-  override def receive: Receive = {
+  val initialReceive: Receive = {
     case RefreshTopicList => pipe(fetchTopics(Seq.empty)) to self
 
     case GetTopicsResponse(topics) =>
@@ -66,8 +65,9 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration) extends Actor
 
     case GetTopicRequest(_) => stash()
 
-
   }
+
+  override def receive: Receive = initialReceive orElse handleFailure
 
   private def withTopics(topicList: Seq[String]): Receive = {
     case GetTopicRequest(topic) =>
@@ -78,7 +78,6 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration) extends Actor
 
     case GetTopicsResponse(topics) =>
       context.become(withTopics(topics) orElse handleFailure)
-
   }
 
   private def handleFailure: Receive  = {
@@ -92,7 +91,7 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration) extends Actor
   }
 }
 
-object KafkaTopicActor {
+object KafkaTopicsActor {
 
   case object TopicsTimer
 
@@ -106,6 +105,7 @@ object KafkaTopicActor {
 
   case class GetTopicsFailure(cause: Throwable)
 
-  def props(cfg: Config, interval: FiniteDuration = 5 seconds) = Props(classOf[KafkaTopicsActor], cfg, interval)
+  def props(cfg: Config, checkInterval: FiniteDuration = 5.seconds, kafkaTimeoutSeconds: Long = 2): Props =
+    Props(new KafkaTopicsActor(cfg, checkInterval, kafkaTimeoutSeconds))
 
 }

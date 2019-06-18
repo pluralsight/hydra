@@ -48,7 +48,6 @@ class CompactedTopicStreamActorSpec extends TestKit(ActorSystem("compacted-strea
 
   override def afterEach(): Unit = {
     EmbeddedKafka.stop()
-
   }
 
   "The CompactedTopicStreamActor" should "stream from a non compacted topic to a compacted topic in" in {
