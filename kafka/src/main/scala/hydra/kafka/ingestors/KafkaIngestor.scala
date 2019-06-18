@@ -17,12 +17,13 @@
 package hydra.kafka.ingestors
 
 import akka.pattern.ask
+import configs.syntax._
 import akka.util.Timeout
 import hydra.core.ingest.RequestParams._
 import hydra.core.ingest.{HydraRequest, Ingestor, RequestParams}
 import hydra.core.protocol._
 import hydra.kafka.config.KafkaConfigSupport
-import hydra.kafka.ingestors.KafkaTopicActor.{GetTopicRequest, GetTopicResponse}
+import hydra.kafka.ingestors.KafkaTopicsActor.{GetTopicRequest, GetTopicResponse}
 import hydra.kafka.producer.{KafkaProducerSupport, KafkaRecordFactories}
 
 import scala.concurrent.Future
@@ -37,10 +38,15 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
 
   override val recordFactory = new KafkaRecordFactories(schemaRegistryActor)
 
-  private implicit val timeout = Timeout(500 millis)
+  private val timeoutDuration = applicationConfig
+    .withOnlyPath("hydra")
+    .get[FiniteDuration]("kafka-ingestor-timeout")
+    .valueOrElse(2.seconds)
+
+  private implicit val timeout = Timeout(timeoutDuration)
 
   private val topicActor = context.
-    actorOf(KafkaTopicActor.props(KafkaConfigSupport.kafkaConfig.getConfig("kafka.producer")))
+    actorOf(KafkaTopicsActor.props(KafkaConfigSupport.kafkaConfig.getConfig("kafka.producer")))
 
   ingest {
     case Publish(request) =>
@@ -60,6 +66,5 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
 
       case iv: InvalidRequest => Future(iv)
     }
-
   }
 }
