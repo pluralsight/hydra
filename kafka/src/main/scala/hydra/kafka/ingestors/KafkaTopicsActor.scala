@@ -78,7 +78,6 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration, kafkaTimeoutS
 
     case GetTopicsResponse(topics) =>
       context.become(withTopics(topics) orElse handleFailure)
-
   }
 
   private def handleFailure: Receive  = {

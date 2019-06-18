@@ -76,8 +76,8 @@ class KafkaIngestorSpec
 
   val json = """{"first":"hydra","last":"hydra"}"""
 
+  // Ingestor uses an actor selection so this class has to be instantiated beforehand so it can be resolved
   val kafkaProducerProbe = TestProbe()
-
   val kafkaProducer = system.actorOf(Props(new ForwardActor(kafkaProducerProbe.ref)), "kafka_producer")
 
   override def beforeAll = {
