@@ -1,20 +1,20 @@
 package hydra.kafka.ingestors
 
 import akka.actor.{ActorRef, ActorSystem}
-import akka.testkit.{ImplicitSender, TestKit, TestProbe}
+import akka.testkit.{TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import hydra.common.config.ConfigSupport
 import hydra.kafka.ingestors.KafkaTopicsActor._
 import net.manub.embeddedkafka.EmbeddedKafka
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+
 import scala.concurrent.duration._
 
 class KafkaTopicsActorSpec
   extends TestKit(ActorSystem("kafka-topics-spec", config = ConfigFactory.parseString("akka.actor.provider=cluster")))
     with Matchers
     with FlatSpecLike
-    with ImplicitSender
     with ConfigSupport
     with Eventually
     with EmbeddedKafka
@@ -31,11 +31,13 @@ class KafkaTopicsActorSpec
   override def afterAll = TestKit.shutdownActorSystem(system)
       
   "A KafkaTopicsActor" should "return topics that exist" in {
+    val probe = TestProbe()
+
     withRunningKafka {
       createCustomTopic("topic-actor")
       val actor = system.actorOf(KafkaTopicsActor.props(config))
-      actor ! GetTopicRequest("topic-actor")
-      expectMsgPF() {
+      actor.tell(GetTopicRequest("topic-actor"), probe.ref)
+      probe.expectMsgPF() {
         case GetTopicResponse(t, _, e) =>
           t shouldBe "topic-actor"
           e shouldBe true
@@ -44,10 +46,12 @@ class KafkaTopicsActorSpec
   }
       
   it should "not return topics that doesn't exist" in {
+    val probe = TestProbe()
+
     withRunningKafka {
       val actor = system.actorOf(KafkaTopicsActor.props(config))
-      actor ! GetTopicRequest("test-topic")
-      expectMsgPF() {
+      actor.tell(GetTopicRequest("test-topic"), probe.ref)
+      probe.expectMsgPF() {
         case GetTopicResponse(t, _, e) =>
           t shouldBe "test-topic"
           e shouldBe false
@@ -56,6 +60,8 @@ class KafkaTopicsActorSpec
   }
       
   it should "update its local cache" in {
+    val probe = TestProbe()
+
     val newTopic = "new-topic"
     val newTopic2 = "new-topic2"
 
@@ -64,18 +70,18 @@ class KafkaTopicsActorSpec
 
       val actor = system.actorOf(KafkaTopicsActor.props(config))
 
-      actor ! GetTopicRequest(newTopic)
+      actor.tell(GetTopicRequest(newTopic), probe.ref)
 
-      expectMsgPF() {
+      probe.expectMsgPF() {
         case GetTopicResponse(topic, _, exists) =>
           topic shouldBe newTopic
           exists shouldBe false
       }
 
       eventually {
-        actor ! GetTopicRequest(newTopic2)
+        actor.tell(GetTopicRequest(newTopic2), probe.ref)
 
-        expectMsgPF() {
+        probe.expectMsgPF() {
           case GetTopicResponse(topic, _, exists) =>
             topic shouldBe newTopic2
             exists shouldBe true
