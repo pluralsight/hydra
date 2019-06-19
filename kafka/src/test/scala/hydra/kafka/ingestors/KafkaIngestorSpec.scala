@@ -31,36 +31,20 @@ class KafkaIngestorSpec
   extends TestKit(ActorSystem("kafka-ingestor-spec", config = ConfigFactory.parseString("akka.actor.provider=cluster")))
     with Matchers
     with FunSpecLike
-    with ImplicitSender
     with ConfigSupport
     with BeforeAndAfterAll
     with ScalaFutures
     with EmbeddedKafka {
 
-  override def afterAll = {
-    TestKit.shutdownActorSystem(system)
-    EmbeddedKafka.stop()
-  }
-
-  override def beforeAll = {
-    implicit val embeddedKafkaConfig = EmbeddedKafkaConfig(kafkaPort = 8092)
-    EmbeddedKafka.start()
-    EmbeddedKafka.createCustomTopic("test-schema")
-    EmbeddedKafka.createCustomTopic("just-a-topic")
-    EmbeddedKafka.createCustomTopic("json-topic")
-  }
+  import KafkaIngestorSpec._
 
   val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
+
   val registryClient = schemaRegistry.registryClient
-  val probe = TestProbe()
-  val supervisor = TestProbe()
 
-  val kafkaProducer = system.actorOf(Props(new ForwardActor(probe.ref)), "kafka_producer")
+  val loader = TestProbe()
 
-  val kafkaIngestor = probe.childActorOf(Props[KafkaIngestor])
-
-
-  val KAFKA = "kafka_ingestor"
+  val avroRecordFactory = new AvroRecordFactory(loader.ref)
 
   val schema =
     """{
@@ -87,94 +71,138 @@ class KafkaIngestorSpec
   val avroSchema = new Schema.Parser().parse(schema)
 
   val record = new GenericRecordBuilder(avroSchema).set("first", "hydra").set("last", "hydra").build()
+
   val ar = producer.AvroRecord("test-schema", avroSchema, None, record, AckStrategy.NoAck)
 
   val json = """{"first":"hydra","last":"hydra"}"""
 
-  registryClient.register("test-schema-value", new Parser().parse(schema))
-  registryClient.register("test-schema2-value", new Parser().parse(schema2))
+  // Ingestor uses an actor selection so this class has to be instantiated beforehand so it can be resolved
+  val kafkaProducerProbe = TestProbe()
+  val kafkaProducer = system.actorOf(Props(new ForwardActor(kafkaProducerProbe.ref)), "kafka_producer")
+
+  override def beforeAll = {
+    implicit val embeddedKafkaConfig = EmbeddedKafkaConfig(kafkaPort = 8092)
+    EmbeddedKafka.start()
+    EmbeddedKafka.createCustomTopic("test-schema")
+    EmbeddedKafka.createCustomTopic("just-a-topic")
+    EmbeddedKafka.createCustomTopic("json-topic")
+    registryClient.register("test-schema-value", new Parser().parse(schema))
+    registryClient.register("test-schema2-value", new Parser().parse(schema2))
+  }
+
+  override def afterAll = {
+    TestKit.shutdownActorSystem(system)
+    EmbeddedKafka.stop()
+  }
 
   describe("when using the KafkaIngestor") {
     it("joins") {
+      val kafkaIngestor = system.actorOf(Props[KafkaIngestor])
+      val probe = TestProbe()
+
       val request = HydraRequest(
         "123",
         "someString", None,
-        Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "topic"))
-      kafkaIngestor ! Publish(request)
-      expectMsg(Join)
+        Map(HYDRA_INGESTOR_PARAM -> KafkaIngestorName, HYDRA_KAFKA_TOPIC_PARAM -> "topic"))
+      kafkaIngestor.tell(Publish(request), probe.ref)
+      probe.expectMsg(Join)
     }
 
     it("is invalid when there is no topic") {
+      val kafkaIngestor = system.actorOf(Props[KafkaIngestor])
+      val probe = TestProbe()
+
       val request = HydraRequest(
         "123",
         "someString", None,
-        Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_RECORD_FORMAT_PARAM -> "json"))
-      kafkaIngestor ! Validate(request)
-      expectMsgType[InvalidRequest]
+        Map(HYDRA_INGESTOR_PARAM -> KafkaIngestorName, HYDRA_RECORD_FORMAT_PARAM -> "json"))
+      kafkaIngestor.tell(Validate(request), probe.ref)
+      probe.expectMsgType[InvalidRequest]
     }
 
     it("ingests") {
+      val kafkaIngestor = system.actorOf(Props[KafkaIngestor])
+      val probe = TestProbe()
+
+
       val request = HydraRequest(
         "123",
         """{"first":"Roar","last":"King"}""", None,
-        Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema"))
+        Map(HYDRA_INGESTOR_PARAM -> KafkaIngestorName, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema"))
       whenReady(TestRecordFactory.build(request)) { record =>
-        kafkaIngestor ! Ingest(record, NoAck)
-        probe.expectMsg(Produce(record, self, NoAck))
+        kafkaIngestor.tell(Ingest(record, NoAck), probe.ref)
+        kafkaProducerProbe.expectMsg(Produce(record, probe.ref, NoAck))
       }
     }
   }
 
-  val loader = TestProbe()
-  val avroRecordFactory = new AvroRecordFactory(loader.ref)
-
   it("is invalid if it can't find the schema") {
+    val kafkaIngestor = system.actorOf(Props[KafkaIngestor])
+    val probe = TestProbe()
+
     val request = HydraRequest(
       "213",
       "someString", None,
-      Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "avro-topic"))
-    kafkaIngestor ! Validate(request)
-    expectMsgType[InvalidRequest]
+      Map(HYDRA_INGESTOR_PARAM -> KafkaIngestorName, HYDRA_KAFKA_TOPIC_PARAM -> "avro-topic"))
+    kafkaIngestor.tell(Validate(request), probe.ref)
+    probe.expectMsgType[InvalidRequest]
   }
 
   it("is valid with no schema if the topic can be resolved to a string") {
+    val kafkaIngestor = system.actorOf(Props[KafkaIngestor])
+    val probe = TestProbe()
+
     val request = HydraRequest(
       "123",
       json, None,
-      Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema"))
-    kafkaIngestor ! Validate(request)
+      Map(HYDRA_INGESTOR_PARAM -> KafkaIngestorName, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema"))
+    kafkaIngestor.tell(Validate(request), probe.ref)
     avroRecordFactory.getTopicAndSchemaSubject(request).get._2 shouldBe "test-schema"
-    expectMsg(ValidRequest(ar))
+    probe.expectMsg(ValidRequest(ar))
   }
 
   it("is valid when a schema name overrides the topic name") {
+    val kafkaIngestor = system.actorOf(Props[KafkaIngestor])
+    val probe = TestProbe()
+
     val request = HydraRequest(
       "123",
       json, None,
-      Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "just-a-topic", HYDRA_SCHEMA_PARAM -> "test-schema"))
+      Map(HYDRA_INGESTOR_PARAM -> KafkaIngestorName, HYDRA_KAFKA_TOPIC_PARAM -> "just-a-topic", HYDRA_SCHEMA_PARAM -> "test-schema"))
     avroRecordFactory.getTopicAndSchemaSubject(request).get._2 shouldBe "test-schema"
-    kafkaIngestor ! Validate(request)
+    kafkaIngestor.tell(Validate(request), probe.ref)
     val ar = AvroRecord("just-a-topic", avroSchema, None, record, AckStrategy.NoAck)
-    expectMsg(ValidRequest(ar))
+    probe.expectMsg(ValidRequest(ar))
   }
+
   it("is valid if schema can't be found, but json is allowed") {
+    val kafkaIngestor = system.actorOf(Props[KafkaIngestor])
+    val probe = TestProbe()
+
     val request = HydraRequest("123", json, None,
-      Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_RECORD_FORMAT_PARAM -> "json", HYDRA_KAFKA_TOPIC_PARAM -> "json-topic"))
-    kafkaIngestor ! Validate(request)
+      Map(HYDRA_INGESTOR_PARAM -> KafkaIngestorName, HYDRA_RECORD_FORMAT_PARAM -> "json", HYDRA_KAFKA_TOPIC_PARAM -> "json-topic"))
+    kafkaIngestor.tell(Validate(request), probe.ref)
     val node = new ObjectMapper().reader().readTree("""{"first":"hydra","last":"hydra"}""")
-    expectMsg(ValidRequest(JsonRecord("json-topic", None, node, AckStrategy.NoAck)))
+    probe.expectMsg(ValidRequest(JsonRecord("json-topic", None, node, AckStrategy.NoAck)))
   }
 
   it("is invalid if schema exists, but topic doesn't") {
+    val kafkaIngestor = system.actorOf(Props[KafkaIngestor])
+    val probe = TestProbe()
+
     val request = HydraRequest(
       "123",
       json, None,
-      Map(HYDRA_INGESTOR_PARAM -> KAFKA, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema2"))
+      Map(HYDRA_INGESTOR_PARAM -> KafkaIngestorName, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema2"))
     avroRecordFactory.getTopicAndSchemaSubject(request).get._2 shouldBe "test-schema2"
-    kafkaIngestor ! Validate(request)
-    expectMsgPF() {
+    kafkaIngestor.tell(Validate(request), probe.ref)
+    probe.expectMsgPF() {
       case InvalidRequest(ex) => ex shouldBe an[IllegalArgumentException]
     }
   }
 
+}
+
+object KafkaIngestorSpec {
+  val KafkaIngestorName = "kafka_ingestor"
 }
