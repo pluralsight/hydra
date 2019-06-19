@@ -31,4 +31,8 @@ class TopicNameValidatorSpec extends FlatSpec
   it should "return multiple errors if validation fails for multiple reasons" in {
     TopicNameValidator.validate("falsetestTestTopic") shouldBe Failure(TopicNameValidatorException(Seq(BadOrgError, BadTopicFormatError)))
   }
+
+  it should "return no errors if lgl is used as the organization" in {
+    TopicNameValidator.validate("lgl.test.test-topic.v1.TestEntity") shouldBe Success(Valid)
+  }
 }
