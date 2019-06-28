@@ -1,12 +1,14 @@
 package hydra.ingest.http
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.testkit.TestKit
 import com.typesafe.config.ConfigFactory
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
-import hydra.core.marshallers.HydraJsonSupport
+import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
+import hydra.ingest.http.mock.MockEndpoint
 import org.apache.avro.Schema
 import org.scalatest.{Matchers, WordSpecLike}
 
@@ -119,5 +121,21 @@ class SchemasEndpointSpec extends Matchers
         response.status.intValue() shouldBe 400
       }
     }
+
+    "exception handler should return the status code, error code, and message from a RestClientException" in {
+      val mockRoute = new MockEndpoint().route
+      val statusCode = 409
+      val errorCode = 23
+      val errorMessage = "someErrorOccurred"
+      val url = s"/throwRestClientException?statusCode=$statusCode&errorCode=$errorCode&errorMessage=$errorMessage"
+      Get(url) ~> Route.seal(mockRoute) ~> check {
+        response.status.intValue() shouldBe statusCode
+        val res = responseAs[GenericServiceResponse]
+        val resMessage = res.message
+        resMessage.contains(errorCode.toString) shouldBe true
+        resMessage.contains(errorMessage) shouldBe true
+      }
+    }
   }
 }
+
