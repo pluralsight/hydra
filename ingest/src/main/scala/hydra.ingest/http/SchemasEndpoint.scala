@@ -101,7 +101,9 @@ class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionCon
       complete(NotFound, GenericServiceResponse(404, e.getMessage))
 
     case e: RestClientException =>
-      complete(BadRequest, GenericServiceResponse(e.getErrorCode, s"Registry error: ${e.getMessage}"))
+      val registryHttpStatus = e.getStatus
+      val registryErrorCode = e.getErrorCode
+      complete(registryHttpStatus, GenericServiceResponse(registryErrorCode, s"Registry error: ${e.getMessage}"))
 
     case e: SchemaParseException =>
       complete(BadRequest, GenericServiceResponse(400, s"Unable to parse avro schema: ${e.getMessage}"))
