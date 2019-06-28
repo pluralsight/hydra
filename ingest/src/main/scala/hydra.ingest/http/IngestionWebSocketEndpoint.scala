@@ -20,8 +20,8 @@ import akka.actor._
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.server.Route
-import akka.stream.scaladsl.Flow
-import akka.stream.{Materializer, StreamLimitReachedException}
+import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.stream.{ActorMaterializer, Materializer, StreamLimitReachedException}
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.config.ConfigSupport
@@ -39,7 +39,7 @@ import scala.util.control.NonFatal
 /**
   * Created by alexsilva on 12/22/15.
   */
-class IngestionWebSocketEndpoint(implicit system: ActorSystem, implicit val e: ExecutionContext, materizlizer: Materializer)
+class IngestionWebSocketEndpoint(implicit system: ActorSystem, e: ExecutionContext, materializer: Materializer)
   extends RoutedEndpoints with LoggingAdapter with HydraIngestJsonSupport with HydraDirectives {
 
   //visible for testing
@@ -62,18 +62,22 @@ class IngestionWebSocketEndpoint(implicit system: ActorSystem, implicit val e: E
 
   private[http] def ingestSocketFlow(): Flow[Message, Message, Any] = {
     Flow[Message].collect {
-      case TextMessage.Strict(txt) => Future successful txt
+      case TextMessage.Strict(txt) => Future successful Right(txt)
       case TextMessage.Streamed(src) => src
         .limit(IngestionWebSocketEndpoint.maxNumberOfWSFrames)
+        .completionTimeout(IngestionWebSocketEndpoint.streamedWSMessageTimeout)
+        .fold("")(_ + _)
+        .map(Right.apply)
         .recover {
           case s: StreamLimitReachedException =>
-            log.error("Stream frame limit reached after frame number {}", s.n)
-          case NonFatal(t) =>
-            log.error("Exception in combining websocket frames, {}", t.getMessage)
+            Left(SimpleOutgoingMessage(400, s"Frame limit reached after frame number ${s.n}"))
         }
-        .completionTimeout(IngestionWebSocketEndpoint.streamedWSMessageTimeout)
-        .runFold("")(_ + _)
-    }.mapAsync(1)(identity).via(socketFactory.ingestFlow()).map {
+        .runWith(Sink.head)
+    }.mapAsync(1)(identity).flatMapConcat {
+      case Right(incomingMessage) =>
+        Source.single(incomingMessage).via(socketFactory.ingestFlow())
+      case Left(errorResponse) => Source.single(errorResponse)
+    }.map {
       case m: SimpleOutgoingMessage => TextMessage(m.toJson.compactPrint)
       case r: IngestionOutgoingMessage => TextMessage(r.report.toJson.compactPrint)
     }.via(reportErrorsFlow)

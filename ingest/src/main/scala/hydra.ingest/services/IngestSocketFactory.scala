@@ -7,13 +7,11 @@ import hydra.core.ingest.IngestionReport
 
 trait IngestSocketFactory {
   def ingestFlow(): Flow[String, OutgoingMessage, Any]
-
 }
 
 
 object IngestSocketFactory {
   def createSocket(fact: ActorRefFactory): IngestSocketFactory = {
-
     () => {
 
       val socketActor = fact.actorOf(Props[IngestionSocketActor])
@@ -22,7 +20,7 @@ object IngestSocketFactory {
 
       val in =
         Flow[String]
-          .map(IncomingMessage(_))
+          .map(IncomingMessage)
           .to(actorSink)
 
       val out =
