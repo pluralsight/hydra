@@ -144,14 +144,11 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
         // check response for WS Upgrade headers
         isWebSocketUpgrade shouldEqual true
 
-        wsClient.sendMessage(
-          TextMessage
-            .Streamed(Source("""--asdf-c SET hydra-kafka-topic = test.Topic}}}}}}}}}}}}}}}"""
-              .toCharArray
-              .map(_.toString)
-              .toList))
-        )
-        wsClient.expectMessage("""{"message":"BAD_REQUEST:Not a valid message. Use 'HELP' for help.","status":400}""")
+        wsClient.sendMessage(TextMessage.Streamed(Source(List.fill(55)("A"))))
+        wsClient.expectMessage("""{"message":"Frame limit reached after frame number 50.","status":400}""")
+
+        wsClient.sendMessage(TextMessage.Streamed(Source("-c SET hydra-delivery-" :: "strategy = at-most-once" :: Nil)))
+        wsClient.expectMessage("""{"message":"OK[HYDRA-DELIVERY-STRATEGY=at-most-once]","status":200}""")
 
         wsClient.sendCompletion()
         wsClient.expectCompletion()

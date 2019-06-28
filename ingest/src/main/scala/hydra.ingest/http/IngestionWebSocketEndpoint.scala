@@ -59,25 +59,14 @@ class IngestionWebSocketEndpoint(implicit system: ActorSystem, e: ExecutionConte
       }
     }
 
-
   private[http] def ingestSocketFlow(): Flow[Message, Message, Any] = {
-    Flow[Message].collect {
-      case TextMessage.Strict(txt) => Future successful Right(txt)
+    Flow[Message].flatMapConcat {
+      case TextMessage.Strict(txt) => Source.single(txt)
       case TextMessage.Streamed(src) => src
         .limit(IngestionWebSocketEndpoint.maxNumberOfWSFrames)
         .completionTimeout(IngestionWebSocketEndpoint.streamedWSMessageTimeout)
         .fold("")(_ + _)
-        .map(Right.apply)
-        .recover {
-          case s: StreamLimitReachedException =>
-            Left(SimpleOutgoingMessage(400, s"Frame limit reached after frame number ${s.n}"))
-        }
-        .runWith(Sink.head)
-    }.mapAsync(1)(identity).flatMapConcat {
-      case Right(incomingMessage) =>
-        Source.single(incomingMessage).via(socketFactory.ingestFlow())
-      case Left(errorResponse) => Source.single(errorResponse)
-    }.map {
+    }.via(socketFactory.ingestFlow()).map {
       case m: SimpleOutgoingMessage => TextMessage(m.toJson.compactPrint)
       case r: IngestionOutgoingMessage => TextMessage(r.report.toJson.compactPrint)
     }.via(reportErrorsFlow)
