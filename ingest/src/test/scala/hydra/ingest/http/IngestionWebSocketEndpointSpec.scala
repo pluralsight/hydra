@@ -3,6 +3,8 @@ package hydra.ingest.http
 import akka.actor.Actor
 import akka.http.scaladsl.model.ws.TextMessage
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
+import akka.pattern.pipe
+import akka.stream.scaladsl.Source
 import akka.testkit.{TestActorRef, TestKit}
 import hydra.core.protocol._
 import hydra.ingest.IngestorInfo
@@ -10,8 +12,6 @@ import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult
 import hydra.ingest.test.TestRecordFactory
 import org.joda.time.DateTime
 import org.scalatest.{Matchers, WordSpecLike}
-import akka.pattern.pipe
-import akka.stream.scaladsl.Source
 
 import scala.concurrent.duration._
 
@@ -144,8 +144,11 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
         // check response for WS Upgrade headers
         isWebSocketUpgrade shouldEqual true
 
-        wsClient.sendMessage(TextMessage.Streamed(Source(List.fill(55)("A"))))
+        wsClient.sendMessage(TextMessage.Streamed(Source(1 to 55).map(_.toString)))
         wsClient.expectMessage("""{"message":"Frame limit reached after frame number 50.","status":400}""")
+
+        wsClient.sendMessage(TextMessage.Streamed(Source(1 to 55).map(_.toString).throttle(1, 5.seconds)))
+        wsClient.expectMessage("""{"message":"Timeout on frame buffer reached.","status":400}""")
 
         wsClient.sendMessage(TextMessage.Streamed(Source("-c SET hydra-delivery-" :: "strategy = at-most-once" :: Nil)))
         wsClient.expectMessage("""{"message":"OK[HYDRA-DELIVERY-STRATEGY=at-most-once]","status":200}""")

@@ -28,7 +28,7 @@ object IngestSocketFactory {
         Source.actorRef[OutgoingMessage](1, OverflowStrategy.fail)
           .mapMaterializedValue(socketActor ! SocketStarted(_))
 
-      Flow.fromSinkAndSource(in, out)
+      Flow.fromSinkAndSourceCoupled(in, out)
 
     }
   }

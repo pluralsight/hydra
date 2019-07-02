@@ -20,21 +20,21 @@ import akka.actor._
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.server.Route
-import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.stream.{ActorMaterializer, Materializer, StreamLimitReachedException}
+import akka.stream.javadsl.RestartSource
+import akka.stream.{Materializer, StreamLimitReachedException}
+import akka.stream.scaladsl.{Flow, RestartFlow, Source}
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
 import hydra.core.marshallers.GenericServiceResponse
-import hydra.core.protocol.HydraApplicationError
 import hydra.ingest.services.{IngestSocketFactory, IngestionOutgoingMessage, SimpleOutgoingMessage}
 import spray.json._
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, TimeoutException}
+import scala.concurrent.duration._
 import scala.util.Failure
-import scala.util.control.NonFatal
 
 /**
   * Created by alexsilva on 12/22/15.
@@ -60,16 +60,23 @@ class IngestionWebSocketEndpoint(implicit system: ActorSystem, e: ExecutionConte
     }
 
   private[http] def ingestSocketFlow(): Flow[Message, Message, Any] = {
-    Flow[Message].flatMapConcat {
-      case TextMessage.Strict(txt) => Source.single(txt)
-      case TextMessage.Streamed(src) => src
-        .limit(IngestionWebSocketEndpoint.maxNumberOfWSFrames)
-        .completionTimeout(IngestionWebSocketEndpoint.streamedWSMessageTimeout)
-        .fold("")(_ + _)
-    }.via(socketFactory.ingestFlow()).map {
-      case m: SimpleOutgoingMessage => TextMessage(m.toJson.compactPrint)
-      case r: IngestionOutgoingMessage => TextMessage(r.report.toJson.compactPrint)
-    }.via(reportErrorsFlow)
+    RestartFlow.withBackoff(3.seconds, 30.seconds, 0.2, 20) { () =>
+      Flow[Message].flatMapConcat {
+        case TextMessage.Strict(txt) => Source.single(txt)
+        case TextMessage.Streamed(src) => src
+          .limit(IngestionWebSocketEndpoint.maxNumberOfWSFrames)
+          .completionTimeout(IngestionWebSocketEndpoint.streamedWSMessageTimeout)
+          .fold("")(_ + _)
+      }.via(socketFactory.ingestFlow()).recover {
+        case s: StreamLimitReachedException =>
+          SimpleOutgoingMessage(400, s"Frame limit reached after frame number ${s.n}.")
+        case t: TimeoutException =>
+          SimpleOutgoingMessage(400, s"Timeout on frame buffer reached.")
+      }.map {
+        case m: SimpleOutgoingMessage => TextMessage(m.toJson.compactPrint)
+        case r: IngestionOutgoingMessage => TextMessage(r.report.toJson.compactPrint)
+      }.via(reportErrorsFlow)
+    }
   }
 
   private def reportErrorsFlow[T]: Flow[T, T, Any] =

@@ -17,8 +17,8 @@ import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestionSocketActor._
 
-import scala.concurrent.{ExecutionContext, TimeoutException}
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, TimeoutException}
 import scala.util.{Success, Try}
 
 class IngestionSocketActor extends Actor with LoggingAdapter with ConfigSupport {
@@ -38,12 +38,8 @@ class IngestionSocketActor extends Actor with LoggingAdapter with ConfigSupport 
       context.become(ingestOrReceiveCommand(Some(actor), SocketSession()))
   }
 
-  private def ingestOrReceiveCommand(flowActor: Option[ActorRef], session: SocketSession): Receive = {
-    ingesting(flowActor, session) orElse commandReceive(flowActor, session) orElse {
-      case Failure(s: StreamLimitReachedException) => flowActor.foreach(_ !  SimpleOutgoingMessage(400, s"Frame limit reached after frame number ${s.n}."))
-      case Failure(t: TimeoutException) => flowActor.foreach(_ !  SimpleOutgoingMessage(400, s"Frames were sent over too long of a time."))
-    }
-  }
+  private def ingestOrReceiveCommand(flowActor: Option[ActorRef], session: SocketSession): Receive =
+    ingesting(flowActor, session) orElse commandReceive(flowActor, session)
 
   private def commandReceive(flowActor: Option[ActorRef], session: SocketSession): Receive = {
 
