@@ -20,9 +20,8 @@ import akka.actor._
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.server.Route
-import akka.stream.javadsl.RestartSource
-import akka.stream.{Materializer, StreamLimitReachedException}
 import akka.stream.scaladsl.{Flow, RestartFlow, Source}
+import akka.stream.{Materializer, StreamLimitReachedException}
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.config.ConfigSupport
@@ -32,8 +31,8 @@ import hydra.core.marshallers.GenericServiceResponse
 import hydra.ingest.services.{IngestSocketFactory, IngestionOutgoingMessage, SimpleOutgoingMessage}
 import spray.json._
 
-import scala.concurrent.{ExecutionContext, TimeoutException}
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, TimeoutException}
 import scala.util.Failure
 
 /**
