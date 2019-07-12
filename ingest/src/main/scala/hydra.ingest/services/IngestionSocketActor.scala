@@ -29,10 +29,9 @@ class IngestionSocketActor extends Actor with LoggingAdapter with ConfigSupport 
   private lazy val registry = context.
     actorSelection(HydraIngestorRegistryClient.registryPath(applicationConfig)).resolveOne()
 
-
   override def receive: Receive = waitForSocket
 
-  private lazy val waitForSocket: Receive = {
+  private val waitForSocket: Receive = {
     case SocketStarted(actor) =>
       context.become(ingestOrReceiveCommand(actor, SocketSession()))
   }
