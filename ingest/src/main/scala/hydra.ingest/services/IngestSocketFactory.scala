@@ -1,19 +1,18 @@
 package hydra.ingest.services
 
+import akka.NotUsed
 import akka.actor.{ActorRef, ActorRefFactory, Props}
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import hydra.core.ingest.IngestionReport
 
 trait IngestSocketFactory {
-  def ingestFlow(): Flow[String, OutgoingMessage, Any]
-
+  def ingestFlow(): Flow[String, OutgoingMessage, NotUsed]
 }
 
 
 object IngestSocketFactory {
   def createSocket(fact: ActorRefFactory): IngestSocketFactory = {
-
     () => {
 
       val socketActor = fact.actorOf(Props[IngestionSocketActor])
@@ -22,15 +21,15 @@ object IngestSocketFactory {
 
       val in =
         Flow[String]
-          .map(IncomingMessage(_))
+          .map(IncomingMessage)
           .to(actorSink)
 
       val out =
         Source.actorRef[OutgoingMessage](1, OverflowStrategy.fail)
           .mapMaterializedValue(socketActor ! SocketStarted(_))
 
-      Flow.fromSinkAndSource(in, out)
-      
+      Flow.fromSinkAndSourceCoupled(in, out)
+
     }
   }
 }

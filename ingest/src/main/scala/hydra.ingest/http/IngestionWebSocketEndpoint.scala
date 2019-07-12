@@ -18,24 +18,27 @@ package hydra.ingest.http
 
 import akka.actor._
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ws.{Message, TextMessage}
+import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.Route
-import akka.stream.scaladsl.Flow
+import akka.stream.scaladsl.{Flow, RestartFlow, Source}
+import akka.stream.{Materializer, StreamLimitReachedException}
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
+import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
 import hydra.core.marshallers.GenericServiceResponse
 import hydra.ingest.services.{IngestSocketFactory, IngestionOutgoingMessage, SimpleOutgoingMessage}
 import spray.json._
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, TimeoutException}
 import scala.util.Failure
 
 /**
   * Created by alexsilva on 12/22/15.
   */
-class IngestionWebSocketEndpoint(implicit system: ActorSystem, implicit val e: ExecutionContext)
+class IngestionWebSocketEndpoint(implicit system: ActorSystem, e: ExecutionContext, materializer: Materializer)
   extends RoutedEndpoints with LoggingAdapter with HydraIngestJsonSupport with HydraDirectives {
 
   //visible for testing
@@ -43,8 +46,7 @@ class IngestionWebSocketEndpoint(implicit system: ActorSystem, implicit val e: E
     .valueOrElse(false)
 
   private val socketFactory = IngestSocketFactory.createSocket(system)
-
-  implicit val simpleOutgoingMessageFormat = jsonFormat2(SimpleOutgoingMessage)
+  implicit val simpleOutgoingMessageFormat: JsonFormat[SimpleOutgoingMessage] = jsonFormat2(SimpleOutgoingMessage)
 
   override val route: Route =
     path("ws-ingest") {
@@ -56,15 +58,28 @@ class IngestionWebSocketEndpoint(implicit system: ActorSystem, implicit val e: E
       }
     }
 
-
   private[http] def ingestSocketFlow(): Flow[Message, Message, Any] = {
-    Flow[Message].collect {
-      case TextMessage.Strict(txt) => txt
-    }.via(socketFactory.ingestFlow())
-      .map {
+    RestartFlow.withBackoff(3.seconds, 30.seconds, 0.2, 20) { () =>
+      Flow[Message].flatMapConcat {
+        case TextMessage.Strict(txt) => Source.single(txt)
+        case TextMessage.Streamed(src) => src
+          .limit(IngestionWebSocketEndpoint.maxNumberOfWSFrames)
+          .completionTimeout(IngestionWebSocketEndpoint.streamedWSMessageTimeout)
+          .fold("")(_ + _)
+        case _: BinaryMessage =>
+          throw new IllegalArgumentException("Binary messages are not supported.")
+      }.via(socketFactory.ingestFlow()).recover {
+        case s: StreamLimitReachedException =>
+          SimpleOutgoingMessage(400, s"Frame limit reached after frame number ${s.n}.")
+        case t: TimeoutException =>
+          SimpleOutgoingMessage(400, s"Timeout on frame buffer reached.")
+        case i: IllegalArgumentException =>
+          SimpleOutgoingMessage(400, i.getMessage)
+      }.map {
         case m: SimpleOutgoingMessage => TextMessage(m.toJson.compactPrint)
         case r: IngestionOutgoingMessage => TextMessage(r.report.toJson.compactPrint)
       }.via(reportErrorsFlow)
+    }
   }
 
   private def reportErrorsFlow[T]: Flow[T, T, Any] =
@@ -73,5 +88,17 @@ class IngestionWebSocketEndpoint(implicit system: ActorSystem, implicit val e: E
         case Failure(cause) => log.error(s"WS stream failed with $cause")
         case _ => //ignore
       }(e))
+
+}
+
+object IngestionWebSocketEndpoint extends ConfigSupport {
+
+  import concurrent.duration._
+
+  private[http] val maxNumberOfWSFrames: Int =
+    rootConfig.getInt("hydra.ingest.websocket.max-frames")
+
+  private[http] val streamedWSMessageTimeout: FiniteDuration =
+    rootConfig.getDuration("hydra.ingest.websocket.stream-timeout").toMillis.millis
 
 }

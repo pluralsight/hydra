@@ -62,7 +62,7 @@ object DefaultIngestionHandler extends ConfigSupport {
 
   def props(request: HydraRequest, registry: ActorRef, requestor: ActorRef,
             timeout: FiniteDuration): Props = {
-    Props(classOf[DefaultIngestionHandler], request, registry, requestor, timeout)
+    Props(new DefaultIngestionHandler(request, registry, requestor, timeout))
   }
 }
 

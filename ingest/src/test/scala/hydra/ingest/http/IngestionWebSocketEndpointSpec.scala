@@ -1,15 +1,19 @@
 package hydra.ingest.http
 
 import akka.actor.Actor
+import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
+import akka.pattern.pipe
+import akka.stream.scaladsl.Source
 import akka.testkit.{TestActorRef, TestKit}
+import akka.util.ByteString
 import hydra.core.protocol._
 import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.TestRecordFactory
 import org.joda.time.DateTime
 import org.scalatest.{Matchers, WordSpecLike}
-import akka.pattern.pipe
+
 import scala.concurrent.duration._
 
 /**
@@ -19,13 +23,13 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
 
   val endpt = new IngestionWebSocketEndpoint()
 
-  override def afterAll = {
+  override def afterAll: Unit = {
     super.afterAll()
     TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10 seconds)
   }
 
   val ingestor = TestActorRef(new Actor {
-    override def receive = {
+    override def receive: Receive = {
       case Publish(_) => sender ! Join
       case Validate(r) =>
         TestRecordFactory.build(r).map(ValidRequest(_)) pipeTo sender
@@ -38,7 +42,7 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
   val ingestorInfo = IngestorInfo("test_ingestor", "test", ingestor.path, DateTime.now)
 
   val registry = TestActorRef(new Actor {
-    override def receive = {
+    override def receive: Receive = {
       case FindByName("tester") => sender ! LookupResult(Seq(ingestorInfo))
       case FindAll => sender ! LookupResult(Seq(ingestorInfo))
     }
@@ -97,6 +101,7 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
       }
 
     }
+
     "sets metadata" in {
       val wsClient = WSProbe()
 
@@ -116,6 +121,45 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
         wsClient.expectCompletion()
       }
 
+    }
+
+    "handle ws message with more than one frame" in {
+      val wsClient = WSProbe()
+
+      WS("/ws-ingest", wsClient.flow) ~> endpt.route ~> check {
+        // check response for WS Upgrade headers
+        isWebSocketUpgrade shouldEqual true
+
+        wsClient.sendMessage(TextMessage.Streamed(Source("-c SET hydra-delivery-" :: "strategy = at-most-once" :: Nil)))
+        wsClient.expectMessage("""{"message":"OK[HYDRA-DELIVERY-STRATEGY=at-most-once]","status":200}""")
+
+        wsClient.sendCompletion()
+        wsClient.expectCompletion()
+      }
+    }
+
+    "reject ws message with too many frames" in {
+      val wsClient = WSProbe()
+
+      WS("/ws-ingest", wsClient.flow) ~> endpt.route ~> check {
+        // check response for WS Upgrade headers
+        isWebSocketUpgrade shouldEqual true
+
+        wsClient.sendMessage(TextMessage.Streamed(Source(1 to IngestionWebSocketEndpoint.maxNumberOfWSFrames + 1).map(_.toString)))
+        wsClient.expectMessage("""{"message":"Frame limit reached after frame number 50.","status":400}""")
+
+        wsClient.sendMessage(TextMessage.Streamed(Source(1 to 10).map(_.toString).throttle(1, IngestionWebSocketEndpoint.streamedWSMessageTimeout)))
+        wsClient.expectMessage("""{"message":"Timeout on frame buffer reached.","status":400}""")
+
+        wsClient.sendMessage(BinaryMessage.apply(ByteString("")))
+        wsClient.expectMessage("""{"message":"Binary messages are not supported.","status":400}""")
+
+        wsClient.sendMessage(TextMessage.Streamed(Source("-c SET hydra-delivery-" :: "strategy = at-most-once" :: Nil)))
+        wsClient.expectMessage("""{"message":"OK[HYDRA-DELIVERY-STRATEGY=at-most-once]","status":200}""")
+
+        wsClient.sendCompletion()
+        wsClient.expectCompletion()
+      }
     }
 
   }
