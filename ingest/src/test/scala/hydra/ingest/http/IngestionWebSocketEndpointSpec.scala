@@ -144,10 +144,10 @@ class IngestionWebSocketEndpointSpec extends Matchers with WordSpecLike with Sca
         // check response for WS Upgrade headers
         isWebSocketUpgrade shouldEqual true
 
-        wsClient.sendMessage(TextMessage.Streamed(Source(1 to 55).map(_.toString)))
+        wsClient.sendMessage(TextMessage.Streamed(Source(1 to IngestionWebSocketEndpoint.maxNumberOfWSFrames + 1).map(_.toString)))
         wsClient.expectMessage("""{"message":"Frame limit reached after frame number 50.","status":400}""")
 
-        wsClient.sendMessage(TextMessage.Streamed(Source(1 to 55).map(_.toString).throttle(1, 5.seconds)))
+        wsClient.sendMessage(TextMessage.Streamed(Source(1 to 2).map(_.toString).throttle(1, IngestionWebSocketEndpoint.streamedWSMessageTimeout)))
         wsClient.expectMessage("""{"message":"Timeout on frame buffer reached.","status":400}""")
 
         wsClient.sendMessage(TextMessage.Streamed(Source("-c SET hydra-delivery-" :: "strategy = at-most-once" :: Nil)))
