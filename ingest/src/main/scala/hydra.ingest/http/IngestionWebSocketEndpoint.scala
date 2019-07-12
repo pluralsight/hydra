@@ -18,7 +18,7 @@ package hydra.ingest.http
 
 import akka.actor._
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ws.{Message, TextMessage}
+import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.{Flow, RestartFlow, Source}
 import akka.stream.{Materializer, StreamLimitReachedException}
@@ -66,11 +66,15 @@ class IngestionWebSocketEndpoint(implicit system: ActorSystem, e: ExecutionConte
           .limit(IngestionWebSocketEndpoint.maxNumberOfWSFrames)
           .completionTimeout(IngestionWebSocketEndpoint.streamedWSMessageTimeout)
           .fold("")(_ + _)
+        case _: BinaryMessage =>
+          throw new IllegalArgumentException("Binary messages are not supported.")
       }.via(socketFactory.ingestFlow()).recover {
         case s: StreamLimitReachedException =>
           SimpleOutgoingMessage(400, s"Frame limit reached after frame number ${s.n}.")
         case t: TimeoutException =>
           SimpleOutgoingMessage(400, s"Timeout on frame buffer reached.")
+        case i: IllegalArgumentException =>
+          SimpleOutgoingMessage(400, i.getMessage)
       }.map {
         case m: SimpleOutgoingMessage => TextMessage(m.toJson.compactPrint)
         case r: IngestionOutgoingMessage => TextMessage(r.report.toJson.compactPrint)
