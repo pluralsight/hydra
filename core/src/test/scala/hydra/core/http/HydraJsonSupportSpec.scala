@@ -81,6 +81,8 @@ class HydraJsonSupportSpec extends Matchers with FunSpecLike with HydraJsonSuppo
       curr.convertTo[StreamType] shouldBe CurrentState
       val notf = JsString("Notification")
       notf.convertTo[StreamType] shouldBe Notification
+      val tel = JsString("Telemetry")
+      tel.convertTo[StreamType] shouldBe Telemetry
 
       intercept[DeserializationException] {
         JsString("dummy").convertTo[StreamType] shouldBe History

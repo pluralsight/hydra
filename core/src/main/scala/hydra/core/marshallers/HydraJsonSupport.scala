@@ -133,6 +133,7 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
       case JsString("Notification") => Notification
       case JsString("History") => History
       case JsString("CurrentState") => CurrentState
+      case JsString("Telemetry") => Telemetry
       case _ => {
         import scala.reflect.runtime.{universe => ru}
         val tpe = ru.typeOf[StreamType]
@@ -167,5 +168,5 @@ sealed trait StreamType
 case object Notification extends StreamType
 case object CurrentState extends StreamType
 case object History extends StreamType
-
+case object Telemetry extends StreamType
 
