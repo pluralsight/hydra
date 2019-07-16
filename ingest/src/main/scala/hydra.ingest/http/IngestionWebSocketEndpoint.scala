@@ -20,8 +20,8 @@ import akka.actor._
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.Route
+import akka.stream.StreamLimitReachedException
 import akka.stream.scaladsl.{Flow, RestartFlow, Source}
-import akka.stream.{Materializer, StreamLimitReachedException}
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.config.ConfigSupport
@@ -38,7 +38,7 @@ import scala.util.Failure
 /**
   * Created by alexsilva on 12/22/15.
   */
-class IngestionWebSocketEndpoint(implicit system: ActorSystem, e: ExecutionContext, materializer: Materializer)
+class IngestionWebSocketEndpoint(implicit system: ActorSystem, e: ExecutionContext)
   extends RoutedEndpoints with LoggingAdapter with HydraIngestJsonSupport with HydraDirectives {
 
   //visible for testing
