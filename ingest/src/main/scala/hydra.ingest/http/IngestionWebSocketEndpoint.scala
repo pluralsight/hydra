@@ -41,8 +41,6 @@ import scala.util.Failure
 class IngestionWebSocketEndpoint(implicit system: ActorSystem, e: ExecutionContext)
   extends RoutedEndpoints with LoggingAdapter with HydraIngestJsonSupport with HydraDirectives {
 
-  implicit val materializer: Materializer = ActorMaterializer()
-
   //visible for testing
   private[http] val enabled = applicationConfig.get[Boolean]("ingest.websocket.enabled")
     .valueOrElse(false)
