@@ -107,10 +107,10 @@ class BootstrapEndpointSpec extends Matchers
       EmbeddedKafka.publishToKafka("_hydra.metadata.topic", record)
 
       eventually {
-        Get("/topics") ~> bootstrapRoute ~> check {
+        Get("/streams") ~> bootstrapRoute ~> check {
           val r = responseAs[Seq[TopicMetadata]]
           r.length should be >= 1
-          r(0).id.toString shouldBe "79a1627e-04a6-11e9-8eb2-f2801f1b9fd1"
+          r.head.id.toString shouldBe "79a1627e-04a6-11e9-8eb2-f2801f1b9fd1"
         }
       }
     }

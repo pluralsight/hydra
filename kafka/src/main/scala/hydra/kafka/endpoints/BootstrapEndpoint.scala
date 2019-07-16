@@ -66,7 +66,7 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
 
 
   override val route: Route = cors(settings) {
-    pathPrefix("streams" | "topics") {
+    pathPrefix("streams") {
       pathEndOrSingleSlash {
         post {
           requestEntityPresent {
