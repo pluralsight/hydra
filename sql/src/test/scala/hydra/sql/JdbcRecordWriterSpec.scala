@@ -1,5 +1,6 @@
 package hydra.sql
 
+import java.sql.BatchUpdateException
 import java.util.Properties
 
 import com.typesafe.config.ConfigFactory
@@ -508,5 +509,51 @@ class JdbcRecordWriterSpec extends Matchers
         rs.next() shouldBe false
       }.get
     }
+
+    it ("throws a BatchUpdateException when null bytes exist in a string") {
+      val configPG = ConfigFactory.parseString(
+        """
+          |connection.url = "jdbc:postgresql://localhost:5432/postgres"
+          |connection.user = postgres
+          |
+      """.stripMargin)
+
+      val providerPG = new DriverManagerConnectionProvider("jdbc:postgresql://localhost:5432/postgres",
+        "postgres", "", 1, 1.millis)
+
+      val writerSettingsPostgres = JdbcWriterSettings(configPG)
+
+      val schemaSt =
+        """
+          |{
+          |	"type": "record",
+          |	"name": "User1",
+          |	"namespace": "hydra",
+          |	"fields": [{
+          |			"name": "id",
+          |			"type": "int",
+          |			"doc": "doc"
+          |		},
+          |		{
+          |			"name": "username",
+          |			"type": ["null", "string"]
+          |		}
+          |	]
+          |}""".stripMargin
+
+      val stringWithNullBytes = "This string has" + '\u0000' + "null bytes" + '\u0000'
+
+      val recordToBatch = new GenericData.Record(schema.schema)
+      recordToBatch.put("id", 2)
+      recordToBatch.put("username", stringWithNullBytes)
+
+      val writer = new JdbcRecordWriter(writerSettingsPostgres, providerPG,
+        SchemaWrapper.from(new Schema.Parser().parse(schemaSt)))
+      writer.batch(Upsert(recordToBatch))
+      intercept[BatchUpdateException] {
+        writer.flush()
+      }
+    }
+
   }
 }
