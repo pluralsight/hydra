@@ -21,6 +21,11 @@
       "type": "string"
     },
     {
+      "name": "deprecated",
+      "type": ["null", "boolean"],
+      "default": null
+    },
+    {
       "name": "streamType",
       "type": {
         "name": "streamTypeEnum",
