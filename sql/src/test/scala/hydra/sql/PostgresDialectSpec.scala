@@ -470,4 +470,8 @@ class PostgresDialectSpec extends Matchers
       .dropNotNullConstraintQueries("user", schema, UnderscoreSyntax)
     tp shouldBe Seq("""alter table user alter column "username" drop not null""")
   }
+
+  it("removes null bytes in the format string function") {
+    PostgresDialect.formatStringForPreparedStatement("Hello thi\u0000s is a string\u0000") shouldBe "Hello this is a string"
+  }
 }
