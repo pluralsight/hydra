@@ -65,7 +65,7 @@ class BootstrapEndpointSpec extends Matchers
 
   private val bootstrapRoute = new BootstrapEndpoint().route
 
-  implicit val f = jsonFormat10(TopicMetadata)
+  implicit val f = jsonFormat11(TopicMetadata)
 
   override def beforeAll: Unit = {
     EmbeddedKafka.start()
