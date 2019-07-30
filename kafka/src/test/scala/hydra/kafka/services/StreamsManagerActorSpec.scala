@@ -58,7 +58,7 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
 
   val schema = new Schema.Parser().parse(topicMetadataJson)
 
-  implicit val format = jsonFormat10(TopicMetadata)
+  implicit val format = jsonFormat11(TopicMetadata)
 
   val formatter = ISODateTimeFormat.basicDateTimeNoMillis()
 

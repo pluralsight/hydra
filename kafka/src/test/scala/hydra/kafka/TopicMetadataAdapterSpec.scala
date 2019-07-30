@@ -20,6 +20,7 @@ class TopicMetadataAdapterSpec extends Matchers
       streamType = "Notification",
       subject = "hydra-test",
       derived = false,
+      deprecated = None,
       dataClassification = "public",
       contact = "alex",
       additionalDocumentation = None,
