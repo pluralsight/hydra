@@ -167,6 +167,14 @@ abstract class JdbcDialect extends Serializable {
       .orElse(JdbcUtils.getCommonJDBCType(schema.getElementType).map(_.databaseTypeDefinition))
       .map(typeName => JdbcType(s"$typeName[]", java.sql.JDBCType.ARRAY))
   }
+
+  /**
+    * Perform any formatting on a string before it gets placed in a PreparedStatement.
+    * @param string The string to be formatted
+    * @return The formatted string
+    */
+  def formatStringForPreparedStatement(string: String): String = string
+
 }
 
 object JdbcDialects {

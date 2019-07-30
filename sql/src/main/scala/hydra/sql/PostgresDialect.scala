@@ -120,5 +120,7 @@ private[sql] object PostgresDialect extends JdbcDialect with LoggingAdapter {
 
   override def tableNameForMetadataQuery(tableName: String): String = tableName.toLowerCase
 
+  override def formatStringForPreparedStatement(string: String): String = string.replace("\u0000", "")
+
 }
 

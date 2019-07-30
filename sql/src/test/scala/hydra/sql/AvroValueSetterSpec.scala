@@ -341,5 +341,39 @@ class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
         record.getSchema().getField("relatedTopics").schema(), mockedStmt, 1)
 
     }
+
+    it("Removes null bytes from strings when the dialect is Postgres") {
+      val simpleSchemaString =
+        """
+          |{
+          |     "type": "record",
+          |     "namespace": "hydra",
+          |     "name": "FullName",
+          |     "fields": [
+          |       { "name": "first", "type": "string" },
+          |       { "name": "last", "type": "string" }
+          |     ]
+          |}
+        """.stripMargin
+      val schemaWrapper = SchemaWrapper.from(new Schema.Parser().parse(simpleSchemaString))
+
+      val testRecord = {
+        val tr = new GenericData.Record(schemaWrapper.schema)
+        tr.put("first", "FirstName")
+        tr.put("last", "Last\u0000Name\u0000")
+        tr
+      }
+
+      val mockedStatement = {
+        val ps = mock[PreparedStatement]
+        (ps.setString _).expects(1, "FirstName")
+        (ps.setString _).expects(2, "LastName")
+        (ps.addBatch _).expects()
+        ps
+      }
+
+      val avroValueSetter = new AvroValueSetter(schemaWrapper, PostgresDialect)
+      avroValueSetter.bind(testRecord, mockedStatement)
+    }
   }
 }

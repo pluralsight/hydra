@@ -71,7 +71,7 @@ private[sql] class AvroValueSetter(schema: SchemaWrapper, dialect: JdbcDialect) 
         case Schema.Type.STRING if isLogicalType(schema, uc.getLogicalTypeName) =>
           pstmt.setObject(idx, uc.fromCharSequence(value.toString, schema, IsoDate))
         case Schema.Type.STRING =>
-          pstmt.setString(idx, value.toString)
+          pstmt.setString(idx, dialect.formatStringForPreparedStatement(value.toString))
         case Schema.Type.BOOLEAN =>
           pstmt.setBoolean(idx, value.asInstanceOf[Boolean])
         case Schema.Type.DOUBLE =>
