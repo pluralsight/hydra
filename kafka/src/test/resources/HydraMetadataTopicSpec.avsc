@@ -21,11 +21,16 @@
       "type": "string"
     },
     {
+      "name": "deprecated",
+      "type": ["null", "boolean"],
+      "default": null
+    },
+    {
       "name": "streamType",
       "type": {
         "name": "streamTypeEnum",
         "type": "enum",
-        "symbols": ["Notification", "CurrentState", "History"]
+        "symbols": ["Notification", "CurrentState", "History", "Telemetry"]
       }
     },
     {
@@ -33,7 +38,7 @@
       "type": {
         "name": "dataClassificationEnum",
         "type": "enum",
-        "symbols": ["Public", "InternalUseOnly", "ConfidentialPII", "ConfidentialFinancial"]
+        "symbols": ["Public", "InternalUseOnly", "ConfidentialPII", "RestrictedFinancial","RestrictedEmployeeData"]
       }
     },
     {
