@@ -56,7 +56,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   val config = ConfigFactory.load().getConfig("hydra_kafka.bootstrap-config")
 
-  val topicMetadataJson = Source.fromResource("HydraMetadataTopic.avsc").mkString
+  val topicMetadataJson = Source.fromResource("HydraMetadataTopicSpec.avsc").mkString
 
   val testSchemaResource = SchemaResource(1, 1, new Schema.Parser().parse(topicMetadataJson))
 
