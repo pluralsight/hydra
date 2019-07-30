@@ -717,7 +717,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
 
 class MockStreamsManagerActor extends Actor {
-  val tm = TopicMetadata("test-md-subject", 1, "entity", false, "private", "alex",
+  val tm = TopicMetadata("test-md-subject", 1, "entity", false, None, "private", "alex",
     None, None, UUID.randomUUID(), DateTime.now())
 
   override def receive: Receive = {

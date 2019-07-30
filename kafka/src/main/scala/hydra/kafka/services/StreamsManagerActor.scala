@@ -136,6 +136,7 @@ object StreamsManagerActor {
           record.get("schemaId").toString.toInt,
           record.get("streamType").toString,
           record.get("derived").toString.toBoolean,
+          Option(record.get("deprecated")).map(_.toString.toBoolean),
           record.get("dataClassification").toString,
           record.get("contact").toString,
           Option(record.get("additionalDocumentation")).map(_.toString),
