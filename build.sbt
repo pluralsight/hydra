@@ -29,7 +29,7 @@ lazy val defaultSettings = Seq(
 )
 
 lazy val restartSettings = Seq(
-  javaOptions in reStart += "-Xmx2g",
+  javaOptions in reStart += sys.env.getOrElse("MAX_JVM_MEMORY_FLAG", "-Xmx2g"),
   mainClass in reStart := Some("hydra.sandbox.app.HydraSandbox")
 )
 
