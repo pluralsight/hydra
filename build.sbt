@@ -4,6 +4,7 @@ val JDK = "1.8"
 val buildNumber = scala.util.Properties.envOrNone("version").map(v => "." + v).getOrElse("")
 val hydraVersion = "0.11.3" + buildNumber
 
+val jvmMaxMemoryFlag = sys.env.getOrElse("MAX_JVM_MEMORY_FLAG", "-Xmx2g")
 lazy val defaultSettings = Seq(
   organization := "pluralsight",
   version := hydraVersion,
@@ -25,11 +26,14 @@ lazy val defaultSettings = Seq(
   resolvers += Resolver.bintrayRepo("hseeberger", "maven"),
   ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet,
   parallelExecution in sbt.Test := false,
-  javaOptions in Universal += "-Dorg.aspectj.tracing.factory=default"
+  javaOptions in Universal ++= Seq(
+    "-Dorg.aspectj.tracing.factory=default",
+    jvmMaxMemoryFlag,
+  )
 )
 
 lazy val restartSettings = Seq(
-  javaOptions in reStart += sys.env.getOrElse("MAX_JVM_MEMORY_FLAG", "-Xmx2g"),
+  javaOptions in reStart += jvmMaxMemoryFlag,
   mainClass in reStart := Some("hydra.sandbox.app.HydraSandbox")
 )
 
