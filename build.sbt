@@ -28,7 +28,7 @@ lazy val defaultSettings = Seq(
   parallelExecution in sbt.Test := false,
   javaOptions in Universal ++= Seq(
     "-Dorg.aspectj.tracing.factory=default",
-    jvmMaxMemoryFlag,
+    "-J"+jvmMaxMemoryFlag
   )
 )
 
