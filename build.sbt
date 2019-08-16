@@ -3,8 +3,8 @@ import sbt.Resolver
 val JDK = "1.8"
 val buildNumber = scala.util.Properties.envOrNone("version").map(v => "." + v).getOrElse("")
 val hydraVersion = "0.11.3" + buildNumber
-
 val jvmMaxMemoryFlag = sys.env.getOrElse("MAX_JVM_MEMORY_FLAG", "-Xmx2g")
+
 lazy val defaultSettings = Seq(
   organization := "pluralsight",
   version := hydraVersion,
