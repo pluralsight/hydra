@@ -1,5 +1,6 @@
 package hydra.avro.convert
 
+import java.text.SimpleDateFormat
 import java.time._
 
 import hydra.common.logging.LoggingAdapter
@@ -20,11 +21,15 @@ class ISODateConverter extends Conversion[ZonedDateTime] with LoggingAdapter {
 
   override def getConvertedType: Class[ZonedDateTime] = classOf[ZonedDateTime]
 
+  private val simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX")
+
   override def fromCharSequence(value: CharSequence,
                                 schema: Schema, `type`: LogicalType): ZonedDateTime = {
     Try(OffsetDateTime.parse(value).toInstant)
       .orElse {
         Try(LocalDateTime.parse(value).toInstant(ZoneOffset.UTC))
+      }.orElse {
+        Try(simpleDateFormat.parse(value.toString).toInstant)
       }.recover {
       case e: Throwable =>
         log.error(e.getMessage, e)
