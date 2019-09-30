@@ -30,7 +30,7 @@ class HttpRequestFactory extends RequestFactory[HttpRequest] with CodingDirectiv
       .map(_.value().toLowerCase)
 
     Unmarshal(request.entity).to[String].flatMap { payload =>
-      val dPayload = if (request.method == HttpMethods.DELETE && payload.isEmpty) null else payload
+      val dPayload = if (request.method == HttpMethods.DELETE) null else payload
       val metadata: Map[String, String] = request.headers.map(h => h.name.toLowerCase -> h.value).toMap
       Future.fromTry(as)
         .map(ack => HydraRequest(correlationId, dPayload, clientId, metadata, vs, ack))
