@@ -67,6 +67,19 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
       }
     }
 
+    it("builds a DELETE request and nulls out payload if it exists") {
+      implicit val mat = ActorMaterializer()
+      val json = """{"name":"value"}"""
+      val httpRequest = HttpRequest(
+        HttpMethods.DELETE,
+        uri = "/test",
+        entity = HttpEntity(MediaTypes.`application/json`, json))
+      val req = new HttpRequestFactory().createRequest("123", httpRequest)
+      whenReady(req) {
+        req => req.payload shouldBe null
+      }
+    }
+
     it("does not modify empty payloads for non-DELETE requests") {
       implicit val mat = ActorMaterializer()
       val httpRequest = HttpRequest(
