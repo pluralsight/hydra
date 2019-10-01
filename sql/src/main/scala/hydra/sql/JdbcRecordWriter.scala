@@ -11,10 +11,10 @@ import hydra.sql.TableCreator.JdbcTruncate
 import org.apache.avro.LogicalTypes.LogicalTypeFactory
 import org.apache.avro.generic.GenericRecord
 import org.apache.avro.{LogicalType, LogicalTypes, Schema}
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.mutable
-import scala.util.Try
+import scala.util.{Failure, Try}
 import scala.util.control.NonFatal
 
 
@@ -84,7 +84,7 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
       case u@Upsert(_) => add(u)
       case DeleteByKey(keys) =>
         flush()
-        delete(keys)
+        delete(keys).handleErrors
     }
   }
 
@@ -123,11 +123,11 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
       TryWith(connection.prepareStatement(upsertStmt)) { pstmt =>
         valueSetter.bind(record, pstmt)
         pstmt.executeUpdate()
-      } //TODO: better error handling here, we do the get just so that we throw an exception if there is one.
+      }
     }
     else {
       updateDb(record)
-      upsert(record)
+      upsert(record).handleErrors
     }
   }
 
@@ -144,7 +144,7 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
       case Some(s) =>
         TryWith(connection.prepareStatement(s)) { dstmt =>
           val fields = keys.map(v => schemaWrapper.schema.getField(v._1) -> v._2)
-          valueSetter.bind(schemaWrapper.schema, fields, dstmt)
+          valueSetter.bindForDeletion(fields, dstmt)
           dstmt.executeUpdate()
         } //TODO: better error handling here, we do the get just so that we throw an exception if there is one.
 
@@ -154,8 +154,8 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
 
   override def execute(operation: Operation): Try[Unit] = {
     operation match {
-      case Upsert(record) => upsert(record)
-      case DeleteByKey(fields) => delete(fields)
+      case Upsert(record) => upsert(record).handleErrors
+      case DeleteByKey(fields) => delete(fields).handleErrors
     }
   }
 
@@ -187,7 +187,7 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
       case Upsert(record) => valueSetter.bind(record, upsert)
       case DeleteByKey(keys) =>
         val fields = keys.map(v => schemaWrapper.schema.getField(v._1) -> v._2)
-        valueSetter.bind(schemaWrapper.schema, fields, delete)
+        valueSetter.bindForDeletion(fields, delete)
     }
     try {
       upsert.executeBatch()
@@ -224,5 +224,16 @@ object JdbcRecordWriter {
     override def fromSchema(schema: Schema): LogicalType = IsoDate
   })
 
-  val logger = LoggerFactory.getLogger(getClass)
+  val logger: Logger = LoggerFactory.getLogger(getClass)
+
+  implicit class HandleTryUnitErrors(t: Try[Unit]) {
+    def handleErrors: Try[Unit] =
+      t match {
+        case Failure(exception) =>
+          logger.error("Failed to execute query due to exception", exception)
+          t
+        case _ => t
+      }
+  }
+
 }

@@ -34,16 +34,18 @@ private[sql] class AvroValueSetter(schema: SchemaWrapper, dialect: JdbcDialect) 
     field -> getJdbcType(field.schema(), dialect)
   }.toMap
 
-  def bind(schema: Schema, fields: Map[Field, AnyRef], stmt: PreparedStatement) = {
+  def bindForDeletion(fields: Map[Field, AnyRef], stmt: PreparedStatement): Unit = {
     fields.zipWithIndex.foreach {
       case (f, idx) =>
-        setFieldValue(f._2, fieldTypes(f._1), schema, stmt, idx + 1)
+        val payloadValue = f._2
+        val field = f._1
+        setFieldValue(payloadValue, fieldTypes(field), field.schema(), stmt, idx + 1)
     }
 
     stmt.addBatch()
   }
 
-  def bind(record: GenericRecord, stmt: PreparedStatement) = {
+  def bind(record: GenericRecord, stmt: PreparedStatement): Unit = {
     fields.zipWithIndex.foreach {
       case (f, idx) =>
         setFieldValue(record.get(f.name()), fieldTypes(f), f.schema(), stmt, idx + 1)
