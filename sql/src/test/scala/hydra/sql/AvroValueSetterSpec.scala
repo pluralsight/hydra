@@ -375,5 +375,32 @@ class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       val avroValueSetter = new AvroValueSetter(schemaWrapper, PostgresDialect)
       avroValueSetter.bind(testRecord, mockedStatement)
     }
+
+    it("binds correctly for deletion") {
+      val simpleSchemaString =
+        """
+          |{
+          |     "type": "record",
+          |     "namespace": "hydra",
+          |     "name": "RandomRecord",
+          |     "fields": [
+          |       { "name": "id", "type": "int" },
+          |       { "name": "value", "type": "string" }
+          |     ]
+          |}
+        """.stripMargin
+      val schema = new Schema.Parser().parse(simpleSchemaString)
+      val schemaWrapper = SchemaWrapper.from(schema)
+      val avroValueSetter = new AvroValueSetter(schemaWrapper, PostgresDialect)
+
+      val preparedStatement = {
+        val ps = mock[PreparedStatement]
+        (ps.setInt _).expects(1, 100)
+        (ps.addBatch _).expects()
+        ps
+      }
+
+      avroValueSetter.bindForDeletion(Map(schema.getField("id") -> 100.asInstanceOf[AnyRef]), preparedStatement)
+    }
   }
 }
