@@ -347,6 +347,51 @@ class JdbcUtilsSpec extends Matchers
         " UUID NOT NULL,\"testEnum\" TEXT NOT NULL,CONSTRAINT \"User_PK\" PRIMARY KEY (\"id\")"
     }
 
+    it("Generates the correct ddl statement with default values") {
+      val schema =
+        """
+          |{
+          |	"type": "record",
+          |	"name": "User",
+          |	"namespace": "hydra",
+          | "hydra.key":"id",
+          |	"fields": [
+          | {
+          |			"name": "id",
+          |			"type": "int",
+          |     "default": 100
+          |		},
+          |		{
+          |			"name": "username",
+          |			"type": "string",
+          |     "default": "defaultUser"
+          |		},
+          |  		{
+          |			"name": "uuidTest",
+          |			"type": {
+          |				"type": "string",
+          |				"logicalType": "uuid"
+          |			}
+          |		},
+          |  {
+          |			"name": "testEnum",
+          |			"type": {
+          |            "type": "enum",
+          |            "name": "test_type",
+          |            "symbols": ["test1", "test2"]
+          |        }
+          |		}
+          |	]
+          |}
+        """.stripMargin
+
+      val avro = new Schema.Parser().parse(schema)
+
+      val stmt = JdbcUtils.schemaString(SchemaWrapper.from((avro)), "User", PostgresDialect)
+      stmt shouldBe "\"id\" INTEGER NOT NULL DEFAULT 100,\"username\" TEXT NOT NULL DEFAULT 'defaultUser',\"uuidTest\"" +
+        " UUID NOT NULL,\"testEnum\" TEXT NOT NULL,CONSTRAINT \"User_PK\" PRIMARY KEY (\"id\")"
+    }
+
     it("Generates the correct ddl statement with composite primary  keys") {
       val schema =
         """

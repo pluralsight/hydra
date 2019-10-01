@@ -146,7 +146,12 @@ private[sql] object JdbcUtils {
       val name = dialect.quoteIdentifier(dbSyntax.format(field.name))
       val typ = getJdbcType(field.schema(), dialect).databaseTypeDefinition
       val nullable = if (isNullableUnion(field.schema())) "" else "NOT NULL"
-      s"$name $typ $nullable"
+      val defaultValue = field.defaultVal() match {
+        case null => ""
+        case stringDefault: String => s" DEFAULT '$stringDefault'"
+        case otherDefault => s" DEFAULT $otherDefault"
+      }
+      s"$name $typ $nullable$defaultValue"
     }
     val pkSeq = schema.primaryKeys
       .map(f => dialect.quoteIdentifier(dbSyntax.format(f)))
