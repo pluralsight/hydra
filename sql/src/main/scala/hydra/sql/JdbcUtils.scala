@@ -3,6 +3,7 @@ package hydra.sql
 import java.sql.{Connection, JDBCType}
 
 import hydra.avro.util.SchemaWrapper
+import org.apache.avro.JsonProperties.Null
 import org.apache.avro.LogicalTypes.Decimal
 import org.apache.avro.Schema.Type._
 import org.apache.avro.Schema.{Field, Type}
@@ -147,7 +148,7 @@ private[sql] object JdbcUtils {
       val typ = getJdbcType(field.schema(), dialect).databaseTypeDefinition
       val nullable = if (isNullableUnion(field.schema())) "" else "NOT NULL"
       val defaultValue = field.defaultVal() match {
-        case null => ""
+        case null | _: Null => ""
         case stringDefault: String => s" DEFAULT '$stringDefault'"
         case otherDefault => s" DEFAULT $otherDefault"
       }
