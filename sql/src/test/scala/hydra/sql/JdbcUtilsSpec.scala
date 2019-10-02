@@ -380,7 +380,15 @@ class JdbcUtilsSpec extends Matchers
           |            "name": "test_type",
           |            "symbols": ["test1", "test2"]
           |        }
-          |		}
+          |		},
+          |  {
+          |  "name": "eventName",
+          |  "type": [
+          |    "null",
+          |    "string"
+          |   ],
+          |   "default": null
+          |  }
           |	]
           |}
         """.stripMargin
@@ -389,7 +397,7 @@ class JdbcUtilsSpec extends Matchers
 
       val stmt = JdbcUtils.schemaString(SchemaWrapper.from((avro)), "User", PostgresDialect)
       stmt shouldBe "\"id\" INTEGER NOT NULL DEFAULT 100,\"username\" TEXT NOT NULL DEFAULT 'defaultUser',\"uuidTest\"" +
-        " UUID NOT NULL,\"testEnum\" TEXT NOT NULL,CONSTRAINT \"User_PK\" PRIMARY KEY (\"id\")"
+        " UUID NOT NULL,\"testEnum\" TEXT NOT NULL,\"eventName\" TEXT ,CONSTRAINT \"User_PK\" PRIMARY KEY (\"id\")"
     }
 
     it("Generates the correct ddl statement with composite primary  keys") {
