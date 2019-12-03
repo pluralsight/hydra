@@ -44,26 +44,10 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
     with LoggingAdapter
     with TopicMetadataAdapter
     with HydraDirectives
-    with CorsSupport {
+    with CorsSupport
+    with BootstrapEndpointActors {
 
   private implicit val timeout = Timeout(10.seconds)
-
-  private implicit val mat = ActorMaterializer()
-
-  private val kafkaIngestor = system.actorSelection(
-    path = applicationConfig.getString("kafka-ingestor-path"))
-
-  private val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(applicationConfig))
-
-  private val bootstrapKafkaConfig = applicationConfig.getConfig("bootstrap-config")
-
-  private val streamsManagerProps = StreamsManagerActor.props(bootstrapKafkaConfig,
-    KafkaUtils.BootstrapServers, ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient)
-
-
-  private val bootstrapActor = system.actorOf(
-    TopicBootstrapActor.props(schemaRegistryActor, kafkaIngestor, streamsManagerProps, Some(bootstrapKafkaConfig)))
-
 
   override val route: Route = cors(settings) {
     pathPrefix("streams") {

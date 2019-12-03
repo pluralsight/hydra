@@ -43,7 +43,7 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
   private val metadataTopicName = bootstrapKafkaConfig.get[String]("metadata-topic-name").valueOrElse("_hydra.metadata.topic")
   private val compactedPrefix = bootstrapKafkaConfig.get[String]("compacted-topic-prefix").valueOrElse("_compacted.")
 
-  private val metadataMap = new collection.mutable.HashMap[String, TopicMetadata]()
+  private[kafka] val metadataMap = Map[String, TopicMetadata]()
   private val metadataStream = StreamsManagerActor.createMetadataStream(bootstrapKafkaConfig, bootstrapServers,
     schemaRegistryClient, metadataTopicName, self)
 
@@ -51,7 +51,7 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
   override def receive: Receive = Actor.emptyBehavior
 
   override def preStart(): Unit = {
-    context.become(streaming(metadataStream.run(), Map.empty))
+    context.become(streaming(metadataStream.run(), metadataMap))
   }
 
 

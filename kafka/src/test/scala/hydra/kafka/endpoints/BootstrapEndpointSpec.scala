@@ -161,7 +161,6 @@ class BootstrapEndpointSpec extends Matchers
       val testEntity = HttpEntity(
         ContentTypes.`application/json`,
         """{
-          |	"subject": "exp.dataplatform.testsubject",
           |	"streamType": "Notification",
           | "derived": false,
           |	"dataClassification": "Public",
@@ -195,7 +194,6 @@ class BootstrapEndpointSpec extends Matchers
       val testEntity = HttpEntity(
         ContentTypes.`application/json`,
         """{
-          |	"subject": "exp.dataplatform.failed",
           |	"streamType": "Notification",
           | "derived": false,
           |	"dataClassification": "Public",
@@ -205,8 +203,8 @@ class BootstrapEndpointSpec extends Matchers
           |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
           |	"notes": "here are some notes topkek",
           |	"schema": {
-          |	  "namespace": "exp.assessment",
-          |	  "name": "SkillAssessmentTopicsScored",
+          |	  "namespace": "exp.dataplatform",
+          |	  "name": "failed",
           |	  "type": "record",
           |	  "version": 1,
           |	  "fields": [
@@ -227,7 +225,6 @@ class BootstrapEndpointSpec extends Matchers
       val testEntity = HttpEntity(
         ContentTypes.`application/json`,
         """{
-          |	"subject": "invalid",
           |	"streamType": "Notification",
           | "derived": false,
           |	"dataClassification": "Public",
@@ -237,7 +234,37 @@ class BootstrapEndpointSpec extends Matchers
           |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
           |	"notes": "here are some notes topkek",
           |	"schema": {
-          |	  "namespace": "exp.assessment",
+          |	  "namespace": "exp",
+          |	  "name": "SkillAssessmentTopicsScored",
+          |	  "type": "record",
+          |	  "version": 1,
+          |	  "fields": [
+          |	    {
+          |	      "name": "testField",
+          |	      "type": "string"
+          |	    }
+          |	  ]
+          |	}
+          |}""".stripMargin)
+
+      Post("/streams", testEntity) ~> bootstrapRoute ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
+
+    "reject requests with invalid generic schema" in {
+      val testEntity = HttpEntity(
+        ContentTypes.`application/json`,
+        """{
+          |	"streamType": "Notification",
+          | "derived": false,
+          |	"dataClassification": "Public",
+          |	"dataSourceOwner": "BARTON",
+          |	"contact": "slackity slack dont talk back",
+          |	"psDataLake": false,
+          |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+          |	"notes": "here are some notes topkek",
+          |	"schema": {
           |	  "name": "SkillAssessmentTopicsScored",
           |	  "type": "record",
           |	  "version": 1,
@@ -282,6 +309,38 @@ class BootstrapEndpointSpec extends Matchers
 
       Post("/streams", testEntity) ~> bootstrapRoute ~> check {
         rejection shouldBe a[MalformedRequestContentRejection]
+      }
+    }
+
+    "accept previously existing invalid schema" in {
+      val testEntity = HttpEntity(
+        ContentTypes.`application/json`,
+        """{
+          |	"streamType": "Notification",
+          | "derived": false,
+          |	"dataClassification": "Public",
+          |	"dataSourceOwner": "BARTON",
+          |	"contact": "slackity slack dont talk back",
+          |	"psDataLake": false,
+          |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+          |	"notes": "here are some notes topkek",
+          |	"schema": {
+          |   "namespace": "exp.test-existing.v1",
+          |	  "name": "SubjectPreexisted",
+          |	  "type": "record",
+          |	  "version": 1,
+          |	  "fields": [
+          |	    {
+          |	      "name": "testField",
+          |	      "type": "string"
+          |	    }
+          |	  ]
+          |	}
+          |}""".stripMargin)
+
+      val bootstrapRouteWithOverridenStreamManager = (new BootstrapEndpoint() with BootstrapEndpointTestActors).route
+      Post("/streams", testEntity) ~> bootstrapRouteWithOverridenStreamManager ~> check {
+        status shouldBe StatusCodes.OK
       }
     }
   }

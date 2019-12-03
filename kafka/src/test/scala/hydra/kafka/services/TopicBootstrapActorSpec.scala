@@ -111,7 +111,6 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   "A TopicBootstrapActor" should "process metadata and send an Ingest message to the kafka ingestor" in {
 
     val mdRequest = """{
-                      |	"subject": "exp.dataplatform.testsubject1",
                       |	"streamType": "Notification",
                       | "derived": false,
                       |	"dataClassification": "Public",
@@ -121,8 +120,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
                       |	"notes": "here are some notes topkek",
                       |	"schema": {
-                      |	  "namespace": "exp.assessment",
-                      |	  "name": "SkillAssessmentTopicsScored",
+                      |	  "namespace": "exp.dataplatform",
+                      |	  "name": "testsubject1",
                       |	  "type": "record",
                       |	  "version": 1,
                       |	  "fields": [
@@ -150,7 +149,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     probe.receiveWhile(messages = 2) {
       case RegisterSchemaRequest(schemaJson) => schemaJson should
-        include("SkillAssessmentTopicsScored")
+        include("testsubject1")
       case FetchSchemaRequest(schemaName) => schemaName shouldEqual "_hydra.metadata.topic"
     }
 
@@ -163,7 +162,6 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   it should "respond with the error that caused the failed actor state" in {
     val mdRequest = """{
-                      |	"subject": "exp.dataplatform.testsubject2",
                       |	"streamType": "Notification",
                       | "derived": false,
                       |	"dataClassification": "Public",
@@ -173,8 +171,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
                       |	"notes": "here are some notes topkek",
                       |	"schema": {
-                      |	  "namespace": "exp.assessment",
-                      |	  "name": "SkillAssessmentTopicsScored",
+                      |	  "namespace": "exp.dataplatform",
+                      |	  "name": "testsubject2",
                       |	  "type": "record",
                       |	  "version": 1,
                       |	  "fields": [
@@ -211,7 +209,6 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   it should "respond with the appropriate metadata failure message" in {
 
     val mdRequest = """{
-                      |	"subject": "exp....",
                       |	"streamType": "Notification",
                       | "derived": false,
                       |	"dataClassification": "Public",
@@ -221,7 +218,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
                       |	"notes": "here are some notes topkek",
                       |	"schema": {
-                      |	  "namespace": "exp.assessment",
+                      |	  "namespace": "exp....",
                       |	  "name": "SkillAssessmentTopicsScored",
                       |	  "type": "record",
                       |	  "version": 1,
@@ -257,7 +254,6 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   it should "respond with the appropriate failure when the KafkaIngestor returns an exception" in {
     val mdRequest = """{
-                      |	"subject": "exp.dataplatform.testsubject4",
                       |	"streamType": "Notification",
                       | "derived": false,
                       |	"dataClassification": "Public",
@@ -267,8 +263,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
                       |	"notes": "here are some notes topkek",
                       |	"schema": {
-                      |	  "namespace": "exp.assessment",
-                      |	  "name": "SkillAssessmentTopicsScored",
+                      |	  "namespace": "exp.dataplatform",
+                      |	  "name": "testsubject4",
                       |	  "type": "record",
                       |	  "version": 1,
                       |	  "fields": [
@@ -305,7 +301,6 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val subject = "exp.dataplatform.testsubject5"
 
     val mdRequest = s"""{
-                       |	"subject": "$subject",
                        |	"streamType": "Notification",
                        | "derived": false,
                        |	"dataClassification": "Public",
@@ -315,8 +310,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
                        |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
                        |	"notes": "here are some notes topkek",
                        |	"schema": {
-                       |	  "namespace": "exp.assessment",
-                       |	  "name": "SkillAssessmentTopicsScored",
+                       |	  "namespace": "exp.dataplatform",
+                       |	  "name": "testsubject5",
                        |	  "type": "record",
                        |	  "version": 1,
                        |	  "fields": [
@@ -345,7 +340,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     probe.receiveWhile(messages = 2) {
       case RegisterSchemaRequest(schemaJson) => schemaJson should
-        include("SkillAssessmentTopicsScored")
+        include("testsubject5")
       case FetchSchemaRequest(schemaName) => schemaName shouldEqual "_hydra.metadata.topic"
     }
 
@@ -373,7 +368,6 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val subject = "exp.dataplatform.testsubject6"
 
     val mdRequest = s"""{
-                       |	"subject": "$subject",
                        |	"streamType": "Notification",
                        | "derived": false,
                        |	"dataClassification": "Public",
@@ -383,8 +377,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
                        |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
                        |	"notes": "here are some notes topkek",
                        |	"schema": {
-                       |	  "namespace": "exp.assessment",
-                       |	  "name": "SkillAssessmentTopicsScored",
+                       |	  "namespace": "exp.dataplatform",
+                       |	  "name": "testsubject6",
                        |	  "type": "record",
                        |	  "version": 1,
                        |	  "fields": [
@@ -423,7 +417,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     probe.receiveWhile(messages = 2) {
       case RegisterSchemaRequest(schemaJson) => schemaJson should
-        include("SkillAssessmentTopicsScored")
+        include("testsubject6")
       case FetchSchemaRequest(schemaName) => schemaName shouldEqual "_hydra.metadata.topic"
     }
 
@@ -444,7 +438,6 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val subject = "exp.dataplatform.testsubject7"
 
     val mdRequest = s"""{
-                       |	"subject": "$subject",
                        |	"streamType": "Notification",
                        | "derived": false,
                        |	"dataClassification": "Public",
@@ -454,8 +447,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
                        |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
                        |	"notes": "here are some notes topkek",
                        |	"schema": {
-                       |	  "namespace": "exp.assessment",
-                       |	  "name": "SkillAssessmentTopicsScored",
+                       |	  "namespace": "exp.dataplatform",
+                       |	  "name": "testsubject7",
                        |	  "type": "record",
                        |	  "version": 1,
                        |	  "fields": [
@@ -484,7 +477,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
     probe.receiveWhile(messages = 2) {
       case RegisterSchemaRequest(schemaJson) => schemaJson should
-        include("SkillAssessmentTopicsScored")
+        include("testsubject7")
       case FetchSchemaRequest(schemaName) => schemaName shouldEqual "_hydra.metadata.topic"
     }
 
@@ -555,7 +548,6 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   it should "retry after a configurable interval when the schema registration fails" in {
     val mdRequest = """{
-                      |	"subject": "exp.dataplatform.testsubject8",
                       |	"streamType": "Notification",
                       | "derived": false,
                       |	"dataClassification": "Public",
@@ -565,8 +557,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
                       |	"notes": "here are some notes topkek",
                       |	"schema": {
-                      |	  "namespace": "exp.assessment",
-                      |	  "name": "SkillAssessmentTopicsScored",
+                      |	  "namespace": "exp.dataplatform",
+                      |	  "name": "testsubject8",
                       |	  "type": "record",
                       |	  "version": 1,
                       |	  "fields": [
@@ -615,7 +607,6 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       val subject = "exp.dataplatform.testsbject5"
 
       val mdRequest = s"""{
-                         |	"subject": "$subject",
                          |	"streamType": "History",
                          |  "derived": false,
                          |	"dataClassification": "Public",
@@ -625,8 +616,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
                          |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
                          |	"notes": "here are some notes topkek",
                          |	"schema": {
-                         |	  "namespace": "exp.assessment",
-                         |	  "name": "SkillAssessmentTopicsScored",
+                         |	  "namespace": "exp.dataplatform",
+                         |	  "name": "testsbject5",
                          |    "hydra.key": "testField",
                          |	  "type": "record",
                          |	  "version": 1,
@@ -667,7 +658,6 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     val subject = "exp.dataplatform.testsbject6"
 
     val mdRequest = s"""{
-                       |	"subject": "$subject",
                        |	"streamType": "History",
                        |  "derived": false,
                        |	"dataClassification": "Public",
@@ -677,8 +667,8 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
                        |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
                        |	"notes": "here are some notes topkek",
                        |	"schema": {
-                       |	  "namespace": "exp.assessment",
-                       |	  "name": "SkillAssessmentTopicsScored",
+                       |	  "namespace": "exp.dataplatform",
+                       |	  "name": "testsbject6",
                        |	  "type": "record",
                        |	  "version": 1,
                        |	  "fields": [
