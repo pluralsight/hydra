@@ -67,7 +67,7 @@ object TopicMetadataValidator {
   }
 
   private def validFormat(topic: String): ValidationResponse = {
-    topic.split("\\.").toList match {
+    topic.split("\\.").filterNot(_.isBlank).toList match {
       case Nil => Invalid(BadTopicFormatError)
       case l: List[String] if l.length < 3 => Invalid(BadTopicFormatError)
       case _ => Valid
