@@ -240,7 +240,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     try {
       Some(topicMetadataRequest.schema.convertTo[GenericSchema])
     } catch {
-      case _: SerializationException =>
+      case _: DeserializationException =>
         None
     }
   }
