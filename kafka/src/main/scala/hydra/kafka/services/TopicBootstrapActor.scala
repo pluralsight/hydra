@@ -117,6 +117,8 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
                     executeEndpoint(topicMetadataRequest)
                   case Failure(ex: SchemaValidatorException) =>
                     Future(BootstrapFailure(ex.reasons))
+                  case Failure(e) =>
+                    Future(BootstrapFailure(e.getMessage :: Nil))
                 }
             }
           }
