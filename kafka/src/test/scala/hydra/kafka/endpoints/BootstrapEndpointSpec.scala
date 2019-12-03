@@ -13,6 +13,7 @@ import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.AvroRecord
+import hydra.kafka.services.TopicBootstrapActor
 import io.confluent.kafka.serializers.KafkaAvroSerializer
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.avro.Schema
@@ -283,6 +284,12 @@ class BootstrapEndpointSpec extends Matchers
       Post("/streams", testEntity) ~> bootstrapRoute ~> check {
         rejection shouldBe a[MalformedRequestContentRejection]
       }
+    }
+  }
+
+  "The Bootstrap Auxiliary Functions" should {
+    "should return some, given a valid generic schema" in {
+      TopicBootstrapActor
     }
   }
 }

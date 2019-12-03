@@ -13,7 +13,7 @@ import configs.syntax._
 import hydra.common.config.ConfigSupport
 import hydra.core.akka.SchemaRegistryActor.{RegisterSchemaRequest, RegisterSchemaResponse}
 import hydra.core.ingest.{HydraRequest, RequestParams}
-import hydra.core.marshallers.{History, HydraJsonSupport, TopicMetadataRequest}
+import hydra.core.marshallers.{GenericSchema, History, HydraJsonSupport, TopicMetadataRequest}
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.kafka.model.TopicMetadata
@@ -43,6 +43,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
   import spray.json._
 
   implicit val metadataFormat = jsonFormat11(TopicMetadata)
+
 
   implicit val ec = context.dispatcher
 
@@ -104,7 +105,10 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
 
   def active: Receive = {
     case InitiateTopicBootstrap(topicMetadataRequest) =>
-      TopicNameValidator.validate(topicMetadataRequest.subject) match {
+
+      val schema = getGenericSchema(topicMetadataRequest)
+
+      TopicMetadataValidator.validate(schema) match {
         case Success(_) =>
           val result = for {
             schema <- registerSchema(topicMetadataRequest.schema.compactPrint)
@@ -119,7 +123,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
             case e => BootstrapFailure(Seq(e.getMessage))
           }) to sender
 
-        case Failure(ex: TopicNameValidatorException) =>
+        case Failure(ex: SchemaValidatorException) =>
           Future(BootstrapFailure(ex.reasons)) pipeTo sender
       }
 
@@ -153,8 +157,9 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
   private[kafka] def ingestMetadata(topicMetadataRequest: TopicMetadataRequest,
                                     schemaId: Int): Future[TopicMetadata] = {
 
+    val schema = getGenericSchema(topicMetadataRequest)
     val topicMetadata = TopicMetadata(
-      topicMetadataRequest.subject,
+      schema.map(s => s"${s.namespace}.${s.name}").getOrElse("Schema does not conform to GenericSchema"),
       schemaId,
       topicMetadataRequest.streamType.toString,
       topicMetadataRequest.derived,
@@ -205,7 +210,9 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
 
   private[kafka] def createKafkaTopics(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
     val timeoutMillis = bootstrapKafkaConfig.getInt("timeout")
-    val topicName = topicMetadataRequest.subject
+
+    val schema = getGenericSchema(topicMetadataRequest)
+    val topicName = schema.map(s => s"${s.namespace}.${s.name}").getOrElse("Schema does not conform to GenericSchema")
 
     var topicMap: Map[String, TopicDetails] = Map(topicName -> topicDetails)
 
@@ -228,6 +235,15 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
       }
 
     }
+
+  private[kafka] def getGenericSchema(topicMetadataRequest: TopicMetadataRequest): Option[GenericSchema] = {
+    try {
+      Some(topicMetadataRequest.schema.convertTo[GenericSchema])
+    } catch {
+      case _: SerializationException =>
+        None
+    }
+  }
 
 }
 

@@ -151,11 +151,13 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
   implicit val topicCreationMetadataFormat = jsonFormat9(TopicMetadataRequest)
 
+  implicit val genericSchemaFormat = jsonFormat2(GenericSchema)
+
 }
 
 case class GenericError(status: Int, errorMessage: String)
 
-case class TopicMetadataRequest(subject: String,
+case class TopicMetadataRequest(subject: Option[String],
                                 schema: JsObject,
                                 streamType: StreamType,
                                 derived: Boolean,
@@ -164,6 +166,9 @@ case class TopicMetadataRequest(subject: String,
                                 contact: String,
                                 additionalDocumentation: Option[String],
                                 notes: Option[String])
+
+
+case class GenericSchema(name: String, namespace: String)
 
 sealed trait StreamType
 case object Notification extends StreamType
