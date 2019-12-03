@@ -18,7 +18,7 @@ trait BootstrapEndpointTestActors extends BootstrapEndpointActors {
                          bootstrapServers: String,
                          schemaRegistryClient: SchemaRegistryClient) extends StreamsManagerActor(bootstrapKafkaConfig, bootstrapServers, schemaRegistryClient) {
     override val metadataMap: Map[String, TopicMetadata] = Map[String, TopicMetadata]{
-      "exp.test-existing.v1.Subject-Preexisted" -> TopicMetadata("",0,"",derived = false, None, "", "", None, None, UUID.randomUUID(),DateTime.now)
+      "exp.test-existing.v1.SubjectPreexisted" -> TopicMetadata("",0,"",derived = false, None, "", "", None, None, UUID.randomUUID(),DateTime.now)
     }
   }
 
