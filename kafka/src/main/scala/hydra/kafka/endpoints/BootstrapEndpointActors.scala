@@ -17,13 +17,13 @@ trait BootstrapEndpointActors extends ConfigSupport {
   private implicit val mat: Materializer = ActorMaterializer()
 
 
-  private val kafkaIngestor = system.actorSelection(path = applicationConfig.getString("kafka-ingestor-path"))
+  private[kafka] val kafkaIngestor = system.actorSelection(path = applicationConfig.getString("kafka-ingestor-path"))
 
-  private val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(applicationConfig))
+  private[kafka] val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(applicationConfig))
 
-  private val bootstrapKafkaConfig = applicationConfig.getConfig("bootstrap-config")
+  private[kafka] val bootstrapKafkaConfig = applicationConfig.getConfig("bootstrap-config")
 
-  private val streamsManagerProps = StreamsManagerActor.props(bootstrapKafkaConfig,
+  private[kafka] val streamsManagerProps = StreamsManagerActor.props(bootstrapKafkaConfig,
     KafkaUtils.BootstrapServers, ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient)
 
 

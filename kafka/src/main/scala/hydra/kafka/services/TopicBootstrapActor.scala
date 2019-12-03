@@ -105,27 +105,24 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
 
   def active: Receive = {
     case InitiateTopicBootstrap(topicMetadataRequest) =>
-
-      val schema = getGenericSchema(topicMetadataRequest)
-
-      TopicMetadataValidator.validate(schema) match {
-        case Success(_) =>
-          val result = for {
-            schema <- registerSchema(topicMetadataRequest.schema.compactPrint)
-            topicMetadata <- ingestMetadata(topicMetadataRequest, schema.schemaResource.id)
-            _ <- createKafkaTopics(topicMetadataRequest)
-          } yield topicMetadata
-
-          pipe(result.map{
-            metadata => BootstrapSuccess(metadata)
-          }.
-            recover{
-            case e => BootstrapFailure(Seq(e.getMessage))
-          }) to sender
-
-        case Failure(ex: SchemaValidatorException) =>
-          Future(BootstrapFailure(ex.reasons)) pipeTo sender
-      }
+      (getGenericSchema(topicMetadataRequest) match {
+        case Some(schema) =>
+          (streamsManagerActor ? GetMetadata).mapTo[GetMetadataResponse].flatMap { metadataReponse =>
+            metadataReponse.metadata.get(schema.subject) match {
+              case Some(_) =>
+                executeEndpoint(topicMetadataRequest)
+              case None =>
+                TopicMetadataValidator.validate(Some(schema)) match {
+                  case Success(_) =>
+                    executeEndpoint(topicMetadataRequest)
+                  case Failure(ex: SchemaValidatorException) =>
+                    Future(BootstrapFailure(ex.reasons))
+                }
+            }
+          }
+        case None =>
+          Future(BootstrapFailure(ErrorMessages.SchemaError :: Nil))
+      }) pipeTo sender()
 
     case GetStreams(subject) =>
       val streams: Future[GetStreamsResponse] = (streamsManagerActor ? GetMetadata).mapTo[GetMetadataResponse]
@@ -136,7 +133,6 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
 
       pipe(streams) to sender
   }
-
 
   def failed(ex: Throwable): Receive = {
     case Retry =>
@@ -149,6 +145,18 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
       Future.failed(new Exception(failureMessage)) pipeTo sender
   }
 
+  private def executeEndpoint(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
+    val result = for {
+      schema <- registerSchema(topicMetadataRequest.schema.compactPrint)
+      topicMetadata <- ingestMetadata(topicMetadataRequest, schema.schemaResource.id)
+      _ <- createKafkaTopics(topicMetadataRequest)
+    } yield topicMetadata
+
+    result.map(BootstrapSuccess.apply)
+      .recover {
+        case e => BootstrapFailure(Seq(e.getMessage))
+      }
+  }
 
   private[kafka] def registerSchema(schemaJson: String): Future[RegisterSchemaResponse] = {
     (schemaRegistryActor ? RegisterSchemaRequest(schemaJson)).mapTo[RegisterSchemaResponse]
@@ -159,7 +167,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
 
     val schema = getGenericSchema(topicMetadataRequest)
     val topicMetadata = TopicMetadata(
-      schema.map(s => s"${s.namespace}.${s.name}").getOrElse("Schema does not conform to GenericSchema"),
+      schema.map(_.subject).getOrElse("Schema does not conform to GenericSchema"),
       schemaId,
       topicMetadataRequest.streamType.toString,
       topicMetadataRequest.derived,
@@ -212,7 +220,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     val timeoutMillis = bootstrapKafkaConfig.getInt("timeout")
 
     val schema = getGenericSchema(topicMetadataRequest)
-    val topicName = schema.map(s => s"${s.namespace}.${s.name}").getOrElse("Schema does not conform to GenericSchema")
+    val topicName = schema.map(_.subject).getOrElse("Schema does not conform to GenericSchema")
 
     var topicMap: Map[String, TopicDetails] = Map(topicName -> topicDetails)
 

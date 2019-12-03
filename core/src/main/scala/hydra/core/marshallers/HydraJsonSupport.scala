@@ -168,7 +168,9 @@ case class TopicMetadataRequest(subject: Option[String],
                                 notes: Option[String])
 
 
-case class GenericSchema(name: String, namespace: String)
+case class GenericSchema(name: String, namespace: String) {
+  def subject = s"$namespace.$name"
+}
 
 sealed trait StreamType
 case object Notification extends StreamType
