@@ -109,8 +109,8 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
         case Some(schema) =>
           (streamsManagerActor ? GetMetadata).mapTo[GetMetadataResponse].flatMap { metadataReponse =>
             metadataReponse.metadata.get(schema.subject) match {
-              case Some(_) =>
-                executeEndpoint(topicMetadataRequest)
+              case Some(topicMetadata) =>
+                executeEndpoint(topicMetadataRequest, Some(topicMetadata))
               case None =>
                 TopicMetadataValidator.validate(Some(schema)) match {
                   case Success(_) =>
@@ -147,10 +147,10 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
       Future.failed(new Exception(failureMessage)) pipeTo sender
   }
 
-  private def executeEndpoint(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
+  private def executeEndpoint(topicMetadataRequest: TopicMetadataRequest, existingTopicMetadata: Option[TopicMetadata] = None): Future[BootstrapResult] = {
     val result = for {
       schema <- registerSchema(topicMetadataRequest.schema.compactPrint)
-      topicMetadata <- ingestMetadata(topicMetadataRequest, schema.schemaResource.id)
+      topicMetadata <- ingestMetadata(topicMetadataRequest, schema.schemaResource.id, existingTopicMetadata)
       _ <- createKafkaTopics(topicMetadataRequest)
     } yield topicMetadata
 
@@ -165,7 +165,7 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
   }
 
   private[kafka] def ingestMetadata(topicMetadataRequest: TopicMetadataRequest,
-                                    schemaId: Int): Future[TopicMetadata] = {
+                                    schemaId: Int, existingTopicMetadata: Option[TopicMetadata] = None): Future[TopicMetadata] = {
 
     val schema = getGenericSchema(topicMetadataRequest)
     val topicMetadata = TopicMetadata(
@@ -179,7 +179,8 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
       topicMetadataRequest.additionalDocumentation,
       topicMetadataRequest.notes,
       UUID.randomUUID(),
-      org.joda.time.DateTime.now())
+      existingTopicMetadata.map(_.createdDate).getOrElse(org.joda.time.DateTime.now())
+    )
 
     buildAvroRecord(topicMetadata).flatMap { record =>
       (kafkaIngestor ? Ingest(record, record.ackStrategy)).map {
