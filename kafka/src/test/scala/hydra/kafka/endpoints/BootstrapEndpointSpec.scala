@@ -343,5 +343,43 @@ class BootstrapEndpointSpec extends Matchers
         status shouldBe StatusCodes.OK
       }
     }
+
+    "verify that creation date does not change on updates" in {
+      val testEntity = HttpEntity(
+        ContentTypes.`application/json`,
+        """{
+          |	"streamType": "Notification",
+          | "derived": false,
+          |	"dataClassification": "Public",
+          |	"dataSourceOwner": "BARTON",
+          |	"contact": "slackity slack dont talk back",
+          |	"psDataLake": false,
+          |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+          |	"notes": "here are some notes topkek",
+          |	"schema": {
+          |   "namespace": "exp.test-existing.v1",
+          |	  "name": "SubjectPreexisted",
+          |	  "type": "record",
+          |	  "version": 1,
+          |	  "fields": [
+          |	    {
+          |	      "name": "testField",
+          |	      "type": "string"
+          |	    }
+          |	  ]
+          |	}
+          |}""".stripMargin)
+
+      val bootstrapRouteWithOverridenStreamManager = (new BootstrapEndpoint() with BootstrapEndpointTestActors).route
+      Get("/streams/exp.test-existing.v1.SubjectPreexisted") ~> bootstrapRouteWithOverridenStreamManager ~> check {
+        val originalTopicData = responseAs[Seq[TopicMetadata]]
+        val originalTopicCreationDate = originalTopicData.head.createdDate
+        Post("/streams", testEntity) ~> bootstrapRouteWithOverridenStreamManager ~> check {
+          status shouldBe StatusCodes.OK
+          val response2 = responseAs[TopicMetadata]
+          response2.createdDate shouldBe originalTopicCreationDate
+        }
+      }
+    }
   }
 }
