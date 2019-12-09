@@ -59,12 +59,13 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
   def getSubject(schema: Schema): String = addSchemaSuffix(schema.getFullName)
 
   private def errorHandler[U](schema: String): PartialFunction[Throwable, Future[U]] = {
-    case e: SchemaRegistryException
-      if e.getCause.isInstanceOf[RestClientException] && e.getCause.asInstanceOf[RestClientException].getErrorCode == 40401 =>
+    case e: SchemaRegistryException if e.getCause.isInstanceOf[RestClientException] && isServerError(e) =>
       throw new IllegalArgumentException(s"Schema '$schema' doesnt exist. [Schema registry URL: ${registry.registryUrl}]")
     case e: Throwable =>
       throw e
   }
+
+  private def isServerError(e: SchemaRegistryException) = e.getCause.asInstanceOf[RestClientException].getErrorCode < 500
 
   private def fetchSchema(location: String) = {
     loader.retrieveSchema(location).map(resource => FetchSchemaResponse(resource))
