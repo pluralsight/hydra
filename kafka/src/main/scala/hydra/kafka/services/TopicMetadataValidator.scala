@@ -41,7 +41,7 @@ object TopicMetadataValidator {
   }
 
   private def topicContainsInvalidChars(topic: String): ValidationResponse = {
-    if (topic.matches("^[a-zA-Z0-9\\.\\_]*$")) {
+    if (topic.matches("^[a-zA-Z0-9\\.\\_\\-]*$")) {
       Valid
     }
     else {
@@ -81,7 +81,7 @@ object ErrorMessages {
   val LengthError: String = "Schema namespace +  schema name longer than 249 characters"
 
   val InvalidCharacterError: String = "Schema namespace + schema name may only contain letters, numbers and the characters '.'," +
-    " '_'"
+    " '_'" + " '-'"
 
   val BadOrgError: String = "Schema namespace must begin with one of the following organizations: exp | rev | fin |" +
     " mkg | pnp | sbo | dvs"
