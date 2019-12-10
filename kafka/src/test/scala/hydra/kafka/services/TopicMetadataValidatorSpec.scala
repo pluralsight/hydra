@@ -38,7 +38,7 @@ class TopicMetadataValidatorSpec extends FlatSpec
   }
 
   it should "return Invalid for namespace or name containing hyphens" in {
-    TopicMetadataValidator.validate(Some(GenericSchema("Test-Entity","exp.test.l-1325"))) shouldBe Failure(SchemaValidatorException(Seq(InvalidCharacterError)))
+    TopicMetadataValidator.validate(Some(GenericSchema("Test-Entity","exp.test.l-1325"))) should not be Failure(SchemaValidatorException(Seq(InvalidCharacterError)))
   }
 
   it should "return Invalid for missing generic schema" in {
