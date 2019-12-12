@@ -99,7 +99,6 @@ class SchemaResourceLoader(registryUrl: String,
 
   private implicit class AddSuffix(subject: String) {
     private val valueSuffix = "-value"
-    private val keySuffix = "-key"
 
     def withValueSuffix = {
       if (subject.endsWith(valueSuffix)) subject else subject + valueSuffix
