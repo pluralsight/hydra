@@ -86,11 +86,8 @@ class SchemaResourceLoader(registryUrl: String,
 
   private def loadFromRegistry(subject: String, version: String)(implicit ec: ExecutionContext): Future[SchemaResource] = {
     log.debug(s"Loading schema $subject, version $version from schema registry $registryUrl.")
-    println(registry.getSchemaMetadata(subject, version.toInt))
-    Future(version.toInt).map(v => registry.getSchemaMetadata(subject, v)).map(toSchemaResource)
-      .map(
-        m => {
-          println(m)
+     Future(version.toInt).map(v => registry.getSchemaMetadata(subject, v)).map(toSchemaResource)
+      .map(m => {
         registry.getById(m.id) //this is what will throw if the schema does not exist
         m
       })
