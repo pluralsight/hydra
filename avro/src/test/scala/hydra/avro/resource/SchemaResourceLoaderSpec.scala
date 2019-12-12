@@ -56,15 +56,7 @@ class SchemaResourceLoaderSpec extends Matchers
   describe("When loading schemas from the registry") {
     it("returns the latest version of the schema") {
       val loader = fixture()
-      val res = loader.retrieveSchema(subject)
-      whenReady(res) { schemaMetadata =>
-        schemaMetadata.schema shouldBe testSchema
-      }
-    }
-
-    it("loads a schema with an explicit version") {
-      val loader = fixture()
-      val res = loader.retrieveSchema(s"${subject}#1")
+      val res = loader.retrieveValueSchema(subject)
       whenReady(res) { schemaMetadata =>
         schemaMetadata.schema shouldBe testSchema
       }
@@ -72,7 +64,7 @@ class SchemaResourceLoaderSpec extends Matchers
 
     it("errors if can't find a schema with a specific version") {
       val loader = fixture()
-      val res = loader.retrieveSchema(s"${subject}#2").failed
+      val res = loader.retrieveValueSchema(s"${subject}#2").failed
       whenReady(res) { error =>
         error shouldBe a[SchemaRegistryException]
         error.getMessage should not be null
@@ -81,7 +73,7 @@ class SchemaResourceLoaderSpec extends Matchers
 
     it("errors when subject is not known") {
       val loader = fixture()
-      whenReady(loader.retrieveSchema("registry:tester").failed)(_ shouldBe a[SchemaRegistryException])
+      whenReady(loader.retrieveValueSchema("registry:tester").failed)(_ shouldBe a[SchemaRegistryException])
     }
 
     it("loads a previously cached schema from the cache") {
@@ -89,8 +81,8 @@ class SchemaResourceLoaderSpec extends Matchers
       val client = new MockSchemaRegistryClient
       val loader = new SchemaResourceLoader("http://localhost:48223", client)
       val expectedSchemaResource = SchemaResource(1, 1, testSchema)
-      whenReady(loader.loadSchemaIntoCache(expectedSchemaResource)) { _ =>
-        val res = loader.retrieveSchema("hydra.test.Tester")
+      whenReady(loader.loadValueSchemaIntoCache(expectedSchemaResource)) { _ =>
+        val res = loader.retrieveValueSchema("hydra.test.Tester")
         whenReady(res) { schemaMetadata =>
           schemaMetadata.schema shouldBe testSchema
         }
@@ -101,8 +93,8 @@ class SchemaResourceLoaderSpec extends Matchers
       val client = new MockSchemaRegistryClient
       val loader = new SchemaResourceLoader("http://localhost:48223", client)
       val expectedSchemaResource = SchemaResource(1, 1, testSchema)
-      loader.loadSchemaIntoCache(expectedSchemaResource)
-      val res = loader.retrieveSchema(testSchema.getFullName, 1)
+      loader.loadValueSchemaIntoCache(expectedSchemaResource)
+      val res = loader.retrieveValueSchema(testSchema.getFullName, 1)
       whenReady(res) { schemaResource =>
         schemaResource.schema shouldBe testSchema
       }
@@ -113,14 +105,14 @@ class SchemaResourceLoaderSpec extends Matchers
       client.register(testSchema.getFullName + "-value", testSchema)
       val loader = new SchemaResourceLoader("http://localhost:48223", client,
         metadataCheckInterval = 5.millis)
-      whenReady(loader.retrieveSchema(testSchema.getFullName)) { schemaResource =>
+      whenReady(loader.retrieveValueSchema(testSchema.getFullName)) { schemaResource =>
         schemaResource.schema shouldBe testSchema
       }
 
       Thread.sleep(200)
 
       eventually {
-        whenReady(loader.retrieveSchema(testSchema.getFullName)) { schemaResource =>
+        whenReady(loader.retrieveValueSchema(testSchema.getFullName)) { schemaResource =>
           (schemaResource.schema eq testSchema) shouldBe true
         }
       }
@@ -132,7 +124,7 @@ class SchemaResourceLoaderSpec extends Matchers
       client.register(nschema.getFullName + "-value", nschema)
       val loader = new SchemaResourceLoader("http://localhost:48223", client,
         metadataCheckInterval = 5.millis)
-      whenReady(loader.retrieveSchema(nschema.getFullName)) { schemaResource =>
+      whenReady(loader.retrieveValueSchema(nschema.getFullName)) { schemaResource =>
         schemaResource.schema shouldBe nschema
       }
 
@@ -145,7 +137,7 @@ class SchemaResourceLoaderSpec extends Matchers
         "evolve", nschema.getNamespace(), false, fields.asJava)
       client.register(nschema.getFullName + "-value", evolvedSchema)
       eventually {
-        whenReady(loader.retrieveSchema(nschema.getFullName)) { schemaResource =>
+        whenReady(loader.retrieveValueSchema(nschema.getFullName)) { schemaResource =>
           (schemaResource.schema eq nschema) shouldBe false
         }
       }
