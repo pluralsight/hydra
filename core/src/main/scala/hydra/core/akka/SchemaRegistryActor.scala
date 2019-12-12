@@ -68,7 +68,7 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
   private def isServerError(e: SchemaRegistryException) = e.getCause.asInstanceOf[RestClientException].getErrorCode < 500
 
   private def fetchSchema(location: String) = {
-    loader.retrieveSchema(location).map(resource => FetchSchemaResponse(resource))
+    loader.retrieveValueSchema(location).map(resource => FetchSchemaResponse(resource))
       .recoverWith(errorHandler(location))
   }
 
@@ -92,13 +92,13 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
 
     case SchemaRegistered(id, version, schemaString) =>
       val schemaResource = SchemaResource(id, version, new Schema.Parser().parse(schemaString))
-      loader.loadSchemaIntoCache(schemaResource) pipeTo sender
+      loader.loadValueSchemaIntoCache(schemaResource) pipeTo sender
 
     case FetchAllSchemaVersionsRequest(subject: String) =>
       val allVersionsRequest = for {
-        resource <- loader.retrieveSchema(addSchemaSuffix(subject))
+        resource <- loader.retrieveValueSchema(addSchemaSuffix(subject))
         allVersions <- Future.sequence((1 to resource.version).map { versionNumber =>
-          loader.retrieveSchema(subject, versionNumber)
+          loader.retrieveValueSchema(subject, versionNumber)
         })
       } yield FetchAllSchemaVersionsResponse(allVersions)
       breaker.withCircuitBreaker(allVersionsRequest, registryFailure) pipeTo sender
@@ -113,12 +113,12 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
       breaker.withCircuitBreaker(allSubjectsRequest, registryFailure) pipeTo sender
 
     case FetchSchemaMetadataRequest(subject) =>
-      val metadataRequest = loader.retrieveSchema(subject)
+      val metadataRequest = loader.retrieveValueSchema(subject)
         .map(FetchSchemaMetadataResponse(_))
       breaker.withCircuitBreaker(metadataRequest, registryFailure) pipeTo sender
 
     case FetchSchemaVersionRequest(subject, version) =>
-      val metadataRequest = loader.retrieveSchema(subject, version)
+      val metadataRequest = loader.retrieveValueSchema(subject, version)
         .map(FetchSchemaVersionResponse(_))
       breaker.withCircuitBreaker(metadataRequest, registryFailure) pipeTo sender
   }

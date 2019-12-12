@@ -21,12 +21,12 @@ import hydra.avro.registry.SchemaRegistryException
 import io.confluent.kafka.schemaregistry.client.{SchemaMetadata, SchemaRegistryClient}
 import org.apache.avro.Schema
 import org.slf4j.LoggerFactory
-
-import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
 import scalacache._
 import scalacache.guava.GuavaCache
 import scalacache.modes.scalaFuture._
+
+import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 //import io.confluent.kafka.schemaregistry.client.SchemaResource
 
 /**
@@ -34,38 +34,26 @@ import scalacache.modes.scalaFuture._
   */
 
 /**
-  * We only support two location prefixes: classpath and registry (or no prefix, which defaults
-  * to registry.)
   *
   * @param registryUrl
   * @param registry
-  * @param suffix
   */
 class SchemaResourceLoader(registryUrl: String,
                            registry: SchemaRegistryClient,
-                           suffix: String = "-value",
                            metadataCheckInterval: FiniteDuration = 1 minute) {
 
   import SchemaResourceLoader._
 
   private implicit val guava = SchemaResourceLoader.cache
 
-  def retrieveSchema(subject: String, version: Int)(implicit ec: ExecutionContext): Future[SchemaResource] = {
-    loadFromCache(subject.withSuffix, version.toString)
+  def retrieveValueSchema(subject: String, version: Int = 0)(implicit ec: ExecutionContext): Future[SchemaResource] = {
+    if (version == 0) getLatestSchema(subject.withValueSuffix) else loadFromCache(subject.withValueSuffix, version.toString)
   }
 
-  def retrieveSchema(subject: String)(implicit ec: ExecutionContext) = {
-    val parts = subject.split("\\#")
-    parts match {
-      case Array(subject, version) => loadFromCache(subject.withSuffix, version)
-      case Array(subject) => getLatestSchema(subject.withSuffix)
-    }
-  }
-
-  def loadSchemaIntoCache(schemaResource: SchemaResource)
+  def loadValueSchemaIntoCache(schemaResource: SchemaResource)
                          (implicit ec: ExecutionContext): Future[SchemaResource] = {
     require(schemaResource.id > 0, "A schema id is required.")
-    val subject = schemaResource.schema.getFullName.withSuffix
+    val subject = schemaResource.schema.getFullName.withValueSuffix
     Future.sequence {
       Seq(
         schemaCache.put(schemaResource.id)(schemaResource.schema, ttl = None),
@@ -98,7 +86,7 @@ class SchemaResourceLoader(registryUrl: String,
 
   private def loadFromRegistry(subject: String, version: String)(implicit ec: ExecutionContext): Future[SchemaResource] = {
     log.debug(s"Loading schema $subject, version $version from schema registry $registryUrl.")
-    Future(version.toInt).map(v => registry.getSchemaMetadata(subject, v)).map(toSchemaResource)
+     Future(version.toInt).map(v => registry.getSchemaMetadata(subject, v)).map(toSchemaResource)
       .map(m => {
         registry.getById(m.id) //this is what will throw if the schema does not exist
         m
@@ -110,8 +98,10 @@ class SchemaResourceLoader(registryUrl: String,
   }
 
   private implicit class AddSuffix(subject: String) {
-    def withSuffix = {
-      if (subject.endsWith(suffix)) subject else subject + suffix
+    private val valueSuffix = "-value"
+
+    def withValueSuffix = {
+      if (subject.endsWith(valueSuffix)) subject else subject + valueSuffix
     }
   }
 
