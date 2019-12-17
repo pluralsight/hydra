@@ -20,14 +20,12 @@ trait IngestionHandler {
 
   private val targetIngestor = request.metadataValue(RequestParams.HYDRA_INGESTOR_PARAM)
 
-  context.setReceiveTimeout(timeout)
-
   targetIngestor match {
     case Some(ingestor) => registry ! FindByName(ingestor)
     case None => registry ! FindAll
   }
 
-  override def receive: Receive = timeOut orElse {
+  override def receive: Receive = {
     case LookupResult(Nil) =>
       val errorCode = targetIngestor
         .map(i => StatusCodes.custom(404, s"No ingestor named $i was found in the registry."))
@@ -52,13 +50,6 @@ trait IngestionHandler {
 
   private def errorWith(statusCode: StatusCode) = {
     IngestionReport(request.correlationId, Map.empty, statusCode.intValue())
-  }
-
-
-  private def timeOut: Receive = {
-    case ReceiveTimeout =>
-      complete(errorWith(StatusCodes.custom(StatusCodes.RequestTimeout.intValue,
-        s"Ingestion timed out after ${timeout}.")))
   }
 
   def complete(report: IngestionReport)
