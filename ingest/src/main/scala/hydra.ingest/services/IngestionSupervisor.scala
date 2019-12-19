@@ -85,10 +85,8 @@ class IngestionSupervisor(request: HydraRequest, requestor: ActorRef, info: Seq[
       val errorMsg =
         s"""${request.correlationId}: Ack:${request.ackStrategy};
            |Validation: ${request.validationStrategy}; Metadata:${request.metadata}; Payload: ${request.payload}""".stripMargin
-
-      log.error(s"Ingestion timed out for request $errorMsg")
       log.error(ingestors.toString)
-
+      log.error(s"Ingestion timed out for request $errorMsg")
       context.system.eventStream.publish(IngestionTimedOut(request, start, timeout,
         ingestors.keys.mkString(",")))
       timeoutIngestors()
