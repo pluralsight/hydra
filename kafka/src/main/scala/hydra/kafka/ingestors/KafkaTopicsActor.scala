@@ -80,9 +80,9 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration, kafkaTimeoutS
       context.become(withTopics(topics) orElse handleFailure)
   }
 
-  private def handleFailure: Receive  = {
+  private def handleFailure: Receive = {
     case Failure(ex) =>
-      log.error(s"Error occurred while attempting to retrieve topics: ${ex.getMessage}")
+      log.error(s"Error occurred while attempting to retrieve topics: ${ex.getMessage}", ex: Throwable)
       context.system.eventStream.publish(GetTopicsFailure(ex))
   }
 
