@@ -44,6 +44,7 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
 
   private val metadataTopicName = bootstrapKafkaConfig.get[String]("metadata-topic-name").valueOrElse("_hydra.metadata.topic")
   private val compactedPrefix = bootstrapKafkaConfig.get[String]("compacted-topic-prefix").valueOrElse("_compacted.")
+  private val enableCompactedDerivedStream = bootstrapKafkaConfig.get[Boolean]("compacted_topic.enabled").valueOrElse(false)
 
   private[kafka] val metadataMap = Map[String, TopicMetadata]()
   private val metadataStream = StreamsManagerActor.createMetadataStream(bootstrapKafkaConfig, bootstrapServers,
@@ -80,23 +81,24 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
       }) to sender
   }
 
-
   private[kafka] def buildCompactedProps(metadata: TopicMetadata): Option[Props] = {
-    kafkaUtils.topicExists(metadata.subject) match {
-      case Success(e) if e =>
-        booleanToOption[Props](StreamTypeFormat.read(metadata.streamType.toJson) == History) { () =>
-          val schema = schemaRegistryClient.getById(metadata.schemaId).toString()
-          booleanToOption[Props](schema.contains("hydra.key")) { () =>
-            log.info(s"Attempting to create compacted stream for $metadata")
-            Some(CompactedTopicStreamActor.props(metadata.subject, compactedPrefix + metadata.subject, bootstrapServers, bootstrapKafkaConfig))
+    booleanToOption[Props](enableCompactedDerivedStream) { () =>
+      kafkaUtils.topicExists(metadata.subject) match {
+        case Success(e) if e =>
+          booleanToOption[Props](StreamTypeFormat.read(metadata.streamType.toJson) == History) { () =>
+            val schema = schemaRegistryClient.getById(metadata.schemaId).toString()
+            booleanToOption[Props](schema.contains("hydra.key")) { () =>
+              log.info(s"Attempting to create compacted stream for $metadata")
+              Some(CompactedTopicStreamActor.props(metadata.subject, compactedPrefix + metadata.subject, bootstrapServers, bootstrapKafkaConfig))
+            }
           }
-        }
-      case Success(e) if !e =>
-        log.error(s"Topic ${metadata.subject} does not exist; won't create compacted topic.")
-        None
-      case Failure(ex) =>
-        log.error(ex, s"Unable to create compacted topic for ${metadata.subject}")
-        None
+        case Success(e) if !e =>
+          log.error(s"Topic ${metadata.subject} does not exist; won't create compacted topic.")
+          None
+        case Failure(ex) =>
+          log.error(ex, s"Unable to create compacted topic for ${metadata.subject}")
+          None
+      }
     }
   }
 }
