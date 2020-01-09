@@ -6,6 +6,8 @@ import com.typesafe.config.ConfigFactory
 import hydra.common.config.ConfigSupport
 import hydra.kafka.ingestors.KafkaTopicsActor._
 import net.manub.embeddedkafka.EmbeddedKafka
+import org.apache.kafka.clients.admin.{AdminClient, ListTopicsResult}
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
@@ -18,7 +20,8 @@ class KafkaTopicsActorSpec
     with ConfigSupport
     with Eventually
     with EmbeddedKafka
-    with BeforeAndAfterAll {
+    with BeforeAndAfterAll
+    with MockFactory {
       
   val config = ConfigFactory.parseString(
     """
@@ -45,7 +48,7 @@ class KafkaTopicsActorSpec
     }
   }
       
-  it should "not return topics that doesn't exist" in {
+  it should "not return topics that don't exist" in {
     val probe = TestProbe()
 
     withRunningKafka {
@@ -106,4 +109,13 @@ class KafkaTopicsActorSpec
     actor ! RefreshTopicList
     probinho.expectMsgType[GetTopicsFailure]
   }
+
+  "fetchTopics" should "clean up resources" in {
+    val adminClientMock = mock[AdminClient]
+    (adminClientMock.close(_: Long, _: TimeUnit)).expects(*, *).once()
+    (adminClientMock.listTopics: () => ListTopicsResult).expects().throwing(new Exception("Failure")).once()
+    val createAdminClient: () => AdminClient = () => adminClientMock
+    fetchTopics(createAdminClient, 1.second.toSeconds)
+  }
+
 }
