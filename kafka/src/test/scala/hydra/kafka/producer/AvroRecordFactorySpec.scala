@@ -133,6 +133,7 @@ class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
       }
     }
 
+
     it("builds keyed messages using HYDRA_RECORD_KEY_PARAM") {
       val json = """{"name":"test", "rank":10}"""
       val request = HydraRequest("123", json)
