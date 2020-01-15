@@ -19,11 +19,11 @@ import hydra.avro.registry.ConfluentSchemaRegistry
 
 class JdbcIngestorSpec
   extends TestKit(ActorSystem("jdbc-ingestor-spec", config = ConfigFactory.parseString("akka.actor.provider=cluster")))
-  with Matchers
-  with FunSpecLike
-  with ImplicitSender
-  with ConfigSupport
-  with BeforeAndAfterAll {
+    with Matchers
+    with FunSpecLike
+    with ImplicitSender
+    with ConfigSupport
+    with BeforeAndAfterAll {
 
   val ingestor = system.actorOf(Props[JdbcIngestor])
 
@@ -81,11 +81,11 @@ class JdbcIngestorSpec
     }
 
     it("transports") {
-      ingestor ! Ingest(TestRecord("test", "test", None, AckStrategy.NoAck), NoAck)
-      probe.expectMsg(Produce(TestRecord("test", "test", None, AckStrategy.NoAck), self, NoAck))
+      ingestor ! Ingest(TestRecord("test", "test", "", AckStrategy.NoAck), NoAck)
+      probe.expectMsg(Produce(TestRecord("test", "test", "", AckStrategy.NoAck), self, NoAck))
     }
   }
 
-  case class TestRecord(destination: String, payload: String, key: Option[String], ackStrategy: AckStrategy) extends HydraRecord[String, String]
+  case class TestRecord(destination: String, payload: String, key: String, ackStrategy: AckStrategy) extends HydraRecord[String, String]
 
 }

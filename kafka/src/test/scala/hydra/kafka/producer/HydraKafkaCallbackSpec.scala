@@ -43,7 +43,7 @@ class HydraKafkaCallbackSpec extends TestKit(ActorSystem("hydra")) with Matchers
 
   describe("When using the HydraCallback") {
     it("sends the completion to the actor selection") {
-      val record = StringRecord("test", "test", AckStrategy.NoAck)
+      val record = StringRecord("test", None, "test", AckStrategy.NoAck)
       val e = new HydraKafkaCallback(112, record, ActorSelection(probe.ref, Seq.empty), callback(record))
       val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1L: java.lang.Long, 1, 1)
       e.onCompletion(md, null)
@@ -52,7 +52,7 @@ class HydraKafkaCallbackSpec extends TestKit(ActorSystem("hydra")) with Matchers
     }
 
     it("sends the error to the actor selection") {
-      val record = StringRecord("test", "test", AckStrategy.NoAck)
+      val record = StringRecord("test", None, "test", AckStrategy.NoAck)
       val e = new HydraKafkaCallback(112, record,
         ActorSelection(probe.ref, Seq.empty), callback(record))
       val err = new IllegalArgumentException("test")
@@ -62,7 +62,7 @@ class HydraKafkaCallbackSpec extends TestKit(ActorSystem("hydra")) with Matchers
     }
 
     it("sends the completion to the actor selection and acks the ingestor") {
-      val record = StringRecord("test", "test", AckStrategy.NoAck)
+      val record = StringRecord("test", None, "test", AckStrategy.NoAck)
       val e = new HydraKafkaCallback(112, record,
         ActorSelection(probe.ref, Seq.empty), callback(record))
       val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1L: java.lang.Long, 1, 1)
@@ -72,7 +72,7 @@ class HydraKafkaCallbackSpec extends TestKit(ActorSystem("hydra")) with Matchers
     }
 
     it("sends the error to the actor selection and acks the ingestor") {
-      val record = StringRecord("test", "test", AckStrategy.NoAck)
+      val record = StringRecord("test", None, "test", AckStrategy.NoAck)
       val e = new HydraKafkaCallback(112, record,
         ActorSelection(probe.ref, Seq.empty), callback(record))
       val md = new RecordMetadata(new TopicPartition("test", 0), 0L, 1L, 1L, 1L: java.lang.Long, 1, 1)

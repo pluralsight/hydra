@@ -40,7 +40,7 @@ class TransportCallbackSpec extends TestKit(ActorSystem("test")) with Matchers w
     }
 
     it("handles ingestor callbacks") {
-      val rec = TestRecord("OK", Some("1"), "test", AckStrategy.NoAck)
+      val rec = TestRecord("OK", "1", "test", AckStrategy.NoAck)
       val transport = TestProbe()
       val cb = new IngestorCallback[String, String](rec, ingestor.ref, supervisor.ref, transport.ref)
 

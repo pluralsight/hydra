@@ -59,10 +59,10 @@ class RabbitIngestorSpec extends TestKit(ActorSystem("rabbit-ingestor-spec")) wi
     }
 
     it("transports") {
-      ingestor ! Ingest(TestRecord("test", "test", None, AckStrategy.NoAck), AckStrategy.NoAck)
-      probe.expectMsg(Produce(TestRecord("test", "test", None, AckStrategy.NoAck), self, AckStrategy.NoAck))
+      ingestor ! Ingest(TestRecord("test", "test", "", AckStrategy.NoAck), AckStrategy.NoAck)
+      probe.expectMsg(Produce(TestRecord("test", "test", "", AckStrategy.NoAck), self, AckStrategy.NoAck))
     }
   }
 }
 
-case class TestRecord(destination: String, payload: String, key: Option[String], ackStrategy: AckStrategy) extends HydraRecord[String, String]
+case class TestRecord(destination: String, payload: String, key: String, ackStrategy: AckStrategy) extends HydraRecord[String, String]

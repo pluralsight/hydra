@@ -18,7 +18,7 @@ class LoggingIngestor extends Ingestor {
 
   override val recordFactory = new RecordFactory[String, String] {
     override def build(request: HydraRequest)(implicit ec: ExecutionContext) =
-      Future.successful(StringRecord("", None, request.payload, request.ackStrategy))
+      Future.successful(StringRecord("", "", request.payload, request.ackStrategy))
   }
   ingest {
     case Publish(request) =>

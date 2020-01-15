@@ -1,6 +1,7 @@
 package hydra.sandbox.transport
 
 import hydra.core.transport.{AckStrategy, HydraRecord, RecordMetadata}
+import org.apache.commons.lang3.StringUtils
 
 /**
   * Created by alexsilva on 3/29/17.
@@ -8,7 +9,7 @@ import hydra.core.transport.{AckStrategy, HydraRecord, RecordMetadata}
 case class FileRecord(destination: String, payload: String, ackStrategy: AckStrategy)
   extends HydraRecord[String, String] {
 
-  override val key: Option[String] = None
+  override val key = StringUtils.EMPTY //not needed
 }
 
 

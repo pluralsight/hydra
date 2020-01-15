@@ -5,10 +5,8 @@ import hydra.core.transport.AckStrategy
 /**
   * Created by alexsilva on 10/30/15.
   */
-case class DeleteTombstoneRecord(destination: String, key: Option[String], ackStrategy: AckStrategy)
+case class DeleteTombstoneRecord(destination: String, key: String, ackStrategy: AckStrategy)
   extends KafkaRecord[String, Any] {
-
-  assert(key.isDefined, "A key is required")
 
   override val payload = null
 
