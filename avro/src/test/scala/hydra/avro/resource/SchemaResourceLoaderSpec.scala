@@ -160,8 +160,6 @@ class SchemaResourceLoaderSpec extends Matchers
         schemaResource.schema shouldBe testValueSchema
       }
 
-      Thread.sleep(200)
-
       eventually {
         whenReady(loader.retrieveValueSchema(testValueSchema.getFullName)) { schemaResource =>
           (schemaResource.schema eq testValueSchema) shouldBe true
@@ -177,8 +175,6 @@ class SchemaResourceLoaderSpec extends Matchers
       whenReady(loader.retrieveKeySchema(testKeySchema.getFullName)) { schemaResource =>
         schemaResource.schema shouldBe testKeySchema
       }
-
-      Thread.sleep(200)
 
       eventually {
         whenReady(loader.retrieveKeySchema(testKeySchema.getFullName)) { schemaResource =>
