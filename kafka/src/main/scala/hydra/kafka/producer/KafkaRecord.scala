@@ -33,10 +33,11 @@ trait KafkaRecord[K, V] extends HydraRecord[K, V] {
 
 object KafkaRecord {
   implicit def toProducerRecord[K, V](record: KafkaRecord[K, V]) = {
+   val key = if (record.key.isEmpty) null else record.key
     new ProducerRecord[K, V](record.destination,
       record.partition.getOrElse(null).asInstanceOf[Integer],
       record.timestamp,
-      record.key,
+      key,
       record.payload)
   }
 }
