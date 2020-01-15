@@ -36,7 +36,7 @@ object KafkaRecord {
     new ProducerRecord[K, V](record.destination,
       record.partition.getOrElse(null).asInstanceOf[Integer],
       record.timestamp,
-      record.key.getOrElse(null).asInstanceOf[K],
+      record.key,
       record.payload)
   }
 }

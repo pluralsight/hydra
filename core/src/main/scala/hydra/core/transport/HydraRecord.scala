@@ -12,7 +12,7 @@ trait HydraRecord[+K, +P] {
 
   def destination: String
 
-  def key: Option[K]
+  def key: K
 
   def payload: P
 

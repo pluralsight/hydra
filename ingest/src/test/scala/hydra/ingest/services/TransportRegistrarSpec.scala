@@ -26,14 +26,14 @@ class TransportRegistrarSpec extends TestKit(ActorSystem("test")) with Matchers
     }
     it("registers a transport using its companion object") {
       val transports = bootstrap(Map("transport_test1" -> classOf[TransportTest]), system, applicationConfig)
-      transports(0).get ! Deliver(TestRecord("transport_test", Some("key"), """{"name":"alex"}""", AckStrategy.NoAck))
+      transports(0).get ! Deliver(TestRecord("transport_test", "key", """{"name":"alex"}""", AckStrategy.NoAck))
       expectMsg("HELLO!") //defined in reference.conf
     }
 
     it("registers a transport without a companion object") {
       val transports = bootstrap(Map("transport_test2" -> classOf[CompanionLessTransportTest]), system,
         applicationConfig)
-      transports(0).get ! Deliver(TestRecord("transport_test", Some("key"), """{"name":"alex"}""", AckStrategy.NoAck))
+      transports(0).get ! Deliver(TestRecord("transport_test", "key", """{"name":"alex"}""", AckStrategy.NoAck))
       expectMsg("HI!")
     }
 

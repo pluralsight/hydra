@@ -9,7 +9,7 @@ import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.common.serialization.StringSerializer
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
-import org.scalatest.{BeforeAndAfterEach, FlatSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FlatSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
@@ -17,6 +17,7 @@ class CompactedTopicStreamActorSpec extends TestKit(ActorSystem("compacted-strea
   with FlatSpecLike
   with Matchers
   with BeforeAndAfterEach
+  with BeforeAndAfterAll
   with MockFactory
   with ScalaFutures
   with EmbeddedKafka
@@ -38,7 +39,6 @@ class CompactedTopicStreamActorSpec extends TestKit(ActorSystem("compacted-strea
   val bootstrapServers = KafkaUtils.BootstrapServers
 
 
-
   override def beforeEach(): Unit = {
     EmbeddedKafka.start()
     EmbeddedKafka.createCustomTopic(topic)
@@ -49,6 +49,8 @@ class CompactedTopicStreamActorSpec extends TestKit(ActorSystem("compacted-strea
   override def afterEach(): Unit = {
     EmbeddedKafka.stop()
   }
+
+  override def afterAll() = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 
   "The CompactedTopicStreamActor" should "stream from a non compacted topic to a compacted topic in" in {
 
@@ -71,7 +73,6 @@ class CompactedTopicStreamActorSpec extends TestKit(ActorSystem("compacted-strea
       name = compactedTopic)
     publishToKafka(compactedTopic, "message", "message")(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
   }
-
 
 
 }

@@ -125,7 +125,7 @@ class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       whenReady(factory.build(request)) { msg =>
         msg.destination shouldBe "test-topic"
-        msg.key shouldBe None
+        msg.key shouldBe ""
         msg.schema shouldBe testSchema
         msg.payload.get("name") shouldBe "test"
         msg.payload.get("rank") shouldBe 10
@@ -144,7 +144,7 @@ class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
         msg.schema shouldBe testSchema
         msg.payload.get("name") shouldBe "test"
         msg.payload.get("rank") shouldBe 10
-        msg.key shouldBe Some("test")
+        msg.key shouldBe "test"
         msg.payload shouldBe new JsonConverter[GenericRecord](testSchema).convert(json)
       }
     }
@@ -159,7 +159,7 @@ class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
         msg.schema shouldBe testKeyedSchema
         msg.payload.get("name") shouldBe "thisIsTheKey"
         msg.payload.get("rank") shouldBe 10
-        msg.key shouldBe Some("thisIsTheKey")
+        msg.key shouldBe "thisIsTheKey"
         msg.payload shouldBe new JsonConverter[GenericRecord](testKeyedSchema).convert(json)
       }
     }

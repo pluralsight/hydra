@@ -37,19 +37,19 @@ class JdbcTransportSpec extends TestKit(ActorSystem("jdbc-transport-spec")) with
       val profiles = jdbcTransport.underlyingActor.dbProfiles
       profiles.keySet should contain("test-dsprofile")
       profiles("test-dsprofile").name shouldBe "test-dsprofile"
-      TryWith(profiles("test-dsprofile").ds.getConnection) { c =>
+      TryWith(profiles("test-dsprofile").ds.getConnection()) { c =>
         c.getMetaData.getURL shouldBe "jdbc:h2:mem:test_db"
       }
     }
 
     it("reports error if profile can't be found") {
-      val record = JdbcRecord("dest", Some(Seq.empty), gr, "dbProfile", AckStrategy.NoAck)
+      val record = JdbcRecord("dest", Seq.empty, gr, "dbProfile", AckStrategy.NoAck)
       jdbcTransport ! Deliver(record, 1, ack)
       probe.expectMsgType[NoSuchElementException]
     }
 
     it("transports") {
-      val record = JdbcRecord("test_transport", Some(Seq.empty), gr, "test-dsprofile", AckStrategy.NoAck)
+      val record = JdbcRecord("test_transport", Seq.empty, gr, "test-dsprofile", AckStrategy.NoAck)
       jdbcTransport ! Deliver(record, 1, ack)
       probe.expectMsg("DONE")
       //check the db too
@@ -65,14 +65,14 @@ class JdbcTransportSpec extends TestKit(ActorSystem("jdbc-transport-spec")) with
     it("errors if underlying datasource is closed") {
       val jt = TestActorRef[JdbcTransport](Props[JdbcTransport])
       jt.underlyingActor.dbProfiles("test-dsprofile").close()
-      val record = JdbcRecord("test_transport", Some(Seq.empty), gr, "test-dsprofile", AckStrategy.NoAck)
+      val record = JdbcRecord("test_transport", Seq.empty, gr, "test-dsprofile", AckStrategy.NoAck)
       jt ! Deliver(record, 1, ack)
       probe.expectMsgType[SQLException]
       system.stop(jt)
     }
   }
 
-  case class TestRecord(destination: String, payload: String, key: Option[String], ackStrategy: AckStrategy) extends HydraRecord[String, String]
+  case class TestRecord(destination: String, payload: String, key: String, ackStrategy: AckStrategy) extends HydraRecord[String, String]
 
 }
 

@@ -20,6 +20,7 @@ import hydra.common.config.ConfigSupport
 import hydra.core.ingest.HydraRequest
 import hydra.core.transport.{AckStrategy, HydraRecord, RecordFactory, RecordMetadata}
 import hydra.rabbit.RabbitRecord.{DESTINATION_TYPE_EXCHANGE, DESTINATION_TYPE_QUEUE, HYDRA_RABBIT_EXCHANGE, HYDRA_RABBIT_QUEUE}
+import org.apache.commons.lang3.StringUtils
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -44,7 +45,7 @@ case class RabbitRecord(destination: String,
                         ackStrategy: AckStrategy)
   extends HydraRecord[String, String] {
 
-  override val key: Option[String] = None
+  override val key: String = StringUtils.EMPTY
 }
 
 object RabbitRecord {

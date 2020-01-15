@@ -34,8 +34,8 @@ import scala.concurrent.duration._
 import scala.io.Source
 
 /**
- * Created by alexsilva on 1/11/17.
- */
+  * Created by alexsilva on 1/11/17.
+  */
 class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
   with Matchers
   with FunSpecLike
@@ -51,7 +51,7 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
 
   val loader = system.actorOf(Props(new Actor() {
     override def receive: Receive = {
-      case FetchSchemaRequest(_) => sender ! FetchSchemaResponse(SchemaResource(1,1,testSchema))
+      case FetchSchemaRequest(_) => sender ! FetchSchemaResponse(SchemaResource(1, 1, testSchema))
     }
   }))
 
@@ -77,7 +77,7 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
           HYDRA_KAFKA_TOPIC_PARAM -> "test-topic",
           RequestParams.HYDRA_RECORD_KEY_PARAM -> "123")
       val record = factories.build(request)
-      whenReady(record)(_ shouldBe DeleteTombstoneRecord("test-topic", Some("123"), AckStrategy.NoAck))
+      whenReady(record)(_ shouldBe DeleteTombstoneRecord("test-topic", "123", AckStrategy.NoAck))
     }
 
     it("handles json") {

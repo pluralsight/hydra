@@ -62,7 +62,7 @@ class JsonRecordFactorySpec extends Matchers
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       whenReady(JsonRecordFactory.build(request)) { msg =>
         msg.destination shouldBe "test-topic"
-        msg.key shouldBe Some("test")
+        msg.key shouldBe "test"
         msg.payload shouldBe new ObjectMapper().reader().readTree("""{"name":"test"}""")
       }
     }

@@ -50,7 +50,7 @@ class StringRecordFactorySpec extends Matchers
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       whenReady(StringRecordFactory.build(request)) { msg =>
         msg.destination shouldBe "test-topic"
-        msg.key shouldBe Some("test")
+        msg.key shouldBe "test"
         msg.payload shouldBe """{"name":"test"}"""
       }
     }
