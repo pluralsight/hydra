@@ -28,5 +28,5 @@ case class StringRecord(destination: String, key: String, payload: String,
 
 object StringRecord {
   def apply(topic: String, key: Option[String], payload: String, ackStrategy: AckStrategy): StringRecord =
-    new StringRecord(topic, key.getOrElse(""), payload, ackStrategy)
+    new StringRecord(topic, key.orNull, payload, ackStrategy)
 }

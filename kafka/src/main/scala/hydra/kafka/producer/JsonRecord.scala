@@ -35,6 +35,6 @@ object JsonRecord {
 
   def apply(topic: String, key: Option[String], obj: Any, ackStrategy: AckStrategy): JsonRecord = {
     val payload = mapper.convertValue[JsonNode](obj, classOf[JsonNode])
-    new JsonRecord(topic, key.getOrElse(StringUtils.EMPTY), payload, ackStrategy)
+    new JsonRecord(topic, key.orNull, payload, ackStrategy)
   }
 }

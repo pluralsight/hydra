@@ -22,12 +22,12 @@ object AvroRecord {
       converter.convert(json)
     }
 
-    AvroRecord(destination, schema, key.getOrElse(StringUtils.EMPTY), payload, ackStrategy)
+    AvroRecord(destination, schema, key.orNull, payload, ackStrategy)
   }
 
   def apply(destination: String, schema: Schema, key: Option[String], record: GenericRecord,
             ackStrategy: AckStrategy): AvroRecord = {
-    AvroRecord(destination, schema, key.getOrElse(StringUtils.EMPTY), record, ackStrategy)
+    AvroRecord(destination, schema, key.orNull, record, ackStrategy)
   }
 }
 
