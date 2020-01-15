@@ -125,7 +125,7 @@ class AvroRecordFactorySpec extends TestKit(ActorSystem("hydra"))
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       whenReady(factory.build(request)) { msg =>
         msg.destination shouldBe "test-topic"
-        msg.key shouldBe ""
+        msg.key shouldBe null
         msg.schema shouldBe testSchema
         msg.payload.get("name") shouldBe "test"
         msg.payload.get("rank") shouldBe 10
