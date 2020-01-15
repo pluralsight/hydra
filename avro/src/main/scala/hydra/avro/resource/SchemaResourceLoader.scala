@@ -50,17 +50,29 @@ class SchemaResourceLoader(registryUrl: String,
     if (version == 0) getLatestSchema(subject.withValueSuffix) else loadFromCache(subject.withValueSuffix, version.toString)
   }
 
-  def loadValueSchemaIntoCache(schemaResource: SchemaResource)
-                         (implicit ec: ExecutionContext): Future[SchemaResource] = {
-    require(schemaResource.id > 0, "A schema id is required.")
-    val subject = schemaResource.schema.getFullName.withValueSuffix
-    Future.sequence {
-      Seq(
-        schemaCache.put(schemaResource.id)(schemaResource.schema, ttl = None),
-        put(subject)(schemaResource, ttl = Some(metadataCheckInterval)),
-        put(subject, schemaResource.version)(schemaResource, ttl = None))
-    }.map(_ => schemaResource)
+  def retrieveKeySchema(subject: String, version: Int = 0)(implicit ec: ExecutionContext): Future[SchemaResource] = {
+    if (version == 0) getLatestSchema(subject.withKeySuffix) else loadFromCache(subject.withKeySuffix, version.toString)
   }
+
+  def loadValueSchemaIntoCache(schemaResource: SchemaResource)
+                              (implicit ec: ExecutionContext): Future[SchemaResource] = {
+    require(schemaResource.id > 0, "A schema id is required.")
+    loadSchemaIntoCache(schemaResource.schema.getFullName.withValueSuffix, schemaResource)
+  }
+
+  def loadKeySchemaIntoCache(schemaResource: SchemaResource)
+                            (implicit ec: ExecutionContext): Future[SchemaResource] = {
+    require(schemaResource.id > 0, "A schema id is required.")
+    loadSchemaIntoCache(schemaResource.schema.getFullName.withKeySuffix, schemaResource)
+  }
+
+  private def loadSchemaIntoCache(srSubject: String, schemaResource: SchemaResource)
+                                 (implicit ec: ExecutionContext): Future[SchemaResource] = Future.sequence {
+    Seq(
+      schemaCache.put(schemaResource.id)(schemaResource.schema, ttl = None),
+      put(srSubject)(schemaResource, ttl = Some(metadataCheckInterval)),
+      put(srSubject, schemaResource.version)(schemaResource, ttl = None))
+  }.map(_ => schemaResource)
 
   private def getLatestSchema(subject: String)(implicit ec: ExecutionContext): Future[SchemaResource] = {
     cachingF(subject)(ttl = Some(metadataCheckInterval)) {
@@ -86,7 +98,7 @@ class SchemaResourceLoader(registryUrl: String,
 
   private def loadFromRegistry(subject: String, version: String)(implicit ec: ExecutionContext): Future[SchemaResource] = {
     log.debug(s"Loading schema $subject, version $version from schema registry $registryUrl.")
-     Future(version.toInt).map(v => registry.getSchemaMetadata(subject, v)).map(toSchemaResource)
+    Future(version.toInt).map(v => registry.getSchemaMetadata(subject, v)).map(toSchemaResource)
       .map(m => {
         registry.getById(m.id) //this is what will throw if the schema does not exist
         m
@@ -99,9 +111,14 @@ class SchemaResourceLoader(registryUrl: String,
 
   private implicit class AddSuffix(subject: String) {
     private val valueSuffix = "-value"
+    private val keySuffix = "-key"
 
     def withValueSuffix = {
       if (subject.endsWith(valueSuffix)) subject else subject + valueSuffix
+    }
+
+    def withKeySuffix = {
+      if (subject.endsWith(keySuffix)) subject else subject + keySuffix
     }
   }
 
