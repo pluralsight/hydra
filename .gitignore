@@ -70,3 +70,11 @@ build.properties
 #ensime http://ensime.github.io/
 .ensime
 .ensime_cache
+
+#metals
+
+.metals/
+metals.sbt
+metals/project/
+
+**/.bloop
