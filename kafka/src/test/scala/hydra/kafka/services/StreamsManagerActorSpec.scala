@@ -208,7 +208,7 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
 
   }
 
-  it should "not create a compacted topic stream if streamType isn't History from the metadata payload" in {
+  it should "create a topic stream if streamType isn't History from the metadata payload" in {
     val schemaWithKey = new Schema.Parser().parse(
       """
         |{
