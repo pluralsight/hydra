@@ -41,7 +41,6 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
     customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
 
   val bootstrapConfig = ConfigFactory.load().getConfig("hydra_kafka.bootstrap-config")
-    .withValue("compacted_topic.enabled", ConfigValueFactory.fromAnyRef(true))
 
   val bootstrapServers = KafkaUtils.BootstrapServers
 
@@ -156,61 +155,7 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
 
   }
 
-  it should "create a compacted topic stream if necessary" in {
-
-    EmbeddedKafka.createCustomTopic("exp.assessment.SkillAssessmentTopicsScored")
-
-    val schemaWithKey = new Schema.Parser().parse(
-      """
-        |{
-        |	  "namespace": "exp.assessment",
-        |	  "name": "SkillAssessmentTopicsScored",
-        |	  "type": "record",
-        |   "hydra.key": "testField",
-        |	  "version": 1,
-        |	  "fields": [
-        |	    {
-        |	      "name": "testField",
-        |	      "type": "string"
-        |	    }
-        |	  ]
-        |	}
-      """.stripMargin)
-
-    val schemaWKeyId = srClient.register("exp.assessment.SkillAssessmentTopicsScored", schemaWithKey)
-
-    val metadata =
-      s"""{
-         |	"id":"79a1627e-04a6-11e9-8eb2-f2801f1b9fd1",
-         | "createdDate":"${formatter.print(DateTime.now)}",
-         | "subject": "exp.assessment.SkillAssessmentTopicsScored",
-         |	"streamType": "History",
-         | "derived": false,
-         |	"dataClassification": "Public",
-         |	"contact": "slackity slack dont talk back",
-         |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
-         |	"notes": "here are some notes topkek",
-         |	"schemaId": $schemaWKeyId
-         |}"""
-        .stripMargin
-        .parseJson
-        .convertTo[TopicMetadata]
-
-    val streamsManagerActor = system.actorOf(StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient), name = "stream_manager")
-    val compactedTopic = "_compacted.exp.assessment.SkillAssessmentTopicsScored"
-    val shouldBeName = s"akka://metadata-stream-actor-spec/user/stream_manager/$compactedTopic"
-
-    streamsManagerActor ! metadata
-
-    implicit val timeout = Timeout(3.seconds)
-    eventually {
-      whenReady(system.actorSelection(shouldBeName).resolveOne()) { _ =>
-        succeed
-      }
-    }
-  }
-
-  it should "not create a compacted topic stream if hydra.key is missing" in {
+  it should "create a stream even if hydra.key is missing" in {
     val schemaWithKey = new Schema.Parser().parse(
       """
         |{
@@ -248,7 +193,7 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
         .convertTo[TopicMetadata]
 
     val streamsManagerActor = system.actorOf(StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient), name = "stream_manager2")
-    val compactedTopic = "_compacted.exp.assessment.SkillAssessmentTopicsScored"
+    val topicName = "exp.assessment.SkillAssessmentTopicsScored"
 
     streamsManagerActor ! metadata
 
@@ -257,7 +202,7 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
     implicit val timeout = Timeout(3.seconds)
 
 
-    whenReady(streamsManagerActor ? GetStreamActor(compactedTopic)) {
+    whenReady(streamsManagerActor ? GetStreamActor(topicName)) {
       res => res shouldBe GetStreamActorResponse(None)
     }
 
@@ -301,7 +246,7 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
         .convertTo[TopicMetadata]
 
     val streamsManagerActor = system.actorOf(StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient), name = "stream_manager3")
-    val compactedTopic = "_compacted.exp.assessment.SkillAssessmentTopicsScored"
+    val topicName = "exp.assessment.SkillAssessmentTopicsScored"
 
     streamsManagerActor ! metadata
 
@@ -310,115 +255,10 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
     implicit val timeout = Timeout(3.seconds)
 
 
-    whenReady(streamsManagerActor ? GetStreamActor(compactedTopic)) {
+    whenReady(streamsManagerActor ? GetStreamActor(topicName)) {
       res => res shouldBe GetStreamActorResponse(None)
     }
 
-  }
-
-  it should "not create a compacted stream for a topic that doesn't exist" in {
-    val schemaWithKey = new Schema.Parser().parse(
-      """
-        |{
-        |	  "namespace": "does.not",
-        |	  "name": "Exist",
-        |	  "type": "record",
-        |   "hydra.key": "testField",
-        |	  "version": 1,
-        |	  "fields": [
-        |	    {
-        |	      "name": "testField",
-        |	      "type": "string"
-        |	    }
-        |	  ]
-        |	}
-      """.stripMargin)
-
-    val schemaWKeyId = srClient.register("exp.assessment.SkillAssessmentTopicsScored", schemaWithKey)
-
-    val metadata =
-      s"""{
-         |	"id":"79a1627e-04a6-11e9-8eb2-f2801f1b9fd1",
-         | "createdDate":"${formatter.print(DateTime.now)}",
-         | "subject": "does.not.Exist",
-         |	"streamType": "CurrentState",
-         | "derived": false,
-         |	"dataClassification": "Public",
-         |	"contact": "slackity slack dont talk back",
-         |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
-         |	"notes": "here are some notes topkek",
-         |	"schemaId": $schemaWKeyId
-         |}"""
-        .stripMargin
-        .parseJson
-        .convertTo[TopicMetadata]
-
-    val streamsManagerActor = system.actorOf(StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient), name = "stream_manager4")
-    val compactedTopic = "_compacted.does.not.Exist"
-
-    streamsManagerActor ! metadata
-
-    import akka.pattern.ask
-
-    implicit val timeout = Timeout(3.seconds)
-
-    whenReady(streamsManagerActor ? GetStreamActor(compactedTopic)) {
-      res => res shouldBe GetStreamActorResponse(None)
-    }
-
-  }
-
-  it should "not create a compacted topic stream if config is not enabled" in {
-
-    val schemaWithKey = new Schema.Parser().parse(
-      """
-        |{
-        |	  "namespace": "exp.assessment",
-        |	  "name": "SkillAssessmentTopicsScored",
-        |	  "type": "record",
-        |   "hydra.key": "testField",
-        |	  "version": 1,
-        |	  "fields": [
-        |	    {
-        |	      "name": "testField",
-        |	      "type": "string"
-        |	    }
-        |	  ]
-        |	}
-      """.stripMargin)
-
-    val schemaWKeyId = srClient.register("exp.assessment.SkillAssessmentTopicsScored", schemaWithKey)
-
-    val metadata =
-      s"""{
-         |	"id":"79a1627e-04a6-11e9-8eb2-f2801f1b9fd1",
-         | "createdDate":"${formatter.print(DateTime.now)}",
-         | "subject": "exp.assessment.SkillAssessmentTopicsScored",
-         |	"streamType": "History",
-         | "derived": false,
-         |	"dataClassification": "Public",
-         |	"contact": "slackity slack dont talk back",
-         |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
-         |	"notes": "here are some notes topkek",
-         |	"schemaId": $schemaWKeyId
-         |}"""
-        .stripMargin
-        .parseJson
-        .convertTo[TopicMetadata]
-
-    val streamsManagerActor = system.actorOf(StreamsManagerActor.props(
-      bootstrapConfig.withValue("compacted_topic.enabled", ConfigValueFactory.fromAnyRef(false)),
-      bootstrapServers, srClient), name = "stream_manager_cfg")
-    val compactedTopic = "_compacted.exp.assessment.SkillAssessmentTopicsScored"
-    val shouldBeName = s"akka://metadata-stream-actor-spec/user/stream_manager/$compactedTopic"
-
-    streamsManagerActor ! metadata
-
-    implicit val timeout = Timeout(3.seconds)
-    import akka.pattern.ask
-    whenReady(streamsManagerActor ? GetStreamActor(compactedTopic)) {
-      res => res shouldBe GetStreamActorResponse(None)
-    }
   }
 }
 
