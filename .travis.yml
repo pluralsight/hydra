@@ -5,7 +5,7 @@ env:
   global:
     - _JAVA_OPTIONS="-Dakka.test.timefactor=3"
 scala:
-   - 2.12.4
+   - 2.12.10
 jdk:
    - openjdk8
 script:
