@@ -32,6 +32,38 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Try
 
+object KafkaTopicsActor {
+
+  case object TopicsTimer
+
+  case object RefreshTopicList
+
+  case class GetTopicRequest(topic: String)
+
+  case class GetTopicResponse(topic: String, lookupDate: DateTime, exists: Boolean)
+
+  case class GetTopicsResponse(topics: Seq[String])
+
+  case class GetTopicsFailure(cause: Throwable)
+
+  def fetchTopics(createAdminClient: () => AdminClient, kafkaTimeoutSeconds: Long): Future[GetTopicsResponse] = {
+    Future.fromTry {
+      Try(createAdminClient()).map { c =>
+        try {
+          val t = c.listTopics().names.get(kafkaTimeoutSeconds, TimeUnit.SECONDS).asScala.toSeq
+          GetTopicsResponse(t)
+        } finally {
+          Try(c.close(kafkaTimeoutSeconds, TimeUnit.SECONDS))
+        }
+      }
+    }
+  }
+
+  def props(cfg: Config, checkInterval: FiniteDuration = 5.seconds, kafkaTimeoutSeconds: Long = 2): Props =
+    Props(new KafkaTopicsActor(cfg, checkInterval, kafkaTimeoutSeconds))
+
+}
+
 class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration, kafkaTimeoutSeconds: Long) extends Actor
   with Timers
   with LoggingAdapter
@@ -81,36 +113,4 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration, kafkaTimeoutS
   override def postStop(): Unit = {
     timers.cancel(TopicsTimer)
   }
-}
-
-object KafkaTopicsActor {
-
-  case object TopicsTimer
-
-  case object RefreshTopicList
-
-  case class GetTopicRequest(topic: String)
-
-  case class GetTopicResponse(topic: String, lookupDate: DateTime, exists: Boolean)
-
-  case class GetTopicsResponse(topics: Seq[String])
-
-  case class GetTopicsFailure(cause: Throwable)
-
-  def fetchTopics(createAdminClient: () => AdminClient, kafkaTimeoutSeconds: Long): Future[GetTopicsResponse] = {
-    Future.fromTry {
-      Try(createAdminClient()).map { c =>
-        try {
-          val t = c.listTopics().names.get(kafkaTimeoutSeconds, TimeUnit.SECONDS).asScala.toSeq
-          GetTopicsResponse(t)
-        } finally {
-          Try(c.close(kafkaTimeoutSeconds, TimeUnit.SECONDS))
-        }
-      }
-    }
-  }
-
-  def props(cfg: Config, checkInterval: FiniteDuration = 5.seconds, kafkaTimeoutSeconds: Long = 2): Props =
-    Props(new KafkaTopicsActor(cfg, checkInterval, kafkaTimeoutSeconds))
-
 }
