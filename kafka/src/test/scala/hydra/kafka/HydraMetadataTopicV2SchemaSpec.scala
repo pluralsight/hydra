@@ -10,7 +10,8 @@ class HydraMetadataTopicV2SchemaSpec extends FlatSpec with Matchers {
 
     it should "be able to parse the HydraMetadataTopicV2.avsc into the Schema class" in {
         val jsonSchemaString: String = Source.fromResource("HydraMetadataTopicV2.avsc").mkString
-        new Parser().parse(jsonSchemaString) shouldBe a[Schema]
+        val schema = new Parser().parse(jsonSchemaString)
+        schema shouldBe a[Schema]
     } 
 
 }
