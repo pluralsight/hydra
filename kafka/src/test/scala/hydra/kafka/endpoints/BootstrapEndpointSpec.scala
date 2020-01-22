@@ -98,7 +98,7 @@ class BootstrapEndpointSpec extends Matchers
           .parseJson
           .convertTo[TopicMetadata]
 
-      val topicMetadataJson = Source.fromResource("HydraMetadataTopicSpec.avsc").mkString
+      val topicMetadataJson = Source.fromResource("HydraMetadataTopic.avsc").mkString
 
       val schema = new Schema.Parser().parse(topicMetadataJson)
 
@@ -134,7 +134,7 @@ class BootstrapEndpointSpec extends Matchers
           .parseJson
           .convertTo[TopicMetadata]
 
-      val topicMetadataJson = Source.fromResource("HydraMetadataTopicSpec.avsc").mkString
+      val topicMetadataJson = Source.fromResource("HydraMetadataTopic.avsc").mkString
 
       val schema = new Schema.Parser().parse(topicMetadataJson)
 
