@@ -1,0 +1,85 @@
+{
+    "namespace": "_hydra.metadata.v2",
+    "name": "topic",
+    "type": "record",
+    "version": 1,
+    "fields": [
+      {
+        "name": "createdDate",
+        "type": {
+          "type": "string",
+          "logicalType": "iso-datetime"
+        }
+      },
+      {
+        "name": "subject",
+        "type": "string"
+      },
+      {
+        "name": "deprecated",
+        "type": "boolean"
+      },
+      {
+          "name": "schemaNames",
+          "type": {
+              "type": "record",
+              "name": "schemaNamesRecord",
+              "fields": [
+                  {
+                      "name": "key",
+                      "type": "string"
+                  },
+                  {
+                    "name": "value",
+                    "type": "string"
+                  }
+              ]
+          }
+      },
+      {
+        "name": "streamType",
+        "type": {
+          "name": "streamTypeEnum",
+          "type": "enum",
+          "symbols": ["Notification", "CurrentState", "History", "Telemetry"]
+        }
+      },
+      {
+        "name": "dataClassification",
+        "type": {
+          "name": "dataClassificationEnum",
+          "type": "enum",
+          "symbols": ["Public", "InternalUseOnly", "ConfidentialPII", "RestrictedFinancial","RestrictedEmployeeData"]
+        }
+      },
+      {
+        "name": "parentSubjects",
+        "type": {
+            "type": "array",
+            "items": "subject"
+        }
+      },
+      {
+        "name": "contact",
+        "type": {
+            "type": "record",
+            "name": "contactOptions",
+            "fields": [
+                {
+                    "name": "email",
+                    "type": "string"
+                },
+                {
+                    "name": "slackChannel",
+                    "type": "string"
+                }
+            ]
+        }
+      },
+      {
+        "name": "notes",
+        "type": ["null", "string"],
+        "default": null
+      }
+    ]
+  }
