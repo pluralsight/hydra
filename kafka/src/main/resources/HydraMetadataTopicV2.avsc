@@ -28,7 +28,6 @@
                 {
                     "name": "key",
                     "type": {
-                      "namespace": "_hydra.metadata.v2",
                       "name": "schemaNameInfo",
                       "type": "record",
                       "fields": [
