@@ -56,7 +56,7 @@
         "name": "parentSubjects",
         "type": {
             "type": "array",
-            "items": "subject"
+            "items": "string"
         }
       },
       {
