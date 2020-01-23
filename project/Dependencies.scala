@@ -5,7 +5,7 @@ import sbt.{ExclusionRule, _}
 object Dependencies {
 
   val akkaVersion = "2.6.1"
-  val scalaTestVersion = "3.1.0"
+  val scalaTestVersion = "3.0.5"
   val easyMockVersion = "3.5" //needed for mocking static java methods
   val powerMockVersion = "2.0.0-beta.5" //needed for mocking static java methods
   val slf4jVersion = "1.7.29"
@@ -79,6 +79,7 @@ object Dependencies {
       .exclude("com.fasterxml.jackson.core", "jackson-core")
 
     val akka = Seq("com.typesafe.akka" %% "akka-actor" % akkaVersion,
+      "com.typesafe.akka" %% "akka-discovery" % akkaVersion,
       "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
       "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaManagementVersion,
       "com.lightbend.akka.discovery" %% "akka-discovery-consul" % akkaManagementVersion,
