@@ -20,11 +20,11 @@ import scala.util.{Failure, Success}
   */
 class FileTransport(destinations: Map[String, String]) extends Transport {
 
-  implicit val materializer = ActorMaterializer()
-
   private implicit val ec = context.dispatcher
 
   private val sharedKillSwitch = KillSwitches.shared("file-transport-switch")
+
+  implicit val s = context.system
 
   private val sinks = destinations.map { e =>
     e._1 -> Source.queue(0, OverflowStrategy.backpressure).to(toMessageSink(e._2)).run()

@@ -19,8 +19,6 @@ class RequestFactoriesSpec extends TestKit(ActorSystem("RequestFactoriesSpec"))
 
   import RequestFactories._
 
-  private implicit val mat = ActorMaterializer()
-
   describe("The RequestFactories") {
     it("build a Hydra request from an HTTP request") {
       val hr = HttpRequest(entity = "test")

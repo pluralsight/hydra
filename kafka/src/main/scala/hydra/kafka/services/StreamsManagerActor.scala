@@ -4,7 +4,7 @@ import java.net.InetAddress
 import java.util.UUID
 
 import akka.NotUsed
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.kafka.scaladsl.Consumer
 import akka.kafka.scaladsl.Consumer.Control
 import akka.kafka.{ConsumerSettings, Subscriptions}
@@ -40,7 +40,8 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
   import StreamsManagerActor._
 
   private implicit val ec = context.dispatcher
-  private implicit val materializer: Materializer = ActorMaterializer()
+
+  private implicit val system = context.system
 
   private val metadataTopicName = bootstrapKafkaConfig.get[String]("metadata-topic-name").valueOrElse("_hydra.metadata.topic")
 
@@ -96,7 +97,7 @@ object StreamsManagerActor {
                                                    schemaRegistryClient: SchemaRegistryClient,
                                                    metadataTopicName: String,
                                                    destination: ActorRef)
-                                                  (implicit ec: ExecutionContext, mat: Materializer): Stream = {
+                                                  (implicit ec: ExecutionContext, s: ActorSystem): Stream = {
 
     val formatter = ISODateTimeFormat.basicDateTimeNoMillis()
 

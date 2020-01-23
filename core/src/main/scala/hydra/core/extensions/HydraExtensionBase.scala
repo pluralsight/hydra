@@ -86,7 +86,7 @@ abstract class HydraExtensionBase(val extName: String, val extConfig: Config)(im
       val props = backOff(Props(c, moduleId, cfg), s"${extName}_${moduleId}")
       val ref = system.actorOf(props, s"${extName}_${moduleId}_supervisor")
       intervalOpt match {
-        case Some(interval) => system.scheduler.schedule(initialDelay, interval, ref, Run)
+        case Some(interval) => system.scheduler.scheduleWithFixedDelay(initialDelay, interval, ref, Run)
         case None => system.scheduler.scheduleOnce(initialDelay, ref, Run)
       }
       Left(ref)

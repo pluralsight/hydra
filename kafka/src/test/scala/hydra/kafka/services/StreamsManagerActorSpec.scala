@@ -146,9 +146,9 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
     val probe = TestProbe()
 
     val stream = StreamsManagerActor.createMetadataStream(kafkaConfig, "localhost:8092", srClient,
-      "hydra.metadata.topic", probe.ref)(system.dispatcher, ActorMaterializer())
+      "hydra.metadata.topic", probe.ref)(system.dispatcher, system)
 
-    val s = stream.run()(ActorMaterializer())
+    val s = stream.run()
 
     probe.expectMsg(max = 10.seconds, json)
     probe.expectMsg(json)
