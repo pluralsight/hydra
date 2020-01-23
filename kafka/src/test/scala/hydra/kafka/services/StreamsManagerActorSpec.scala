@@ -24,6 +24,8 @@ import spray.json._
 
 import scala.concurrent.duration._
 import scala.io.Source
+import akka.actor.ActorRef
+import org.apache.kafka.common.requests.MetadataResponse.TopicMetadata
 
 class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor-spec"))
   with FlatSpecLike
@@ -260,6 +262,29 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
     }
 
   }
+
+it should "respond with MetadataProcessed after TopicMetadata is received" in {
+  val streamsManagerActor: ActorRef = system.actorOf(StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient), name = "stream_manager4")
+  val topicMetadata = s"""{
+         |	"id":"79a1627e-04a6-11e9-8eb2-f2801f1b9fd1",
+         | "createdDate":"${formatter.print(DateTime.now)}",
+         | "subject": "exp.assessment.SkillAssessmentTopicsScored",
+         |	"streamType": "History",
+         | "derived": false,
+         |	"dataClassification": "Public",
+         |	"contact": "slackity slack dont talk back",
+         |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+         |	"notes": "here are some notes topkek",
+         |	"schemaId": $schemaWKeyId
+         |}"""
+        .stripMargin
+        .parseJson
+        .convertTo[TopicMetadata]
+  val probe = TestProbe()
+  streamsManagerActor.tell(topicMetadata, probe.ref)
+  probe.expectMsg(MetadataProcessed)
+}
+
 }
 
 

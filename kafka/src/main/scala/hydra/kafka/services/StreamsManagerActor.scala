@@ -62,6 +62,7 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
 
     case t: TopicMetadata =>
       context.become(streaming(stream, metadataMap + (t.subject -> t)))
+      sender ! MetadataProcessed
 
     case StopStream =>
       pipe(stream._1.shutdown().map(_ => StreamStopped)) to sender
@@ -70,6 +71,8 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
       pipe(Future {
         GetStreamActorResponse(context.child(actorName))
       }) to sender
+
+    case StreamFailed(ex) => log.error("StreamsManagerActor stream failed with exception", ex)
   }
 }
 
@@ -78,6 +81,8 @@ object StreamsManagerActor {
   private type Stream = RunnableGraph[(Control, NotUsed)]
 
   case object GetMetadata
+
+  case object MetadataProcessed
 
   case class GetStreamActor(actorName: String)
 
@@ -88,6 +93,8 @@ object StreamsManagerActor {
   case object StopStream
 
   case object StreamStopped
+
+  case class StreamFailed(ex: Throwable)
 
   def getMetadataTopicName(c: Config) = c.get[String]("metadata-topic-name")
     .valueOrElse("_hydra.metadata.topic")
@@ -129,7 +136,12 @@ object StreamsManagerActor {
           UUID.fromString(record.get("id").toString),
           formatter.parseDateTime(record.get("createdDate").toString)
         )
-      }.toMat(Sink.actorRef(destination, StreamStopped))(Keep.both)
+      }.toMat(Sink.actorRefWithBackpressure(
+        destination,
+        onInitMessage = (),
+        ackMessage = MetadataProcessed,
+        onCompleteMessage = StreamStopped,
+        onFailureMessage = StreamFailed.apply))(Keep.both)
   }
 
 
