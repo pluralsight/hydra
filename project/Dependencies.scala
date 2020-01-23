@@ -4,8 +4,8 @@ import sbt.{ExclusionRule, _}
 
 object Dependencies {
 
-  val akkaVersion = "2.5.21"
-  val scalaTestVersion = "3.0.5"
+  val akkaVersion = "2.6.1"
+  val scalaTestVersion = "3.1.0"
   val easyMockVersion = "3.5" //needed for mocking static java methods
   val powerMockVersion = "2.0.0-beta.5" //needed for mocking static java methods
   val slf4jVersion = "1.7.29"
@@ -24,7 +24,7 @@ object Dependencies {
   val scalazVersion = "7.2.9"
   val scalaMockVersion = "4.1.0"
   val serviceContainerVersion = "2.0.7"
-  val scalaCacheVersion = "0.23.0"
+  val scalaCacheVersion = "0.28.0"
   val commonsDbcpVersion = "1.4"
   val hikariCPVersion = "2.6.2"
   val jacksonVersion = "2.9.5"
@@ -34,7 +34,7 @@ object Dependencies {
   val kamonPVersion = "1.0.0"
   val akkaKryoVersion = "0.5.2"
   val h2DbVersion = "1.4.196"
-  val akkaManagementVersion = "1.0.0"
+  val akkaManagementVersion = "1.0.5"
 
   object Compile {
 
