@@ -70,7 +70,7 @@ object ConfigSupport {
   }
 
   implicit def toProps(map: Map[String, AnyRef]): Properties = {
-    (map.foldLeft(new Properties) {
+    map.foldLeft(new Properties) {
       case (a, (k, v)) =>
         a.put(k, v)
         a
