@@ -24,7 +24,7 @@ trait ClusterHealthCheck extends RegisteredHealthCheckActor {
   private[health] var currentHealth = HealthInfo(name, details = "")
 
   override def preStart(): Unit = {
-    context.system.scheduler.schedule(interval, interval, self, CheckHealth)
+    context.system.scheduler.scheduleAtFixedRate(interval, interval, self, CheckHealth)
   }
 
   private def maybePublish(newHealth: HealthInfo): Unit = {
