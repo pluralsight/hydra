@@ -16,7 +16,7 @@ lazy val defaultSettings = Seq(
   packageOptions in(Compile, packageBin) +=
     Package.ManifestAttributes("Implementation-Build" -> buildNumber),
   logLevel := Level.Info,
-  scalacOptions ++= Seq("-encoding", "UTF-8", "-feature", "-language:_", "-deprecation", "-unchecked"),
+  scalacOptions ++= Seq("-encoding", "UTF-8", "-feature", "-language:_", "-deprecation", "-unchecked", "-Ypartial-unification"),
   javacOptions in Compile ++= Seq("-encoding", "UTF-8", "-source", JDK, "-target", JDK,
     "-Xlint:unchecked", "-Xlint:deprecation", "-Xlint:-options"),
   resolvers += Resolver.mavenLocal,
@@ -28,7 +28,7 @@ lazy val defaultSettings = Seq(
   parallelExecution in sbt.Test := false,
   javaOptions in Universal ++= Seq(
     "-Dorg.aspectj.tracing.factory=default",
-    "-J"+jvmMaxMemoryFlag
+    "-J" + jvmMaxMemoryFlag
   )
 )
 
