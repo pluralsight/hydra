@@ -35,6 +35,7 @@ object Dependencies {
   val akkaKryoVersion = "0.5.2"
   val h2DbVersion = "1.4.196"
   val akkaManagementVersion = "1.0.5"
+  val aeronVersion = "1.24.0"
 
   object Compile {
 
@@ -129,6 +130,11 @@ object Dependencies {
     )
 
     val postgres = "org.postgresql" % "postgresql" % "42.2.4"
+
+    val aeron = Seq(
+      "io.aeron" % "aeron-driver",
+      "io.aeron" % "aeron-client"
+    ).map(_ % aeronVersion)
   }
 
   object Test {
@@ -168,7 +174,7 @@ object Dependencies {
 
   val coreDeps = akka ++ baseDeps ++
     Seq(guavacache, reflections, akkaKryo, serviceContainer, sdNotify, postgres, h2db, retry) ++
-    confluent ++ kamon
+    confluent ++ kamon ++ aeron
 
   val ingestDeps = coreDeps ++ akkaHttpHal
 

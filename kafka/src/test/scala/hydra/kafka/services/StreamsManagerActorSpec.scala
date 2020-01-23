@@ -8,7 +8,7 @@ import com.pluralsight.hydra.avro.JsonConverter
 import com.typesafe.config.{ConfigFactory, ConfigValue, ConfigValueFactory}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadata
-import hydra.kafka.services.StreamsManagerActor.{GetStreamActor, GetStreamActorResponse, MetadataProcessed}
+import hydra.kafka.services.StreamsManagerActor.{GetStreamActor, GetStreamActorResponse, InitializedStream, MetadataProcessed}
 import hydra.kafka.util.KafkaUtils
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
 import io.confluent.kafka.serializers.KafkaAvroSerializer
@@ -151,7 +151,10 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
 
     val s = stream.run()
 
+    probe.expectMsg(InitializedStream)
+    probe.reply(MetadataProcessed)
     probe.expectMsg(max = 10.seconds, json)
+    probe.reply(MetadataProcessed)
     probe.expectMsg(json)
 
   }

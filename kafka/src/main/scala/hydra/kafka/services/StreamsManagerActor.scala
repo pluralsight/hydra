@@ -57,6 +57,9 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
 
 
   def streaming(stream: (Control, NotUsed), metadataMap: Map[String, TopicMetadata]): Receive = {
+    case InitializedStream =>
+      sender ! MetadataProcessed
+
     case GetMetadata =>
       sender ! GetMetadataResponse(metadataMap)
 
@@ -95,6 +98,8 @@ object StreamsManagerActor {
   case object StreamStopped
 
   case class StreamFailed(ex: Throwable)
+
+  case object InitializedStream
 
   def getMetadataTopicName(c: Config) = c.get[String]("metadata-topic-name")
     .valueOrElse("_hydra.metadata.topic")
@@ -138,7 +143,7 @@ object StreamsManagerActor {
         )
       }.toMat(Sink.actorRefWithBackpressure(
         destination,
-        onInitMessage = (),
+        onInitMessage = InitializedStream,
         ackMessage = MetadataProcessed,
         onCompleteMessage = StreamStopped,
         onFailureMessage = StreamFailed.apply))(Keep.both)
