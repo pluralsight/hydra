@@ -8,7 +8,7 @@ import com.pluralsight.hydra.avro.JsonConverter
 import com.typesafe.config.{ConfigFactory, ConfigValue, ConfigValueFactory}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadata
-import hydra.kafka.services.StreamsManagerActor.{GetStreamActor, GetStreamActorResponse}
+import hydra.kafka.services.StreamsManagerActor.{GetStreamActor, GetStreamActorResponse, MetadataProcessed}
 import hydra.kafka.util.KafkaUtils
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
 import io.confluent.kafka.serializers.KafkaAvroSerializer
@@ -25,7 +25,6 @@ import spray.json._
 import scala.concurrent.duration._
 import scala.io.Source
 import akka.actor.ActorRef
-import org.apache.kafka.common.requests.MetadataResponse.TopicMetadata
 
 class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor-spec"))
   with FlatSpecLike
@@ -275,7 +274,7 @@ it should "respond with MetadataProcessed after TopicMetadata is received" in {
          |	"contact": "slackity slack dont talk back",
          |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
          |	"notes": "here are some notes topkek",
-         |	"schemaId": $schemaWKeyId
+         |	"schemaId": 1
          |}"""
         .stripMargin
         .parseJson
