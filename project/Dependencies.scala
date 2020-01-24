@@ -19,7 +19,7 @@ object Dependencies {
   val sprayJsonVersion = "1.3.5"
   val kafkaVersion = "2.0.0"
   val reflectionsVersion = "0.9.11"
-  val akkaHTTPVersion = "10.1.7"
+  val akkaHTTPVersion = "10.1.11"
   val akkaKafkaStreamVersion = "1.0-M1"
   val scalazVersion = "7.2.9"
   val scalaMockVersion = "4.1.0"
