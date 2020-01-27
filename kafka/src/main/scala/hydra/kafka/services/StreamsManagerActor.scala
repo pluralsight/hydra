@@ -4,7 +4,7 @@ import java.net.InetAddress
 import java.util.UUID
 
 import akka.NotUsed
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.kafka.scaladsl.Consumer
 import akka.kafka.scaladsl.Consumer.Control
 import akka.kafka.{ConsumerSettings, Subscriptions}
@@ -40,7 +40,8 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
   import StreamsManagerActor._
 
   private implicit val ec = context.dispatcher
-  private implicit val materializer: Materializer = ActorMaterializer()
+
+  private implicit val system = context.system
 
   private val metadataTopicName = bootstrapKafkaConfig.get[String]("metadata-topic-name").valueOrElse("_hydra.metadata.topic")
 
@@ -56,11 +57,15 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
 
 
   def streaming(stream: (Control, NotUsed), metadataMap: Map[String, TopicMetadata]): Receive = {
+    case InitializedStream =>
+      sender ! MetadataProcessed
+
     case GetMetadata =>
       sender ! GetMetadataResponse(metadataMap)
 
     case t: TopicMetadata =>
       context.become(streaming(stream, metadataMap + (t.subject -> t)))
+      sender ! MetadataProcessed
 
     case StopStream =>
       pipe(stream._1.shutdown().map(_ => StreamStopped)) to sender
@@ -69,6 +74,8 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
       pipe(Future {
         GetStreamActorResponse(context.child(actorName))
       }) to sender
+
+    case StreamFailed(ex) => log.error("StreamsManagerActor stream failed with exception", ex)
   }
 }
 
@@ -77,6 +84,8 @@ object StreamsManagerActor {
   private type Stream = RunnableGraph[(Control, NotUsed)]
 
   case object GetMetadata
+
+  case object MetadataProcessed
 
   case class GetStreamActor(actorName: String)
 
@@ -88,6 +97,10 @@ object StreamsManagerActor {
 
   case object StreamStopped
 
+  case class StreamFailed(ex: Throwable)
+
+  case object InitializedStream
+
   def getMetadataTopicName(c: Config) = c.get[String]("metadata-topic-name")
     .valueOrElse("_hydra.metadata.topic")
 
@@ -96,7 +109,7 @@ object StreamsManagerActor {
                                                    schemaRegistryClient: SchemaRegistryClient,
                                                    metadataTopicName: String,
                                                    destination: ActorRef)
-                                                  (implicit ec: ExecutionContext, mat: Materializer): Stream = {
+                                                  (implicit ec: ExecutionContext, s: ActorSystem): Stream = {
 
     val formatter = ISODateTimeFormat.basicDateTimeNoMillis()
 
@@ -128,7 +141,12 @@ object StreamsManagerActor {
           UUID.fromString(record.get("id").toString),
           formatter.parseDateTime(record.get("createdDate").toString)
         )
-      }.toMat(Sink.actorRef(destination, StreamStopped))(Keep.both)
+      }.toMat(Sink.actorRefWithBackpressure(
+        destination,
+        onInitMessage = InitializedStream,
+        ackMessage = MetadataProcessed,
+        onCompleteMessage = StreamStopped,
+        onFailureMessage = StreamFailed.apply))(Keep.both)
   }
 
 

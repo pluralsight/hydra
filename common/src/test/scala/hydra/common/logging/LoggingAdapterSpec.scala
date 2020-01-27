@@ -1,7 +1,6 @@
 package hydra.common.logging
 
-import akka.actor.ActorDSL._
-import akka.actor.ActorSystem
+import akka.actor.{Actor, ActorSystem}
 import akka.testkit.{TestActorRef, TestKit, TestProbe}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
@@ -16,8 +15,8 @@ class LoggingAdapterSpec extends TestKit(ActorSystem("test")) with Matchers with
 
     it("allows an actor to use the logger") {
 
-      val act = TestActorRef(new Act with ActorLoggingAdapter {
-        become {
+      val act = TestActorRef(new Actor with ActorLoggingAdapter {
+        override def receive = {
           case _ => log.info("got it"); sender ! "got it"
         }
       }, "logger-test")

@@ -23,7 +23,6 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
 
   describe("When build a HydraRequest from HTTP") {
     it("builds") {
-      implicit val mat = ActorMaterializer()
       val json = """{"name":"value"}"""
       val httpRequest = HttpRequest(
         HttpMethods.POST,
@@ -45,7 +44,6 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
     }
 
     it("errors out if an ack strategy that doesn't exist is specified") {
-      implicit val mat = ActorMaterializer()
       val httpRequest = HttpRequest(
         HttpMethods.POST,
         uri = "/test",
@@ -56,7 +54,6 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
     }
 
     it("builds a DELETE request") {
-      implicit val mat = ActorMaterializer()
       val httpRequest = HttpRequest(
         HttpMethods.DELETE,
         uri = "/test",
@@ -68,7 +65,6 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
     }
 
     it("builds a DELETE request and nulls out payload if it exists") {
-      implicit val mat = ActorMaterializer()
       val json = """{"name":"value"}"""
       val httpRequest = HttpRequest(
         HttpMethods.DELETE,
@@ -81,7 +77,6 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
     }
 
     it("does not modify empty payloads for non-DELETE requests") {
-      implicit val mat = ActorMaterializer()
       val httpRequest = HttpRequest(
         HttpMethods.POST,
         uri = "/test",
@@ -93,7 +88,6 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
     }
 
     it("builds with default strategy values") {
-      implicit val mat = ActorMaterializer()
       val json = """{"name":"value"}"""
       val httpRequest = HttpRequest(
         HttpMethods.POST,
