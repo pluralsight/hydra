@@ -1,7 +1,6 @@
 package hydra.core.http
 
 import akka.http.scaladsl.model.HttpMethods
-import akka.http.scaladsl.model.headers.HttpOriginRange
 import ch.megard.akka.http.cors.scaladsl.model.HttpOriginMatcher
 import org.scalatest.{FunSpecLike, Matchers}
 
