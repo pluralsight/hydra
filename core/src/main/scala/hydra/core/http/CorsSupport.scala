@@ -10,8 +10,9 @@ import hydra.common.config.ConfigSupport
 import scala.collection.immutable
 
 trait CorsSupport extends ConfigSupport {
-  val settings = CorsSettings.defaultSettings.copy(exposedHeaders = immutable.Seq("Link")
-    , allowCredentials = false)
+  val settings = CorsSettings.defaultSettings
+    .withAllowCredentials(false)
+    .withExposedHeaders(immutable.Seq("Link"))
 }
 
 

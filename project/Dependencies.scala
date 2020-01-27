@@ -29,7 +29,7 @@ object Dependencies {
   val hikariCPVersion = "2.6.2"
   val jacksonVersion = "2.9.5"
   val opRabbitVersion = "2.0.0"
-  val akkaHTTPCorsVersion = "0.2.2"
+  val akkaHTTPCorsVersion = "0.4.2"
   val kamonVersion = "1.1.0"
   val kamonPVersion = "1.0.0"
   val akkaKryoVersion = "0.5.2"
