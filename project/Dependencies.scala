@@ -36,8 +36,11 @@ object Dependencies {
   val h2DbVersion = "1.4.196"
   val akkaManagementVersion = "1.0.5"
   val aeronVersion = "1.24.0"
+  val catsVersion =  "2.0.0"
 
   object Compile {
+
+    val cats =  "org.typelevel" %% "cats-core" % catsVersion
 
     val scalaConfigs = "com.github.kxbmap" %% "configs" % kxbmapConfigVersion
 
@@ -166,7 +169,7 @@ object Dependencies {
   val testDeps = Seq(scalaTest, junit, scalaMock, easyMock, embeddedConsul, embeddedPostgres) ++
     powerMock ++ akkaTest
 
-  val baseDeps = akka ++ Seq(scalaz, scalaConfigs, avro) ++ logging ++ joda ++ testDeps
+  val baseDeps = akka ++ Seq(scalaz, scalaConfigs, avro, cats) ++ logging ++ joda ++ testDeps
 
   val sqlDeps = logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
 
