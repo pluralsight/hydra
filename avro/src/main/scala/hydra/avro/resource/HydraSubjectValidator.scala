@@ -1,18 +1,15 @@
-package hydra.kafka.services
+package hydra.avro.resource
 
 import cats.data._
 import cats.implicits._
 
-/*
-    V2 Subject Validator - mimics limited functionality of the TopicMetadataValidator
- */
 trait HydraSubjectValidator {
   import HydraSubjectValidator._
   private val kafkaValidCharacterRegex = """^[a-zA-Z0-9_\-.]*$""".r
 
   type ValidationResult[A] = ValidatedNec[SubjectValidation, A]
 
-  private[services] def validateSubjectCharacters(subject: String): ValidationResult[String] =
+  private[resource] def validateSubjectCharacters(subject: String): ValidationResult[String] =
     if (kafkaValidCharacterRegex.pattern.matcher(subject).matches) subject.validNec
     else SubjectHasInvalidCharacters.invalidNec
 }

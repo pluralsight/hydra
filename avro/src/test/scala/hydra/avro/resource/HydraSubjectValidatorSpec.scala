@@ -1,6 +1,6 @@
-package hydra.kafka.services
+package hydra.avro.resource
 
-import hydra.kafka.services.HydraSubjectValidator.SubjectHasInvalidCharacters
+import hydra.avro.resource.HydraSubjectValidator.SubjectHasInvalidCharacters
 import org.scalatest.{FlatSpec, Matchers}
 
 class HydraSubjectValidatorSpec extends FlatSpec with Matchers with HydraSubjectValidator {
