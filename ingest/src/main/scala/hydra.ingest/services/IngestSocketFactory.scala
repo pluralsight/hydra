@@ -17,7 +17,11 @@ object IngestSocketFactory {
 
       val socketActor = fact.actorOf(Props[IngestionSocketActor])
 
-      def actorSink = Sink.actorRef[SocketEvent](socketActor, SocketEnded)
+      def actorSink = Sink.actorRefWithBackpressure(socketActor,
+      onInitMessage = SocketInit,
+      ackMessage = SocketAck,
+      onCompleteMessage = SocketEnded,
+      onFailureMessage = SocketFailed.apply)
 
       val in =
         Flow[String]
@@ -25,7 +29,7 @@ object IngestSocketFactory {
           .to(actorSink)
 
       val out =
-        Source.actorRef[OutgoingMessage](1, OverflowStrategy.fail)
+        Source.actorRefWithBackpressure[OutgoingMessage](SocketAck, PartialFunction.empty, PartialFunction.empty)
           .mapMaterializedValue(socketActor ! SocketStarted(_))
 
       Flow.fromSinkAndSourceCoupled(in, out)
@@ -36,11 +40,17 @@ object IngestSocketFactory {
 
 sealed trait SocketEvent
 
+case object SocketInit extends SocketEvent
+
 case class SocketStarted(ref: ActorRef) extends SocketEvent
 
 case object SocketEnded extends SocketEvent
 
+case object SocketAck extends SocketEvent
+
 case class IncomingMessage(message: String) extends SocketEvent
+
+case class SocketFailed(ex: Throwable)
 
 sealed trait OutgoingMessage extends SocketEvent
 

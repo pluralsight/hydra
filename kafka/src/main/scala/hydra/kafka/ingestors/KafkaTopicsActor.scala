@@ -73,7 +73,7 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration, kafkaTimeoutS
 
   self ! RefreshTopicList
 
-  timers.startPeriodicTimer(TopicsTimer, RefreshTopicList, checkInterval)
+  timers.startTimerAtFixedRate(TopicsTimer, RefreshTopicList, checkInterval)
 
   implicit val ec = context.dispatcher
 

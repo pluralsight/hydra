@@ -40,9 +40,7 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: Execut
   extends RoutedEndpoints with LoggingAdapter with HydraJsonSupport with HydraDirectives {
 
   import hydra.ingest.bootstrap.RequestFactories._
-
-  implicit val mat = ActorMaterializer()
-
+  
   //for performance reasons, we give this endpoint its own instance of the gateway
   private val registryPath = HydraIngestorRegistryClient.registryPath(applicationConfig)
 

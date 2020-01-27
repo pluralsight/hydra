@@ -29,20 +29,25 @@ class IngestionSocketActor extends Actor with LoggingAdapter with ConfigSupport 
   private lazy val registry = context.
     actorSelection(HydraIngestorRegistryClient.registryPath(applicationConfig)).resolveOne()
 
-  override def receive: Receive = waitForSocket
+  override def receive: Receive = waitForSocket orElse ackInit
 
   private val waitForSocket: Receive = {
     case SocketStarted(actor) =>
       context.become(ingestOrReceiveCommand(actor, SocketSession()))
   }
 
+  private val ackInit: Receive = {
+    case SocketInit => sender ! SocketAck
+  }
+
   private def ingestOrReceiveCommand(flowActor: ActorRef, session: SocketSession): Receive =
-    ingesting(flowActor, session) orElse commandReceive(flowActor, session)
+    ingesting(flowActor, session) orElse commandReceive(flowActor, session) orElse ackInit
 
   private def commandReceive(flowActor: ActorRef, session: SocketSession): Receive = {
 
     case IncomingMessage(SetPattern(null, _)) =>
       flowActor ! SimpleOutgoingMessage(200, session.metadata.mkString(";"))
+      sender ! SocketAck
 
     case IncomingMessage(SetPattern(key, value)) =>
       val theKey = key.toUpperCase.trim
@@ -55,12 +60,15 @@ class IngestionSocketActor extends Actor with LoggingAdapter with ConfigSupport 
         context.become(ingestOrReceiveCommand(flowActor, session.withMetadata(theKey -> theValue)))
         flowActor ! SimpleOutgoingMessage(200, s"OK[$theKey=$theValue]")
       }
+      sender ! SocketAck
 
     case IncomingMessage(HelpPattern()) =>
       flowActor ! SimpleOutgoingMessage(200, "Set metadata: --set (name)=(value)")
+      sender ! SocketAck
 
     case IncomingMessage(_) =>
       flowActor ! SimpleOutgoingMessage(400, "BAD_REQUEST:Not a valid message. Use 'HELP' for help.")
+      sender ! SocketAck
 
     case SocketEnded =>
       context.stop(flowActor)
@@ -86,10 +94,13 @@ class IngestionSocketActor extends Actor with LoggingAdapter with ConfigSupport 
           case scala.util.Failure(ex) => sender ! Failure(ex)
         }
       }
+      sender ! SocketAck
     case report: IngestionReport =>
       flowActor ! IngestionOutgoingMessage(report)
+      sender ! SocketAck
     case e: HydraError =>
       flowActor ! SimpleOutgoingMessage(StatusCodes.InternalServerError.intValue, e.cause.getMessage)
+      sender ! SocketAck
   }
 
 }

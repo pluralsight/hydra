@@ -4,7 +4,7 @@ import sbt.{ExclusionRule, _}
 
 object Dependencies {
 
-  val akkaVersion = "2.5.21"
+  val akkaVersion = "2.6.1"
   val scalaTestVersion = "3.0.5"
   val easyMockVersion = "3.5" //needed for mocking static java methods
   val powerMockVersion = "2.0.0-beta.5" //needed for mocking static java methods
@@ -19,22 +19,23 @@ object Dependencies {
   val sprayJsonVersion = "1.3.5"
   val kafkaVersion = "2.0.0"
   val reflectionsVersion = "0.9.11"
-  val akkaHTTPVersion = "10.1.7"
+  val akkaHTTPVersion = "10.1.10"
   val akkaKafkaStreamVersion = "1.0-M1"
   val scalazVersion = "7.2.9"
   val scalaMockVersion = "4.1.0"
   val serviceContainerVersion = "2.0.7"
-  val scalaCacheVersion = "0.23.0"
+  val scalaCacheVersion = "0.28.0"
   val commonsDbcpVersion = "1.4"
   val hikariCPVersion = "2.6.2"
   val jacksonVersion = "2.9.5"
   val opRabbitVersion = "2.0.0"
-  val akkaHTTPCorsVersion = "0.2.2"
+  val akkaHTTPCorsVersion = "0.4.2"
   val kamonVersion = "1.1.0"
   val kamonPVersion = "1.0.0"
   val akkaKryoVersion = "0.5.2"
   val h2DbVersion = "1.4.196"
-  val akkaManagementVersion = "1.0.0"
+  val akkaManagementVersion = "1.0.5"
+  val aeronVersion = "1.24.0"
   val catsVersion =  "2.0.0"
 
   object Compile {
@@ -82,6 +83,7 @@ object Dependencies {
       .exclude("com.fasterxml.jackson.core", "jackson-core")
 
     val akka = Seq("com.typesafe.akka" %% "akka-actor" % akkaVersion,
+      "com.typesafe.akka" %% "akka-discovery" % akkaVersion,
       "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
       "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaManagementVersion,
       "com.lightbend.akka.discovery" %% "akka-discovery-consul" % akkaManagementVersion,
@@ -131,6 +133,11 @@ object Dependencies {
     )
 
     val postgres = "org.postgresql" % "postgresql" % "42.2.4"
+
+    val aeron = Seq(
+      "io.aeron" % "aeron-driver",
+      "io.aeron" % "aeron-client"
+    ).map(_ % aeronVersion)
   }
 
   object Test {
@@ -170,7 +177,7 @@ object Dependencies {
 
   val coreDeps = akka ++ baseDeps ++
     Seq(guavacache, reflections, akkaKryo, serviceContainer, sdNotify, postgres, h2db, retry) ++
-    confluent ++ kamon
+    confluent ++ kamon ++ aeron
 
   val ingestDeps = coreDeps ++ akkaHttpHal
 
