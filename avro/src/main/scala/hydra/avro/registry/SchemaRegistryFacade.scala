@@ -4,6 +4,7 @@ import cats.effect.{ExitCase, IO, Resource}
 import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, SchemaRegistryClient}
 import org.apache.avro.Schema
 import cats.implicits._
+import collection.JavaConverters._
 
 trait SchemaRegistryFacade {
 
@@ -21,9 +22,10 @@ object SchemaRegistryFacade {
 
     private def registerSchema(subject: String, schema: Schema, isKey: Boolean): Resource[IO, Unit] = {
       val suffixedSubject = subject + (if (isKey) "-key" else "-value")
-      val registerSchema = IO(schemaRegistryClient.register(suffixedSubject, schema))
+      val registerSchema = IO(schemaRegistryClient.register(suffixedSubject, schema)) *>
+        IO(schemaRegistryClient.getVersion(suffixedSubject, schema))
       Resource.makeCase(registerSchema)((version, exitCase) => exitCase match {
-        case ExitCase.Error(_) => IO(schemaRegistryClient.deleteSchemaVersion(subject, version.toString))
+        case ExitCase.Error(_) => IO(schemaRegistryClient.deleteSchemaVersion(suffixedSubject, version.toString))
         case _ => IO.unit
       }).map(_ => ())
     }
