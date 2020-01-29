@@ -54,16 +54,4 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
 
     case Ingest(record, ackStrategy) => transport(record, ackStrategy)
   }
-
-  override def doValidate(request: HydraRequest): Future[MessageValidationResult] = {
-    super.doValidate(request) flatMap {
-      case vr: ValidRequest[_, _] =>
-        val tp = request.metadataValue(RequestParams.HYDRA_KAFKA_TOPIC_PARAM).get
-        (topicActor ? GetTopicRequest(tp)).mapTo[GetTopicResponse].map { r =>
-          if (r.exists) vr else InvalidRequest(new IllegalArgumentException(s"Kafka topic '$tp' doesn't exist."))
-        }
-
-      case iv: InvalidRequest => Future(iv)
-    }
-  }
 }
