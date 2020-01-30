@@ -1,9 +1,9 @@
 package hydra.kafka.serializers
 
-import java.time.ZoneOffset
+import java.time.{Instant, ZoneOffset}
 
 import hydra.core.marshallers._
-import hydra.kafka.model.{Email, Schemas, Slack}
+import hydra.kafka.model.{Email, Schemas, Slack, TopicMetadataV2Request}
 import org.scalatest.{Matchers, WordSpec}
 
 class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadataV2Parser {
@@ -23,9 +23,9 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
 
     "throw a Deserialization error with invalid date string" in {
       val invalidJsString = JsString.empty
-      the [DeserializationException] thrownBy {
+      the[DeserializationException] thrownBy {
         InstantFormat.read(invalidJsString)
-      } should have message (CreatedDateNotSpecifiedAsISO8601(invalidJsString).errorMessage)
+      } should have message CreatedDateNotSpecifiedAsISO8601(invalidJsString).errorMessage
     }
 
     "parse list of contact method with email and slack channel" in {
@@ -72,7 +72,7 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
 
     "throw error when parsing list of contact method with no required fields" in {
       val jsValue = JsObject.empty
-      the [DeserializationException] thrownBy {
+      the[DeserializationException] thrownBy {
         ContactFormat.read(jsValue)
       } should have message ContactMissingContactOption.errorMessage
     }
@@ -90,7 +90,7 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
       val tpe = ru.typeOf[StreamType]
       val knownDirectSubclasses: Set[ru.Symbol] = tpe.typeSymbol.asClass.knownDirectSubclasses
 
-      the [DeserializationException] thrownBy {
+      the[DeserializationException] thrownBy {
         StreamTypeFormat.read(jsValue)
       } should have message StreamTypeInvalid(jsValue, knownDirectSubclasses).errorMessage
     }
@@ -118,7 +118,7 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
 
     "throw an error given an invalid schema" in {
       val jsValue = JsObject.empty
-      the [DeserializationException] thrownBy {
+      the[DeserializationException] thrownBy {
         new SchemaFormat("").read(jsValue).getName
       } should have message InvalidSchema(jsValue, "").errorMessage
     }
@@ -131,39 +131,64 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
           |"value":${validAvroSchema.compactPrint}
           |}
           |""".stripMargin.parseJson
-      SchemasFormat.read(json) shouldBe(Schemas(new SchemaFormat("key").read(validAvroSchema),new SchemaFormat("value").read(validAvroSchema)))
+      SchemasFormat.read(json) shouldBe Schemas(new SchemaFormat("key").read(validAvroSchema),new SchemaFormat("value").read(validAvroSchema))
     }
 
     "throw a comprehensive error given an incomplete Schemas object" in {
-      val errorMessage = IncompleteSchemas(List(InvalidSchema(JsObject.empty, "key").errorMessage,InvalidSchema(JsObject.empty, "value").errorMessage).mkString(" ")).errorMessage
-      the [DeserializationException] thrownBy{
+      val errorMessage = IncompleteSchemas(
+          List(InvalidSchema(JsObject.empty, "key").errorMessage,InvalidSchema(JsObject.empty, "value").errorMessage)
+            .mkString(" ")
+        ).errorMessage
+      the[DeserializationException] thrownBy{
         val json = JsObject.empty
         SchemasFormat.read(json)
       } should have message errorMessage
     }
 
+    "parse a complete object and return a TopicMetadataV2Request" in {
+      val subject = "foo"
+      val streamType = History
+      val deprecated = false
+      val dataClassification = "Public"
+      val slackChannel = "#slackChannel"
+      val email = "email@address.com"
+      val createdDate = Instant.now
+      val parentSubjects = List("1","2")
+      val notes = "My Note Here"
+      val jsonData =
+        s"""
+           |{
+           |  "subject": "$subject",
+           |  "schemas": {
+           |   "key": ${validAvroSchema.compactPrint},
+           |   "value": ${validAvroSchema.compactPrint}
+           |  },
+           |  "streamType": "${streamType.toString}",
+           |  "deprecated": $deprecated,
+           |  "dataClassification":"$dataClassification",
+           |  "contact": {
+           |    "slackChannel": "$slackChannel",
+           |    "email": "$email"
+           |  },
+           |  "createdDate": "${createdDate.toString}",
+           |  "parentSubjects": ${parentSubjects.toJson.compactPrint},
+           |  "notes": "$notes"
+           |}
+           |""".stripMargin
 
-    //    "accept all fields" in {
-//      val jsonData =
-//        s"""
-//          |{
-//          | "contact": {
-//          |   "slackChannel": "#foo",
-//          |   "email": "foo@example.com"
-//          | },
-//          | "parentSubjects": ["foo"],
-//          | "subject": "foo",
-//          | "schemas": {
-//          |   "key": {},
-//          |   "value": {}
-//          | },
-//          | "streamType": "History",
-//          | "dataClassification": "Public",
-//          | "notes": "Hello world",
-//          | "createdDate": "${Instant.now.toString}",
-//          | "deprecated": false
-//          |}
-//          |""".stripMargin
-//    }
+      TopicMetadataV2Format.read(jsonData.parseJson) shouldBe
+        TopicMetadataV2Request(
+          subject,
+          Schemas(new SchemaFormat("key").read(validAvroSchema),new SchemaFormat("value").read(validAvroSchema)),
+          streamType,
+          deprecated,
+          dataClassification,
+          List(Email(email), Slack(slackChannel)),
+          createdDate,
+          parentSubjects,
+          Some(notes)
+        )
+    }
+
   }
 }

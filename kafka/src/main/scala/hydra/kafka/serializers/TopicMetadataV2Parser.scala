@@ -123,7 +123,7 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
     override def read(json: JsValue): TopicMetadataV2Request = json match {
       case j: JsObject =>
         val subject = validateSubject(Try(getStringWithKey(j, "subject")))
-        val schemas = toMVR(Validated.catchNonFatal(SchemasFormat.read(j)))
+        val schemas = toMVR(Validated.catchNonFatal(SchemasFormat.read(j.getFields("schemas").headOption.getOrElse(throwDeserializationError("schemas", "JsObject with key and value Avro Schemas")))))
         val streamType = toMVR(Validated.catchNonFatal(StreamTypeFormat.read(j.getFields("streamType").headOption.getOrElse(throwDeserializationError("streamType", "String")))))
         val deprecated = toMVR(Validated.catchNonFatal(getBoolWithKey(j, "deprecated")))
         val dataClassification = toMVR(Validated.catchNonFatal(getStringWithKey(j, "dataClassification")))
@@ -150,16 +150,16 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
         val json =
           """
             |{
-            |   "subject": "String",
+            |   "subject": "String a-zA-Z0-9_.-\",
             |   "schemas": {
             |     "key": {},
             |     "value": {}
             |   },
             |   "streamType": "oneOf History, Notification, Telemetry, CurrentState",
             |   "deprecated": false,
-            |   "dataClassification": "String",
+            |   "dataClassification": "Public",
             |   "contact": {
-            |     "slack" : "#channelName",
+            |     "slackChannel" : "#channelName",
             |     "email" : "email@address.com"
             |   },
             |   "createdDate":"2020-01-20T12:34:56Z",
