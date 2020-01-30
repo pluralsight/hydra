@@ -3,7 +3,7 @@ package hydra.kafka.serializers
 import java.time.ZoneOffset
 
 import hydra.core.marshallers._
-import hydra.kafka.model.{Email, Slack}
+import hydra.kafka.model.{Email, Schemas, Slack}
 import org.scalatest.{Matchers, WordSpec}
 
 class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadataV2Parser {
@@ -22,7 +22,7 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
     }
 
     "throw a Deserialization error with invalid date string" in {
-      val invalidJsString = JsString("invalid date String")
+      val invalidJsString = JsString.empty
       the [DeserializationException] thrownBy {
         InstantFormat.read(invalidJsString)
       } should have message (CreatedDateNotSpecifiedAsISO8601(invalidJsString).errorMessage)
@@ -71,8 +71,7 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
     }
 
     "throw error when parsing list of contact method with no required fields" in {
-      val json = "{}"
-      val jsValue = json.parseJson
+      val jsValue = JsObject.empty
       the [DeserializationException] thrownBy {
         ContactFormat.read(jsValue)
       } should have message ContactMissingContactOption.errorMessage
@@ -86,7 +85,7 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
     }
 
     "throw error when parsing StreamType" in {
-      val jsValue = JsString("Not A Real Type")
+      val jsValue = JsString.empty
       import scala.reflect.runtime.{universe => ru}
       val tpe = ru.typeOf[StreamType]
       val knownDirectSubclasses: Set[ru.Symbol] = tpe.typeSymbol.asClass.knownDirectSubclasses
@@ -96,32 +95,51 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
       } should have message StreamTypeInvalid(jsValue, knownDirectSubclasses).errorMessage
     }
 
+    val validAvroSchema =
+      """
+        |{
+        |  "namespace": "_hydra.metadata",
+        |  "name": "SomeName",
+        |  "type": "record",
+        |  "version": 1,
+        |  "fields": [
+        |    {
+        |      "name": "id",
+        |      "type": "string"
+        |    }
+        |  ]
+        |}
+        |""".stripMargin.parseJson
+
     "parse a valid schema" in {
-      val jsonString =
-        """
-          |{
-          |  "namespace": "_hydra.metadata",
-          |  "name": "SomeName",
-          |  "type": "record",
-          |  "version": 1,
-          |  "fields": [
-          |    {
-          |      "name": "id",
-          |      "type": "string"
-          |    }
-          |  ]
-          |}
-          |""".stripMargin
-      val jsValue = jsonString.parseJson
-      SchemaFormat.read(jsValue).getName shouldBe "SomeName"
+      val jsValue = validAvroSchema
+      new SchemaFormat("").read(jsValue).getName shouldBe "SomeName"
     }
 
     "throw an error given an invalid schema" in {
-      val jsonString = "{}"
-      val jsValue = jsonString.parseJson
+      val jsValue = JsObject.empty
       the [DeserializationException] thrownBy {
-        SchemaFormat.read(jsValue).getName
-      } should have message InvalidSchema(jsValue).errorMessage
+        new SchemaFormat("").read(jsValue).getName
+      } should have message InvalidSchema(jsValue, "").errorMessage
+    }
+
+    "parse a valid Schemas object" in {
+      val json =
+        s"""
+          |{
+          | "key":${validAvroSchema.compactPrint},
+          |"value":${validAvroSchema.compactPrint}
+          |}
+          |""".stripMargin.parseJson
+      SchemasFormat.read(json) shouldBe(Schemas(new SchemaFormat("key").read(validAvroSchema),new SchemaFormat("value").read(validAvroSchema)))
+    }
+
+    "throw a comprehensive error given an incomplete Schemas object" in {
+      val errorMessage = IncompleteSchemas(List(InvalidSchema(JsObject.empty, "key").errorMessage,InvalidSchema(JsObject.empty, "value").errorMessage).mkString(" ")).errorMessage
+      the [DeserializationException] thrownBy{
+        val json = JsObject.empty
+        SchemasFormat.read(json)
+      } should have message errorMessage
     }
 
 
