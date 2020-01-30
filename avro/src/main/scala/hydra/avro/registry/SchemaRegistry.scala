@@ -14,6 +14,8 @@ trait SchemaRegistry[F[_]] {
 
   def getVersion(subject: String, schema: Schema): F[SchemaVersion]
 
+  def getAllVersions(subject: String): F[List[Int]]
+
 }
 
 object SchemaRegistry {
@@ -36,29 +38,38 @@ object SchemaRegistry {
   final case class NumericSchemaVersion(value: Int) extends SchemaVersion
   case object LatestSchemaVersion extends SchemaVersion
 
-  def live[F[_]](schemaRegistryBaseUrl: String, maxCacheSize: Int)
-                (implicit F: Sync[F]): F[SchemaRegistry[F]] = Sync[F].delay {
+  def live[F[_]: Sync](schemaRegistryBaseUrl: String, maxCacheSize: Int): F[SchemaRegistry[F]] = Sync[F].delay {
     getFromSchemaRegistryClient(new CachedSchemaRegistryClient(schemaRegistryBaseUrl, maxCacheSize))
   }
 
-  def test[F[_]](implicit F: Sync[F]): F[SchemaRegistry[F]] = Sync[F].delay {
+  def test[F[_]: Sync]: F[SchemaRegistry[F]] = Sync[F].delay {
     getFromSchemaRegistryClient(new MockSchemaRegistryClient)
   }
 
-  private[this] def getFromSchemaRegistryClient[F[_]](schemaRegistryClient: SchemaRegistryClient)
-                                                     (implicit F: Sync[F]): SchemaRegistry[F] = new SchemaRegistry[F] {
+  private[this] def getFromSchemaRegistryClient[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient): SchemaRegistry[F] =
+    new SchemaRegistry[F] {
 
-    override def registerSchema(subject: String, schema: Schema): F[SchemaId] =
-      Sync[F].delay(schemaRegistryClient.register(subject, schema))
+      override def registerSchema(subject: String, schema: Schema): F[SchemaId] =
+        Sync[F].delay(schemaRegistryClient.register(subject, schema))
 
-    override def deleteSchemaOfVersion(subject: String, version: SchemaVersion): F[Unit] =
-      Sync[F].delay(schemaRegistryClient.deleteSchemaVersion(subject, version.getStringVersion))
+      override def deleteSchemaOfVersion(subject: String, version: SchemaVersion): F[Unit] =
+        Sync[F].delay(schemaRegistryClient.deleteSchemaVersion(subject, version.getStringVersion))
 
-    override def getVersion(subject: String, schema: Schema): F[SchemaVersion] =
-      Sync[F].delay {
-        val version = schemaRegistryClient.getVersion(subject, schema)
-        SchemaVersion.create(version)
-      }
+      override def getVersion(subject: String, schema: Schema): F[SchemaVersion] =
+        Sync[F].delay {
+          val version = schemaRegistryClient.getVersion(subject, schema)
+          SchemaVersion.create(version).get
+        }
+
+      override def getAllVersions(subject: String): F[List[SchemaId]] =
+        Sync[F].delay {
+          import collection.JavaConverters._
+          schemaRegistryClient.getAllVersions(subject)
+            .asScala
+            .toList
+            .map(_.toInt)
+        }
+
   }
 
 }
