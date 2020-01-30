@@ -9,7 +9,7 @@ trait HydraSubjectValidator {
 
   type ValidationResult[A] = ValidatedNec[SubjectValidation, A]
 
-  private[resource] def validateSubjectCharacters(subject: String): ValidationResult[String] =
+  def validateSubjectCharacters(subject: String): ValidationResult[String] =
     if (kafkaValidCharacterRegex.pattern.matcher(subject).matches) subject.validNec
     else SubjectHasInvalidCharacters.invalidNec
 }
@@ -20,6 +20,6 @@ object HydraSubjectValidator {
   }
 
   case object SubjectHasInvalidCharacters extends SubjectValidation {
-    val errorMessage = "Subject can only contain numbers, letters, hyphens, periods, and underscores."
+    val errorMessage = "Field `subject` can only contain numbers, letters, hyphens, periods, and underscores."
   }
 }
