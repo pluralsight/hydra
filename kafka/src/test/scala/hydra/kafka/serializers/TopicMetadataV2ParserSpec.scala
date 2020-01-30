@@ -1,11 +1,10 @@
 package hydra.kafka.serializers
 
-import java.time.{Instant, ZoneOffset}
+import java.time.ZoneOffset
 
-import hydra.core.marshallers.{CurrentState, History, Notification, StreamType, Telemetry}
+import hydra.core.marshallers._
 import hydra.kafka.model.{Email, Slack}
 import org.scalatest.{Matchers, WordSpec}
-import spray.json.{DeserializationException, JsString}
 
 class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadataV2Parser {
   import spray.json._
@@ -95,6 +94,34 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
       the [DeserializationException] thrownBy {
         StreamTypeFormat.read(jsValue)
       } should have message StreamTypeInvalid(jsValue, knownDirectSubclasses).errorMessage
+    }
+
+    "parse a valid schema" in {
+      val jsonString =
+        """
+          |{
+          |  "namespace": "_hydra.metadata",
+          |  "name": "SomeName",
+          |  "type": "record",
+          |  "version": 1,
+          |  "fields": [
+          |    {
+          |      "name": "id",
+          |      "type": "string"
+          |    }
+          |  ]
+          |}
+          |""".stripMargin
+      val jsValue = jsonString.parseJson
+      SchemaFormat.read(jsValue).getName shouldBe "SomeName"
+    }
+
+    "throw an error given an invalid schema" in {
+      val jsonString = "{}"
+      val jsValue = jsonString.parseJson
+      the [DeserializationException] thrownBy {
+        SchemaFormat.read(jsValue).getName
+      } should have message InvalidSchema(jsValue).errorMessage
     }
 
 

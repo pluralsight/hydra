@@ -110,9 +110,9 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
       obj.toString().parseJson
     }
 
-    override def read(json: JsValue): Schema = json match {
-      case j: JsObject =>
-        Try(new Schema.Parser().parse(j.compactPrint)).getOrElse(throw DeserializationException(s"${j.compactPrint} is not a properly formatted Avro Schema."))
+    override def read(json: JsValue): Schema = {
+      val jsonString = json.compactPrint
+      Try(new Schema.Parser().parse(jsonString)).getOrElse(throw DeserializationException(InvalidSchema(json).errorMessage))
     }
   }
 
@@ -180,6 +180,10 @@ sealed trait TopicMetadataV2Validator extends HydraSubjectValidator {
 
   final case class CreatedDateNotSpecifiedAsISO8601(value: JsValue) extends DomainValidation {
     def errorMessage: String = s"Field `createdDate` expected ISO-8601 DateString formatted YYYY-MM-DDThh:mm:ssZ, received $value."
+  }
+
+  final case class InvalidSchema(value: JsValue) extends DomainValidation {
+    def errorMessage: String = s"${value.compactPrint} is not a properly formatted Avro Schema."
   }
 
   case object ContactMissingContactOption extends DomainValidation {
