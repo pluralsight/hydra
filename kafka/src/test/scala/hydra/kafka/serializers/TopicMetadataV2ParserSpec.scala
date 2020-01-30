@@ -3,7 +3,7 @@ package hydra.kafka.serializers
 import java.time.{Instant, ZoneOffset}
 
 import org.scalatest.{Matchers, WordSpec}
-import spray.json.JsString
+import spray.json.{DeserializationException, JsString}
 
 class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadataV2Parser {
   "TopicMetadataV2Parser" must {
@@ -17,6 +17,14 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
       instant.getMinute shouldBe 34
       instant.getSecond shouldBe 56
     }
+
+    "throw a Deserialization error with invalid date string" in {
+      val invalidJsString = JsString("invalid date String")
+      the [DeserializationException] thrownBy {
+        InstantFormat.read(invalidJsString)
+      } should have message (CreatedDateNotSpecifiedAsISO8601(invalidJsString).errorMessage)
+    }
+
 //    "accept all fields" in {
 //      val jsonData =
 //        s"""
