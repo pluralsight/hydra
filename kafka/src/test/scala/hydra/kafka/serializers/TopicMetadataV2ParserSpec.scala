@@ -2,10 +2,14 @@ package hydra.kafka.serializers
 
 import java.time.{Instant, ZoneOffset}
 
+import hydra.core.marshallers.{CurrentState, History, Notification, StreamType, Telemetry}
+import hydra.kafka.model.{Email, Slack}
 import org.scalatest.{Matchers, WordSpec}
 import spray.json.{DeserializationException, JsString}
 
 class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadataV2Parser {
+  import spray.json._
+
   "TopicMetadataV2Parser" must {
 
     "parse a valid ISO-8601 date in Zulu time" in {
@@ -25,7 +29,76 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
       } should have message (CreatedDateNotSpecifiedAsISO8601(invalidJsString).errorMessage)
     }
 
-//    "accept all fields" in {
+    "parse list of contact method with email and slack channel" in {
+      val email = "dataplatform@pluralsight.com"
+      val slackChannel = "#dev-data-platform"
+      val json =
+        s"""
+          |{
+          | "email":"$email",
+          | "slackChannel":"$slackChannel"
+          |}
+          |""".stripMargin
+      val jsValue = json.parseJson
+      ContactFormat.read(jsValue) should contain allOf(Slack(slackChannel), Email(email))
+    }
+
+    "parse list of contact method with only slack channel" in {
+      val slackChannel = "#dev-data-platform"
+      val json =
+        s"""
+           |{
+           | "slackChannel":"$slackChannel"
+           |}
+           |""".stripMargin
+      val jsValue = json.parseJson
+      val contactList = ContactFormat.read(jsValue)
+      contactList.head shouldBe Slack(slackChannel)
+      contactList should have length 1
+    }
+
+    "parse list of contact method with only an email" in {
+      val email = "dataplatform@pluralsight.com"
+      val json =
+        s"""
+           |{
+           | "email":"$email"
+           |}
+           |""".stripMargin
+      val jsValue = json.parseJson
+      val contactList = ContactFormat.read(jsValue)
+      contactList.head shouldBe Email(email)
+      contactList should have length 1
+    }
+
+    "throw error when parsing list of contact method with no required fields" in {
+      val json = "{}"
+      val jsValue = json.parseJson
+      the [DeserializationException] thrownBy {
+        ContactFormat.read(jsValue)
+      } should have message ContactMissingContactOption.errorMessage
+    }
+
+    "parse one of each type of StreamType" in {
+      StreamTypeFormat.read(JsString("Notification")) shouldBe Notification
+      StreamTypeFormat.read(JsString("History")) shouldBe History
+      StreamTypeFormat.read(JsString("CurrentState")) shouldBe CurrentState
+      StreamTypeFormat.read(JsString("Telemetry")) shouldBe Telemetry
+    }
+
+    "throw error when parsing StreamType" in {
+      val jsValue = JsString("Not A Real Type")
+      import scala.reflect.runtime.{universe => ru}
+      val tpe = ru.typeOf[StreamType]
+      val knownDirectSubclasses: Set[ru.Symbol] = tpe.typeSymbol.asClass.knownDirectSubclasses
+
+      the [DeserializationException] thrownBy {
+        StreamTypeFormat.read(jsValue)
+      } should have message StreamTypeInvalid(jsValue, knownDirectSubclasses).errorMessage
+    }
+
+
+    //    "accept all fields" in {
 //      val jsonData =
 //        s"""
 //          |{
