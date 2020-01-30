@@ -9,6 +9,7 @@ import cats.implicits._
 import hydra.avro.resource.HydraSubjectValidator
 import hydra.core.marshallers.{CurrentState, GenericServiceResponse, History, Notification, StreamType, Telemetry}
 import hydra.kafka.model.{ContactMethod, Email, Schemas, Slack, TopicMetadataV2Request}
+import hydra.kafka.serializers.Errors._
 import org.apache.avro.Schema
 import spray.json.{DefaultJsonProtocol, DeserializationException, JsArray, JsBoolean, JsObject, JsString, JsValue, RootJsonFormat}
 
@@ -123,14 +124,14 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
     override def read(json: JsValue): TopicMetadataV2Request = json match {
       case j: JsObject =>
         val subject = validateSubject(Try(getStringWithKey(j, "subject")))
-        val schemas = toMVR(Validated.catchNonFatal(SchemasFormat.read(j.getFields("schemas").headOption.getOrElse(throwDeserializationError("schemas", "JsObject with key and value Avro Schemas")))))
-        val streamType = toMVR(Validated.catchNonFatal(StreamTypeFormat.read(j.getFields("streamType").headOption.getOrElse(throwDeserializationError("streamType", "String")))))
-        val deprecated = toMVR(Validated.catchNonFatal(getBoolWithKey(j, "deprecated")))
-        val dataClassification = toMVR(Validated.catchNonFatal(getStringWithKey(j, "dataClassification")))
-        val contact = toMVR(Validated.catchNonFatal(ContactFormat.read(j.getFields("contact").headOption.getOrElse(throwDeserializationError("contact", "JsObject")))))
-        val createdDate = toMVR(Validated.catchNonFatal(InstantFormat.read(j.getFields("createdDate").headOption.getOrElse(throwDeserializationError("createdDate", "ISO-8601 DateString formatted YYYY-MM-DDThh:mm:ssZ")))))
-        val parentSubjects = toMVR(Validated.catchNonFatal(j.getFields("parentSubjects").headOption.map(_.convertTo[List[String]]).getOrElse(throwDeserializationError("parentSubjects", "List of String"))))
-        val notes = toMVR(Validated.catchNonFatal(j.getFields("notes").headOption.map(_.convertTo[String])))
+        val schemas = toMVR(SchemasFormat.read(j.getFields("schemas").headOption.getOrElse(throwDeserializationError("schemas", "JsObject with key and value Avro Schemas"))))
+        val streamType = toMVR(StreamTypeFormat.read(j.getFields("streamType").headOption.getOrElse(throwDeserializationError("streamType", "String"))))
+        val deprecated = toMVR(getBoolWithKey(j, "deprecated"))
+        val dataClassification = toMVR(getStringWithKey(j, "dataClassification"))
+        val contact = toMVR(ContactFormat.read(j.getFields("contact").headOption.getOrElse(throwDeserializationError("contact", "JsObject"))))
+        val createdDate = toMVR(InstantFormat.read(j.getFields("createdDate").headOption.getOrElse(throwDeserializationError("createdDate", "ISO-8601 DateString formatted YYYY-MM-DDThh:mm:ssZ"))))
+        val parentSubjects = toMVR(j.getFields("parentSubjects").headOption.map(_.convertTo[List[String]]).getOrElse(throwDeserializationError("parentSubjects", "List of String")))
+        val notes = toMVR(j.getFields("notes").headOption.map(_.convertTo[String]))
         (
           subject,
           schemas,
@@ -184,8 +185,11 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
 
 sealed trait TopicMetadataV2Validator extends HydraSubjectValidator with Errors {
 
-  def toMVR[A](v: Validated[Throwable, A]): MetadataValidationResult[A] = v.toValidatedNec.leftMap[NonEmptyChain[ExceptionThrownOnParseWithException]]{ es =>
-    es.map(e => ExceptionThrownOnParseWithException(e.getMessage))
+  def toMVR[A](a: => A): MetadataValidationResult[A] = {
+    val v = Validated.catchNonFatal(a)
+    v.toValidatedNec.leftMap[NonEmptyChain[ExceptionThrownOnParseWithException]]{ es =>
+      es.map(e => ExceptionThrownOnParseWithException(e.getMessage))
+    }
   }
 
   def validateSubject(subject: Try[String]): MetadataValidationResult[String] = {
@@ -217,7 +221,9 @@ sealed trait TopicMetadataV2Validator extends HydraSubjectValidator with Errors 
 
 }
 
-sealed trait Errors {
+sealed trait Errors
+
+object Errors {
   final case class CreatedDateNotSpecifiedAsISO8601(value: JsValue) {
     def errorMessage: String = s"Field `createdDate` expected ISO-8601 DateString formatted YYYY-MM-DDThh:mm:ssZ, received ${value.compactPrint}."
   }
@@ -243,8 +249,8 @@ sealed trait Errors {
     def errorMessage: String = s"Field `streamType` expected oneOf $knownDirectSubclasses, received ${value.compactPrint}"
   }
 
-  final case class MissingField(field: String, `type`: String) {
-    def errorMessage: String = ""//s"Field of type $`type` is required in the payload."
+  final case class MissingField(field: String, fieldType: String)
+  {
+    def errorMessage: String = s"Field `$field` of type $fieldType is required in the payload."
   }
-
 }

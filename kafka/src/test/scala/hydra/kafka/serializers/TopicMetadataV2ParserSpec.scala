@@ -5,6 +5,7 @@ import java.time.{Instant, ZoneOffset}
 import hydra.core.marshallers._
 import hydra.kafka.model.{Email, Schemas, Slack, TopicMetadataV2Request}
 import org.scalatest.{Matchers, WordSpec}
+import Errors._
 
 class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadataV2Parser {
   import spray.json._
