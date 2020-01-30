@@ -15,7 +15,7 @@ import spray.json.{DefaultJsonProtocol, DeserializationException, JsArray, JsBoo
 
 import scala.util.{Failure, Success, Try}
 
-trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol with TopicMetadataV2Validator with Errors {
+trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol with TopicMetadataV2Validator {
   implicit object InstantFormat extends RootJsonFormat[Instant] {
     override def write(obj: Instant): JsValue = JsString(obj.toString)
 
@@ -83,15 +83,15 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
   implicit object SchemasFormat extends RootJsonFormat[Schemas] {
     override def write(obj: Schemas): JsValue = {
       JsObject(Map[String, JsValue](
-        "key" -> new SchemaFormat("key").write(obj.key),
-        "value" -> new SchemaFormat("value").write(obj.value)
+        "key" -> new SchemaFormat(isKey = true).write(obj.key),
+        "value" -> new SchemaFormat(isKey = false).write(obj.value)
       ))
     }
 
     override def read(json: JsValue): Schemas = json match {
       case j: JsObject =>
-        val key = Try(new SchemaFormat("key").read(j.getFields("key").headOption.getOrElse(JsObject.empty)))
-        val value = Try(new SchemaFormat("value").read(j.getFields("value").headOption.getOrElse(JsObject.empty)))
+        val key = Try(new SchemaFormat(isKey = true).read(j.getFields("key").headOption.getOrElse(JsObject.empty)))
+        val value = Try(new SchemaFormat(isKey = false).read(j.getFields("value").headOption.getOrElse(JsObject.empty)))
         (key, value) match {
           case (Success(keySchema), Success(valueSchema)) =>
             Schemas(keySchema, valueSchema)
@@ -106,7 +106,7 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
     }
   }
 
-  class SchemaFormat(field: String) extends RootJsonFormat[Schema] {
+  class SchemaFormat(isKey: Boolean) extends RootJsonFormat[Schema] {
     override def write(obj: Schema): JsValue = {
       import spray.json._
       obj.toString().parseJson
@@ -114,7 +114,7 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
 
     override def read(json: JsValue): Schema = {
       val jsonString = json.compactPrint
-      Try(new Schema.Parser().parse(jsonString)).getOrElse(throw DeserializationException(InvalidSchema(json, field).errorMessage))
+      Try(new Schema.Parser().parse(jsonString)).getOrElse(throw DeserializationException(InvalidSchema(json, isKey).errorMessage))
     }
   }
 
@@ -168,7 +168,7 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
             |   "notes": "Optional - String Note"
             |}
             |""".stripMargin
-        throw DeserializationException(s"Expected payload like ${json.parseJson.compactPrint}, but received ${j.compactPrint}")
+        throw DeserializationException(s"Expected payload like ${json.parseJson.prettyPrint}, but received ${j.prettyPrint}")
     }
   }
 
@@ -183,7 +183,7 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
   }
 }
 
-sealed trait TopicMetadataV2Validator extends HydraSubjectValidator with Errors {
+sealed trait TopicMetadataV2Validator extends HydraSubjectValidator {
 
   def toMVR[A](a: => A): MetadataValidationResult[A] = {
     val v = Validated.catchNonFatal(a)
@@ -221,15 +221,13 @@ sealed trait TopicMetadataV2Validator extends HydraSubjectValidator with Errors 
 
 }
 
-sealed trait Errors
-
 object Errors {
   final case class CreatedDateNotSpecifiedAsISO8601(value: JsValue) {
     def errorMessage: String = s"Field `createdDate` expected ISO-8601 DateString formatted YYYY-MM-DDThh:mm:ssZ, received ${value.compactPrint}."
   }
 
-  final case class InvalidSchema(value: JsValue, field: String) {
-    def errorMessage: String = s"${value.compactPrint} is not a properly formatted Avro Schema for field `$field`."
+  final case class InvalidSchema(value: JsValue, isKey: Boolean) {
+    def errorMessage: String = s"${value.compactPrint} is not a properly formatted Avro Schema for field `${if (isKey) "key" else "value"}`."
   }
 
   final case class InvalidSchemas(value: JsValue) {

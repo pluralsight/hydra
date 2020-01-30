@@ -114,14 +114,14 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
 
     "parse a valid schema" in {
       val jsValue = validAvroSchema
-      new SchemaFormat("").read(jsValue).getName shouldBe "SomeName"
+      new SchemaFormat(isKey = false).read(jsValue).getName shouldBe "SomeName"
     }
 
     "throw an error given an invalid schema" in {
       val jsValue = JsObject.empty
       the[DeserializationException] thrownBy {
-        new SchemaFormat("").read(jsValue).getName
-      } should have message InvalidSchema(jsValue, "").errorMessage
+        new SchemaFormat(isKey = false).read(jsValue).getName
+      } should have message InvalidSchema(jsValue, isKey = false).errorMessage
     }
 
     "parse a valid Schemas object" in {
@@ -132,12 +132,12 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
           |"value":${validAvroSchema.compactPrint}
           |}
           |""".stripMargin.parseJson
-      SchemasFormat.read(json) shouldBe Schemas(new SchemaFormat("key").read(validAvroSchema),new SchemaFormat("value").read(validAvroSchema))
+      SchemasFormat.read(json) shouldBe Schemas(new SchemaFormat(isKey = true).read(validAvroSchema),new SchemaFormat(isKey = false).read(validAvroSchema))
     }
 
     "throw a comprehensive error given an incomplete Schemas object" in {
       val errorMessage = IncompleteSchemas(
-          List(InvalidSchema(JsObject.empty, "key").errorMessage,InvalidSchema(JsObject.empty, "value").errorMessage)
+          List(InvalidSchema(JsObject.empty, isKey = true).errorMessage,InvalidSchema(JsObject.empty, isKey = false).errorMessage)
             .mkString(" ")
         ).errorMessage
       the[DeserializationException] thrownBy{
@@ -180,7 +180,7 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
       TopicMetadataV2Format.read(jsonData.parseJson) shouldBe
         TopicMetadataV2Request(
           subject,
-          Schemas(new SchemaFormat("key").read(validAvroSchema),new SchemaFormat("value").read(validAvroSchema)),
+          Schemas(new SchemaFormat(isKey = true).read(validAvroSchema),new SchemaFormat(isKey = false).read(validAvroSchema)),
           streamType,
           deprecated,
           dataClassification,
