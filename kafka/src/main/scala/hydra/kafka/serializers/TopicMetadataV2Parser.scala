@@ -9,7 +9,6 @@ import cats.implicits._
 import hydra.avro.resource.HydraSubjectValidator
 import hydra.core.marshallers.{CurrentState, GenericServiceResponse, History, Notification, StreamType, Telemetry}
 import hydra.kafka.model.{ContactMethod, Email, Schemas, Slack, TopicMetadataV2Request}
-import kafka.utils.json.JsonObject
 import org.apache.avro.Schema
 import spray.json.{DefaultJsonProtocol, DeserializationException, JsBoolean, JsObject, JsString, JsValue, RootJsonFormat}
 
@@ -127,9 +126,7 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
         val streamType = validateSimpleExceptionThrow(Try(StreamTypeFormat.read(j.getFields("streamType").headOption.getOrElse(JsString.empty))))
         val deprecated = validateSimpleExceptionThrow(Try(getBoolWithKey(j, "deprecated")))
         val dataClassification = validateSimpleExceptionThrow(Try(getStringWithKey(j, "dataClassification")))
-        HydraSubjectValidator
-        TopicMetadataV2Request()
-
+        throw DeserializationException("WTF did you send us?")
       case _ =>
         throw DeserializationException("WTF did you send us?")
     }
