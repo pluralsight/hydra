@@ -20,9 +20,9 @@ class SchemaRegistrySpec extends FlatSpec with Matchers {
     }
 
   private def testAddSubject[F[_]: Monad](schemaRegistry: SchemaRegistry[F]): F[Unit] = {
-    val subject = "testSubject"
+    val subject = "testSubjectAdd"
     for {
-      schema <- getSchema[F]("testSchema")
+      schema <- getSchema[F]("testSchemaAdd")
       _ <- schemaRegistry.registerSchema(subject, schema)
       allVersions <- schemaRegistry.getAllVersions(subject)
     } yield {
@@ -32,14 +32,28 @@ class SchemaRegistrySpec extends FlatSpec with Matchers {
     }
   }
 
-  private def runTests[F[_]: Monad](schemaRegistry: SchemaRegistry[F]): F[Unit] = {
+  private def testDeleteSchemaVersion[F[_]: Monad](schemaRegistry: SchemaRegistry[F]): F[Unit] = {
+    val subject = "testSubjectDelete"
     for {
-      _ <- testAddSubject(schemaRegistry)
+      schema <- getSchema[F]("testSchemaDelete")
+      _ <- schemaRegistry.registerSchema(subject, schema)
+      version <- schemaRegistry.getVersion(subject, schema)
+      delete <- schemaRegistry.deleteSchemaOfVersion(subject, version)
+      allVersions <- schemaRegistry.getAllVersions(subject)
+    } yield {
+      it must "delete a schema version" in {
+        allVersions shouldBe List.empty
+      }
+    }
+  }
+
+  private def runTests[F[_]: Monad](schemaRegistry: F[SchemaRegistry[F]]): F[Unit] = {
+    for {
+      _ <- schemaRegistry.flatMap(testAddSubject[F])
+      _ <- schemaRegistry.flatMap(testDeleteSchemaVersion[F])
     } yield ()
   }
 
-  SchemaRegistry.test[IO].flatMap { schemaRegistry =>
-    runTests(schemaRegistry)
-  }.unsafeRunSync()
+  runTests(SchemaRegistry.test[IO]).unsafeRunSync()
 
 }
