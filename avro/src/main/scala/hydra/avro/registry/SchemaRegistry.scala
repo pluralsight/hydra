@@ -35,7 +35,7 @@ object SchemaRegistry {
       case _ => None
     }
   }
-  final case class NumericSchemaVersion(value: Int) extends SchemaVersion
+  final case class NumericSchemaVersion private(value: Int) extends SchemaVersion
   case object LatestSchemaVersion extends SchemaVersion
 
   def live[F[_]: Sync](schemaRegistryBaseUrl: String, maxCacheSize: Int): F[SchemaRegistry[F]] = Sync[F].delay {
