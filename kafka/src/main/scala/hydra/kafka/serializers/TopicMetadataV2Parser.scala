@@ -4,14 +4,15 @@ import java.time.Instant
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import cats.data.Validated.{Invalid, Valid}
-import cats.data.{NonEmptyChain, Validated, ValidatedNec}
+import cats.data.{NonEmptyChain, NonEmptyList, Validated, ValidatedNec}
 import cats.implicits._
 import hydra.core.marshallers.{CurrentState, GenericServiceResponse, History, Notification, StreamType, Telemetry}
-import hydra.kafka.model.{ContactMethod, Email, Schemas, Slack, Subject, TopicMetadataV2Request}
+import hydra.kafka.model.{ConfidentialPII, ContactMethod, DataClassification, Email, InternalUseOnly, Public, RestrictedEmployeeData, RestrictedFinancial, Schemas, Slack, Subject, TopicMetadataV2Request}
 import hydra.kafka.serializers.Errors._
 import org.apache.avro.Schema
 import spray.json.{DefaultJsonProtocol, DeserializationException, JsArray, JsBoolean, JsObject, JsString, JsValue, RootJsonFormat}
 
+import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
 
 trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol with TopicMetadataV2Validator {
@@ -38,35 +39,50 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
     }
   }
 
+  private object EmailFormat extends RootJsonFormat[Email] {
+    override def write(obj: Email): JsValue = {
+      JsString(obj.address)
+    }
 
-  implicit object ContactFormat extends RootJsonFormat[List[ContactMethod]] {
-    def read(json: JsValue): List[ContactMethod] = {
+    override def read(json: JsValue): Email = json match {
+      case JsString(value) =>
+      case _ =>
+    }
+  }
+
+
+  implicit object ContactFormat extends RootJsonFormat[NonEmptyList[ContactMethod]] {
+    def extractContactMethod[A](optionalField: Option[JsValue], regex: Regex, f: String => A, e: JsValue => String): Either[String, Option[A]] = {
+      optionalField match {
+        case Some(JsString(value)) =>
+          if (regex.pattern.matcher(value).matches()) Right(Some(f(value))) else Left(e(JsString(value)))
+        case _ =>
+          Right(None)
+      }
+    }
+
+    def coalesceErrors(contacts: List[Either[String, _]]): String = {
+      contacts.foldLeft(List[String]())((acc, i) => acc ++ (i match {
+        case Right(_) => None
+        case Left(value) => Some(value)
+      })).mkString(" ")
+    }
+
+    def read(json: JsValue): NonEmptyList[ContactMethod] = {
       val deserializationExceptionMessage = ContactMissingContactOption.errorMessage
       json match {
         case JsObject(fields) if fields.isDefinedAt("email") || fields.isDefinedAt("slackChannel") =>
-          val email = fields.get("email") match {
-            case Some(JsString(value)) =>
-              val emailRegex = """^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+.[A-Za-z]{2,64}$""".r
-              if (emailRegex.pattern.matcher(value).matches()) Right(Some(Email(value))) else Left(InvalidEmailProvided(JsString(value)).errorMessage)
-            case _ =>
-              Right(None)
-          }
-          val slackChannel = fields.get("slackChannel") match {
-            case Some(JsString(value)) =>
-              val slackRegex = """^[#][^\sA-Z]{1,79}$""".r
-              if (slackRegex.pattern.matcher(value).matches()) Right(Some(Slack(value))) else Left(InvalidSlackChannelProvided(JsString(value)).errorMessage)
-            case _ =>
-              Right(None)
-          }
-          val contacts = List(email, slackChannel)
+          val emailRegex = """^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+.[A-Za-z]{2,64}$""".r
+          val email = extractContactMethod(fields.get("email"), emailRegex, Email.apply, Errors.invalidEmailProvided)
+          val slackRegex = """^[#][^\sA-Z]{1,79}$""".r
+          val slackChannel = extractContactMethod(fields.get("slackChannel"), slackRegex, Slack.apply, Errors.invalidSlackChannelProvided)
+          val contacts = (email , slackChannel).map2()
+
           if (contacts.forall(_.isRight)) {
             val contactMethods = contacts.flatMap{ case Right(value) => value; case Left(_) => None}
             if (contactMethods.nonEmpty) contactMethods else throw DeserializationException(deserializationExceptionMessage)
           } else {
-            val errorString = contacts.foldLeft(List[String]())((acc, i) => acc ++ (i match {
-              case Right(_) => None
-              case Left(value) => Some(value)
-            })).mkString(" ")
+            val errorString =
             throw DeserializationException(errorString)
           }
         case _ =>
@@ -76,8 +92,8 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
 
     def write(obj: List[ContactMethod]): JsValue = {
       val map = obj.map {
-        case Email(address) =>
-          ("email", JsString(address))
+        case e: Email =>
+          ("email", EmailFormat.write(e))
         case Slack(channel) =>
           ("slackChannel", JsString(channel))
         case _ => ("unspecified", JsString("unspecified"))
@@ -103,6 +119,26 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
       JsString(obj.toString)
     }
   }
+
+  implicit object DataClassificationFormat extends RootJsonFormat[DataClassification] {
+    def read(json: JsValue): DataClassification = json match {
+      case JsString("Public") => Public
+      case JsString("InternalUseOnly") => InternalUseOnly
+      case JsString("ConfidentialPII") => ConfidentialPII
+      case JsString("RestrictedFinancial") => RestrictedFinancial
+      case JsString("RestrictedEmployeeData") => RestrictedEmployeeData
+      case _ =>
+        import scala.reflect.runtime.{universe => ru}
+        val tpe = ru.typeOf[DataClassification]
+        val knownDirectSubclasses: Set[ru.Symbol] = tpe.typeSymbol.asClass.knownDirectSubclasses
+        throw DeserializationException(StreamTypeInvalid(json, knownDirectSubclasses).errorMessage)
+    }
+
+    def write(obj: DataClassification): JsValue = {
+      JsString(obj.toString)
+    }
+  }
+
 
   implicit object SchemasFormat extends RootJsonFormat[Schemas] {
     override def write(obj: Schemas): JsValue = {
@@ -237,13 +273,10 @@ object Errors {
     def errorMessage: String = s"Field `createdDate` expected ISO-8601 DateString formatted YYYY-MM-DDThh:mm:ssZ, received ${value.compactPrint}."
   }
 
-  final case class InvalidEmailProvided(value: JsValue) {
-    def errorMessage: String = s"Field `email` not recognized as a valid address, received ${value.compactPrint}."
-  }
+  def invalidEmailProvided(value: JsValue) = s"Field `email` not recognized as a valid address, received ${value.compactPrint}."
 
-  final case class InvalidSlackChannelProvided(value: JsValue) {
-    def errorMessage: String = s"Field `slackChannel` must be all lowercase with no spaces and less than 80 characters, received ${value.compactPrint}."
-  }
+  def invalidSlackChannelProvided(value: JsValue) = s"Field `slackChannel` must be all lowercase with no spaces and less than 80 characters, received ${value.compactPrint}."
+
 
   final case class InvalidSchema(value: JsValue, isKey: Boolean) {
     def errorMessage: String = s"${value.compactPrint} is not a properly formatted Avro Schema for field `${if (isKey) "key" else "value"}`."
@@ -269,6 +302,11 @@ object Errors {
   import scala.reflect.runtime.{universe => ru}
   final case class StreamTypeInvalid(value: JsValue, knownDirectSubclasses: Set[ru.Symbol]) {
     def errorMessage: String = s"Field `streamType` expected oneOf $knownDirectSubclasses, received ${value.compactPrint}"
+  }
+
+  import scala.reflect.runtime.{universe => ru}
+  final case class DataClassificationInvalid(value: JsValue, knownDirectSubclasses: Set[ru.Symbol]) {
+    def errorMessage: String = s"Field `dataClassification` expected oneOf $knownDirectSubclasses, received ${value.compactPrint}"
   }
 
   final case class MissingField(field: String, fieldType: String)
