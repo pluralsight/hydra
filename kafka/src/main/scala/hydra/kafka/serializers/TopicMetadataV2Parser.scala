@@ -4,7 +4,7 @@ import java.time.Instant
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import cats.data.Validated.{Invalid, Valid}
-import cats.data.{NonEmptyChain, NonEmptyList, Validated, ValidatedNec}
+import cats.data.{NonEmptyChain, NonEmptyList, Validated, ValidatedNec, ValidatedNel}
 import cats.implicits._
 import hydra.core.marshallers.{CurrentState, GenericServiceResponse, History, Notification, StreamType, Telemetry}
 import hydra.kafka.model.{ConfidentialPII, ContactMethod, DataClassification, Email, InternalUseOnly, Public, RestrictedEmployeeData, RestrictedFinancial, Schemas, Slack, Subject, TopicMetadataV2Request}
@@ -39,18 +39,6 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
     }
   }
 
-  private object EmailFormat extends RootJsonFormat[Email] {
-    override def write(obj: Email): JsValue = {
-      JsString(obj.address)
-    }
-
-    override def read(json: JsValue): Email = json match {
-      case JsString(value) =>
-      case _ =>
-    }
-  }
-
-
   implicit object ContactFormat extends RootJsonFormat[NonEmptyList[ContactMethod]] {
     def extractContactMethod[A](optionalField: Option[JsValue], regex: Regex, f: String => A, e: JsValue => String): Either[String, Option[A]] = {
       optionalField match {
@@ -61,11 +49,14 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
       }
     }
 
-    def coalesceErrors(contacts: List[Either[String, _]]): String = {
-      contacts.foldLeft(List[String]())((acc, i) => acc ++ (i match {
-        case Right(_) => None
-        case Left(value) => Some(value)
-      })).mkString(" ")
+    def separateEithers(email: Either[String, Option[Email]], slackChannel: Either[String, Option[Slack]]): ValidatedNel[String, List[ContactMethod]] = {
+      val e = Validated.fromEither(email).toValidatedNel
+      val s = Validated.fromEither(slackChannel).toValidatedNel
+      (e, s).mapN {
+        case (Some(em), sl) => List(em) ++ sl
+        case (None, Some(sl)) => List(sl)
+        case _ => List.empty
+      }
     }
 
     def read(json: JsValue): NonEmptyList[ContactMethod] = {
@@ -76,28 +67,26 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
           val email = extractContactMethod(fields.get("email"), emailRegex, Email.apply, Errors.invalidEmailProvided)
           val slackRegex = """^[#][^\sA-Z]{1,79}$""".r
           val slackChannel = extractContactMethod(fields.get("slackChannel"), slackRegex, Slack.apply, Errors.invalidSlackChannelProvided)
-          val contacts = (email , slackChannel).map2()
-
-          if (contacts.forall(_.isRight)) {
-            val contactMethods = contacts.flatMap{ case Right(value) => value; case Left(_) => None}
-            if (contactMethods.nonEmpty) contactMethods else throw DeserializationException(deserializationExceptionMessage)
-          } else {
-            val errorString =
-            throw DeserializationException(errorString)
+          separateEithers(email, slackChannel) match {
+            case Valid(contactMethods) =>
+              NonEmptyList.fromList(contactMethods).getOrElse(throw DeserializationException(deserializationExceptionMessage))
+            case Invalid(e) =>
+              val errorString = e.toList.mkString(" ")
+              throw DeserializationException(errorString)
           }
         case _ =>
           throw DeserializationException(deserializationExceptionMessage)
       }
     }
 
-    def write(obj: List[ContactMethod]): JsValue = {
+    def write(obj: NonEmptyList[ContactMethod]): JsValue = {
       val map = obj.map {
-        case e: Email =>
-          ("email", EmailFormat.write(e))
+        case Email(address) =>
+          ("email", JsString(address))
         case Slack(channel) =>
           ("slackChannel", JsString(channel))
         case _ => ("unspecified", JsString("unspecified"))
-      }.toMap
+      }.toList.toMap
       JsObject(map)
     }
   }
@@ -131,7 +120,7 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
         import scala.reflect.runtime.{universe => ru}
         val tpe = ru.typeOf[DataClassification]
         val knownDirectSubclasses: Set[ru.Symbol] = tpe.typeSymbol.asClass.knownDirectSubclasses
-        throw DeserializationException(StreamTypeInvalid(json, knownDirectSubclasses).errorMessage)
+        throw DeserializationException(DataClassificationInvalid(json, knownDirectSubclasses).errorMessage)
     }
 
     def write(obj: DataClassification): JsValue = {
@@ -187,7 +176,7 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
         val schemas = toResult(SchemasFormat.read(j.getFields("schemas").headOption.getOrElse(throwDeserializationError("schemas", "JsObject with key and value Avro Schemas"))))
         val streamType = toResult(StreamTypeFormat.read(j.getFields("streamType").headOption.getOrElse(throwDeserializationError("streamType", "String"))))
         val deprecated = toResult(getBoolWithKey(j, "deprecated"))
-        val dataClassification = toResult(getStringWithKey(j, "dataClassification"))
+        val dataClassification = toResult(DataClassificationFormat.read(j.getFields("dataClassification").headOption.getOrElse(throwDeserializationError("dataClassification", "String"))))
         val contact = toResult(ContactFormat.read(j.getFields("contact").headOption.getOrElse(throwDeserializationError("contact", "JsObject"))))
         val createdDate = toResult(InstantFormat.read(j.getFields("createdDate").headOption.getOrElse(JsString.empty)))
         val parentSubjects = toResult(j.getFields("parentSubjects").headOption.map(_.convertTo[List[Subject]]).getOrElse(throwDeserializationError("parentSubjects", "List of Subject")))
