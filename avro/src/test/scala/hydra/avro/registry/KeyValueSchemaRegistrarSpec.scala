@@ -5,7 +5,7 @@ import cats.implicits._
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.{FlatSpec, Matchers}
 
-class SchemaRegistryFacadeSpec extends FlatSpec with Matchers {
+class KeyValueSchemaRegistrarSpec extends FlatSpec with Matchers {
 
   private def getSchema(name: String): Schema =
     SchemaBuilder.record(name)
@@ -21,7 +21,7 @@ class SchemaRegistryFacadeSpec extends FlatSpec with Matchers {
   private def getTestResources[F[_]: Sync]: F[(SchemaRegistry[F], Resource[F, Unit])] = {
     for {
       schemaRegistryClient <- SchemaRegistry.test[F]
-      facade <- SchemaRegistryFacade.make(schemaRegistryClient)
+      facade <- KeyValueSchemaRegistrar.make(schemaRegistryClient)
       registerResource = facade.registerSchemas(subject, getSchema("key"), getSchema("value")) 
     } yield (schemaRegistryClient, registerResource)
   }

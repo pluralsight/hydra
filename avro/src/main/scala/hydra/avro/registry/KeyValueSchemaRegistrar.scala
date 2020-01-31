@@ -5,19 +5,19 @@ import cats.effect.{ExitCase, Resource, Sync}
 import cats.implicits._
 import org.apache.avro.Schema
 
-trait SchemaRegistryFacade[F[_]] {
+trait KeyValueSchemaRegistrar[F[_]] {
 
   def registerSchemas(subject: String, keySchema: Schema, valueSchema: Schema): Resource[F, Unit]
 
 }
 
-object SchemaRegistryFacade {
+object KeyValueSchemaRegistrar {
 
-  def make[F[_]: Sync](schemaRegistry: SchemaRegistry[F]): F[SchemaRegistryFacade[F]] = {
+  def make[F[_]: Sync](schemaRegistry: SchemaRegistry[F]): F[KeyValueSchemaRegistrar[F]] = {
     Sync[F].delay((apply(schemaRegistry)))
   }
 
-  private[this] def apply[F[_]: Monad](schemaRegistry: SchemaRegistry[F]): SchemaRegistryFacade[F] = new SchemaRegistryFacade[F] {
+  private[this] def apply[F[_]: Monad](schemaRegistry: SchemaRegistry[F]): KeyValueSchemaRegistrar[F] = new KeyValueSchemaRegistrar[F] {
 
     private def registerSchema(subject: String, schema: Schema, isKey: Boolean): Resource[F, Unit] = {
       val suffixedSubject = subject + (if (isKey) "-key" else "-value")
