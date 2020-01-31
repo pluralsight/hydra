@@ -149,7 +149,7 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
 
     "parse a complete object and return a TopicMetadataV2Request" in {
       val (jsonData, subject, streamType, deprecated, dataClassification, email, slackChannel, createdDateString, parentSubjects, notes) =
-        createJsValueOfTopicMetadataV2Request("Foo","#slack_channel","email@address.com","2020-01-20T12:34:56Z")
+        createJsValueOfTopicMetadataV2Request("Foo","#slack_channel","email@address.com","2020-01-20T12:34:56Z", hasNotes = false)
       TopicMetadataV2Format.read(jsonData) shouldBe
         TopicMetadataV2Request(
           subject,
@@ -160,7 +160,7 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
           List(email, slackChannel),
           Instant.parse(createdDateString),
           parentSubjects,
-          Some(notes)
+          notes
         )
     }
 
@@ -175,7 +175,7 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
 
     "accumulate errors from improper provided data" in {
       val (jsonData, _, _, _, _, email, slack, createdDate, _, _) =
-        createJsValueOfTopicMetadataV2Request("@#$%^&","NOT a slack channel","invalid@address","2020-01-20")
+        createJsValueOfTopicMetadataV2Request("@#$%^&","NOT a slack channel","invalid@address","2020-01-20", hasNotes = true)
       val error = the[DeserializationException] thrownBy {
         TopicMetadataV2Format.read(jsonData)
       }
@@ -184,8 +184,8 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
 
   }
 
-  private def createJsValueOfTopicMetadataV2Request(subject: String, slackChannel: String, email: String, createdDate: String):
-                                        (JsValue, String, StreamType, Boolean, String, Email, Slack, String, List[String], String) = {
+  private def createJsValueOfTopicMetadataV2Request(subject: String, slackChannel: String, email: String, createdDate: String, hasNotes: Boolean):
+                                        (JsValue, String, StreamType, Boolean, String, Email, Slack, String, List[String], Option[String]) = {
     val streamType = History
     val deprecated = false
     val dataClassification = "Public"
@@ -208,10 +208,9 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
          |    "email": "$email"
          |  },
          |  "createdDate": "$createdDate",
-         |  "parentSubjects": ${parentSubjects.toJson.compactPrint},
-         |  "notes": "$notes"
-         |}
+         |  "parentSubjects": ${parentSubjects.toJson.compactPrint}
+         |  ${if (hasNotes) s""","notes": "$notes"""" else ""}}
          |""".stripMargin.parseJson
-    (jsValue, subject, streamType, deprecated, dataClassification, Email(email), Slack(slackChannel), createdDate, parentSubjects, notes)
+    (jsValue, subject, streamType, deprecated, dataClassification, Email(email), Slack(slackChannel), createdDate, parentSubjects, if (hasNotes) Some(notes) else None)
   }
 }
