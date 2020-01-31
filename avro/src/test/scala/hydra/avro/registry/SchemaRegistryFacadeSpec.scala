@@ -1,12 +1,9 @@
 package hydra.avro.registry
 
-import cats.effect.IO
-import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
+import cats.effect.{IO, Resource, Sync}
+import cats.implicits._
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.{FlatSpec, Matchers}
-
-import scala.collection.JavaConverters._
-import scala.util.Try
 
 class SchemaRegistryFacadeSpec extends FlatSpec with Matchers {
 
@@ -21,31 +18,38 @@ class SchemaRegistryFacadeSpec extends FlatSpec with Matchers {
 
   val subject = "testSubject"
 
-  private def getTestResources = {
-    val schemaRegistryClient = new MockSchemaRegistryClient()
-    val facade = SchemaRegistryFacade(schemaRegistryClient)
-    val registerResource =
-      facade.registerSchemas(subject, getSchema("key"), getSchema("value"))
-    (schemaRegistryClient, registerResource)
+  private def getTestResources[F[_]: Sync]: F[(SchemaRegistry[F], Resource[F, Unit])] = {
+    for {
+      schemaRegistryClient <- SchemaRegistry.test[F]
+      facade <- SchemaRegistryFacade.make(schemaRegistryClient)
+      registerResource = facade.registerSchemas(subject, getSchema("key"), getSchema("value")) 
+    } yield (schemaRegistryClient, registerResource)
   }
 
   it should "register key and value schema" in {
-    val (schemaRegistryClient, registerResource) = getTestResources
-    registerResource.use(_ => IO.unit).unsafeRunSync()
-    val allSubjects = schemaRegistryClient.getAllSubjects.asScala.toList
-    allSubjects should contain allElementsOf List("-key", "-value").map(subject + _)
+    getTestResources[IO].flatMap { case (schemaRegistryClient, registerResource) =>
+      registerResource.use(_ => IO.unit) *>
+      List("-key", "-value").map(subject + _).traverse(schemaRegistryClient.getAllVersions).map { allVersions =>
+        allVersions.flatten shouldBe List(1, 1)
+      }
+    }.unsafeRunSync
   }
 
   it should "Rollback if an error occurs in a later resource" in {
-    val (schemaRegistryClient, registerResource) = getTestResources
-    Try(registerResource.map { _ =>
-      throw new Exception
-      ()
-    }.use(_ => IO.unit).unsafeRunSync())
-    val allKeyVersions = schemaRegistryClient.getAllVersions(subject + "-key")
-    val allValueVersions = schemaRegistryClient.getAllVersions(subject + "-value")
-    allKeyVersions shouldBe empty
-    allValueVersions shouldBe empty
+    getTestResources[IO].flatMap { case (schemaRegistryClient, registerResource) =>
+      val failRegister = registerResource.map { _ =>
+        throw new Exception
+        ()
+      }.use(_ => IO.unit).recover { case _ => () }
+      for {
+        _ <- failRegister
+        allKeyVersions <- schemaRegistryClient.getAllVersions(subject + "-key")
+        allValueVersions <- schemaRegistryClient.getAllVersions(subject + "-value")
+      } yield {
+        allKeyVersions shouldBe empty
+        allValueVersions shouldBe empty
+      }
+    }.unsafeRunSync
   }
 
 }

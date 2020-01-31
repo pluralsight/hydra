@@ -31,7 +31,7 @@ object SchemaRegistry {
   object SchemaVersion {
     def create[A](input: A): Option[SchemaVersion] = input match {
       case "latest" => Some(LatestSchemaVersion)
-      case i: Int => Some(NumericSchemaVersion(i))
+      case i: Int if i > 0 => Some(NumericSchemaVersion(i))
       case _ => None
     }
   }

@@ -1,36 +1,35 @@
 package hydra.avro.registry
 
-import cats.effect.{ExitCase, IO, Resource}
-import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, SchemaRegistryClient}
-import org.apache.avro.Schema
+import cats.Monad
+import cats.effect.{ExitCase, Resource, Sync}
 import cats.implicits._
-import collection.JavaConverters._
+import org.apache.avro.Schema
 
-trait SchemaRegistryFacade {
+trait SchemaRegistryFacade[F[_]] {
 
-  def registerSchemas(subject: String, keySchema: Schema, valueSchema: Schema): Resource[IO, Unit]
+  def registerSchemas(subject: String, keySchema: Schema, valueSchema: Schema): Resource[F, Unit]
 
 }
 
 object SchemaRegistryFacade {
 
-  def make(baseUrl: String, identityCacheSize: Int): IO[SchemaRegistryFacade] = {
-    IO(apply(new CachedSchemaRegistryClient(baseUrl, identityCacheSize)))
+  def make[F[_]: Sync](schemaRegistry: SchemaRegistry[F]): F[SchemaRegistryFacade[F]] = {
+    Sync[F].delay((apply(schemaRegistry)))
   }
 
-  private[registry] def apply(schemaRegistryClient: SchemaRegistryClient): SchemaRegistryFacade = new SchemaRegistryFacade {
+  private[this] def apply[F[_]: Monad](schemaRegistry: SchemaRegistry[F]): SchemaRegistryFacade[F] = new SchemaRegistryFacade[F] {
 
-    private def registerSchema(subject: String, schema: Schema, isKey: Boolean): Resource[IO, Unit] = {
+    private def registerSchema(subject: String, schema: Schema, isKey: Boolean): Resource[F, Unit] = {
       val suffixedSubject = subject + (if (isKey) "-key" else "-value")
-      val registerSchema = IO(schemaRegistryClient.register(suffixedSubject, schema)) *>
-        IO(schemaRegistryClient.getVersion(suffixedSubject, schema))
+      val registerSchema = schemaRegistry.registerSchema(suffixedSubject, schema) *>
+        schemaRegistry.getVersion(suffixedSubject, schema)
       Resource.makeCase(registerSchema)((version, exitCase) => exitCase match {
-        case ExitCase.Error(_) => IO(schemaRegistryClient.deleteSchemaVersion(suffixedSubject, version.toString))
-        case _ => IO.unit
+        case ExitCase.Error(_) => schemaRegistry.deleteSchemaOfVersion(suffixedSubject, version)
+        case _ => Monad[F].pure(())
       }).map(_ => ())
     }
 
-    override def registerSchemas(subject: String, keySchema: Schema, valueSchema: Schema): Resource[IO, Unit] = {
+    override def registerSchemas(subject: String, keySchema: Schema, valueSchema: Schema): Resource[F, Unit] = {
       registerSchema(subject, keySchema, isKey = true) *> registerSchema(subject, valueSchema, isKey = false)
     }
   }
