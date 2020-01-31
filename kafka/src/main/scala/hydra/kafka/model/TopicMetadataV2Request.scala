@@ -12,13 +12,24 @@ final case class Slack(channel: String) extends ContactMethod
 
 final case class Schemas(key: Schema, value: Schema)
 
+final case class Subject private (value: String) extends AnyVal
+
+object Subject {
+  private val kafkaValidCharacterRegex = """^[a-zA-Z0-9_\-.]+$""".r
+
+  def createValidated(value: String): Option[Subject] =
+    if(kafkaValidCharacterRegex.pattern.matcher(value).matches()) {
+      Some(new Subject(value))
+    } else None
+}
+
 case class TopicMetadataV2Request(
-                                  subject: String,
+                                  subject: Subject,
                                   schemas: Schemas,
                                   streamType: StreamType,
                                   deprecated: Boolean,
                                   dataClassification: String,
                                   contact: List[ContactMethod],
                                   createdDate: Instant,
-                                  parentSubjects: List[String],
+                                  parentSubjects: List[Subject],
                                   notes: Option[String])

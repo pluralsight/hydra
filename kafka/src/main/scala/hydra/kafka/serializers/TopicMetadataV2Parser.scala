@@ -6,9 +6,8 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import cats.data.Validated.{Invalid, Valid}
 import cats.data.{NonEmptyChain, Validated, ValidatedNec}
 import cats.implicits._
-import hydra.avro.resource.HydraSubjectValidator
 import hydra.core.marshallers.{CurrentState, GenericServiceResponse, History, Notification, StreamType, Telemetry}
-import hydra.kafka.model.{ContactMethod, Email, Schemas, Slack, TopicMetadataV2Request}
+import hydra.kafka.model.{ContactMethod, Email, Schemas, Slack, Subject, TopicMetadataV2Request}
 import hydra.kafka.serializers.Errors._
 import org.apache.avro.Schema
 import spray.json.{DefaultJsonProtocol, DeserializationException, JsArray, JsBoolean, JsObject, JsString, JsValue, RootJsonFormat}
@@ -16,12 +15,26 @@ import spray.json.{DefaultJsonProtocol, DeserializationException, JsArray, JsBoo
 import scala.util.{Failure, Success, Try}
 
 trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol with TopicMetadataV2Validator {
+  implicit object SubjectFormat extends RootJsonFormat[Subject] {
+    override def write(obj: Subject): JsValue = {
+      JsString(obj.value)
+    }
+
+    override def read(json: JsValue): Subject = json match {
+      case JsString(value) => Subject.createValidated(value) match {
+        case Some(subject) => subject
+        case None => throw DeserializationException(InvalidSubject(json).errorMessage)
+      }
+      case j => throw DeserializationException(InvalidSubject(j).errorMessage)
+    }
+  }
+
   implicit object InstantFormat extends RootJsonFormat[Instant] {
     override def write(obj: Instant): JsValue = JsString(obj.toString)
 
     override def read(json: JsValue): Instant = json match {
       case JsString(value) => Try(Instant.parse(value)).getOrElse(throw DeserializationException(CreatedDateNotSpecifiedAsISO8601(json).errorMessage))
-      case j => throw DeserializationException(CreatedDateNotSpecifiedAsISO8601(j).errorMessage)
+      case _ => throwDeserializationError("createdDate", "ISO-8601 DateString formatted YYYY-MM-DDThh:mm:ssZ")
     }
   }
 
@@ -47,7 +60,7 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
           }
           val contacts = List(email, slackChannel)
           if (contacts.forall(_.isRight)) {
-            val contactMethods = contacts.flatMap{ case Right(value) => value}
+            val contactMethods = contacts.flatMap{ case Right(value) => value; case Left(_) => None}
             if (contactMethods.nonEmpty) contactMethods else throw DeserializationException(deserializationExceptionMessage)
           } else {
             val errorString = contacts.foldLeft(List[String]())((acc, i) => acc ++ (i match {
@@ -134,14 +147,14 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
 
     override def read(json: JsValue): TopicMetadataV2Request = json match {
       case j: JsObject =>
-        val subject = validateSubject(Try(getStringWithKey(j, "subject")))
+        val subject = toResult(SubjectFormat.read(j.getFields("subject").headOption.getOrElse(JsString.empty)))
         val schemas = toResult(SchemasFormat.read(j.getFields("schemas").headOption.getOrElse(throwDeserializationError("schemas", "JsObject with key and value Avro Schemas"))))
         val streamType = toResult(StreamTypeFormat.read(j.getFields("streamType").headOption.getOrElse(throwDeserializationError("streamType", "String"))))
         val deprecated = toResult(getBoolWithKey(j, "deprecated"))
         val dataClassification = toResult(getStringWithKey(j, "dataClassification"))
         val contact = toResult(ContactFormat.read(j.getFields("contact").headOption.getOrElse(throwDeserializationError("contact", "JsObject"))))
-        val createdDate = toResult(InstantFormat.read(j.getFields("createdDate").headOption.getOrElse(throwDeserializationError("createdDate", "ISO-8601 DateString formatted YYYY-MM-DDThh:mm:ssZ"))))
-        val parentSubjects = toResult(j.getFields("parentSubjects").headOption.map(_.convertTo[List[String]]).getOrElse(throwDeserializationError("parentSubjects", "List of String")))
+        val createdDate = toResult(InstantFormat.read(j.getFields("createdDate").headOption.getOrElse(JsString.empty)))
+        val parentSubjects = toResult(j.getFields("parentSubjects").headOption.map(_.convertTo[List[Subject]]).getOrElse(throwDeserializationError("parentSubjects", "List of Subject")))
         val notes = toResult(j.getFields("notes").headOption.map(_.convertTo[String]))
         (
           subject,
@@ -194,7 +207,7 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
   }
 }
 
-sealed trait TopicMetadataV2Validator extends HydraSubjectValidator {
+sealed trait TopicMetadataV2Validator {
 
   def toResult[A](a: => A): MetadataValidationResult[A] = {
     val v = Validated.catchNonFatal(a)
@@ -203,25 +216,12 @@ sealed trait TopicMetadataV2Validator extends HydraSubjectValidator {
     }
   }
 
-  def validateSubject(subject: Try[String]): MetadataValidationResult[String] = {
-    subject match {
-      case Failure(exception) =>
-        ExceptionThrownOnParseWithException(exception.getMessage).invalidNec
-      case Success(value) =>
-        validateSubjectCharacters(value) match {
-          case Valid(a) =>
-            a.validNec
-          case Invalid(e) => ExternalValidator(e.head.errorMessage).invalidNec
-        }
-    }
-  }
-
   sealed trait TopicMetadataV2PayloadValidation {
     def errorMessage: String
   }
 
   final case class ExceptionThrownOnParseWithException(message: String) extends TopicMetadataV2PayloadValidation {
-    def errorMessage: String = message
+    override def errorMessage: String = message
   }
 
   final case class ExternalValidator(message: String) extends TopicMetadataV2PayloadValidation {
@@ -248,6 +248,11 @@ object Errors {
   final case class InvalidSchema(value: JsValue, isKey: Boolean) {
     def errorMessage: String = s"${value.compactPrint} is not a properly formatted Avro Schema for field `${if (isKey) "key" else "value"}`."
   }
+
+  final case class InvalidSubject(jsValue: JsValue) {
+    val errorMessage = s"Field `subject` must be a string containing only numbers, letters, hyphens, periods, and underscores, received ${jsValue.compactPrint}."
+  }
+
 
   final case class InvalidSchemas(value: JsValue) {
     def errorMessage: String = s"Field Schemas must be an object containing a `key` avro schema and a `value` avro schema, received ${value.compactPrint}."

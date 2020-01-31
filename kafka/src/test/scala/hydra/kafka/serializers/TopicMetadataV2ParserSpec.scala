@@ -3,10 +3,9 @@ package hydra.kafka.serializers
 import java.time.{Instant, ZoneOffset}
 
 import hydra.core.marshallers._
-import hydra.kafka.model.{Email, Schemas, Slack, TopicMetadataV2Request}
+import hydra.kafka.model.{Email, Schemas, Slack, Subject, TopicMetadataV2Request}
 import org.scalatest.{Matchers, WordSpec}
 import Errors._
-import hydra.avro.resource.HydraSubjectValidator
 
 class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadataV2Parser {
   import spray.json._
@@ -152,14 +151,14 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
         createJsValueOfTopicMetadataV2Request("Foo","#slack_channel","email@address.com","2020-01-20T12:34:56Z", hasNotes = false)
       TopicMetadataV2Format.read(jsonData) shouldBe
         TopicMetadataV2Request(
-          subject,
+          Subject.createValidated(subject).get,
           Schemas(new SchemaFormat(isKey = true).read(validAvroSchema),new SchemaFormat(isKey = false).read(validAvroSchema)),
           streamType,
           deprecated,
           dataClassification,
           List(email, slackChannel),
           Instant.parse(createdDateString),
-          parentSubjects,
+          parentSubjects.flatMap(Subject.createValidated),
           notes
         )
     }
@@ -174,12 +173,12 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
     }
 
     "accumulate errors from improper provided data" in {
-      val (jsonData, _, _, _, _, email, slack, createdDate, _, _) =
+      val (jsonData, subject, _, _, _, email, slack, createdDate, _, _) =
         createJsValueOfTopicMetadataV2Request("@#$%^&","NOT a slack channel","invalid@address","2020-01-20", hasNotes = true)
       val error = the[DeserializationException] thrownBy {
         TopicMetadataV2Format.read(jsonData)
       }
-      containsAllOf(error, HydraSubjectValidator.SubjectHasInvalidCharacters.errorMessage, Errors.CreatedDateNotSpecifiedAsISO8601(JsString(createdDate)).errorMessage, InvalidEmailProvided(JsString(email.address)).errorMessage, InvalidSlackChannelProvided(JsString(slack.channel)).errorMessage)
+      containsAllOf(error, Errors.InvalidSubject(JsString(subject)).errorMessage, Errors.CreatedDateNotSpecifiedAsISO8601(JsString(createdDate)).errorMessage, InvalidEmailProvided(JsString(email.address)).errorMessage, InvalidSlackChannelProvided(JsString(slack.channel)).errorMessage)
     }
 
   }
