@@ -33,18 +33,29 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
         case JsObject(fields) if fields.isDefinedAt("email") || fields.isDefinedAt("slackChannel") =>
           val email = fields.get("email") match {
             case Some(JsString(value)) =>
-              Some(Email(value))
+              val emailRegex = """^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+.[A-Za-z]{2,64}$""".r
+              if (emailRegex.pattern.matcher(value).matches()) Right(Some(Email(value))) else Left(InvalidEmailProvided(JsString(value)).errorMessage)
             case _ =>
-              None
+              Right(None)
           }
           val slackChannel = fields.get("slackChannel") match {
             case Some(JsString(value)) =>
-              Some(Slack(value))
+              val slackRegex = """^[#][^\sA-Z]{1,79}$""".r
+              if (slackRegex.pattern.matcher(value).matches()) Right(Some(Slack(value))) else Left(InvalidSlackChannelProvided(JsString(value)).errorMessage)
             case _ =>
-              None
+              Right(None)
           }
-          val contactMethods: List[ContactMethod] = List(email, slackChannel).flatten
-          if (contactMethods.nonEmpty) contactMethods else throw DeserializationException(deserializationExceptionMessage)
+          val contacts = List(email, slackChannel)
+          if (contacts.forall(_.isRight)) {
+            val contactMethods = contacts.flatMap{ case Right(value) => value}
+            if (contactMethods.nonEmpty) contactMethods else throw DeserializationException(deserializationExceptionMessage)
+          } else {
+            val errorString = contacts.foldLeft(List[String]())((acc, i) => acc ++ (i match {
+              case Right(_) => None
+              case Left(value) => Some(value)
+            })).mkString(" ")
+            throw DeserializationException(errorString)
+          }
         case _ =>
           throw DeserializationException(deserializationExceptionMessage)
       }
@@ -124,14 +135,14 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
     override def read(json: JsValue): TopicMetadataV2Request = json match {
       case j: JsObject =>
         val subject = validateSubject(Try(getStringWithKey(j, "subject")))
-        val schemas = toMVR(SchemasFormat.read(j.getFields("schemas").headOption.getOrElse(throwDeserializationError("schemas", "JsObject with key and value Avro Schemas"))))
-        val streamType = toMVR(StreamTypeFormat.read(j.getFields("streamType").headOption.getOrElse(throwDeserializationError("streamType", "String"))))
-        val deprecated = toMVR(getBoolWithKey(j, "deprecated"))
-        val dataClassification = toMVR(getStringWithKey(j, "dataClassification"))
-        val contact = toMVR(ContactFormat.read(j.getFields("contact").headOption.getOrElse(throwDeserializationError("contact", "JsObject"))))
-        val createdDate = toMVR(InstantFormat.read(j.getFields("createdDate").headOption.getOrElse(throwDeserializationError("createdDate", "ISO-8601 DateString formatted YYYY-MM-DDThh:mm:ssZ"))))
-        val parentSubjects = toMVR(j.getFields("parentSubjects").headOption.map(_.convertTo[List[String]]).getOrElse(throwDeserializationError("parentSubjects", "List of String")))
-        val notes = toMVR(j.getFields("notes").headOption.map(_.convertTo[String]))
+        val schemas = toResult(SchemasFormat.read(j.getFields("schemas").headOption.getOrElse(throwDeserializationError("schemas", "JsObject with key and value Avro Schemas"))))
+        val streamType = toResult(StreamTypeFormat.read(j.getFields("streamType").headOption.getOrElse(throwDeserializationError("streamType", "String"))))
+        val deprecated = toResult(getBoolWithKey(j, "deprecated"))
+        val dataClassification = toResult(getStringWithKey(j, "dataClassification"))
+        val contact = toResult(ContactFormat.read(j.getFields("contact").headOption.getOrElse(throwDeserializationError("contact", "JsObject"))))
+        val createdDate = toResult(InstantFormat.read(j.getFields("createdDate").headOption.getOrElse(throwDeserializationError("createdDate", "ISO-8601 DateString formatted YYYY-MM-DDThh:mm:ssZ"))))
+        val parentSubjects = toResult(j.getFields("parentSubjects").headOption.map(_.convertTo[List[String]]).getOrElse(throwDeserializationError("parentSubjects", "List of String")))
+        val notes = toResult(j.getFields("notes").headOption.map(_.convertTo[String]))
         (
           subject,
           schemas,
@@ -185,7 +196,7 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
 
 sealed trait TopicMetadataV2Validator extends HydraSubjectValidator {
 
-  def toMVR[A](a: => A): MetadataValidationResult[A] = {
+  def toResult[A](a: => A): MetadataValidationResult[A] = {
     val v = Validated.catchNonFatal(a)
     v.toValidatedNec.leftMap[NonEmptyChain[ExceptionThrownOnParseWithException]]{ es =>
       es.map(e => ExceptionThrownOnParseWithException(e.getMessage))
@@ -226,6 +237,14 @@ object Errors {
     def errorMessage: String = s"Field `createdDate` expected ISO-8601 DateString formatted YYYY-MM-DDThh:mm:ssZ, received ${value.compactPrint}."
   }
 
+  final case class InvalidEmailProvided(value: JsValue) {
+    def errorMessage: String = s"Field `email` not recognized as a valid address, received ${value.compactPrint}."
+  }
+
+  final case class InvalidSlackChannelProvided(value: JsValue) {
+    def errorMessage: String = s"Field `slackChannel` must be all lowercase with no spaces and less than 80 characters, received ${value.compactPrint}."
+  }
+
   final case class InvalidSchema(value: JsValue, isKey: Boolean) {
     def errorMessage: String = s"${value.compactPrint} is not a properly formatted Avro Schema for field `${if (isKey) "key" else "value"}`."
   }
@@ -249,6 +268,6 @@ object Errors {
 
   final case class MissingField(field: String, fieldType: String)
   {
-    def errorMessage: String = s"Field `$field` of type $fieldType is required in the payload."
+    def errorMessage: String = s"Field `$field` of type $fieldType"
   }
 }
