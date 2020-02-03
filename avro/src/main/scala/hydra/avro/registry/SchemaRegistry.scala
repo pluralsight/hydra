@@ -21,22 +21,7 @@ trait SchemaRegistry[F[_]] {
 object SchemaRegistry {
 
   type SchemaId = Int
-
-  sealed abstract class SchemaVersion {
-    def getStringVersion: String = this match {
-      case NumericSchemaVersion(v) => v.toString
-      case LatestSchemaVersion => "latest"
-    }
-  }
-  object SchemaVersion {
-    def create[A](input: A): Option[SchemaVersion] = input match {
-      case "latest" => Some(LatestSchemaVersion)
-      case i: Int if i > 0 => Some(NumericSchemaVersion(i))
-      case _ => None
-    }
-  }
-  final case class NumericSchemaVersion private(value: Int) extends SchemaVersion
-  case object LatestSchemaVersion extends SchemaVersion
+  type SchemaVersion = Int
 
   def live[F[_]: Sync](schemaRegistryBaseUrl: String, maxCacheSize: Int): F[SchemaRegistry[F]] = Sync[F].delay {
     getFromSchemaRegistryClient(new CachedSchemaRegistryClient(schemaRegistryBaseUrl, maxCacheSize))
@@ -53,12 +38,11 @@ object SchemaRegistry {
         Sync[F].delay(schemaRegistryClient.register(subject, schema))
 
       override def deleteSchemaOfVersion(subject: String, version: SchemaVersion): F[Unit] =
-        Sync[F].delay(schemaRegistryClient.deleteSchemaVersion(subject, version.getStringVersion))
+        Sync[F].delay(schemaRegistryClient.deleteSchemaVersion(subject, version.toString))
 
       override def getVersion(subject: String, schema: Schema): F[SchemaVersion] =
         Sync[F].delay {
-          val version = schemaRegistryClient.getVersion(subject, schema)
-          SchemaVersion.create(version).get
+          schemaRegistryClient.getVersion(subject, schema)
         }
 
       override def getAllVersions(subject: String): F[List[SchemaId]] =

@@ -4,6 +4,7 @@ import cats.effect.{IO, Resource, Sync}
 import cats.implicits._
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.{FlatSpec, Matchers}
+import java.util.concurrent.atomic.AtomicBoolean
 
 class KeyValueSchemaRegistrarSpec extends FlatSpec with Matchers {
 
@@ -37,17 +38,20 @@ class KeyValueSchemaRegistrarSpec extends FlatSpec with Matchers {
 
   it should "Rollback if an error occurs in a later resource" in {
     getTestResources[IO].flatMap { case (schemaRegistryClient, registerResource) =>
-      val failRegister = registerResource.map { _ =>
+      val subjectsWereAdded = new AtomicBoolean(false)
+      val getAllVersions = List("-key", "-value").map(subject + _).traverse(schemaRegistryClient.getAllVersions).map(_.flatten)
+      val failRegister = registerResource.flatMap { _ =>
+        Resource.liftF(getAllVersions).map(allVersions => subjectsWereAdded.set(allVersions.length == 2))
+      }.map { _ =>
         throw new Exception
         ()
       }.use(_ => IO.unit).recover { case _ => () }
       for {
         _ <- failRegister
-        allKeyVersions <- schemaRegistryClient.getAllVersions(subject + "-key")
-        allValueVersions <- schemaRegistryClient.getAllVersions(subject + "-value")
+        allVersions <- getAllVersions
       } yield {
-        allKeyVersions shouldBe empty
-        allValueVersions shouldBe empty
+        allVersions shouldBe List.empty
+        subjectsWereAdded.get shouldBe true
       }
     }.unsafeRunSync
   }
