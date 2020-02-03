@@ -1,14 +1,10 @@
 package hydra.avro.registry
 
-import cats.effect.{IO, Resource, Sync}
+import cats.Applicative
+import cats.effect.{Bracket, IO, Resource, Sync}
 import cats.implicits._
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.{FlatSpec, Matchers}
-import java.util.concurrent.atomic.AtomicBoolean
-import cats.Monad
-import cats.effect.Bracket
-import cats.Applicative
-import cats.Traverse
 
 class KeyValueSchemaRegistrarSpec extends FlatSpec with Matchers {
 

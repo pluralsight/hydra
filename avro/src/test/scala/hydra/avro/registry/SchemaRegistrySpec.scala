@@ -38,7 +38,7 @@ class SchemaRegistrySpec extends FlatSpec with Matchers {
       schema <- getSchema[F]("testSchemaDelete")
       _ <- schemaRegistry.registerSchema(subject, schema)
       version <- schemaRegistry.getVersion(subject, schema)
-      delete <- schemaRegistry.deleteSchemaOfVersion(subject, version)
+      _ <- schemaRegistry.deleteSchemaOfVersion(subject, version)
       allVersions <- schemaRegistry.getAllVersions(subject)
     } yield {
       it must "delete a schema version" in {
@@ -55,9 +55,8 @@ class SchemaRegistrySpec extends FlatSpec with Matchers {
       _ <- schemaRegistry.registerSchema(subject, schema)
       allSubjectsOne <- schemaRegistry.getAllSubjects
       version <- schemaRegistry.getVersion(subject, schema)
-      delete <- schemaRegistry.deleteSchemaOfVersion(subject, version)
+      _ <- schemaRegistry.deleteSchemaOfVersion(subject, version)
       allSubjectsAfterDelete <- schemaRegistry.getAllSubjects
-      allVersions <- schemaRegistry.getAllVersions(subject)
     } yield {
       it must "get all subjects when no subjects exist" in {
         allSubjectsEmpty shouldBe empty
