@@ -42,7 +42,31 @@ class SchemaRegistrySpec extends FlatSpec with Matchers {
       allVersions <- schemaRegistry.getAllVersions(subject)
     } yield {
       it must "delete a schema version" in {
-        allVersions shouldBe List.empty
+        allVersions shouldBe empty
+      }
+    }
+  }
+
+  private def testGetAllSubjects[F[_]: Monad](schemaRegistry: SchemaRegistry[F]): F[Unit] = {
+    val subject = "testGetAllSubjects"
+    for {
+      schema <- getSchema[F]("testGetAllSubjects")
+      allSubjectsEmpty <- schemaRegistry.getAllSubjects
+      _ <- schemaRegistry.registerSchema(subject, schema)
+      allSubjectsOne <- schemaRegistry.getAllSubjects
+      version <- schemaRegistry.getVersion(subject, schema)
+      delete <- schemaRegistry.deleteSchemaOfVersion(subject, version)
+      allSubjectsAfterDelete <- schemaRegistry.getAllSubjects
+      allVersions <- schemaRegistry.getAllVersions(subject)
+    } yield {
+      it must "get all subjects when no subjects exist" in {
+        allSubjectsEmpty shouldBe empty
+      }
+      it must "get all subjects when a subject exists" in {
+        allSubjectsOne shouldBe List(subject)
+      }
+      it must "get all subjects even after their schemas have been deleted" in {
+        allSubjectsAfterDelete shouldBe List(subject)
       }
     }
   }
@@ -51,6 +75,7 @@ class SchemaRegistrySpec extends FlatSpec with Matchers {
     for {
       _ <- schemaRegistry.flatMap(testAddSubject[F])
       _ <- schemaRegistry.flatMap(testDeleteSchemaVersion[F])
+      _ <- schemaRegistry.flatMap(testGetAllSubjects[F])
     } yield ()
   }
 

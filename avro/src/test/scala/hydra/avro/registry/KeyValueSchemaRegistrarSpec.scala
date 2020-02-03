@@ -38,20 +38,18 @@ class KeyValueSchemaRegistrarSpec extends FlatSpec with Matchers {
 
   it should "Rollback if an error occurs in a later resource" in {
     getTestResources[IO].flatMap { case (schemaRegistryClient, registerResource) =>
-      val subjectsWereAdded = new AtomicBoolean(false)
       val getAllVersions = List("-key", "-value").map(subject + _).traverse(schemaRegistryClient.getAllVersions).map(_.flatten)
-      val failRegister = registerResource.flatMap { _ =>
-        Resource.liftF(getAllVersions).map(allVersions => subjectsWereAdded.set(allVersions.length == 2))
-      }.map { _ =>
+      val failRegister = registerResource.map { _ =>
         throw new Exception
         ()
       }.use(_ => IO.unit).recover { case _ => () }
       for {
         _ <- failRegister
         allVersions <- getAllVersions
+        allSubjects <- schemaRegistryClient.getAllSubjects
       } yield {
-        allVersions shouldBe List.empty
-        subjectsWereAdded.get shouldBe true
+        allVersions shouldBe empty
+        allSubjects should contain allOf (subject + "-key", subject + "-value")
       }
     }.unsafeRunSync
   }

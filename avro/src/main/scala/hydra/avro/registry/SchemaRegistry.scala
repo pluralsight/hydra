@@ -16,6 +16,8 @@ trait SchemaRegistry[F[_]] {
 
   def getAllVersions(subject: String): F[List[Int]]
 
+  def getAllSubjects: F[List[String]]
+
 }
 
 object SchemaRegistry {
@@ -53,6 +55,14 @@ object SchemaRegistry {
             .toList
             .map(_.toInt)
         }
+
+        override def getAllSubjects: F[List[String]] =
+          Sync[F].delay {
+           import collection.JavaConverters._
+           schemaRegistryClient.getAllSubjects
+           .asScala
+           .toList 
+          }
 
   }
 
