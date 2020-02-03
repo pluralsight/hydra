@@ -38,7 +38,7 @@ class KeyValueSchemaRegistrarSpec extends FlatSpec with Matchers {
   }
 
   private def testRollback[F[_]: Applicative](schemaRegistryClient: SchemaRegistry[F], registerResource: Resource[F, Unit])
-                                       (implicit bracket: Bracket[F, Throwable]): F[Unit] = {
+                                             (implicit bracket: Bracket[F, Throwable]): F[Unit] = {
     val getAllVersions = List("-key", "-value").map(subject + _).traverse(schemaRegistryClient.getAllVersions).map(_.flatten)
       val failRegister = registerResource.map { _ =>
         throw new Exception
