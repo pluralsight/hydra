@@ -37,10 +37,13 @@ object Dependencies {
   val akkaManagementVersion = "1.0.5"
   val aeronVersion = "1.24.0"
   val catsVersion =  "2.0.0"
+  val catsEffectVersion = "2.0.0"
 
   object Compile {
 
     val cats =  "org.typelevel" %% "cats-core" % catsVersion
+
+    val catsEffect = "org.typelevel" %% "cats-effect" % catsEffectVersion
 
     val scalaConfigs = "com.github.kxbmap" %% "configs" % kxbmapConfigVersion
 
@@ -173,7 +176,7 @@ object Dependencies {
 
   val sqlDeps = logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
 
-  val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache)
+  val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache, catsEffect)
 
   val coreDeps = akka ++ baseDeps ++
     Seq(guavacache, reflections, akkaKryo, serviceContainer, sdNotify, postgres, h2db, retry) ++
