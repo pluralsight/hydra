@@ -3,7 +3,7 @@ package hydra.kafka.serializers
 import java.time.{Instant, ZoneOffset}
 
 import hydra.core.marshallers._
-import hydra.kafka.model.{DataClassification, Email, Public, Schemas, Slack, Subject, TopicMetadataV2Request}
+import hydra.kafka.model.{ConfidentialPII, DataClassification, Email, InternalUseOnly, Public, RestrictedEmployeeData, RestrictedFinancial, Schemas, Slack, Subject, TopicMetadataV2Request}
 import org.scalatest.{Matchers, WordSpec}
 import Errors._
 import cats.data.NonEmptyList
@@ -113,6 +113,26 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
       } should have message StreamTypeInvalid(jsValue, knownDirectSubclasses).errorMessage
     }
 
+    "parse one of each type of DataClassification" in {
+      DataClassificationFormat.read(JsString("Public")) shouldBe Public
+      DataClassificationFormat.read(JsString("InternalUseOnly")) shouldBe InternalUseOnly
+      DataClassificationFormat.read(JsString("ConfidentialPII")) shouldBe ConfidentialPII
+      DataClassificationFormat.read(JsString("RestrictedFinancial")) shouldBe RestrictedFinancial
+      DataClassificationFormat.read(JsString("RestrictedEmployeeData")) shouldBe RestrictedEmployeeData
+    }
+
+    "throw error when parsing DataClassification" in {
+      val jsValue = JsString.empty
+      import scala.reflect.runtime.{universe => ru}
+      val tpe = ru.typeOf[DataClassification]
+      val knownDirectSubclasses: Set[ru.Symbol] = tpe.typeSymbol.asClass.knownDirectSubclasses
+
+      the[DeserializationException] thrownBy {
+        DataClassificationFormat.read(jsValue)
+      } should have message DataClassificationInvalid(jsValue, knownDirectSubclasses).errorMessage
+    }
+
+
     "parse a valid schema" in {
       val jsValue = validAvroSchema
       new SchemaFormat(isKey = false).read(jsValue).getName shouldBe "SomeName"
@@ -147,6 +167,13 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
       } should have message errorMessage
     }
 
+    "throw a generic schemas error given a random non JsObject" in {
+      the[DeserializationException] thrownBy{
+        val json = JsString.empty
+        SchemasFormat.read(json)
+      } should have message InvalidSchemas(JsString.empty).errorMessage
+    }
+
     "parse a complete object and return a TopicMetadataV2Request" in {
       val (jsonData, subject, streamType, deprecated, dataClassification, email, slackChannel, createdDateString, parentSubjects, notes) =
         createJsValueOfTopicMetadataV2Request(Subject.createValidated("Foo").get,"#slack_channel","email@address.com","2020-01-20T12:34:56Z")()
@@ -162,6 +189,12 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
           parentSubjects,
           notes
         )
+    }
+
+    "throw deserialization error with invalid payload" in {
+      the[DeserializationException] thrownBy {
+        TopicMetadataV2Format.read(JsString.empty)
+      } should have message invalidPayloadProvided(JsString.empty)
     }
 
     def containsAllOf(error: Throwable, errorMessages: String*) = errorMessages.forall(error.getMessage.contains)
@@ -239,8 +272,7 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadat
     }
 
     "serialize a DataClassificationFormat" in {
-      val dataClassification = Public
-      DataClassificationFormat.write(dataClassification) shouldBe JsString("Public")
+      DataClassificationFormat.write(Public) shouldBe JsString("Public")
     }
 
     "serialize an avro schema" in {

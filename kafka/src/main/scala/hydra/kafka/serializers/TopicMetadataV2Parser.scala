@@ -196,28 +196,7 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
           case Invalid(e) => throw DeserializationException(e.map(_.errorMessage).mkString_(" "))
         }
       case j =>
-        import spray.json._
-        val json =
-          """
-            |{
-            |   "subject": "String a-zA-Z0-9_.-\",
-            |   "schemas": {
-            |     "key": {},
-            |     "value": {}
-            |   },
-            |   "streamType": "oneOf History, Notification, Telemetry, CurrentState",
-            |   "deprecated": false,
-            |   "dataClassification": "Public",
-            |   "contact": {
-            |     "slackChannel" : "#channelName",
-            |     "email" : "email@address.com"
-            |   },
-            |   "createdDate":"2020-01-20T12:34:56Z",
-            |   "parentSubjects": ["subjectName"],
-            |   "notes": "Optional - String Note"
-            |}
-            |""".stripMargin
-        throw DeserializationException(s"Expected payload like ${json.parseJson.prettyPrint}, but received ${j.prettyPrint}")
+        throw DeserializationException(invalidPayloadProvided(j))
     }
   }
 
@@ -225,10 +204,6 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
 
   private def getBoolWithKey(json: JsObject, key: String): Boolean = {
     json.getFields(key).headOption.map(_.convertTo[Boolean]).getOrElse(throwDeserializationError(key, "Boolean"))
-  }
-
-  private def getStringWithKey(json: JsObject, key: String): String = {
-    json.getFields(key).headOption.map(_.convertTo[String]).getOrElse(throwDeserializationError(key, "String"))
   }
 }
 
@@ -249,10 +224,6 @@ sealed trait TopicMetadataV2Validator {
     override def errorMessage: String = message
   }
 
-  final case class ExternalValidator(message: String) extends TopicMetadataV2PayloadValidation {
-    override def errorMessage: String = message
-  }
-
   type MetadataValidationResult[A] = ValidatedNec[TopicMetadataV2PayloadValidation, A]
 
 }
@@ -260,6 +231,32 @@ sealed trait TopicMetadataV2Validator {
 object Errors {
   final case class CreatedDateNotSpecifiedAsISO8601(value: JsValue) {
     def errorMessage: String = s"Field `createdDate` expected ISO-8601 DateString formatted YYYY-MM-DDThh:mm:ssZ, received ${value.compactPrint}."
+  }
+
+  def invalidPayloadProvided(actual: JsValue): String = {
+    import spray.json._
+    val expected =
+      """
+        |{
+        |   "subject": "String a-zA-Z0-9_.-\\",
+        |   "schemas": {
+        |     "key": {},
+        |     "value": {}
+        |   },
+        |   "streamType": "oneOf History, Notification, Telemetry, CurrentState",
+        |   "deprecated": false,
+        |   "dataClassification": "Public",
+        |   "contact": {
+        |     "slackChannel" : "#channelName",
+        |     "email" : "email@address.com"
+        |   },
+        |   "createdDate":"2020-01-20T12:34:56Z",
+        |   "parentSubjects": ["subjectName"],
+        |   "notes": "Optional - String Note"
+        |}
+        |""".stripMargin
+
+    s"Expected payload like ${expected.parseJson.prettyPrint}, but received ${actual.prettyPrint}"
   }
 
   def invalidEmailProvided(value: JsValue) = s"Field `email` not recognized as a valid address, received ${value.compactPrint}."
