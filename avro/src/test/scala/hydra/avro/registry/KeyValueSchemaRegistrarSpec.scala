@@ -5,6 +5,10 @@ import cats.implicits._
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.{FlatSpec, Matchers}
 import java.util.concurrent.atomic.AtomicBoolean
+import cats.Monad
+import cats.effect.Bracket
+import cats.Applicative
+import cats.Traverse
 
 class KeyValueSchemaRegistrarSpec extends FlatSpec with Matchers {
 
@@ -17,7 +21,7 @@ class KeyValueSchemaRegistrarSpec extends FlatSpec with Matchers {
       .noDefault()
       .endRecord()
 
-  val subject = "testSubject"
+  private val subject = "testSubject"
 
   private def getTestResources[F[_]: Sync]: F[(SchemaRegistry[F], Resource[F, Unit])] = {
     for {
@@ -27,31 +31,42 @@ class KeyValueSchemaRegistrarSpec extends FlatSpec with Matchers {
     } yield (schemaRegistryClient, registerResource)
   }
 
-  it should "register key and value schema" in {
-    getTestResources[IO].flatMap { case (schemaRegistryClient, registerResource) =>
-      registerResource.use(_ => IO.unit) *>
+  private def testRegister[F[_]: Applicative](schemaRegistryClient: SchemaRegistry[F], registerResource: Resource[F, Unit])
+                                       (implicit bracket: Bracket[F, Throwable]): F[Unit] = {
+    registerResource.use(_ => Applicative[F].pure(())) *>
       List("-key", "-value").map(subject + _).traverse(schemaRegistryClient.getAllVersions).map { allVersions =>
-        allVersions.flatten shouldBe List(1, 1)
+        it should "register key and value schema" in {
+          allVersions.flatten shouldBe List(1, 1)
+        }
       }
-    }.unsafeRunSync
   }
 
-  it should "Rollback if an error occurs in a later resource" in {
-    getTestResources[IO].flatMap { case (schemaRegistryClient, registerResource) =>
-      val getAllVersions = List("-key", "-value").map(subject + _).traverse(schemaRegistryClient.getAllVersions).map(_.flatten)
+  private def testRollback[F[_]: Applicative](schemaRegistryClient: SchemaRegistry[F], registerResource: Resource[F, Unit])
+                                       (implicit bracket: Bracket[F, Throwable]): F[Unit] = {
+    val getAllVersions = List("-key", "-value").map(subject + _).traverse(schemaRegistryClient.getAllVersions).map(_.flatten)
       val failRegister = registerResource.map { _ =>
         throw new Exception
         ()
-      }.use(_ => IO.unit).recover { case _ => () }
+      }.use(_ => Applicative[F].pure(())).recover { case _ => () }
       for {
         _ <- failRegister
         allVersions <- getAllVersions
         allSubjects <- schemaRegistryClient.getAllSubjects
       } yield {
-        allVersions shouldBe empty
-        allSubjects should contain allOf (subject + "-key", subject + "-value")
+        it should "Rollback if an error occurs in a later resource" in {
+          allVersions shouldBe empty
+          allSubjects should contain allOf (subject + "-key", subject + "-value")
+        }
       }
-    }.unsafeRunSync
   }
+
+  private def runTests[F[_]: Sync](implicit bracket: Bracket[F, Throwable]): F[Unit] = {
+    for {
+      _ <- getTestResources.flatMap((testRegister[F] _).tupled(_))
+      _ <- getTestResources.flatMap((testRollback[F] _).tupled(_))
+    } yield ()
+  }
+
+  runTests[IO].unsafeRunSync()
 
 }
