@@ -46,11 +46,13 @@
           "fields": [
               {
                   "name": "email",
-                  "type": "string"
+                  "type": ["null", "string"],
+                  "default": null
               },
               {
                   "name": "slackChannel",
-                  "type": "string"
+                  "type": ["null", "string"],
+                  "default": null
               }
           ]
       }
