@@ -18,10 +18,10 @@ import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, Li
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.util.KafkaUtils
 import org.apache.kafka.common.PartitionInfo
-import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 import scalacache._
 import scalacache.guava.GuavaCache
 import scalacache.modes.scalaFuture._
+import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Map

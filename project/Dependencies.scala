@@ -20,7 +20,7 @@ object Dependencies {
   val kafkaVersion = "2.0.0"
   val reflectionsVersion = "0.9.11"
   val akkaHTTPVersion = "10.1.10"
-  val akkaKafkaStreamVersion = "1.0-M1"
+  val akkaKafkaStreamVersion = "2.0.1"
   val scalazVersion = "7.2.9"
   val scalaMockVersion = "4.1.0"
   val serviceContainerVersion = "2.0.7"
