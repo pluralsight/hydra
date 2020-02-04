@@ -49,6 +49,7 @@ class KafkaUtilsSpec extends WordSpec
       |akka {
       |  kafka.producer {
       |    parallelism = 100
+      |    close-on-producer-stop = true
       |    close-timeout = 60s
       |    use-dispatcher = test
       |    eos-commit-interval = 100ms
