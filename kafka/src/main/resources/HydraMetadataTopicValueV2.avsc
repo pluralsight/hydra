@@ -20,36 +20,6 @@
       "type": "boolean"
     },
     {
-        "name": "schemas",
-        "type": {
-            "type": "record",
-            "name": "schemasRecord",
-            "fields": [
-                {
-                    "name": "key",
-                    "type": {
-                      "name": "schemaNameInfo",
-                      "type": "record",
-                      "fields": [
-                        {
-                          "name": "name",
-                          "type": "string"
-                        },
-                        {
-                          "name": "namespace",
-                          "type": "string"
-                        }
-                      ]
-                    }
-                },
-                {
-                  "name": "value",
-                  "type": "_hydra.metadata.v2.schemaNameInfo"
-                }
-            ]
-        }
-    },
-    {
       "name": "streamType",
       "type": {
         "name": "streamTypeEnum",
@@ -80,11 +50,13 @@
           "fields": [
               {
                   "name": "email",
-                  "type": "string"
+                  "type": ["null", "string"],
+                  "default": null
               },
               {
                   "name": "slackChannel",
-                  "type": "string"
+                  "type": ["null", "string"],
+                  "default": null
               }
           ]
       }
