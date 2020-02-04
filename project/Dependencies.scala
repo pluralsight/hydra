@@ -4,46 +4,50 @@ import sbt.{ExclusionRule, _}
 
 object Dependencies {
 
-  val akkaVersion = "2.6.1"
-  val scalaTestVersion = "3.0.5"
-  val easyMockVersion = "3.5" //needed for mocking static java methods
-  val powerMockVersion = "2.0.0-beta.5" //needed for mocking static java methods
-  val slf4jVersion = "1.7.29"
-  val log4jVersion = "2.7"
-  val kxbmapConfigVersion = "0.4.4"
-  val typesafeConfigVersion = "1.3.2"
-  val avroVersion = "1.8.1"
-  val jodaTimeVersion = "2.9.9"
-  val jodaConvertVersion = "1.8.1"
-  val confluentVersion = "5.0.0"
-  val sprayJsonVersion = "1.3.5"
-  val kafkaVersion = "2.0.0"
-  val reflectionsVersion = "0.9.11"
+  val aeronVersion = "1.24.0"
+  val akkaHTTPCorsVersion = "0.4.2"
   val akkaHTTPVersion = "10.1.10"
   val akkaKafkaStreamVersion = "1.0-M1"
-  val scalazVersion = "7.2.9"
-  val scalaMockVersion = "4.1.0"
-  val serviceContainerVersion = "2.0.7"
-  val scalaCacheVersion = "0.28.0"
-  val commonsDbcpVersion = "1.4"
-  val hikariCPVersion = "2.6.2"
-  val jacksonVersion = "2.9.5"
-  val opRabbitVersion = "2.0.0"
-  val akkaHTTPCorsVersion = "0.4.2"
-  val kamonVersion = "1.1.0"
-  val kamonPVersion = "1.0.0"
   val akkaKryoVersion = "0.5.2"
-  val h2DbVersion = "1.4.196"
   val akkaManagementVersion = "1.0.5"
-  val aeronVersion = "1.24.0"
-  val catsVersion =  "2.0.0"
+  val akkaVersion = "2.6.1"
+  val avroVersion = "1.8.1"
   val catsEffectVersion = "2.0.0"
+  val catsRetryVersion = "1.0.0"
+  val catsVersion =  "2.0.0"
+  val commonsDbcpVersion = "1.4"
+  val confluentVersion = "5.0.0"
+  val easyMockVersion = "3.5" //needed for mocking static java methods
+  val hikariCPVersion = "2.6.2"
+  val h2DbVersion = "1.4.196"
+  val jacksonVersion = "2.9.5"
+  val jodaConvertVersion = "1.8.1"
+  val jodaTimeVersion = "2.9.9"
+  val kafkaVersion = "2.0.0"
+  val kamonPVersion = "1.0.0"
+  val kamonVersion = "1.1.0"
+  val kxbmapConfigVersion = "0.4.4"
+  val log4jVersion = "2.7"
+  val opRabbitVersion = "2.0.0"
+  val powerMockVersion = "2.0.0-beta.5" //needed for mocking static java methods
+  val reflectionsVersion = "0.9.11"
+  val scalaCacheVersion = "0.28.0"
+  val scalaMockVersion = "4.1.0"
+  val scalaTestVersion = "3.0.5"
+  val scalazVersion = "7.2.9"
+  val serviceContainerVersion = "2.0.7"
+  val slf4jVersion = "1.7.29"
+  val sprayJsonVersion = "1.3.5"
+  val typesafeConfigVersion = "1.3.2"
 
   object Compile {
 
     val cats =  "org.typelevel" %% "cats-core" % catsVersion
 
-    val catsEffect = "org.typelevel" %% "cats-effect" % catsEffectVersion
+    lazy val catsEffect = Seq(
+      "org.typelevel" %% "cats-effect" % catsEffectVersion,
+      "com.github.cb372" %% "cats-retry" % catsRetryVersion
+    )
 
     val scalaConfigs = "com.github.kxbmap" %% "configs" % kxbmapConfigVersion
 
@@ -176,7 +180,7 @@ object Dependencies {
 
   val sqlDeps = logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
 
-  val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache, catsEffect)
+  val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache) ++ catsEffect
 
   val coreDeps = akka ++ baseDeps ++
     Seq(guavacache, reflections, akkaKryo, serviceContainer, sdNotify, postgres, h2db, retry) ++
