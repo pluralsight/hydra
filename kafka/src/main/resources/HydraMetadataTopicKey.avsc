@@ -5,7 +5,7 @@
   "version": 1,
   "fields": [
     {
-      "name": "subject"
+      "name": "subject",
       "type": "string"
     }
   ]
