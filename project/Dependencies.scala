@@ -15,9 +15,9 @@ object Dependencies {
   val avroVersion = "1.8.1"
   val jodaTimeVersion = "2.9.9"
   val jodaConvertVersion = "1.8.1"
-  val confluentVersion = "5.0.0"
+  val confluentVersion = "5.4.0"
   val sprayJsonVersion = "1.3.5"
-  val kafkaVersion = "2.0.0"
+  val kafkaVersion = "2.4.0"
   val reflectionsVersion = "0.9.11"
   val akkaHTTPVersion = "10.1.10"
   val akkaKafkaStreamVersion = "2.0.1"
@@ -69,8 +69,7 @@ object Dependencies {
       "org.apache.kafka" % "kafka-clients" % kafkaVersion,
       embeddedKafka % "test")
 
-    val confluent = Seq("io.confluent" % "kafka-schema-registry-client" % confluentVersion,
-      "io.confluent" % "kafka-avro-serializer" % confluentVersion).map(_.excludeAll(
+    val confluent = Seq("io.confluent" % "kafka-avro-serializer" % confluentVersion).map(_.excludeAll(
       ExclusionRule(organization = "org.codehaus.jackson"),
       ExclusionRule(organization = "com.fasterxml.jackson.core")))
 
