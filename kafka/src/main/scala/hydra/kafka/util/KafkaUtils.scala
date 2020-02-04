@@ -7,9 +7,9 @@ import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.common.util.TryWith
 import hydra.kafka.config.KafkaConfigSupport
+import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.kafka.clients.admin.{AdminClient, CreateTopicsResult, NewTopic}
 import org.apache.kafka.clients.consumer.ConsumerConfig
-import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Map
@@ -46,7 +46,7 @@ case class KafkaUtils(config: Map[String, AnyRef]) extends LoggingAdapter
         }
       }.flatMap { _ => //accounts for topic exists or zookeeper connection error
         val newTopics = topics.map(t =>
-          new NewTopic(t._1, t._2.numPartitions, t._2.replicationFactor).configs(t._2.configs))
+          new NewTopic(t._1, t._2.numPartitions, t._2.replicationFactor).configs(t._2.configs.asJava))
         TryWith(AdminClient.create(config.asJava)) { client => client.createTopics(newTopics.asJavaCollection) }
       }
     }
@@ -54,6 +54,8 @@ case class KafkaUtils(config: Map[String, AnyRef]) extends LoggingAdapter
 }
 
 object KafkaUtils extends ConfigSupport {
+
+  final case class TopicDetails(numPartitions: Int, replicationFactor: Short, configs: Map[String, String] = Map.empty)
 
   private val _consumerSettings = consumerSettings(rootConfig)
 

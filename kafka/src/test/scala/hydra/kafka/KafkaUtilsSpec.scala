@@ -4,8 +4,8 @@ import java.util.concurrent.ExecutionException
 
 import com.typesafe.config.ConfigFactory
 import hydra.kafka.util.KafkaUtils
+import hydra.kafka.util.KafkaUtils.TopicDetails
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
-import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
 
@@ -158,7 +158,7 @@ class KafkaUtilsSpec extends WordSpec
       )
       val kafkaUtils = new KafkaUtils(defaultCfg)
       kafkaUtils.topicExists("test.Hydra").get shouldBe false
-      val details = new TopicDetails(1, 1: Short, configs.asJava)
+      val details = new TopicDetails(1, 1: Short, configs)
       whenReady(kafkaUtils.createTopic("test.Hydra", details, 3000)) { response =>
         response.all().get() shouldBe null //the kafka API returns a 'Void'
         kafkaUtils.topicExists("test.Hydra").get shouldBe true
@@ -175,7 +175,7 @@ class KafkaUtilsSpec extends WordSpec
       val kafkaUtils = new KafkaUtils(defaultCfg)
       createCustomTopic("hydra.already.Exists")
       kafkaUtils.topicExists("hydra.already.Exists").get shouldBe true
-      val details = new TopicDetails(1, 1, configs.asJava)
+      val details = new TopicDetails(1, 1, configs)
       whenReady(kafkaUtils.createTopic("hydra.already.Exists", details, 1000).failed) { response =>
         response shouldBe an[IllegalArgumentException]
       }
@@ -188,7 +188,7 @@ class KafkaUtilsSpec extends WordSpec
         "cleanup.policy" -> "under the carpet"
       )
       val kafkaUtils = new KafkaUtils(defaultCfg)
-      val details = new TopicDetails(1, 1, configs.asJava)
+      val details = new TopicDetails(1, 1, configs)
       whenReady(kafkaUtils.createTopic("InvalidConfig", details, 1000)) { response =>
         intercept[ExecutionException](response.all().get)
       }
