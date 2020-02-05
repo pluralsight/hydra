@@ -44,7 +44,7 @@ public class JsonConverterTest {
     }
 
     private static Schema sr(Schema.Field... fields) {
-        return Schema.createRecord(Arrays.asList(fields));
+        return Schema.createRecord("testName", "", "testNamespace", false, Arrays.asList(fields));
     }
 
 

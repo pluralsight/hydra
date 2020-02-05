@@ -17,8 +17,8 @@ import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.util.KafkaUtils
+import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.kafka.common.PartitionInfo
-import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
 import scalacache._
 import scalacache.guava.GuavaCache
 import scalacache.modes.scalaFuture._
@@ -90,7 +90,7 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
   private def createTopic = path("topics") {
     post {
       entity(as[CreateTopicReq]) { req =>
-        val details = new TopicDetails(req.partitions, req.replicationFactor, req.config.asJava)
+        val details = new TopicDetails(req.partitions, req.replicationFactor, req.config)
         val to = timeout.duration.toMillis.toInt
         onSuccess(kafkaUtils.createTopic(req.topic, details, to)) { result =>
           Try(result.all.get(timeout.duration.toSeconds, TimeUnit.SECONDS))

@@ -152,7 +152,7 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
           |		},
           |  {
           |			"name": "optional",
-          |			"type": ["null", "string"],
+          |			"type": ["string", "null"],
           |     "default":"test"
           |		}
           |	]
@@ -248,7 +248,7 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
           |		},
           |  {
           |			"name": "testColumn",
-          |			"type": ["null", "string"],
+          |			"type": ["string", "null"],
           |     "default":"test"
           |		}
           |	]

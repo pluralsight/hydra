@@ -7,7 +7,7 @@ object Dependencies {
   val aeronVersion = "1.24.0"
   val akkaHTTPCorsVersion = "0.4.2"
   val akkaHTTPVersion = "10.1.10"
-  val akkaKafkaStreamVersion = "1.0-M1"
+  val akkaKafkaStreamVersion = "2.0.1"
   val akkaKryoVersion = "0.5.2"
   val akkaManagementVersion = "1.0.5"
   val akkaVersion = "2.6.1"
@@ -17,14 +17,14 @@ object Dependencies {
   val catsRetryVersion = "1.0.0"
   val catsVersion =  "2.0.0"
   val commonsDbcpVersion = "1.4"
-  val confluentVersion = "5.0.0"
+  val confluentVersion = "5.4.0"
   val easyMockVersion = "3.5" //needed for mocking static java methods
   val hikariCPVersion = "2.6.2"
   val h2DbVersion = "1.4.196"
   val jacksonVersion = "2.9.5"
   val jodaConvertVersion = "1.8.1"
   val jodaTimeVersion = "2.9.9"
-  val kafkaVersion = "2.0.0"
+  val kafkaVersion = "2.4.0"
   val kamonPVersion = "1.0.0"
   val kamonVersion = "1.1.0"
   val kxbmapConfigVersion = "0.4.4"
@@ -76,8 +76,7 @@ object Dependencies {
       "org.apache.kafka" % "kafka-clients" % kafkaVersion,
       embeddedKafka % "test")
 
-    val confluent = Seq("io.confluent" % "kafka-schema-registry-client" % confluentVersion,
-      "io.confluent" % "kafka-avro-serializer" % confluentVersion).map(_.excludeAll(
+    val confluent = Seq("io.confluent" % "kafka-avro-serializer" % confluentVersion).map(_.excludeAll(
       ExclusionRule(organization = "org.codehaus.jackson"),
       ExclusionRule(organization = "com.fasterxml.jackson.core")))
 
