@@ -83,7 +83,7 @@ class KafkaProducerProxy[K, V](id: String, settings: ProducerSettings[K, V])
     Try {
       Option(producer).foreach { p =>
         p.flush()
-        p.close(5000, TimeUnit.MILLISECONDS)
+        p.close(java.time.Duration.ofSeconds(5))
       }
     }
   }
