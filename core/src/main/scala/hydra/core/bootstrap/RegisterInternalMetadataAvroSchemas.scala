@@ -1,5 +1,6 @@
 package hydra.core.bootstrap
 
+import cats.MonadError
 import cats.effect.Sync
 import cats.implicits._
 import hydra.avro.registry.{KeyValueSchemaRegistrar, SchemaRegistry}
@@ -21,8 +22,8 @@ class RegisterInternalMetadataAvroSchemas[F[_]: Sync: Sleep: Logger](
     val onFailure: (Throwable, RetryDetails) => F[Unit] = (error, retryDetails) =>
       Logger[F].info(s"Retrying due to failure: $error. RetryDetails: $retryDetails")
 
-    val keySchemaF = Sync[F].delay(new Schema.Parser().parse(Source.fromResource(keyAvroResource).mkString))
-    val valueSchemaF = Sync[F].delay(new Schema.Parser().parse(Source.fromResource(valueAvroResource).mkString))
+    val keySchemaF = Sync[F].catchNonFatal(new Schema.Parser().parse(Source.fromResource(keyAvroResource).mkString))
+    val valueSchemaF = Sync[F].catchNonFatal(new Schema.Parser().parse(Source.fromResource(valueAvroResource).mkString))
 
     for {
       keySchema <- keySchemaF

@@ -30,9 +30,12 @@ class RegisterInternalMetadataAvroSchemasSpec extends WordSpec with Matchers {
 
       (for {
         schemaRegistry <- schemaRegistryIO
-        registerInternalMetadata <- RegisterInternalMetadataAvroSchemas.make[IO](keyResource, valueResource, schemaRegistry)
-        assertion = assertThrows[NullPointerException](registerInternalMetadata.createSchemas().unsafeRunSync())
-      } yield assertion).unsafeRunSync()
+        register <- RegisterInternalMetadataAvroSchemas.make[IO](keyResource, valueResource, schemaRegistry)
+        _ <- register.createSchemas()
+      } yield ()).attempt.map {
+        case Left(_) => succeed
+        case Right(_) => fail
+      }.unsafeRunSync()
     }
 
   }
