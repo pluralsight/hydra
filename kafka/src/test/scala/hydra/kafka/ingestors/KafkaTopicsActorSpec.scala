@@ -112,7 +112,7 @@ class KafkaTopicsActorSpec
 
   "fetchTopics" should "clean up resources" in {
     val adminClientMock = mock[AdminClient]
-    (adminClientMock.close(_: Long, _: TimeUnit)).expects(*, *).once()
+    (adminClientMock.close(_: java.time.Duration)).expects(*).once()
     (adminClientMock.listTopics: () => ListTopicsResult).expects().throwing(new Exception("Failure")).once()
     val createAdminClient: () => AdminClient = () => adminClientMock
     fetchTopics(createAdminClient, 1.second.toSeconds)

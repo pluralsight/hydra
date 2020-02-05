@@ -135,8 +135,7 @@ class TopicMetadataEndpointSpec extends Matchers
       val entity = CreateTopicReq("test", 1, 1, config)
       Post("/transports/kafka/topics", entity) ~> route ~> check {
         response.status.intValue() shouldBe 400
-        val r = responseAs[CreateTopicResponseError]
-        r.error.indexOf("UnknownServerException") should be > -1
+        responseAs[CreateTopicResponseError]
       }
     }
   }

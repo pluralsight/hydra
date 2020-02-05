@@ -10,7 +10,7 @@ import hydra.core.transport.TransportCallback
 import hydra.kafka.producer.{HydraKafkaCallback, KafkaRecord, KafkaRecordMetadata}
 import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
-import org.apache.kafka.clients.producer.{Callback, KafkaProducer}
+import org.apache.kafka.clients.producer.{Callback, Producer}
 
 import scala.util.{Failure, Success, Try}
 
@@ -20,7 +20,7 @@ import scala.util.{Failure, Success, Try}
 class KafkaProducerProxy[K, V](id: String, settings: ProducerSettings[K, V])
   extends Actor with LoggingAdapter with Stash {
 
-  private[transport] var producer: KafkaProducer[K, V] = _
+  private[transport] var producer: Producer[K, V] = _
 
   implicit val ec = context.dispatcher
 
@@ -76,14 +76,14 @@ class KafkaProducerProxy[K, V](id: String, settings: ProducerSettings[K, V])
     }
   }
 
-  private def createProducer(): Try[KafkaProducer[K, V]] =
+  private def createProducer(): Try[Producer[K, V]] =
     Try(settings.createKafkaProducer())
 
   private def closeProducer(): Try[Unit] = {
     Try {
       Option(producer).foreach { p =>
         p.flush()
-        p.close(5000, TimeUnit.MILLISECONDS)
+        p.close(java.time.Duration.ofSeconds(5))
       }
     }
   }

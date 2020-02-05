@@ -20,7 +20,7 @@ import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.{AvroRecord, AvroRecordFactory}
 import hydra.kafka.services.StreamsManagerActor.{GetMetadata, GetMetadataResponse, StopStream}
 import hydra.kafka.util.KafkaUtils
-import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
+import hydra.kafka.util.KafkaUtils.TopicDetails
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
@@ -56,12 +56,10 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
   val bootstrapKafkaConfig: Config = bootstrapConfig getOrElse
     applicationConfig.getConfig("bootstrap-config")
 
-  val topicDetailsConfig: util.Map[String, String] = Map[String, String]().empty.asJava
-
   val topicDetails = new TopicDetails(
     bootstrapKafkaConfig.getInt("partitions"),
     bootstrapKafkaConfig.getInt("replication-factor").toShort,
-    topicDetailsConfig)
+    Map.empty)
 
   private val failureRetryInterval = bootstrapKafkaConfig
     .get[Int]("failure-retry-millis")

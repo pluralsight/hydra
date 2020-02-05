@@ -97,6 +97,7 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra"))
         """
           |akka {
           |  kafka.producer {
+          |    close-on-producer-stop = true
           |    parallelism = 100
           |    close-timeout = 60s
           |    use-dispatcher = test
@@ -106,6 +107,7 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra"))
           |  }
           |}
           |hydra_kafka {
+          |
           |   schema.registry.url = "localhost:808"
           |   kafka.producer {
           |     bootstrap.servers="localhost:8092"

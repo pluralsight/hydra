@@ -16,6 +16,7 @@
 
 package hydra.kafka.ingestors
 
+import java.time.Duration
 import java.util.concurrent.TimeUnit
 
 import akka.actor.Status.Failure
@@ -53,7 +54,7 @@ object KafkaTopicsActor {
           val t = c.listTopics().names.get(kafkaTimeoutSeconds, TimeUnit.SECONDS).asScala.toSeq
           GetTopicsResponse(t)
         } finally {
-          Try(c.close(kafkaTimeoutSeconds, TimeUnit.SECONDS))
+          Try(c.close(Duration.ofSeconds(kafkaTimeoutSeconds)))
         }
       }
     }
