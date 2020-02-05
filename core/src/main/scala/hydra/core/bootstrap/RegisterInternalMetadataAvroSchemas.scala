@@ -28,7 +28,7 @@ class RegisterInternalMetadataAvroSchemas[F[_]: Sync: Sleep: Logger](
       keySchema <- keySchemaF
       valueSchema <- valueSchemaF
       _ <- schemaRegistrar.registerSchemas(keySchema.getFullName, keySchema, valueSchema).use(_ => Sync[F].pure(())).retryingOnAllErrors(policy, onFailure)
-    } yield ()
+    } yield (())
   }
 }
 
