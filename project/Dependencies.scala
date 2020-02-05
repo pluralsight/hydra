@@ -13,6 +13,7 @@ object Dependencies {
   val akkaVersion = "2.6.1"
   val avroVersion = "1.8.1"
   val catsEffectVersion = "2.0.0"
+  val catsLoggerVersion = "1.0.1"
   val catsRetryVersion = "1.0.0"
   val catsVersion =  "2.0.0"
   val commonsDbcpVersion = "1.4"
@@ -36,13 +37,15 @@ object Dependencies {
   val scalaTestVersion = "3.0.5"
   val scalazVersion = "7.2.9"
   val serviceContainerVersion = "2.0.7"
-  val slf4jVersion = "1.7.29"
+  val slf4jVersion = "1.7.30"
   val sprayJsonVersion = "1.3.5"
   val typesafeConfigVersion = "1.3.2"
 
   object Compile {
 
     val cats =  "org.typelevel" %% "cats-core" % catsVersion
+
+    val catsLogger = "io.chrisdavenport" %% "log4cats-slf4j" % catsLoggerVersion
 
     lazy val catsEffect = Seq(
       "org.typelevel" %% "cats-effect" % catsEffectVersion,
@@ -183,7 +186,7 @@ object Dependencies {
   val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache) ++ catsEffect
 
   val coreDeps = akka ++ baseDeps ++
-    Seq(guavacache, reflections, akkaKryo, serviceContainer, sdNotify, postgres, h2db, retry) ++
+    Seq(guavacache, reflections, akkaKryo, serviceContainer, sdNotify, postgres, h2db, retry, catsLogger) ++
     confluent ++ kamon ++ aeron
 
   val ingestDeps = coreDeps ++ akkaHttpHal

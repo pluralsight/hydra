@@ -11,10 +11,6 @@
         "logicalType": "iso-datetime"
       }
     },
-    {[
-      "name": "subject",
-      "type": "string"
-    },
     {
       "name": "deprecated",
       "type": "boolean"
