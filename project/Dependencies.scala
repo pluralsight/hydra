@@ -12,7 +12,7 @@ object Dependencies {
   val log4jVersion = "2.7"
   val kxbmapConfigVersion = "0.4.4"
   val typesafeConfigVersion = "1.3.2"
-  val avroVersion = "1.8.1"
+  val avroVersion = "1.9.1"
   val jodaTimeVersion = "2.9.9"
   val jodaConvertVersion = "1.8.1"
   val confluentVersion = "5.4.0"

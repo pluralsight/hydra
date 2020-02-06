@@ -28,7 +28,7 @@ import static org.junit.Assert.assertEquals;
 
 public class JsonConverterTest {
     private static Schema.Field sf(String name, Schema schema) {
-        return new Schema.Field(name, schema, "", JsonProperties.NULL_VALUE);
+        return new Schema.Field(name, schema, "");
     }
 
     private static Schema.Field sfnull(String name, Schema schema) {
