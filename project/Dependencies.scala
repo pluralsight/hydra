@@ -37,7 +37,7 @@ object Dependencies {
   val scalaTestVersion = "3.0.5"
   val scalazVersion = "7.2.9"
   val serviceContainerVersion = "2.0.7"
-  val slf4jVersion = "1.7.30"
+  val slf4jVersion = "1.7.29"
   val sprayJsonVersion = "1.3.5"
   val typesafeConfigVersion = "1.3.2"
 
@@ -76,7 +76,7 @@ object Dependencies {
       "org.apache.kafka" % "kafka-clients" % kafkaVersion,
       embeddedKafka % "test")
 
-    val confluent = Seq("io.confluent" % "kafka-avro-serializer" % confluentVersion).map(_.excludeAll(
+    val confluent: Seq[ModuleID] = Seq("io.confluent" % "kafka-avro-serializer" % confluentVersion).map(_.excludeAll(
       ExclusionRule(organization = "org.codehaus.jackson"),
       ExclusionRule(organization = "com.fasterxml.jackson.core")))
 
@@ -143,7 +143,7 @@ object Dependencies {
 
     val postgres = "org.postgresql" % "postgresql" % "42.2.4"
 
-    val aeron = Seq(
+    val aeron: Seq[ModuleID] = Seq(
       "io.aeron" % "aeron-driver",
       "io.aeron" % "aeron-client"
     ).map(_ % aeronVersion)
@@ -175,26 +175,26 @@ object Dependencies {
   import Compile._
   import Test._
 
-  val testDeps = Seq(scalaTest, junit, scalaMock, easyMock, embeddedConsul, embeddedPostgres) ++
+  val testDeps: Seq[ModuleID] = Seq(scalaTest, junit, scalaMock, easyMock, embeddedConsul, embeddedPostgres) ++
     powerMock ++ akkaTest
 
-  val baseDeps = akka ++ Seq(scalaz, scalaConfigs, avro, cats) ++ logging ++ joda ++ testDeps
+  val baseDeps: Seq[ModuleID] = akka ++ Seq(scalaz, scalaConfigs, avro, cats) ++ logging ++ joda ++ testDeps
 
-  val sqlDeps = logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
+  val sqlDeps: Seq[ModuleID] = logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
 
-  val avroDeps = baseDeps ++ confluent ++ jackson ++ Seq(guavacache) ++ catsEffect
+  val avroDeps: Seq[ModuleID] = baseDeps ++ confluent ++ jackson ++ Seq(guavacache) ++ catsEffect
 
-  val coreDeps = akka ++ baseDeps ++
+  val coreDeps: Seq[ModuleID] = akka ++ baseDeps ++
     Seq(guavacache, reflections, akkaKryo, serviceContainer, sdNotify, postgres, h2db, retry, catsLogger) ++
     confluent ++ kamon ++ aeron
 
-  val ingestDeps = coreDeps ++ akkaHttpHal
+  val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal
 
-  val rabbitDeps = logging ++ Seq(scalaConfigs) ++ joda ++ opRabbit ++ testDeps
+  val rabbitDeps: Seq[ModuleID] = logging ++ Seq(scalaConfigs) ++ joda ++ opRabbit ++ testDeps
 
-  val kafkaDeps = coreDeps ++ Seq(akkaKafkaStream, jsonLenses) ++ kafka ++ akkaHttpHal
+  val kafkaDeps: Seq[ModuleID] = coreDeps ++ Seq(akkaKafkaStream, jsonLenses) ++ kafka ++ akkaHttpHal
 
-  val sandboxDeps = kafkaDeps ++ sqlDeps ++
+  val sandboxDeps: Seq[ModuleID] = kafkaDeps ++ sqlDeps ++
     Seq("com.h2database" % "h2" % "1.4.196") ++ Seq(embeddedKafka)
 
   val overrides = Set(logging, typesafeConfig, joda)
