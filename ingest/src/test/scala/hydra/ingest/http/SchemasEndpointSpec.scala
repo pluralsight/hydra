@@ -25,8 +25,7 @@ class SchemasEndpointSpec extends Matchers
   with ConfigSupport {
 
   override def createActorSystem(): ActorSystem =
-    ActorSystem(actorSystemNameFrom(getClass),
-      ConfigFactory.parseString("akka.actor.provider=cluster").withFallback(ConfigFactory.load()))
+    ActorSystem(actorSystemNameFrom(getClass), ConfigFactory.load())
 
 
   val schemasRoute = new SchemasEndpoint().route

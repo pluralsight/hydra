@@ -51,7 +51,7 @@ class SchemaResourceLoader(registryUrl: String,
   }
 
   def retrieveKeySchema(subject: String, version: Int = 0)(implicit ec: ExecutionContext): Future[SchemaResource] = {
-    if (version == 0) getLatestSchema(subject.withKeySuffix) else loadFromCache(subject.withKeySuffix, version.toString)
+    if (version == 0)  getLatestSchema(subject.withKeySuffix) else loadFromCache(subject.withKeySuffix, version.toString)
   }
 
   def loadValueSchemaIntoCache(schemaResource: SchemaResource)

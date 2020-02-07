@@ -14,7 +14,7 @@ import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import scala.concurrent.duration._
 
 class KafkaTopicsActorSpec
-  extends TestKit(ActorSystem("kafka-topics-spec", config = ConfigFactory.parseString("akka.actor.provider=cluster")))
+  extends TestKit(ActorSystem("kafka-topics-spec"))
     with Matchers
     with FlatSpecLike
     with ConfigSupport

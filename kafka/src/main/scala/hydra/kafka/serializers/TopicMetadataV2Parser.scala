@@ -216,17 +216,18 @@ sealed trait TopicMetadataV2Validator {
     }
   }
 
-  sealed trait TopicMetadataV2PayloadValidation {
-    def errorMessage: String
-  }
-
-  final case class ExceptionThrownOnParseWithException(message: String) extends TopicMetadataV2PayloadValidation {
-    override def errorMessage: String = message
-  }
-
   type MetadataValidationResult[A] = ValidatedNec[TopicMetadataV2PayloadValidation, A]
 
 }
+
+sealed trait TopicMetadataV2PayloadValidation {
+  def errorMessage: String
+}
+
+final case class ExceptionThrownOnParseWithException(message: String) extends TopicMetadataV2PayloadValidation {
+  override def errorMessage: String = message
+}
+
 
 object Errors {
   final case class CreatedDateNotSpecifiedAsISO8601(value: JsValue) {
@@ -299,4 +300,5 @@ object Errors {
   {
     def errorMessage: String = s"Field `$field` of type $fieldType"
   }
+
 }

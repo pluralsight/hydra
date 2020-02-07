@@ -18,7 +18,7 @@ import hydra.common.config.ConfigSupport
 import hydra.avro.registry.ConfluentSchemaRegistry
 
 class JdbcIngestorSpec
-  extends TestKit(ActorSystem("jdbc-ingestor-spec", config = ConfigFactory.parseString("akka.actor.provider=cluster")))
+  extends TestKit(ActorSystem("jdbc-ingestor-spec"))
     with Matchers
     with FunSpecLike
     with ImplicitSender
