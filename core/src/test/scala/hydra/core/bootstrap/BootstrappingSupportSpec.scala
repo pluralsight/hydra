@@ -7,14 +7,14 @@ import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import com.github.vonnagy.service.container.listener.ContainerLifecycleListener
 import com.github.vonnagy.service.container.service.ContainerService
 import hydra.core.ingest.TestIngestorDefault
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 import scala.concurrent.ExecutionContext
 
 /**
   * Created by alexsilva on 3/7/17.
   */
-class BootstrappingSupportSpec extends Matchers with FlatSpecLike with BootstrappingSupport {
+class BootstrappingSupportSpec extends Matchers with FlatSpecLike with BootstrappingSupport with BeforeAndAfterAll {
 
   val conf =
     """
@@ -33,7 +33,7 @@ class BootstrappingSupportSpec extends Matchers with FlatSpecLike with Bootstrap
 
   lazy val container = containerService
 
-  def afterAll = {
+  override def afterAll = {
     TestKit.shutdownActorSystem(container.system)
     container.shutdown()
   }
