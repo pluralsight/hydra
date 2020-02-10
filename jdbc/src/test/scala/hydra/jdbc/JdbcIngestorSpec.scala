@@ -18,7 +18,7 @@ import hydra.common.config.ConfigSupport
 import hydra.avro.registry.ConfluentSchemaRegistry
 
 class JdbcIngestorSpec
-  extends TestKit(ActorSystem("jdbc-ingestor-spec"))
+  extends TestKit(ActorSystem("jdbc-ingestor-spec", config = ConfigFactory.parseString("")))
     with Matchers
     with FunSpecLike
     with ImplicitSender

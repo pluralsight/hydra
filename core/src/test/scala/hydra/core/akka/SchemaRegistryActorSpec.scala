@@ -22,7 +22,7 @@ import scala.io.Source
   * Created by alexsilva on 3/9/17.
   */
 class SchemaRegistryActorSpec
-  extends TestKit(ActorSystem("SchemaRegistryActorSpec"))
+  extends TestKit(ActorSystem("SchemaRegistryActorSpec", config = ConfigFactory.parseString("")))
     with Matchers
     with FlatSpecLike
     with ImplicitSender

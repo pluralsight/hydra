@@ -34,6 +34,7 @@ object Dependencies {
   val kamonPVersion = "1.0.0"
   val akkaKryoVersion = "0.5.2"
   val h2DbVersion = "1.4.196"
+  val akkaManagementVersion = "1.0.5"
   val aeronVersion = "1.24.0"
   val catsVersion =  "2.0.0"
   val catsEffectVersion = "2.0.0"
@@ -78,18 +79,18 @@ object Dependencies {
       "org.apache.logging.log4j" % "log4j-api" % log4jVersion,
       "org.apache.logging.log4j" % "log4j-1.2-api" % log4jVersion)
 
-//    val akkaManagement = ("com.lightbend.akka.management" %%
-//      "akka-management-cluster-bootstrap" % akkaManagementVersion)
-//      .excludeAll(ExclusionRule("io.spray"))
-//      .exclude("com.fasterxml.jackson.core", "jackson-core")
+    val akkaManagement = ("com.lightbend.akka.management" %%
+      "akka-management-cluster-bootstrap" % akkaManagementVersion)
+      .excludeAll(ExclusionRule("io.spray"))
+      .exclude("com.fasterxml.jackson.core", "jackson-core")
 
     val akka = Seq("com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-discovery" % akkaVersion,
-//      "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
-//      "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaManagementVersion,
-//      "com.lightbend.akka.discovery" %% "akka-discovery-consul" % akkaManagementVersion,
-//      akkaManagement,
-//      "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
+      "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
+      "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaManagementVersion,
+      "com.lightbend.akka.discovery" %% "akka-discovery-consul" % akkaManagementVersion,
+      akkaManagement,
+      "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
       "com.typesafe.akka" %% "akka-remote" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,

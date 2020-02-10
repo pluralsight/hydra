@@ -19,7 +19,7 @@ class TopicMetadataEndpointSpec extends Matchers
 
   import scala.concurrent.duration._
 
-  private val kafkaConfig = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
+  implicit val kafkaConfig = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
 
   override def beforeAll(): Unit = {
     super.beforeAll()
