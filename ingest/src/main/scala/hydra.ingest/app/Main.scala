@@ -15,7 +15,8 @@ object Main extends App with BootstrappingSupport with LoggingAdapter {
       .get[Boolean]("monitoring.prometheus.enable")
       .valueOrElse(false)
     if (enablePrometheus) {
-      Kamon.addReporter(new PrometheusReporter())
+      val module = new PrometheusReporter()
+      Kamon.registerModule("MainModule", module)
     }
 
     containerService.start()
@@ -23,7 +24,7 @@ object Main extends App with BootstrappingSupport with LoggingAdapter {
     case e: Throwable => {
       log.error("Unhandled exception.  Shutting down actor system.", e)
       Kamon
-        .stopAllReporters()
+        .stopModules()
         .map(_ => containerService.shutdown())
         .onComplete(throw e)
     }

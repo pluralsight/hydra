@@ -7,16 +7,14 @@ import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import com.github.vonnagy.service.container.listener.ContainerLifecycleListener
 import com.github.vonnagy.service.container.service.ContainerService
 import hydra.core.ingest.TestIngestorDefault
-import hydra.core.test.ConsulTestingSupport
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 import scala.concurrent.ExecutionContext
 
 /**
   * Created by alexsilva on 3/7/17.
   */
-class BootstrappingSupportSpec extends Matchers with FlatSpecLike
-  with ConsulTestingSupport with BootstrappingSupport {
+class BootstrappingSupportSpec extends Matchers with FlatSpecLike with BootstrappingSupport with BeforeAndAfterAll {
 
   val conf =
     """
@@ -38,7 +36,6 @@ class BootstrappingSupportSpec extends Matchers with FlatSpecLike
   override def afterAll = {
     TestKit.shutdownActorSystem(container.system)
     container.shutdown()
-    super.afterAll()
   }
 
   "The BootstrappingSupport trait" should
