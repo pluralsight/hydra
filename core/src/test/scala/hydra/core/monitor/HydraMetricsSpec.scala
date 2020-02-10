@@ -33,7 +33,7 @@ class HydraMetricsSpec extends Matchers
     histogramsCache.removeAll()
   }
 
-  override def afterAll = Try(Kamon.stopAllReporters())
+  override def afterAll = Try(Kamon.stopModules())
 
   val lookup = "lookup.xyz"
   val lookup2 = "lookup.abc"

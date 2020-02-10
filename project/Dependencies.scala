@@ -30,8 +30,8 @@ object Dependencies {
   val jacksonVersion = "2.9.5"
   val opRabbitVersion = "2.0.0"
   val akkaHTTPCorsVersion = "0.4.2"
-  val kamonVersion = "1.1.0"
-  val kamonPVersion = "1.0.0"
+  val kamonVersion = "2.0.1"
+  val kamonPVersion = "2.0.1"
   val akkaKryoVersion = "0.5.2"
   val h2DbVersion = "1.4.196"
   val akkaManagementVersion = "1.0.5"
@@ -79,19 +79,7 @@ object Dependencies {
       "org.apache.logging.log4j" % "log4j-api" % log4jVersion,
       "org.apache.logging.log4j" % "log4j-1.2-api" % log4jVersion)
 
-    val akkaManagement = ("com.lightbend.akka.management" %%
-      "akka-management-cluster-bootstrap" % akkaManagementVersion)
-      .excludeAll(ExclusionRule("io.spray"))
-      .exclude("com.fasterxml.jackson.core", "jackson-core")
-
     val akka = Seq("com.typesafe.akka" %% "akka-actor" % akkaVersion,
-      "com.typesafe.akka" %% "akka-discovery" % akkaVersion,
-      "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
-      "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaManagementVersion,
-      "com.lightbend.akka.discovery" %% "akka-discovery-consul" % akkaManagementVersion,
-      akkaManagement,
-      "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
-      "com.typesafe.akka" %% "akka-remote" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
       "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
@@ -105,10 +93,13 @@ object Dependencies {
     val serviceContainer = ("com.github.vonnagy" %% "service-container" % serviceContainerVersion)
       .excludeAll(
         ExclusionRule(organization = "ch.qos.logback"),
-        ExclusionRule(organization = "org.slf4j")
+        ExclusionRule(organization = "org.slf4j"),
+        ExclusionRule(organization = "com.typesafe.akka")
       )
 
-    val akkaKryo = "com.github.romix.akka" %% "akka-kryo-serialization" % akkaKryoVersion
+    val akkaKryo = ("com.github.romix.akka" %% "akka-kryo-serialization" % akkaKryoVersion).excludeAll {
+      ExclusionRule(organization = "com.typesafe.akka")
+    }
 
     val akkaKafkaStream = "com.typesafe.akka" %% "akka-stream-kafka" % akkaKafkaStreamVersion
 
