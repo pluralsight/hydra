@@ -28,7 +28,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
   * Created by alexsilva on 11/18/16.
   */
 class KafkaIngestorSpec
-  extends TestKit(ActorSystem("kafka-ingestor-spec", ConfigFactory.parseString("")))
+  extends TestKit(ActorSystem("kafka-ingestor-spec"))
     with Matchers
     with FunSpecLike
     with ConfigSupport

@@ -25,7 +25,7 @@ class SchemasEndpointSpec extends Matchers
   with ConfigSupport {
 
   override def createActorSystem(): ActorSystem =
-    ActorSystem(actorSystemNameFrom(getClass), ConfigFactory.parseString(""))
+    ActorSystem(actorSystemNameFrom(getClass))
 
 
   val schemasRoute = new SchemasEndpoint().route

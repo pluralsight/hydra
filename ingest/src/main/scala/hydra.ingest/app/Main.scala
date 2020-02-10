@@ -4,9 +4,7 @@ import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.bootstrap.BootstrappingSupport
 import kamon.Kamon
-import kamon.module.{MetricReporter, Module}
 import kamon.prometheus.PrometheusReporter
-
 import scala.concurrent.ExecutionContext.Implicits.global
 
 // $COVERAGE-OFF$Disabling highlighting by default until a workaround for https://issues.scala-lang.org/browse/SI-8596 is found

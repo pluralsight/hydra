@@ -8,7 +8,7 @@ import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
 import hydra.avro.util.SchemaWrapper
 import hydra.common.Settings
 import hydra.common.logging.LoggingAdapter
-import hydra.core.protocol.{HydraApplicationError, InvalidRequest}
+import hydra.core.protocol.HydraApplicationError
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.{Schema, SchemaParseException}
 
@@ -76,12 +76,6 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
       val registerSchema = Future.fromTry(maybeRegister)
       val registerSchemaResponse: Future[RegisterSchemaResponse] = breaker
         .withCircuitBreaker(registerSchema, registryFailure)
-
-//      registerSchemaResponse.foreach { registerSchemaResponse =>
-//        val schemaResource = registerSchemaResponse.schemaResource
-//        val registeredResponse = SchemaRegistered(schemaResource.id, schemaResource.version, schemaResource.schema.toString)
-//      }
-
       pipe(registerSchemaResponse) to sender
 
     case SchemaRegistered(id, version, schemaString) =>
