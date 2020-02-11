@@ -2,6 +2,7 @@ package hydra.core.monitor
 
 import kamon.Kamon
 import kamon.metric.{Counter, Gauge, Histogram}
+import kamon.tag.TagSet
 import scalacache.guava.GuavaCache
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -19,21 +20,21 @@ object HydraMetrics {
   def getOrCreateCounter(lookupKey: String, metricName: String, tags: => Tags)
                         (implicit ec: ExecutionContext): Future[Counter] = {
     countersCache.caching(lookupKey)(ttl = None) {
-      Kamon.counter(metricName).refine(tags: _*)
+      Kamon.counter(metricName).withTags(TagSet.from(tags.toMap))
     }
   }
 
   def getOrCreateGauge(lookupKey: String, metricName: String, tags: => Tags)
                       (implicit ec: ExecutionContext): Future[Gauge] = {
     gaugesCache.caching(lookupKey)(ttl = None) {
-      Kamon.gauge(metricName).refine(tags: _*)
+      Kamon.gauge(metricName).withTags(TagSet.from(tags.toMap))
     }
   }
 
   def getOrCreateHistogram(lookupKey: String, metricName: String, tags: => Tags)
                           (implicit ec: ExecutionContext): Future[Histogram] = {
     histogramsCache.caching(lookupKey)(ttl = None) {
-      Kamon.histogram(metricName).refine(tags: _*)
+      Kamon.histogram(metricName).withTags(TagSet.from(tags.toMap))
     }
   }
 

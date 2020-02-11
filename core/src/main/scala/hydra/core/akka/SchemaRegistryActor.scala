@@ -1,8 +1,6 @@
 package hydra.core.akka
 
 import akka.actor.{Actor, Props}
-import akka.cluster.pubsub.DistributedPubSub
-import akka.cluster.pubsub.DistributedPubSubMediator.{Publish, Subscribe}
 import akka.pattern.{CircuitBreaker, pipe}
 import com.typesafe.config.Config
 import hydra.avro.registry.{ConfluentSchemaRegistry, SchemaRegistryException}
@@ -10,7 +8,7 @@ import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
 import hydra.avro.util.SchemaWrapper
 import hydra.common.Settings
 import hydra.common.logging.LoggingAdapter
-import hydra.core.protocol.{HydraApplicationError, InvalidRequest}
+import hydra.core.protocol.HydraApplicationError
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.{Schema, SchemaParseException}
 
@@ -53,9 +51,6 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
   val loader = new SchemaResourceLoader(registry.registryUrl, registry.registryClient,
     metadataCheckInterval = Settings.HydraSettings.SchemaMetadataRefreshInterval)
 
-  val mediator = DistributedPubSub(context.system).mediator
-  mediator ! Subscribe(SchemaRegisteredTopic, self)
-
   def getSubject(schema: Schema): String = addSchemaSuffix(schema.getFullName)
 
   private def errorHandler[U](schema: String): PartialFunction[Throwable, Future[U]] = {
@@ -79,16 +74,9 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
     case RegisterSchemaRequest(json: String) =>
       val maybeRegister = tryHandleRegisterSchema(json)
       val registerSchema = Future.fromTry(maybeRegister)
-      val registerSchemaRequest: Future[RegisterSchemaResponse] = breaker
+      val registerSchemaResponse: Future[RegisterSchemaResponse] = breaker
         .withCircuitBreaker(registerSchema, registryFailure)
-
-      registerSchemaRequest.foreach { registerSchemaResponse =>
-        val schemaResource = registerSchemaResponse.schemaResource
-        val registeredResponse = SchemaRegistered(schemaResource.id, schemaResource.version, schemaResource.schema.toString)
-        mediator ! Publish(SchemaRegisteredTopic, registeredResponse)
-      }
-
-      pipe(registerSchemaRequest) to sender
+      pipe(registerSchemaResponse) to sender
 
     case SchemaRegistered(id, version, schemaString) =>
       val schemaResource = SchemaResource(id, version, new Schema.Parser().parse(schemaString))

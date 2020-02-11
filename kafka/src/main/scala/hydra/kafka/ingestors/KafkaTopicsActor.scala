@@ -25,7 +25,7 @@ import akka.pattern.pipe
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
-import org.apache.kafka.clients.admin.AdminClient
+import org.apache.kafka.clients.admin.Admin
 import org.joda.time.DateTime
 
 import scala.collection.JavaConverters._
@@ -47,7 +47,7 @@ object KafkaTopicsActor {
 
   case class GetTopicsFailure(cause: Throwable)
 
-  def fetchTopics(createAdminClient: () => AdminClient, kafkaTimeoutSeconds: Long): Future[GetTopicsResponse] = {
+  def fetchTopics(createAdminClient: () => Admin, kafkaTimeoutSeconds: Long): Future[GetTopicsResponse] = {
     Future.fromTry {
       Try(createAdminClient()).map { c =>
         try {
@@ -78,8 +78,8 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration, kafkaTimeoutS
 
   implicit val ec = context.dispatcher
 
-  private def createAdminClient(): AdminClient =
-    AdminClient.create(ConfigSupport.toMap(cfg).asJava)
+  private def createAdminClient(): Admin =
+    Admin.create(ConfigSupport.toMap(cfg).asJava)
 
   val initialReceive: Receive = {
     case RefreshTopicList => pipe(fetchTopics(createAdminClient, kafkaTimeoutSeconds)) to self

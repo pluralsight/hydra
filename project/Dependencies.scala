@@ -9,14 +9,12 @@ object Dependencies {
   val akkaHTTPVersion = "10.1.10"
   val akkaKafkaStreamVersion = "2.0.1"
   val akkaKryoVersion = "0.5.2"
-  val akkaManagementVersion = "1.0.5"
   val akkaVersion = "2.6.1"
   val avroVersion = "1.9.1"
   val catsEffectVersion = "2.0.0"
   val catsLoggerVersion = "1.0.1"
   val catsRetryVersion = "1.0.0"
   val catsVersion =  "2.0.0"
-  val commonsDbcpVersion = "1.4"
   val confluentVersion = "5.4.0"
   val easyMockVersion = "3.5" //needed for mocking static java methods
   val hikariCPVersion = "2.6.2"
@@ -25,8 +23,8 @@ object Dependencies {
   val jodaConvertVersion = "1.8.1"
   val jodaTimeVersion = "2.9.9"
   val kafkaVersion = "2.4.0"
-  val kamonPVersion = "1.0.0"
-  val kamonVersion = "1.1.0"
+  val kamonPVersion = "2.0.1"
+  val kamonVersion = "2.0.1"
   val kxbmapConfigVersion = "0.4.4"
   val log4jVersion = "2.7"
   val opRabbitVersion = "2.0.0"
@@ -37,7 +35,6 @@ object Dependencies {
   val scalaTestVersion = "3.0.5"
   val scalazVersion = "7.2.9"
   val serviceContainerVersion = "2.0.7"
-  val slf4jVersion = "1.7.29"
   val sprayJsonVersion = "1.3.5"
   val typesafeConfigVersion = "1.3.2"
 
@@ -86,18 +83,7 @@ object Dependencies {
       "org.apache.logging.log4j" % "log4j-api" % log4jVersion,
       "org.apache.logging.log4j" % "log4j-1.2-api" % log4jVersion)
 
-    val akkaManagement = ("com.lightbend.akka.management" %%
-      "akka-management-cluster-bootstrap" % akkaManagementVersion)
-      .excludeAll(ExclusionRule("io.spray"))
-      .exclude("com.fasterxml.jackson.core", "jackson-core")
-
     val akka = Seq("com.typesafe.akka" %% "akka-actor" % akkaVersion,
-      "com.typesafe.akka" %% "akka-discovery" % akkaVersion,
-      "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
-      "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % akkaManagementVersion,
-      "com.lightbend.akka.discovery" %% "akka-discovery-consul" % akkaManagementVersion,
-      akkaManagement,
-      "com.typesafe.akka" %% "akka-cluster-tools" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
       "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
@@ -111,10 +97,13 @@ object Dependencies {
     val serviceContainer = ("com.github.vonnagy" %% "service-container" % serviceContainerVersion)
       .excludeAll(
         ExclusionRule(organization = "ch.qos.logback"),
-        ExclusionRule(organization = "org.slf4j")
+        ExclusionRule(organization = "org.slf4j"),
+        ExclusionRule(organization = "com.typesafe.akka")
       )
 
-    val akkaKryo = "com.github.romix.akka" %% "akka-kryo-serialization" % akkaKryoVersion
+    val akkaKryo = ("com.github.romix.akka" %% "akka-kryo-serialization" % akkaKryoVersion).excludeAll {
+      ExclusionRule(organization = "com.typesafe.akka")
+    }
 
     val akkaKafkaStream = "com.typesafe.akka" %% "akka-stream-kafka" % akkaKafkaStreamVersion
 
@@ -152,7 +141,6 @@ object Dependencies {
   object Test {
     val akkaTest = Seq("com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
       "com.typesafe.akka" %% "akka-http-testkit" % akkaHTTPVersion % "test",
-      "com.typesafe.akka" %% "akka-multi-node-testkit" % akkaVersion % "test",
       "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % "test")
 
     val scalaTest = "org.scalatest" %% "scalatest" % scalaTestVersion % "test"

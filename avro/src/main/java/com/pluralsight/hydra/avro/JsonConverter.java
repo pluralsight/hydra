@@ -121,7 +121,7 @@ public class JsonConverter<T extends GenericRecord> {
             //let's be proactive and fail fast with strict validation
             Map<String, Object> fields = mapper.readValue(json, Map.class);
             if (strictValidation) performStrictValidation(fields, baseSchema);
-            return (T) convert(fields, baseSchema);
+            return convert(fields, baseSchema);
         } catch (IOException e) {
             throw new IOException("Failed to parse as Json: " + json + "\n\n" + e.getMessage());
         }
