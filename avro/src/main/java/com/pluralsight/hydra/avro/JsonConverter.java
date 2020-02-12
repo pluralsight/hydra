@@ -15,7 +15,7 @@
 
 package com.pluralsight.hydra.avro;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import org.codehaus.jackson.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.util.ClassUtil;
 import com.google.common.collect.ImmutableSet;

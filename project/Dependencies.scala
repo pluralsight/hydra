@@ -12,7 +12,7 @@ object Dependencies {
   val log4jVersion = "2.7"
   val kxbmapConfigVersion = "0.4.4"
   val typesafeConfigVersion = "1.3.2"
-  val avroVersion = "1.9.1"
+  val avroVersion = "1.8.2"
   val jodaTimeVersion = "2.9.9"
   val jodaConvertVersion = "1.8.1"
   val confluentVersion = "5.4.0"
@@ -71,7 +71,8 @@ object Dependencies {
 
     val confluent = Seq("io.confluent" % "kafka-avro-serializer" % confluentVersion).map(_.excludeAll(
       ExclusionRule(organization = "org.codehaus.jackson"),
-      ExclusionRule(organization = "com.fasterxml.jackson.core")))
+      ExclusionRule(organization = "com.fasterxml.jackson.core"),
+      ExclusionRule(organization = "org.apache.avro")))
 
     val logging = Seq(
       "org.apache.logging.log4j" % "log4j-slf4j-impl" % log4jVersion,
