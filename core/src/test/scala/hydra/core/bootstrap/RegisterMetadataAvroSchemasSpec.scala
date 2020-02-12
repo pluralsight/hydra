@@ -4,37 +4,42 @@ import cats.effect.{IO, Sync, Timer}
 import hydra.avro.registry.SchemaRegistry
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import org.apache.avro.SchemaParseException
 import org.scalatest.{AsyncFlatSpec, Matchers, WordSpec}
 
-class RegisterInternalMetadataAvroSchemasSpec extends WordSpec with Matchers {
+import scala.io.Source
+
+class RegisterMetadataAvroSchemasSpec extends WordSpec with Matchers {
   implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] = Slf4jLogger.getLogger[F]
   implicit val timer: Timer[IO] = IO.timer(concurrent.ExecutionContext.global)
 
   "RegisterInternalSpec" must {
     "register the two avro schemas" in {
       val schemaRegistryIO = SchemaRegistry.test[IO]
-      val keyResource = "HydraMetadataTopicKeyV2.avsc"
-      val valueResource = "HydraMetadataTopicValueV2.avsc"
+
+      val keyAvroString = Source.fromResource("HydraMetadataTopicKeyV2.avsc").mkString
+      val valueAvroString = Source.fromResource("HydraMetadataTopicValueV2.avsc").mkString
 
       (for {
         schemaRegistry <- schemaRegistryIO
-        registerInternalMetadata <- RegisterInternalMetadataAvroSchemas.make[IO](keyResource, valueResource, schemaRegistry)
+        registerInternalMetadata <- RegisterMetadataAvroSchemas.make[IO](keyAvroString, valueAvroString, schemaRegistry)
         _ = registerInternalMetadata.createSchemas().unsafeRunSync()
       } yield succeed).unsafeRunSync()
     }
 
     "fail to register the two avro schemas" in {
       val schemaRegistryIO = SchemaRegistry.test[IO]
-      val keyResource = "Not a Real Avro File"
-      val valueResource = "HydraMetadataTopicValueV2.avsc"
+      val keyAvroString = "NotAnAvroSchema"
+      val valueAvroString = Source.fromResource("HydraMetadataTopicValueV2.avsc").mkString
 
       (for {
         schemaRegistry <- schemaRegistryIO
-        register <- RegisterInternalMetadataAvroSchemas.make[IO](keyResource, valueResource, schemaRegistry)
+        register <- RegisterMetadataAvroSchemas.make[IO](keyAvroString, valueAvroString, schemaRegistry)
         _ <- register.createSchemas()
       } yield ()).attempt.map {
-        case Left(_) => succeed
-        case Right(_) => fail
+        case Left(_: SchemaParseException) => succeed
+        case Right(_) => fail()
+        case _ => fail()
       }.unsafeRunSync()
     }
 
