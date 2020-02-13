@@ -208,7 +208,6 @@ trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol wi
 }
 
 sealed trait TopicMetadataV2Validator {
-
   def toResult[A](a: => A): MetadataValidationResult[A] = {
     val v = Validated.catchNonFatal(a)
     v.toValidatedNec.leftMap[NonEmptyChain[ExceptionThrownOnParseWithException]]{ es =>
@@ -223,7 +222,6 @@ sealed trait TopicMetadataV2Validator {
 sealed trait TopicMetadataV2PayloadValidation {
   def errorMessage: String
 }
-
 final case class ExceptionThrownOnParseWithException(message: String) extends TopicMetadataV2PayloadValidation {
   override def errorMessage: String = message
 }
