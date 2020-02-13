@@ -4,6 +4,7 @@ import cats.Monad
 import cats.effect.{ExitCase, Resource, Sync}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
+import hydra.avro.registry.SchemaRegistry.SchemaVersion
 import io.chrisdavenport.log4cats.Logger
 import org.apache.avro.Schema
 import retry.syntax.all._
@@ -18,10 +19,16 @@ final class CreateTopic[F[_]: Sync: Sleep: Logger](
       Logger[F].info(s"Retrying due to failure: $error. RetryDetails: $retryDetails")
     }
     val suffixedSubject = subject + (if (isKey) "-key" else "-value")
-    val registerSchema = (schemaRegistry.registerSchema(suffixedSubject, schema) *>
-      schemaRegistry.getVersion(suffixedSubject, schema)).retryingOnAllErrors(retryPolicy, onFailure)
-    Resource.makeCase(registerSchema)((version, exitCase) => exitCase match {
-      case ExitCase.Error(_) => schemaRegistry.deleteSchemaOfVersion(suffixedSubject, version)
+    val registerSchema: F[Option[SchemaVersion]] = {
+      schemaRegistry.getVersion(suffixedSubject, schema).attempt.map(_.toOption).flatMap { previousSchemaVersion =>
+        schemaRegistry.registerSchema(suffixedSubject, schema) *>
+          schemaRegistry.getVersion(suffixedSubject, schema).map{ newSchemaVersion =>
+            if (previousSchemaVersion.contains(newSchemaVersion)) None else Some(newSchemaVersion)
+          }
+      }
+    }.retryingOnAllErrors(retryPolicy, onFailure)
+    Resource.makeCase(registerSchema)((newVersionMaybe, exitCase) => (exitCase, newVersionMaybe) match {
+      case (ExitCase.Error(_), Some(newVersion)) => schemaRegistry.deleteSchemaOfVersion(suffixedSubject, newVersion)
       case _ => Sync[F].unit
     }).map(_ => ())
   }
