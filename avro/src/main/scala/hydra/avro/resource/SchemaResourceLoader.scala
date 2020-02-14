@@ -16,7 +16,6 @@
 package hydra.avro.resource
 
 import java.net.ConnectException
-
 import hydra.avro.registry.SchemaRegistryException
 import io.confluent.kafka.schemaregistry.client.{SchemaMetadata, SchemaRegistryClient}
 import org.apache.avro.Schema
@@ -24,10 +23,8 @@ import org.slf4j.LoggerFactory
 import scalacache._
 import scalacache.guava.GuavaCache
 import scalacache.modes.scalaFuture._
-
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
-//import io.confluent.kafka.schemaregistry.client.SchemaResource
 
 /**
   * Created by alexsilva on 1/20/17.

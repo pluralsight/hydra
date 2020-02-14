@@ -36,7 +36,7 @@ class IngestionSupervisor(request: HydraRequest, requestor: ActorRef, info: Seq[
 
   private val ingestors: mutable.Map[String, IngestorStatus] = new mutable.HashMap
 
-  private val ingestTimer = Kamon.timer("ingestion").start()
+  private val ingestTimer = Kamon.timer("ingestion").withoutTags().start()
 
   info.foreach { i =>
     ingestors.update(i.name, RequestPublished)

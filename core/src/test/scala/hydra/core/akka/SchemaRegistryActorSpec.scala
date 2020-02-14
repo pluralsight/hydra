@@ -4,9 +4,6 @@ import java.net.ConnectException
 
 import akka.actor.ActorSystem
 import akka.actor.Status.Failure
-import akka.cluster.pubsub.DistributedPubSub
-import akka.cluster.pubsub.DistributedPubSubMediator.Subscribe
-import akka.pattern.ask
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
@@ -14,7 +11,6 @@ import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.avro.resource.SchemaResource
 import hydra.core.akka.SchemaRegistryActor._
 import hydra.core.protocol.HydraApplicationError
-import org.apache.avro.Schema
 import org.apache.avro.Schema.Parser
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
@@ -26,7 +22,7 @@ import scala.io.Source
   * Created by alexsilva on 3/9/17.
   */
 class SchemaRegistryActorSpec
-  extends TestKit(ActorSystem("SchemaRegistryActorSpec", config = ConfigFactory.parseString("akka.actor.provider=cluster")))
+  extends TestKit(ActorSystem("SchemaRegistryActorSpec"))
     with Matchers
     with FlatSpecLike
     with ImplicitSender
@@ -118,42 +114,6 @@ class SchemaRegistryActorSpec
         schemaResource.version should be > 0
         schemaResource.schema shouldBe testSchema
     }
-  }
-
-  it should "send a SchemaRegistered message to the mediator if registered successfully" in {
-    val (probe, schemaRegistryActor) = fixture
-    val mediatorListener = TestProbe()
-
-    val mediator = DistributedPubSub(system).mediator
-    mediator ! Subscribe(SchemaRegistryActor.SchemaRegisteredTopic, mediatorListener.ref)
-
-    schemaRegistryActor.tell(RegisterSchemaRequest(testSchemaString), probe.ref)
-
-    mediatorListener.expectMsgPF() {
-      case SchemaRegistered(_, _, schemaString) =>
-        new Schema.Parser().parse(schemaString) shouldBe testSchema
-      case _ =>
-        fail("Expected SchemaRegistered message through mediator")
-    }
-
-  }
-
-  it should "NOT send a SchemaRegistered message to the mediator if NOT registered successfully" in {
-    val config = ConfigFactory.parseString(
-      """
-        |schema.registry.url = "http://localhost:0101"
-      """.stripMargin)
-    val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(config, Some(settings)))
-    val mediatorListener = TestProbe()
-    val senderProbe = TestProbe()
-    val mediator = DistributedPubSub(system).mediator
-
-    mediator ! Subscribe(SchemaRegistryActor.SchemaRegisteredTopic, mediatorListener.ref)
-
-    val registerSchemaRequest = schemaRegistryActor ? RegisterSchemaRequest(testSchemaString)
-
-    senderProbe.expectNoMessage(3.seconds)
-    mediatorListener.expectNoMessage(3.seconds)
   }
 
   "Receiving RegisterSchemaResponse" should "save the schema metadata to the cache" in {
@@ -265,16 +225,4 @@ class SchemaRegistryActorSpec
     }
   }
 
-}
-
-object SchemaRegistryActorSpec {
-  val config =
-    """
-    akka {
-      loglevel = "WARNING"
-      actor {
-        clustering = ClusterActorRefProvider
-      }
-    }
-    """
 }
