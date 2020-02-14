@@ -8,17 +8,6 @@ import io.chrisdavenport.log4cats.Logger
 import retry.RetryPolicies._
 import retry.RetryPolicy
 
-object Programs {
-
-  def make[F[_]: Logger: Sync: Timer](
-    createTopicConfig: CreateTopicConfig,
-    algebras: Algebras[F]
-  ): F[Programs[F]] = Sync[F].delay {
-    new Programs[F](createTopicConfig, algebras)
-  }
-
-}
-
 final class Programs[F[_]: Logger: Sync: Timer] private (
     cfg: CreateTopicConfig,
     algebras: Algebras[F]
@@ -31,5 +20,16 @@ final class Programs[F[_]: Logger: Sync: Timer] private (
     algebras.schemaRegistry,
     retryPolicy
   )
+
+}
+
+object Programs {
+
+  def make[F[_]: Logger: Sync: Timer](
+                                       createTopicConfig: CreateTopicConfig,
+                                       algebras: Algebras[F]
+                                     ): F[Programs[F]] = Sync[F].delay {
+    new Programs[F](createTopicConfig, algebras)
+  }
 
 }

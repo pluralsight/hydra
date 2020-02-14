@@ -8,11 +8,9 @@ import kamon.prometheus.PrometheusReporter
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import hydra.core.bootstrap.CreateTopicProgram
-import cats.effect.IO
+import cats.effect.{Blocker, ExitCode, IO, IOApp, Resource}
 import hydra.avro.registry.SchemaRegistry
 import hydra.ingest.modules.{Algebras, Programs}
-import cats.effect.IOApp
-import cats.effect.ExitCode
 import cats.implicits._
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
@@ -21,8 +19,9 @@ import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 object Main extends IOApp with BootstrappingSupport with LoggingAdapter {
 
   private implicit val catsLogger: SelfAwareStructuredLogger[IO] = Slf4jLogger.getLogger[IO]
+  private val blockerResource: Resource[IO, Blocker] = Blocker.apply[IO]
 
-  val program = AppConfig.appConfig.load[IO].flatMap { config =>
+  private val program = blockerResource.use(AppConfig.appConfig(_).load[IO]).flatMap { config =>
     for {
       algebras <- Algebras.make[IO](config.createTopicConfig.schemaRegistryConfig)
       programs <- Programs.make[IO](config.createTopicConfig, algebras)
