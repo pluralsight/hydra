@@ -1,10 +1,9 @@
-package hydra.kafka
+package hydra.kafka.config
 
-import hydra.kafka.config.MetadataSchemaConfig
 import org.apache.avro.Schema
 import org.scalatest.{FlatSpec, Matchers}
 
-class HydraMetadataTopicV2SchemaSpec extends FlatSpec with Matchers {
+class MetadataSchemaConfigSpec extends FlatSpec with Matchers {
 
     it should "be able to parse the HydraMetadataTopicValueV2.avsc into the Schema class" in {
         MetadataSchemaConfig.keySchema shouldBe a[Schema]
