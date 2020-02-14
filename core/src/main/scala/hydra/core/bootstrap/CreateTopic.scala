@@ -10,7 +10,7 @@ import org.apache.avro.Schema
 import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy, _}
 
-final class CreateTopic[F[_]: Sync: Sleep: Logger](
+final class CreateTopicProgram[F[_]: Sync: Sleep: Logger](
                                                     schemaRegistry: SchemaRegistry[F],
                                                     retryPolicy: RetryPolicy[F]) {
 
@@ -37,7 +37,7 @@ final class CreateTopic[F[_]: Sync: Sleep: Logger](
     registerSchema(subject, keySchema, isKey = true) *> registerSchema(subject, valueSchema, isKey = false)
   }
 
-  def createSchemas(subject: String, keySchema: Schema, valueSchema: Schema): F[Unit] = {
+  def createTopic(subject: String, keySchema: Schema, valueSchema: Schema): F[Unit] = {
     for {
       _ <- registerSchemas(subject, keySchema, valueSchema).use(_ => Sync[F].unit)
     } yield ()
