@@ -6,7 +6,7 @@ import cats.implicits._
 import hydra.ingest.app.AppConfig.V2MetadataTopicConfig
 
 final class Bootstrap[F[_]: Sync] private (
-                                   createTopic: CreateTopicProgram[F],
+                                   createTopicProgram: CreateTopicProgram[F],
                                    cfg: V2MetadataTopicConfig
                                  ) {
 
@@ -16,16 +16,16 @@ final class Bootstrap[F[_]: Sync] private (
 
   private def bootstrapMetadataTopic: F[Unit] = {
     // TODO: Update create topic to take a subject instead of a string
-    createTopic.createTopic(cfg.topicName.value, cfg.keySchema, cfg.valueSchema)
+    createTopicProgram.createTopic(cfg.topicName.value, cfg.keySchema, cfg.valueSchema)
   }
 
 }
 
 object Bootstrap {
   def make[F[_]: Sync](
-                        createTopicProgram: CreateTopicProgram[F],
+                        programs: Programs[F],
                         v2MetadataTopicConfig: V2MetadataTopicConfig
                       ): F[Bootstrap[F]] = Sync[F].delay {
-    new Bootstrap[F](createTopicProgram, v2MetadataTopicConfig)
+    new Bootstrap[F](programs.createTopic, v2MetadataTopicConfig)
   }
 }
