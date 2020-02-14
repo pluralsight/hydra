@@ -25,8 +25,8 @@ class CreateTopicSpec extends WordSpec with Matchers {
 
       (for {
         schemaRegistry <- schemaRegistryIO
-        registerInternalMetadata = new CreateTopic[IO](schemaRegistry, policy)
-        _ = registerInternalMetadata.createSchemas("subject", keySchema, valueSchema).unsafeRunSync()
+        registerInternalMetadata = new CreateTopicProgram[IO](schemaRegistry, policy)
+        _ = registerInternalMetadata.createTopic("subject", keySchema, valueSchema).unsafeRunSync()
         containsSingleKeyAndValue <- schemaRegistry.getAllSubjects.map(_.length == 2)
       } yield assert(containsSingleKeyAndValue)).unsafeRunSync()
     }
@@ -53,9 +53,9 @@ class CreateTopicSpec extends WordSpec with Matchers {
 
       Ref[IO].of(TestState(deleteSchemaWasCalled = false, 0)).flatMap { ref =>
         val schemaRegistry = getSchemaRegistry(ref)
-        val createTopic = new CreateTopic[IO](schemaRegistry, policy)
+        val createTopic = new CreateTopicProgram[IO](schemaRegistry, policy)
         for {
-          _ <- createTopic.createSchemas("subject", keySchema, valueSchema).attempt
+          _ <- createTopic.createTopic("subject", keySchema, valueSchema).attempt
           result <- ref.get
         } yield assert(result.deleteSchemaWasCalled)
 
@@ -78,9 +78,9 @@ class CreateTopicSpec extends WordSpec with Matchers {
 
       Ref[IO].of(0).flatMap { ref =>
         val schemaRegistry = getSchemaRegistry(ref)
-        val createTopic = new CreateTopic[IO](schemaRegistry, policy)
+        val createTopic = new CreateTopicProgram[IO](schemaRegistry, policy)
         for {
-          _ <- createTopic.createSchemas("subject", keySchema, valueSchema).attempt
+          _ <- createTopic.createTopic("subject", keySchema, valueSchema).attempt
           result <- ref.get
         } yield result shouldBe numberRetries + 1
 
@@ -110,9 +110,9 @@ class CreateTopicSpec extends WordSpec with Matchers {
       val schemaRegistryState = Map("subject-key" -> 1)
       Ref[IO].of(TestState(schemaRegistryState)).flatMap { ref =>
         val schemaRegistry = getSchemaRegistry(ref)
-        val createTopic = new CreateTopic[IO](schemaRegistry, policy)
+        val createTopic = new CreateTopicProgram[IO](schemaRegistry, policy)
         for {
-          _ <- createTopic.createSchemas("subject", keySchema, valueSchema).attempt
+          _ <- createTopic.createTopic("subject", keySchema, valueSchema).attempt
           result <- ref.get
         } yield result.schemas shouldBe schemaRegistryState
 
