@@ -39,14 +39,20 @@ object AppConfig {
   private implicit val subjectConfigDecoder: ConfigDecoder[String, Subject] =
     ConfigDecoder[String, String].mapOption("Subject")(Subject.createValidated)
 
-  final case class V2MetadataTopicConfig(topicName: Subject, keySchema: Schema, valueSchema: Schema)
+  final case class V2MetadataTopicConfig(
+    topicName: Subject,
+    keySchema: Schema,
+    valueSchema: Schema,
+    createOnStartup: Boolean
+  )
 
   private val v2MetadataTopicConfig: ConfigValue[V2MetadataTopicConfig] =
     (
       env("HYDRA_V2_METADATA_TOPIC_NAME").as[Subject].default(Subject.createValidated("_hydra.v2.metadata").get),
+      env("HYDRA_V2_METADATA_CREATE_ON_STARTUP").as[Boolean].default(false)
     )
-    .map { subject =>
-      V2MetadataTopicConfig(subject, MetadataSchemaConfig.keySchema, MetadataSchemaConfig.valueSchema)
+    .parMapN { (subject, createOnStartup) =>
+      V2MetadataTopicConfig(subject, MetadataSchemaConfig.keySchema, MetadataSchemaConfig.valueSchema, createOnStartup)
     }
 
   final case class AppConfig(

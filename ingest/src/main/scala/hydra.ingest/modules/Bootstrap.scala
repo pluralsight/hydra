@@ -14,10 +14,12 @@ final class Bootstrap[F[_]: Sync] private (
     _ <- bootstrapMetadataTopic
   } yield ()
 
-  private def bootstrapMetadataTopic: F[Unit] = {
-    // TODO: Update create topic to take a subject instead of a string
-    createTopicProgram.createTopic(cfg.topicName.value, cfg.keySchema, cfg.valueSchema)
-  }
+  private def bootstrapMetadataTopic: F[Unit] =
+    if (cfg.createOnStartup) {
+      createTopicProgram.createTopic(cfg.topicName.value, cfg.keySchema, cfg.valueSchema)
+    } else {
+      Sync[F].unit
+    }
 
 }
 
