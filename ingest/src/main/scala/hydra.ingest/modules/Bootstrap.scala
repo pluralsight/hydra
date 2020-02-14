@@ -23,9 +23,9 @@ final class Bootstrap[F[_]: Sync] private (
 
 object Bootstrap {
   def make[F[_]: Sync](
-                        programs: Programs[F],
+                        createTopicProgram: CreateTopicProgram[F],
                         v2MetadataTopicConfig: V2MetadataTopicConfig
                       ): F[Bootstrap[F]] = Sync[F].delay {
-    new Bootstrap[F](programs.createTopic, v2MetadataTopicConfig)
+    new Bootstrap[F](createTopicProgram, v2MetadataTopicConfig)
   }
 }

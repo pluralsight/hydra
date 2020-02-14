@@ -43,7 +43,7 @@ object Main extends IOApp with BootstrappingSupport with LoggingAdapter {
     for {
       algebras <- Algebras.make[IO](config.createTopicConfig.schemaRegistryConfig)
       programs <- Programs.make[IO](config.createTopicConfig, algebras)
-      _ <- Bootstrap.make[IO](programs, config.v2MetadataTopicConfig)
+      _ <- Bootstrap.make[IO](programs.createTopic, config.v2MetadataTopicConfig)
       _ <- oldBoostrap
     } yield ()
   }
