@@ -23,16 +23,51 @@ import scala.concurrent.ExecutionContext
 
 final class BootstrapEndpointV2Spec extends WordSpecLike with ScalatestRouteTest with Matchers {
 
+  private trait TestCreateTopicDependency extends CreateTopicDependency {
+
+    private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
+    private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
+
+    private val schemaRegistry = SchemaRegistry.test[IO].unsafeRunSync()
+
+    override def createTopic(subject: Subject, key: Schema, value: Schema): IO[Unit] = {
+      val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      new CreateTopicProgram[IO](schemaRegistry, retryPolicy).createTopic(subject.value, key, value)
+    }
+  }
+
+  private trait FailingTestCreateTopicDependency extends CreateTopicDependency {
+
+    private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
+    private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
+
+    private val schemaRegistry: SchemaRegistry[IO] = new SchemaRegistry[IO] {
+      private val err = IO.raiseError(new Exception)
+      override def registerSchema(subject: String, schema: Schema): IO[SchemaId] = err
+      override def deleteSchemaOfVersion(subject: String, version: SchemaVersion): IO[Unit] = err
+      override def getVersion(subject: String, schema: Schema): IO[SchemaVersion] = err
+      override def getAllVersions(subject: String): IO[List[Int]] = err
+      override def getAllSubjects: IO[List[String]] = err
+    }
+
+    override def createTopic(subject: Subject, key: Schema, value: Schema): IO[Unit] = {
+      val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      new CreateTopicProgram[IO](schemaRegistry, retryPolicy).createTopic(subject.value, key, value)
+    }
+  }
+
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
   private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
 
-  private def getTestCreateTopicProgram(s: SchemaRegistry[IO]): BootstrapEndpointV2 = {
-    val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-    new BootstrapEndpointV2(new CreateTopicProgram[IO](s, retryPolicy))
+  private def getTestCreateTopicProgram: BootstrapEndpointV2 = {
+    new BootstrapEndpointV2() with TestCreateTopicDependency
   }
 
   private val testCreateTopicProgram: IO[BootstrapEndpointV2] =
-    SchemaRegistry.test[IO].map(getTestCreateTopicProgram)
+    IO.pure(new BootstrapEndpointV2() with TestCreateTopicDependency)
+
+  private val failingCreateTopicProgram: IO[BootstrapEndpointV2] =
+    IO.pure(new BootstrapEndpointV2() with FailingTestCreateTopicDependency)
 
   "BootstrapEndpointV2" must {
 
@@ -75,17 +110,11 @@ final class BootstrapEndpointV2Spec extends WordSpecLike with ScalatestRouteTest
     }
 
     "return an InternalServerError on an unexpected exception" in {
-      val failingSchemaRegistry: SchemaRegistry[IO] = new SchemaRegistry[IO] {
-        private val err = IO.raiseError(new Exception)
-        override def registerSchema(subject: String, schema: Schema): IO[SchemaId] = err
-        override def deleteSchemaOfVersion(subject: String, version: SchemaVersion): IO[Unit] = err
-        override def getVersion(subject: String, schema: Schema): IO[SchemaVersion] = err
-        override def getAllVersions(subject: String): IO[List[Int]] = err
-        override def getAllSubjects: IO[List[String]] = err
-      }
-      Post("/v2/streams", validRequest) ~> Route.seal(getTestCreateTopicProgram(failingSchemaRegistry).route) ~> check {
-        response.status shouldBe StatusCodes.InternalServerError
-      }
+      failingCreateTopicProgram.map { bootstrapEndpoint =>
+        Post("/v2/streams", validRequest) ~> Route.seal(bootstrapEndpoint.route) ~> check {
+          response.status shouldBe StatusCodes.InternalServerError
+        }
+      }.unsafeRunSync()
     }
   }
 
