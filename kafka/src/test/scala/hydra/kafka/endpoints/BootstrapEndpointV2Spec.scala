@@ -89,5 +89,4 @@ final class BootstrapEndpointV2Spec extends WordSpecLike with ScalatestRouteTest
     }
   }
 
-
 }
