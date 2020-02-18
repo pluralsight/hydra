@@ -18,10 +18,10 @@ package hydra.kafka.endpoints
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
-import cats.effect.IO
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import com.pluralsight.hydra.reflect.DoNotScan
+import hydra.common.util.Futurable
 import hydra.core.bootstrap.CreateTopicProgram
 import hydra.core.http.CorsSupport
 import hydra.kafka.model.TopicMetadataV2Request
@@ -31,8 +31,8 @@ import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
 @DoNotScan
-class BootstrapEndpointV2(createTopicProgram: CreateTopicProgram[IO])
-                         (implicit val system: ActorSystem, implicit val e: ExecutionContext) extends RoutedEndpoints with CorsSupport {
+final class BootstrapEndpointV2[F[_]](createTopicProgram: CreateTopicProgram[F])
+                         (implicit val system: ActorSystem, implicit val e: ExecutionContext, Futurable: Futurable[F, Unit]) extends RoutedEndpoints with CorsSupport {
 
   import TopicMetadataV2Parser._
 
@@ -41,7 +41,7 @@ class BootstrapEndpointV2(createTopicProgram: CreateTopicProgram[IO])
       post {
         pathEndOrSingleSlash {
           entity(as[TopicMetadataV2Request]) { t =>
-            onComplete(createTopicProgram.createTopic(t.subject.value, t.schemas.key, t.schemas.value).unsafeToFuture()) {
+            onComplete(Futurable.unsafeToFuture(createTopicProgram.createTopic(t.subject.value, t.schemas.key, t.schemas.value))) {
               case Success(_) => complete(StatusCodes.OK)
               case Failure(e) => complete(StatusCodes.InternalServerError, e)
             }

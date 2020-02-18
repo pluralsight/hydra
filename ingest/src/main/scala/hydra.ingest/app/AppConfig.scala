@@ -25,14 +25,16 @@ object AppConfig {
   final case class CreateTopicConfig(
     schemaRegistryConfig: SchemaRegistryConfig,
     numRetries: Int,
-    baseBackoffDelay: FiniteDuration
+    baseBackoffDelay: FiniteDuration,
+    v2CreateEndpointEnabled: Boolean
   )
 
   private val createTopicConfig: ConfigValue[CreateTopicConfig] =
     (
       schemaRegistryConfig,
       env("CREATE_TOPIC_NUM_RETRIES").as[Int].default(1),
-      env("CREATE_TOPIC_BASE_BACKOFF_DELAY").as[FiniteDuration].default(1.second)
+      env("CREATE_TOPIC_BASE_BACKOFF_DELAY").as[FiniteDuration].default(1.second),
+      env("HYDRA_V2_METADATA_CREATE_ENDPOINT_ENABLED").as[Boolean].default(false)
     )
     .parMapN(CreateTopicConfig)
 
