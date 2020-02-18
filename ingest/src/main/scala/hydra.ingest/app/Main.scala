@@ -6,7 +6,7 @@ import cats.implicits._
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.bootstrap.BootstrappingSupport
-import hydra.ingest.modules.{Algebras, Bootstrap, HttpApi, Programs}
+import hydra.ingest.modules.{Algebras, Bootstrap, Programs}
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import kamon.Kamon
@@ -44,7 +44,6 @@ object Main extends IOApp with BootstrappingSupport with LoggingAdapter {
     for {
       algebras <- Algebras.make[IO](config.createTopicConfig.schemaRegistryConfig)
       programs <- Programs.make[IO](config.createTopicConfig, algebras)
-      httpApi <- HttpApi.make[IO](programs, config.createTopicConfig)
       bootstrap <- Bootstrap.make[IO](programs.createTopic, config.v2MetadataTopicConfig)
       _ <- bootstrap.bootstrapAll
       _ <- oldBoostrap
