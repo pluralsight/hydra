@@ -27,26 +27,27 @@ import hydra.kafka.serializers.TopicMetadataV2Parser
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import hydra.core.bootstrap.CreateTopicProgram
+import scala.util.Success
+import akka.http.scaladsl.model.StatusCodes
+import scala.util.Failure
 
 
-class TopicEndpoint (implicit val system: ActorSystem, implicit val e: ExecutionContext)
+class BootstrapEndpointV2[F[_]](createTopicProgram: CreateTopicProgram[F])(implicit val system: ActorSystem, implicit val e: ExecutionContext)
   extends RoutedEndpoints
-    with LoggingAdapter
-    with TopicMetadataAdapter
-    with HydraDirectives
     with CorsSupport
-    with BootstrapEndpointActors
     with TopicMetadataV2Parser {
-
-  private implicit val timeout = Timeout(10.seconds)
 
   override val route: Route = cors(settings) {
     pathPrefix("/v2/streams") {
       pathEndOrSingleSlash {
         post {
           requestEntityPresent {
-            entity(as[TopicMetadataV2Request]) {
-              topicMetadataV2Request =>
+            entity(as[TopicMetadataV2Request]) { t =>
+              onComplete(createTopicProgram.createTopic(t.subject, t.schemas.key, t.schemas.value).unsafeToFuture) {
+                case Success(_) => complete(StatusCodes.OK)
+                case Failure(e) => complete(StatusCodes.InternalServerError, e)
+              }
             }
           }
         }
