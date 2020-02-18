@@ -16,38 +16,34 @@
 package hydra.kafka.endpoints
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
-import akka.util.Timeout
+import cats.effect.IO
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
-import hydra.common.logging.LoggingAdapter
-import hydra.core.http.{CorsSupport, HydraDirectives}
-import hydra.kafka.model.{TopicMetadataAdapter, TopicMetadataV2Request}
+import com.pluralsight.hydra.reflect.DoNotScan
+import hydra.core.bootstrap.CreateTopicProgram
+import hydra.core.http.CorsSupport
+import hydra.kafka.model.TopicMetadataV2Request
 import hydra.kafka.serializers.TopicMetadataV2Parser
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
-import hydra.core.bootstrap.CreateTopicProgram
-import scala.util.Success
-import akka.http.scaladsl.model.StatusCodes
-import scala.util.Failure
+import scala.util.{Failure, Success}
 
+@DoNotScan
+class BootstrapEndpointV2(createTopicProgram: CreateTopicProgram[IO])
+                         (implicit val system: ActorSystem, implicit val e: ExecutionContext) extends RoutedEndpoints with CorsSupport {
 
-class BootstrapEndpointV2[F[_]](createTopicProgram: CreateTopicProgram[F])(implicit val system: ActorSystem, implicit val e: ExecutionContext)
-  extends RoutedEndpoints
-    with CorsSupport
-    with TopicMetadataV2Parser {
+  import TopicMetadataV2Parser._
 
   override val route: Route = cors(settings) {
-    pathPrefix("/v2/streams") {
-      pathEndOrSingleSlash {
-        post {
-          requestEntityPresent {
-            entity(as[TopicMetadataV2Request]) { t =>
-              onComplete(createTopicProgram.createTopic(t.subject, t.schemas.key, t.schemas.value).unsafeToFuture) {
-                case Success(_) => complete(StatusCodes.OK)
-                case Failure(e) => complete(StatusCodes.InternalServerError, e)
-              }
+    path("v2" / "streams") {
+      post {
+        pathEndOrSingleSlash {
+          entity(as[TopicMetadataV2Request]) { t =>
+            onComplete(createTopicProgram.createTopic(t.subject.value, t.schemas.key, t.schemas.value).unsafeToFuture()) {
+              case Success(_) => complete(StatusCodes.OK)
+              case Failure(e) => complete(StatusCodes.InternalServerError, e)
             }
           }
         }

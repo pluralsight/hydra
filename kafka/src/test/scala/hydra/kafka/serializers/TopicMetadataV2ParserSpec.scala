@@ -8,7 +8,8 @@ import org.scalatest.{Matchers, WordSpec}
 import Errors._
 import cats.data.NonEmptyList
 
-class TopicMetadataV2ParserSpec extends WordSpec with Matchers with TopicMetadataV2Parser {
+class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
+  import TopicMetadataV2Parser._
   import spray.json._
 
   val validAvroSchema =

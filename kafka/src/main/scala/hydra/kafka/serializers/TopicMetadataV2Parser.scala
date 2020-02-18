@@ -15,7 +15,9 @@ import spray.json.{DefaultJsonProtocol, DeserializationException, JsArray, JsBoo
 import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
 
-trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol with TopicMetadataV2Validator {
+object TopicMetadataV2Parser extends TopicMetadataV2Parser
+
+sealed trait TopicMetadataV2Parser extends SprayJsonSupport with DefaultJsonProtocol with TopicMetadataV2Validator {
   implicit object SubjectFormat extends RootJsonFormat[Subject] {
     override def write(obj: Subject): JsValue = {
       JsString(obj.value)
