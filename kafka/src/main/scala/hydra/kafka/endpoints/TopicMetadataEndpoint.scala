@@ -23,7 +23,6 @@ import scalacache._
 import scalacache.guava.GuavaCache
 import scalacache.modes.scalaFuture._
 
-import scala.collection.JavaConverters._
 import scala.collection.immutable.Map
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}

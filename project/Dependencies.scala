@@ -15,6 +15,7 @@ object Dependencies {
   val catsLoggerVersion = "1.0.1"
   val catsRetryVersion = "1.0.0"
   val catsVersion =  "2.0.0"
+  val cirisVersion = "1.0.3"
   val confluentVersion = "5.4.0"
   val easyMockVersion = "3.5" //needed for mocking static java methods
   val fs2KafkaVersion = "1.0.0"
@@ -51,6 +52,8 @@ object Dependencies {
     )
 
     val fs2Kafka = "com.github.fd4s" %% "fs2-kafka" % fs2KafkaVersion
+
+    val ciris = "is.cir" %% "ciris" % cirisVersion
 
     val scalaConfigs = "com.github.kxbmap" %% "configs" % kxbmapConfigVersion
 
@@ -179,7 +182,7 @@ object Dependencies {
     Seq(guavacache, reflections, akkaKryo, serviceContainer, sdNotify, postgres, h2db, retry, catsLogger) ++
     confluent ++ kamon ++ aeron
 
-  val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal
+  val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(ciris)
 
   val rabbitDeps: Seq[ModuleID] = logging ++ Seq(scalaConfigs) ++ joda ++ opRabbit ++ testDeps
 

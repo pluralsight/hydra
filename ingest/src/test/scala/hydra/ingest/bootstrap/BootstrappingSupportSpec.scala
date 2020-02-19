@@ -1,4 +1,4 @@
-package hydra.core.bootstrap
+package hydra.ingest.bootstrap
 
 import akka.actor.{ActorSystem, Props}
 import akka.http.scaladsl.server.Route
@@ -6,14 +6,57 @@ import akka.testkit.TestKit
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import com.github.vonnagy.service.container.listener.ContainerLifecycleListener
 import com.github.vonnagy.service.container.service.ContainerService
-import hydra.core.ingest.TestIngestorDefault
+import hydra.core.bootstrap.ServiceProvider
+import hydra.core.ingest.{HydraRequest, Ingestor}
+import hydra.core.transport.{AckStrategy, HydraRecord, RecordFactory}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration._
 
-/**
-  * Created by alexsilva on 3/7/17.
-  */
+class TestIngestorDefault extends Ingestor {
+
+
+  /**
+    * This will _not_ override; instead it will use the default value of 1.second. We'll test it.
+    */
+  override val initTimeout = 2.millisecond
+
+  val to = context.receiveTimeout
+
+  ingest {
+    case "hello" => sender ! "hi!"
+    case "timeout" => sender ! to
+  }
+
+  override val recordFactory = TestRecordFactory
+}
+
+object TestRecordFactory extends RecordFactory[String, String] {
+  override def build(r: HydraRequest)(implicit ec: ExecutionContext) = {
+    val timeout = r.metadataValueEquals("timeout", "true")
+    if (timeout) {
+      Future.successful(TimeoutRecord("test-topic", r.correlationId.toString, r.payload,
+        r.ackStrategy))
+    }
+    else {
+      Future.successful(TestRecord("test-topic", r.correlationId.toString, r.payload,
+        r.ackStrategy))
+    }
+  }
+}
+
+case class TestRecord(destination: String,
+                      key: String,
+                      payload: String,
+                      ackStrategy: AckStrategy) extends HydraRecord[String, String]
+
+
+case class TimeoutRecord(destination: String,
+                         key: String,
+                         payload: String,
+                         ackStrategy: AckStrategy) extends HydraRecord[String, String]
+
 class BootstrappingSupportSpec extends Matchers with FlatSpecLike with BootstrappingSupport with BeforeAndAfterAll {
 
   val conf =
@@ -40,7 +83,7 @@ class BootstrappingSupportSpec extends Matchers with FlatSpecLike with Bootstrap
 
   "The BootstrappingSupport trait" should
     "load endpoints" in {
-    endpoints shouldBe Seq(classOf[DummyEndpoint])
+    endpoints should contain (classOf[DummyEndpoint])
   }
 
   it should "load listeners" in {
@@ -60,7 +103,6 @@ class BootstrappingSupportSpec extends Matchers with FlatSpecLike with Bootstrap
       Seq("test" -> Props[TestIngestorDefault], "test2" -> Props[TestIngestorDefault])
       , Seq(new DummyListener), "hydra_test")(container.system)
     csvc.name shouldBe container.name
-    csvc.registeredRoutes shouldBe container.registeredRoutes
     csvc.listeners.map(_.getClass) should contain(classOf[DummyListener])
     csvc.name shouldBe container.name
   }
