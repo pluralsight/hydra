@@ -14,7 +14,7 @@ trait SchemaRegistry[F[_]] {
 
   def getVersion(subject: String, schema: Schema): F[SchemaVersion]
 
-  def getAllVersions(subject: String): F[List[Int]]
+  def getAllVersions(subject: String): F[List[SchemaVersion]]
 
   def getAllSubjects: F[List[String]]
 
