@@ -19,8 +19,8 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import cats.effect.IO
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
-import hydra.common.util.Futurable
 import hydra.core.bootstrap.CreateTopicProgram
 import hydra.core.http.CorsSupport
 import hydra.kafka.model.TopicMetadataV2Request
@@ -29,8 +29,8 @@ import hydra.kafka.serializers.TopicMetadataV2Parser
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
-final class BootstrapEndpointV2[F[_]](createTopicProgram: CreateTopicProgram[F])
-                                     (implicit val system: ActorSystem, implicit val e: ExecutionContext, Futurable: Futurable[F, Unit]) extends CorsSupport {
+final class BootstrapEndpointV2(createTopicProgram: CreateTopicProgram[IO])
+                                     (implicit val system: ActorSystem, implicit val e: ExecutionContext) extends CorsSupport {
 
   import TopicMetadataV2Parser._
 
@@ -39,7 +39,7 @@ final class BootstrapEndpointV2[F[_]](createTopicProgram: CreateTopicProgram[F])
       post {
         pathEndOrSingleSlash {
           entity(as[TopicMetadataV2Request]) { t =>
-            onComplete(Futurable.unsafeToFuture(createTopicProgram.createTopic(t.subject.value, t.schemas.key, t.schemas.value))) {
+            onComplete(createTopicProgram.createTopic(t.subject.value, t.schemas.key, t.schemas.value).unsafeToFuture()) {
               case Success(_) => complete(StatusCodes.OK)
               case Failure(e) => complete(StatusCodes.InternalServerError, e)
             }

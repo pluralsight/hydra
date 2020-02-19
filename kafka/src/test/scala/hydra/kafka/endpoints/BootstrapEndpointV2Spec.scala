@@ -26,12 +26,12 @@ final class BootstrapEndpointV2Spec extends WordSpecLike with ScalatestRouteTest
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
   private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
 
-  private def getTestCreateTopicProgram(s: SchemaRegistry[IO]): BootstrapEndpointV2[IO] = {
+  private def getTestCreateTopicProgram(s: SchemaRegistry[IO]): BootstrapEndpointV2 = {
     val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
     new BootstrapEndpointV2(new CreateTopicProgram[IO](s, retryPolicy))
   }
 
-  private val testCreateTopicProgram: IO[BootstrapEndpointV2[IO]] =
+  private val testCreateTopicProgram: IO[BootstrapEndpointV2] =
     SchemaRegistry.test[IO].map(getTestCreateTopicProgram)
 
   "BootstrapEndpointV2" must {

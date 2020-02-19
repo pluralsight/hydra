@@ -17,7 +17,6 @@ import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.common.reflect.{ComponentInstantiator, ReflectionUtils}
 import hydra.common.util.RoutedEndpointLookup
-import hydra.core.bootstrap.ReflectionsWrapper.reflections
 import hydra.core.bootstrap.{CreateTopicProgram, ReflectionsWrapper, ServiceProvider}
 import hydra.kafka.endpoints.BootstrapEndpointV2
 import io.chrisdavenport.log4cats.Logger
@@ -37,7 +36,7 @@ class BootstrapEndpoints(implicit val system: ActorSystem, implicit val ec: Exec
 
   private val bootstrapV2Endpoint = {
     val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-    new BootstrapEndpointV2[IO](new CreateTopicProgram[IO](schemaRegistry, retryPolicy))
+    new BootstrapEndpointV2(new CreateTopicProgram[IO](schemaRegistry, retryPolicy))
   }
 
   private lazy val allEndpointClasses = scanFor(classOf[RoutedEndpointLookup])
