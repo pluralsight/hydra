@@ -19,7 +19,6 @@ package hydra.ingest.http
 import akka.actor._
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
-import akka.stream.ActorMaterializer
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter

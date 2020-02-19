@@ -23,7 +23,6 @@ import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.pattern.ask
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
-import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.avro.resource.SchemaResource
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
@@ -33,6 +32,8 @@ import hydra.core.http.CorsSupport
 import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.SchemaParseException
+import akka.http.scaladsl.server.Directives._
+import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
