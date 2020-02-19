@@ -5,7 +5,7 @@ import cats.effect.{ExitCode, IO, IOApp}
 import cats.implicits._
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
-import hydra.core.bootstrap.BootstrappingSupport
+import hydra.ingest.bootstrap.BootstrappingSupport
 import hydra.ingest.modules.{Algebras, Bootstrap, Programs}
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger

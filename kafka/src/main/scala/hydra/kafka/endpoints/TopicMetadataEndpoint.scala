@@ -8,10 +8,9 @@ import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.ExceptionHandler
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
-import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
-import hydra.common.util.ActorUtils
+import hydra.common.util.{ActorUtils, RoutedEndpointLookup}
 import hydra.core.http.{CorsSupport, HydraDirectives, NotFoundException}
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
@@ -23,7 +22,6 @@ import scalacache._
 import scalacache.guava.GuavaCache
 import scalacache.modes.scalaFuture._
 
-import scala.collection.JavaConverters._
 import scala.collection.immutable.Map
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
@@ -35,7 +33,7 @@ import scala.util.Try
   * Created by alexsilva on 3/18/17.
   */
 class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: ExecutionContext)
-  extends RoutedEndpoints
+  extends RoutedEndpointLookup
     with LoggingAdapter
     with HydraDirectives
     with HydraKafkaJsonSupport

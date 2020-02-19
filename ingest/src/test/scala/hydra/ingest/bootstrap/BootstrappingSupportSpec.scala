@@ -1,4 +1,4 @@
-package hydra.core.bootstrap
+package hydra.ingest.bootstrap
 
 import akka.actor.{ActorSystem, Props}
 import akka.http.scaladsl.server.Route
@@ -6,6 +6,7 @@ import akka.testkit.TestKit
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import com.github.vonnagy.service.container.listener.ContainerLifecycleListener
 import com.github.vonnagy.service.container.service.ContainerService
+import hydra.core.bootstrap.ServiceProvider
 import hydra.core.ingest.TestIngestorDefault
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 

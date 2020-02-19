@@ -16,7 +16,7 @@
 
 package hydra.sandbox.app
 
-import hydra.core.bootstrap.BootstrappingSupport
+import hydra.ingest.bootstrap.BootstrappingSupport
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 // $COVERAGE-OFF$
 object HydraSandbox extends App with BootstrappingSupport {

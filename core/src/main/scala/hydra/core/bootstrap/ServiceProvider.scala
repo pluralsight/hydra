@@ -6,7 +6,7 @@ import akka.actor.Props
   * A trait that can be extended by classes providing services (actors) to be loaded during
   * boot time for Hydra.
   *
-  * The [[hydra.core.bootstrap.BootstrappingSupport]] trait scans the classpath for objects that extend this interface
+  * The [[BootstrappingSupport]] trait scans the classpath for objects that extend this interface
   * and adds the services provided to the list of services to be managed by Hydra.
   *
   */

@@ -5,9 +5,8 @@ import akka.http.scaladsl.common.EntityStreamingSupport
 import akka.kafka.Subscriptions
 import akka.kafka.scaladsl.Consumer
 import akka.util.Timeout
-import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.common.logging.LoggingAdapter
-import hydra.common.util.ActorUtils
+import hydra.common.util.{ActorUtils, RoutedEndpointLookup}
 import hydra.core.http.HydraDirectives
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetLatestOffsets, LatestOffsetsResponse}
@@ -25,7 +24,7 @@ import scala.concurrent.{Await, ExecutionContext, Future}
   * Created by alexsilva on 3/18/17.
   */
 class TopicsEndpoint(implicit system: ActorSystem, implicit val e: ExecutionContext)
-  extends RoutedEndpoints with LoggingAdapter with HydraDirectives with HydraKafkaJsonSupport {
+  extends RoutedEndpointLookup with LoggingAdapter with HydraDirectives with HydraKafkaJsonSupport {
 
   import hydra.kafka.util.KafkaUtils._
 
