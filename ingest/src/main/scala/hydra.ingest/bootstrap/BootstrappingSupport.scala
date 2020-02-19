@@ -4,6 +4,7 @@ import java.lang.reflect.Modifier
 
 import akka.actor.{ActorSystem, Props}
 import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.directives.RouteDirectives
 import cats.effect.{IO, Timer}
 import com.github.vonnagy.service.container.ContainerBuilder
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
@@ -29,14 +30,22 @@ class BootstrapEndpoints(implicit val system: ActorSystem, implicit val ec: Exec
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
   private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
 
-  private val schemaRegistry = SchemaRegistry.live[IO](ConfigFactory.load().getString("hydra.schema.registry.url"), 100).unsafeRunSync()
+  private val schemaRegistryUrl = ConfigFactory.load().getString("hydra.schema.registry.url")
+
+  private val schemaRegistry = SchemaRegistry.live[IO](schemaRegistryUrl, 100).unsafeRunSync()
+
+  private val isBootstrapV2Enabled = ConfigFactory.load().getBoolean("hydra.v2.create-topic.enabled")
 
   private val bootstrapV2Endpoint = {
-    val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-    new BootstrapEndpointV2(new CreateTopicProgram[IO](schemaRegistry, retryPolicy))
+    if (isBootstrapV2Enabled) {
+      val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      new BootstrapEndpointV2(new CreateTopicProgram[IO](schemaRegistry, retryPolicy)).route
+    } else {
+      RouteDirectives.reject
+    }
   }
 
-  override def route: Route = bootstrapV2Endpoint.route
+  override def route: Route = bootstrapV2Endpoint
 }
 
 trait BootstrappingSupport extends ConfigSupport with LoggingAdapter {
