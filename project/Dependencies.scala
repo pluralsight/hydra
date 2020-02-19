@@ -18,6 +18,7 @@ object Dependencies {
   val cirisVersion = "1.0.3"
   val confluentVersion = "5.4.0"
   val easyMockVersion = "3.5" //needed for mocking static java methods
+  val fs2KafkaVersion = "1.0.0"
   val hikariCPVersion = "2.6.2"
   val h2DbVersion = "1.4.196"
   val jacksonVersion = "2.9.5"
@@ -49,6 +50,8 @@ object Dependencies {
       "org.typelevel" %% "cats-effect" % catsEffectVersion,
       "com.github.cb372" %% "cats-retry" % catsRetryVersion
     )
+
+    val fs2Kafka = "com.github.fd4s" %% "fs2-kafka" % fs2KafkaVersion
 
     val ciris = "is.cir" %% "ciris" % cirisVersion
 
@@ -183,7 +186,7 @@ object Dependencies {
 
   val rabbitDeps: Seq[ModuleID] = logging ++ Seq(scalaConfigs) ++ joda ++ opRabbit ++ testDeps
 
-  val kafkaDeps: Seq[ModuleID] = coreDeps ++ Seq(akkaKafkaStream, jsonLenses) ++ kafka ++ akkaHttpHal
+  val kafkaDeps: Seq[ModuleID] = coreDeps ++ Seq(akkaKafkaStream, jsonLenses, fs2Kafka) ++ kafka ++ akkaHttpHal
 
   val sandboxDeps: Seq[ModuleID] = kafkaDeps ++ sqlDeps ++
     Seq("com.h2database" % "h2" % "1.4.196") ++ Seq(embeddedKafka)
