@@ -22,10 +22,10 @@ import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.Route
 import akka.stream.StreamLimitReachedException
 import akka.stream.scaladsl.{Flow, RestartFlow, Source}
+import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
-import hydra.common.util.RoutedEndpointLookup
 import hydra.core.http.HydraDirectives
 import hydra.core.marshallers.GenericServiceResponse
 import hydra.ingest.services.{IngestSocketFactory, IngestionOutgoingMessage, SimpleOutgoingMessage}
@@ -39,7 +39,7 @@ import scala.util.Failure
   * Created by alexsilva on 12/22/15.
   */
 class IngestionWebSocketEndpoint(implicit system: ActorSystem, e: ExecutionContext)
-  extends RoutedEndpointLookup with LoggingAdapter with HydraIngestJsonSupport with HydraDirectives {
+  extends RoutedEndpoints with LoggingAdapter with HydraIngestJsonSupport with HydraDirectives {
 
   //visible for testing
   private[http] val enabled = applicationConfig.get[Boolean]("ingest.websocket.enabled")

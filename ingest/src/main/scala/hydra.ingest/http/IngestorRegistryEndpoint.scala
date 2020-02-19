@@ -20,10 +20,10 @@ import akka.actor._
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import akka.util.Timeout
+import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
-import hydra.common.util.RoutedEndpointLookup
 import hydra.core.http.HydraDirectives
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestorRegistry.{FindAll, LookupResult}
@@ -35,7 +35,7 @@ import scala.concurrent.duration.{FiniteDuration, _}
  * Created by alexsilva on 12/22/15.
  */
 class IngestorRegistryEndpoint(implicit val system: ActorSystem, implicit val e: ExecutionContext)
-  extends RoutedEndpointLookup with LoggingAdapter with HydraIngestJsonSupport with HydraDirectives with ConfigSupport {
+  extends RoutedEndpoints with LoggingAdapter with HydraIngestJsonSupport with HydraDirectives with ConfigSupport {
 
   private val registryLookupTimeout = applicationConfig
     .get[FiniteDuration]("ingest.service-lookup.timeout").valueOrElse(5.seconds)

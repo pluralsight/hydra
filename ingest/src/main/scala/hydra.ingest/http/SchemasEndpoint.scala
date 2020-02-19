@@ -26,7 +26,6 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import hydra.avro.resource.SchemaResource
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
-import hydra.common.util.RoutedEndpointLookup
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.akka.SchemaRegistryActor._
 import hydra.core.http.CorsSupport
@@ -34,6 +33,7 @@ import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.SchemaParseException
 import akka.http.scaladsl.server.Directives._
+import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -44,7 +44,7 @@ import scala.concurrent.duration._
   * Created by alexsilva on 2/13/16.
   */
 class SchemasEndpoint(implicit system: ActorSystem, implicit val e: ExecutionContext)
-  extends RoutedEndpointLookup with ConfigSupport with LoggingAdapter with HydraJsonSupport with CorsSupport {
+  extends RoutedEndpoints with ConfigSupport with LoggingAdapter with HydraJsonSupport with CorsSupport {
 
   implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
   implicit val timeout = Timeout(3.seconds)

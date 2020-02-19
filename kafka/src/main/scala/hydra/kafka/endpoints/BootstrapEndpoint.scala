@@ -22,8 +22,8 @@ import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
+import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.common.logging.LoggingAdapter
-import hydra.common.util.RoutedEndpointLookup
 import hydra.core.http.{CorsSupport, HydraDirectives}
 import hydra.core.marshallers.TopicMetadataRequest
 import hydra.kafka.model.TopicMetadataAdapter
@@ -35,7 +35,7 @@ import scala.util.{Failure, Success}
 
 
 class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: ExecutionContext)
-  extends RoutedEndpointLookup
+  extends RoutedEndpoints
     with LoggingAdapter
     with TopicMetadataAdapter
     with HydraDirectives

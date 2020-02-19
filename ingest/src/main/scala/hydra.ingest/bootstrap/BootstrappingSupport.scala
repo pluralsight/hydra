@@ -2,8 +2,7 @@ package hydra.ingest.bootstrap
 
 import java.lang.reflect.Modifier
 
-import akka.ConfigurationException
-import akka.actor.{ActorSystem, ExtendedActorSystem, Props}
+import akka.actor.{ActorSystem, Props}
 import akka.http.scaladsl.server.Route
 import cats.effect.{IO, Timer}
 import com.github.vonnagy.service.container.ContainerBuilder
@@ -16,7 +15,6 @@ import hydra.avro.registry.SchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.common.reflect.{ComponentInstantiator, ReflectionUtils}
-import hydra.common.util.RoutedEndpointLookup
 import hydra.core.bootstrap.{CreateTopicProgram, ReflectionsWrapper, ServiceProvider}
 import hydra.kafka.endpoints.BootstrapEndpointV2
 import io.chrisdavenport.log4cats.Logger
@@ -27,7 +25,6 @@ import scala.concurrent.ExecutionContext
 import scala.util.Try
 
 class BootstrapEndpoints(implicit val system: ActorSystem, implicit val ec: ExecutionContext) extends RoutedEndpoints {
-  import BootstrappingSupport._
 
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
   private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
@@ -39,32 +36,22 @@ class BootstrapEndpoints(implicit val system: ActorSystem, implicit val ec: Exec
     new BootstrapEndpointV2(new CreateTopicProgram[IO](schemaRegistry, retryPolicy))
   }
 
-  private lazy val allEndpointClasses = scanFor(classOf[RoutedEndpointLookup])
-
-  private lazy val allEndpoints = {
-    for {
-      route <- allEndpointClasses
-    } yield {
-      val args = List(classOf[ActorSystem] -> system, classOf[ExecutionContext] -> ec)
-
-      system.asInstanceOf[ExtendedActorSystem].dynamicAccess
-        .createInstanceFor[RoutedEndpointLookup](route.getName, args).map({ route =>
-          route
-      }).recover({
-        case e => throw new ConfigurationException(
-          "RoutedEndpoints can't be loaded [" + route.getName +
-            "] due to [" + e.toString + "]", e)
-      }).get
-    }
-  }
-
-  override def route: Route = allEndpoints.map(_.route).reduce(_ ~ _) ~ bootstrapV2Endpoint.route
+  override def route: Route = bootstrapV2Endpoint.route
 }
 
 trait BootstrappingSupport extends ConfigSupport with LoggingAdapter {
 
+  import ReflectionsWrapper._
+
+  import scala.collection.JavaConverters._
   import scala.util.control.Exception._
-  import BootstrappingSupport._
+
+  private def scanFor[T](clazz: Class[T]): Seq[Class[_ <: T]] = {
+    reflections.getSubTypesOf(clazz)
+      .asScala
+      .filterNot(c => Modifier.isAbstract(c.getModifiers))
+      .filterNot(c => c.isAnnotationPresent(classOf[DoNotScan])).toSeq
+  }
 
   private val exceptionLogger = handling(classOf[Exception]) by { ex =>
     log.error("Could not instantiate class.", ex); None
@@ -92,18 +79,4 @@ trait BootstrappingSupport extends ConfigSupport with LoggingAdapter {
       .withListeners(listeners: _*)
       .withName(applicationName).build
   }
-}
-
-object BootstrappingSupport {
-
-  import ReflectionsWrapper._
-  import scala.collection.JavaConverters._
-
-  def scanFor[T](clazz: Class[T]): Seq[Class[_ <: T]] = {
-    reflections.getSubTypesOf(clazz)
-      .asScala
-      .filterNot(c => Modifier.isAbstract(c.getModifiers))
-      .filterNot(c => c.isAnnotationPresent(classOf[DoNotScan])).toSeq
-  }
-
 }
