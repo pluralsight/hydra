@@ -47,17 +47,17 @@ object KafkaClient {
     }
   }
 
-  def test[F[_]: Sync]: F[KafkaClient[F]] = Ref[F].of(Map[TopicName, Topic]()).flatMap(getTestKafkaClient)
+  def test[F[_]: Sync]: F[KafkaClient[F]] = Ref[F].of(Map[TopicName, Topic]()).flatMap(getTestKafkaClient[F])
 
   private[this] def getTestKafkaClient[F[_]: Sync](ref: Ref[F, Map[TopicName, Topic]]): F[KafkaClient[F]] = Sync[F].delay {
     new KafkaClient[F] {
       override def describeTopic(name: TopicName): F[Option[Topic]] = ref.get.map(_.get(name))
 
-      override def getTopicNames: F[List[TopicName]] = ref.get.map(_.keys)
+      override def getTopicNames: F[List[TopicName]] = ref.get.map(_.keys.toList)
 
       override def createTopic(name: TopicName, details: TopicDetails): F[Unit] = {
         val entry = name -> Topic(name, details.numPartitions)
-        ref.modify(old => (old, old + entry))
+        ref.update(old => old + entry)
       }
     }
   }
