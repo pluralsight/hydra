@@ -169,7 +169,7 @@ object Dependencies {
   val testDeps: Seq[ModuleID] = Seq(scalaTest, junit, scalaMock, easyMock, embeddedConsul, embeddedPostgres) ++
     powerMock ++ akkaTest
 
-  val baseDeps: Seq[ModuleID] = akka ++ Seq(scalaz, scalaConfigs, avro, cats) ++ logging ++ joda ++ testDeps ++ catsEffect
+  val baseDeps: Seq[ModuleID] = akka ++ Seq(scalaz, scalaConfigs, avro, cats) ++ logging ++ joda ++ testDeps
 
   val sqlDeps: Seq[ModuleID] = logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
 
