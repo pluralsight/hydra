@@ -28,7 +28,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
   * Created by alexsilva on 11/18/16.
   */
 class KafkaIngestorSpec
-  extends TestKit(ActorSystem("kafka-ingestor-spec", config = ConfigFactory.parseString("akka.actor.provider=cluster")))
+  extends TestKit(ActorSystem("kafka-ingestor-spec"))
     with Matchers
     with FunSpecLike
     with ConfigSupport
@@ -186,20 +186,20 @@ class KafkaIngestorSpec
     probe.expectMsg(ValidRequest(JsonRecord("json-topic", None, node, AckStrategy.NoAck)))
   }
 
-  it("is invalid if schema exists, but topic doesn't") {
-    val kafkaIngestor = system.actorOf(Props[KafkaIngestor])
-    val probe = TestProbe()
-
-    val request = HydraRequest(
-      "123",
-      json, None,
-      Map(HYDRA_INGESTOR_PARAM -> KafkaIngestorName, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema2"))
-    avroRecordFactory.getTopicAndSchemaSubject(request).get._2 shouldBe "test-schema2"
-    kafkaIngestor.tell(Validate(request), probe.ref)
-    probe.expectMsgPF() {
-      case InvalidRequest(ex) => ex shouldBe an[IllegalArgumentException]
-    }
-  }
+//  it("is invalid if schema exists, but topic doesn't") {
+//    val kafkaIngestor = system.actorOf(Props[KafkaIngestor])
+//    val probe = TestProbe()
+//
+//    val request = HydraRequest(
+//      "123",
+//      json, None,
+//      Map(HYDRA_INGESTOR_PARAM -> KafkaIngestorName, HYDRA_KAFKA_TOPIC_PARAM -> "test-schema2"))
+//    avroRecordFactory.getTopicAndSchemaSubject(request).get._2 shouldBe "test-schema2"
+//    kafkaIngestor.tell(Validate(request), probe.ref)
+//    probe.expectMsgPF() {
+//      case InvalidRequest(ex) => ex shouldBe an[IllegalArgumentException]
+//    }
+//  }
 
 }
 

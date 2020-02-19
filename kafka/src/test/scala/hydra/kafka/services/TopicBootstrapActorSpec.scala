@@ -56,14 +56,10 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
 
   val config = ConfigFactory.load().getConfig("hydra_kafka.bootstrap-config")
 
-  val topicMetadataJson = Source.fromResource("HydraMetadataTopicSpec.avsc").mkString
+  val topicMetadataJson = Source.fromResource("HydraMetadataTopic.avsc").mkString
 
   val testSchemaResource = SchemaResource(1, 1, new Schema.Parser().parse(topicMetadataJson))
 
-  val compactedTopicManagerActor = system.actorOf(Props(new Actor {
-    override def receive: Receive = {Actor.emptyBehavior}
-  }))
-  
   def fixture(key: String, kafkaShouldFail: Boolean = false,
               schemaRegistryShouldFail: Boolean = false) = {
     val probe = TestProbe()
@@ -279,7 +275,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       .parseJson
       .convertTo[TopicMetadataRequest]
 
-    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test4", kafkaShouldFail = true)
+    val (probe, schemaRegistryActor, _) = fixture("test4", kafkaShouldFail = true)
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
       system.actorSelection("/user/kafka_ingestor_test4"), Props(new MockStreamsManagerActor())
@@ -326,7 +322,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       .parseJson
       .convertTo[TopicMetadataRequest]
 
-    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test5")
+    val (probe, schemaRegistryActor, _) = fixture("test5")
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
       system.actorSelection("/user/kafka_ingestor_test5"), Props(new MockStreamsManagerActor())
@@ -403,7 +399,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
         |}
       """.stripMargin)
 
-    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test6")
+    val (probe, schemaRegistryActor, _) = fixture("test6")
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
       system.actorSelection("/user/kafka_ingestor_test6"), Props(new MockStreamsManagerActor()), Some(testConfig)
@@ -463,7 +459,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       .parseJson
       .convertTo[TopicMetadataRequest]
 
-    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test7")
+    val (probe, schemaRegistryActor, _) = fixture("test7")
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
       system.actorSelection("/user/kafka_ingestor_test7"), Props(new MockStreamsManagerActor())
@@ -524,8 +520,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
   }
 
   it should "get a stream by its subject" in {
-    val (probe, schemaRegistryActor, _) = fixture("test-get-stream-subject",
-      schemaRegistryShouldFail = false)
+    val (probe, schemaRegistryActor, _) = fixture("test-get-stream-subject")
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
       system.actorSelection("kafka_ingestor_test-get-stream-subject"), Props(new MockStreamsManagerActor())
@@ -602,9 +597,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     }
   }
 
-  it should "create a compacted topic if a hydra key exists and the stream type is historic" in {
-
-      val subject = "exp.dataplatform.testsbject5"
+  it should "create a topic if a hydra key exists and the stream type is historic" in {
 
       val mdRequest = s"""{
                          |	"streamType": "History",
@@ -633,7 +626,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
         .parseJson
         .convertTo[TopicMetadataRequest]
 
-      val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test12")
+      val (probe, schemaRegistryActor, _) = fixture("test12")
 
       val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
         system.actorSelection("/user/kafka_ingestor_test12"), Props(new MockStreamsManagerActor())
@@ -646,16 +639,14 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
 
       val expectedMessage = "message"
-      val consumeSubject = "_compacted.exp.dataplatform.testsbject5"
+      val consumeSubject = "exp.dataplatform.testsbject5"
 
-      //need to publish a KEY and VALUE here, otherwise kafka throws an exception for the compacted topic
+      //need to publish a KEY and VALUE here
       publishToKafka(consumeSubject, expectedMessage, expectedMessage)(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
       consumeFirstStringMessageFrom(consumeSubject) shouldEqual expectedMessage
   }
 
-  it should "not create a compacted topic if hydra.key is not present" in {
-
-    val subject = "exp.dataplatform.testsbject6"
+  it should "create a topic if hydra.key is not present" in {
 
     val mdRequest = s"""{
                        |	"streamType": "History",
@@ -683,7 +674,7 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
       .parseJson
       .convertTo[TopicMetadataRequest]
 
-    val (probe, schemaRegistryActor, kafkaIngestor) = fixture("test13")
+    val (probe, schemaRegistryActor, _) = fixture("test13")
 
     val bootstrapActor = system.actorOf(TopicBootstrapActor.props(schemaRegistryActor,
       system.actorSelection("/user/kafka_ingestor_test13"), Props(new MockStreamsManagerActor())
@@ -696,12 +687,11 @@ class TopicBootstrapActorSpec extends TestKit(ActorSystem("topic-bootstrap-actor
     bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
 
     val expectedMessage = "message"
-    val consumeSubject = "_compacted.exp.dataplatform.testsbject6"
+    val consumeSubject = "exp.dataplatform.testsbject6"
 
-    //need to publish a KEY and VALUE here, otherwise kafka throws an exception for the compacted topic
-    assertThrows[KafkaUnavailableException]{
-      publishToKafka(consumeSubject, expectedMessage, expectedMessage)(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
-    }
+    //need to publish a KEY and VALUE here
+    publishToKafka(consumeSubject, expectedMessage, expectedMessage)(config = embeddedKafkaConfig, new StringSerializer(), new StringSerializer())
+    consumeFirstStringMessageFrom(consumeSubject) shouldEqual expectedMessage
   }
 }
 

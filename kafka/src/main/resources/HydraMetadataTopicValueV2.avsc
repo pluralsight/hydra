@@ -1,14 +1,9 @@
 {
-  "namespace": "_hydra.metadata",
+  "namespace": "_hydra.metadata.v2",
   "name": "topic",
   "type": "record",
   "version": 1,
-  "hydra.key": "subject",
   "fields": [
-    {
-      "name": "id",
-      "type": "string"
-    },
     {
       "name": "createdDate",
       "type": {
@@ -17,13 +12,8 @@
       }
     },
     {
-      "name": "subject",
-      "type": "string"
-    },
-    {
       "name": "deprecated",
-      "type": ["null", "boolean"],
-      "default": null
+      "type": "boolean"
     },
     {
       "name": "streamType",
@@ -42,26 +32,35 @@
       }
     },
     {
-      "name": "derived",
-      "type": "boolean"
+      "name": "parentSubjects",
+      "type": {
+          "type": "array",
+          "items": "string"
+      }
     },
     {
       "name": "contact",
-      "type": "string"
-    },
-    {
-      "name": "additionalDocumentation",
-      "type": ["null", "string"],
-      "default": null
+      "type": {
+          "type": "record",
+          "name": "contactOptions",
+          "fields": [
+              {
+                  "name": "email",
+                  "type": ["null", "string"],
+                  "default": null
+              },
+              {
+                  "name": "slackChannel",
+                  "type": ["null", "string"],
+                  "default": null
+              }
+          ]
+      }
     },
     {
       "name": "notes",
       "type": ["null", "string"],
       "default": null
-    },
-    {
-      "name": "schemaId",
-      "type": "int"
     }
   ]
 }

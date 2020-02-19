@@ -18,6 +18,7 @@ package hydra.kafka.producer
 import hydra.core.ingest.HydraRequest
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success, Try}
 
 /**
   * Created by alexsilva on 9/27/16.
@@ -27,9 +28,12 @@ object DeleteTombstoneRecordFactory extends KafkaRecordFactory[String, Any] {
 
   override def build(request: HydraRequest)
                     (implicit ex: ExecutionContext): Future[DeleteTombstoneRecord] = {
+    val theKey = getKey(request)
+      .fold[Try[String]](Failure(new IllegalArgumentException("A key is required for deletes.")))(Success(_))
     for {
+      key <- Future.fromTry(theKey)
       topic <- Future.fromTry(getTopic(request))
-    } yield DeleteTombstoneRecord(topic, getKey(request), request.ackStrategy)
+    } yield DeleteTombstoneRecord(topic, key, request.ackStrategy)
   }
 }
 

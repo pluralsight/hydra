@@ -15,6 +15,7 @@
 
 package com.pluralsight.hydra.avro;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.util.ClassUtil;
 import com.google.common.collect.ImmutableSet;
@@ -27,7 +28,6 @@ import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.internal.JacksonUtils;
-import org.codehaus.jackson.JsonNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -121,7 +121,7 @@ public class JsonConverter<T extends GenericRecord> {
             //let's be proactive and fail fast with strict validation
             Map<String, Object> fields = mapper.readValue(json, Map.class);
             if (strictValidation) performStrictValidation(fields, baseSchema);
-            return (T) convert(fields, baseSchema);
+            return convert(fields, baseSchema);
         } catch (IOException e) {
             throw new IOException("Failed to parse as Json: " + json + "\n\n" + e.getMessage());
         }

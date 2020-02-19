@@ -17,15 +17,16 @@
 package hydra.kafka.producer
 
 import hydra.core.transport.AckStrategy
+import org.apache.commons.lang3.StringUtils
 
 /**
   * Created by alexsilva on 11/30/15.
   */
-case class StringRecord(destination: String, key: Option[String], payload: String,
+case class StringRecord(destination: String, key: String, payload: String,
                         ackStrategy: AckStrategy)
   extends KafkaRecord[String, String]
 
 object StringRecord {
-  def apply(topic: String, payload: String, ackStrategy: AckStrategy): StringRecord =
-    new StringRecord(topic, None, payload, ackStrategy)
+  def apply(topic: String, key: Option[String], payload: String, ackStrategy: AckStrategy): StringRecord =
+    new StringRecord(topic, key.orNull, payload, ackStrategy)
 }

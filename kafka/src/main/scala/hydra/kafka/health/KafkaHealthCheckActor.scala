@@ -33,7 +33,7 @@ class KafkaHealthCheckActor(bootstrapServers: String, healthCheckTopic: String, 
 
   private val producer = new KafkaProducer[String, String](producerConfig.asJava)
 
-  override def postStop(): Unit = producer.close(5, TimeUnit.SECONDS)
+  override def postStop(): Unit = producer.close(java.time.Duration.ofSeconds(5))
 
   override def checkHealth(): Future[HealthInfo] = {
     val time = System.currentTimeMillis().toString

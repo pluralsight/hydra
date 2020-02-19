@@ -8,7 +8,7 @@ val jvmMaxMemoryFlag = sys.env.getOrElse("MAX_JVM_MEMORY_FLAG", "-Xmx2g")
 lazy val defaultSettings = Seq(
   organization := "pluralsight",
   version := hydraVersion,
-  scalaVersion := "2.12.8",
+  scalaVersion := "2.12.10",
   description := "Hydra",
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
   excludeDependencies += "org.slf4j" % "slf4j-log4j12",
@@ -16,19 +16,19 @@ lazy val defaultSettings = Seq(
   packageOptions in(Compile, packageBin) +=
     Package.ManifestAttributes("Implementation-Build" -> buildNumber),
   logLevel := Level.Info,
-  scalacOptions ++= Seq("-encoding", "UTF-8", "-feature", "-language:_", "-deprecation", "-unchecked"),
+  scalacOptions ++= Seq("-encoding", "UTF-8", "-feature", "-language:_", "-deprecation", "-unchecked", "-Ypartial-unification"),
   javacOptions in Compile ++= Seq("-encoding", "UTF-8", "-source", JDK, "-target", JDK,
     "-Xlint:unchecked", "-Xlint:deprecation", "-Xlint:-options"),
   resolvers += Resolver.mavenLocal,
   resolvers += "Scalaz Bintray Repo" at "https://dl.bintray.com/scalaz/releases",
-  resolvers += "Confluent Maven Repo" at "http://packages.confluent.io/maven/",
+  resolvers += "Confluent Maven Repo" at "https://packages.confluent.io/maven/",
   resolvers += "jitpack" at "https://jitpack.io",
   resolvers += Resolver.bintrayRepo("hseeberger", "maven"),
   ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet,
   parallelExecution in sbt.Test := false,
   javaOptions in Universal ++= Seq(
     "-Dorg.aspectj.tracing.factory=default",
-    "-J"+jvmMaxMemoryFlag
+    "-J" + jvmMaxMemoryFlag
   )
 )
 

@@ -10,10 +10,10 @@ object TopicMetadataValidator {
   import ErrorMessages._
 
   private val subjectValidationFunctions: Seq[String => ValidationResponse] = List(
-    topicIsTooLong _,
-    topicContainsInvalidChars _,
-    validOrg _,
-    validFormat _
+    topicIsTooLong,
+    topicContainsInvalidChars,
+    validOrg,
+    validFormat
   )
 
   def validate(gOpt: Option[GenericSchema]): Try[ValidationResponse] = {
@@ -41,7 +41,7 @@ object TopicMetadataValidator {
   }
 
   private def topicContainsInvalidChars(topic: String): ValidationResponse = {
-    if (topic.matches("^[a-zA-Z0-9\\.\\_\\-]*$")) {
+    if (topic.matches("""^[a-zA-Z0-9._\-]*$""")) {
       Valid
     }
     else {

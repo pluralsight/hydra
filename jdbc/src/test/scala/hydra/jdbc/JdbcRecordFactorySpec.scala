@@ -104,7 +104,7 @@ class JdbcRecordFactorySpec extends TestKit(ActorSystem("hydra"))
 
       whenReady(factory.build(request)) { rec =>
         rec.destination shouldBe "table"
-        rec.key shouldBe Some(Seq.empty)
+        rec.key shouldBe Seq.empty
         rec.payload shouldBe new JsonConverter[GenericRecord](schemaNPK).convert("""{"id":1, "name":"test", "rank" : 1}""")
       }
     }
@@ -117,7 +117,7 @@ class JdbcRecordFactorySpec extends TestKit(ActorSystem("hydra"))
         rec.destination shouldBe schemaPK.getName
         rec.primaryKeys shouldBe Seq("id")
         rec.keyValues shouldBe Map("id" -> 1)
-        rec.key shouldBe Some(Seq("id"))
+        rec.key shouldBe Seq("id")
         rec.payload shouldBe new JsonConverter[GenericRecord](schemaPK).convert("""{"id":1, "name":"test", "rank" : 1}""")
       }
     }

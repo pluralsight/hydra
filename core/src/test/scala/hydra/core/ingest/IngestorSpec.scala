@@ -41,7 +41,7 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
       ing ! Validate(HydraRequest("1", "test").withMetadata("invalid" -> "true"))
       expectMsgType[InvalidRequest]
       ing ! Validate(HydraRequest("1", "test"))
-      expectMsg(ValidRequest(TestRecord("test-topic", Some("1"), "test", AckStrategy.NoAck)))
+      expectMsg(ValidRequest(TestRecord("test-topic", "1", "test", AckStrategy.NoAck)))
     }
 
     it("calls the default init method") {
@@ -62,10 +62,10 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
       ing ! Publish(req)
       expectMsg(Ignore)
       ing ! Validate(req)
-      expectMsg(ValidRequest(TestRecord("test-topic", Some("1"), "test", AckStrategy.NoAck)))
+      expectMsg(ValidRequest(TestRecord("test-topic", "1", "test", AckStrategy.NoAck)))
       ing ! RecordProduced(TestRecordMetadata(0, 0, "", AckStrategy.NoAck), self)
       expectMsg(IngestorCompleted)
-      ing ! RecordNotProduced(TestRecord("test-topic", Some("1"), "test", AckStrategy.NoAck), new IllegalArgumentException, sup.ref)
+      ing ! RecordNotProduced(TestRecord("test-topic", "1", "test", AckStrategy.NoAck), new IllegalArgumentException, sup.ref)
       sup.expectMsgPF() {
         case i: IngestorError =>
           i.cause shouldBe a[IllegalArgumentException]

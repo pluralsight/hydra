@@ -16,6 +16,7 @@
 
 package hydra.kafka.ingestors
 
+import java.time.Duration
 import java.util.concurrent.TimeUnit
 
 import akka.actor.Status.Failure
@@ -24,13 +25,45 @@ import akka.pattern.pipe
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
-import org.apache.kafka.clients.admin.AdminClient
+import org.apache.kafka.clients.admin.Admin
 import org.joda.time.DateTime
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Try
+
+object KafkaTopicsActor {
+
+  case object TopicsTimer
+
+  case object RefreshTopicList
+
+  case class GetTopicRequest(topic: String)
+
+  case class GetTopicResponse(topic: String, lookupDate: DateTime, exists: Boolean)
+
+  case class GetTopicsResponse(topics: Seq[String])
+
+  case class GetTopicsFailure(cause: Throwable)
+
+  def fetchTopics(createAdminClient: () => Admin, kafkaTimeoutSeconds: Long): Future[GetTopicsResponse] = {
+    Future.fromTry {
+      Try(createAdminClient()).map { c =>
+        try {
+          val t = c.listTopics().names.get(kafkaTimeoutSeconds, TimeUnit.SECONDS).asScala.toSeq
+          GetTopicsResponse(t)
+        } finally {
+          Try(c.close(Duration.ofSeconds(kafkaTimeoutSeconds)))
+        }
+      }
+    }
+  }
+
+  def props(cfg: Config, checkInterval: FiniteDuration = 5.seconds, kafkaTimeoutSeconds: Long = 2): Props =
+    Props(new KafkaTopicsActor(cfg, checkInterval, kafkaTimeoutSeconds))
+
+}
 
 class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration, kafkaTimeoutSeconds: Long) extends Actor
   with Timers
@@ -41,12 +74,12 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration, kafkaTimeoutS
 
   self ! RefreshTopicList
 
-  timers.startPeriodicTimer(TopicsTimer, RefreshTopicList, checkInterval)
+  timers.startTimerAtFixedRate(TopicsTimer, RefreshTopicList, checkInterval)
 
   implicit val ec = context.dispatcher
 
-  private def createAdminClient(): AdminClient =
-    AdminClient.create(ConfigSupport.toMap(cfg).asJava)
+  private def createAdminClient(): Admin =
+    Admin.create(ConfigSupport.toMap(cfg).asJava)
 
   val initialReceive: Receive = {
     case RefreshTopicList => pipe(fetchTopics(createAdminClient, kafkaTimeoutSeconds)) to self
@@ -81,36 +114,4 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration, kafkaTimeoutS
   override def postStop(): Unit = {
     timers.cancel(TopicsTimer)
   }
-}
-
-object KafkaTopicsActor {
-
-  case object TopicsTimer
-
-  case object RefreshTopicList
-
-  case class GetTopicRequest(topic: String)
-
-  case class GetTopicResponse(topic: String, lookupDate: DateTime, exists: Boolean)
-
-  case class GetTopicsResponse(topics: Seq[String])
-
-  case class GetTopicsFailure(cause: Throwable)
-
-  def fetchTopics(createAdminClient: () => AdminClient, kafkaTimeoutSeconds: Long): Future[GetTopicsResponse] = {
-    Future.fromTry {
-      Try(createAdminClient()).map { c =>
-        try {
-          val t = c.listTopics().names.get(kafkaTimeoutSeconds, TimeUnit.SECONDS).asScala.toSeq
-          GetTopicsResponse(t)
-        } finally {
-          Try(c.close(kafkaTimeoutSeconds, TimeUnit.SECONDS))
-        }
-      }
-    }
-  }
-
-  def props(cfg: Config, checkInterval: FiniteDuration = 5.seconds, kafkaTimeoutSeconds: Long = 2): Props =
-    Props(new KafkaTopicsActor(cfg, checkInterval, kafkaTimeoutSeconds))
-
 }

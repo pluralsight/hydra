@@ -58,7 +58,7 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra"))
       val probe = TestProbe()
       val ack: TransportCallback = (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) =>
         probe.ref ! err.get
-      val rec = new StringRecord("transport_test", Some("key"), """{"name":"alex"}""", AckStrategy.NoAck) {
+      val rec = new StringRecord("transport_test", "key", """{"name":"alex"}""", AckStrategy.NoAck) {
         override val formatName: String = "unknown"
       }
       transport ! Deliver(rec, 1, ack)
@@ -67,14 +67,14 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra"))
 
     it("forwards to the right proxy") {
       val ack: TransportCallback = (d: Long, m: Option[RecordMetadata], e: Option[Throwable]) => ingestor.ref ! "DONE"
-      val rec = StringRecord("transport_test", Some("key"), "payload", AckStrategy.NoAck)
+      val rec = StringRecord("transport_test", "key", "payload", AckStrategy.NoAck)
       transport ! Deliver(rec, 1, ack)
       ingestor.expectMsg(max = 10.seconds, "DONE")
     }
 
     it("handles delete records") {
       val ack: TransportCallback = (d: Long, m: Option[RecordMetadata], e: Option[Throwable]) => ingestor.ref ! "DONE"
-      val rec = DeleteTombstoneRecord("transport_test", Some("key"), AckStrategy.NoAck)
+      val rec = DeleteTombstoneRecord("transport_test", "key", AckStrategy.NoAck)
       transport ! Deliver(rec, 1, ack)
       ingestor.expectMsg(max = 10.seconds, "DONE")
     }
@@ -97,6 +97,7 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra"))
         """
           |akka {
           |  kafka.producer {
+          |    close-on-producer-stop = true
           |    parallelism = 100
           |    close-timeout = 60s
           |    use-dispatcher = test
@@ -106,6 +107,7 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra"))
           |  }
           |}
           |hydra_kafka {
+          |
           |   schema.registry.url = "localhost:808"
           |   kafka.producer {
           |     bootstrap.servers="localhost:8092"

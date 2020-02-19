@@ -4,7 +4,7 @@ import java.net.InetAddress
 import java.util.UUID
 
 import akka.NotUsed
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.kafka.scaladsl.Consumer
 import akka.kafka.scaladsl.Consumer.Control
 import akka.kafka.{ConsumerSettings, Subscriptions}
@@ -40,17 +40,14 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
   import StreamsManagerActor._
 
   private implicit val ec = context.dispatcher
-  private implicit val materializer: Materializer = ActorMaterializer()
+
+  private implicit val system = context.system
 
   private val metadataTopicName = bootstrapKafkaConfig.get[String]("metadata-topic-name").valueOrElse("_hydra.metadata.topic")
-  private val compactedPrefix = bootstrapKafkaConfig.get[String]("compacted-topic-prefix").valueOrElse("_compacted.")
-  private val enableCompactedDerivedStream = bootstrapKafkaConfig.get[Boolean]("compacted_topic.enabled").valueOrElse(false)
 
   private[kafka] val metadataMap = Map[String, TopicMetadata]()
   private val metadataStream = StreamsManagerActor.createMetadataStream(bootstrapKafkaConfig, bootstrapServers,
     schemaRegistryClient, metadataTopicName, self)
-
-  private val kafkaUtils = KafkaUtils()
 
   override def receive: Receive = Actor.emptyBehavior
 
@@ -60,17 +57,15 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
 
 
   def streaming(stream: (Control, NotUsed), metadataMap: Map[String, TopicMetadata]): Receive = {
+    case InitializedStream =>
+      sender ! MetadataProcessed
+
     case GetMetadata =>
       sender ! GetMetadataResponse(metadataMap)
 
     case t: TopicMetadata =>
-      buildCompactedProps(t).foreach { compactedProps =>
-        val childName = compactedPrefix + t.subject
-        if (context.child(childName).isEmpty) {
-          context.actorOf(compactedProps, name = childName)
-        }
-      }
       context.become(streaming(stream, metadataMap + (t.subject -> t)))
+      sender ! MetadataProcessed
 
     case StopStream =>
       pipe(stream._1.shutdown().map(_ => StreamStopped)) to sender
@@ -79,27 +74,8 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
       pipe(Future {
         GetStreamActorResponse(context.child(actorName))
       }) to sender
-  }
 
-  private[kafka] def buildCompactedProps(metadata: TopicMetadata): Option[Props] = {
-    booleanToOption[Props](enableCompactedDerivedStream) { () =>
-      kafkaUtils.topicExists(metadata.subject) match {
-        case Success(e) if e =>
-          booleanToOption[Props](StreamTypeFormat.read(metadata.streamType.toJson) == History) { () =>
-            val schema = schemaRegistryClient.getById(metadata.schemaId).toString()
-            booleanToOption[Props](schema.contains("hydra.key")) { () =>
-              log.info(s"Attempting to create compacted stream for $metadata")
-              Some(CompactedTopicStreamActor.props(metadata.subject, compactedPrefix + metadata.subject, bootstrapServers, bootstrapKafkaConfig))
-            }
-          }
-        case Success(e) if !e =>
-          log.error(s"Topic ${metadata.subject} does not exist; won't create compacted topic.")
-          None
-        case Failure(ex) =>
-          log.error(ex, s"Unable to create compacted topic for ${metadata.subject}")
-          None
-      }
-    }
+    case StreamFailed(ex) => log.error("StreamsManagerActor stream failed with exception", ex)
   }
 }
 
@@ -108,6 +84,8 @@ object StreamsManagerActor {
   private type Stream = RunnableGraph[(Control, NotUsed)]
 
   case object GetMetadata
+
+  case object MetadataProcessed
 
   case class GetStreamActor(actorName: String)
 
@@ -119,6 +97,10 @@ object StreamsManagerActor {
 
   case object StreamStopped
 
+  case class StreamFailed(ex: Throwable)
+
+  case object InitializedStream
+
   def getMetadataTopicName(c: Config) = c.get[String]("metadata-topic-name")
     .valueOrElse("_hydra.metadata.topic")
 
@@ -127,7 +109,7 @@ object StreamsManagerActor {
                                                    schemaRegistryClient: SchemaRegistryClient,
                                                    metadataTopicName: String,
                                                    destination: ActorRef)
-                                                  (implicit ec: ExecutionContext, mat: Materializer): Stream = {
+                                                  (implicit ec: ExecutionContext, s: ActorSystem): Stream = {
 
     val formatter = ISODateTimeFormat.basicDateTimeNoMillis()
 
@@ -159,7 +141,12 @@ object StreamsManagerActor {
           UUID.fromString(record.get("id").toString),
           formatter.parseDateTime(record.get("createdDate").toString)
         )
-      }.toMat(Sink.actorRef(destination, StreamStopped))(Keep.both)
+      }.toMat(Sink.actorRefWithBackpressure(
+        destination,
+        onInitMessage = InitializedStream,
+        ackMessage = MetadataProcessed,
+        onCompleteMessage = StreamStopped,
+        onFailureMessage = StreamFailed.apply))(Keep.both)
   }
 
 

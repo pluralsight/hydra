@@ -54,7 +54,7 @@ class JdbcRecordFactory(schemaResourceLoader: ActorRef) extends RecordFactory[Se
           DB_PROFILE_PARAM,
           s"A db profile name is required ${DB_PROFILE_PARAM}]."))
 
-      JdbcRecord(table, Some(JdbcRecordFactory.pk(request, schema)), record, dbProfile, ackStrategy)
+      JdbcRecord(table, JdbcRecordFactory.pk(request, schema), record, dbProfile, ackStrategy)
     }
   }
 }
@@ -81,10 +81,10 @@ object JdbcRecordFactory {
   }
 }
 
-case class JdbcRecord(destination: String, key: Option[Seq[String]], payload: GenericRecord,
+case class JdbcRecord(destination: String, key: Seq[String], payload: GenericRecord,
                       dbProfile: String, ackStrategy: AckStrategy)
   extends HydraRecord[Seq[String], GenericRecord] {
-  lazy val primaryKeys = key.getOrElse(Seq.empty)
+  lazy val primaryKeys = key
   lazy val keyValues: Map[String, AnyRef] = primaryKeys.map(k => k -> payload.get(k)).toMap
 }
 

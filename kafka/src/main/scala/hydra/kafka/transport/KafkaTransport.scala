@@ -45,7 +45,7 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 
   private[kafka] val msgCounter = new AtomicLong()
 
-  timers.startPeriodicTimer("kamon", ReportMetrics, 1.minute)
+  timers.startTimerAtFixedRate("kamon", ReportMetrics, 1.minute)
 
   override def transport: Receive = {
     case Deliver(kr: KafkaRecord[_, _], deliveryId, ack) =>

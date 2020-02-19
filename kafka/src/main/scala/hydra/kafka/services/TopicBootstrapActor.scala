@@ -20,7 +20,7 @@ import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.{AvroRecord, AvroRecordFactory}
 import hydra.kafka.services.StreamsManagerActor.{GetMetadata, GetMetadataResponse, StopStream}
 import hydra.kafka.util.KafkaUtils
-import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails
+import hydra.kafka.util.KafkaUtils.TopicDetails
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
@@ -56,24 +56,14 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
   val bootstrapKafkaConfig: Config = bootstrapConfig getOrElse
     applicationConfig.getConfig("bootstrap-config")
 
-  val topicDetailsConfig: util.Map[String, String] = Map[String, String]().empty.asJava
-
   val topicDetails = new TopicDetails(
     bootstrapKafkaConfig.getInt("partitions"),
     bootstrapKafkaConfig.getInt("replication-factor").toShort,
-    topicDetailsConfig)
+    Map.empty)
 
   private val failureRetryInterval = bootstrapKafkaConfig
     .get[Int]("failure-retry-millis")
     .value
-
-
-  private val compactedDetailsConfig: util.Map[String, String] = Map[String, String]("cleanup.policy" -> "compact").asJava
-  private final val compactedDetails = new TopicDetails(
-    bootstrapKafkaConfig.getInt("partitions"),
-    bootstrapKafkaConfig.getInt("replication-factor").toShort,
-    compactedDetailsConfig)
-
 
   private val streamsManagerActor = context.actorOf(streamsManagerProps)
 
@@ -215,10 +205,6 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     )
   }
 
-  private[kafka] def shouldCreateCompactedTopic(topicMetadataRequest: TopicMetadataRequest): Boolean = {
-    topicMetadataRequest.streamType == History && topicMetadataRequest.schema.fields.contains("hydra.key")
-  }
-
   private[kafka] def createKafkaTopics(topicMetadataRequest: TopicMetadataRequest): Future[BootstrapResult] = {
     val timeoutMillis = bootstrapKafkaConfig.getInt("timeout")
 
@@ -226,12 +212,6 @@ class TopicBootstrapActor(schemaRegistryActor: ActorRef,
     val topicName = schema.map(_.subject).getOrElse("Schema does not conform to GenericSchema")
 
     var topicMap: Map[String, TopicDetails] = Map(topicName -> topicDetails)
-
-    if(shouldCreateCompactedTopic(topicMetadataRequest)) {
-      val compactedPrefix = bootstrapKafkaConfig.get[String]("compacted-topic-prefix").valueOrElse("_compacted.")
-      log.info(s"adding $compactedPrefix to creation...")
-      topicMap += (compactedPrefix+topicName -> compactedDetails)
-    }
 
     kafkaUtils.createTopics(topicMap, timeout = timeoutMillis)
       .map { r =>

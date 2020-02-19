@@ -1,0 +1,19 @@
+{
+  "namespace": "hydra.test",
+  "type": "record",
+  "name": "KeyTester",
+  "fields": [
+    {
+      "name": "id",
+      "type": "int"
+    },
+    {
+      "name": "name",
+      "type": "string"
+    },
+    {
+      "name": "rank",
+      "type": "int"
+    }
+  ]
+}
