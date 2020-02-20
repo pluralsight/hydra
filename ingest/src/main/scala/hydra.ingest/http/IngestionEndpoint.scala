@@ -82,8 +82,8 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: Execut
 
   private def exceptionHandler = ExceptionHandler {
     case e: IllegalArgumentException =>
-      if(ConfigFactory.load().getBoolean("hydra.ingest.shouldLog400s")) {
-        log.error("IngestionEndpoint::exceptionHandler: 400 ERROR: " + e.getMessage)
+      if(applicationConfig.get[Boolean]("hydra.ingest.shouldLog400s").valueOrElse(false)) {
+        log.error("Ingestion 400 ERROR: " + e.getMessage)
       }
       complete(400, GenericError(400, e.getMessage))
   }
