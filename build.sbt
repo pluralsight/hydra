@@ -139,7 +139,6 @@ lazy val dockerSettings = Seq(
   dockerfile in docker := {
     val appDir: File = stage.value
     val targetDir = "/app"
-    val dockerFiles = IO.listFiles(new java.io.File("docker")).find(_.getPath.endsWith(".conf")).toSeq
 
     new Dockerfile {
       from("java")
@@ -148,7 +147,6 @@ lazy val dockerSettings = Seq(
       env("JAVA_OPTS", "-Xmx2G")
       runRaw("mkdir -p /etc/hydra")
       run("mkdir", "-p", "/var/log/hydra")
-      copy(dockerFiles, "/etc/hydra/")
       expose(8088)
       entryPoint(s"$targetDir/bin/${executableScriptName.value}")
       copy(appDir, targetDir)

@@ -50,14 +50,6 @@ services:
         - 8081:8081
       expose:
         - 8081
-  consul:
-    image: consul:latest
-    expose:
-    - 8500
-    ports:
-    - 8500:8500
-    - 8300:8300
-
   hydra:
     image: pluralsight/hydra:0.11.0
     command: bash
@@ -68,7 +60,6 @@ services:
     expose:
       - 8088
     depends_on:
-      - consul
       - kafka
       - schema-registry
     environment:
