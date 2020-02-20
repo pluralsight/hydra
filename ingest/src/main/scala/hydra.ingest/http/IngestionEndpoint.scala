@@ -20,6 +20,7 @@ import akka.actor._
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
+import com.typesafe.config.ConfigFactory
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.HydraDirectives
@@ -80,7 +81,11 @@ class IngestionEndpoint(implicit val system: ActorSystem, implicit val e: Execut
   }
 
   private def exceptionHandler = ExceptionHandler {
-    case e: IllegalArgumentException => complete(400, GenericError(400, e.getMessage))
+    case e: IllegalArgumentException =>
+      if(applicationConfig.get[Boolean]("hydra.ingest.shouldLog400s").valueOrElse(false)) {
+        log.error("Ingestion 400 ERROR: " + e.getMessage)
+      }
+      complete(400, GenericError(400, e.getMessage))
   }
 }
 
