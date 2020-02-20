@@ -214,8 +214,10 @@ class SchemaResourceLoaderSpec extends Matchers
       client.register(nschema.getFullName + "-value", nschema)
       val loader = new SchemaResourceLoader("http://localhost:48223", client,
         metadataCheckInterval = 5.millis)
-      whenReady(loader.retrieveValueSchema(nschema.getFullName)) { schemaResource =>
-        schemaResource.schema shouldBe nschema
+      eventually {
+        whenReady(loader.retrieveValueSchema(nschema.getFullName)) { schemaResource =>
+          schemaResource.schema shouldBe nschema
+        }
       }
 
       //evolve the schema
