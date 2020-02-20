@@ -86,12 +86,14 @@ This documentation walks through setting up the core basic components of Hydra.
 
 ### Create a VirtualBox instance
 
-```docker-machine create --driver virtualbox --virtualbox-memory 6000 hydra
+```
+docker-machine create --driver virtualbox --virtualbox-memory 6000 hydra
 ```
 
 ### Configure Terminal to attach to the new machine
 
-```docker-machine env hydra
+```
+docker-machine env hydra
 ```
 
 ### Create a Docker network
