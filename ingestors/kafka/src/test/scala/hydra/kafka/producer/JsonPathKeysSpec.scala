@@ -25,7 +25,7 @@ class JsonPathKeysSpec extends Matchers with FunSpecLike {
 
   describe("When using json path") {
     it ("parses static keys") {
-      JsonPathKeys.getKey("test","test") shouldBe "test"
+      JsonPathKeys.getKey("test", "test") shouldBe "test"
       JsonPathKeys.getKey("123","""{"id":"1","host":"host","port":9092}""".parseJson) shouldBe "123"
     }
 

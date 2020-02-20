@@ -79,7 +79,7 @@ lazy val core = Project(
 
 lazy val kafka = Project(
   id = "kafka",
-  base = file("kafka")
+  base = file("ingestors/kafka")
 ).dependsOn(core).settings(moduleSettings, name := "hydra-kafka", libraryDependencies ++= Dependencies.kafkaDeps)
 
 lazy val avro = Project(
@@ -100,13 +100,13 @@ lazy val sql = Project(
 
 lazy val jdbc = Project(
   id = "jdbc",
-  base = file("jdbc")
+  base = file("ingestors/jdbc")
 ).dependsOn(core, sql)
   .settings(moduleSettings, name := "hydra-jdbc", libraryDependencies ++= Dependencies.sqlDeps)
 
 lazy val rabbitmq = Project(
   id = "rabbitmq",
-  base = file("rabbitmq")
+  base = file("ingestors/rabbitmq")
 ).dependsOn(core)
   .settings(moduleSettings, name := "hydra-rabbitmq", libraryDependencies ++= Dependencies.rabbitDeps)
 
