@@ -75,5 +75,7 @@ class DbProfile(val name: String, props: Map[String, AnyRef], val settings: Jdbc
 
   lazy val provider = new DataSourceConnectionProvider(ds)
 
-  def close() = ds.close()
+  def close(): Unit = ds.close()
+
+  def isClosed: Boolean = ds.isClosed
 }
