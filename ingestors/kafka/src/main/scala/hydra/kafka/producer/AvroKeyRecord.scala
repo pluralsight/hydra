@@ -4,8 +4,6 @@ import com.pluralsight.hydra.avro.JsonConverter
 import hydra.core.transport.AckStrategy
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
-import org.apache.commons.lang3.StringUtils
-import cats.implicits._
 
 final case class AvroKeyRecord(destination: String, keySchema: Schema, valueSchema: Schema, key: GenericRecord,
                       payload: GenericRecord, ackStrategy: AckStrategy)
