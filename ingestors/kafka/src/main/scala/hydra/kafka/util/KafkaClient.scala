@@ -7,6 +7,7 @@ import cats.implicits._
 import fs2.kafka._
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.kafka.clients.admin.NewTopic
+import hydra.kafka.producer.KafkaRecord
 
 trait KafkaClient[F[_]]  {
   import KafkaClient._
@@ -16,6 +17,8 @@ trait KafkaClient[F[_]]  {
   def getTopicNames: F[List[TopicName]]
 
   def createTopic(name: TopicName, details: TopicDetails): F[Unit]
+
+  def publishMessage[K, V](name: TopicName, record: KafkaRecord[K, V]): F[Unit]
 
 }
 
