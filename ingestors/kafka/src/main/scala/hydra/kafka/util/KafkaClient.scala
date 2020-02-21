@@ -1,12 +1,18 @@
 package hydra.kafka.util
 
-import cats.Monad
+import akka.actor.ActorSelection
 import cats.effect.concurrent.Ref
-import cats.effect.{Concurrent, ContextShift, Resource, Sync}
+import cats.effect.{Async, Concurrent, ContextShift, Resource, Sync}
 import cats.implicits._
 import fs2.kafka._
+import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError, IngestorStatus, IngestorTimeout}
+import hydra.core.transport.AckStrategy
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.kafka.clients.admin.NewTopic
+import hydra.kafka.producer.KafkaRecord
+
+import scala.concurrent.duration._
+import scala.util.control.NoStackTrace
 
 trait KafkaClient[F[_]]  {
   import KafkaClient._
@@ -17,6 +23,8 @@ trait KafkaClient[F[_]]  {
 
   def createTopic(name: TopicName, details: TopicDetails): F[Unit]
 
+  def publishMessage[K, V](record: KafkaRecord[K, V]): F[Either[PublishError, Unit]]
+
 }
 
 object KafkaClient {
@@ -24,7 +32,14 @@ object KafkaClient {
   type TopicName = String
   final case class Topic(name: TopicName, numberPartitions: Int)
 
-  def live[F[_]: Sync: Concurrent: ContextShift](bootstrapServers: String): F[KafkaClient[F]] = Sync[F].delay {
+  sealed abstract class PublishError extends Exception with Product with Serializable
+  object PublishError {
+    final case object Timeout extends PublishError with NoStackTrace
+    final case class UnexpectedResponse(ingestorResponse: IngestorStatus) extends PublishError
+    final case class Failed(cause: Throwable) extends PublishError
+  }
+
+  def live[F[_]: Async: Concurrent: ContextShift](bootstrapServers: String, ingestActor: ActorSelection): F[KafkaClient[F]] = Sync[F].delay {
     new KafkaClient[F] {
 
       override def describeTopic(name: TopicName): F[Option[Topic]] = {
@@ -40,6 +55,23 @@ object KafkaClient {
         val newTopic = new NewTopic(name, d.numPartitions, d.replicationFactor).configs(d.configs.asJava)
         getAdminClientResource.use(_.createTopic(newTopic))
       }
+
+      override def publishMessage[K, V](record: KafkaRecord[K, V]): F[Either[PublishError, Unit]] = {
+        import akka.pattern.ask
+
+        implicit val timeout: akka.util.Timeout = akka.util.Timeout(1.second)
+        val ingestRecord = Async.fromFuture(Sync[F].delay((ingestActor ? Ingest(record, AckStrategy.Replicated)).mapTo[IngestorStatus]))
+        val ingestionResult: F[Unit] = ingestRecord.flatMap {
+          case IngestorCompleted => Async[F].unit
+          case IngestorError(error) => Async[F].raiseError(PublishError.Failed(error))
+          case IngestorTimeout => Async[F].raiseError(PublishError.Timeout)
+          case otherStatus => Async[F].raiseError(PublishError.UnexpectedResponse(otherStatus))
+        }
+
+        ingestionResult.attemptNarrow[PublishError]
+      }
+
+
 
       private def getAdminClientResource: Resource[F, KafkaAdminClient[F]] = {
         adminClientResource(AdminClientSettings.apply.withBootstrapServers(bootstrapServers))
@@ -59,6 +91,10 @@ object KafkaClient {
         val entry = name -> Topic(name, details.numPartitions)
         ref.update(old => old + entry)
       }
+
+      override def publishMessage[K, V](record: KafkaRecord[K,V]): F[Either[PublishError, Unit]] =
+        Sync[F].pure(Right(()))
+      
     }
   }
 
