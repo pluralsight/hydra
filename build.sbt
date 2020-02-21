@@ -1,7 +1,9 @@
 import sbt.Resolver
 
 val JDK = "1.8"
-val buildNumber = scala.util.Properties.envOrNone("version").map(v => "." + v).getOrElse("")
+
+val buildNumber =
+  scala.util.Properties.envOrNone("version").map(v => "." + v).getOrElse("")
 val hydraVersion = "0.11.3" + buildNumber
 val jvmMaxMemoryFlag = sys.env.getOrElse("MAX_JVM_MEMORY_FLAG", "-Xmx2g")
 
@@ -13,12 +15,29 @@ lazy val defaultSettings = Seq(
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
   excludeDependencies += "org.slf4j" % "slf4j-log4j12",
   excludeDependencies += "log4j" % "log4j",
-  packageOptions in(Compile, packageBin) +=
+  packageOptions in (Compile, packageBin) +=
     Package.ManifestAttributes("Implementation-Build" -> buildNumber),
   logLevel := Level.Info,
-  scalacOptions ++= Seq("-encoding", "UTF-8", "-feature", "-language:_", "-deprecation", "-unchecked", "-Ypartial-unification"),
-  javacOptions in Compile ++= Seq("-encoding", "UTF-8", "-source", JDK, "-target", JDK,
-    "-Xlint:unchecked", "-Xlint:deprecation", "-Xlint:-options"),
+  scalacOptions ++= Seq(
+    "-encoding",
+    "UTF-8",
+    "-feature",
+    "-language:_",
+    "-deprecation",
+    "-unchecked",
+    "-Ypartial-unification"
+  ),
+  javacOptions in Compile ++= Seq(
+    "-encoding",
+    "UTF-8",
+    "-source",
+    JDK,
+    "-target",
+    JDK,
+    "-Xlint:unchecked",
+    "-Xlint:deprecation",
+    "-Xlint:-options"
+  ),
   resolvers += Resolver.mavenLocal,
   resolvers += "Scalaz Bintray Repo" at "https://dl.bintray.com/scalaz/releases",
   resolvers += "Confluent Maven Repo" at "https://packages.confluent.io/maven/",
@@ -44,7 +63,9 @@ val noPublishSettings = Seq(
   publishArtifact := false,
   // required until these tickets are closed https://github.com/sbt/sbt-pgp/issues/42,
   // https://github.com/sbt/sbt-pgp/issues/36
-  publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
+  publishTo := Some(
+    Resolver.file("Unused transient repository", file("target/unusedrepo"))
+  ),
   packageBin := {
     new File("")
   },
@@ -56,75 +77,110 @@ val noPublishSettings = Seq(
   }
 )
 
-lazy val moduleSettings = defaultSettings ++ Test.testSettings //++ Publish.settings
+lazy val moduleSettings =
+  defaultSettings ++ Test.testSettings //++ Publish.settings
 
 lazy val root = Project(
   id = "hydra",
   base = file(".")
-).settings(defaultSettings).aggregate(common, core, avro, ingest, kafka, sql, jdbc, rabbitmq,
-  sandbox)
+).settings(defaultSettings)
+  .aggregate(common, core, avro, ingest, kafka, sql, jdbc, rabbitmq, sandbox)
 
 lazy val common = Project(
   id = "common",
   base = file("common")
-).settings(moduleSettings,
+).settings(
+  moduleSettings,
   crossScalaVersions := Seq("2.11.8", "2.12.8"),
-  name := "hydra-common", libraryDependencies ++= Dependencies.baseDeps)
+  name := "hydra-common",
+  libraryDependencies ++= Dependencies.baseDeps
+)
 
 lazy val core = Project(
   id = "core",
   base = file("core")
 ).dependsOn(avro)
-  .settings(moduleSettings, name := "hydra-core", libraryDependencies ++= Dependencies.coreDeps)
-
+  .settings(
+    moduleSettings,
+    name := "hydra-core",
+    libraryDependencies ++= Dependencies.coreDeps
+  )
 
 lazy val kafka = Project(
   id = "kafka",
   base = file("ingestors/kafka")
-).dependsOn(core).settings(moduleSettings, name := "hydra-kafka", libraryDependencies ++= Dependencies.kafkaDeps)
+).dependsOn(core)
+  .settings(
+    moduleSettings,
+    name := "hydra-kafka",
+    libraryDependencies ++= Dependencies.kafkaDeps
+  )
 
 lazy val avro = Project(
   id = "avro",
   base = file("avro")
 ).dependsOn(common)
-  .settings(moduleSettings,
+  .settings(
+    moduleSettings,
     crossScalaVersions := Seq("2.11.8", "2.12.8"),
-    name := "hydra-avro", libraryDependencies ++= Dependencies.avroDeps)
+    name := "hydra-avro",
+    libraryDependencies ++= Dependencies.avroDeps
+  )
 
 lazy val sql = Project(
   id = "sql",
   base = file("sql")
 ).dependsOn(avro)
-  .settings(moduleSettings,
+  .settings(
+    moduleSettings,
     crossScalaVersions := Seq("2.11.8", "2.12.8"),
-    name := "hydra-sql", libraryDependencies ++= Dependencies.sqlDeps)
+    name := "hydra-sql",
+    libraryDependencies ++= Dependencies.sqlDeps
+  )
 
 lazy val jdbc = Project(
   id = "jdbc",
   base = file("ingestors/jdbc")
 ).dependsOn(core, sql)
-  .settings(moduleSettings, name := "hydra-jdbc", libraryDependencies ++= Dependencies.sqlDeps)
+  .settings(
+    moduleSettings,
+    name := "hydra-jdbc",
+    libraryDependencies ++= Dependencies.sqlDeps
+  )
 
 lazy val rabbitmq = Project(
   id = "rabbitmq",
   base = file("ingestors/rabbitmq")
 ).dependsOn(core)
-  .settings(moduleSettings, name := "hydra-rabbitmq", libraryDependencies ++= Dependencies.rabbitDeps)
+  .settings(
+    moduleSettings,
+    name := "hydra-rabbitmq",
+    libraryDependencies ++= Dependencies.rabbitDeps
+  )
 
-val sbSettings = defaultSettings ++ Test.testSettings ++ noPublishSettings ++ restartSettings
+val sbSettings =
+  defaultSettings ++ Test.testSettings ++ noPublishSettings ++ restartSettings
+
 lazy val sandbox = Project(
   id = "sandbox",
   base = file("sandbox")
 ).dependsOn(ingest, jdbc)
-  .settings(sbSettings, name := "hydra-examples", libraryDependencies ++= Dependencies.sandboxDeps)
+  .settings(
+    sbSettings,
+    name := "hydra-examples",
+    libraryDependencies ++= Dependencies.sandboxDeps
+  )
 
 lazy val ingest = Project(
   id = "ingest",
   base = file("ingest")
 ).dependsOn(core, kafka)
-  .settings(moduleSettings ++ dockerSettings,
+  .settings(
+    moduleSettings ++ dockerSettings,
     javaAgents += "org.aspectj" % "aspectjweaver" % "1.8.13",
-    name := "hydra-ingest", libraryDependencies ++= Dependencies.ingestDeps)
+    name := "hydra-ingest",
+    libraryDependencies ++= Dependencies.ingestDeps
+  )
   .enablePlugins(JavaAppPackaging, JavaAgent, sbtdocker.DockerPlugin)
 
 //scala style
@@ -153,11 +209,9 @@ lazy val dockerSettings = Seq(
       copy(appDir, targetDir)
     }
   },
-
   imageNames in docker := Seq(
     // Sets the latest tag
     ImageName(s"${organization.value}/hydra:latest"),
-
     // Sets a name with a tag that contains the project version
     ImageName(
       namespace = Some(organization.value),
