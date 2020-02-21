@@ -14,6 +14,7 @@ import hydra.kafka.producer.KafkaRecord
 
 import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
+import com.fasterxml.jackson.module.scala.deser.`package`.overrides
 
 trait KafkaClient[F[_]]  {
   import KafkaClient._
@@ -24,7 +25,7 @@ trait KafkaClient[F[_]]  {
 
   def createTopic(name: TopicName, details: TopicDetails): F[Unit]
 
-  def publishMessage[K, V](name: TopicName, record: KafkaRecord[K, V]): F[Either[PublishError, Unit]]
+  def publishMessage[K, V](record: KafkaRecord[K, V]): F[Either[PublishError, Unit]]
 
 }
 
@@ -54,7 +55,7 @@ object KafkaClient {
         getAdminClientResource.use(_.createTopic(newTopic))
       }
 
-      override def publishMessage[K, V](name: TopicName, record: KafkaRecord[K, V]): F[Either[PublishError, Unit]] = {
+      override def publishMessage[K, V](record: KafkaRecord[K, V]): F[Either[PublishError, Unit]] = {
         import akka.pattern.ask
 
         implicit val timeout: akka.util.Timeout = akka.util.Timeout(1.second)
@@ -89,6 +90,10 @@ object KafkaClient {
         val entry = name -> Topic(name, details.numPartitions)
         ref.update(old => old + entry)
       }
+
+      override def publishMessage[K, V](record: KafkaRecord[K,V]): F[Either[PublishError, Unit]] =
+        Sync[F].pure(Right(()))
+      
     }
   }
 
