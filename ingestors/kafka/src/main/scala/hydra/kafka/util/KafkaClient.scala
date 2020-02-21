@@ -1,13 +1,18 @@
 package hydra.kafka.util
 
+import akka.actor.ActorSelection
 import cats.Monad
 import cats.effect.concurrent.Ref
-import cats.effect.{Concurrent, ContextShift, Resource, Sync}
+import cats.effect.{Async, Concurrent, ContextShift, Resource, Sync}
 import cats.implicits._
 import fs2.kafka._
+import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError, IngestorStatus, IngestorTimeout}
+import hydra.core.transport.AckStrategy
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.kafka.clients.admin.NewTopic
 import hydra.kafka.producer.KafkaRecord
+
+import scala.concurrent.duration._
 
 trait KafkaClient[F[_]]  {
   import KafkaClient._
@@ -26,8 +31,9 @@ object KafkaClient {
 
   type TopicName = String
   final case class Topic(name: TopicName, numberPartitions: Int)
+  final case class PublishMessageTimeout(message: String)
 
-  def live[F[_]: Sync: Concurrent: ContextShift](bootstrapServers: String): F[KafkaClient[F]] = Sync[F].delay {
+  def live[F[_]: Async: Concurrent: ContextShift](bootstrapServers: String, ingestActor: ActorSelection): F[KafkaClient[F]] = Sync[F].delay {
     new KafkaClient[F] {
 
       override def describeTopic(name: TopicName): F[Option[Topic]] = {
@@ -43,6 +49,21 @@ object KafkaClient {
         val newTopic = new NewTopic(name, d.numPartitions, d.replicationFactor).configs(d.configs.asJava)
         getAdminClientResource.use(_.createTopic(newTopic))
       }
+
+      override def publishMessage[K, V](name: TopicName, record: KafkaRecord[K, V]): F[Unit] = {
+        import akka.pattern.ask
+
+        implicit val timeout: akka.util.Timeout = akka.util.Timeout(1.second)
+        val ingestRecord = Async.fromFuture(Sync[F].delay((ingestActor ? Ingest(record, AckStrategy.Replicated)).mapTo[IngestorStatus]))
+        ingestRecord.map {
+          case IngestorCompleted => Async[F].unit
+          case IngestorError(error) => Async[F].raiseError(error)
+          case IngestorTimeout => Async[F].raiseError()
+        }
+
+      }
+
+
 
       private def getAdminClientResource: Resource[F, KafkaAdminClient[F]] = {
         adminClientResource(AdminClientSettings.apply.withBootstrapServers(bootstrapServers))

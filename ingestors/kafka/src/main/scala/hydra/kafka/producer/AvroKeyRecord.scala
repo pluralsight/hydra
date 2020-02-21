@@ -11,7 +11,7 @@ final case class AvroKeyRecord(destination: String, keySchema: Schema, valueSche
                       payload: GenericRecord, ackStrategy: AckStrategy)
   extends KafkaRecord[GenericRecord, GenericRecord]
 
-object AvroRecord {
+object AvroKeyRecord {
   def apply(destination: String, keySchema: Schema, valueSchema: Schema, keyJson: String, valueJson: String,
             ackStrategy: AckStrategy): AvroKeyRecord = {
 
