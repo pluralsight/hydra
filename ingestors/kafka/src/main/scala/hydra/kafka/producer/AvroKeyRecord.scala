@@ -26,6 +26,6 @@ object AvroKeyRecord {
 
   def apply(destination: String, keySchema: Schema, valueSchema: Schema, key: GenericRecord, value: GenericRecord,
             ackStrategy: AckStrategy): AvroKeyRecord = {
-    AvroKeyRecord(destination, keySchema, valueSchema, key, value, ackStrategy)
+    new AvroKeyRecord(destination, keySchema, valueSchema, key, value, ackStrategy)
   }
 }
