@@ -25,6 +25,7 @@ lazy val defaultSettings = Seq(
   resolvers += "jitpack" at "https://jitpack.io",
   resolvers += Resolver.bintrayRepo("hseeberger", "maven"),
   ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet,
+  scalafmtOnCompile in ThisBuild := true,
   parallelExecution in sbt.Test := false,
   javaOptions in Universal ++= Seq(
     "-Dorg.aspectj.tracing.factory=default",
