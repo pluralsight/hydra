@@ -4,7 +4,6 @@ import scala.reflect.api.{Mirror, TypeCreator, Universe}
 import scala.reflect.runtime.universe._
 import scala.reflect.runtime.{currentMirror => cm, universe => ru}
 
-
 /**
   * Created by alexsilva on 6/2/16.
   */
@@ -28,25 +27,36 @@ class CaseClassFactory[T](cls: Class[T]) {
   val defaultConstructor: MethodSymbol =
     if (constructorSymbol.isMethod) {
       constructorSymbol.asMethod
-    }
-    else {
+    } else {
       val ctors = constructorSymbol.asTerm.alternatives
-      ctors.map {
-        _.asMethod
-      }.find {
-        _.isPrimaryConstructor
-      }.get
+      ctors
+        .map {
+          _.asMethod
+        }
+        .find {
+          _.isPrimaryConstructor
+        }
+        .get
     }
 
   val constructorMethod = classMirror.reflectConstructor(defaultConstructor)
 
-  lazy val contructorTypes: Map[String, TypeTag[_]] = Map(defaultConstructor.paramLists.reduceLeft(_ ++ _)
-    .map(sym => sym.name.toString -> tagForType(tpe.member(sym.name).asMethod.returnType)): _*)
+  lazy val contructorTypes: Map[String, TypeTag[_]] = Map(
+    defaultConstructor.paramLists
+      .reduceLeft(_ ++ _)
+      .map(sym =>
+        sym.name.toString -> tagForType(
+          tpe.member(sym.name).asMethod.returnType
+        )
+      ): _*
+  )
 
   def tagForType(tpe: Type): TypeTag[_] = TypeTag(
     classLoaderMirror,
     new TypeCreator {
-      def apply[U <: Universe with Singleton](m: Mirror[U]) = tpe.asInstanceOf[U#Type]
+
+      def apply[U <: Universe with Singleton](m: Mirror[U]) =
+        tpe.asInstanceOf[U#Type]
     }
   )
 
@@ -57,9 +67,10 @@ class CaseClassFactory[T](cls: Class[T]) {
     * @param args the arguments to supply to the constructor method
     */
   def buildWith(args: Seq[_]): T = {
-    require(contructorTypes.size == args.size,
-      s"Class [$cls] has ${contructorTypes.size} parameters; arguments supplied have ${args.size}.")
+    require(
+      contructorTypes.size == args.size,
+      s"Class [$cls] has ${contructorTypes.size} parameters; arguments supplied have ${args.size}."
+    )
     constructorMethod(args: _*).asInstanceOf[T]
   }
 }
-

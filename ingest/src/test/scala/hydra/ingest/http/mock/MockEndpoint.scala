@@ -9,28 +9,40 @@ import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientExcept
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class MockEndpoint(implicit system: ActorSystem, implicit val e: ExecutionContext) {
+class MockEndpoint(
+    implicit system: ActorSystem,
+    implicit val e: ExecutionContext
+) {
 
-  def throwRestClientException(statusCode: Int, errorCode: Int, errorMessage: String): Future[Any] = {
+  def throwRestClientException(
+      statusCode: Int,
+      errorCode: Int,
+      errorMessage: String
+  ): Future[Any] = {
     throw new RestClientException(errorMessage, statusCode, errorCode)
   }
 
-  val schemaRouteExceptionHandler: ExceptionHandler = new SchemasEndpoint().excptHandler
+  val schemaRouteExceptionHandler: ExceptionHandler =
+    new SchemasEndpoint().excptHandler
 
   def route: Route = {
     pathPrefix("throwRestClientException") {
       handleExceptions(schemaRouteExceptionHandler) {
         get {
-          parameters('statusCode, 'errorCode, 'errorMessage) { (statusCode, errorCode, errorMessage) =>
-            pathEndOrSingleSlash {
-              onSuccess(throwRestClientException(statusCode.toInt, errorCode.toInt, errorMessage)) { _ =>
-                complete(OK)
+          parameters('statusCode, 'errorCode, 'errorMessage) {
+            (statusCode, errorCode, errorMessage) =>
+              pathEndOrSingleSlash {
+                onSuccess(
+                  throwRestClientException(
+                    statusCode.toInt,
+                    errorCode.toInt,
+                    errorMessage
+                  )
+                ) { _ => complete(OK) }
               }
-            }
           }
         }
       }
     }
   }
 }
-

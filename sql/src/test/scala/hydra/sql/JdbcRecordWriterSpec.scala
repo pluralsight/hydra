@@ -15,9 +15,10 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 5/4/17.
   */
-class JdbcRecordWriterSpec extends Matchers
-  with FunSpecLike
-  with BeforeAndAfterAll {
+class JdbcRecordWriterSpec
+    extends Matchers
+    with FunSpecLike
+    with BeforeAndAfterAll {
 
   import scala.collection.JavaConverters._
 
@@ -45,14 +46,18 @@ class JdbcRecordWriterSpec extends Matchers
 
   val properties = new Properties
 
-  cfg.entrySet().asScala.foreach(e => properties.setProperty(e.getKey(), cfg.getString(e.getKey())))
+  cfg
+    .entrySet()
+    .asScala
+    .foreach(e => properties.setProperty(e.getKey(), cfg.getString(e.getKey())))
 
   val config = ConfigFactory.parseString(
     """
       |connection.url = "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1"
       |connection.user = sa
       |
-      """.stripMargin)
+      """.stripMargin
+  )
 
   private val writerSettings = JdbcWriterSettings(config)
 
@@ -60,8 +65,13 @@ class JdbcRecordWriterSpec extends Matchers
   record.put("id", 1)
   record.put("username", "alex")
 
-  val provider = new DriverManagerConnectionProvider("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1",
-    "", "", 1, 1.millis)
+  val provider = new DriverManagerConnectionProvider(
+    "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1",
+    "",
+    "",
+    1,
+    1.millis
+  )
 
   val catalog = new JdbcCatalog(provider, UnderscoreSyntax, H2Dialect)
 
@@ -86,11 +96,17 @@ class JdbcRecordWriterSpec extends Matchers
       catalog.createOrAlterTable(Table("tester", schema))
       val s = SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
       intercept[AnalysisException] {
-        new JdbcRecordWriter(writerSettings, provider, s, SaveMode.ErrorIfExists)
+        new JdbcRecordWriter(
+          writerSettings,
+          provider,
+          s,
+          SaveMode.ErrorIfExists
+        )
       }
 
       new JdbcRecordWriter(writerSettings, provider, s, SaveMode.Append).close()
-      new JdbcRecordWriter(writerSettings, provider, s, SaveMode.Overwrite).close()
+      new JdbcRecordWriter(writerSettings, provider, s, SaveMode.Overwrite)
+        .close()
       new JdbcRecordWriter(writerSettings, provider, s, SaveMode.Ignore).close()
     }
 
@@ -109,7 +125,12 @@ class JdbcRecordWriterSpec extends Matchers
           |}""".stripMargin
 
       val s = new Schema.Parser().parse(schemaStr)
-      new JdbcRecordWriter(writerSettings, provider, SchemaWrapper.from(s), SaveMode.Append).close()
+      new JdbcRecordWriter(
+        writerSettings,
+        provider,
+        SchemaWrapper.from(s),
+        SaveMode.Append
+      ).close()
       catalog.tableExists(TableIdentifier("tester")) shouldBe true
     }
 
@@ -129,10 +150,15 @@ class JdbcRecordWriterSpec extends Matchers
 
       val s = new Schema.Parser().parse(schemaStr)
       val tblId = Some(TableIdentifier("my_table"))
-      new JdbcRecordWriter(writerSettings, provider, SchemaWrapper.from(s), SaveMode.Append, tblId).close()
+      new JdbcRecordWriter(
+        writerSettings,
+        provider,
+        SchemaWrapper.from(s),
+        SaveMode.Append,
+        tblId
+      ).close()
       catalog.tableExists(TableIdentifier("my_table")) shouldBe true
     }
-
 
     it("writes") {
       val writer = new JdbcRecordWriter(writerSettings, provider, schema)
@@ -166,9 +192,11 @@ class JdbcRecordWriterSpec extends Matchers
           |	]
           |}""".stripMargin
 
-
-      val writer = new JdbcRecordWriter(writerSettings, provider,
-        SchemaWrapper.from(new Schema.Parser().parse(schemaStr)))
+      val writer = new JdbcRecordWriter(
+        writerSettings,
+        provider,
+        SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
+      )
       writer.batch(Upsert(record))
 
       val c1 = provider.getConnection
@@ -211,13 +239,18 @@ class JdbcRecordWriterSpec extends Matchers
       srecord.put("id", 1)
       srecord.put("username", "alex")
 
-      val writer = new JdbcRecordWriter(writerSettings, provider,
-        SchemaWrapper.from(new Schema.Parser().parse(schemaStr)))
+      val writer = new JdbcRecordWriter(
+        writerSettings,
+        provider,
+        SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
+      )
 
       writer.execute(Upsert(srecord))
       val c = provider.getConnection
       TryWith(c.createStatement()) { stmt =>
-        val rs = stmt.executeQuery("select \"id\",\"username\" from write_single_record")
+        val rs = stmt.executeQuery(
+          "select \"id\",\"username\" from write_single_record"
+        )
         rs.next() shouldBe true
         rs.getString(2) shouldBe "alex"
         rs.getInt(1) shouldBe 1
@@ -247,7 +280,8 @@ class JdbcRecordWriterSpec extends Matchers
           |	]
           |}""".stripMargin
 
-      val newRecord = new GenericData.Record(new Schema.Parser().parse(newSchema))
+      val newRecord =
+        new GenericData.Record(new Schema.Parser().parse(newSchema))
       newRecord.put("id", 2)
       newRecord.put("rank", 2)
       newRecord.put("username", "alex-new")
@@ -258,7 +292,9 @@ class JdbcRecordWriterSpec extends Matchers
       writer.execute(Upsert(newRecord))
 
       TryWith(c.createStatement()) { stmt =>
-        val rs = stmt.executeQuery("select \"id\",\"username\", \"rank\" from write_single_record")
+        val rs = stmt.executeQuery(
+          "select \"id\",\"username\", \"rank\" from write_single_record"
+        )
         rs.next() shouldBe true
         rs.getString(2) shouldBe "alex-new"
         rs.getInt(1) shouldBe 2
@@ -291,12 +327,18 @@ class JdbcRecordWriterSpec extends Matchers
       srecord.put("id", 1)
       srecord.put("username", "alex")
 
-      val writer = new JdbcRecordWriter(writerSettings, provider, SchemaWrapper.from(pschema))
+      val writer = new JdbcRecordWriter(
+        writerSettings,
+        provider,
+        SchemaWrapper.from(pschema)
+      )
 
       writer.execute(Upsert(srecord))
       val c = provider.getConnection
       TryWith(c.createStatement()) { stmt =>
-        val rs = stmt.executeQuery("select \"id\",\"username\" from delete_single_record")
+        val rs = stmt.executeQuery(
+          "select \"id\",\"username\" from delete_single_record"
+        )
         rs.next() shouldBe true
         rs.getString(2) shouldBe "alex"
         rs.getInt(1) shouldBe 1
@@ -305,7 +347,9 @@ class JdbcRecordWriterSpec extends Matchers
       //delete
       writer.execute(DeleteByKey(Map("id" -> (1: java.lang.Integer))))
       TryWith(c.createStatement()) { stmt =>
-        val rs = stmt.executeQuery("select \"id\",\"username\" from delete_single_record")
+        val rs = stmt.executeQuery(
+          "select \"id\",\"username\" from delete_single_record"
+        )
         rs.next() shouldBe false
       }.get
     }
@@ -334,12 +378,15 @@ class JdbcRecordWriterSpec extends Matchers
       srecord.put("id", 1)
       srecord.put("username", "alex")
 
-      val writer = new JdbcRecordWriter(writerSettings, provider, SchemaWrapper.from(pschema))
+      val writer = new JdbcRecordWriter(
+        writerSettings,
+        provider,
+        SchemaWrapper.from(pschema)
+      )
       intercept[UnsupportedOperationException] {
         writer.execute(DeleteByKey(Map("id" -> (1: java.lang.Integer))))
       }
     }
-
 
     it("flushesOnClose") {
 
@@ -361,21 +408,25 @@ class JdbcRecordWriterSpec extends Matchers
           |	]
           |}""".stripMargin
 
-
-      val writer = new JdbcRecordWriter(writerSettings, provider,
-        SchemaWrapper.from(new Schema.Parser().parse(schemaStr)))
+      val writer = new JdbcRecordWriter(
+        writerSettings,
+        provider,
+        SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
+      )
       writer.batch(Upsert(record))
 
       val c = provider.getConnection
       TryWith(c.createStatement()) { stmt =>
-        val rs = stmt.executeQuery("select \"id\",\"username\" from flush_on_close")
+        val rs =
+          stmt.executeQuery("select \"id\",\"username\" from flush_on_close")
         rs.next() shouldBe false
       }.get
 
       writer.close()
 
       TryWith(c.createStatement()) { stmt =>
-        val rs = stmt.executeQuery("select \"id\",\"username\" from flush_on_close")
+        val rs =
+          stmt.executeQuery("select \"id\",\"username\" from flush_on_close")
         rs.next()
         Seq(rs.getInt(1), rs.getString(2)) shouldBe Seq(1, "alex")
       }.get
@@ -400,9 +451,11 @@ class JdbcRecordWriterSpec extends Matchers
           |	]
           |}""".stripMargin
 
-
-      val writer = new JdbcRecordWriter(writerSettings, provider,
-        SchemaWrapper.from(new Schema.Parser().parse(schemaStr)))
+      val writer = new JdbcRecordWriter(
+        writerSettings,
+        provider,
+        SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
+      )
       //writer.batch(Delete(Map.empty))
     }
 
@@ -430,8 +483,11 @@ class JdbcRecordWriterSpec extends Matchers
 
       val pschema = new Schema.Parser().parse(schemaStr)
 
-      val writer = new JdbcRecordWriter(writerSettings, provider,
-        SchemaWrapper.from(pschema))
+      val writer = new JdbcRecordWriter(
+        writerSettings,
+        provider,
+        SchemaWrapper.from(pschema)
+      )
 
       writer.batch(Upsert(record))
 
@@ -441,7 +497,6 @@ class JdbcRecordWriterSpec extends Matchers
         val rs = stmt.executeQuery("select \"id\",\"username\" from test_flush")
         rs.next() shouldBe true
       }.get
-
 
       writer.batch(DeleteByKey(Map("id" -> (1: java.lang.Integer))))
 
@@ -471,7 +526,12 @@ class JdbcRecordWriterSpec extends Matchers
 
       val schemaVersion2 = new Schema.Parser().parse(schemaStrV2)
 
-      new JdbcRecordWriter(writerSettings, provider, SchemaWrapper.from(schemaVersion2), SaveMode.Append).close()
+      new JdbcRecordWriter(
+        writerSettings,
+        provider,
+        SchemaWrapper.from(schemaVersion2),
+        SaveMode.Append
+      ).close()
       catalog.tableExists(TableIdentifier("versioned_table_v2")) shouldBe true
     }
 
@@ -494,8 +554,11 @@ class JdbcRecordWriterSpec extends Matchers
           |	]
           |}""".stripMargin
 
-      val writer = new JdbcRecordWriter(writerSettings, provider,
-        SchemaWrapper.from(new Schema.Parser().parse(schemaStr)))
+      val writer = new JdbcRecordWriter(
+        writerSettings,
+        provider,
+        SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
+      )
       writer.batch(Upsert(record))
       writer.batch(Upsert(record))
       writer.resetBatchedOps()
@@ -504,7 +567,8 @@ class JdbcRecordWriterSpec extends Matchers
       val c = provider.getConnection()
 
       TryWith(c.createStatement()) { stmt =>
-        val rs = stmt.executeQuery("select \"id\",\"username\" from test_rollback")
+        val rs =
+          stmt.executeQuery("select \"id\",\"username\" from test_rollback")
         rs.next() shouldBe false
       }.get
     }

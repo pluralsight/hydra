@@ -10,7 +10,10 @@ import hydra.common.logging.LoggingAdapter
 import hydra.common.util.ActorUtils
 import hydra.core.http.HydraDirectives
 import hydra.kafka.consumer.KafkaConsumerProxy
-import hydra.kafka.consumer.KafkaConsumerProxy.{GetLatestOffsets, LatestOffsetsResponse}
+import hydra.kafka.consumer.KafkaConsumerProxy.{
+  GetLatestOffsets,
+  LatestOffsetsResponse
+}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
@@ -24,58 +27,81 @@ import scala.concurrent.{Await, ExecutionContext, Future}
   *
   * Created by alexsilva on 3/18/17.
   */
-class TopicsEndpoint(implicit system: ActorSystem, implicit val e: ExecutionContext)
-  extends RoutedEndpoints with LoggingAdapter with HydraDirectives with HydraKafkaJsonSupport {
+class TopicsEndpoint(
+    implicit system: ActorSystem,
+    implicit val e: ExecutionContext
+) extends RoutedEndpoints
+    with LoggingAdapter
+    with HydraDirectives
+    with HydraKafkaJsonSupport {
 
   import hydra.kafka.util.KafkaUtils._
 
   implicit val jsonStreamingSupport = EntityStreamingSupport.json()
 
   private val consumerProxy = system
-    .actorSelection(s"/user/service/${ActorUtils.actorName(classOf[KafkaConsumerProxy])}")
+    .actorSelection(
+      s"/user/service/${ActorUtils.actorName(classOf[KafkaConsumerProxy])}"
+    )
 
-  override val route = path("transports" / "kafka" / "consumer" / "topics" / Segment) { topicName =>
-    get {
-      extractRequestContext { ctx =>
-        parameters('format.?, 'group.?, 'n ? 10, 'start ? "earliest") { (format, groupId, n, startOffset) =>
-          val settings = loadConsumerSettings[Any, Any](format.getOrElse("avro"), groupId.getOrElse("hydra"), startOffset)
-          val offsets = latestOffsets(topicName)
-          val source = Consumer.plainSource(settings, Subscriptions.topics(topicName))
-            .initialTimeout(5.seconds)
-            .zipWithIndex
-            .takeWhile(rec => rec._2 <= n && !shouldCancel(offsets, rec._1))
-            .map(rec => rec._1.value().toString)
-            .watchTermination()((_, termination) => termination.failed.foreach {
-              case cause => ctx.fail(cause)
-            })
-          complete(source)
+  override val route =
+    path("transports" / "kafka" / "consumer" / "topics" / Segment) {
+      topicName =>
+        get {
+          extractRequestContext { ctx =>
+            parameters('format.?, 'group.?, 'n ? 10, 'start ? "earliest") {
+              (format, groupId, n, startOffset) =>
+                val settings = loadConsumerSettings[Any, Any](
+                  format.getOrElse("avro"),
+                  groupId.getOrElse("hydra"),
+                  startOffset
+                )
+                val offsets = latestOffsets(topicName)
+                val source = Consumer
+                  .plainSource(settings, Subscriptions.topics(topicName))
+                  .initialTimeout(5.seconds)
+                  .zipWithIndex
+                  .takeWhile(rec =>
+                    rec._2 <= n && !shouldCancel(offsets, rec._1)
+                  )
+                  .map(rec => rec._1.value().toString)
+                  .watchTermination()((_, termination) =>
+                    termination.failed.foreach {
+                      case cause => ctx.fail(cause)
+                    }
+                  )
+                complete(source)
 
+            }
+          }
         }
-      }
     }
-  }
 
-  def shouldCancel(fpartitions: Future[Map[TopicPartition, Long]], record: ConsumerRecord[Any, Any]): Boolean = {
+  def shouldCancel(
+      fpartitions: Future[Map[TopicPartition, Long]],
+      record: ConsumerRecord[Any, Any]
+  ): Boolean = {
     if (fpartitions.isCompleted) {
       val partitions = Await.result(fpartitions, 1.millis)
       val tp = new TopicPartition(record.topic(), record.partition())
       partitions.get(tp) match {
         case Some(offset) => record.offset() >= offset
-        case None => false
+        case None         => false
       }
-    }
-    else {
+    } else {
       false
     }
 
   }
 
-  private def latestOffsets(topic: String): Future[Map[TopicPartition, Long]] = {
+  private def latestOffsets(
+      topic: String
+  ): Future[Map[TopicPartition, Long]] = {
     implicit val timeout = Timeout(5 seconds)
     import akka.pattern.ask
-    (consumerProxy ? GetLatestOffsets(topic)).mapTo[LatestOffsetsResponse].map(_.offsets)
+    (consumerProxy ? GetLatestOffsets(topic))
+      .mapTo[LatestOffsetsResponse]
+      .map(_.offsets)
   }
 
-
 }
-

@@ -47,5 +47,3 @@ class DateUtilsSpec extends Matchers with FunSpecLike {
   }
 
 }
-
-

@@ -13,7 +13,6 @@ case object ConfidentialPII extends DataClassification
 case object RestrictedFinancial extends DataClassification
 case object RestrictedEmployeeData extends DataClassification
 
-
 sealed trait ContactMethod
 
 final case class Email(address: String) extends ContactMethod
@@ -27,16 +26,19 @@ object Subject {
   private val kafkaValidCharacterRegex = """^[a-zA-Z0-9_\-.]+$""".r
 
   def createValidated(value: String): Option[Subject] =
-    if (kafkaValidCharacterRegex.pattern.matcher(value).matches()) Some(new Subject(value)) else None
+    if (kafkaValidCharacterRegex.pattern.matcher(value).matches())
+      Some(new Subject(value))
+    else None
 }
 
 case class TopicMetadataV2Request(
-                                   subject: Subject,
-                                   schemas: Schemas,
-                                   streamType: StreamType,
-                                   deprecated: Boolean,
-                                   dataClassification: DataClassification,
-                                   contact: NonEmptyList[ContactMethod],
-                                   createdDate: Instant,
-                                   parentSubjects: List[Subject],
-                                   notes: Option[String])
+    subject: Subject,
+    schemas: Schemas,
+    streamType: StreamType,
+    deprecated: Boolean,
+    dataClassification: DataClassification,
+    contact: NonEmptyList[ContactMethod],
+    createdDate: Instant,
+    parentSubjects: List[Subject],
+    notes: Option[String]
+)

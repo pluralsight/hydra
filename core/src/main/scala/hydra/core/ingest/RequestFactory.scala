@@ -9,5 +9,8 @@ import scala.concurrent.Future
   * Created by alexsilva on 3/14/17.
   */
 trait RequestFactory[S] {
-  def createRequest(correlationId: String, source: S)(implicit mat: Materializer): Future[HydraRequest]
+
+  def createRequest(correlationId: String, source: S)(
+      implicit mat: Materializer
+  ): Future[HydraRequest]
 }

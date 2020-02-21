@@ -10,7 +10,8 @@ class SchemaRegistrySpec extends FlatSpec with Matchers {
 
   private def getSchema[F[_]: Applicative](name: String): F[Schema] =
     Applicative[F].pure {
-      SchemaBuilder.record(name)
+      SchemaBuilder
+        .record(name)
         .fields()
         .name("isTrue")
         .`type`()
@@ -19,7 +20,9 @@ class SchemaRegistrySpec extends FlatSpec with Matchers {
         .endRecord()
     }
 
-  private def testAddSubject[F[_]: Monad](schemaRegistry: SchemaRegistry[F]): F[Unit] = {
+  private def testAddSubject[F[_]: Monad](
+      schemaRegistry: SchemaRegistry[F]
+  ): F[Unit] = {
     val subject = "testSubjectAdd"
     for {
       schema <- getSchema[F]("testSchemaAdd")
@@ -32,7 +35,9 @@ class SchemaRegistrySpec extends FlatSpec with Matchers {
     }
   }
 
-  private def testDeleteSchemaVersion[F[_]: Monad](schemaRegistry: SchemaRegistry[F]): F[Unit] = {
+  private def testDeleteSchemaVersion[F[_]: Monad](
+      schemaRegistry: SchemaRegistry[F]
+  ): F[Unit] = {
     val subject = "testSubjectDelete"
     for {
       schema <- getSchema[F]("testSchemaDelete")
@@ -47,7 +52,9 @@ class SchemaRegistrySpec extends FlatSpec with Matchers {
     }
   }
 
-  private def testGetAllSubjects[F[_]: Monad](schemaRegistry: SchemaRegistry[F]): F[Unit] = {
+  private def testGetAllSubjects[F[_]: Monad](
+      schemaRegistry: SchemaRegistry[F]
+  ): F[Unit] = {
     val subject = "testGetAllSubjects"
     for {
       schema <- getSchema[F]("testGetAllSubjects")
@@ -70,7 +77,9 @@ class SchemaRegistrySpec extends FlatSpec with Matchers {
     }
   }
 
-  private def runTests[F[_]: Monad](schemaRegistry: F[SchemaRegistry[F]]): F[Unit] = {
+  private def runTests[F[_]: Monad](
+      schemaRegistry: F[SchemaRegistry[F]]
+  ): F[Unit] = {
     for {
       _ <- schemaRegistry.flatMap(testAddSubject[F])
       _ <- schemaRegistry.flatMap(testDeleteSchemaVersion[F])

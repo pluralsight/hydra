@@ -15,14 +15,12 @@ package hydra.avro.util
  * limitations under the License.
  */
 
-
 import java.util.Random
 
 import com.fasterxml.jackson.databind.node.{ArrayNode, JsonNodeType}
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 
 import scala.collection.JavaConverters._
-
 
 /**
   * Simple utility class that takes in a Json object and creates an Avro schema from that sample.
@@ -49,37 +47,88 @@ class AvroSchemaGenerator {
       val node = field.getValue
       node.getNodeType match {
         case JsonNodeType.NUMBER =>
-          fields.add(mapper.createObjectNode().put(NAME, field.getKey).put(TYPE, if (node.isLong) "long" else "double"))
+          fields.add(
+            mapper
+              .createObjectNode()
+              .put(NAME, field.getKey)
+              .put(
+                TYPE,
+                if (node.isLong) "long"
+                else "double"
+              )
+          )
         case JsonNodeType.STRING =>
-          fields.add(mapper.createObjectNode().put(NAME, field.getKey()).put(TYPE, STRING))
+          fields.add(
+            mapper
+              .createObjectNode()
+              .put(NAME, field.getKey())
+              .put(TYPE, STRING)
+          )
         case JsonNodeType.OBJECT =>
           val objNode = mapper.createObjectNode()
           objNode.put(NAME, field.getKey())
-          objNode.set(TYPE, mapper.createObjectNode().put(TYPE, RECORD)
-            .put(NAME, generateRandomKey(field)).set(FIELDS, getFields(node)))
+          objNode.set(
+            TYPE,
+            mapper
+              .createObjectNode()
+              .put(TYPE, RECORD)
+              .put(NAME, generateRandomKey(field))
+              .set(FIELDS, getFields(node))
+          )
           fields.add(objNode)
         case JsonNodeType.BOOLEAN =>
-          fields.add(mapper.createObjectNode().put(NAME, field.getKey()).put(TYPE, BOOLEAN))
+          fields.add(
+            mapper
+              .createObjectNode()
+              .put(NAME, field.getKey())
+              .put(TYPE, BOOLEAN)
+          )
         case JsonNodeType.ARRAY =>
           val arrayNode = node.asInstanceOf[ArrayNode]
           val element = arrayNode.get(0)
           val objectNode = mapper.createObjectNode()
           objectNode.put(NAME, field.getKey())
           if (element.getNodeType() == JsonNodeType.NUMBER) {
-            objectNode.set(TYPE, mapper.createObjectNode().put(TYPE, ARRAY)
-              .put(ITEMS, if (node.isLong) "long" else "double"))
+            objectNode.set(
+              TYPE,
+              mapper
+                .createObjectNode()
+                .put(TYPE, ARRAY)
+                .put(
+                  ITEMS,
+                  if (node.isLong) "long"
+                  else "double"
+                )
+            )
             fields.add(objectNode)
           } else if (element.getNodeType() == JsonNodeType.STRING) {
-            objectNode.set(TYPE, mapper.createObjectNode().put(TYPE, ARRAY).put(ITEMS, STRING))
+            objectNode.set(
+              TYPE,
+              mapper.createObjectNode().put(TYPE, ARRAY).put(ITEMS, STRING)
+            )
             fields.add(objectNode)
           } else {
-            objectNode.set(TYPE, mapper.createObjectNode().put(TYPE, ARRAY).set(ITEMS, mapper.createObjectNode()
-              .put(TYPE, RECORD).put(NAME, generateRandomKey(field)).set(FIELDS, getFields(element))))
+            objectNode.set(
+              TYPE,
+              mapper
+                .createObjectNode()
+                .put(TYPE, ARRAY)
+                .set(
+                  ITEMS,
+                  mapper
+                    .createObjectNode()
+                    .put(TYPE, RECORD)
+                    .put(NAME, generateRandomKey(field))
+                    .set(FIELDS, getFields(element))
+                )
+            )
           }
           fields.add(objectNode)
         case _ =>
-          throw new IllegalArgumentException(s"Unable to determine action for node ${node.getNodeType}. " +
-            "Allowed types are ARRAY, STRING, NUMBER, OBJECT")
+          throw new IllegalArgumentException(
+            s"Unable to determine action for node ${node.getNodeType}. " +
+              "Allowed types are ARRAY, STRING, NUMBER, OBJECT"
+          )
       }
     }
 
@@ -90,7 +139,6 @@ class AvroSchemaGenerator {
     entry.getKey() + "_" + new Random().nextInt(100)
 
 }
-
 
 object AvroSchemaGenerator {
   val NAME = "name"

@@ -18,7 +18,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 object Main extends IOApp with BootstrappingSupport with LoggingAdapter {
 
   private implicit val system: ActorSystem = containerService.system
-  private implicit val catsLogger: SelfAwareStructuredLogger[IO] = Slf4jLogger.getLogger[IO]
+
+  private implicit val catsLogger: SelfAwareStructuredLogger[IO] =
+    Slf4jLogger.getLogger[IO]
 
   private val oldBoostrap = IO(try {
     val enablePrometheus = applicationConfig
@@ -42,9 +44,11 @@ object Main extends IOApp with BootstrappingSupport with LoggingAdapter {
 
   private val mainProgram = AppConfig.appConfig.load[IO].flatMap { config =>
     for {
-      algebras <- Algebras.make[IO](config.createTopicConfig.schemaRegistryConfig)
+      algebras <- Algebras
+        .make[IO](config.createTopicConfig.schemaRegistryConfig)
       programs <- Programs.make[IO](config.createTopicConfig, algebras)
-      bootstrap <- Bootstrap.make[IO](programs.createTopic, config.v2MetadataTopicConfig)
+      bootstrap <- Bootstrap
+        .make[IO](programs.createTopic, config.v2MetadataTopicConfig)
       _ <- bootstrap.bootstrapAll
       _ <- oldBoostrap
     } yield ()

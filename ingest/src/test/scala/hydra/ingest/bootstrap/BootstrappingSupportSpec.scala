@@ -16,7 +16,6 @@ import scala.concurrent.duration._
 
 class TestIngestorDefault extends Ingestor {
 
-
   /**
     * This will _not_ override; instead it will use the default value of 1.second. We'll test it.
     */
@@ -25,7 +24,7 @@ class TestIngestorDefault extends Ingestor {
   val to = context.receiveTimeout
 
   ingest {
-    case "hello" => sender ! "hi!"
+    case "hello"   => sender ! "hi!"
     case "timeout" => sender ! to
   }
 
@@ -33,31 +32,50 @@ class TestIngestorDefault extends Ingestor {
 }
 
 object TestRecordFactory extends RecordFactory[String, String] {
+
   override def build(r: HydraRequest)(implicit ec: ExecutionContext) = {
     val timeout = r.metadataValueEquals("timeout", "true")
     if (timeout) {
-      Future.successful(TimeoutRecord("test-topic", r.correlationId.toString, r.payload,
-        r.ackStrategy))
-    }
-    else {
-      Future.successful(TestRecord("test-topic", r.correlationId.toString, r.payload,
-        r.ackStrategy))
+      Future.successful(
+        TimeoutRecord(
+          "test-topic",
+          r.correlationId.toString,
+          r.payload,
+          r.ackStrategy
+        )
+      )
+    } else {
+      Future.successful(
+        TestRecord(
+          "test-topic",
+          r.correlationId.toString,
+          r.payload,
+          r.ackStrategy
+        )
+      )
     }
   }
 }
 
-case class TestRecord(destination: String,
-                      key: String,
-                      payload: String,
-                      ackStrategy: AckStrategy) extends HydraRecord[String, String]
+case class TestRecord(
+    destination: String,
+    key: String,
+    payload: String,
+    ackStrategy: AckStrategy
+) extends HydraRecord[String, String]
 
+case class TimeoutRecord(
+    destination: String,
+    key: String,
+    payload: String,
+    ackStrategy: AckStrategy
+) extends HydraRecord[String, String]
 
-case class TimeoutRecord(destination: String,
-                         key: String,
-                         payload: String,
-                         ackStrategy: AckStrategy) extends HydraRecord[String, String]
-
-class BootstrappingSupportSpec extends Matchers with FlatSpecLike with BootstrappingSupport with BeforeAndAfterAll {
+class BootstrappingSupportSpec
+    extends Matchers
+    with FlatSpecLike
+    with BootstrappingSupport
+    with BeforeAndAfterAll {
 
   val conf =
     """
@@ -73,7 +91,6 @@ class BootstrappingSupportSpec extends Matchers with FlatSpecLike with Bootstrap
       |}
     """.stripMargin
 
-
   lazy val container = containerService
 
   override def afterAll = {
@@ -83,7 +100,7 @@ class BootstrappingSupportSpec extends Matchers with FlatSpecLike with Bootstrap
 
   "The BootstrappingSupport trait" should
     "load endpoints" in {
-    endpoints should contain (classOf[DummyEndpoint])
+    endpoints should contain(classOf[DummyEndpoint])
   }
 
   it should "load listeners" in {
@@ -91,17 +108,26 @@ class BootstrappingSupportSpec extends Matchers with FlatSpecLike with Bootstrap
   }
 
   it should "load service providers" in {
-    serviceProviders should contain allOf(DummyServiceProviderObject.getClass, classOf[DummyServiceProvider])
+    serviceProviders should contain allOf (DummyServiceProviderObject.getClass, classOf[
+      DummyServiceProvider
+    ])
   }
 
   it should "ask for services from all providers" in {
-    services.map(_._1) should contain allOf("test", "test2")
+    services.map(_._1) should contain allOf ("test", "test2")
   }
 
   it should "build a container" in {
-    val csvc = new ContainerService(Seq(classOf[DummyEndpoint]), Nil,
-      Seq("test" -> Props[TestIngestorDefault], "test2" -> Props[TestIngestorDefault])
-      , Seq(new DummyListener), "hydra_test")(container.system)
+    val csvc = new ContainerService(
+      Seq(classOf[DummyEndpoint]),
+      Nil,
+      Seq(
+        "test" -> Props[TestIngestorDefault],
+        "test2" -> Props[TestIngestorDefault]
+      ),
+      Seq(new DummyListener),
+      "hydra_test"
+    )(container.system)
     csvc.name shouldBe container.name
     csvc.listeners.map(_.getClass) should contain(classOf[DummyListener])
     csvc.name shouldBe container.name
@@ -122,8 +148,11 @@ private object DummyServiceProviderObject extends ServiceProvider {
   override val services = Seq("test2" -> Props[TestIngestorDefault])
 }
 
-private class DummyEndpoint(implicit s: ActorSystem, implicit val e: ExecutionContext)
-  extends RoutedEndpoints {
+private class DummyEndpoint(
+    implicit s: ActorSystem,
+    implicit val e: ExecutionContext
+) extends RoutedEndpoints {
+
   override def route: Route = get {
     complete("DONE")
   }

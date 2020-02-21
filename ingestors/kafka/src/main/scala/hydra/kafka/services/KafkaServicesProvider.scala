@@ -14,14 +14,19 @@ import scala.concurrent.duration._
 object KafkaServicesProvider extends ServiceProvider with ConfigSupport {
 
   val healthCheckTopic = applicationConfig
-    .getOrElse[String]("kafka.health-check-topic", "_hydra_health_check").value
+    .getOrElse[String]("kafka.health-check-topic", "_hydra_health_check")
+    .value
 
-  val interval = applicationConfig.getOrElse[FiniteDuration]("kafka.health_check.interval",
-    20.seconds).value
-
+  val interval = applicationConfig
+    .getOrElse[FiniteDuration]("kafka.health_check.interval", 20.seconds)
+    .value
 
   override val services = Seq(
-    Tuple2(ActorUtils.actorName[KafkaHealthCheckActor],
-      KafkaHealthCheckActor.props(KafkaConfigSupport.bootstrapServers, healthCheckTopic, interval)),
-    Tuple2(ActorUtils.actorName[KafkaConsumerProxy], Props[KafkaConsumerProxy]))
+    Tuple2(
+      ActorUtils.actorName[KafkaHealthCheckActor],
+      KafkaHealthCheckActor
+        .props(KafkaConfigSupport.bootstrapServers, healthCheckTopic, interval)
+    ),
+    Tuple2(ActorUtils.actorName[KafkaConsumerProxy], Props[KafkaConsumerProxy])
+  )
 }

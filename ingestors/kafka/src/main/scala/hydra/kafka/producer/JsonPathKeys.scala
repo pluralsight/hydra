@@ -9,6 +9,7 @@ import spray.json.lenses.JsonLenses._
   * Created by alexsilva on 2/23/17.
   */
 object JsonPathKeys {
+
   def getKey(key: String, json: String): String = {
     if (key.startsWith("{$.")) {
       val theKey = key.substring(1, key.length - 1)

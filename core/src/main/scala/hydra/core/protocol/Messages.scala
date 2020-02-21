@@ -4,7 +4,12 @@ import akka.actor.ActorRef
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.HydraRequest
-import hydra.core.transport.{AckStrategy, HydraRecord, HydraRecordMetadata, RecordMetadata}
+import hydra.core.transport.{
+  AckStrategy,
+  HydraRecord,
+  HydraRecordMetadata,
+  RecordMetadata
+}
 import org.joda.time.DateTime
 
 import scala.concurrent.duration.FiniteDuration
@@ -27,7 +32,8 @@ trait MessageValidationResult extends HydraMessage
 
 case class Publish(request: HydraRequest) extends HydraMessage
 
-case class Ingest[K, V](record: HydraRecord[K, V], ack: AckStrategy) extends HydraMessage
+case class Ingest[K, V](record: HydraRecord[K, V], ack: AckStrategy)
+    extends HydraMessage
 
 case object Join extends HydraMessage
 
@@ -40,15 +46,18 @@ trait IngestionError extends HydraError {
   val ingestor: String
 }
 
-case class GenericIngestionError(ingestor: String,
-                                 cause: Throwable,
-                                 request: HydraRequest,
-                                 statusCode: Int,
-                                 time: DateTime = DateTime.now) extends IngestionError {
+case class GenericIngestionError(
+    ingestor: String,
+    cause: Throwable,
+    request: HydraRequest,
+    statusCode: Int,
+    time: DateTime = DateTime.now
+) extends IngestionError {
 
   private val rootError = Option(cause.getMessage).getOrElse("Unknown error.")
 
-  val errorMessage = Option(cause.getCause).map(e => s"$rootError: ${e.getMessage}")
+  val errorMessage = Option(cause.getCause)
+    .map(e => s"$rootError: ${e.getMessage}")
     .getOrElse(rootError)
 }
 
@@ -60,27 +69,34 @@ case class GenericIngestionError(ingestor: String,
   * @param time
   * @param timeout
   */
-case class IngestionTimedOut(request: HydraRequest, time: DateTime,
-                             timeout: FiniteDuration, ingestor: String) extends IngestionError {
+case class IngestionTimedOut(
+    request: HydraRequest,
+    time: DateTime,
+    timeout: FiniteDuration,
+    ingestor: String
+) extends IngestionError {
   val statusCode: Int = 408
   val cause = new IngestionTimedOutException("Ingestion timed out.", timeout)
 }
 
 case class IngestionTimedOutException(msg: String, timeout: FiniteDuration)
-  extends RuntimeException(msg)
+    extends RuntimeException(msg)
 
-
-case class InvalidRequestError(ingestor: String,
-                               request: HydraRequest,
-                               time: DateTime, cause: Throwable) extends IngestionError {
+case class InvalidRequestError(
+    ingestor: String,
+    request: HydraRequest,
+    time: DateTime,
+    cause: Throwable
+) extends IngestionError {
   val statusCode: Int = 400
 }
 
-
-case class IngestorUnavailable(ingestor: String,
-                               cause: Throwable,
-                               request: HydraRequest,
-                               time: DateTime = DateTime.now) extends IngestionError {
+case class IngestorUnavailable(
+    ingestor: String,
+    cause: Throwable,
+    request: HydraRequest,
+    time: DateTime = DateTime.now
+) extends IngestionError {
   override val statusCode: Int = 503
 }
 
@@ -92,9 +108,11 @@ case class IngestorUnavailable(ingestor: String,
   * @tparam K
   * @tparam V
   */
-case class Produce[K, V](record: HydraRecord[K, V],
-                         supervisor: ActorRef,
-                         ack: AckStrategy) extends HydraMessage
+case class Produce[K, V](
+    record: HydraRecord[K, V],
+    supervisor: ActorRef,
+    ack: AckStrategy
+) extends HydraMessage
 
 /**
   * Signals the record was accepted by a transport for production, but it hasn't been necessarily saved yet.
@@ -102,7 +120,8 @@ case class Produce[K, V](record: HydraRecord[K, V],
   *
   * @param supervisor
   */
-case class RecordAccepted(supervisor: ActorRef, destination: String) extends HydraMessage
+case class RecordAccepted(supervisor: ActorRef, destination: String)
+    extends HydraMessage
 
 /**
   * Signals that a record was successfully produced by Hydra.
@@ -118,10 +137,14 @@ case class RecordAccepted(supervisor: ActorRef, destination: String) extends Hyd
   * @param supervisor The ingestor should send this message to its supervisor if present.
   *                   This reference is here because most times the record is produced asynchronously.
   */
-case class RecordProduced(md: RecordMetadata, supervisor: ActorRef) extends HydraMessage
+case class RecordProduced(md: RecordMetadata, supervisor: ActorRef)
+    extends HydraMessage
 
-case class RecordNotProduced[K, V](record: HydraRecord[K, V], error: Throwable,
-                                   supervisor: ActorRef) extends HydraMessage
+case class RecordNotProduced[K, V](
+    record: HydraRecord[K, V],
+    error: Throwable,
+    supervisor: ActorRef
+) extends HydraMessage
 
 sealed trait IngestorStatus extends HydraMessage with Product {
   val name: String = productPrefix
@@ -136,7 +159,6 @@ sealed trait IngestorStatus extends HydraMessage with Product {
   def message: String = statusCode.reason()
 }
 
-
 case object IngestorJoined extends IngestorStatus {
   val statusCode = StatusCodes.Accepted
 }
@@ -149,15 +171,22 @@ case object RequestPublished extends IngestorStatus {
   val statusCode = StatusCodes.Created
 }
 
-case class IngestorError(cause: Throwable) extends IngestorStatus with HydraError {
+case class IngestorError(cause: Throwable)
+    extends IngestorStatus
+    with HydraError {
   override val completed = true
   val rootError = Option(cause.getMessage).getOrElse("Unknown error.")
-  override val message = Option(cause.getCause).map(e => s"$rootError: ${e.getMessage}")
+
+  override val message = Option(cause.getCause)
+    .map(e => s"$rootError: ${e.getMessage}")
     .getOrElse(rootError)
   val statusCode = StatusCodes.ServiceUnavailable
 }
 
-case class InvalidRequest(cause: Throwable) extends IngestorStatus with HydraError with MessageValidationResult {
+case class InvalidRequest(cause: Throwable)
+    extends IngestorStatus
+    with HydraError
+    with MessageValidationResult {
   def this(msg: String) = this(new IllegalArgumentException(msg))
 
   override val completed = true
@@ -165,7 +194,9 @@ case class InvalidRequest(cause: Throwable) extends IngestorStatus with HydraErr
   val statusCode = StatusCodes.BadRequest
 }
 
-case class ValidRequest[K, V](record: HydraRecord[K, V]) extends IngestorStatus with MessageValidationResult {
+case class ValidRequest[K, V](record: HydraRecord[K, V])
+    extends IngestorStatus
+    with MessageValidationResult {
   override val completed = true
   val statusCode = StatusCodes.Continue
 }
@@ -181,13 +212,17 @@ case object IngestorCompleted extends IngestorStatus {
 }
 
 //Initiate ingestion messages
-case class InitiateHttpRequest(request: HydraRequest, timeout: FiniteDuration,
-                               ctx: ImperativeRequestContext)
+case class InitiateHttpRequest(
+    request: HydraRequest,
+    timeout: FiniteDuration,
+    ctx: ImperativeRequestContext
+)
 
-case class InitiateRequest(request: HydraRequest, timeout: FiniteDuration,
-                           requestor: Option[ActorRef] = None)
+case class InitiateRequest(
+    request: HydraRequest,
+    timeout: FiniteDuration,
+    requestor: Option[ActorRef] = None
+)
 
-
-case class MissingMetadataException(name: String, msg: String) extends RuntimeException(msg)
-
-
+case class MissingMetadataException(name: String, msg: String)
+    extends RuntimeException(msg)

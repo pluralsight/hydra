@@ -10,15 +10,19 @@ object ReflectionsWrapper extends ConfigSupport {
   import configs.syntax._
 
   private[bootstrap] val scanPkgs = "hydra" +: applicationConfig
-    .getOrElse[Seq[String]]("scan-packages", Seq.empty).value
+    .getOrElse[Seq[String]]("scan-packages", Seq.empty)
+    .value
 
-  private def reflectionsCfg = new ConfigurationBuilder().forPackages(scanPkgs: _*)
-    .addScanners(new SubTypesScanner).useParallelExecutor()
+  private def reflectionsCfg =
+    new ConfigurationBuilder()
+      .forPackages(scanPkgs: _*)
+      .addScanners(new SubTypesScanner)
+      .useParallelExecutor()
 
   private var _reflections = new Reflections(reflectionsCfg)
 
   val reflections = _reflections
 
   //for testing only
-  def rescan():Unit = _reflections = new Reflections(reflectionsCfg)
+  def rescan(): Unit = _reflections = new Reflections(reflectionsCfg)
 }

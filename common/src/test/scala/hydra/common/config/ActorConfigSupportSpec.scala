@@ -8,8 +8,12 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 /**
   * Created by alexsilva on 3/2/17.
   */
-class ActorConfigSupportSpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike with
-  BeforeAndAfterAll with ConfigSupport {
+class ActorConfigSupportSpec
+    extends TestKit(ActorSystem("test"))
+    with Matchers
+    with FunSpecLike
+    with BeforeAndAfterAll
+    with ConfigSupport {
 
   val dummy = TestActorRef[DummyActor]
 
@@ -21,7 +25,9 @@ class ActorConfigSupportSpec extends TestKit(ActorSystem("test")) with Matchers 
     }
 
     it("has the correct actor config") {
-      dummy.underlyingActor.actorConfig shouldBe rootConfig.getConfig("hydraTest.actors.dummy_actor")
+      dummy.underlyingActor.actorConfig shouldBe rootConfig.getConfig(
+        "hydraTest.actors.dummy_actor"
+      )
     }
 
   }

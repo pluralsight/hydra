@@ -14,27 +14,38 @@ import scala.util.Success
 /**
   * Created by alexsilva on 3/14/17.
   */
-class HttpRequestFactory extends RequestFactory[HttpRequest] with CodingDirectives {
+class HttpRequestFactory
+    extends RequestFactory[HttpRequest]
+    with CodingDirectives {
 
-  override def createRequest(correlationId: String, request: HttpRequest)
-                            (implicit mat: Materializer): Future[HydraRequest] = {
+  override def createRequest(correlationId: String, request: HttpRequest)(
+      implicit mat: Materializer
+  ): Future[HydraRequest] = {
     implicit val ec = mat.executionContext
 
-    lazy val vs = request.headers.find(_.lowercaseName() == HYDRA_VALIDATION_STRATEGY)
-      .map(h => ValidationStrategy(h.value())).getOrElse(ValidationStrategy.Strict)
+    lazy val vs = request.headers
+      .find(_.lowercaseName() == HYDRA_VALIDATION_STRATEGY)
+      .map(h => ValidationStrategy(h.value()))
+      .getOrElse(ValidationStrategy.Strict)
 
-    lazy val as = request.headers.find(_.lowercaseName() == HYDRA_ACK_STRATEGY)
-      .map(h => AckStrategy(h.value())).getOrElse(Success(AckStrategy.NoAck))
+    lazy val as = request.headers
+      .find(_.lowercaseName() == HYDRA_ACK_STRATEGY)
+      .map(h => AckStrategy(h.value()))
+      .getOrElse(Success(AckStrategy.NoAck))
 
-    lazy val clientId = request.headers.find(_.lowercaseName() == HydraClientId)
+    lazy val clientId = request.headers
+      .find(_.lowercaseName() == HydraClientId)
       .map(_.value().toLowerCase)
 
     Unmarshal(request.entity).to[String].flatMap { payload =>
       val dPayload = if (request.method == HttpMethods.DELETE) null else payload
-      val metadata: Map[String, String] = request.headers.map(h => h.name.toLowerCase -> h.value).toMap
-      Future.fromTry(as)
-        .map(ack => HydraRequest(correlationId, dPayload, clientId, metadata, vs, ack))
+      val metadata: Map[String, String] =
+        request.headers.map(h => h.name.toLowerCase -> h.value).toMap
+      Future
+        .fromTry(as)
+        .map(ack =>
+          HydraRequest(correlationId, dPayload, clientId, metadata, vs, ack)
+        )
     }
   }
 }
-

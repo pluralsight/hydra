@@ -17,12 +17,16 @@ class LoggingIngestor extends Ingestor {
   override def initTimeout = 2.seconds
 
   override val recordFactory = new RecordFactory[String, String] {
+
     override def build(request: HydraRequest)(implicit ec: ExecutionContext) =
-      Future.successful(StringRecord("", "", request.payload, request.ackStrategy))
+      Future.successful(
+        StringRecord("", "", request.payload, request.ackStrategy)
+      )
   }
   ingest {
     case Publish(request) =>
-      sender ! (if (request.metadataValueEquals("logging-enabled", "true")) Join else Ignore)
+      sender ! (if (request.metadataValueEquals("logging-enabled", "true")) Join
+                else Ignore)
 
     case Ingest(record, _) =>
       log.info(record.payload.toString)

@@ -21,7 +21,7 @@ trait ConnectionProvider {
   /**
     * @return A new connection; clients _must_ close it.
     */
-  def getNewConnection():Connection
+  def getNewConnection(): Connection
 
   def close(): Unit
 }
@@ -33,12 +33,13 @@ trait ConnectionProvider {
   * @param maxConnectionAttempts
   * @param retryBackoff The time to wait following an error before a retry attempt is made
   */
-class DriverManagerConnectionProvider private[sql](val connectionUrl: String,
-                                                   val username: String,
-                                                   val password: String,
-                                                   val maxConnectionAttempts: Int = 3,
-                                                   val retryBackoff: FiniteDuration = 3.seconds)
-  extends ConnectionProvider {
+class DriverManagerConnectionProvider private[sql] (
+    val connectionUrl: String,
+    val username: String,
+    val password: String,
+    val maxConnectionAttempts: Int = 3,
+    val retryBackoff: FiniteDuration = 3.seconds
+) extends ConnectionProvider {
 
   import DriverManagerConnectionProvider._
 
@@ -47,8 +48,7 @@ class DriverManagerConnectionProvider private[sql](val connectionUrl: String,
   def getConnection(): Connection = synchronized {
     if (connection == null) {
       doConnect()
-    }
-    else if (!connection.isValid(VALIDITY_CHECK_TIMEOUT)) {
+    } else if (!connection.isValid(VALIDITY_CHECK_TIMEOUT)) {
       log.info("The database connection is invalid. Reconnecting...")
       closeQuietly()
       doConnect()
@@ -64,7 +64,10 @@ class DriverManagerConnectionProvider private[sql](val connectionUrl: String,
     Try(fn) match {
       case Success(x) => x
       case Failure(e) if n > 1 =>
-        log.info(s"Unable to connect to database. Will retry in $retryBackoff", e)
+        log.info(
+          s"Unable to connect to database. Will retry in $retryBackoff",
+          e
+        )
         Thread.sleep(retryBackoff.toMillis)
         retry(n - 1)(fn)
       case Failure(e) => throw e
@@ -74,7 +77,8 @@ class DriverManagerConnectionProvider private[sql](val connectionUrl: String,
   private def doConnect(): Unit = {
     retry(maxConnectionAttempts) {
       log.debug(s"Attempting to connect to {}", connectionUrl)
-      connection = DriverManager.getConnection(connectionUrl, username, password)
+      connection =
+        DriverManager.getConnection(connectionUrl, username, password)
     }
   }
 
@@ -102,11 +106,15 @@ object DriverManagerConnectionProvider {
       config.get[String]("connection.user").valueOrElse(""),
       config.get[String]("connection.password").valueOrElse(""),
       config.get[Int]("connection.max.retries").valueOrElse(3),
-      config.get[FiniteDuration]("connection.retry.backoff ").valueOrElse(3.seconds))
+      config
+        .get[FiniteDuration]("connection.retry.backoff ")
+        .valueOrElse(3.seconds)
+    )
   }
 }
 
-class DataSourceConnectionProvider(ds: HikariDataSource) extends ConnectionProvider {
+class DataSourceConnectionProvider(ds: HikariDataSource)
+    extends ConnectionProvider {
 
   override val connectionUrl = Option(ds.getJdbcUrl)
     .getOrElse(ds.getDataSourceProperties.getProperty("url"))

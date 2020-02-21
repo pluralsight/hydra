@@ -14,10 +14,11 @@ import scala.concurrent.Promise
   */
 trait HydraDirectives extends Directives with ConfigSupport {
 
-  def imperativelyComplete(inner: ImperativeRequestContext => Unit): Route = { ctx: RequestContext =>
-    val p = Promise[RouteResult]()
-    inner(new ImperativeRequestContextImpl(ctx, p))
-    p.future
+  def imperativelyComplete(inner: ImperativeRequestContext => Unit): Route = {
+    ctx: RequestContext =>
+      val p = Promise[RouteResult]()
+      inner(new ImperativeRequestContextImpl(ctx, p))
+      p.future
   }
 
   def completeWithLocationHeader[T](status: StatusCode, resourceId: T): Route =
@@ -37,12 +38,16 @@ trait ImperativeRequestContext {
 }
 
 // an imperative wrapper for request context
-final class ImperativeRequestContextImpl(val ctx: RequestContext, promise: Promise[RouteResult])
-  extends ImperativeRequestContext {
+final class ImperativeRequestContextImpl(
+    val ctx: RequestContext,
+    promise: Promise[RouteResult]
+) extends ImperativeRequestContext {
 
   private implicit val ec = ctx.executionContext
 
-  def complete(obj: ToResponseMarshallable): Unit = ctx.complete(obj).onComplete(promise.complete)
+  def complete(obj: ToResponseMarshallable): Unit =
+    ctx.complete(obj).onComplete(promise.complete)
 
-  def failWith(error: Throwable): Unit = ctx.fail(error).onComplete(promise.complete)
+  def failWith(error: Throwable): Unit =
+    ctx.fail(error).onComplete(promise.complete)
 }

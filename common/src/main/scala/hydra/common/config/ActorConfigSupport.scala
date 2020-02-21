@@ -39,5 +39,7 @@ trait ActorConfigSupport extends ConfigSupport {
     *
     * @return The configuration object for this actor; empty if path not found.
     */
-  val actorConfig: Config = applicationConfig.get[Config](s"actors.${thisActorName}").valueOrElse(ConfigFactory.empty())
+  val actorConfig: Config = applicationConfig
+    .get[Config](s"actors.${thisActorName}")
+    .valueOrElse(ConfigFactory.empty())
 }

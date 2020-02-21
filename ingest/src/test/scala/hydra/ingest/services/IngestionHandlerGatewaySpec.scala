@@ -9,7 +9,11 @@ import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.{HydraRequest, IngestionReport}
 import hydra.core.protocol._
 import hydra.ingest.IngestorInfo
-import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
+import hydra.ingest.services.IngestorRegistry.{
+  FindAll,
+  FindByName,
+  LookupResult
+}
 import hydra.ingest.test.TestRecordFactory
 import org.joda.time.DateTime
 import org.scalatest._
@@ -19,38 +23,56 @@ import org.scalatest.time.{Seconds, Span}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class IngestionHandlerGatewaySpec extends TestKit(ActorSystem("hydra")) with Matchers with FlatSpecLike
-  with BeforeAndAfterAll with Eventually with ImplicitSender {
+class IngestionHandlerGatewaySpec
+    extends TestKit(ActorSystem("hydra"))
+    with Matchers
+    with FlatSpecLike
+    with BeforeAndAfterAll
+    with Eventually
+    with ImplicitSender {
 
-  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true,
-    duration = 10 seconds)
+  override def afterAll =
+    TestKit.shutdownActorSystem(
+      system,
+      verifySystemShutdown = true,
+      duration = 10 seconds
+    )
 
-  val ingestor = TestActorRef(new Actor {
-    override def receive = {
-      case Publish(_) => sender ! Join
-      case Validate(r) =>
-        TestRecordFactory.build(r).map(ValidRequest(_)) pipeTo sender
-      case Ingest(r, _) => sender ! IngestorCompleted
-    }
-  }, "test_ingestor")
+  val ingestor = TestActorRef(
+    new Actor {
 
-  val ingestorInfo = IngestorInfo("test_ingestor", "test", ingestor.path, DateTime.now)
+      override def receive = {
+        case Publish(_) => sender ! Join
+        case Validate(r) =>
+          TestRecordFactory.build(r).map(ValidRequest(_)) pipeTo sender
+        case Ingest(r, _) => sender ! IngestorCompleted
+      }
+    },
+    "test_ingestor"
+  )
 
-  val registry = TestActorRef(new Actor {
-    override def receive = {
-      case FindByName("tester") =>
-        sender ! LookupResult(Seq(ingestorInfo))
-      case FindAll =>
-        sender ! LookupResult(Seq(ingestorInfo))
-    }
-  }, "ingestor_registry")
+  val ingestorInfo =
+    IngestorInfo("test_ingestor", "test", ingestor.path, DateTime.now)
+
+  val registry = TestActorRef(
+    new Actor {
+
+      override def receive = {
+        case FindByName("tester") =>
+          sender ! LookupResult(Seq(ingestorInfo))
+        case FindAll =>
+          sender ! LookupResult(Seq(ingestorInfo))
+      }
+    },
+    "ingestor_registry"
+  )
 
   val props = IngestionHandlerGateway.props(registry.path.toString)
 
   val gateway = system.actorOf(props)
 
-  implicit override val patienceConfig = PatienceConfig(timeout = Span(5, Seconds),
-    interval = Span(1, Seconds))
+  implicit override val patienceConfig =
+    PatienceConfig(timeout = Span(5, Seconds), interval = Span(1, Seconds))
 
   "The IngestRequestGateway actor" should "complete an http request" in {
 

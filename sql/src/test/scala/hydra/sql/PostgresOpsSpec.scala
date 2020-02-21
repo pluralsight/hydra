@@ -7,15 +7,17 @@ import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecordBuilder
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
-class PostgresOpsSpec extends Matchers with FlatSpecLike with BeforeAndAfterAll {
+class PostgresOpsSpec
+    extends Matchers
+    with FlatSpecLike
+    with BeforeAndAfterAll {
 
   lazy val pg = EmbeddedPostgres.start()
 
   lazy val pgDb = pg.getPostgresDatabase()
 
-
-  val compositePKSchema = SchemaWrapper.from(new Schema.Parser().parse(
-    """
+  val compositePKSchema =
+    SchemaWrapper.from(new Schema.Parser().parse("""
       |{
       |	"type": "record",
       |	"name": "CompositeKeyUser",
@@ -37,8 +39,8 @@ class PostgresOpsSpec extends Matchers with FlatSpecLike with BeforeAndAfterAll 
       |}
     """.stripMargin))
 
-  val schema = SchemaWrapper.from(new Schema.Parser().parse(
-    """
+  val schema =
+    SchemaWrapper.from(new Schema.Parser().parse("""
       |{
       |	"type": "record",
       |	"name": "SingleKeyUser",
@@ -62,8 +64,22 @@ class PostgresOpsSpec extends Matchers with FlatSpecLike with BeforeAndAfterAll 
 
   override def beforeAll = {
     TryWith(pgDb.getConnection("postgres", "")) { conn =>
-      JdbcUtils.createTable(compositePKSchema, PostgresDialect, "test_composite", "", UnderscoreSyntax, conn)
-      JdbcUtils.createTable(schema, PostgresDialect, "test_single", "", UnderscoreSyntax, conn)
+      JdbcUtils.createTable(
+        compositePKSchema,
+        PostgresDialect,
+        "test_composite",
+        "",
+        UnderscoreSyntax,
+        conn
+      )
+      JdbcUtils.createTable(
+        schema,
+        PostgresDialect,
+        "test_single",
+        "",
+        UnderscoreSyntax,
+        conn
+      )
     }.get
   }
 
@@ -77,11 +93,18 @@ class PostgresOpsSpec extends Matchers with FlatSpecLike with BeforeAndAfterAll 
 
   "The Postgres dialect" should "create valid upsert statements for composite keys" in {
     TryWith(pgDb.getConnection("postgres", "")) { conn =>
-      val sql = PostgresDialect.buildUpsert("test_composite", compositePKSchema, UnderscoreSyntax)
+      val sql = PostgresDialect.buildUpsert(
+        "test_composite",
+        compositePKSchema,
+        UnderscoreSyntax
+      )
       val stmt = conn.prepareStatement(sql)
       println(sql)
-      val rec = new GenericRecordBuilder(compositePKSchema.schema).set("id", 1)
-        .set("username", "alex").set("rank", 10).build
+      val rec = new GenericRecordBuilder(compositePKSchema.schema)
+        .set("id", 1)
+        .set("username", "alex")
+        .set("rank", 10)
+        .build
       new AvroValueSetter(compositePKSchema, PostgresDialect).bind(rec, stmt)
       stmt.executeUpdate() shouldBe 1
     }.get
@@ -89,18 +112,22 @@ class PostgresOpsSpec extends Matchers with FlatSpecLike with BeforeAndAfterAll 
 
   it should "create valid upsert statements for single primary keys" in {
     TryWith(pgDb.getConnection("postgres", "")) { conn =>
-      val sql = PostgresDialect.buildUpsert("test_single", schema, UnderscoreSyntax)
+      val sql =
+        PostgresDialect.buildUpsert("test_single", schema, UnderscoreSyntax)
       val stmt = conn.prepareStatement(sql)
-      val rec = new GenericRecordBuilder(schema.schema).set("id", 1)
-        .set("username", "alex").set("rank", 10).build
+      val rec = new GenericRecordBuilder(schema.schema)
+        .set("id", 1)
+        .set("username", "alex")
+        .set("rank", 10)
+        .build
       new AvroValueSetter(schema, PostgresDialect).bind(rec, stmt)
       stmt.executeUpdate() shouldBe 1
     }.get
   }
 
   it should "drop not null constraints from tables" in {
-    val schema = SchemaWrapper.from(new Schema.Parser().parse(
-      """
+    val schema =
+      SchemaWrapper.from(new Schema.Parser().parse("""
         |{
         |	"type": "record",
         |	"name": "ConstTest",
@@ -118,8 +145,8 @@ class PostgresOpsSpec extends Matchers with FlatSpecLike with BeforeAndAfterAll 
         |}
       """.stripMargin))
 
-    val nSchema = SchemaWrapper.from(new Schema.Parser().parse(
-      """
+    val nSchema = SchemaWrapper.from(
+      new Schema.Parser().parse("""
         |{
         |	"type": "record",
         |	"name": "ConstTest",
@@ -136,15 +163,24 @@ class PostgresOpsSpec extends Matchers with FlatSpecLike with BeforeAndAfterAll 
         |		}
         |	]
         |}
-      """.stripMargin))
-
+      """.stripMargin)
+    )
 
     TryWith(pgDb.getConnection("postgres", "")) { conn =>
-      JdbcUtils.createTable(schema, PostgresDialect, "const_test", "",
-        UnderscoreSyntax, conn)
+      JdbcUtils.createTable(
+        schema,
+        PostgresDialect,
+        "const_test",
+        "",
+        UnderscoreSyntax,
+        conn
+      )
 
-      val stmts = PostgresDialect.dropNotNullConstraintQueries("const_test",
-        nSchema, UnderscoreSyntax)
+      val stmts = PostgresDialect.dropNotNullConstraintQueries(
+        "const_test",
+        nSchema,
+        UnderscoreSyntax
+      )
       stmts.foreach { stmt =>
         val s = conn.prepareStatement(stmt)
         s.executeUpdate() shouldBe 0

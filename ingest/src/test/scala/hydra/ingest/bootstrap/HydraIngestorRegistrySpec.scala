@@ -14,19 +14,27 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
-class HydraIngestorRegistrySpec extends TestKit(ActorSystem("HydraIngestorRegistrySpec"))
-  with Matchers
-  with FunSpecLike
-  with BeforeAndAfterAll
-  with ImplicitSender
-  with ScalaFutures {
+class HydraIngestorRegistrySpec
+    extends TestKit(ActorSystem("HydraIngestorRegistrySpec"))
+    with Matchers
+    with FunSpecLike
+    with BeforeAndAfterAll
+    with ImplicitSender
+    with ScalaFutures {
 
-  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true,
-    duration = 10.seconds)
+  override def afterAll =
+    TestKit.shutdownActorSystem(
+      system,
+      verifySystemShutdown = true,
+      duration = 10.seconds
+    )
 
-  val testRegistry = system.actorOf(Props[IngestorRegistry], "ingestor_registry")
+  val testRegistry =
+    system.actorOf(Props[IngestorRegistry], "ingestor_registry")
 
-  val cfg = ConfigFactory.parseString("ingest.ingestor-registry.path=/user/ingestor_registry")
+  val cfg = ConfigFactory.parseString(
+    "ingest.ingestor-registry.path=/user/ingestor_registry"
+  )
   val registry = HydraIngestorRegistryClient(cfg)
 
   implicit val actorRefFactory = system

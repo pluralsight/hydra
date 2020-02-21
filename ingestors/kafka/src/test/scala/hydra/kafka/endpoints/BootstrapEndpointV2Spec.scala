@@ -21,12 +21,17 @@ import retry.{RetryPolicies, RetryPolicy}
 
 import scala.concurrent.ExecutionContext
 
-final class BootstrapEndpointV2Spec extends WordSpecLike with ScalatestRouteTest with Matchers {
+final class BootstrapEndpointV2Spec
+    extends WordSpecLike
+    with ScalatestRouteTest
+    with Matchers {
 
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
   private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
 
-  private def getTestCreateTopicProgram(s: SchemaRegistry[IO]): BootstrapEndpointV2 = {
+  private def getTestCreateTopicProgram(
+      s: SchemaRegistry[IO]
+  ): BootstrapEndpointV2 = {
     val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
     new BootstrapEndpointV2(new CreateTopicProgram[IO](s, retryPolicy))
   }
@@ -37,20 +42,24 @@ final class BootstrapEndpointV2Spec extends WordSpecLike with ScalatestRouteTest
   "BootstrapEndpointV2" must {
 
     "reject an empty request" in {
-      testCreateTopicProgram.map { bootstrapEndpoint =>
-        Post("/v2/streams") ~> Route.seal(bootstrapEndpoint.route) ~> check {
-          response.status shouldBe StatusCodes.BadRequest
+      testCreateTopicProgram
+        .map { bootstrapEndpoint =>
+          Post("/v2/streams") ~> Route.seal(bootstrapEndpoint.route) ~> check {
+            response.status shouldBe StatusCodes.BadRequest
+          }
         }
-      }.unsafeRunSync()
+        .unsafeRunSync()
     }
 
-    val getTestSchema: String => Schema = schemaName => SchemaBuilder.record(schemaName)
-      .fields()
-      .name("test")
-      .`type`()
-      .stringType()
-      .noDefault()
-      .endRecord()
+    val getTestSchema: String => Schema = schemaName =>
+      SchemaBuilder
+        .record(schemaName)
+        .fields()
+        .name("test")
+        .`type`()
+        .stringType()
+        .noDefault()
+        .endRecord()
 
     val validRequest = TopicMetadataV2Request(
       Subject.createValidated("testing").get,
@@ -67,27 +76,41 @@ final class BootstrapEndpointV2Spec extends WordSpecLike with ScalatestRouteTest
     import TopicMetadataV2Parser._
 
     "accept a valid request" in {
-      testCreateTopicProgram.map { bootstrapEndpoint =>
-        Post("/v2/streams", validRequest) ~> Route.seal(bootstrapEndpoint.route) ~> check {
-          response.status shouldBe StatusCodes.OK
+      testCreateTopicProgram
+        .map { bootstrapEndpoint =>
+          Post("/v2/streams", validRequest) ~> Route.seal(
+            bootstrapEndpoint.route
+          ) ~> check {
+            response.status shouldBe StatusCodes.OK
+          }
         }
-      }.unsafeRunSync()
+        .unsafeRunSync()
     }
 
     "return an InternalServerError on an unexpected exception" in {
       val failingSchemaRegistry: SchemaRegistry[IO] = new SchemaRegistry[IO] {
         private val err = IO.raiseError(new Exception)
-        override def registerSchema(subject: String, schema: Schema): IO[SchemaId] = err
-        override def deleteSchemaOfVersion(subject: String, version: SchemaVersion): IO[Unit] = err
-        override def getVersion(subject: String, schema: Schema): IO[SchemaVersion] = err
+        override def registerSchema(
+            subject: String,
+            schema: Schema
+        ): IO[SchemaId] = err
+        override def deleteSchemaOfVersion(
+            subject: String,
+            version: SchemaVersion
+        ): IO[Unit] = err
+        override def getVersion(
+            subject: String,
+            schema: Schema
+        ): IO[SchemaVersion] = err
         override def getAllVersions(subject: String): IO[List[Int]] = err
         override def getAllSubjects: IO[List[String]] = err
       }
-      Post("/v2/streams", validRequest) ~> Route.seal(getTestCreateTopicProgram(failingSchemaRegistry).route) ~> check {
+      Post("/v2/streams", validRequest) ~> Route.seal(
+        getTestCreateTopicProgram(failingSchemaRegistry).route
+      ) ~> check {
         response.status shouldBe StatusCodes.InternalServerError
       }
     }
   }
-
 
 }

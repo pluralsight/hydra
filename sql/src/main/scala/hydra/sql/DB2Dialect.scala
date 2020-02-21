@@ -13,9 +13,9 @@ private object DB2Dialect extends JdbcDialect {
   override def canHandle(url: String): Boolean = url.startsWith("jdbc:db2")
 
   override def getJDBCType(dt: Schema): Option[JdbcType] = dt.getType match {
-    case STRING => Option(JdbcType("CLOB", JDBCType.CLOB))
+    case STRING  => Option(JdbcType("CLOB", JDBCType.CLOB))
     case BOOLEAN => Option(JdbcType("CHAR(1)", JDBCType.CHAR))
-    case _ => None
+    case _       => None
   }
 
   override def isCascadingTruncateTable(): Option[Boolean] = Some(false)

@@ -24,19 +24,21 @@ trait KafkaRecord[K, V] extends HydraRecord[K, V] {
     val idx = cname.indexOf("Record")
     if (idx != -1) {
       cname.take(idx).toLowerCase
-    }
-    else {
+    } else {
       getClass.getName
     }
   }
 }
 
 object KafkaRecord {
+
   implicit def toProducerRecord[K, V](record: KafkaRecord[K, V]) = {
-    new ProducerRecord[K, V](record.destination,
+    new ProducerRecord[K, V](
+      record.destination,
       record.partition.getOrElse(null).asInstanceOf[Integer],
       record.timestamp,
       record.key,
-      record.payload)
+      record.payload
+    )
   }
 }

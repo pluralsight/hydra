@@ -5,8 +5,11 @@ import akka.http.scaladsl.model.{StatusCodes, Uri}
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import org.scalatest.{FunSpecLike, Matchers}
 
-class HydraDirectivesSpec extends Matchers with FunSpecLike with ScalatestRouteTest
-  with HydraDirectives {
+class HydraDirectivesSpec
+    extends Matchers
+    with FunSpecLike
+    with ScalatestRouteTest
+    with HydraDirectives {
 
   describe("Hydra Directives") {
     it("completes with location header") {

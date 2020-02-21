@@ -4,13 +4,21 @@ import hydra.avro.io.SaveMode
 import hydra.avro.io.SaveMode.SaveMode
 import hydra.avro.util.SchemaWrapper
 
-class TableCreator(provider: ConnectionProvider, dbSyntax: DbSyntax, dialect: JdbcDialect) {
+class TableCreator(
+    provider: ConnectionProvider,
+    dbSyntax: DbSyntax,
+    dialect: JdbcDialect
+) {
 
-
-  def createOrAlterTable(mode: SaveMode, wrapper: SchemaWrapper, isTruncate: Boolean,
-                         tableIdentifier: Option[TableIdentifier] = None): Table = {
-    val tableId = tableIdentifier.getOrElse(TableIdentifier(JdbcUtils.
-      createTableNameFromSchema(wrapper.schema)))
+  def createOrAlterTable(
+      mode: SaveMode,
+      wrapper: SchemaWrapper,
+      isTruncate: Boolean,
+      tableIdentifier: Option[TableIdentifier] = None
+  ): Table = {
+    val tableId = tableIdentifier.getOrElse(
+      TableIdentifier(JdbcUtils.createTableNameFromSchema(wrapper.schema))
+    )
     val tableName = dbSyntax.format(tableId.table)
     val conn = provider.getConnection
     val store = new JdbcCatalog(provider, UnderscoreSyntax, dialect)
@@ -34,7 +42,8 @@ class TableCreator(provider: ConnectionProvider, dbSyntax: DbSyntax, dialect: Jd
 
         case SaveMode.ErrorIfExists =>
           throw new AnalysisException(
-            s"Table or view '$tableName' already exists. SaveMode: ErrorIfExists.")
+            s"Table or view '$tableName' already exists. SaveMode: ErrorIfExists."
+          )
 
         case SaveMode.Ignore =>
         // With `SaveMode.Ignore` mode, if table already exists, the save operation is expected

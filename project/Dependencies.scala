@@ -1,6 +1,4 @@
-
 import sbt.{ExclusionRule, _}
-
 
 object Dependencies {
 
@@ -14,7 +12,7 @@ object Dependencies {
   val catsEffectVersion = "2.0.0"
   val catsLoggerVersion = "1.0.1"
   val catsRetryVersion = "1.0.0"
-  val catsVersion =  "2.0.0"
+  val catsVersion = "2.0.0"
   val cirisVersion = "1.0.3"
   val confluentVersion = "5.4.0"
   val easyMockVersion = "3.5" //needed for mocking static java methods
@@ -42,7 +40,7 @@ object Dependencies {
 
   object Compile {
 
-    val cats =  "org.typelevel" %% "cats-core" % catsVersion
+    val cats = "org.typelevel" %% "cats-core" % catsVersion
 
     val catsLogger = "io.chrisdavenport" %% "log4cats-slf4j" % catsLoggerVersion
 
@@ -77,49 +75,67 @@ object Dependencies {
     val kafka = Seq(
       "org.apache.kafka" %% "kafka" % kafkaVersion,
       "org.apache.kafka" % "kafka-clients" % kafkaVersion,
-      embeddedKafka % "test")
+      embeddedKafka % "test"
+    )
 
-    val confluent: Seq[ModuleID] = Seq("io.confluent" % "kafka-avro-serializer" % confluentVersion).map(_.excludeAll(
-      ExclusionRule(organization = "org.codehaus.jackson"),
-      ExclusionRule(organization = "com.fasterxml.jackson.core")))
+    val confluent: Seq[ModuleID] =
+      Seq("io.confluent" % "kafka-avro-serializer" % confluentVersion).map(
+        _.excludeAll(
+          ExclusionRule(organization = "org.codehaus.jackson"),
+          ExclusionRule(organization = "com.fasterxml.jackson.core")
+        )
+      )
 
     val logging = Seq(
       "org.apache.logging.log4j" % "log4j-slf4j-impl" % log4jVersion,
       "org.apache.logging.log4j" % "log4j-core" % log4jVersion,
       "org.apache.logging.log4j" % "log4j-api" % log4jVersion,
-      "org.apache.logging.log4j" % "log4j-1.2-api" % log4jVersion)
+      "org.apache.logging.log4j" % "log4j-1.2-api" % log4jVersion
+    )
 
-    val akka = Seq("com.typesafe.akka" %% "akka-actor" % akkaVersion,
+    val akka = Seq(
+      "com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
       "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
       "ch.megard" %% "akka-http-cors" % akkaHTTPCorsVersion,
       "org.iq80.leveldb" % "leveldb" % "0.7",
-      "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8")
+      "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8"
+    )
 
-    val akkaHttpHal = Seq(("com.github.marcuslange" % "akka-http-hal" % "1.2.1")
-      .excludeAll(ExclusionRule(organization = "io.spray")))
+    val akkaHttpHal = Seq(
+      ("com.github.marcuslange" % "akka-http-hal" % "1.2.1")
+        .excludeAll(ExclusionRule(organization = "io.spray"))
+    )
 
-    val serviceContainer = ("com.github.vonnagy" %% "service-container" % serviceContainerVersion)
-      .excludeAll(
-        ExclusionRule(organization = "ch.qos.logback"),
-        ExclusionRule(organization = "org.slf4j"),
-        ExclusionRule(organization = "com.typesafe.akka")
-      )
+    val serviceContainer =
+      ("com.github.vonnagy" %% "service-container" % serviceContainerVersion)
+        .excludeAll(
+          ExclusionRule(organization = "ch.qos.logback"),
+          ExclusionRule(organization = "org.slf4j"),
+          ExclusionRule(organization = "com.typesafe.akka")
+        )
 
-    val akkaKryo = ("com.github.romix.akka" %% "akka-kryo-serialization" % akkaKryoVersion).excludeAll {
-      ExclusionRule(organization = "com.typesafe.akka")
-    }
+    val akkaKryo =
+      ("com.github.romix.akka" %% "akka-kryo-serialization" % akkaKryoVersion)
+        .excludeAll {
+          ExclusionRule(organization = "com.typesafe.akka")
+        }
 
-    val akkaKafkaStream = "com.typesafe.akka" %% "akka-stream-kafka" % akkaKafkaStreamVersion
+    val akkaKafkaStream =
+      "com.typesafe.akka" %% "akka-stream-kafka" % akkaKafkaStreamVersion
 
     val avro = "org.apache.avro" % "avro" % avroVersion
 
     val jsonLenses = "net.virtual-void" %% "json-lenses" % "0.6.2"
 
-    val joda = Seq("joda-time" % "joda-time" % jodaTimeVersion, "org.joda" % "joda-convert" % jodaConvertVersion)
+    val joda = Seq(
+      "joda-time" % "joda-time" % jodaTimeVersion,
+      "org.joda" % "joda-convert" % jodaConvertVersion
+    )
 
-    val guavacache = "com.github.cb372" %% "scalacache-guava" % scalaCacheVersion
+    val guavacache =
+      "com.github.cb372" %% "scalacache-guava" % scalaCacheVersion
 
     val reflections = "org.reflections" % "reflections" % reflectionsVersion
 
@@ -145,12 +161,16 @@ object Dependencies {
   }
 
   object Test {
-    val akkaTest = Seq("com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
+
+    val akkaTest = Seq(
+      "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
       "com.typesafe.akka" %% "akka-http-testkit" % akkaHTTPVersion % "test",
-      "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % "test")
+      "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % "test"
+    )
 
     val scalaTest = "org.scalatest" %% "scalatest" % scalaTestVersion % "test"
     val easyMock = "org.easymock" % "easymock" % easyMockVersion % "test"
+
     val powerMock = Seq(
       "org.powermock" % "powermock-api-easymock" % powerMockVersion % "test",
       "org.powermock" % "powermock-module-junit4" % powerMockVersion % "test"
@@ -161,30 +181,50 @@ object Dependencies {
 
     val h2db = "com.h2database" % "h2" % h2DbVersion % "test"
 
-    val embeddedPostgres = "com.opentable.components" % "otj-pg-embedded" % "0.12.0" % "test"
+    val embeddedPostgres =
+      "com.opentable.components" % "otj-pg-embedded" % "0.12.0" % "test"
   }
 
   import Compile._
   import Test._
 
-  val testDeps: Seq[ModuleID] = Seq(scalaTest, junit, scalaMock, easyMock, embeddedPostgres) ++
-    powerMock ++ akkaTest
+  val testDeps: Seq[ModuleID] =
+    Seq(scalaTest, junit, scalaMock, easyMock, embeddedPostgres) ++
+      powerMock ++ akkaTest
 
-  val baseDeps: Seq[ModuleID] = akka ++ Seq(scalaz, scalaConfigs, avro, cats) ++ logging ++ joda ++ testDeps
+  val baseDeps: Seq[ModuleID] =
+    akka ++ Seq(scalaz, scalaConfigs, avro, cats) ++ logging ++ joda ++ testDeps
 
-  val sqlDeps: Seq[ModuleID] = logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
+  val sqlDeps: Seq[ModuleID] =
+    logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
 
-  val avroDeps: Seq[ModuleID] = baseDeps ++ confluent ++ jackson ++ Seq(guavacache) ++ catsEffect
+  val avroDeps: Seq[ModuleID] =
+    baseDeps ++ confluent ++ jackson ++ Seq(guavacache) ++ catsEffect
 
   val coreDeps: Seq[ModuleID] = akka ++ baseDeps ++
-    Seq(guavacache, reflections, akkaKryo, serviceContainer, sdNotify, postgres, h2db, retry, catsLogger) ++
+    Seq(
+      guavacache,
+      reflections,
+      akkaKryo,
+      serviceContainer,
+      sdNotify,
+      postgres,
+      h2db,
+      retry,
+      catsLogger
+    ) ++
     confluent ++ kamon ++ aeron
 
   val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(ciris)
 
-  val rabbitDeps: Seq[ModuleID] = logging ++ Seq(scalaConfigs) ++ joda ++ opRabbit ++ testDeps
+  val rabbitDeps: Seq[ModuleID] =
+    logging ++ Seq(scalaConfigs) ++ joda ++ opRabbit ++ testDeps
 
-  val kafkaDeps: Seq[ModuleID] = coreDeps ++ Seq(akkaKafkaStream, jsonLenses, fs2Kafka) ++ kafka ++ akkaHttpHal
+  val kafkaDeps: Seq[ModuleID] = coreDeps ++ Seq(
+    akkaKafkaStream,
+    jsonLenses,
+    fs2Kafka
+  ) ++ kafka ++ akkaHttpHal
 
   val sandboxDeps: Seq[ModuleID] = kafkaDeps ++ sqlDeps ++
     Seq("com.h2database" % "h2" % "1.4.196") ++ Seq(embeddedKafka)

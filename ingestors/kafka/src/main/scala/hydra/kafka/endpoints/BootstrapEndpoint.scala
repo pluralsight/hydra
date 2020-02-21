@@ -33,9 +33,10 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
-
-class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: ExecutionContext)
-  extends RoutedEndpoints
+class BootstrapEndpoint(
+    implicit val system: ActorSystem,
+    implicit val e: ExecutionContext
+) extends RoutedEndpoints
     with LoggingAdapter
     with TopicMetadataAdapter
     with HydraDirectives
@@ -50,19 +51,22 @@ class BootstrapEndpoint(implicit val system: ActorSystem, implicit val e: Execut
         post {
           requestEntityPresent {
             entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
-              onComplete(bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)) {
-                case Success(message) => message match {
+              onComplete(
+                bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)
+              ) {
+                case Success(message) =>
+                  message match {
 
-                  case BootstrapSuccess(metadata) =>
-                    complete(StatusCodes.OK, toResource(metadata))
+                    case BootstrapSuccess(metadata) =>
+                      complete(StatusCodes.OK, toResource(metadata))
 
-                  case BootstrapFailure(reasons) =>
-                    complete(StatusCodes.BadRequest, reasons)
+                    case BootstrapFailure(reasons) =>
+                      complete(StatusCodes.BadRequest, reasons)
 
-                  case e: Exception =>
-                    log.error("Unexpected error in TopicBootstrapActor", e)
-                    complete(StatusCodes.InternalServerError, e.getMessage)
-                }
+                    case e: Exception =>
+                      log.error("Unexpected error in TopicBootstrapActor", e)
+                      complete(StatusCodes.InternalServerError, e.getMessage)
+                  }
 
                 case Failure(ex) =>
                   log.error("Unexpected error in BootstrapEndpoint", ex)

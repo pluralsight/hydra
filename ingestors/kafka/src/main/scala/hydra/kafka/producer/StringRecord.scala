@@ -22,11 +22,20 @@ import org.apache.commons.lang3.StringUtils
 /**
   * Created by alexsilva on 11/30/15.
   */
-case class StringRecord(destination: String, key: String, payload: String,
-                        ackStrategy: AckStrategy)
-  extends KafkaRecord[String, String]
+case class StringRecord(
+    destination: String,
+    key: String,
+    payload: String,
+    ackStrategy: AckStrategy
+) extends KafkaRecord[String, String]
 
 object StringRecord {
-  def apply(topic: String, key: Option[String], payload: String, ackStrategy: AckStrategy): StringRecord =
+
+  def apply(
+      topic: String,
+      key: Option[String],
+      payload: String,
+      ackStrategy: AckStrategy
+  ): StringRecord =
     new StringRecord(topic, key.orNull, payload, ackStrategy)
 }

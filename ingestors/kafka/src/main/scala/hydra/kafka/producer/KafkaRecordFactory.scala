@@ -11,22 +11,32 @@ import org.apache.avro.generic.GenericRecord
 
 import scala.util.{Failure, Success, Try}
 
-
 /**
   * Created by alexsilva on 3/2/17.
   */
 trait KafkaRecordFactory[K, V] extends RecordFactory[K, V] {
 
-  def getKey(request: HydraRequest, value: V)(implicit ev: RecordKeyExtractor[K, V]): Option[K] =
+  def getKey(request: HydraRequest, value: V)(
+      implicit ev: RecordKeyExtractor[K, V]
+  ): Option[K] =
     ev.extractKeyValue(request, value)
 
   //delete requests
-  def getKey(request: HydraRequest): Option[String] = request.metadataValue(HYDRA_RECORD_KEY_PARAM)
+  def getKey(request: HydraRequest): Option[String] =
+    request.metadataValue(HYDRA_RECORD_KEY_PARAM)
 
   def getTopic(request: HydraRequest): Try[String] = {
-    request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM).map(Success(_))
-      .getOrElse(Failure(MissingMetadataException(HYDRA_KAFKA_TOPIC_PARAM,
-        "No kafka topic present in the request.")))
+    request
+      .metadataValue(HYDRA_KAFKA_TOPIC_PARAM)
+      .map(Success(_))
+      .getOrElse(
+        Failure(
+          MissingMetadataException(
+            HYDRA_KAFKA_TOPIC_PARAM,
+            "No kafka topic present in the request."
+          )
+        )
+      )
   }
 
   /**
@@ -44,12 +54,16 @@ trait KafkaRecordFactory[K, V] extends RecordFactory[K, V] {
     val subject = request.metadataValue(RequestParams.HYDRA_SCHEMA_PARAM)
     request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM) match {
       case Some(topic) => Success(topic -> subject.getOrElse(topic))
-      case None => Failure(MissingMetadataException(HYDRA_KAFKA_TOPIC_PARAM,
-        "No kafka topic present in the request."))
+      case None =>
+        Failure(
+          MissingMetadataException(
+            HYDRA_KAFKA_TOPIC_PARAM,
+            "No kafka topic present in the request."
+          )
+        )
     }
   }
 }
-
 
 object KafkaRecordFactory {
 
@@ -60,32 +74,53 @@ object KafkaRecordFactory {
 
   object RecordKeyExtractor {
 
-    implicit object StringRecordKeyExtractor extends RecordKeyExtractor[String, String] {
-      override def extractKeyValue(request: HydraRequest, record: String): Option[String] = {
-        request.metadataValue(HYDRA_RECORD_KEY_PARAM).map(key => JsonPathKeys.getKey(key, record))
+    implicit object StringRecordKeyExtractor
+        extends RecordKeyExtractor[String, String] {
+
+      override def extractKeyValue(
+          request: HydraRequest,
+          record: String
+      ): Option[String] = {
+        request
+          .metadataValue(HYDRA_RECORD_KEY_PARAM)
+          .map(key => JsonPathKeys.getKey(key, record))
       }
     }
 
-    implicit object JsonRecordKeyExtractor extends RecordKeyExtractor[String, JsonNode] {
-      override def extractKeyValue(request: HydraRequest, record: JsonNode): Option[String] = {
-        request.metadataValue(HYDRA_RECORD_KEY_PARAM)
+    implicit object JsonRecordKeyExtractor
+        extends RecordKeyExtractor[String, JsonNode] {
+
+      override def extractKeyValue(
+          request: HydraRequest,
+          record: JsonNode
+      ): Option[String] = {
+        request
+          .metadataValue(HYDRA_RECORD_KEY_PARAM)
           .map(key => JsonPathKeys.getKey(key, record.toString))
       }
     }
 
-    implicit object SchemaKeyExtractor extends RecordKeyExtractor[String, GenericRecord] {
-      override def extractKeyValue(request: HydraRequest, payload: GenericRecord): Option[String] = {
-        request.metadataValue(HYDRA_RECORD_KEY_PARAM).map { key =>
-          JsonPathKeys.getKey(key, request.payload)
-        }.orElse {
-          val schema = payload.getSchema
-          val wrapper = SchemaWrapper.from(schema)
-          wrapper.validate().get //we're throwing the exception here so that the request ends with a 400
-          wrapper.primaryKeys.map(payload.get) match {
-            case Nil => None
-            case keys => Some(keys.mkString("|"))
+    implicit object SchemaKeyExtractor
+        extends RecordKeyExtractor[String, GenericRecord] {
+
+      override def extractKeyValue(
+          request: HydraRequest,
+          payload: GenericRecord
+      ): Option[String] = {
+        request
+          .metadataValue(HYDRA_RECORD_KEY_PARAM)
+          .map { key => JsonPathKeys.getKey(key, request.payload) }
+          .orElse {
+            val schema = payload.getSchema
+            val wrapper = SchemaWrapper.from(schema)
+            wrapper
+              .validate()
+              .get //we're throwing the exception here so that the request ends with a 400
+            wrapper.primaryKeys.map(payload.get) match {
+              case Nil  => None
+              case keys => Some(keys.mkString("|"))
+            }
           }
-        }
       }
     }
 

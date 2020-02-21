@@ -22,24 +22,37 @@ import scala.collection.JavaConverters._
   * Created by alexsilva on 7/12/17.
   */
 //scalastyle:off
-private[sql] class AvroValueSetter(schema: SchemaWrapper, dialect: JdbcDialect) {
+private[sql] class AvroValueSetter(
+    schema: SchemaWrapper,
+    dialect: JdbcDialect
+) {
 
   private val pk = schema.primaryKeys
 
   private lazy val uc = new UUIDConversion
 
-  private val fields = if (pk.isEmpty) schema.getFields else dialect.upsertFields(schema)
+  private val fields =
+    if (pk.isEmpty) schema.getFields else dialect.upsertFields(schema)
 
   val fieldTypes: Map[Field, JdbcType] = fields.map { field =>
     field -> getJdbcType(field.schema(), dialect)
   }.toMap
 
-  def bindForDeletion(fields: Map[Field, AnyRef], stmt: PreparedStatement): Unit = {
+  def bindForDeletion(
+      fields: Map[Field, AnyRef],
+      stmt: PreparedStatement
+  ): Unit = {
     fields.zipWithIndex.foreach {
       case (f, idx) =>
         val payloadValue = f._2
         val field = f._1
-        setFieldValue(payloadValue, fieldTypes(field), field.schema(), stmt, idx + 1)
+        setFieldValue(
+          payloadValue,
+          fieldTypes(field),
+          field.schema(),
+          stmt,
+          idx + 1
+        )
     }
 
     stmt.addBatch()
@@ -48,32 +61,60 @@ private[sql] class AvroValueSetter(schema: SchemaWrapper, dialect: JdbcDialect) 
   def bind(record: GenericRecord, stmt: PreparedStatement): Unit = {
     fields.zipWithIndex.foreach {
       case (f, idx) =>
-        setFieldValue(record.get(f.name()), fieldTypes(f), f.schema(), stmt, idx + 1)
+        setFieldValue(
+          record.get(f.name()),
+          fieldTypes(f),
+          f.schema(),
+          stmt,
+          idx + 1
+        )
     }
 
     stmt.addBatch()
   }
 
-  private def setFieldValue(value: AnyRef, jdbcType: JdbcType,
-                            schema: Schema, pstmt: PreparedStatement, idx: Int): Unit = {
+  private def setFieldValue(
+      value: AnyRef,
+      jdbcType: JdbcType,
+      schema: Schema,
+      pstmt: PreparedStatement,
+      idx: Int
+  ): Unit = {
     if (value == null) {
       pstmt.setNull(idx, jdbcType.targetSqlType.getVendorTypeNumber.intValue())
     } else {
       schema.getType match {
-        case Schema.Type.UNION => unionValue(value, jdbcType, schema, pstmt, idx)
+        case Schema.Type.UNION =>
+          unionValue(value, jdbcType, schema, pstmt, idx)
         case Schema.Type.ARRAY =>
           value match {
-            case a: GenericData.Array[_] => arrayValue(a.iterator().asScala.toList, schema, pstmt, idx)
-            case l: java.util.List[_] => arrayValue(l.asScala.toList, schema, pstmt, idx)
+            case a: GenericData.Array[_] =>
+              arrayValue(a.iterator().asScala.toList, schema, pstmt, idx)
+            case l: java.util.List[_] =>
+              arrayValue(l.asScala.toList, schema, pstmt, idx)
           }
-        case Schema.Type.STRING if isLogicalType(schema, IsoDate.IsoDateLogicalTypeName) =>
-          pstmt.setTimestamp(idx,
-            new Timestamp(new ISODateConverter()
-              .fromCharSequence(value.toString, schema, IsoDate).toInstant.toEpochMilli))
-        case Schema.Type.STRING if isLogicalType(schema, uc.getLogicalTypeName) =>
-          pstmt.setObject(idx, uc.fromCharSequence(value.toString, schema, IsoDate))
+        case Schema.Type.STRING
+            if isLogicalType(schema, IsoDate.IsoDateLogicalTypeName) =>
+          pstmt.setTimestamp(
+            idx,
+            new Timestamp(
+              new ISODateConverter()
+                .fromCharSequence(value.toString, schema, IsoDate)
+                .toInstant
+                .toEpochMilli
+            )
+          )
+        case Schema.Type.STRING
+            if isLogicalType(schema, uc.getLogicalTypeName) =>
+          pstmt.setObject(
+            idx,
+            uc.fromCharSequence(value.toString, schema, IsoDate)
+          )
         case Schema.Type.STRING =>
-          pstmt.setString(idx, dialect.formatStringForPreparedStatement(value.toString))
+          pstmt.setString(
+            idx,
+            dialect.formatStringForPreparedStatement(value.toString)
+          )
         case Schema.Type.BOOLEAN =>
           pstmt.setBoolean(idx, value.asInstanceOf[Boolean])
         case Schema.Type.DOUBLE =>
@@ -87,30 +128,46 @@ private[sql] class AvroValueSetter(schema: SchemaWrapper, dialect: JdbcDialect) 
         case Schema.Type.INT => pstmt.setInt(idx, value.toString.toInt)
         case LONG if isLogicalType(schema, "timestamp-millis") =>
           pstmt.setTimestamp(idx, new Timestamp(value.toString.toLong))
-        case Schema.Type.LONG => pstmt.setLong(idx, value.toString.toLong)
-        case Schema.Type.BYTES => byteValue(value, schema, pstmt, idx)
-        case Schema.Type.ENUM => pstmt.setString(idx, value.toString)
+        case Schema.Type.LONG   => pstmt.setLong(idx, value.toString.toLong)
+        case Schema.Type.BYTES  => byteValue(value, schema, pstmt, idx)
+        case Schema.Type.ENUM   => pstmt.setString(idx, value.toString)
         case Schema.Type.RECORD => pstmt.setString(idx, value.toString)
         case Schema.Type.NULL =>
-          pstmt.setNull(idx, jdbcType.targetSqlType.getVendorTypeNumber.intValue())
-        case _ => throw new IllegalArgumentException(s"Type ${schema.getType} is not supported.")
+          pstmt.setNull(
+            idx,
+            jdbcType.targetSqlType.getVendorTypeNumber.intValue()
+          )
+        case _ =>
+          throw new IllegalArgumentException(
+            s"Type ${schema.getType} is not supported."
+          )
       }
     }
   }
 
-  private def byteValue(obj: AnyRef, schema: Schema, pstmt: PreparedStatement, idx: Int) = {
+  private def byteValue(
+      obj: AnyRef,
+      schema: Schema,
+      pstmt: PreparedStatement,
+      idx: Int
+  ) = {
     if (isLogicalType(schema, "decimal")) {
       val lt = LogicalTypes.fromSchema(schema).asInstanceOf[Decimal]
       val ctx = new MathContext(lt.getPrecision, RoundingMode.HALF_EVEN)
-      val decimal = new java.math.BigDecimal(obj.toString, ctx).setScale(lt.getScale)
+      val decimal =
+        new java.math.BigDecimal(obj.toString, ctx).setScale(lt.getScale)
       pstmt.setBigDecimal(idx, decimal)
-    }
-    else {
+    } else {
       pstmt.setBytes(idx, obj.asInstanceOf[ByteBuffer].array())
     }
   }
 
-  private[sql] def arrayValue(values: List[_], schema: Schema, pstmt: PreparedStatement, idx: Int): Unit = {
+  private[sql] def arrayValue(
+      values: List[_],
+      schema: Schema,
+      pstmt: PreparedStatement,
+      idx: Int
+  ): Unit = {
     val aType = JdbcUtils.getJdbcType(schema.getElementType, dialect)
     if (aType.databaseTypeDefinition == "JSON") {
       //if it is json, we don't insert it as an array.
@@ -118,23 +175,40 @@ private[sql] class AvroValueSetter(schema: SchemaWrapper, dialect: JdbcDialect) 
       val colVal = "[" + elems.mkString(",") + "]"
       pstmt.setString(idx, colVal)
     } else {
-      val arr = pstmt.getConnection.createArrayOf(aType.targetSqlType.getName, values
-        .asInstanceOf[List[AnyRef]].toArray)
+      val arr = pstmt.getConnection.createArrayOf(
+        aType.targetSqlType.getName,
+        values
+          .asInstanceOf[List[AnyRef]]
+          .toArray
+      )
       pstmt.setArray(idx, arr)
     }
 
-
   }
 
-  private def unionValue(obj: AnyRef, jdbcType: JdbcType, schema: Schema, pstmt: PreparedStatement, idx: Int): Unit = {
+  private def unionValue(
+      obj: AnyRef,
+      jdbcType: JdbcType,
+      schema: Schema,
+      pstmt: PreparedStatement,
+      idx: Int
+  ): Unit = {
     val types = schema.getTypes
 
     if (!JdbcUtils.isNullableUnion(schema)) {
-      throw new AvroRuntimeException("Unions may only consist of a concrete type and null in hydra avro.")
+      throw new AvroRuntimeException(
+        "Unions may only consist of a concrete type and null in hydra avro."
+      )
     }
     if (types.size == 1) {
       setFieldValue(obj, jdbcType, types.get(0), pstmt, idx)
-    }
-    else setFieldValue(obj, jdbcType, JdbcUtils.getNonNullableUnionType(schema), pstmt, idx)
+    } else
+      setFieldValue(
+        obj,
+        jdbcType,
+        JdbcUtils.getNonNullableUnionType(schema),
+        pstmt,
+        idx
+      )
   }
 }

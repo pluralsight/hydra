@@ -8,7 +8,12 @@ import com.pluralsight.hydra.avro.JsonConverter
 import com.typesafe.config.{ConfigFactory, ConfigValue, ConfigValueFactory}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadata
-import hydra.kafka.services.StreamsManagerActor.{GetStreamActor, GetStreamActorResponse, InitializedStream, MetadataProcessed}
+import hydra.kafka.services.StreamsManagerActor.{
+  GetStreamActor,
+  GetStreamActorResponse,
+  InitializedStream,
+  MetadataProcessed
+}
 import hydra.kafka.util.KafkaUtils
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
 import io.confluent.kafka.serializers.KafkaAvroSerializer
@@ -26,35 +31,41 @@ import scala.concurrent.duration._
 import scala.io.Source
 import akka.actor.ActorRef
 
-class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor-spec"))
-  with FlatSpecLike
-  with Matchers
-  with BeforeAndAfterAll
-  with MockFactory
-  with ScalaFutures
-  with EmbeddedKafka
-  with HydraKafkaJsonSupport
-  with Eventually {
+class StreamsManagerActorSpec
+    extends TestKit(ActorSystem("metadata-stream-actor-spec"))
+    with FlatSpecLike
+    with Matchers
+    with BeforeAndAfterAll
+    with MockFactory
+    with ScalaFutures
+    with EmbeddedKafka
+    with HydraKafkaJsonSupport
+    with Eventually {
 
   implicit val ec = system.dispatcher
 
-  implicit val embeddedKafkaConfig = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
-    customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
+  implicit val embeddedKafkaConfig = EmbeddedKafkaConfig(
+    kafkaPort = 8092,
+    zooKeeperPort = 3181,
+    customBrokerProperties = Map("auto.create.topics.enable" -> "false")
+  )
 
-  val bootstrapConfig = ConfigFactory.load().getConfig("hydra_kafka.bootstrap-config")
+  val bootstrapConfig =
+    ConfigFactory.load().getConfig("hydra_kafka.bootstrap-config")
 
   val bootstrapServers = KafkaUtils.BootstrapServers
 
   override implicit val patienceConfig = PatienceConfig(
     timeout = scaled(5000 millis),
-    interval = scaled(1000 millis))
+    interval = scaled(1000 millis)
+  )
 
   val config = ConfigFactory.load().getConfig("hydra_kafka.bootstrap-config")
 
-  val topicMetadataJson = Source.fromResource("HydraMetadataTopic.avsc").mkString
+  val topicMetadataJson =
+    Source.fromResource("HydraMetadataTopic.avsc").mkString
 
   val srClient = new MockSchemaRegistryClient()
-
 
   val schema = new Schema.Parser().parse(topicMetadataJson)
 
@@ -62,8 +73,8 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
 
   val formatter = ISODateTimeFormat.basicDateTimeNoMillis()
 
-  val testSchema = new Schema.Parser().parse(
-    """
+  val testSchema =
+    new Schema.Parser().parse("""
       |{
       |	  "namespace": "exp.assessment",
       |	  "name": "SkillAssessmentTopicsScored",
@@ -78,7 +89,8 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
       |	}
     """.stripMargin)
 
-  val testSchemaId = srClient.register("exp.assessment.SkillAssessmentTopicsScored", testSchema)
+  val testSchemaId =
+    srClient.register("exp.assessment.SkillAssessmentTopicsScored", testSchema)
 
   val json =
     s"""{
@@ -92,9 +104,7 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
        |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
        |	"notes": "here are some notes topkek",
        |	"schemaId": $testSchemaId
-       |}"""
-      .stripMargin
-      .parseJson
+       |}""".stripMargin.parseJson
       .convertTo[TopicMetadata]
 
   val kafkaConfig = ConfigFactory.parseString(
@@ -133,7 +143,8 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
       |    key.deserializer = org.apache.kafka.common.serialization.StringDeserializer
       |    value.deserializer = io.confluent.kafka.serializers.KafkaAvroDeserializer
       |  }
-    """.stripMargin)
+    """.stripMargin
+  )
 
   override def beforeAll: Unit = {
     srClient.register("hydra.metadata.topic-value", schema)
@@ -147,20 +158,24 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
     TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
   }
 
-
   def publishRecord(topicMetadata: TopicMetadata) = {
-    val record: Object = new JsonConverter[GenericRecord](schema).convert(topicMetadata.toJson.compactPrint)
+    val record: Object = new JsonConverter[GenericRecord](schema)
+      .convert(topicMetadata.toJson.compactPrint)
     implicit val deserializer = new KafkaAvroSerializer(srClient)
     EmbeddedKafka.publishToKafka("hydra.metadata.topic", record)
   }
-
 
   "The MetadataConsumerActor companion" should "create a Kafka stream" in {
     publishRecord(json)
     val probe = TestProbe()
 
-    val stream = StreamsManagerActor.createMetadataStream(kafkaConfig, "localhost:8092", srClient,
-      "hydra.metadata.topic", probe.ref)(system.dispatcher, system)
+    val stream = StreamsManagerActor.createMetadataStream(
+      kafkaConfig,
+      "localhost:8092",
+      srClient,
+      "hydra.metadata.topic",
+      probe.ref
+    )(system.dispatcher, system)
 
     val s = stream.run()
 
@@ -173,8 +188,8 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
   }
 
   it should "create a stream even if hydra.key is missing" in {
-    val schemaWithKey = new Schema.Parser().parse(
-      """
+    val schemaWithKey =
+      new Schema.Parser().parse("""
         |{
         |	  "namespace": "exp.assessment",
         |	  "name": "SkillAssessmentTopicsScored",
@@ -190,7 +205,10 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
         |	}
       """.stripMargin)
 
-    val schemaWKeyId = srClient.register("exp.assessment.SkillAssessmentTopicsScored", schemaWithKey)
+    val schemaWKeyId = srClient.register(
+      "exp.assessment.SkillAssessmentTopicsScored",
+      schemaWithKey
+    )
 
     val metadata =
       s"""{
@@ -204,12 +222,13 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
          |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
          |	"notes": "here are some notes topkek",
          |	"schemaId": $schemaWKeyId
-         |}"""
-        .stripMargin
-        .parseJson
+         |}""".stripMargin.parseJson
         .convertTo[TopicMetadata]
 
-    val streamsManagerActor = system.actorOf(StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient), name = "stream_manager2")
+    val streamsManagerActor = system.actorOf(
+      StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient),
+      name = "stream_manager2"
+    )
     val topicName = "exp.assessment.SkillAssessmentTopicsScored"
 
     streamsManagerActor ! metadata
@@ -218,16 +237,15 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
 
     implicit val timeout = Timeout(3.seconds)
 
-
-    whenReady(streamsManagerActor ? GetStreamActor(topicName)) {
-      res => res shouldBe GetStreamActorResponse(None)
+    whenReady(streamsManagerActor ? GetStreamActor(topicName)) { res =>
+      res shouldBe GetStreamActorResponse(None)
     }
 
   }
 
   it should "create a topic stream if streamType isn't History from the metadata payload" in {
-    val schemaWithKey = new Schema.Parser().parse(
-      """
+    val schemaWithKey =
+      new Schema.Parser().parse("""
         |{
         |	  "namespace": "exp.assessment",
         |	  "name": "SkillAssessmentTopicsScored",
@@ -243,7 +261,10 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
         |	}
       """.stripMargin)
 
-    val schemaWKeyId = srClient.register("exp.assessment.SkillAssessmentTopicsScored", schemaWithKey)
+    val schemaWKeyId = srClient.register(
+      "exp.assessment.SkillAssessmentTopicsScored",
+      schemaWithKey
+    )
 
     val metadata =
       s"""{
@@ -257,12 +278,13 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
          |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
          |	"notes": "here are some notes topkek",
          |	"schemaId": $schemaWKeyId
-         |}"""
-        .stripMargin
-        .parseJson
+         |}""".stripMargin.parseJson
         .convertTo[TopicMetadata]
 
-    val streamsManagerActor = system.actorOf(StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient), name = "stream_manager3")
+    val streamsManagerActor = system.actorOf(
+      StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient),
+      name = "stream_manager3"
+    )
     val topicName = "exp.assessment.SkillAssessmentTopicsScored"
 
     streamsManagerActor ! metadata
@@ -271,16 +293,18 @@ class StreamsManagerActorSpec extends TestKit(ActorSystem("metadata-stream-actor
 
     implicit val timeout = Timeout(3.seconds)
 
-
-    whenReady(streamsManagerActor ? GetStreamActor(topicName)) {
-      res => res shouldBe GetStreamActorResponse(None)
+    whenReady(streamsManagerActor ? GetStreamActor(topicName)) { res =>
+      res shouldBe GetStreamActorResponse(None)
     }
 
   }
 
-it should "respond with MetadataProcessed after TopicMetadata is received" in {
-  val streamsManagerActor: ActorRef = system.actorOf(StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient), name = "stream_manager4")
-  val topicMetadata = s"""{
+  it should "respond with MetadataProcessed after TopicMetadata is received" in {
+    val streamsManagerActor: ActorRef = system.actorOf(
+      StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient),
+      name = "stream_manager4"
+    )
+    val topicMetadata = s"""{
          |	"id":"79a1627e-04a6-11e9-8eb2-f2801f1b9fd1",
          | "createdDate":"${formatter.print(DateTime.now)}",
          | "subject": "exp.assessment.SkillAssessmentTopicsScored",
@@ -291,15 +315,11 @@ it should "respond with MetadataProcessed after TopicMetadata is received" in {
          |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
          |	"notes": "here are some notes topkek",
          |	"schemaId": 1
-         |}"""
-        .stripMargin
-        .parseJson
-        .convertTo[TopicMetadata]
-  val probe = TestProbe()
-  streamsManagerActor.tell(topicMetadata, probe.ref)
-  probe.expectMsg(MetadataProcessed)
-}
+         |}""".stripMargin.parseJson
+      .convertTo[TopicMetadata]
+    val probe = TestProbe()
+    streamsManagerActor.tell(topicMetadata, probe.ref)
+    probe.expectMsg(MetadataProcessed)
+  }
 
 }
-
-

@@ -31,6 +31,6 @@ trait ActorLoggingAdapter {
 }
 
 /**
- * Use this trait in your class so that there is logging support
- */
+  * Use this trait in your class so that there is logging support
+  */
 trait LoggingAdapter extends SLF4JLogging

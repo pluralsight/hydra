@@ -14,7 +14,12 @@ import hydra.common.logging.LoggingAdapter
 import hydra.common.util.ActorUtils
 import hydra.core.http.{CorsSupport, HydraDirectives, NotFoundException}
 import hydra.kafka.consumer.KafkaConsumerProxy
-import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
+import hydra.kafka.consumer.KafkaConsumerProxy.{
+  GetPartitionInfo,
+  ListTopics,
+  ListTopicsResponse,
+  PartitionInfoResponse
+}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.util.KafkaUtils
 import hydra.kafka.util.KafkaUtils.TopicDetails
@@ -33,8 +38,10 @@ import scala.util.Try
   *
   * Created by alexsilva on 3/18/17.
   */
-class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: ExecutionContext)
-  extends RoutedEndpoints
+class TopicMetadataEndpoint(
+    implicit system: ActorSystem,
+    implicit val ec: ExecutionContext
+) extends RoutedEndpoints
     with LoggingAdapter
     with HydraDirectives
     with HydraKafkaJsonSupport
@@ -43,10 +50,14 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
   private implicit val cache = GuavaCache[Map[String, Seq[PartitionInfo]]]
 
   private val showSystemTopics = applicationConfig
-    .get[Boolean]("transports.kafka.show-system-topics").valueOrElse(false)
+    .get[Boolean]("transports.kafka.show-system-topics")
+    .valueOrElse(false)
 
-  private val consumerPath = applicationConfig.get[String]("actors.kafka.consumer_proxy.path")
-    .valueOrElse(s"/user/service/${ActorUtils.actorName(classOf[KafkaConsumerProxy])}")
+  private val consumerPath = applicationConfig
+    .get[String]("actors.kafka.consumer_proxy.path")
+    .valueOrElse(
+      s"/user/service/${ActorUtils.actorName(classOf[KafkaConsumerProxy])}"
+    )
 
   private val consumerProxy = system.actorSelection(consumerPath)
 
@@ -58,7 +69,8 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
 
   private lazy val kafkaUtils = KafkaUtils()
 
-  private val filterSystemTopics = (t: String) => (t.startsWith("_") && showSystemTopics) || !t.startsWith("_")
+  private val filterSystemTopics = (t: String) =>
+    (t.startsWith("_") && showSystemTopics) || !t.startsWith("_")
 
   override val route = cors(settings) {
     pathPrefix("transports" / "kafka") {
@@ -69,12 +81,17 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
               val topicList = pattern.map(filterByPattern) getOrElse topics
               n match {
                 case Some(_) => complete(topicList.map(_.keys))
-                case None => complete(topicList)
+                case None    => complete(topicList)
               }
             }
           } ~ path("topics" / Segment) { name =>
             onSuccess(topics) { topics =>
-              topics.get(name).map(complete(_)).getOrElse(failWith(new NotFoundException(s"Topic $name not found.")))
+              topics
+                .get(name)
+                .map(complete(_))
+                .getOrElse(
+                  failWith(new NotFoundException(s"Topic $name not found."))
+                )
             }
           }
         } ~ createTopic
@@ -82,20 +99,28 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
     }
   }
 
-  private def filterByPattern(pattern: String): Future[Map[String, Seq[PartitionInfo]]] =
+  private def filterByPattern(
+      pattern: String
+  ): Future[Map[String, Seq[PartitionInfo]]] =
     topics.map(_.filter(e => e._1 matches pattern))
-
 
   private def createTopic = path("topics") {
     post {
       entity(as[CreateTopicReq]) { req =>
-        val details = new TopicDetails(req.partitions, req.replicationFactor, req.config)
+        val details =
+          new TopicDetails(req.partitions, req.replicationFactor, req.config)
         val to = timeout.duration.toMillis.toInt
         onSuccess(kafkaUtils.createTopic(req.topic, details, to)) { result =>
           Try(result.all.get(timeout.duration.toSeconds, TimeUnit.SECONDS))
             .map(_ => complete(StatusCodes.OK, topicInfo(req.topic)))
-            .recover { case e: Exception => complete(StatusCodes.BadRequest,
-              CreateTopicResponseError(e.getMessage)) }.get
+            .recover {
+              case e: Exception =>
+                complete(
+                  StatusCodes.BadRequest,
+                  CreateTopicResponseError(e.getMessage)
+                )
+            }
+            .get
         }
       }
     }
@@ -103,7 +128,9 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
 
   private def topicInfo(name: String): Future[Seq[PartitionInfo]] = {
     import akka.pattern.ask
-    (consumerProxy ? GetPartitionInfo(name)).mapTo[PartitionInfoResponse].map(_.partitionInfo)
+    (consumerProxy ? GetPartitionInfo(name))
+      .mapTo[PartitionInfoResponse]
+      .map(_.partitionInfo)
   }
 
   private def topics: Future[Map[String, Seq[PartitionInfo]]] = {
@@ -111,7 +138,9 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
     cachingF("topics")(ttl = Some(1.minute)) {
       import akka.pattern.ask
       (consumerProxy ? ListTopics).mapTo[ListTopicsResponse].map { response =>
-        response.topics.filter(t => filterSystemTopics(t._1)).map { case (k, v) => k -> v.toList }
+        response.topics.filter(t => filterSystemTopics(t._1)).map {
+          case (k, v) => k -> v.toList
+        }
       }
     }
   }
@@ -124,16 +153,11 @@ class TopicMetadataEndpoint(implicit system: ActorSystem, implicit val ec: Execu
   }
 }
 
-case class CreateTopicReq(topic: String,
-                          partitions: Int,
-                          replicationFactor: Short,
-                          config: Map[String, String])
+case class CreateTopicReq(
+    topic: String,
+    partitions: Int,
+    replicationFactor: Short,
+    config: Map[String, String]
+)
 
-
-case class CreateTopicResponseError(error:String)
-
-
-
-
-
-
+case class CreateTopicResponseError(error: String)

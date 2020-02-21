@@ -16,7 +16,10 @@
 package hydra.kafka.producer
 
 import hydra.core.ingest.HydraRequest
-import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_KEY_PARAM}
+import hydra.core.ingest.RequestParams.{
+  HYDRA_KAFKA_TOPIC_PARAM,
+  HYDRA_RECORD_KEY_PARAM
+}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FunSpecLike, Matchers}
 
@@ -26,9 +29,10 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 1/11/17.
   */
-class DeleteTombstoneRecordFactorySpec extends Matchers
-  with FunSpecLike
-  with ScalaFutures {
+class DeleteTombstoneRecordFactorySpec
+    extends Matchers
+    with FunSpecLike
+    with ScalaFutures {
 
   override implicit val patienceConfig = PatienceConfig(
     timeout = scaled(1000 millis),

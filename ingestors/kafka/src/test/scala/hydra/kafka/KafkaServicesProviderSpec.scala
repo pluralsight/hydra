@@ -9,7 +9,10 @@ class KafkaServicesProviderSpec extends Matchers with FlatSpecLike {
 
   "KafkaServiceProviders" should "contain the right services" in {
     KafkaServicesProvider.services.map(_._1) should contain
-    allOf(ActorUtils.actorName[KafkaHealthCheckActor], ActorUtils.actorName[KafkaConsumerProxy])
+    allOf(
+      ActorUtils.actorName[KafkaHealthCheckActor],
+      ActorUtils.actorName[KafkaConsumerProxy]
+    )
   }
 
 }

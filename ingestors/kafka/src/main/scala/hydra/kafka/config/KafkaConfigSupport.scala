@@ -26,7 +26,9 @@ object KafkaConfigSupport extends ConfigSupport {
 
   val zkString = kafkaConfig.getString("kafka.consumer.zookeeper.connect")
 
-  val bootstrapServers = kafkaConfig.getString("kafka.producer.bootstrap.servers")
+  val bootstrapServers =
+    kafkaConfig.getString("kafka.producer.bootstrap.servers")
 
-  val schemaRegistryUrl: String = applicationConfig.getString("schema.registry.url")
+  val schemaRegistryUrl: String =
+    applicationConfig.getString("schema.registry.url")
 }

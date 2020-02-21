@@ -16,7 +16,10 @@
 package hydra.kafka.producer
 
 import hydra.core.ingest.HydraRequest
-import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_KEY_PARAM}
+import hydra.core.ingest.RequestParams.{
+  HYDRA_KAFKA_TOPIC_PARAM,
+  HYDRA_RECORD_KEY_PARAM
+}
 import hydra.core.protocol.MissingMetadataException
 import hydra.core.transport.AckStrategy
 import org.scalatest.concurrent.ScalaFutures
@@ -28,9 +31,10 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 1/11/17.
   */
-class StringRecordFactorySpec extends Matchers
-  with FunSpecLike
-  with ScalaFutures {
+class StringRecordFactorySpec
+    extends Matchers
+    with FunSpecLike
+    with ScalaFutures {
 
   override implicit val patienceConfig = PatienceConfig(
     timeout = scaled(1000 millis),
@@ -39,9 +43,18 @@ class StringRecordFactorySpec extends Matchers
   describe("When using the StringRecordFactory") {
 
     it("handles valid strings") {
-      val request = HydraRequest("123","""{"name":"test"}""").withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test")
+      val request = HydraRequest("123", """{"name":"test"}""").withMetadata(
+        HYDRA_KAFKA_TOPIC_PARAM -> "test"
+      )
       val rec = StringRecordFactory.build(request)
-      whenReady(rec)(_ shouldBe StringRecord("test", None,"""{"name":"test"}""", AckStrategy.NoAck))
+      whenReady(rec)(
+        _ shouldBe StringRecord(
+          "test",
+          None,
+          """{"name":"test"}""",
+          AckStrategy.NoAck
+        )
+      )
     }
 
     it("builds") {
@@ -56,8 +69,10 @@ class StringRecordFactorySpec extends Matchers
     }
 
     it("throws an error if no topic is in the request") {
-      val request = HydraRequest("123","""{"name":test"}""")
-      whenReady(StringRecordFactory.build(request).failed)(_ shouldBe an[MissingMetadataException])
+      val request = HydraRequest("123", """{"name":test"}""")
+      whenReady(StringRecordFactory.build(request).failed)(
+        _ shouldBe an[MissingMetadataException]
+      )
     }
   }
 }

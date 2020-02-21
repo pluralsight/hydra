@@ -17,7 +17,6 @@ import scala.collection.mutable
 import scala.util.{Failure, Try}
 import scala.util.control.NonFatal
 
-
 /**
   * Created by alexsilva on 7/11/17.
   *
@@ -35,34 +34,39 @@ import scala.util.control.NonFatal
   * @param mode            See [hydra.avro.io.SaveMode]
   * @param tableIdentifier The table identifier; defaults to using the schema's name if none provided.
   */
-class JdbcRecordWriter(val settings: JdbcWriterSettings,
-                       val connectionProvider: ConnectionProvider,
-                       val schemaWrapper: SchemaWrapper,
-                       val mode: SaveMode = SaveMode.ErrorIfExists,
-                       tableIdentifier: Option[TableIdentifier] = None,
-                       parameters: Map[String, String] = Map.empty) extends RecordWriter {
+class JdbcRecordWriter(
+    val settings: JdbcWriterSettings,
+    val connectionProvider: ConnectionProvider,
+    val schemaWrapper: SchemaWrapper,
+    val mode: SaveMode = SaveMode.ErrorIfExists,
+    tableIdentifier: Option[TableIdentifier] = None,
+    parameters: Map[String, String] = Map.empty
+) extends RecordWriter {
 
   import JdbcRecordWriter._
 
   logger.debug("Initializing JdbcRecordWriter")
-  
+
   private val batchSize = settings.batchSize
 
   private val syntax = settings.dbSyntax
 
   private val dialect = JdbcDialects.get(connectionProvider.connectionUrl)
 
-  private val store: Catalog = new JdbcCatalog(connectionProvider, syntax, dialect)
+  private val store: Catalog =
+    new JdbcCatalog(connectionProvider, syntax, dialect)
 
   private val operations = new mutable.ArrayBuffer[Operation]()
 
   private var currentSchema = schemaWrapper
 
-  private val isTruncate = parameters.getOrElse(JdbcTruncate, "false").toBoolean &&
-    (dialect isCascadingTruncateTable()).contains(false)
+  private val isTruncate =
+    parameters.getOrElse(JdbcTruncate, "false").toBoolean &&
+      (dialect isCascadingTruncateTable ()).contains(false)
 
-  private val tableObj: Table = new TableCreator(connectionProvider, syntax, dialect)
-    .createOrAlterTable(mode, schemaWrapper, isTruncate, tableIdentifier)
+  private val tableObj: Table =
+    new TableCreator(connectionProvider, syntax, dialect)
+      .createOrAlterTable(mode, schemaWrapper, isTruncate, tableIdentifier)
 
   private val tableId = tableObj.name
 
@@ -70,32 +74,35 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
 
   private var valueSetter = new AvroValueSetter(schemaWrapper, dialect)
 
-  private var upsertStmt = dialect.upsert(syntax.format(name), schemaWrapper, syntax)
+  private var upsertStmt =
+    dialect.upsert(syntax.format(name), schemaWrapper, syntax)
 
   //since changing pks on a table isn't supported, this can be a val
   private val deleteStmt =
     schemaWrapper.primaryKeys.headOption.map(_ =>
-      dialect.deleteStatement(syntax.format(name), schemaWrapper.primaryKeys, syntax))
+      dialect
+        .deleteStatement(syntax.format(name), schemaWrapper.primaryKeys, syntax)
+    )
 
   private def connection = connectionProvider.getConnection
 
   override def batch(operation: Operation): Unit = {
     operation match {
-      case u@Upsert(_) => add(u)
+      case u @ Upsert(_) => add(u)
       case DeleteByKey(keys) =>
         flush()
         delete(keys).handleErrors
     }
   }
 
-  private def maybeFlush() = if (batchSize > 0 && operations.size >= batchSize) flush()
+  private def maybeFlush() =
+    if (batchSize > 0 && operations.size >= batchSize) flush()
 
   private def add(op: Upsert): Unit = {
     if (AvroUtils.areEqual(currentSchema.schema, op.record.getSchema)) {
       operations += op
       maybeFlush()
-    }
-    else {
+    } else {
       // Each batch needs to have the same dbInfo, so get the buffered records out, reset state if possible,
       // add columns and re-attempt the add
       flush()
@@ -124,15 +131,16 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
         valueSetter.bind(record, pstmt)
         pstmt.executeUpdate()
       }
-    }
-    else {
+    } else {
       updateDb(record)
       upsert(record).handleErrors
     }
   }
 
   private def deleteError() =
-    throw new UnsupportedOperationException("Deletes are not possible without a primary key.")
+    throw new UnsupportedOperationException(
+      "Deletes are not possible without a primary key."
+    )
 
   /**
     * Convenience method to delete exactly one record from the underlying database.
@@ -143,7 +151,8 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
     deleteStmt match {
       case Some(s) =>
         TryWith(connection.prepareStatement(s)) { dstmt =>
-          val fields = keys.map(v => schemaWrapper.schema.getField(v._1) -> v._2)
+          val fields =
+            keys.map(v => schemaWrapper.schema.getField(v._1) -> v._2)
           valueSetter.bindForDeletion(fields, dstmt)
           dstmt.executeUpdate()
         } //TODO: better error handling here, we do the get just so that we throw an exception if there is one.
@@ -154,7 +163,7 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
 
   override def execute(operation: Operation): Try[Unit] = {
     operation match {
-      case Upsert(record) => upsert(record).handleErrors
+      case Upsert(record)      => upsert(record).handleErrors
       case DeleteByKey(fields) => delete(fields).handleErrors
     }
   }
@@ -162,11 +171,12 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
   def supportsTransactions(conn: Connection): Boolean = {
     try {
       conn.getMetaData().supportsDataManipulationTransactionsOnly() ||
-        conn.getMetaData().supportsDataDefinitionAndDataManipulationTransactions()
+      conn.getMetaData().supportsDataDefinitionAndDataManipulationTransactions()
 
     } catch {
       case NonFatal(e) =>
-        JdbcRecordWriter.logger.warn("Exception while detecting transaction support", e)
+        JdbcRecordWriter.logger
+          .warn("Exception while detecting transaction support", e)
         true
     }
   }
@@ -178,7 +188,8 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
 
     val supportsTxn = supportsTransactions(conn)
 
-    if (supportsTxn) conn.setAutoCommit(false) // Everything in the same db transaction.
+    if (supportsTxn)
+      conn.setAutoCommit(false) // Everything in the same db transaction.
 
     val upsert = conn.prepareStatement(upsertStmt)
     lazy val delete = conn.prepareStatement(deleteStmt.get)
@@ -193,8 +204,7 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
       upsert.executeBatch()
       if (supportsTxn) conn.commit()
       committed = true
-    }
-    catch {
+    } catch {
       case e: BatchUpdateException =>
         logger.error("Batch update error", e.getNextException())
         conn.rollback()
@@ -202,8 +212,7 @@ class JdbcRecordWriter(val settings: JdbcWriterSettings,
       case e: Exception =>
         conn.rollback()
         throw e
-    }
-    finally {
+    } finally {
       if (!committed && supportsTxn) conn.rollback()
 
       conn.setAutoCommit(true) //back
@@ -227,6 +236,7 @@ object JdbcRecordWriter {
   val logger: Logger = LoggerFactory.getLogger(getClass)
 
   implicit class HandleTryUnitErrors(t: Try[Unit]) {
+
     def handleErrors: Try[Unit] =
       t match {
         case Failure(exception) =>

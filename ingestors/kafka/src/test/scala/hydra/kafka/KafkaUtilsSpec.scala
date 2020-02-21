@@ -14,14 +14,16 @@ import scala.collection.JavaConverters._
 /**
   * Created by alexsilva on 5/17/17.
   */
-class KafkaUtilsSpec extends WordSpec
-  with BeforeAndAfterAll
-  with Matchers
-  with Eventually
-  with EmbeddedKafka
-  with ScalaFutures {
+class KafkaUtilsSpec
+    extends WordSpec
+    with BeforeAndAfterAll
+    with Matchers
+    with Eventually
+    with EmbeddedKafka
+    with ScalaFutures {
 
-  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
+  implicit val config =
+    EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
 
   val defaultCfg = Map(
     "key.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
@@ -32,7 +34,8 @@ class KafkaUtilsSpec extends WordSpec
     "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
     "zookeeper.connect" -> "localhost:3181",
     "client.id" -> "string",
-    "metadata.fetch.timeout.ms" -> "100000")
+    "metadata.fetch.timeout.ms" -> "100000"
+  )
 
   val ku = new KafkaUtils(defaultCfg)
 
@@ -74,7 +77,8 @@ class KafkaUtilsSpec extends WordSpec
       |   }
       |}
       |
-      """.stripMargin)
+      """.stripMargin
+  )
 
   "Kafka Utils" should {
     "return false for a topic that doesn't exist" in {
@@ -105,7 +109,8 @@ class KafkaUtilsSpec extends WordSpec
         "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
         "zookeeper.connect" -> "localhost:3181",
         "client.id" -> "string",
-        "metadata.fetch.timeout.ms" -> "100000")
+        "metadata.fetch.timeout.ms" -> "100000"
+      )
 
       d.get.properties shouldBe props
     }
@@ -122,7 +127,8 @@ class KafkaUtilsSpec extends WordSpec
         "zookeeper.connect" -> "localhost:3181",
         "client.id" -> "avro",
         "metadata.fetch.timeout.ms" -> "100000",
-        "schema.registry.url" -> "mock")
+        "schema.registry.url" -> "mock"
+      )
 
       d.properties shouldBe props
     }
@@ -136,18 +142,20 @@ class KafkaUtilsSpec extends WordSpec
         "key.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
         "bootstrap.servers" -> "localhost:8092",
         "client.id" -> "test",
-        "linger.ms" -> "10")
+        "linger.ms" -> "10"
+      )
     }
 
     "retrieve all clients from a config" in {
       val clients = KafkaUtils.producerSettings(cfg)
-      clients.keys should contain allOf("test", "test1")
+      clients.keys should contain allOf ("test", "test1")
       clients("test1").properties shouldBe Map(
         "value.serializer" -> "org.apache.kafka.common.serialization.Tester",
         "key.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
         "bootstrap.servers" -> "localhost:8092",
         "client.id" -> "test1",
-        "linger.ms" -> "10")
+        "linger.ms" -> "10"
+      )
     }
 
     "create a topic" in {
@@ -160,12 +168,12 @@ class KafkaUtilsSpec extends WordSpec
       val kafkaUtils = new KafkaUtils(defaultCfg)
       kafkaUtils.topicExists("test.Hydra").get shouldBe false
       val details = new TopicDetails(1, 1: Short, configs)
-      whenReady(kafkaUtils.createTopic("test.Hydra", details, 3000)) { response =>
-        response.all().get() shouldBe null //the kafka API returns a 'Void'
-        kafkaUtils.topicExists("test.Hydra").get shouldBe true
+      whenReady(kafkaUtils.createTopic("test.Hydra", details, 3000)) {
+        response =>
+          response.all().get() shouldBe null //the kafka API returns a 'Void'
+          kafkaUtils.topicExists("test.Hydra").get shouldBe true
       }
     }
-
 
     "throws error if topic exists" in {
       val configs = Map(
@@ -177,11 +185,10 @@ class KafkaUtilsSpec extends WordSpec
       createCustomTopic("hydra.already.Exists")
       kafkaUtils.topicExists("hydra.already.Exists").get shouldBe true
       val details = new TopicDetails(1, 1, configs)
-      whenReady(kafkaUtils.createTopic("hydra.already.Exists", details, 1000).failed) { response =>
-        response shouldBe an[IllegalArgumentException]
-      }
+      whenReady(
+        kafkaUtils.createTopic("hydra.already.Exists", details, 1000).failed
+      ) { response => response shouldBe an[IllegalArgumentException] }
     }
-
 
     "throws error if configs are invalid" in {
       val configs = Map(
@@ -190,10 +197,9 @@ class KafkaUtilsSpec extends WordSpec
       )
       val kafkaUtils = new KafkaUtils(defaultCfg)
       val details = new TopicDetails(1, 1, configs)
-      whenReady(kafkaUtils.createTopic("InvalidConfig", details, 1000)) { response =>
-        intercept[ExecutionException](response.all().get)
+      whenReady(kafkaUtils.createTopic("InvalidConfig", details, 1000)) {
+        response => intercept[ExecutionException](response.all().get)
       }
     }
   }
 }
-

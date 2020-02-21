@@ -21,15 +21,17 @@ object NoOpMetrics extends KafkaMetrics {
 
 // $COVERAGE-ON$
 
-class PublishMetrics(topic: String)(implicit system: ActorSystem) extends KafkaMetrics
-  with DefaultJsonProtocol
-  with ConfigSupport {
+class PublishMetrics(topic: String)(implicit system: ActorSystem)
+    extends KafkaMetrics
+    with DefaultJsonProtocol
+    with ConfigSupport {
 
   import spray.json._
 
   import KafkaRecordMetadata._
 
-  private val producer = KafkaUtils.producerSettings[String, String]("string", rootConfig)
+  private val producer = KafkaUtils
+    .producerSettings[String, String]("string", rootConfig)
     .withProperty("client.id", "hydra.kafka.metrics")
     .createKafkaProducer()
 
@@ -49,9 +51,12 @@ object KafkaMetrics {
   import configs.syntax._
 
   def apply(config: Config)(implicit system: ActorSystem): KafkaMetrics = {
-    val metricsEnabled = config.get[Boolean]("transports.kafka.metrics.enabled").valueOrElse(false)
+    val metricsEnabled =
+      config.get[Boolean]("transports.kafka.metrics.enabled").valueOrElse(false)
 
-    val metricsTopic = config.get[String]("transports.kafka.metrics.topic").valueOrElse("HydraKafkaError")
+    val metricsTopic = config
+      .get[String]("transports.kafka.metrics.topic")
+      .valueOrElse("HydraKafkaError")
 
     if (metricsEnabled) new PublishMetrics(metricsTopic) else NoOpMetrics
   }

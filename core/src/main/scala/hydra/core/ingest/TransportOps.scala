@@ -23,18 +23,27 @@ trait TransportOps extends ConfigSupport with LoggingAdapter {
 
   implicit val ec = context.dispatcher
 
-  override def initTimeout = applicationConfig
-    .getOrElse[FiniteDuration](s"transports.$transportName.resolve-timeout", 30 seconds).value
+  override def initTimeout =
+    applicationConfig
+      .getOrElse[FiniteDuration](
+        s"transports.$transportName.resolve-timeout",
+        30 seconds
+      )
+      .value
 
   /**
     * Always override this with a def due to how Scala initializes val in subtraits.
     */
   def transportName: String
 
-  private val transportPath = applicationConfig.get[String](s"transports.$transportName.path")
-    .valueOrElse(s"/user/service/transport_registrar/${transportName}_transport")
+  private val transportPath = applicationConfig
+    .get[String](s"transports.$transportName.path")
+    .valueOrElse(
+      s"/user/service/transport_registrar/${transportName}_transport"
+    )
 
-  lazy val transportActorFuture = context.actorSelection(transportPath).resolveOne()(initTimeout)
+  lazy val transportActorFuture =
+    context.actorSelection(transportPath).resolveOne()(initTimeout)
 
   /**
     * Overrides the init method to look up a transport
@@ -42,11 +51,18 @@ trait TransportOps extends ConfigSupport with LoggingAdapter {
   override def init: Future[HydraMessage] = {
     transportActorFuture
       .map { _ =>
-        log.info("{}[{}] initialized", Seq(thisActorName, self.path): _*); Initialized
+        log.info("{}[{}] initialized", Seq(thisActorName, self.path): _*);
+        Initialized
       }
       .recover {
-        case e => InitializationError(new IllegalArgumentException(s"[$thisActorName]: No transport found " +
-          s" at $transportPath", e))
+        case e =>
+          InitializationError(
+            new IllegalArgumentException(
+              s"[$thisActorName]: No transport found " +
+                s" at $transportPath",
+              e
+            )
+          )
       }
   }
 

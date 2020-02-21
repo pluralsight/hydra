@@ -26,26 +26,34 @@ import spray.json._
 import scala.concurrent.duration._
 import scala.io.Source
 
-class BootstrapEndpointSpec extends Matchers
-  with WordSpecLike
-  with ScalatestRouteTest
-  with HydraKafkaJsonSupport
-  with ConfigSupport
-  with EmbeddedKafka
-  with Eventually {
+class BootstrapEndpointSpec
+    extends Matchers
+    with WordSpecLike
+    with ScalatestRouteTest
+    with HydraKafkaJsonSupport
+    with ConfigSupport
+    with EmbeddedKafka
+    with Eventually {
 
   private implicit val timeout = RouteTestTimeout(10.seconds)
 
-  implicit val embeddedKafkaConfig = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
-    customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
+  implicit val embeddedKafkaConfig = EmbeddedKafkaConfig(
+    kafkaPort = 8092,
+    zooKeeperPort = 3181,
+    customBrokerProperties = Map("auto.create.topics.enable" -> "false")
+  )
 
-  override implicit val patienceConfig = PatienceConfig(
-    timeout = scaled(5000 millis),
-    interval = scaled(100 millis))
+  override implicit val patienceConfig =
+    PatienceConfig(timeout = scaled(5000 millis), interval = scaled(100 millis))
 
   class TestKafkaIngestor extends Actor {
+
     override def receive = {
-      case Ingest(hydraRecord, _) if hydraRecord.asInstanceOf[AvroRecord].payload.get("subject") == "exp.dataplatform.failed" =>
+      case Ingest(hydraRecord, _)
+          if hydraRecord
+            .asInstanceOf[AvroRecord]
+            .payload
+            .get("subject") == "exp.dataplatform.failed" =>
         sender ! IngestorError(new Exception("oh noes!"))
       case Ingest(_, _) => sender ! IngestorCompleted
     }
@@ -61,7 +69,8 @@ class BootstrapEndpointSpec extends Matchers
     }
   }
 
-  val ingestorRegistry = system.actorOf(Props(new IngestorRegistry), "ingestor_registry")
+  val ingestorRegistry =
+    system.actorOf(Props(new IngestorRegistry), "ingestor_registry")
 
   private val bootstrapRoute = new BootstrapEndpoint().route
 
@@ -75,7 +84,11 @@ class BootstrapEndpointSpec extends Matchers
   override def afterAll = {
     super.afterAll()
     EmbeddedKafka.stop()
-    TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10.seconds)
+    TestKit.shutdownActorSystem(
+      system,
+      verifySystemShutdown = true,
+      duration = 10.seconds
+    )
   }
 
   "The bootstrap endpoint" should {
@@ -84,7 +97,9 @@ class BootstrapEndpointSpec extends Matchers
       val json =
         s"""{
            |	"id":"79a1627e-04a6-11e9-8eb2-f2801f1b9fd1",
-           | "createdDate":"${ISODateTimeFormat.basicDateTimeNoMillis().print(DateTime.now)}",
+           | "createdDate":"${ISODateTimeFormat
+             .basicDateTimeNoMillis()
+             .print(DateTime.now)}",
            | "subject": "exp.assessment.SkillAssessmentTopicsScored",
            |	"streamType": "Notification",
            | "derived": false,
@@ -93,17 +108,19 @@ class BootstrapEndpointSpec extends Matchers
            |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
            |	"notes": "here are some notes topkek",
            |	"schemaId": 2
-           |}"""
-          .stripMargin
-          .parseJson
+           |}""".stripMargin.parseJson
           .convertTo[TopicMetadata]
 
-      val topicMetadataJson = Source.fromResource("HydraMetadataTopic.avsc").mkString
+      val topicMetadataJson =
+        Source.fromResource("HydraMetadataTopic.avsc").mkString
 
       val schema = new Schema.Parser().parse(topicMetadataJson)
 
-      val record: Object = new JsonConverter[GenericRecord](schema).convert(json.toJson.compactPrint)
-      implicit val deserializer = new KafkaAvroSerializer(ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient)
+      val record: Object = new JsonConverter[GenericRecord](schema)
+        .convert(json.toJson.compactPrint)
+      implicit val deserializer = new KafkaAvroSerializer(
+        ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient
+      )
       EmbeddedKafka.publishToKafka("_hydra.metadata.topic", record)
 
       eventually {
@@ -120,7 +137,9 @@ class BootstrapEndpointSpec extends Matchers
       val json =
         s"""{
            |	"id":"79a1627e-04a6-11e9-8eb2-f2801f1b9fd1",
-           | "createdDate":"${ISODateTimeFormat.basicDateTimeNoMillis().print(DateTime.now)}",
+           | "createdDate":"${ISODateTimeFormat
+             .basicDateTimeNoMillis()
+             .print(DateTime.now)}",
            | "subject": "exp.assessment.SkillAssessmentTopicsScored1",
            |	"streamType": "Notification",
            | "derived": false,
@@ -129,17 +148,19 @@ class BootstrapEndpointSpec extends Matchers
            |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
            |	"notes": "here are some notes topkek",
            |	"schemaId": 2
-           |}"""
-          .stripMargin
-          .parseJson
+           |}""".stripMargin.parseJson
           .convertTo[TopicMetadata]
 
-      val topicMetadataJson = Source.fromResource("HydraMetadataTopic.avsc").mkString
+      val topicMetadataJson =
+        Source.fromResource("HydraMetadataTopic.avsc").mkString
 
       val schema = new Schema.Parser().parse(topicMetadataJson)
 
-      val record: Object = new JsonConverter[GenericRecord](schema).convert(json.toJson.compactPrint)
-      implicit val deserializer = new KafkaAvroSerializer(ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient)
+      val record: Object = new JsonConverter[GenericRecord](schema)
+        .convert(json.toJson.compactPrint)
+      implicit val deserializer = new KafkaAvroSerializer(
+        ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient
+      )
       EmbeddedKafka.publishToKafka("_hydra.metadata.topic", record)
 
       eventually {
@@ -181,7 +202,8 @@ class BootstrapEndpointSpec extends Matchers
           |	    }
           |	  ]
           |	}
-          |}""".stripMargin)
+          |}""".stripMargin
+      )
 
       Post("/streams", testEntity) ~> bootstrapRoute ~> check {
         status shouldBe StatusCodes.OK
@@ -214,7 +236,8 @@ class BootstrapEndpointSpec extends Matchers
           |	    }
           |	  ]
           |	}
-          |}""".stripMargin)
+          |}""".stripMargin
+      )
 
       Post("/streams", testEntity) ~> bootstrapRoute ~> check {
         status shouldBe StatusCodes.BadRequest
@@ -245,7 +268,8 @@ class BootstrapEndpointSpec extends Matchers
           |	    }
           |	  ]
           |	}
-          |}""".stripMargin)
+          |}""".stripMargin
+      )
 
       Post("/streams", testEntity) ~> bootstrapRoute ~> check {
         status shouldBe StatusCodes.BadRequest
@@ -275,7 +299,8 @@ class BootstrapEndpointSpec extends Matchers
           |	    }
           |	  ]
           |	}
-          |}""".stripMargin)
+          |}""".stripMargin
+      )
 
       Post("/streams", testEntity) ~> bootstrapRoute ~> check {
         status shouldBe StatusCodes.BadRequest
@@ -305,7 +330,8 @@ class BootstrapEndpointSpec extends Matchers
           |	    }
           |	  ]
           |	}
-          |}""".stripMargin)
+          |}""".stripMargin
+      )
 
       Post("/streams", testEntity) ~> bootstrapRoute ~> check {
         rejection shouldBe a[MalformedRequestContentRejection]
@@ -336,9 +362,11 @@ class BootstrapEndpointSpec extends Matchers
           |	    }
           |	  ]
           |	}
-          |}""".stripMargin)
+          |}""".stripMargin
+      )
 
-      val bootstrapRouteWithOverridenStreamManager = (new BootstrapEndpoint() with BootstrapEndpointTestActors).route
+      val bootstrapRouteWithOverridenStreamManager =
+        (new BootstrapEndpoint() with BootstrapEndpointTestActors).route
       Post("/streams", testEntity) ~> bootstrapRouteWithOverridenStreamManager ~> check {
         status shouldBe StatusCodes.OK
       }
@@ -368,9 +396,11 @@ class BootstrapEndpointSpec extends Matchers
           |	    }
           |	  ]
           |	}
-          |}""".stripMargin)
+          |}""".stripMargin
+      )
 
-      val bootstrapRouteWithOverridenStreamManager = (new BootstrapEndpoint() with BootstrapEndpointTestActors).route
+      val bootstrapRouteWithOverridenStreamManager =
+        (new BootstrapEndpoint() with BootstrapEndpointTestActors).route
       Get("/streams/exp.test-existing.v1.SubjectPreexisted") ~> bootstrapRouteWithOverridenStreamManager ~> check {
         val originalTopicData = responseAs[Seq[TopicMetadata]]
         val originalTopicCreationDate = originalTopicData.head.createdDate

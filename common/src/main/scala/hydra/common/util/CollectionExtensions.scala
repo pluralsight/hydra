@@ -24,7 +24,10 @@ import scala.language.implicitConversions
   * Created by alexsilva on 11/4/15.
   */
 object CollectionExtensions {
+
   implicit def mapToProps(m: Map[String, Any]): Properties = {
-    m.foldLeft(new java.util.Properties) { case (props, (k, v)) => props.put(k, v.toString); props }
+    m.foldLeft(new java.util.Properties) {
+      case (props, (k, v)) => props.put(k, v.toString); props
+    }
   }
 }

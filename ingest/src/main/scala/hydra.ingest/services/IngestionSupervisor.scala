@@ -27,14 +27,20 @@ import org.joda.time.DateTime
 import scala.collection.mutable
 import scala.concurrent.duration._
 
-class IngestionSupervisor(request: HydraRequest, requestor: ActorRef, info: Seq[IngestorInfo],
-                          timeout: FiniteDuration) extends Actor with ActorLogging {
+class IngestionSupervisor(
+    request: HydraRequest,
+    requestor: ActorRef,
+    info: Seq[IngestorInfo],
+    timeout: FiniteDuration
+) extends Actor
+    with ActorLogging {
 
   context.setReceiveTimeout(timeout)
 
   val start = DateTime.now()
 
-  private val ingestors: mutable.Map[String, IngestorStatus] = new mutable.HashMap
+  private val ingestors: mutable.Map[String, IngestorStatus] =
+    new mutable.HashMap
 
   private val ingestTimer = Kamon.timer("ingestion").withoutTags().start()
 
@@ -57,7 +63,13 @@ class IngestionSupervisor(request: HydraRequest, requestor: ActorRef, info: Seq[
 
     case i: InvalidRequest =>
       context.system.eventStream.publish(
-        InvalidRequestError(ActorUtils.actorName(sender), request, start, i.cause))
+        InvalidRequestError(
+          ActorUtils.actorName(sender),
+          request,
+          start,
+          i.cause
+        )
+      )
       updateStatus(sender, i)
 
     case IngestorCompleted =>
@@ -67,7 +79,12 @@ class IngestionSupervisor(request: HydraRequest, requestor: ActorRef, info: Seq[
       updateStatus(sender, IngestorTimeout)
 
     case err: IngestorError =>
-      val errorMsg = GenericIngestionError(ActorUtils.actorName(sender), err.cause, request, 503)
+      val errorMsg = GenericIngestionError(
+        ActorUtils.actorName(sender),
+        err.cause,
+        request,
+        503
+      )
       context.system.eventStream.publish(errorMsg)
       updateStatus(sender, err)
   }
@@ -90,30 +107,38 @@ class IngestionSupervisor(request: HydraRequest, requestor: ActorRef, info: Seq[
            |Payload: ${request.payload}
            |Ingestors:  ${ingestors.toString}""".stripMargin
       log.error(s"Ingestion timed out for request $errorMsg")
-      context.system.eventStream.publish(IngestionTimedOut(request, start, timeout,
-        ingestors.keys.mkString(",")))
+      context.system.eventStream.publish(
+        IngestionTimedOut(request, start, timeout, ingestors.keys.mkString(","))
+      )
       timeoutIngestors()
-      stop(StatusCodes.custom(408, s"No ingestors completed the request in ${timeout}."))
+      stop(
+        StatusCodes
+          .custom(408, s"No ingestors completed the request in ${timeout}.")
+      )
   }
 
   private def timeoutIngestors(): Unit = {
-    ingestors.filter(_._2 != IngestorCompleted)
+    ingestors
+      .filter(_._2 != IngestorCompleted)
       .foreach(i => ingestors.update(i._1, IngestorTimeout))
   }
 
   private def finishIfReady(): Unit = {
     if (ingestors.isEmpty) {
       stop(StatusCodes.custom(404, s"No ingestors joined this request."))
-    }
-    else if (ingestors.values.filterNot(_.completed).isEmpty) {
-      val status = ingestors.filter(_._2 != IngestorCompleted).values.headOption
+    } else if (ingestors.values.filterNot(_.completed).isEmpty) {
+      val status = ingestors
+        .filter(_._2 != IngestorCompleted)
+        .values
+        .headOption
         .map(_.statusCode) getOrElse StatusCodes.OK
       stop(status)
     }
   }
 
   private def stop(status: StatusCode): Unit = {
-    val report = IngestionReport(request.correlationId, ingestors.toMap, status.intValue())
+    val report =
+      IngestionReport(request.correlationId, ingestors.toMap, status.intValue())
     requestor ! report
     ingestTimer.stop()
     context.stop(self)
@@ -121,8 +146,13 @@ class IngestionSupervisor(request: HydraRequest, requestor: ActorRef, info: Seq[
 }
 
 object IngestionSupervisor {
-  def props(request: HydraRequest, requestor: ActorRef, ingestors: Seq[IngestorInfo],
-            timeout: FiniteDuration): Props = {
+
+  def props(
+      request: HydraRequest,
+      requestor: ActorRef,
+      ingestors: Seq[IngestorInfo],
+      timeout: FiniteDuration
+  ): Props = {
     Props(classOf[IngestionSupervisor], request, requestor, ingestors, timeout)
   }
 }

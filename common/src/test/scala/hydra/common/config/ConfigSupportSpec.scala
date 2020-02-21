@@ -19,22 +19,41 @@ class ConfigSupportSpec extends Matchers with FunSpecLike with ConfigSupport {
     }
 
     it("loads external files properly") {
-      val path = Thread.currentThread().getContextClassLoader.getResource("test.conf").getFile
-      loadExternalConfig(ConfigFactory.parseMap(Map("application.config.location" -> path).asJava))
-        .getString("external-key") shouldBe "external-value"
+      val path = Thread
+        .currentThread()
+        .getContextClassLoader
+        .getResource("test.conf")
+        .getFile
+      loadExternalConfig(
+        ConfigFactory
+          .parseMap(Map("application.config.location" -> path).asJava)
+      ).getString("external-key") shouldBe "external-value"
       loadExternalConfig(ConfigFactory.empty()) shouldBe ConfigFactory.empty()
     }
 
     it("errors if external config file has a syntax error") {
-      val path = Thread.currentThread().getContextClassLoader.getResource("test-error.conf").getFile
+      val path = Thread
+        .currentThread()
+        .getContextClassLoader
+        .getResource("test-error.conf")
+        .getFile
       intercept[ConfigException] {
-        loadExternalConfig(ConfigFactory.parseMap(Map("application.config.location" -> path).asJava))
+        loadExternalConfig(
+          ConfigFactory
+            .parseMap(Map("application.config.location" -> path).asJava)
+        )
       }
     }
 
     it("errors if empty config if path doesn't exists") {
-      loadExternalConfig(ConfigFactory.parseMap(Map("application.config.location"
-        -> "this-doesnt-exist").asJava)) shouldBe ConfigFactory.empty()
+      loadExternalConfig(
+        ConfigFactory.parseMap(
+          Map(
+            "application.config.location"
+              -> "this-doesnt-exist"
+          ).asJava
+        )
+      ) shouldBe ConfigFactory.empty()
     }
 
     it("converts a config to map") {

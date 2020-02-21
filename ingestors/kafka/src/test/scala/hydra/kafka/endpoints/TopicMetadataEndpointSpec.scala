@@ -2,24 +2,31 @@ package hydra.kafka.endpoints
 
 import akka.actor.{Actor, Props}
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
-import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
+import hydra.kafka.consumer.KafkaConsumerProxy.{
+  GetPartitionInfo,
+  ListTopics,
+  ListTopicsResponse,
+  PartitionInfoResponse
+}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.common.{Node, PartitionInfo}
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
-class TopicMetadataEndpointSpec extends Matchers
-  with WordSpecLike
-  with ScalatestRouteTest
-  with HydraKafkaJsonSupport
-  with BeforeAndAfterAll
-  with EmbeddedKafka {
+class TopicMetadataEndpointSpec
+    extends Matchers
+    with WordSpecLike
+    with ScalatestRouteTest
+    with HydraKafkaJsonSupport
+    with BeforeAndAfterAll
+    with EmbeddedKafka {
 
   import spray.json._
 
   import scala.concurrent.duration._
 
-  implicit val kafkaConfig = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
+  implicit val kafkaConfig =
+    EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -35,7 +42,8 @@ class TopicMetadataEndpointSpec extends Matchers
 
   val node = new Node(0, "host", 1)
 
-  def partitionInfo(name: String) = new PartitionInfo(name, 0, node, Array(node), Array(node))
+  def partitionInfo(name: String) =
+    new PartitionInfo(name, 0, node, Array(node), Array(node))
 
   val topics = Map("test1" -> Seq(partitionInfo("test1")))
 
@@ -43,16 +51,20 @@ class TopicMetadataEndpointSpec extends Matchers
 
   private implicit val errorFormat = jsonFormat1(CreateTopicResponseError)
 
-  val proxy = system.actorOf(Props(new Actor {
-    override def receive: Receive = {
-      case ListTopics =>
-        sender ! ListTopicsResponse(topics)
-      case GetPartitionInfo(topic) =>
-        sender ! PartitionInfoResponse(topic, Seq(partitionInfo(topic)))
-      case x =>
-        throw new RuntimeException(s"did not expect $x")
-    }
-  }), "kafka_consumer_proxy_test")
+  val proxy = system.actorOf(
+    Props(new Actor {
+
+      override def receive: Receive = {
+        case ListTopics =>
+          sender ! ListTopicsResponse(topics)
+        case GetPartitionInfo(topic) =>
+          sender ! PartitionInfoResponse(topic, Seq(partitionInfo(topic)))
+        case x =>
+          throw new RuntimeException(s"did not expect $x")
+      }
+    }),
+    "kafka_consumer_proxy_test"
+  )
 
   "The topics endpoint" should {
 
@@ -92,7 +104,6 @@ class TopicMetadataEndpointSpec extends Matchers
         responseAs[JsValue] shouldBe Seq(partitionInfo("test1")).toJson
       }
     }
-
 
     "creates a topic" in {
       implicit val timeout = RouteTestTimeout(5.seconds)

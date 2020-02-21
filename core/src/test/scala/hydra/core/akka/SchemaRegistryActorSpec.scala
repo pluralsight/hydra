@@ -22,7 +22,7 @@ import scala.io.Source
   * Created by alexsilva on 3/9/17.
   */
 class SchemaRegistryActorSpec
-  extends TestKit(ActorSystem("SchemaRegistryActorSpec"))
+    extends TestKit(ActorSystem("SchemaRegistryActorSpec"))
     with Matchers
     with FlatSpecLike
     with ImplicitSender
@@ -31,8 +31,12 @@ class SchemaRegistryActorSpec
 
   implicit val timeout = Timeout(3.seconds)
 
-  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true,
-    duration = 10 seconds)
+  override def afterAll =
+    TestKit.shutdownActorSystem(
+      system,
+      verifySystemShutdown = true,
+      duration = 10 seconds
+    )
 
   val client = ConfluentSchemaRegistry.mockRegistry
 
@@ -54,21 +58,22 @@ class SchemaRegistryActorSpec
   }
 
   def fixture() = {
-    val config = ConfigFactory.parseString(
-      """
+    val config = ConfigFactory.parseString("""
         |schema.registry.url = "mock"
       """.stripMargin)
-    val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(config, Some(settings)))
+    val schemaRegistryActor =
+      system.actorOf(SchemaRegistryActor.props(config, Some(settings)))
     val testProbe = TestProbe()
     (testProbe, schemaRegistryActor)
   }
 
   "Receiving FetchSchemaRequest" should "open the circuit breaker when the registry is down" in {
-    val config = ConfigFactory.parseString(
-      """
+    val config =
+      ConfigFactory.parseString("""
         |schema.registry.url = "http://localhost:0101"
       """.stripMargin)
-    val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(config, Some(settings)))
+    val schemaRegistryActor =
+      system.actorOf(SchemaRegistryActor.props(config, Some(settings)))
     schemaRegistryActor ! FetchSchemaRequest("test")
     schemaRegistryActor ! FetchSchemaRequest("test")
     schemaRegistryActor ! FetchSchemaRequest("test")
@@ -117,19 +122,26 @@ class SchemaRegistryActorSpec
   }
 
   "Receiving RegisterSchemaResponse" should "save the schema metadata to the cache" in {
-    val config = ConfigFactory.parseString(
-      """
+    val config =
+      ConfigFactory.parseString("""
         |schema.registry.url = "http://localhost:0101"
       """.stripMargin)
-    val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(config, Some(settings)))
+    val schemaRegistryActor =
+      system.actorOf(SchemaRegistryActor.props(config, Some(settings)))
     val senderProbe = TestProbe()
 
     val expectedResource = SchemaResource(1, 1, testSchema)
-    schemaRegistryActor.tell(SchemaRegistered(1, 1, testSchemaString), senderProbe.ref)
+    schemaRegistryActor.tell(
+      SchemaRegistered(1, 1, testSchemaString),
+      senderProbe.ref
+    )
     senderProbe.expectMsgPF() {
       case _ => {}
     }
-    schemaRegistryActor.tell(FetchSchemaRequest("hydra.test.Tester"), senderProbe.ref)
+    schemaRegistryActor.tell(
+      FetchSchemaRequest("hydra.test.Tester"),
+      senderProbe.ref
+    )
 
     senderProbe.expectMsgPF() {
       case FetchSchemaResponse(actualSchema) =>
@@ -138,8 +150,7 @@ class SchemaRegistryActorSpec
   }
 
   "The CircuitBreakerSettings" should "load settings from config" in {
-    val cfg = ConfigFactory.parseString(
-      """
+    val cfg = ConfigFactory.parseString("""
         |schema-fetcher.max-failures = 10
         |schema-fetcher.call-timeout = 10s
         |schema-fetcher.reset-timeout = 20s
@@ -173,7 +184,6 @@ class SchemaRegistryActorSpec
     SchemaRegistryActor.removeSchemaSuffix(subjectWithoutSuffix) shouldEqual subjectWithoutSuffix
     SchemaRegistryActor.removeSchemaSuffix(subjectWithSuffix) shouldEqual subjectWithoutSuffix
   }
-
 
   it should "fail registering the schema if hydra.key is a nullable field" in {
     val (probe, schemaRegistryActor) = fixture

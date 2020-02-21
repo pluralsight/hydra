@@ -24,17 +24,23 @@ class JsonPathKeysSpec extends Matchers with FunSpecLike {
   import spray.json._
 
   describe("When using json path") {
-    it ("parses static keys") {
+    it("parses static keys") {
       JsonPathKeys.getKey("test", "test") shouldBe "test"
-      JsonPathKeys.getKey("123","""{"id":"1","host":"host","port":9092}""".parseJson) shouldBe "123"
+      JsonPathKeys.getKey(
+        "123",
+        """{"id":"1","host":"host","port":9092}""".parseJson
+      ) shouldBe "123"
     }
 
-    it ("parses keys from strings") {
-      JsonPathKeys.getKey("{$.id}","""{"id":"1","host":"host","port":9092}""") shouldBe "1"
+    it("parses keys from strings") {
+      JsonPathKeys.getKey("{$.id}", """{"id":"1","host":"host","port":9092}""") shouldBe "1"
     }
 
-    it ("parses keys from JsValue objects") {
-      JsonPathKeys.getKey("{$.id}","""{"id":"1","host":"host","port":9092}""".parseJson) shouldBe "1"
+    it("parses keys from JsValue objects") {
+      JsonPathKeys.getKey(
+        "{$.id}",
+        """{"id":"1","host":"host","port":9092}""".parseJson
+      ) shouldBe "1"
     }
   }
 }

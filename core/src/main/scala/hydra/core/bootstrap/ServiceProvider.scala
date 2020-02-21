@@ -11,6 +11,7 @@ import akka.actor.Props
   *
   */
 trait ServiceProvider {
+
   /**
     * @return The list of services to be instantiated.
     */

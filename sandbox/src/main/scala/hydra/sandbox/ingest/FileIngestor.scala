@@ -19,7 +19,8 @@ class FileIngestor extends Ingestor with TransportOps {
 
   ingest {
     case Publish(request) =>
-      sender ! (if (request.metadataValue("hydra-file-stream").isDefined) Join else Ignore)
+      sender ! (if (request.metadataValue("hydra-file-stream").isDefined) Join
+                else Ignore)
 
     case Ingest(r, ack) => transport(r, ack)
 
@@ -28,20 +29,41 @@ class FileIngestor extends Ingestor with TransportOps {
   override val recordFactory = FileRecordFactory
 }
 
-object FileRecordFactory extends RecordFactory[String, String] with ConfigSupport {
+object FileRecordFactory
+    extends RecordFactory[String, String]
+    with ConfigSupport {
 
   import configs.syntax._
 
   private type REC = HydraRecord[String, String]
 
-  private val destinations = ConfigSupport.toMap(applicationConfig
-    .getOrElse[Config]("transports.file.destinations", ConfigFactory.empty).value)
+  private val destinations = ConfigSupport.toMap(
+    applicationConfig
+      .getOrElse[Config]("transports.file.destinations", ConfigFactory.empty)
+      .value
+  )
 
-  override def build(r: HydraRequest)(implicit ec: ExecutionContext): Future[REC] = {
+  override def build(
+      r: HydraRequest
+  )(implicit ec: ExecutionContext): Future[REC] = {
     val file = r.metadataValue("hydra-file-stream").get
-    destinations.get(file)
-      .map(_ => Future.successful(FileRecord(r.metadataValue("hydra-file-stream").get,
-        r.payload, r.ackStrategy)))
-      .getOrElse(Future.failed(new IllegalArgumentException(s"No file stream with id $file was configured.")))
+    destinations
+      .get(file)
+      .map(_ =>
+        Future.successful(
+          FileRecord(
+            r.metadataValue("hydra-file-stream").get,
+            r.payload,
+            r.ackStrategy
+          )
+        )
+      )
+      .getOrElse(
+        Future.failed(
+          new IllegalArgumentException(
+            s"No file stream with id $file was configured."
+          )
+        )
+      )
   }
 }
