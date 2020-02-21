@@ -1,7 +1,6 @@
 package hydra.kafka.util
 
 import akka.actor.ActorSelection
-import cats.Monad
 import cats.effect.concurrent.Ref
 import cats.effect.{Async, Concurrent, ContextShift, Resource, Sync}
 import cats.implicits._
@@ -14,7 +13,6 @@ import hydra.kafka.producer.KafkaRecord
 
 import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
-import com.fasterxml.jackson.module.scala.deser.`package`.overrides
 
 trait KafkaClient[F[_]]  {
   import KafkaClient._
@@ -35,8 +33,11 @@ object KafkaClient {
   final case class Topic(name: TopicName, numberPartitions: Int)
 
   sealed abstract class PublishError extends Exception with Product with Serializable
-  final case object PublishTimeoutError extends PublishError with NoStackTrace
-  final case class PublishFailed(ingestorResponse: IngestorStatus) extends PublishError
+  object PublishError {
+    final case object Timeout extends PublishError with NoStackTrace
+    final case class UnexpectedResponse(ingestorResponse: IngestorStatus) extends PublishError
+    final case class Failed(cause: Throwable) extends PublishError
+  }
 
   def live[F[_]: Async: Concurrent: ContextShift](bootstrapServers: String, ingestActor: ActorSelection): F[KafkaClient[F]] = Sync[F].delay {
     new KafkaClient[F] {
@@ -62,9 +63,9 @@ object KafkaClient {
         val ingestRecord = Async.fromFuture(Sync[F].delay((ingestActor ? Ingest(record, AckStrategy.Replicated)).mapTo[IngestorStatus]))
         val ingestionResult: F[Unit] = ingestRecord.flatMap {
           case IngestorCompleted => Async[F].unit
-          case IngestorError(error) => Async[F].raiseError(error)
-          case IngestorTimeout => Async[F].raiseError(PublishTimeoutError)
-          case otherStatus => Async[F].raiseError(PublishFailed(otherStatus))
+          case IngestorError(error) => Async[F].raiseError(PublishError.Failed(error))
+          case IngestorTimeout => Async[F].raiseError(PublishError.Timeout)
+          case otherStatus => Async[F].raiseError(PublishError.UnexpectedResponse(otherStatus))
         }
 
         ingestionResult.attemptNarrow[PublishError]

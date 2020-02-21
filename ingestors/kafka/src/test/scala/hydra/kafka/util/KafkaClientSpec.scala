@@ -4,9 +4,10 @@ import akka.actor.ActorSystem
 import akka.testkit.TestProbe
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
-import hydra.core.protocol.{Ingest, IngestorCompleted}
+import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError, IngestorStatus, IngestorTimeout, RequestPublished}
 import hydra.core.transport.AckStrategy
 import hydra.kafka.producer.StringRecord
+import hydra.kafka.util.KafkaClient.PublishError
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
@@ -63,15 +64,31 @@ final class KafkaClientSpec extends WordSpec with Matchers with BeforeAndAfterAl
   private def runLiveOnlyTests(): Unit = {
     val probe = TestProbe()
     KafkaClient.live[IO](s"test", system.actorSelection(probe.ref.path)).map { kafkaClient =>
+      def testCase(ingestorReply: IngestorStatus, expectedResult: Either[PublishError, Unit]): Unit = {
+        val record = StringRecord("some_test_topic", "key", "payload", AckStrategy.Replicated)
+        (for {
+          f <- kafkaClient.publishMessage(record).start
+          _ <- IO(probe.expectMsg(Ingest(record, AckStrategy.Replicated)))
+          _ <- IO(probe.reply(ingestorReply))
+          result <- f.join
+        } yield result shouldBe expectedResult).unsafeRunSync()
+      }
       "KafkaClient#live" must {
         "send ingest request to ingestActor" in {
-          val record = StringRecord("some_test_topic", "key", "payload", AckStrategy.Replicated)
-          (for {
-            f <- kafkaClient.publishMessage(record).start
-            _ <- IO(probe.expectMsg(Ingest(record, AckStrategy.Replicated)))
-            _ <- IO(probe.reply(IngestorCompleted))
-            result <- f.join
-          } yield result shouldBe Right(())).unsafeRunSync()
+          testCase(IngestorCompleted, Right(()))
+        }
+
+        "handle ingestor timeout" in {
+          testCase(IngestorTimeout, Left(PublishError.Timeout))
+        }
+
+        "handle unknown responses" in {
+          testCase(RequestPublished, Left(PublishError.UnexpectedResponse(RequestPublished)))
+        }
+
+        "handle ingestor error" in {
+          val exception = new Exception("Error")
+          testCase(IngestorError(exception), Left(PublishError.Failed(exception)))
         }
       }
     }.unsafeRunSync()
