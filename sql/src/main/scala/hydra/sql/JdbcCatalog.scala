@@ -29,44 +29,54 @@ import scala.collection.JavaConverters._
 
 import scala.util.{Failure, Success, Try}
 
-
 /**
   * Internal implementation of the user-facing `Catalog`.
   */
-class JdbcCatalog(connectionProvider: ConnectionProvider,
-                  dbSyntax: DbSyntax, dialect: JdbcDialect) extends Catalog {
+class JdbcCatalog(
+    connectionProvider: ConnectionProvider,
+    dbSyntax: DbSyntax,
+    dialect: JdbcDialect
+) extends Catalog {
 
   override def createSchema(schema: String): Boolean = {
     val conn = connectionProvider.getConnection
     validateName(schema)
-    Try(JdbcUtils.createSchema(schema, "", conn)).map(_ => true)
-      .recover { case e: SQLException => throw UnableToCreateException(e.getMessage) }
+    Try(JdbcUtils.createSchema(schema, "", conn))
+      .map(_ => true)
+      .recover {
+        case e: SQLException => throw UnableToCreateException(e.getMessage)
+      }
       .get
   }
 
   override def createTable(table: Table): Boolean = {
     val conn = connectionProvider.getConnection
     validateName(table.name)
-    val name = table.dbSchema.map(_ + ".").getOrElse("") + dbSyntax.format(table.name)
-    Try(JdbcUtils.createTable(table.schema, dialect, name, "", dbSyntax, conn)).map(_ => true)
-      .recover { case e: SQLException => throw UnableToCreateException(e.getMessage) }
+    val name =
+      table.dbSchema.map(_ + ".").getOrElse("") + dbSyntax.format(table.name)
+    Try(JdbcUtils.createTable(table.schema, dialect, name, "", dbSyntax, conn))
+      .map(_ => true)
+      .recover {
+        case e: SQLException => throw UnableToCreateException(e.getMessage)
+      }
       .get
   }
 
   override def createOrAlterTable(table: Table): Boolean = {
     val conn = connectionProvider.getConnection
     validateName(table.name)
-    val name = table.dbSchema.map(_ + ".").getOrElse("") + dbSyntax.format(table.name)
+    val name =
+      table.dbSchema.map(_ + ".").getOrElse("") + dbSyntax.format(table.name)
     val tableExists = JdbcUtils.tableExists(conn, dialect, name)
     if (tableExists) {
-      alterIfNeeded(table, conn)
-        .recover { case e: SQLException =>
+      alterIfNeeded(table, conn).recover {
+        case e: SQLException =>
           throw UnableToCreateException(e.getMessage)
-        }
-        .get
+      }.get
     } else {
-      Try(JdbcUtils.createTable(table.schema, dialect, name, "", dbSyntax, conn))
-        .map(_ => true)
+      Try(
+        JdbcUtils.createTable(table.schema, dialect, name, "", dbSyntax, conn)
+      ).map(_ => true)
         .recover {
           case e: SQLException => throw UnableToCreateException(e.getMessage)
         }
@@ -74,47 +84,76 @@ class JdbcCatalog(connectionProvider: ConnectionProvider,
     }
   }
 
-  private def alterIfNeeded(table: Table, connection: Connection): Try[Boolean] = {
+  private def alterIfNeeded(
+      table: Table,
+      connection: Connection
+  ): Try[Boolean] = {
     val autoEvolve = true //todo: make this a config
-    getTableMetadata(TableIdentifier(table.name, None, table.dbSchema)).flatMap { tableMetadata =>
-      val dbColumns = tableMetadata.columns
-      findMissingFields(table.schema, dbColumns) match {
-        case Nil =>
-          Success(false)
-        case fields =>
-          val invalidFields = fields.find(f => JdbcUtils.isNullableUnion(f.schema()) && f.defaultVal() == null)
-          invalidFields.foreach { f =>
-            throw new AvroRuntimeException(s"Cannot ALTER to add missing field ${f.name()}, " +
-              s"as it is not optional and does not have a default value")
-          }
-          if (!autoEvolve) {
-            throw new RuntimeException(s"Table ${table.name} is missing fields ${fields.map(_.name())} and auto-evolution is disabled")
-          }
+    getTableMetadata(TableIdentifier(table.name, None, table.dbSchema))
+      .flatMap { tableMetadata =>
+        val dbColumns = tableMetadata.columns
+        findMissingFields(table.schema, dbColumns) match {
+          case Nil =>
+            Success(false)
+          case fields =>
+            val invalidFields = fields.find(f =>
+              JdbcUtils.isNullableUnion(f.schema()) && f.defaultVal() == null
+            )
+            invalidFields.foreach { f =>
+              throw new AvroRuntimeException(
+                s"Cannot ALTER to add missing field ${f.name()}, " +
+                  s"as it is not optional and does not have a default value"
+              )
+            }
+            if (!autoEvolve) {
+              throw new RuntimeException(
+                s"Table ${table.name} is missing fields ${fields.map(_.name())} and auto-evolution is disabled"
+              )
+            }
 
-          val alterQueries = dialect.alterTableQueries(dbSyntax.format(table.name), fields, dbSyntax)
-          JdbcCatalog.log.info("Amending table to add missing fields:{} with SQL: {}",
-            fields.mkString(","), alterQueries.mkString(","), "")
-          TryWith(connection.createStatement()) { stmt =>
-            alterQueries.foreach(stmt.executeUpdate)
-            true
-          }
-      }
+            val alterQueries = dialect.alterTableQueries(
+              dbSyntax.format(table.name),
+              fields,
+              dbSyntax
+            )
+            JdbcCatalog.log.info(
+              "Amending table to add missing fields:{} with SQL: {}",
+              fields.mkString(","),
+              alterQueries.mkString(","),
+              ""
+            )
+            TryWith(connection.createStatement()) { stmt =>
+              alterQueries.foreach(stmt.executeUpdate)
+              true
+            }
+        }
 
-      //drop constraint from not nullable fields if required
-      TryWith(connection.createStatement()) { stmt =>
-        val fields = table.schema.schema.getFields
-          .asScala.filter(f => JdbcUtils.isNullableUnion(f.schema()))
-        val alterQueries = dialect.dropNotNullConstraintQueries(dbSyntax.format(table.name),
-          table.schema, dbSyntax)
-        JdbcCatalog.log.info("Removing NOT NULLABLE constraint from fields:{} with SQL: {}",
-          fields.mkString(","), alterQueries.mkString(","), "")
-        alterQueries.foreach(stmt.executeUpdate)
-        true
+        //drop constraint from not nullable fields if required
+        TryWith(connection.createStatement()) { stmt =>
+          val fields = table.schema.schema.getFields.asScala.filter(f =>
+            JdbcUtils.isNullableUnion(f.schema())
+          )
+          val alterQueries = dialect.dropNotNullConstraintQueries(
+            dbSyntax.format(table.name),
+            table.schema,
+            dbSyntax
+          )
+          JdbcCatalog.log.info(
+            "Removing NOT NULLABLE constraint from fields:{} with SQL: {}",
+            fields.mkString(","),
+            alterQueries.mkString(","),
+            ""
+          )
+          alterQueries.foreach(stmt.executeUpdate)
+          true
+        }
       }
-    }
   }
 
-  def findMissingFields(schema: SchemaWrapper, columns: Seq[DbColumn]): Seq[Field] = {
+  def findMissingFields(
+      schema: SchemaWrapper,
+      columns: Seq[DbColumn]
+  ): Seq[Field] = {
     val fields = schema.getFields.map(f => dbSyntax.format(f.name) -> f).toMap
     val cols = columns.map(_.name).toSet
     val missing = fields -- cols
@@ -138,15 +177,18 @@ class JdbcCatalog(connectionProvider: ConnectionProvider,
     tableId.schema.filterNot(_.isEmpty).foreach(requireSchemaExists(_, conn))
     val db = tableId.schema.getOrElse("")
     val exists = JdbcUtils.tableExists(conn, dialect, table)
-    if (exists) doGetTableMetadata(table, tableId.schema, conn) else Failure(new NoSuchTableException(db, table))
+    if (exists) doGetTableMetadata(table, tableId.schema, conn)
+    else Failure(new NoSuchTableException(db, table))
 
   }
 
   private[sql] def validateName(name: String): Unit = {
     val validNameFormat = "([\\w_]+)".r
     if (!validNameFormat.pattern.matcher(name).matches()) {
-      throw AnalysisException(s"`$name` is not a valid name for tables/databases. " +
-        "Valid names only contain alphabet characters, numbers and _.")
+      throw AnalysisException(
+        s"`$name` is not a valid name for tables/databases. " +
+          "Valid names only contain alphabet characters, numbers and _."
+      )
     }
   }
 
@@ -170,7 +212,8 @@ class JdbcCatalog(connectionProvider: ConnectionProvider,
   }
 
   protected[this] def formatTableName(name: String): String = {
-    val tableName = if (dialect.caseSensitiveAnalysis) name else name.toLowerCase
+    val tableName =
+      if (dialect.caseSensitiveAnalysis) name else name.toLowerCase
     dbSyntax.format(tableName)
   }
 
@@ -178,12 +221,13 @@ class JdbcCatalog(connectionProvider: ConnectionProvider,
     if (dialect.caseSensitiveAnalysis) name else name.toLowerCase
   }
 
-
   private def getSchema(connection: Connection, product: String): String = {
     product match {
       case s if s matches "(?i)oracle" =>
         TryWith(connection.createStatement()) { stmt =>
-          val rs = stmt.executeQuery("select sys_context('userenv','current_schema') x from dual")
+          val rs = stmt.executeQuery(
+            "select sys_context('userenv','current_schema') x from dual"
+          )
           if (rs.next()) {
             rs.getString("x").toUpperCase
           } else {
@@ -191,48 +235,62 @@ class JdbcCatalog(connectionProvider: ConnectionProvider,
           }
         }.get
       case s if s.toLowerCase.startsWith("postgres") => connection.getSchema
-      case _ => null
+      case _                                         => null
     }
   }
 
-  private def doGetTableMetadata(tableName: String, dbSchema: Option[String], connection: Connection): Try[DbTable] = {
+  private def doGetTableMetadata(
+      tableName: String,
+      dbSchema: Option[String],
+      connection: Connection
+  ): Try[DbTable] = {
     val dbMetaData = connection.getMetaData
     val product = dbMetaData.getDatabaseProductName
     val catalog = connection.getCatalog
-    val schema = dbSchema.map(_.toUpperCase) getOrElse getSchema(connection, product)
+    val schema =
+      dbSchema.map(_.toUpperCase) getOrElse getSchema(connection, product)
     val tableNameForQuery = dialect.tableNameForMetadataQuery(tableName)
-    JdbcCatalog.log.info("Querying column metadata for product:{} schema:{} catalog:{} table:{}",
-      product, schema, catalog, tableNameForQuery)
+    JdbcCatalog.log.info(
+      "Querying column metadata for product:{} schema:{} catalog:{} table:{}",
+      product,
+      schema,
+      catalog,
+      tableNameForQuery
+    )
 
-    val pkColumns: Seq[String] = TryWith(dbMetaData.getPrimaryKeys(catalog, schema, tableNameForQuery)) { rs =>
-      val rsIter = new Iterator[String] {
-        def hasNext = rs.next()
+    val pkColumns: Seq[String] =
+      TryWith(dbMetaData.getPrimaryKeys(catalog, schema, tableNameForQuery)) {
+        rs =>
+          val rsIter = new Iterator[String] {
+            def hasNext = rs.next()
 
-        def next() = rs.getString("COLUMN_NAME")
-      }
+            def next() = rs.getString("COLUMN_NAME")
+          }
 
-      rsIter.toList
-    }.get
+          rsIter.toList
+      }.get
 
-    val columns: Seq[DbColumn] = TryWith(dbMetaData.getColumns(catalog, schema, tableNameForQuery, null)) { rs =>
+    val columns: Seq[DbColumn] =
+      TryWith(dbMetaData.getColumns(catalog, schema, tableNameForQuery, null)) {
+        rs =>
+          val rsIter = new Iterator[DbColumn] {
+            override def hasNext = rs.next()
 
-      val rsIter = new Iterator[DbColumn] {
-        override def hasNext = rs.next()
+            override def next() = {
+              val colName = rs.getString("COLUMN_NAME")
+              val sqlType = rs.getInt("DATA_TYPE")
+              val remarks = rs.getString("REMARKS")
+              val isPk = pkColumns.find(_ == colName).isDefined
+              val isNullable =
+                !isPk && Objects.equals("YES", rs.getString("IS_NULLABLE"))
+              val jtype = JDBCType.valueOf(sqlType)
+              DbColumn(colName, jtype, isNullable, Option(remarks))
+            }
+          }
 
-        override def next() = {
-          val colName = rs.getString("COLUMN_NAME")
-          val sqlType = rs.getInt("DATA_TYPE")
-          val remarks = rs.getString("REMARKS")
-          val isPk = pkColumns.find(_ == colName).isDefined
-          val isNullable = !isPk && Objects.equals("YES", rs.getString("IS_NULLABLE"))
-          val jtype = JDBCType.valueOf(sqlType)
-          DbColumn(colName, jtype, isNullable, Option(remarks))
-        }
-      }
+          rsIter.toList
 
-      rsIter.toList
-
-    }.get
+      }.get
 
     Success(DbTable(tableName, columns))
   }

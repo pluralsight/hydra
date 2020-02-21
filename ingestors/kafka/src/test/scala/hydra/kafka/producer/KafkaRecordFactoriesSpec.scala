@@ -19,8 +19,15 @@ import akka.actor.{Actor, ActorSystem, Props}
 import akka.testkit.TestKit
 import com.fasterxml.jackson.databind.ObjectMapper
 import hydra.avro.resource.SchemaResource
-import hydra.core.akka.SchemaRegistryActor.{FetchSchemaRequest, FetchSchemaResponse}
-import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_FORMAT_PARAM, HYDRA_SCHEMA_PARAM}
+import hydra.core.akka.SchemaRegistryActor.{
+  FetchSchemaRequest,
+  FetchSchemaResponse
+}
+import hydra.core.ingest.RequestParams.{
+  HYDRA_KAFKA_TOPIC_PARAM,
+  HYDRA_RECORD_FORMAT_PARAM,
+  HYDRA_SCHEMA_PARAM
+}
 import hydra.core.ingest.{HydraRequest, RequestParams}
 import hydra.core.protocol.InvalidRequest
 import hydra.core.transport.AckStrategy
@@ -36,22 +43,27 @@ import scala.io.Source
 /**
   * Created by alexsilva on 1/11/17.
   */
-class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
-  with Matchers
-  with FunSpecLike
-  with ScalaFutures
-  with BeforeAndAfterAll {
+class KafkaRecordFactoriesSpec
+    extends TestKit(ActorSystem("hydra"))
+    with Matchers
+    with FunSpecLike
+    with ScalaFutures
+    with BeforeAndAfterAll {
 
-  override implicit val patienceConfig = PatienceConfig(
-    timeout = scaled(200 millis),
-    interval = scaled(100 millis))
+  override implicit val patienceConfig =
+    PatienceConfig(timeout = scaled(200 millis), interval = scaled(100 millis))
 
-  val testSchema = new Schema.Parser().parse(Source.fromResource("avro-factory-test.avsc").mkString)
-  val avroSchema = new Schema.Parser().parse(Source.fromResource("kafka-factories-test.avsc").mkString)
+  val testSchema = new Schema.Parser()
+    .parse(Source.fromResource("avro-factory-test.avsc").mkString)
+
+  val avroSchema = new Schema.Parser()
+    .parse(Source.fromResource("kafka-factories-test.avsc").mkString)
 
   val loader = system.actorOf(Props(new Actor() {
+
     override def receive: Receive = {
-      case FetchSchemaRequest(_) => sender ! FetchSchemaResponse(SchemaResource(1, 1, testSchema))
+      case FetchSchemaRequest(_) =>
+        sender ! FetchSchemaResponse(SchemaResource(1, 1, testSchema))
     }
   }))
 
@@ -66,18 +78,32 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
         .withMetadata(HYDRA_SCHEMA_PARAM -> "kafka-factories-test")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = factories.build(request)
-      val genericRecord = new GenericRecordBuilder(avroSchema).set("name", "test").set("rank", 10).build()
+      val genericRecord = new GenericRecordBuilder(avroSchema)
+        .set("name", "test")
+        .set("rank", 10)
+        .build()
 
-      whenReady(record)(_ shouldBe AvroRecord("test-topic", avroSchema, None, genericRecord, AckStrategy.NoAck))
+      whenReady(record)(
+        _ shouldBe AvroRecord(
+          "test-topic",
+          avroSchema,
+          None,
+          genericRecord,
+          AckStrategy.NoAck
+        )
+      )
     }
 
     it("handles delete records") {
       val request = HydraRequest("123", null)
         .withMetadata(
           HYDRA_KAFKA_TOPIC_PARAM -> "test-topic",
-          RequestParams.HYDRA_RECORD_KEY_PARAM -> "123")
+          RequestParams.HYDRA_RECORD_KEY_PARAM -> "123"
+        )
       val record = factories.build(request)
-      whenReady(record)(_ shouldBe DeleteTombstoneRecord("test-topic", "123", AckStrategy.NoAck))
+      whenReady(record)(
+        _ shouldBe DeleteTombstoneRecord("test-topic", "123", AckStrategy.NoAck)
+      )
     }
 
     it("handles json") {
@@ -87,8 +113,14 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "json")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = factories.build(request)
-      whenReady(record)(_ shouldBe JsonRecord("test-topic", None,
-        new ObjectMapper().reader().readTree(json), AckStrategy.NoAck))
+      whenReady(record)(
+        _ shouldBe JsonRecord(
+          "test-topic",
+          None,
+          new ObjectMapper().reader().readTree(json),
+          AckStrategy.NoAck
+        )
+      )
     }
 
     it("handles strings") {
@@ -98,7 +130,9 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "string")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val record = factories.build(request)
-      whenReady(record)(_ shouldBe StringRecord("test-topic", None, json, AckStrategy.NoAck))
+      whenReady(record)(
+        _ shouldBe StringRecord("test-topic", None, json, AckStrategy.NoAck)
+      )
     }
 
     it("validates json records") {
@@ -131,7 +165,9 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "unknown-format")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = factories.build(request)
-      whenReady(rec.failed)(ex => ex shouldBe InvalidRequest(_: IllegalArgumentException))
+      whenReady(rec.failed)(ex =>
+        ex shouldBe InvalidRequest(_: IllegalArgumentException)
+      )
     }
 
     it("throws error with unknown formats") {
@@ -140,7 +176,9 @@ class KafkaRecordFactoriesSpec extends TestKit(ActorSystem("hydra"))
         .withMetadata(HYDRA_SCHEMA_PARAM -> "kafka-factories-test")
         .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "unknown")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      whenReady(factories.build(request).failed)(_ shouldBe an[IllegalArgumentException])
+      whenReady(factories.build(request).failed)(
+        _ shouldBe an[IllegalArgumentException]
+      )
     }
   }
 }

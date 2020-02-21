@@ -1,6 +1,8 @@
 package hydra.common.util
 
-class Base62(baseString: String = ((0 to 9) ++ ('A' to 'Z') ++ ('a' to 'z')).mkString) {
+class Base62(
+    baseString: String = ((0 to 9) ++ ('A' to 'Z') ++ ('a' to 'z')).mkString
+) {
 
   private val base = 62
 
@@ -10,7 +12,8 @@ class Base62(baseString: String = ((0 to 9) ++ ('A' to 'Z') ++ ('a' to 'z')).mkS
     s.zip(s.indices.reverse)
       .map {
         case (c, p) => baseString.indexOf(c) * scala.math.pow(base, p).toLong
-      }.sum
+      }
+      .sum
   }
 
   def encode(i: Long): String = {
@@ -18,7 +21,7 @@ class Base62(baseString: String = ((0 to 9) ++ ('A' to 'Z') ++ ('a' to 'z')).mkS
     def div(i: Long, res: List[Int] = Nil): List[Int] = {
       (i / base) match {
         case q if q > 0 => div(q, (i % base).toInt :: res)
-        case _ => i.toInt :: res
+        case _          => i.toInt :: res
       }
     }
 

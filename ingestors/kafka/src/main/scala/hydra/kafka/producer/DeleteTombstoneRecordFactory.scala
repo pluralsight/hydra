@@ -26,14 +26,16 @@ import scala.util.{Failure, Success, Try}
 
 object DeleteTombstoneRecordFactory extends KafkaRecordFactory[String, Any] {
 
-  override def build(request: HydraRequest)
-                    (implicit ex: ExecutionContext): Future[DeleteTombstoneRecord] = {
+  override def build(
+      request: HydraRequest
+  )(implicit ex: ExecutionContext): Future[DeleteTombstoneRecord] = {
     val theKey = getKey(request)
-      .fold[Try[String]](Failure(new IllegalArgumentException("A key is required for deletes.")))(Success(_))
+      .fold[Try[String]](
+        Failure(new IllegalArgumentException("A key is required for deletes."))
+      )(Success(_))
     for {
       key <- Future.fromTry(theKey)
       topic <- Future.fromTry(getTopic(request))
     } yield DeleteTombstoneRecord(topic, key, request.ackStrategy)
   }
 }
-

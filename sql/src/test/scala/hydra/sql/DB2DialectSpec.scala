@@ -9,6 +9,7 @@ import org.scalatest.{FunSpecLike, Matchers}
   * Created by alexsilva on 5/4/17.
   */
 class DB2DialectSpec extends Matchers with FunSpecLike {
+
   val schema =
     """
       |{
@@ -83,14 +84,17 @@ class DB2DialectSpec extends Matchers with FunSpecLike {
       |}
     """.stripMargin
 
-
   describe("The DB2 dialect") {
     it("converts a schema") {
       val avro = new Schema.Parser().parse(schema)
-      DB2Dialect.getJDBCType(avro.getField("username").schema()).get shouldBe JdbcType("CLOB", CLOB)
+      DB2Dialect
+        .getJDBCType(avro.getField("username").schema())
+        .get shouldBe JdbcType("CLOB", CLOB)
       DB2Dialect.getJDBCType(avro.getField("passwordHash").schema()) shouldBe None
       DB2Dialect.getJDBCType(avro.getField("rate").schema()) shouldBe None
-      DB2Dialect.getJDBCType(avro.getField("active").schema()) shouldBe Some(JdbcType("CHAR(1)", CHAR))
+      DB2Dialect.getJDBCType(avro.getField("active").schema()) shouldBe Some(
+        JdbcType("CHAR(1)", CHAR)
+      )
       DB2Dialect.getJDBCType(avro.getField("score").schema()) shouldBe None
       DB2Dialect.getJDBCType(avro.getField("scored").schema()) shouldBe None
       DB2Dialect.getJDBCType(avro.getField("testUnion").schema()) shouldBe None

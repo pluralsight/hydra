@@ -19,25 +19,35 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 12/5/16.
   */
-class KafkaTransportSpec extends TestKit(ActorSystem("hydra"))
-  with Matchers
-  with FunSpecLike
-  with ImplicitSender
-  with BeforeAndAfterAll
-  with ConfigSupport {
+class KafkaTransportSpec
+    extends TestKit(ActorSystem("hydra"))
+    with Matchers
+    with FunSpecLike
+    with ImplicitSender
+    with BeforeAndAfterAll
+    with ConfigSupport {
 
-  val producerName = StringRecord("transport_test", Some("key"), "payload", AckStrategy.NoAck).formatName
+  val producerName = StringRecord(
+    "transport_test",
+    Some("key"),
+    "payload",
+    AckStrategy.NoAck
+  ).formatName
 
   lazy val transport = system.actorOf(KafkaTransport.props(rootConfig), "kafka")
 
-  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181,
-    customBrokerProperties = Map("auto.create.topics.enable" -> "false"))
+  implicit val config = EmbeddedKafkaConfig(
+    kafkaPort = 8092,
+    zooKeeperPort = 3181,
+    customBrokerProperties = Map("auto.create.topics.enable" -> "false")
+  )
 
   val ingestor = TestProbe()
   val streamActor = TestProbe()
 
   system.eventStream.subscribe(streamActor.ref, classOf[RecordProduceError])
-  system.eventStream.subscribe(streamActor.ref, classOf[ProducerInitializationError])
+  system.eventStream
+    .subscribe(streamActor.ref, classOf[ProducerInitializationError])
 
   override def beforeAll() = {
     super.beforeAll()
@@ -56,9 +66,15 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra"))
 
     it("errors if no client can be found for the message") {
       val probe = TestProbe()
-      val ack: TransportCallback = (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) =>
-        probe.ref ! err.get
-      val rec = new StringRecord("transport_test", "key", """{"name":"alex"}""", AckStrategy.NoAck) {
+      val ack: TransportCallback =
+        (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) =>
+          probe.ref ! err.get
+      val rec = new StringRecord(
+        "transport_test",
+        "key",
+        """{"name":"alex"}""",
+        AckStrategy.NoAck
+      ) {
         override val formatName: String = "unknown"
       }
       transport ! Deliver(rec, 1, ack)
@@ -66,22 +82,32 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra"))
     }
 
     it("forwards to the right proxy") {
-      val ack: TransportCallback = (d: Long, m: Option[RecordMetadata], e: Option[Throwable]) => ingestor.ref ! "DONE"
-      val rec = StringRecord("transport_test", "key", "payload", AckStrategy.NoAck)
+      val ack: TransportCallback =
+        (d: Long, m: Option[RecordMetadata], e: Option[Throwable]) =>
+          ingestor.ref ! "DONE"
+      val rec =
+        StringRecord("transport_test", "key", "payload", AckStrategy.NoAck)
       transport ! Deliver(rec, 1, ack)
       ingestor.expectMsg(max = 10.seconds, "DONE")
     }
 
     it("handles delete records") {
-      val ack: TransportCallback = (d: Long, m: Option[RecordMetadata], e: Option[Throwable]) => ingestor.ref ! "DONE"
-      val rec = DeleteTombstoneRecord("transport_test", "key", AckStrategy.NoAck)
+      val ack: TransportCallback =
+        (d: Long, m: Option[RecordMetadata], e: Option[Throwable]) =>
+          ingestor.ref ! "DONE"
+      val rec =
+        DeleteTombstoneRecord("transport_test", "key", AckStrategy.NoAck)
       transport ! Deliver(rec, 1, ack)
       ingestor.expectMsg(max = 10.seconds, "DONE")
     }
 
-
     it("publishes errors to the stream") {
-      val rec = JsonRecord("transport_test", Some("key"), """{"name":"alex"}""", AckStrategy.NoAck)
+      val rec = JsonRecord(
+        "transport_test",
+        Some("key"),
+        """{"name":"alex"}""",
+        AckStrategy.NoAck
+      )
       transport ! Deliver(rec)
       streamActor.expectMsgPF() {
         case RecordProduceError(deliveryId, r, err) =>
@@ -120,11 +146,13 @@ class KafkaTransportSpec extends TestKit(ActorSystem("hydra"))
           |   }
           |}
           |
-      """.stripMargin)
+      """.stripMargin
+      )
 
       system.actorOf(KafkaTransport.props(cfg))
-      streamActor.expectMsgPF() { case ProducerInitializationError("test", err) =>
-        err shouldBe a[KafkaException]
+      streamActor.expectMsgPF() {
+        case ProducerInitializationError("test", err) =>
+          err shouldBe a[KafkaException]
       }
     }
   }

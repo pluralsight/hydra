@@ -27,10 +27,15 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 9/7/16.
   */
-class KafkaConsumerProxySpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike
-  with BeforeAndAfterAll with ImplicitSender {
+class KafkaConsumerProxySpec
+    extends TestKit(ActorSystem("test"))
+    with Matchers
+    with FunSpecLike
+    with BeforeAndAfterAll
+    with ImplicitSender {
 
-  implicit val config = EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
+  implicit val config =
+    EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
 
   override def beforeAll() = {
     super.beforeAll()
@@ -50,14 +55,20 @@ class KafkaConsumerProxySpec extends TestKit(ActorSystem("test")) with Matchers 
   describe("When using KafkaConsumerProxy") {
     it("gets latest offsets for a topic") {
       kafkaProxy ! GetLatestOffsets("test-consumer1")
-      expectMsg(10.seconds,
-        LatestOffsetsResponse("test-consumer1", Map(new TopicPartition("test-consumer1", 0) -> 0L)))
+      expectMsg(
+        10.seconds,
+        LatestOffsetsResponse(
+          "test-consumer1",
+          Map(new TopicPartition("test-consumer1", 0) -> 0L)
+        )
+      )
     }
 
     it("lists topics") {
       kafkaProxy ! ListTopics
       expectMsgPF(10.seconds) {
-        case ListTopicsResponse(topics) => topics.keys should contain allOf("test-consumer1", "test-consumer2")
+        case ListTopicsResponse(topics) =>
+          topics.keys should contain allOf ("test-consumer1", "test-consumer2")
       }
     }
 

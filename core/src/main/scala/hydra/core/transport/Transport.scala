@@ -2,13 +2,18 @@ package hydra.core.transport
 
 import akka.persistence.{AtLeastOnceDelivery, PersistentActor}
 import hydra.common.config.ConfigSupport
-import hydra.core.protocol.{HydraMessage, Produce, RecordAccepted, RecordProduced}
+import hydra.core.protocol.{
+  HydraMessage,
+  Produce,
+  RecordAccepted,
+  RecordProduced
+}
 import hydra.core.transport.AckStrategy.{NoAck, Persisted, Replicated}
 
-
-trait Transport extends PersistentActor
-  with ConfigSupport
-  with AtLeastOnceDelivery {
+trait Transport
+    extends PersistentActor
+    with ConfigSupport
+    with AtLeastOnceDelivery {
 
   import Transport._
 
@@ -17,12 +22,13 @@ trait Transport extends PersistentActor
   def transport: Receive
 
   private final def baseCommand: Receive = {
-    case p@Produce(_, _, _) => deliver(p)
+    case p @ Produce(_, _, _) => deliver(p)
 
     case Confirm(deliveryId) =>
-      if (deliveryId > 0) persistAsync(DestinationConfirmed(deliveryId))(updateState)
+      if (deliveryId > 0)
+        persistAsync(DestinationConfirmed(deliveryId))(updateState)
 
-    case t@TransportError(_) =>
+    case t @ TransportError(_) =>
       context.system.eventStream.publish(t)
   }
 
@@ -33,8 +39,10 @@ trait Transport extends PersistentActor
   }
 
   protected def updateState(evt: HydraMessage): Unit = evt match {
-    case Produce(rec, _, _) => deliver(self.path)(deliveryId => Deliver(rec, deliveryId,
-      new TransportSupervisorCallback(self)))
+    case Produce(rec, _, _) =>
+      deliver(self.path)(deliveryId =>
+        Deliver(rec, deliveryId, new TransportSupervisorCallback(self))
+      )
 
     case DestinationConfirmed(deliveryId) =>
       confirmDelivery(deliveryId)
@@ -54,14 +62,23 @@ trait Transport extends PersistentActor
         val ingestor = sender
         persistAsync(p) { p =>
           updateState(p)
-          ingestor ! RecordProduced(HydraRecordMetadata(System.currentTimeMillis, destination,
-            ackStrategy), p.supervisor)
+          ingestor ! RecordProduced(
+            HydraRecordMetadata(
+              System.currentTimeMillis,
+              destination,
+              ackStrategy
+            ),
+            p.supervisor
+          )
         }
 
       case Replicated =>
         val ingestor = sender
-        self ! Deliver(p.record, -1, new IngestorCallback[Any, Any](p.record, ingestor,
-          p.supervisor, self))
+        self ! Deliver(
+          p.record,
+          -1,
+          new IngestorCallback[Any, Any](p.record, ingestor, p.supervisor, self)
+        )
     }
   }
 }
@@ -76,8 +93,10 @@ object Transport {
 
   case class TransportError(deliveryId: Long) extends TransportMessage
 
-  case class Deliver[K, V](record: HydraRecord[K, V],
-                           deliveryId: Long = -1,
-                           callback: TransportCallback = NoCallback) extends TransportMessage
+  case class Deliver[K, V](
+      record: HydraRecord[K, V],
+      deliveryId: Long = -1,
+      callback: TransportCallback = NoCallback
+  ) extends TransportMessage
 
 }

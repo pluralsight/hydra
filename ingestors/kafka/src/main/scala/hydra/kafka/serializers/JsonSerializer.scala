@@ -19,7 +19,11 @@ package hydra.kafka.serializers
 import java.io.ByteArrayInputStream
 import java.util
 
-import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper, SerializationFeature}
+import com.fasterxml.jackson.databind.{
+  JsonNode,
+  ObjectMapper,
+  SerializationFeature
+}
 import hydra.common.config.ConfigSupport
 import org.apache.kafka.common.serialization._
 
@@ -35,7 +39,9 @@ class JsonSerializer extends Serializer[JsonNode] with ConfigSupport {
   }
 
   override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = {
-    val indent = Option(configs.get("kafka.encoders.json.indent.output")).map(_.toString.toBoolean).getOrElse(false)
+    val indent = Option(configs.get("kafka.encoders.json.indent.output"))
+      .map(_.toString.toBoolean)
+      .getOrElse(false)
     mapper.configure(SerializationFeature.INDENT_OUTPUT, indent)
   }
 
@@ -57,7 +63,9 @@ class JsonDeserializer extends Deserializer[JsonNode] {
   }
 
   override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = {
-    val indent = Option(configs.get("kafka.encoders.json.indent.output")).map(_.toString.toBoolean).getOrElse(false)
+    val indent = Option(configs.get("kafka.encoders.json.indent.output"))
+      .map(_.toString.toBoolean)
+      .getOrElse(false)
     mapper.configure(SerializationFeature.INDENT_OUTPUT, indent)
   }
 

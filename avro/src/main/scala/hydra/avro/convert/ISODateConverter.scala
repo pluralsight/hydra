@@ -23,18 +23,24 @@ class ISODateConverter extends Conversion[ZonedDateTime] with LoggingAdapter {
 
   private val simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX")
 
-  override def fromCharSequence(value: CharSequence,
-                                schema: Schema, `type`: LogicalType): ZonedDateTime = {
+  override def fromCharSequence(
+      value: CharSequence,
+      schema: Schema,
+      `type`: LogicalType
+  ): ZonedDateTime = {
     Try(OffsetDateTime.parse(value).toInstant)
       .orElse {
         Try(LocalDateTime.parse(value).toInstant(ZoneOffset.UTC))
-      }.orElse {
+      }
+      .orElse {
         Try(simpleDateFormat.parse(value.toString).toInstant)
-      }.recover {
-      case e: Throwable =>
-        log.error(e.getMessage, e)
-        Instant.EPOCH
-    }.map(_.atZone(utc))
+      }
+      .recover {
+        case e: Throwable =>
+          log.error(e.getMessage, e)
+          Instant.EPOCH
+      }
+      .map(_.atZone(utc))
       .get
   }
 }
@@ -44,7 +50,9 @@ object IsoDate extends LogicalType("iso-datetime") {
 
   override def validate(schema: Schema): Unit = {
     if (schema.getType() != Schema.Type.STRING) {
-      throw new IllegalArgumentException("Iso-datetime can only be used with an underlying string type")
+      throw new IllegalArgumentException(
+        "Iso-datetime can only be used with an underlying string type"
+      )
     }
   }
 }

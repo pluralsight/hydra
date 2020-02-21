@@ -18,7 +18,7 @@ import hydra.common.config.ConfigSupport
 import hydra.avro.registry.ConfluentSchemaRegistry
 
 class JdbcIngestorSpec
-  extends TestKit(ActorSystem("jdbc-ingestor-spec"))
+    extends TestKit(ActorSystem("jdbc-ingestor-spec"))
     with Matchers
     with FunSpecLike
     with ImplicitSender
@@ -29,21 +29,30 @@ class JdbcIngestorSpec
 
   val probe = TestProbe()
 
-  val jdbcTransport = system.actorOf(Props(new ForwardActor(probe.ref)), "jdbc_transport")
-  val jdbcTestSchema = new Schema.Parser().parse(Source.fromResource("jdbc-test.avsc").mkString)
+  val jdbcTransport =
+    system.actorOf(Props(new ForwardActor(probe.ref)), "jdbc_transport")
 
-  val client = ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient
+  val jdbcTestSchema =
+    new Schema.Parser().parse(Source.fromResource("jdbc-test.avsc").mkString)
+
+  val client =
+    ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient
 
   override def beforeAll = {
     client.register("jdbc-test-value", jdbcTestSchema)
   }
 
-  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
+  override def afterAll =
+    TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 
   describe("When using the jdbc ingestor") {
     it("Joins") {
-      val request = HydraRequest("123", "someString", None,
-        Map(JdbcRecordFactory.DB_PROFILE_PARAM -> "testdb"))
+      val request = HydraRequest(
+        "123",
+        "someString",
+        None,
+        Map(JdbcRecordFactory.DB_PROFILE_PARAM -> "testdb")
+      )
       ingestor ! Publish(request)
       expectMsg(Join)
     }
@@ -57,14 +66,18 @@ class JdbcIngestorSpec
     it("validates") {
       val r = HydraRequest("123", "someString").withMetadata(
         HYDRA_SCHEMA_PARAM -> "jdbc-test",
-        JdbcRecordFactory.TABLE_PARAM -> "table")
+        JdbcRecordFactory.TABLE_PARAM -> "table"
+      )
       ingestor ! Validate(r)
       expectMsgType[InvalidRequest]
 
-      val request = HydraRequest("123", """{"id":1, "name":"test", "rank" : 1}""")
-        .withMetadata(
-          HYDRA_SCHEMA_PARAM -> "jdbc-test",
-          JdbcRecordFactory.TABLE_PARAM -> "table", JdbcRecordFactory.DB_PROFILE_PARAM -> "profile")
+      val request =
+        HydraRequest("123", """{"id":1, "name":"test", "rank" : 1}""")
+          .withMetadata(
+            HYDRA_SCHEMA_PARAM -> "jdbc-test",
+            JdbcRecordFactory.TABLE_PARAM -> "table",
+            JdbcRecordFactory.DB_PROFILE_PARAM -> "profile"
+          )
 
       ingestor ! Validate(request)
       expectMsgType[InvalidRequest]
@@ -72,7 +85,9 @@ class JdbcIngestorSpec
       val r2 = HydraRequest("123", """{"id":1, "name":"test", "rank" : 1}""")
         .withMetadata(
           HYDRA_SCHEMA_PARAM -> "jdbc-test",
-          JdbcRecordFactory.TABLE_PARAM -> "table", JdbcRecordFactory.DB_PROFILE_PARAM -> "test-dsprofile")
+          JdbcRecordFactory.TABLE_PARAM -> "table",
+          JdbcRecordFactory.DB_PROFILE_PARAM -> "test-dsprofile"
+        )
       ingestor ! Validate(r2)
       expectMsgPF() {
         case ValidRequest(rec) =>
@@ -81,11 +96,21 @@ class JdbcIngestorSpec
     }
 
     it("transports") {
-      ingestor ! Ingest(TestRecord("test", "test", "", AckStrategy.NoAck), NoAck)
-      probe.expectMsg(Produce(TestRecord("test", "test", "", AckStrategy.NoAck), self, NoAck))
+      ingestor ! Ingest(
+        TestRecord("test", "test", "", AckStrategy.NoAck),
+        NoAck
+      )
+      probe.expectMsg(
+        Produce(TestRecord("test", "test", "", AckStrategy.NoAck), self, NoAck)
+      )
     }
   }
 
-  case class TestRecord(destination: String, payload: String, key: String, ackStrategy: AckStrategy) extends HydraRecord[String, String]
+  case class TestRecord(
+      destination: String,
+      payload: String,
+      key: String,
+      ackStrategy: AckStrategy
+  ) extends HydraRecord[String, String]
 
 }

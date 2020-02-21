@@ -40,7 +40,12 @@ class MiscSpec extends Matchers with FlatSpecLike {
 
   "The InvalidRequestError" should "have correct values" in {
     val req = HydraRequest("123", "test")
-    val err = InvalidRequestError("test", req, DateTime.now, new IllegalArgumentException)
+    val err = InvalidRequestError(
+      "test",
+      req,
+      DateTime.now,
+      new IllegalArgumentException
+    )
     err.statusCode shouldBe 400
   }
 }

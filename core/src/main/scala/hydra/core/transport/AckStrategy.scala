@@ -10,20 +10,25 @@ import scala.util.Try
   *
   * Created by alexsilva on 10/4/16.
   */
-
 sealed trait AckStrategy
 
 object AckStrategy {
 
   def apply(strategy: String): Try[AckStrategy] = {
     Try {
-      Option(strategy).map(_.trim.toLowerCase).collect {
-        case "replicated" => Replicated
-        case "persisted" => Persisted
-        case "noack" => NoAck
-        case s if s.isEmpty => NoAck
-        case x => throw new IllegalArgumentException(s"$x is not a valid ack strategy.")
-      }.getOrElse(NoAck)
+      Option(strategy)
+        .map(_.trim.toLowerCase)
+        .collect {
+          case "replicated"   => Replicated
+          case "persisted"    => Persisted
+          case "noack"        => NoAck
+          case s if s.isEmpty => NoAck
+          case x =>
+            throw new IllegalArgumentException(
+              s"$x is not a valid ack strategy."
+            )
+        }
+        .getOrElse(NoAck)
     }
   }
 
@@ -40,4 +45,3 @@ object AckStrategy {
   case object NoAck extends AckStrategy
 
 }
-

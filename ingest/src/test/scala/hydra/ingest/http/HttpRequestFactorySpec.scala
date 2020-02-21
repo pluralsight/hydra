@@ -16,22 +16,34 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 3/17/17.
   */
-class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with FunSpecLike
-  with ScalaFutures with BeforeAndAfterAll {
+class HttpRequestFactorySpec
+    extends TestKit(ActorSystem())
+    with Matchers
+    with FunSpecLike
+    with ScalaFutures
+    with BeforeAndAfterAll {
 
-  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10 seconds)
+  override def afterAll =
+    TestKit.shutdownActorSystem(
+      system,
+      verifySystemShutdown = true,
+      duration = 10 seconds
+    )
 
   describe("When build a HydraRequest from HTTP") {
     it("builds") {
       val json = """{"name":"value"}"""
       val httpRequest = HttpRequest(
         HttpMethods.POST,
-        headers = Seq(RawHeader("hydra", "awesome"),
+        headers = Seq(
+          RawHeader("hydra", "awesome"),
           RawHeader(RequestParams.HYDRA_VALIDATION_STRATEGY, "relaxed"),
           RawHeader(RequestParams.HydraClientId, "test-client"),
-          RawHeader(RequestParams.HYDRA_ACK_STRATEGY, "replicated")),
+          RawHeader(RequestParams.HYDRA_ACK_STRATEGY, "replicated")
+        ),
         uri = "/test",
-        entity = HttpEntity(MediaTypes.`application/json`, json))
+        entity = HttpEntity(MediaTypes.`application/json`, json)
+      )
       val req = new HttpRequestFactory().createRequest("123", httpRequest)
       whenReady(req) { req =>
         req.payload shouldBe json
@@ -48,7 +60,8 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
         HttpMethods.POST,
         uri = "/test",
         entity = HttpEntity.Empty,
-        headers = Seq(RawHeader(RequestParams.HYDRA_ACK_STRATEGY, "invalid")))
+        headers = Seq(RawHeader(RequestParams.HYDRA_ACK_STRATEGY, "invalid"))
+      )
       val req = new HttpRequestFactory().createRequest("123", httpRequest)
       whenReady(req.failed)(_ shouldBe an[IllegalArgumentException])
     }
@@ -57,11 +70,10 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
       val httpRequest = HttpRequest(
         HttpMethods.DELETE,
         uri = "/test",
-        entity = HttpEntity.Empty)
+        entity = HttpEntity.Empty
+      )
       val req = new HttpRequestFactory().createRequest("123", httpRequest)
-      whenReady(req) {
-        req => req.payload shouldBe null
-      }
+      whenReady(req) { req => req.payload shouldBe null }
     }
 
     it("builds a DELETE request and nulls out payload if it exists") {
@@ -69,22 +81,17 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
       val httpRequest = HttpRequest(
         HttpMethods.DELETE,
         uri = "/test",
-        entity = HttpEntity(MediaTypes.`application/json`, json))
+        entity = HttpEntity(MediaTypes.`application/json`, json)
+      )
       val req = new HttpRequestFactory().createRequest("123", httpRequest)
-      whenReady(req) {
-        req => req.payload shouldBe null
-      }
+      whenReady(req) { req => req.payload shouldBe null }
     }
 
     it("does not modify empty payloads for non-DELETE requests") {
-      val httpRequest = HttpRequest(
-        HttpMethods.POST,
-        uri = "/test",
-        entity = HttpEntity.Empty)
+      val httpRequest =
+        HttpRequest(HttpMethods.POST, uri = "/test", entity = HttpEntity.Empty)
       val req = new HttpRequestFactory().createRequest("123", httpRequest)
-      whenReady(req) {
-        req => req.payload shouldBe ""
-      }
+      whenReady(req) { req => req.payload shouldBe "" }
     }
 
     it("builds with default strategy values") {
@@ -93,7 +100,8 @@ class HttpRequestFactorySpec extends TestKit(ActorSystem()) with Matchers with F
         HttpMethods.POST,
         headers = Seq(RawHeader("hydra", "awesome")),
         uri = "/test",
-        entity = HttpEntity(MediaTypes.`application/json`, json))
+        entity = HttpEntity(MediaTypes.`application/json`, json)
+      )
       val req = new HttpRequestFactory().createRequest("123", httpRequest)
       whenReady(req) { req =>
         req.payload shouldBe json

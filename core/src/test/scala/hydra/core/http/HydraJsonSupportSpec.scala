@@ -12,7 +12,11 @@ import org.scalatest.{FunSpecLike, Matchers}
 
 import scala.util.{Success, Try}
 
-class HydraJsonSupportSpec extends Matchers with FunSpecLike with HydraJsonSupport with SprayJsonSupport {
+class HydraJsonSupportSpec
+    extends Matchers
+    with FunSpecLike
+    with HydraJsonSupport
+    with SprayJsonSupport {
 
   import spray.json._
 
@@ -33,8 +37,12 @@ class HydraJsonSupportSpec extends Matchers with FunSpecLike with HydraJsonSuppo
 
     it("converts Throwable objects") {
       val s = new IllegalArgumentException("error")
-      s.asInstanceOf[Throwable].toJson
-        .toString.indexOf(""""message":"error","stackTrace":"java.lang.IllegalArgumentException""") should not be -1
+      s.asInstanceOf[Throwable]
+        .toJson
+        .toString
+        .indexOf(
+          """"message":"error","stackTrace":"java.lang.IllegalArgumentException"""
+        ) should not be -1
       intercept[NotImplementedError] {
         """"error"""".parseJson.convertTo[Throwable]
       }
@@ -42,10 +50,16 @@ class HydraJsonSupportSpec extends Matchers with FunSpecLike with HydraJsonSuppo
 
     it("converts Try objects") {
       val s = Success("DONE!")
-      s.asInstanceOf[Try[String]].toJson.toString shouldBe """{"success":"DONE!"}"""
+      s.asInstanceOf[Try[String]]
+        .toJson
+        .toString shouldBe """{"success":"DONE!"}"""
       val z = scala.util.Failure(new RuntimeException("ERROR"))
-      z.asInstanceOf[Try[String]].toJson.toString
-        .indexOf(""""message":"ERROR","stackTrace":"java.lang.RuntimeException""") should not be -1
+      z.asInstanceOf[Try[String]]
+        .toJson
+        .toString
+        .indexOf(
+          """"message":"ERROR","stackTrace":"java.lang.RuntimeException"""
+        ) should not be -1
     }
 
     it("converts UUID objects") {

@@ -7,8 +7,15 @@ import akka.kafka.ProducerSettings
 import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol._
 import hydra.core.transport.TransportCallback
-import hydra.kafka.producer.{HydraKafkaCallback, KafkaRecord, KafkaRecordMetadata}
-import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
+import hydra.kafka.producer.{
+  HydraKafkaCallback,
+  KafkaRecord,
+  KafkaRecordMetadata
+}
+import hydra.kafka.transport.KafkaProducerProxy.{
+  ProduceToKafka,
+  ProducerInitializationError
+}
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
 import org.apache.kafka.clients.producer.{Callback, Producer}
 
@@ -18,7 +25,9 @@ import scala.util.{Failure, Success, Try}
   * Created by alexsilva on 10/7/16.
   */
 class KafkaProducerProxy[K, V](id: String, settings: ProducerSettings[K, V])
-  extends Actor with LoggingAdapter with Stash {
+    extends Actor
+    with LoggingAdapter
+    with Stash {
 
   private[transport] var producer: Producer[K, V] = _
 
@@ -91,11 +100,13 @@ class KafkaProducerProxy[K, V](id: String, settings: ProducerSettings[K, V])
   override def postStop(): Unit = closeProducer()
 }
 
-
 object KafkaProducerProxy {
 
-  case class ProduceToKafka(deliveryId: Long, kr: KafkaRecord[_, _],
-                            callback: TransportCallback) extends HydraMessage
+  case class ProduceToKafka(
+      deliveryId: Long,
+      kr: KafkaRecord[_, _],
+      callback: TransportCallback
+  ) extends HydraMessage
 
   case class ProducerInitializationError(id: String, ex: Throwable)
 
@@ -104,5 +115,5 @@ object KafkaProducerProxy {
 
 }
 
-case class InvalidProducerSettingsException(msg: String) extends RuntimeException(msg)
-
+case class InvalidProducerSettingsException(msg: String)
+    extends RuntimeException(msg)

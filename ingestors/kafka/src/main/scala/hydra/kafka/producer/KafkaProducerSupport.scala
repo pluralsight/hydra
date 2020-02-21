@@ -16,7 +16,11 @@
 
 package hydra.kafka.producer
 
-import akka.routing.{DefaultOptimalSizeExploringResizer, OptimalSizeExploringResizer, RoundRobinPool}
+import akka.routing.{
+  DefaultOptimalSizeExploringResizer,
+  OptimalSizeExploringResizer,
+  RoundRobinPool
+}
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.ingest.{Ingestor, TransportOps}
 
@@ -30,8 +34,13 @@ trait KafkaProducerSupport extends TransportOps {
 
   override def transportName: String = "kafka"
 
-  private val pool = RoundRobinPool(nrOfInstances = 5, resizer = Some(DefaultOptimalSizeExploringResizer()))
+  private val pool = RoundRobinPool(
+    nrOfInstances = 5,
+    resizer = Some(DefaultOptimalSizeExploringResizer())
+  )
 
-  val schemaRegistryActor = context.actorOf(pool.props(SchemaRegistryActor.props(applicationConfig)),
-    "kafka-schema-registry-actor")
+  val schemaRegistryActor = context.actorOf(
+    pool.props(SchemaRegistryActor.props(applicationConfig)),
+    "kafka-schema-registry-actor"
+  )
 }

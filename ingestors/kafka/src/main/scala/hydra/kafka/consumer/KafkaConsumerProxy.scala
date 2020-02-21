@@ -39,10 +39,19 @@ class KafkaConsumerProxy extends Actor {
     _defaultConsumer.close()
   }
 
-  private def latestOffsets(topic: String): Future[Map[TopicPartition, Long]] = {
+  private def latestOffsets(
+      topic: String
+  ): Future[Map[TopicPartition, Long]] = {
     Future {
-      val ts = _defaultConsumer.partitionsFor(topic).asScala.map(pi => new TopicPartition(topic, pi.partition()))
-      _defaultConsumer.endOffsets(ts.asJava).asScala.map(tp => tp._1 -> tp._2.toLong).toMap
+      val ts = _defaultConsumer
+        .partitionsFor(topic)
+        .asScala
+        .map(pi => new TopicPartition(topic, pi.partition()))
+      _defaultConsumer
+        .endOffsets(ts.asJava)
+        .asScala
+        .map(tp => tp._1 -> tp._2.toLong)
+        .toMap
     }
   }
 
@@ -60,11 +69,17 @@ object KafkaConsumerProxy {
 
   case class GetLatestOffsets(topic: String)
 
-  case class LatestOffsetsResponse(topic: String, offsets: Map[TopicPartition, Long])
+  case class LatestOffsetsResponse(
+      topic: String,
+      offsets: Map[TopicPartition, Long]
+  )
 
   case class GetPartitionInfo(topic: String)
 
-  case class PartitionInfoResponse(topic: String, partitionInfo: Seq[PartitionInfo])
+  case class PartitionInfoResponse(
+      topic: String,
+      partitionInfo: Seq[PartitionInfo]
+  )
 
   case object ListTopics
 

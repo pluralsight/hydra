@@ -34,7 +34,6 @@ import scala.util.{Failure, Success, Try}
   */
 trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
-
   implicit object StatusCodeJsonFormat extends JsonFormat[StatusCode] {
 
     override def write(t: StatusCode): JsValue =
@@ -50,7 +49,8 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
     override def write(t: ActorPath): JsValue = JsString(t.toString)
 
-    override def read(json: JsValue): ActorPath = ActorPath.fromString(json.convertTo[String])
+    override def read(json: JsValue): ActorPath =
+      ActorPath.fromString(json.convertTo[String])
   }
 
   implicit object ThrowableJsonFormat extends JsonFormat[Throwable] {
@@ -73,7 +73,9 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
       throw new NotImplementedError("Not implemented.")
   }
 
-  implicit val genericServiceResponseFormat = jsonFormat2(GenericServiceResponse)
+  implicit val genericServiceResponseFormat = jsonFormat2(
+    GenericServiceResponse
+  )
 
   implicit object UUIDFormat extends RootJsonFormat[UUID] {
 
@@ -82,8 +84,10 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
     }
 
     def read(json: JsValue): UUID = json match {
-      case JsString(s) => Try(UUID.fromString(s)).getOrElse(deserializationError(s))
-      case _ => deserializationError(s"'${json.toString()}' is not a valid UUID.")
+      case JsString(s) =>
+        Try(UUID.fromString(s)).getOrElse(deserializationError(s))
+      case _ =>
+        deserializationError(s"'${json.toString()}' is not a valid UUID.")
     }
   }
 
@@ -96,7 +100,7 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
     def read(json: JsValue): DateTime = json match {
       case JsString(s) => Try(formatter.parseDateTime(s)).getOrElse(error(s))
-      case _ => error(json.toString())
+      case _           => error(json.toString())
     }
 
     def error(v: Any): DateTime = {
@@ -119,30 +123,35 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
   }
 
   /** Writer for an Try[T] where T has an implicit JsonWriter[T] */
-  implicit def tryWriter[R: JsonWriter]: RootJsonWriter[Try[R]] = new RootJsonWriter[Try[R]] {
-    override def write(responseTry: Try[R]): JsValue = {
-      responseTry match {
-        case Success(r) => JsObject("success" -> r.toJson)
-        case Failure(t) => JsObject("failure" -> t.toJson)
+  implicit def tryWriter[R: JsonWriter]: RootJsonWriter[Try[R]] =
+    new RootJsonWriter[Try[R]] {
+
+      override def write(responseTry: Try[R]): JsValue = {
+        responseTry match {
+          case Success(r) => JsObject("success" -> r.toJson)
+          case Failure(t) => JsObject("failure" -> t.toJson)
+        }
       }
     }
-  }
 
   implicit object StreamTypeFormat extends RootJsonFormat[StreamType] {
-     def read(json: JsValue): StreamType = json match {
+
+    def read(json: JsValue): StreamType = json match {
       case JsString("Notification") => Notification
-      case JsString("History") => History
+      case JsString("History")      => History
       case JsString("CurrentState") => CurrentState
-      case JsString("Telemetry") => Telemetry
+      case JsString("Telemetry")    => Telemetry
       case _ => {
         import scala.reflect.runtime.{universe => ru}
         val tpe = ru.typeOf[StreamType]
         val clazz = tpe.typeSymbol.asClass
-        throw new DeserializationException(s"expected a streamType of ${clazz.knownDirectSubclasses}, but got $json")
+        throw new DeserializationException(
+          s"expected a streamType of ${clazz.knownDirectSubclasses}, but got $json"
+        )
       }
     }
 
-     def write(obj: StreamType): JsValue = {
+    def write(obj: StreamType): JsValue = {
       JsString(obj.toString)
     }
   }
@@ -157,15 +166,16 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
 case class GenericError(status: Int, errorMessage: String)
 
-case class TopicMetadataRequest(schema: JsObject,
-                                streamType: StreamType,
-                                derived: Boolean,
-                                deprecated: Option[Boolean],
-                                dataClassification: String,
-                                contact: String,
-                                additionalDocumentation: Option[String],
-                                notes: Option[String])
-
+case class TopicMetadataRequest(
+    schema: JsObject,
+    streamType: StreamType,
+    derived: Boolean,
+    deprecated: Option[Boolean],
+    dataClassification: String,
+    contact: String,
+    additionalDocumentation: Option[String],
+    notes: Option[String]
+)
 
 case class GenericSchema(name: String, namespace: String) {
   def subject = s"$namespace.$name"
@@ -176,4 +186,3 @@ case object Notification extends StreamType
 case object CurrentState extends StreamType
 case object History extends StreamType
 case object Telemetry extends StreamType
-

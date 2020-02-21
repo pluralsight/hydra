@@ -11,8 +11,11 @@ class RabbitIngestor extends Ingestor with TransportOps {
 
   ingest {
     case Publish(request) =>
-      val exists = request.hasMetadata(HYDRA_RABBIT_EXCHANGE) || request.hasMetadata(HYDRA_RABBIT_QUEUE)
-      sender ! (if(exists) Join else Ignore)
+      val exists =
+        request.hasMetadata(HYDRA_RABBIT_EXCHANGE) || request.hasMetadata(
+          HYDRA_RABBIT_QUEUE
+        )
+      sender ! (if (exists) Join else Ignore)
 
     case Ingest(record, ack) =>
       transport(record, ack)

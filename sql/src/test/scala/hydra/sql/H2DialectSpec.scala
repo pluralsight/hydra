@@ -10,6 +10,7 @@ import org.scalatest.{FunSpecLike, Matchers}
   * Created by alexsilva on 5/4/17.
   */
 class H2DialectSpec extends Matchers with FunSpecLike {
+
   val schema =
     """
       |{
@@ -41,8 +42,12 @@ class H2DialectSpec extends Matchers with FunSpecLike {
       H2Dialect.canHandle("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1") shouldBe true
     }
     it("returns the correct types") {
-      H2Dialect.getJDBCType(avro.getField("username").schema()).get shouldBe JdbcType("CLOB", CLOB)
-      H2Dialect.getJDBCType(avro.getField("active").schema()) shouldBe Some(JdbcType("CHAR(1)", CHAR))
+      H2Dialect
+        .getJDBCType(avro.getField("username").schema())
+        .get shouldBe JdbcType("CLOB", CLOB)
+      H2Dialect.getJDBCType(avro.getField("active").schema()) shouldBe Some(
+        JdbcType("CHAR(1)", CHAR)
+      )
     }
 
     it("works with general sql commands") {
@@ -51,14 +56,17 @@ class H2DialectSpec extends Matchers with FunSpecLike {
     }
 
     it("returns the correct upsert fields") {
-      H2Dialect.upsertFields(SchemaWrapper.from(avro)) shouldBe Seq(avro.getField("id"),
-        avro.getField("username"), avro.getField("active"))
+      H2Dialect.upsertFields(SchemaWrapper.from(avro)) shouldBe Seq(
+        avro.getField("id"),
+        avro.getField("username"),
+        avro.getField("active")
+      )
     }
 
     it("returns upserts") {
-      val upsert = "merge into table (\"id\",\"username\",\"active\") key(\"id\") values (?,?,?);"
-      H2Dialect.upsert("table",
-        SchemaWrapper.from(avro), UnderscoreSyntax) shouldBe upsert
+      val upsert =
+        "merge into table (\"id\",\"username\",\"active\") key(\"id\") values (?,?,?);"
+      H2Dialect.upsert("table", SchemaWrapper.from(avro), UnderscoreSyntax) shouldBe upsert
     }
 
     it("returns the correct array type") {
@@ -86,11 +94,9 @@ class H2DialectSpec extends Matchers with FunSpecLike {
       tp.get shouldBe JdbcType("ARRAY", java.sql.JDBCType.ARRAY)
     }
 
-
     it("Creates the correct alter table statements") {
       import scala.collection.JavaConverters._
-      val schema = new Schema.Parser().parse(
-        """
+      val schema = new Schema.Parser().parse("""
           |{
           |	"type": "record",
           |	"name": "User",
@@ -116,9 +122,14 @@ class H2DialectSpec extends Matchers with FunSpecLike {
       val expected = Seq(
         """alter table test add column "id1" INTEGER""",
         """alter table test add column "id2" INTEGER""",
-        """alter table test add column "username" TEXT""")
+        """alter table test add column "username" TEXT"""
+      )
 
-      H2Dialect.alterTableQueries("test", schema.getFields().asScala, UnderscoreSyntax) shouldBe expected
+      H2Dialect.alterTableQueries(
+        "test",
+        schema.getFields().asScala,
+        UnderscoreSyntax
+      ) shouldBe expected
     }
   }
 }

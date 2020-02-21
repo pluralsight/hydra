@@ -8,14 +8,15 @@ import org.scalatest.{FlatSpec, Matchers}
 class AvroKeyRecordSpec extends FlatSpec with Matchers {
 
   it must "construct an AvroKeyRecord" in {
-    def schema(name: String) = SchemaBuilder
-      .record(name)
-      .fields()
-      .name(name)
-      .`type`
-      .stringType()
-      .noDefault()
-      .endRecord()
+    def schema(name: String) =
+      SchemaBuilder
+        .record(name)
+        .fields()
+        .name(name)
+        .`type`
+        .stringType()
+        .noDefault()
+        .endRecord()
     def json(name: String) =
       s"""
          |{
@@ -28,7 +29,8 @@ class AvroKeyRecordSpec extends FlatSpec with Matchers {
       schema("value"),
       json("key"),
       json("value"),
-      AckStrategy.Replicated)
+      AckStrategy.Replicated
+    )
     def genRecord(name: String) =
       new GenericRecordBuilder(schema(name)).set(name, "test").build()
 
@@ -38,7 +40,8 @@ class AvroKeyRecordSpec extends FlatSpec with Matchers {
       schema("value"),
       genRecord("key"),
       genRecord("value"),
-      AckStrategy.Replicated)
+      AckStrategy.Replicated
+    )
   }
 
 }

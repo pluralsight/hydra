@@ -9,9 +9,9 @@ import hydra.common.config.ConfigSupport
   * Created by alexsilva on 3/8/17.
   */
 case class JsonToAvroConversionExceptionWithMetadata(
-                                                      cause: JsonToAvroConversionException,
-                                                      metadata: SchemaResource)
-  extends RuntimeException(cause) {
+    cause: JsonToAvroConversionException,
+    metadata: SchemaResource
+) extends RuntimeException(cause) {
   val location = s"$registryUrl/schemas/ids/${metadata.id}"
 
   override def getMessage: String = s"${super.getMessage} [$location]"

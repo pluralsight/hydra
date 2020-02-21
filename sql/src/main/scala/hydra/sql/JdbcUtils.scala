@@ -25,14 +25,13 @@ private[sql] object JdbcUtils {
 
   def getCommonJDBCType(dt: Schema): Option[JdbcType] = {
     dt.getType match {
-      case INT => commonIntTypes(dt)
+      case INT   => commonIntTypes(dt)
       case BYTES => commonByteTypes(dt)
       case UNION => commonUnionTypes(dt)
-      case ENUM => Some(JdbcType("TEXT", JDBCType.VARCHAR))
-      case _ => numberTypes(dt)
+      case ENUM  => Some(JdbcType("TEXT", JDBCType.VARCHAR))
+      case _     => numberTypes(dt)
     }
   }
-
 
   private def commonIntTypes(schema: Schema): Option[JdbcType] = {
     if (isLogicalType(schema, "date")) {
@@ -45,50 +44,63 @@ private[sql] object JdbcUtils {
   private def commonByteTypes(schema: Schema): Option[JdbcType] = {
     if (isLogicalType(schema, "decimal")) {
       val lt = LogicalTypes.fromSchema(schema).asInstanceOf[Decimal]
-      Option(JdbcType(s"DECIMAL(${lt.getPrecision},${lt.getScale})", JDBCType.DECIMAL))
-    }
-    else {
+      Option(
+        JdbcType(
+          s"DECIMAL(${lt.getPrecision},${lt.getScale})",
+          JDBCType.DECIMAL
+        )
+      )
+    } else {
       Option(JdbcType("BYTE", JDBCType.TINYINT))
     }
   }
 
-  private def commonUnionTypes(dt: Schema): Option[JdbcType] = dt.getType match {
-    case UNION if (isNullableUnion(dt)) => getCommonJDBCType(getNonNullableUnionType(dt))
-    case _ => throw new IllegalArgumentException(s"Only nullable unions of two elements are supported.")
-  }
+  private def commonUnionTypes(dt: Schema): Option[JdbcType] =
+    dt.getType match {
+      case UNION if (isNullableUnion(dt)) =>
+        getCommonJDBCType(getNonNullableUnionType(dt))
+      case _ =>
+        throw new IllegalArgumentException(
+          s"Only nullable unions of two elements are supported."
+        )
+    }
 
   private def numberTypes(dt: Schema): Option[JdbcType] = dt.getType match {
     case LONG if isLogicalType(dt, "timestamp-millis") =>
       Option(JdbcType("TIMESTAMP", JDBCType.TIMESTAMP))
-    case LONG => Option(JdbcType("BIGINT", JDBCType.BIGINT))
-    case DOUBLE => Option(JdbcType("DOUBLE PRECISION", JDBCType.DOUBLE))
-    case FLOAT => Option(JdbcType("REAL", JDBCType.FLOAT))
+    case LONG    => Option(JdbcType("BIGINT", JDBCType.BIGINT))
+    case DOUBLE  => Option(JdbcType("DOUBLE PRECISION", JDBCType.DOUBLE))
+    case FLOAT   => Option(JdbcType("REAL", JDBCType.FLOAT))
     case BOOLEAN => Option(JdbcType("BIT(1)", JDBCType.BIT))
-    case STRING => Option(JdbcType("TEXT", JDBCType.VARCHAR))
-    case _ => None
+    case STRING  => Option(JdbcType("TEXT", JDBCType.VARCHAR))
+    case _       => None
   }
-
 
   def isLogicalType(schema: Schema, name: String) = {
     Option(schema.getLogicalType).map(_.getName == name) getOrElse false
   }
 
   def getNonNullableUnionType(schema: Schema): Schema = {
-    if (schema.getTypes.get(0).getType == Type.NULL) schema.getTypes.get(1) else schema.getTypes.get(0)
+    if (schema.getTypes.get(0).getType == Type.NULL) schema.getTypes.get(1)
+    else schema.getTypes.get(0)
   }
 
   def isNullableUnion(schema: Schema): Boolean =
-    schema.getType == Type.UNION && schema.getTypes.size == 2 && schema.getTypes().contains(nullSchema)
+    schema.getType == Type.UNION && schema.getTypes.size == 2 && schema
+      .getTypes()
+      .contains(nullSchema)
 
   /**
     * Creates a table with a given schema.
     */
-  def createTable(schema: SchemaWrapper,
-                  dialect: JdbcDialect,
-                  table: String,
-                  createTableOptions: String,
-                  dbSyntax: DbSyntax,
-                  conn: Connection): Int = {
+  def createTable(
+      schema: SchemaWrapper,
+      dialect: JdbcDialect,
+      table: String,
+      createTableOptions: String,
+      dbSyntax: DbSyntax,
+      conn: Connection
+  ): Int = {
     val strSchema = schemaString(schema, table, dialect, dbSyntax)
     val sql = s"CREATE TABLE $table ($strSchema) $createTableOptions"
     logger.debug(sql)
@@ -100,7 +112,11 @@ private[sql] object JdbcUtils {
     }
   }
 
-  def createSchema(name: String, createSchemaOptions: String, conn: Connection): Int = {
+  def createSchema(
+      name: String,
+      createSchemaOptions: String,
+      conn: Connection
+  ): Int = {
     val sql = s"CREATE SCHEMA $name $createSchemaOptions"
     logger.debug(sql)
     val statement = conn.createStatement
@@ -111,11 +127,14 @@ private[sql] object JdbcUtils {
     }
   }
 
-
   /**
     * Returns true if the table already exists in the JDBC database.
     */
-  def tableExists(conn: Connection, dialect: JdbcDialect, table: String): Boolean = {
+  def tableExists(
+      conn: Connection,
+      dialect: JdbcDialect,
+      table: String
+  ): Boolean = {
     Try {
       val sql = dialect.getTableExistsQuery(table)
       logger.info(sql)
@@ -131,7 +150,11 @@ private[sql] object JdbcUtils {
   /**
     * Truncates a table from the JDBC database without side effects.
     */
-  def truncateTable(conn: Connection, dialect: JdbcDialect, table: String): Unit = {
+  def truncateTable(
+      conn: Connection,
+      dialect: JdbcDialect,
+      table: String
+  ): Unit = {
     val statement = conn.createStatement
     try {
       statement.executeUpdate(dialect.getTruncateQuery(table))
@@ -140,54 +163,78 @@ private[sql] object JdbcUtils {
     }
   }
 
-
-  def schemaString(schema: SchemaWrapper, tableName:String, dialect: JdbcDialect,
-                   dbSyntax: DbSyntax = NoOpSyntax): String = {
+  def schemaString(
+      schema: SchemaWrapper,
+      tableName: String,
+      dialect: JdbcDialect,
+      dbSyntax: DbSyntax = NoOpSyntax
+  ): String = {
     val schemaStr = schema.getFields.map { field =>
       val name = dialect.quoteIdentifier(dbSyntax.format(field.name))
       val typ = getJdbcType(field.schema(), dialect).databaseTypeDefinition
       val nullable = if (isNullableUnion(field.schema())) "" else "NOT NULL"
       val defaultValue = field.defaultVal() match {
-        case null | _: Null => ""
+        case null | _: Null        => ""
         case stringDefault: String => s" DEFAULT '$stringDefault'"
-        case otherDefault => s" DEFAULT $otherDefault"
+        case otherDefault          => s" DEFAULT $otherDefault"
       }
       s"$name $typ $nullable$defaultValue"
     }
     val pkSeq = schema.primaryKeys
       .map(f => dialect.quoteIdentifier(dbSyntax.format(f)))
-    val pkStmt = if (!pkSeq.isEmpty) s""",CONSTRAINT "${tableName}_PK" PRIMARY KEY (${pkSeq.mkString(",")})""" else ""
+    val pkStmt =
+      if (!pkSeq.isEmpty) s""",CONSTRAINT "${tableName}_PK" PRIMARY KEY (${pkSeq
+        .mkString(",")})"""
+      else ""
     val ddl = s"${schemaStr.mkString(",")}${pkStmt}"
     ddl
   }
 
-
-  def columnMap(fields: Seq[Field], dialect: JdbcDialect, dbSyntax: DbSyntax): Map[Schema.Field, Column] = {
+  def columnMap(
+      fields: Seq[Field],
+      dialect: JdbcDialect,
+      dbSyntax: DbSyntax
+  ): Map[Schema.Field, Column] = {
     fields.map { field =>
       val name = dbSyntax.format(field.name)
       val typ = getJdbcType(field.schema(), dialect)
       val nullable = isNullableUnion(field.schema())
       field -> Column(name, field.schema(), typ, nullable, Option(field.doc()))
-    }
-      .toMap
+    }.toMap
   }
 
-  def columns(schema: Schema, dialect: JdbcDialect, dbSyntax: DbSyntax = NoOpSyntax): Seq[Column] = {
+  def columns(
+      schema: Schema,
+      dialect: JdbcDialect,
+      dbSyntax: DbSyntax = NoOpSyntax
+  ): Seq[Column] = {
     columnMap(schema, dialect, dbSyntax).values.toSeq
   }
 
-  def columnMap(schema: Schema, dialect: JdbcDialect, dbSyntax: DbSyntax = NoOpSyntax): Map[Schema.Field, Column] =
+  def columnMap(
+      schema: Schema,
+      dialect: JdbcDialect,
+      dbSyntax: DbSyntax = NoOpSyntax
+  ): Map[Schema.Field, Column] =
     columnMap(schema.getFields.asScala, dialect, dbSyntax)
 
-  def columnNames(schema: Schema, dbSyntax: DbSyntax = NoOpSyntax): Seq[String] = {
+  def columnNames(
+      schema: Schema,
+      dbSyntax: DbSyntax = NoOpSyntax
+  ): Seq[String] = {
     schema.getFields.asScala.map(f => dbSyntax.format(f.name()))
   }
 
   def getJdbcType(schema: Schema, dialect: JdbcDialect): JdbcType = {
-    dialect.getJDBCType(schema).orElse(getCommonJDBCType(schema)).getOrElse(
-      throw new IllegalArgumentException(s"Can't get JDBC type for ${schema.getName}"))
+    dialect
+      .getJDBCType(schema)
+      .orElse(getCommonJDBCType(schema))
+      .getOrElse(
+        throw new IllegalArgumentException(
+          s"Can't get JDBC type for ${schema.getName}"
+        )
+      )
   }
-
 
   def createTableNameFromSchema(schema: Schema): String = {
     val namespace = schema.getNamespace

@@ -33,7 +33,8 @@ class SchemaKeyExtractorSpec extends Matchers with FlatSpecLike {
         |  ]
         |}
       """.stripMargin,
-      """{"name":"hydra","rank":1}""")
+      """{"name":"hydra","rank":1}"""
+    )
 
     val req = HydraRequest("123", """{"name":"hydra","rank":1}""")
     SchemaKeyExtractor.extractKeyValue(req, record) shouldBe None
@@ -58,7 +59,8 @@ class SchemaKeyExtractorSpec extends Matchers with FlatSpecLike {
         |  ]
         |}
       """.stripMargin,
-      """{"name":"hydra","rank":1}""")
+      """{"name":"hydra","rank":1}"""
+    )
 
     val req = HydraRequest("123", """{"name":"hydra","rank":1}""")
       .withMetadata(RequestParams.HYDRA_RECORD_KEY_PARAM -> "theKey")
@@ -85,7 +87,8 @@ class SchemaKeyExtractorSpec extends Matchers with FlatSpecLike {
         |  ]
         |}
       """.stripMargin,
-      """{"name":"hydra","rank":1}""")
+      """{"name":"hydra","rank":1}"""
+    )
 
     val req = HydraRequest("123", """{"name":"hydra","rank":1}""")
     SchemaKeyExtractor.extractKeyValue(req, record) shouldBe Some("hydra")
@@ -111,7 +114,8 @@ class SchemaKeyExtractorSpec extends Matchers with FlatSpecLike {
         |  ]
         |}
       """.stripMargin,
-      """{"name":"hydra","rank":1}""")
+      """{"name":"hydra","rank":1}"""
+    )
 
     val req = HydraRequest("123", """{"name":"hydra","rank":1}""")
       .withMetadata(RequestParams.HYDRA_RECORD_KEY_PARAM -> "theKey")
@@ -138,7 +142,8 @@ class SchemaKeyExtractorSpec extends Matchers with FlatSpecLike {
         |  ]
         |}
       """.stripMargin,
-      """{"name":"hydra","rank":1}""")
+      """{"name":"hydra","rank":1}"""
+    )
 
     val req = HydraRequest("123", """{"name":"hydra","rank":1}""")
     intercept[IllegalArgumentException] {
@@ -166,7 +171,8 @@ class SchemaKeyExtractorSpec extends Matchers with FlatSpecLike {
         |  ]
         |}
       """.stripMargin,
-      """{"name":"hydra","rank":1}""")
+      """{"name":"hydra","rank":1}"""
+    )
 
     val req = HydraRequest("123", """{"name":"hydra","rank":1}""")
     SchemaKeyExtractor.extractKeyValue(req, record) shouldBe Some("hydra|1")

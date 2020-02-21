@@ -8,8 +8,12 @@ import hydra.core.transport.Transport.{Confirm, TransportError}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 import scala.concurrent.duration._
 
-class TransportCallbackSpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike with BeforeAndAfterAll
-  with ImplicitSender {
+class TransportCallbackSpec
+    extends TestKit(ActorSystem("test"))
+    with Matchers
+    with FunSpecLike
+    with BeforeAndAfterAll
+    with ImplicitSender {
 
   private val ingestor = TestProbe()
   private val supervisor = TestProbe()
@@ -21,19 +25,28 @@ class TransportCallbackSpec extends TestKit(ActorSystem("test")) with Matchers w
 
   describe("Transports Acks") {
     it("handles empty callbacks") {
-      NoCallback.onCompletion(-1, None, Some(new IllegalArgumentException("test")))
+      NoCallback.onCompletion(
+        -1,
+        None,
+        Some(new IllegalArgumentException("test"))
+      )
       ingestor.expectNoMessage(3 seconds)
       supervisor.expectNoMessage(3 seconds)
     }
 
     it("handles simple/transport only callbacks") {
       val probe = TestProbe()
-      new TransportSupervisorCallback(probe.ref).onCompletion(-11, None, Some(new IllegalArgumentException("test")))
+      new TransportSupervisorCallback(probe.ref)
+        .onCompletion(-11, None, Some(new IllegalArgumentException("test")))
       ingestor.expectNoMessage(3 seconds)
       supervisor.expectNoMessage(3 seconds)
       probe.expectMsg(TransportError(-11))
 
-      new TransportSupervisorCallback(probe.ref).onCompletion(-11, Some(TestRecordMetadata(1, 0, "", AckStrategy.NoAck)), None)
+      new TransportSupervisorCallback(probe.ref).onCompletion(
+        -11,
+        Some(TestRecordMetadata(1, 0, "", AckStrategy.NoAck)),
+        None
+      )
       ingestor.expectNoMessage(3 seconds)
       supervisor.expectNoMessage(3 seconds)
       probe.expectMsg(Confirm(-11))
@@ -42,9 +55,18 @@ class TransportCallbackSpec extends TestKit(ActorSystem("test")) with Matchers w
     it("handles ingestor callbacks") {
       val rec = TestRecord("OK", "1", "test", AckStrategy.NoAck)
       val transport = TestProbe()
-      val cb = new IngestorCallback[String, String](rec, ingestor.ref, supervisor.ref, transport.ref)
+      val cb = new IngestorCallback[String, String](
+        rec,
+        ingestor.ref,
+        supervisor.ref,
+        transport.ref
+      )
 
-      cb.onCompletion(1, Some(TestRecordMetadata(1, 0, "", AckStrategy.NoAck)), None)
+      cb.onCompletion(
+        1,
+        Some(TestRecordMetadata(1, 0, "", AckStrategy.NoAck)),
+        None
+      )
       ingestor.expectMsgPF() {
         case RecordProduced(md, sup) =>
           sup shouldBe supervisor.ref

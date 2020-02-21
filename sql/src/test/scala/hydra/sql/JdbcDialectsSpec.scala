@@ -19,7 +19,8 @@ class JdbcDialectsSpec extends Matchers with FunSpecLike {
     it("gets by url") {
       JdbcDialects.registerDialect(PostgresDialect)
       def tdialect = new JdbcDialect {
-        override def canHandle(url: String): Boolean = url.startsWith("jdbc:test")
+        override def canHandle(url: String): Boolean =
+          url.startsWith("jdbc:test")
       }
       JdbcDialects.registerDialect(tdialect)
       JdbcDialects.registerDialect(tdialect)

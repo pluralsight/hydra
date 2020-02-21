@@ -18,9 +18,12 @@ package hydra.sandbox.app
 
 import hydra.ingest.bootstrap.BootstrappingSupport
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
+
 // $COVERAGE-OFF$
 object HydraSandbox extends App with BootstrappingSupport {
-  implicit val config = EmbeddedKafkaConfig(kafkaPort = 9092, zooKeeperPort = 2181)
+
+  implicit val config =
+    EmbeddedKafkaConfig(kafkaPort = 9092, zooKeeperPort = 2181)
   EmbeddedKafka.start()
   containerService.start()
 }

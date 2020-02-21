@@ -29,13 +29,14 @@ import spray.json._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
-class StreamsManagerActor(bootstrapKafkaConfig: Config,
-                          bootstrapServers: String,
-                          schemaRegistryClient: SchemaRegistryClient,
-                         ) extends Actor
-  with ConfigSupport
-  with HydraJsonSupport
-  with ActorLogging {
+class StreamsManagerActor(
+    bootstrapKafkaConfig: Config,
+    bootstrapServers: String,
+    schemaRegistryClient: SchemaRegistryClient
+) extends Actor
+    with ConfigSupport
+    with HydraJsonSupport
+    with ActorLogging {
 
   import StreamsManagerActor._
 
@@ -43,11 +44,19 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
 
   private implicit val system = context.system
 
-  private val metadataTopicName = bootstrapKafkaConfig.get[String]("metadata-topic-name").valueOrElse("_hydra.metadata.topic")
+  private val metadataTopicName = bootstrapKafkaConfig
+    .get[String]("metadata-topic-name")
+    .valueOrElse("_hydra.metadata.topic")
 
   private[kafka] val metadataMap = Map[String, TopicMetadata]()
-  private val metadataStream = StreamsManagerActor.createMetadataStream(bootstrapKafkaConfig, bootstrapServers,
-    schemaRegistryClient, metadataTopicName, self)
+
+  private val metadataStream = StreamsManagerActor.createMetadataStream(
+    bootstrapKafkaConfig,
+    bootstrapServers,
+    schemaRegistryClient,
+    metadataTopicName,
+    self
+  )
 
   override def receive: Receive = Actor.emptyBehavior
 
@@ -55,8 +64,10 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
     context.become(streaming(metadataStream.run(), metadataMap))
   }
 
-
-  def streaming(stream: (Control, NotUsed), metadataMap: Map[String, TopicMetadata]): Receive = {
+  def streaming(
+      stream: (Control, NotUsed),
+      metadataMap: Map[String, TopicMetadata]
+  ): Receive = {
     case InitializedStream =>
       sender ! MetadataProcessed
 
@@ -75,7 +86,8 @@ class StreamsManagerActor(bootstrapKafkaConfig: Config,
         GetStreamActorResponse(context.child(actorName))
       }) to sender
 
-    case StreamFailed(ex) => log.error("StreamsManagerActor stream failed with exception", ex)
+    case StreamFailed(ex) =>
+      log.error("StreamsManagerActor stream failed with exception", ex)
   }
 }
 
@@ -101,15 +113,17 @@ object StreamsManagerActor {
 
   case object InitializedStream
 
-  def getMetadataTopicName(c: Config) = c.get[String]("metadata-topic-name")
-    .valueOrElse("_hydra.metadata.topic")
+  def getMetadataTopicName(c: Config) =
+    c.get[String]("metadata-topic-name")
+      .valueOrElse("_hydra.metadata.topic")
 
-  private[services] def createMetadataStream[K, V](config: Config,
-                                                   bootstrapSevers: String,
-                                                   schemaRegistryClient: SchemaRegistryClient,
-                                                   metadataTopicName: String,
-                                                   destination: ActorRef)
-                                                  (implicit ec: ExecutionContext, s: ActorSystem): Stream = {
+  private[services] def createMetadataStream[K, V](
+      config: Config,
+      bootstrapSevers: String,
+      schemaRegistryClient: SchemaRegistryClient,
+      metadataTopicName: String,
+      destination: ActorRef
+  )(implicit ec: ExecutionContext, s: ActorSystem): Stream = {
 
     val formatter = ISODateTimeFormat.basicDateTimeNoMillis()
 
@@ -117,15 +131,17 @@ object StreamsManagerActor {
       InetAddress.getLocalHost.getHostName.split("\\.")(0)
     }.getOrElse(UUID.randomUUID().toString)
 
-    val settings = ConsumerSettings(config, new StringDeserializer,
-      new KafkaAvroDeserializer(schemaRegistryClient))
-      .withBootstrapServers(bootstrapSevers)
+    val settings = ConsumerSettings(
+      config,
+      new StringDeserializer,
+      new KafkaAvroDeserializer(schemaRegistryClient)
+    ).withBootstrapServers(bootstrapSevers)
       .withGroupId(s"metadata-consumer-actor-$maybeHost")
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
       .withProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false")
 
-
-    Consumer.plainSource(settings, Subscriptions.topics(metadataTopicName))
+    Consumer
+      .plainSource(settings, Subscriptions.topics(metadataTopicName))
       .map { msg =>
         val record = msg.value.asInstanceOf[GenericRecord]
         TopicMetadata(
@@ -141,20 +157,28 @@ object StreamsManagerActor {
           UUID.fromString(record.get("id").toString),
           formatter.parseDateTime(record.get("createdDate").toString)
         )
-      }.toMat(Sink.actorRefWithBackpressure(
-        destination,
-        onInitMessage = InitializedStream,
-        ackMessage = MetadataProcessed,
-        onCompleteMessage = StreamStopped,
-        onFailureMessage = StreamFailed.apply))(Keep.both)
+      }
+      .toMat(
+        Sink.actorRefWithBackpressure(
+          destination,
+          onInitMessage = InitializedStream,
+          ackMessage = MetadataProcessed,
+          onCompleteMessage = StreamStopped,
+          onFailureMessage = StreamFailed.apply
+        )
+      )(Keep.both)
   }
 
-
-  def props(bootstrapKafkaConfig: Config,
-            bootstrapServers: String,
-            schemaRegistryClient: SchemaRegistryClient) = {
-    Props(classOf[StreamsManagerActor], bootstrapKafkaConfig, bootstrapServers, schemaRegistryClient)
+  def props(
+      bootstrapKafkaConfig: Config,
+      bootstrapServers: String,
+      schemaRegistryClient: SchemaRegistryClient
+  ) = {
+    Props(
+      classOf[StreamsManagerActor],
+      bootstrapKafkaConfig,
+      bootstrapServers,
+      schemaRegistryClient
+    )
   }
 }
-
-

@@ -6,9 +6,10 @@ import hydra.kafka.model.{TopicMetadata, TopicMetadataAdapter}
 import org.joda.time.DateTime
 import org.scalatest.{FlatSpecLike, Matchers}
 
-class TopicMetadataAdapterSpec extends Matchers
-  with FlatSpecLike
-  with TopicMetadataAdapter {
+class TopicMetadataAdapterSpec
+    extends Matchers
+    with FlatSpecLike
+    with TopicMetadataAdapter {
 
   "The TopicMetadataAdapter" should "build a resource" in {
 
@@ -30,7 +31,17 @@ class TopicMetadataAdapterSpec extends Matchers
 
     val resource = toResource(tm)
     val md = resource.asJsObject
-    md.fields("_links").asJsObject.fields("self").asJsObject.fields("href").convertTo[String] shouldBe s"/streams/${tm.subject}"
-    md.fields("_links").asJsObject.fields("hydra-schema").asJsObject.fields("href").convertTo[String] shouldBe "/schemas/hydra-test"
+    md.fields("_links")
+      .asJsObject
+      .fields("self")
+      .asJsObject
+      .fields("href")
+      .convertTo[String] shouldBe s"/streams/${tm.subject}"
+    md.fields("_links")
+      .asJsObject
+      .fields("hydra-schema")
+      .asJsObject
+      .fields("href")
+      .convertTo[String] shouldBe "/schemas/hydra-test"
   }
 }

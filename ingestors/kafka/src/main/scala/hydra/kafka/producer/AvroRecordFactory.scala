@@ -22,7 +22,10 @@ import com.pluralsight.hydra.avro.JsonConverter
 import hydra.avro.resource.SchemaResource
 import hydra.avro.util.AvroUtils
 import hydra.common.config.ConfigSupport
-import hydra.core.akka.SchemaRegistryActor.{FetchSchemaRequest, FetchSchemaResponse}
+import hydra.core.akka.SchemaRegistryActor.{
+  FetchSchemaRequest,
+  FetchSchemaResponse
+}
 import hydra.core.ingest.HydraRequest
 import hydra.core.transport.ValidationStrategy.Strict
 import org.apache.avro.generic.GenericRecord
@@ -34,28 +37,40 @@ import scala.concurrent.{ExecutionContext, Future}
   * Created by alexsilva on 1/11/17.
   */
 class AvroRecordFactory(schemaResourceLoader: ActorRef)
-  extends KafkaRecordFactory[String, GenericRecord] with ConfigSupport {
+    extends KafkaRecordFactory[String, GenericRecord]
+    with ConfigSupport {
 
   private implicit val timeout = util.Timeout(3.seconds)
 
-  override def build(request: HydraRequest)(implicit ec: ExecutionContext): Future[AvroRecord] = {
+  override def build(
+      request: HydraRequest
+  )(implicit ec: ExecutionContext): Future[AvroRecord] = {
     for {
       (topic, subject) <- Future.fromTry(getTopicAndSchemaSubject(request))
-      schemaResource <- (schemaResourceLoader ? FetchSchemaRequest(subject)).mapTo[FetchSchemaResponse].map(_.schemaResource)
+      schemaResource <- (schemaResourceLoader ? FetchSchemaRequest(subject))
+        .mapTo[FetchSchemaResponse]
+        .map(_.schemaResource)
       record <- convert(schemaResource, request)
-    } yield AvroRecord(topic, schemaResource.schema, getKey(request, record), record,
-      request.ackStrategy)
+    } yield AvroRecord(
+      topic,
+      schemaResource.schema,
+      getKey(request, record),
+      record,
+      request.ackStrategy
+    )
   }
 
-  private def convert(schemaResource: SchemaResource, request: HydraRequest)(implicit ec: ExecutionContext): Future[GenericRecord] = {
+  private def convert(schemaResource: SchemaResource, request: HydraRequest)(
+      implicit ec: ExecutionContext
+  ): Future[GenericRecord] = {
     val converter = new JsonConverter[GenericRecord](
       schemaResource.schema,
-      request.validationStrategy == Strict)
+      request.validationStrategy == Strict
+    )
     Future({
       val converted = converter.convert(request.payload)
       converted
-    })
-      .recover {
+    }).recover {
         case ex => throw AvroUtils.improveException(ex, schemaResource)
       }
   }

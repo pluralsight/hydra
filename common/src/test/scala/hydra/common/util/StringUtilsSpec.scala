@@ -26,5 +26,3 @@ class StringUtilsSpec extends Matchers with FunSpecLike {
   }
 
 }
-
-

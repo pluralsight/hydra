@@ -14,7 +14,9 @@ import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import scala.concurrent.duration._
 
 class KafkaTopicsActorSpec
-  extends TestKit(ActorSystem("kafka-topics-spec", config = ConfigFactory.parseString("")))
+    extends TestKit(
+      ActorSystem("kafka-topics-spec", config = ConfigFactory.parseString(""))
+    )
     with Matchers
     with FlatSpecLike
     with ConfigSupport
@@ -22,17 +24,17 @@ class KafkaTopicsActorSpec
     with EmbeddedKafka
     with BeforeAndAfterAll
     with MockFactory {
-      
-  val config = ConfigFactory.parseString(
-    """
+
+  val config = ConfigFactory.parseString("""
       |  bootstrap.servers = "localhost:6001"
       |  zookeeper = "localhost:6000"
     """.stripMargin)
 
-  implicit val patience = PatienceConfig(timeout = 5 seconds, interval = 1 second)
-      
+  implicit val patience =
+    PatienceConfig(timeout = 5 seconds, interval = 1 second)
+
   override def afterAll = TestKit.shutdownActorSystem(system)
-      
+
   "A KafkaTopicsActor" should "return topics that exist" in {
     val probe = TestProbe()
 
@@ -47,7 +49,7 @@ class KafkaTopicsActorSpec
       }
     }
   }
-      
+
   it should "not return topics that don't exist" in {
     val probe = TestProbe()
 
@@ -61,7 +63,7 @@ class KafkaTopicsActorSpec
       }
     }
   }
-      
+
   it should "update its local cache" in {
     val probe = TestProbe()
 
@@ -92,17 +94,19 @@ class KafkaTopicsActorSpec
       }
     }
   }
-      
+
   it should "publish an error if the first attempt to fetch topics fails" in {
-    val actor = system.actorOf(KafkaTopicsActor.props(config, kafkaTimeoutSeconds = 1))
+    val actor =
+      system.actorOf(KafkaTopicsActor.props(config, kafkaTimeoutSeconds = 1))
     val probinho = TestProbe()
     system.eventStream.subscribe(probinho.ref, classOf[GetTopicsFailure])
     probinho.expectMsgType[GetTopicsFailure]
   }
-      
+
   it should "publish an error if subsequent attempts to fetch topics fail" in {
     val probinho = TestProbe()
-    val actor: ActorRef = system.actorOf(KafkaTopicsActor.props(config, kafkaTimeoutSeconds = 1))
+    val actor: ActorRef =
+      system.actorOf(KafkaTopicsActor.props(config, kafkaTimeoutSeconds = 1))
     system.eventStream.subscribe(probinho.ref, classOf[GetTopicsFailure])
     probinho.expectMsgType[GetTopicsFailure]
     actor ! GetTopicsResponse(Seq("test-topic"))
@@ -113,7 +117,10 @@ class KafkaTopicsActorSpec
   "fetchTopics" should "clean up resources" in {
     val adminClientMock = mock[AdminClient]
     (adminClientMock.close(_: java.time.Duration)).expects(*).once()
-    (adminClientMock.listTopics: () => ListTopicsResult).expects().throwing(new Exception("Failure")).once()
+    (adminClientMock.listTopics: () => ListTopicsResult)
+      .expects()
+      .throwing(new Exception("Failure"))
+      .once()
     val createAdminClient: () => AdminClient = () => adminClientMock
     fetchTopics(createAdminClient, 1.second.toSeconds)
   }

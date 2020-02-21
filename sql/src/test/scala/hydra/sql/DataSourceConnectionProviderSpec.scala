@@ -12,13 +12,16 @@ import scala.collection.JavaConverters._
 /**
   * Created by alexsilva on 5/4/17.
   */
-class DataSourceConnectionProviderSpec extends Matchers
-  with FlatSpecLike
-  with BeforeAndAfterAll {
+class DataSourceConnectionProviderSpec
+    extends Matchers
+    with FlatSpecLike
+    with BeforeAndAfterAll {
 
   val properties = new Properties
   val cfg = ConfigFactory.load().getConfig("db-cfg")
-  cfg.entrySet().asScala
+  cfg
+    .entrySet()
+    .asScala
     .foreach(e => properties.setProperty(e.getKey(), cfg.getString(e.getKey())))
 
   private val hikariConfig = new HikariConfig(properties)
@@ -39,8 +42,7 @@ class DataSourceConnectionProviderSpec extends Matchers
   }
 
   "The DriverManagerConnectionProvider" should "be configured properly" in {
-    val config = ConfigFactory.parseString(
-      """
+    val config = ConfigFactory.parseString("""
         |connection.url = url
         |connection.user = test
         |connection.password = password
@@ -57,14 +59,14 @@ class DataSourceConnectionProviderSpec extends Matchers
     c.close()
   }
 
-
   it should "return a new connection" in {
     val config = ConfigFactory.parseString(
       """
         |connection.url = "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1"
         |connection.max.retries = 2
         |connection.retry.backoff = 1s
-      """.stripMargin)
+      """.stripMargin
+    )
 
     val c = DriverManagerConnectionProvider(config)
     c.getConnection() should not be null

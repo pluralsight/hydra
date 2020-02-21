@@ -29,8 +29,10 @@ import hydra.kafka.serializers.TopicMetadataV2Parser
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
-final class BootstrapEndpointV2(createTopicProgram: CreateTopicProgram[IO])
-                                     (implicit val system: ActorSystem, implicit val e: ExecutionContext) extends CorsSupport {
+final class BootstrapEndpointV2(createTopicProgram: CreateTopicProgram[IO])(
+    implicit val system: ActorSystem,
+    implicit val e: ExecutionContext
+) extends CorsSupport {
 
   import TopicMetadataV2Parser._
 
@@ -39,7 +41,11 @@ final class BootstrapEndpointV2(createTopicProgram: CreateTopicProgram[IO])
       post {
         pathEndOrSingleSlash {
           entity(as[TopicMetadataV2Request]) { t =>
-            onComplete(createTopicProgram.createTopic(t.subject.value, t.schemas.key, t.schemas.value).unsafeToFuture()) {
+            onComplete(
+              createTopicProgram
+                .createTopic(t.subject.value, t.schemas.key, t.schemas.value)
+                .unsafeToFuture()
+            ) {
               case Success(_) => complete(StatusCodes.OK)
               case Failure(e) => complete(StatusCodes.InternalServerError, e)
             }

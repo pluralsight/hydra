@@ -20,8 +20,12 @@ package hydra.common.util
   * Created by alexsilva on 11/4/15.
   */
 object StringUtils {
+
   def underscores2camel(name: String): String = {
-    require(!(name endsWith "_"), "names ending in _ not supported by this algorithm.")
+    require(
+      !(name endsWith "_"),
+      "names ending in _ not supported by this algorithm."
+    )
     "[A-Za-z\\d]+_?|_".r.replaceAllIn(name, { x =>
       val x0 = x.group(0)
       if (x0 == "_") x0
@@ -30,6 +34,9 @@ object StringUtils {
   }
 
   def camel2underscores(x: String): String = {
-    "_?[A-Z][a-z\\d]+".r.findAllMatchIn(x).map(_.group(0).toLowerCase).mkString("_")
+    "_?[A-Z][a-z\\d]+".r
+      .findAllMatchIn(x)
+      .map(_.group(0).toLowerCase)
+      .mkString("_")
   }
 }

@@ -15,6 +15,7 @@ import scala.concurrent.Future
 trait HydraKafkaJsonSupport extends HydraJsonSupport {
 
   implicit object NodeJsonFormat extends JsonFormat[Node] {
+
     override def write(node: Node): JsValue = {
       JsObject(
         "id" -> JsNumber(node.idString),
@@ -25,8 +26,16 @@ trait HydraKafkaJsonSupport extends HydraJsonSupport {
 
     override def read(json: JsValue): Node = {
       json.asJsObject.getFields("id", "host", "port") match {
-        case Seq(id, host, port) => new Node(id.convertTo[Int], host.convertTo[String], port.convertTo[Int])
-        case other => spray.json.deserializationError("Cannot deserialize Node. Invalid input: " + other)
+        case Seq(id, host, port) =>
+          new Node(
+            id.convertTo[Int],
+            host.convertTo[String],
+            port.convertTo[Int]
+          )
+        case other =>
+          spray.json.deserializationError(
+            "Cannot deserialize Node. Invalid input: " + other
+          )
       }
     }
   }
@@ -46,12 +55,14 @@ trait HydraKafkaJsonSupport extends HydraJsonSupport {
     override def read(json: JsValue): PartitionInfo = ???
   }
 
-
-  implicit val stringFormat = Marshaller[String, ByteString] { ec ⇒
-    s =>
-      Future.successful {
-        List(Marshalling.WithFixedContentType(ContentTypes.`application/json`, () => ByteString(s)))
-      }
+  implicit val stringFormat = Marshaller[String, ByteString] { ec ⇒ s =>
+    Future.successful {
+      List(
+        Marshalling.WithFixedContentType(
+          ContentTypes.`application/json`,
+          () => ByteString(s)
+        )
+      )
+    }
   }
 }
-

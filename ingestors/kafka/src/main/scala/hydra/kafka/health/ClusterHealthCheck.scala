@@ -24,7 +24,12 @@ trait ClusterHealthCheck extends RegisteredHealthCheckActor {
   private[health] var currentHealth = HealthInfo(name, details = "")
 
   override def preStart(): Unit = {
-    context.system.scheduler.scheduleAtFixedRate(interval, interval, self, CheckHealth)
+    context.system.scheduler.scheduleAtFixedRate(
+      interval,
+      interval,
+      self,
+      CheckHealth
+    )
   }
 
   private def maybePublish(newHealth: HealthInfo): Unit = {
@@ -36,16 +41,20 @@ trait ClusterHealthCheck extends RegisteredHealthCheckActor {
 
   override def receive: Receive = {
     case GetHealth => sender ! currentHealth
-    case CheckHealth => checkHealth() onComplete {
-      case Success(health) => maybePublish(health)
-      case Failure(ex) =>
-        maybePublish(HealthInfo(name, details = ex.getMessage, state = HealthState.CRITICAL))
-    }
+    case CheckHealth =>
+      checkHealth() onComplete {
+        case Success(health) => maybePublish(health)
+        case Failure(ex) =>
+          maybePublish(
+            HealthInfo(
+              name,
+              details = ex.getMessage,
+              state = HealthState.CRITICAL
+            )
+          )
+      }
   }
 
   def checkHealth(): Future[HealthInfo]
 
 }
-
-
-

@@ -8,7 +8,11 @@ import hydra.core.http.{HydraDirectives, ImperativeRequestContext}
 import hydra.core.ingest.{HydraRequest, IngestionReport, RequestParams}
 import hydra.core.protocol._
 import hydra.ingest.IngestorInfo
-import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
+import hydra.ingest.services.IngestorRegistry.{
+  FindAll,
+  FindByName,
+  LookupResult
+}
 import hydra.ingest.test.TestRecordFactory
 import org.joda.time.DateTime
 import org.scalatest.concurrent.Eventually
@@ -20,44 +24,63 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 3/9/17.
   */
-class HttpIngestionHandlerSpec extends TestKit(ActorSystem("hydra")) with Matchers with FunSpecLike
-  with ImplicitSender with BeforeAndAfterAll with HydraDirectives with Eventually {
+class HttpIngestionHandlerSpec
+    extends TestKit(ActorSystem("hydra"))
+    with Matchers
+    with FunSpecLike
+    with ImplicitSender
+    with BeforeAndAfterAll
+    with HydraDirectives
+    with Eventually {
 
   override implicit val patienceConfig = PatienceConfig(
     timeout = scaled(1000 millis),
     interval = scaled(100 millis)
   )
 
-  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true,
-    duration = 10 seconds)
+  override def afterAll =
+    TestKit.shutdownActorSystem(
+      system,
+      verifySystemShutdown = true,
+      duration = 10 seconds
+    )
 
-  val ingestor = TestActorRef(new Actor {
-    override def receive = {
-      case Publish(_) => sender ! Join
-      case Validate(r) =>
-        if (r.correlationId == "400") {
-          sender ! InvalidRequest(new IllegalArgumentException)
-        }
-        else {
-          TestRecordFactory.build(r).map(ValidRequest(_)) pipeTo sender
-        }
-      case Ingest(r, _) => sender ! IngestorCompleted
-    }
-  }, "test_ingestor")
+  val ingestor = TestActorRef(
+    new Actor {
 
+      override def receive = {
+        case Publish(_) => sender ! Join
+        case Validate(r) =>
+          if (r.correlationId == "400") {
+            sender ! InvalidRequest(new IllegalArgumentException)
+          } else {
+            TestRecordFactory.build(r).map(ValidRequest(_)) pipeTo sender
+          }
+        case Ingest(r, _) => sender ! IngestorCompleted
+      }
+    },
+    "test_ingestor"
+  )
 
-  val ingestorInfo = IngestorInfo("test_ingestor", "test", ingestor.path, DateTime.now)
+  val ingestorInfo =
+    IngestorInfo("test_ingestor", "test", ingestor.path, DateTime.now)
 
-  val registry = TestActorRef(new Actor {
-    override def receive = {
-      case FindByName("invalid_ingestor") =>
-        sender ! LookupResult(Seq(IngestorInfo("invalid_ingestor", "test", null, DateTime.now)))
-      case FindByName("tester") =>
-        sender ! LookupResult(Seq(ingestorInfo))
-      case FindAll =>
-        sender ! LookupResult(Seq(ingestorInfo))
-    }
-  }, "ingestor_registry")
+  val registry = TestActorRef(
+    new Actor {
+
+      override def receive = {
+        case FindByName("invalid_ingestor") =>
+          sender ! LookupResult(
+            Seq(IngestorInfo("invalid_ingestor", "test", null, DateTime.now))
+          )
+        case FindByName("tester") =>
+          sender ! LookupResult(Seq(ingestorInfo))
+        case FindAll =>
+          sender ! LookupResult(Seq(ingestorInfo))
+      }
+    },
+    "ingestor_registry"
+  )
 
   describe("When starting an HTTP ingestion") {
     it("completes the request with 400") {
@@ -65,7 +88,8 @@ class HttpIngestionHandlerSpec extends TestKit(ActorSystem("hydra")) with Matche
         var completed: ToResponseMarshallable = _
         var error: Throwable = _
 
-        override def complete(obj: ToResponseMarshallable): Unit = completed = obj
+        override def complete(obj: ToResponseMarshallable): Unit =
+          completed = obj
 
         override def failWith(error: Throwable): Unit = this.error = error
       }
@@ -87,7 +111,8 @@ class HttpIngestionHandlerSpec extends TestKit(ActorSystem("hydra")) with Matche
         var completed: ToResponseMarshallable = _
         var error: Throwable = _
 
-        override def complete(obj: ToResponseMarshallable): Unit = completed = obj
+        override def complete(obj: ToResponseMarshallable): Unit =
+          completed = obj
 
         override def failWith(error: Throwable): Unit = this.error = error
       }
@@ -108,7 +133,8 @@ class HttpIngestionHandlerSpec extends TestKit(ActorSystem("hydra")) with Matche
         var completed: ToResponseMarshallable = _
         var error: Throwable = _
 
-        override def complete(obj: ToResponseMarshallable): Unit = completed = obj
+        override def complete(obj: ToResponseMarshallable): Unit =
+          completed = obj
 
         override def failWith(error: Throwable): Unit = this.error = error
       }

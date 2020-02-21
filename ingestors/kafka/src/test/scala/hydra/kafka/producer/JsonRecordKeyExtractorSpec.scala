@@ -19,7 +19,8 @@ class JsonRecordKeyExtractorSpec extends Matchers with FlatSpecLike {
   it should "return a key" in {
     val json = """{"name":"hydra","rank":1}"""
     val node = mapper.reader().readTree(json)
-    val request = ingest.HydraRequest("corr", node.asText())
+    val request = ingest
+      .HydraRequest("corr", node.asText())
       .withMetadata(RequestParams.HYDRA_RECORD_KEY_PARAM -> "{$.name}")
     JsonRecordKeyExtractor.extractKeyValue(request, node) shouldBe Some("hydra")
   }

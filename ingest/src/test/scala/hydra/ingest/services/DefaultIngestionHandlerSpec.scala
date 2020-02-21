@@ -7,7 +7,11 @@ import hydra.common.util.ActorUtils
 import hydra.core.ingest.{HydraRequest, IngestionReport, RequestParams}
 import hydra.core.protocol._
 import hydra.ingest.IngestorInfo
-import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
+import hydra.ingest.services.IngestorRegistry.{
+  FindAll,
+  FindByName,
+  LookupResult
+}
 import hydra.ingest.test.{TestRecordFactory, TimeoutRecord}
 import org.joda.time.DateTime
 import org.scalatest.concurrent.Eventually
@@ -18,34 +22,50 @@ import scala.concurrent.ExecutionContext.Implicits.global
 /**
   * Created by alexsilva on 3/9/17.
   */
-class DefaultIngestionHandlerSpec extends TestKit(ActorSystem("hydra")) with Matchers
-  with FunSpecLike with ImplicitSender with Eventually with BeforeAndAfterAll {
+class DefaultIngestionHandlerSpec
+    extends TestKit(ActorSystem("hydra"))
+    with Matchers
+    with FunSpecLike
+    with ImplicitSender
+    with Eventually
+    with BeforeAndAfterAll {
 
-  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
+  override def afterAll =
+    TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 
-  val ingestor = TestActorRef(new Actor {
-    override def receive = {
-      case Publish(_) => sender ! Join
-      case Validate(r) =>
-        TestRecordFactory.build(r).map(ValidRequest(_)) pipeTo sender
-      case Ingest(rec, _) =>
-        val timeout = rec.isInstanceOf[TimeoutRecord]
-        sender ! (if (!timeout) IngestorCompleted)
-    }
-  }, "test_ingestor")
+  val ingestor = TestActorRef(
+    new Actor {
 
+      override def receive = {
+        case Publish(_) => sender ! Join
+        case Validate(r) =>
+          TestRecordFactory.build(r).map(ValidRequest(_)) pipeTo sender
+        case Ingest(rec, _) =>
+          val timeout = rec.isInstanceOf[TimeoutRecord]
+          sender ! (if (!timeout) IngestorCompleted)
+      }
+    },
+    "test_ingestor"
+  )
 
-  val ingestorInfo = IngestorInfo("test_ingestor", "test", ingestor.path, DateTime.now)
+  val ingestorInfo =
+    IngestorInfo("test_ingestor", "test", ingestor.path, DateTime.now)
 
-  val registry = TestActorRef(new Actor {
-    override def receive = {
-      case FindByName("tester") => sender ! LookupResult(Seq(ingestorInfo))
-      case FindByName("fail") =>
-        sender ! LookupResult(Seq(IngestorInfo("fail", "f", null, DateTime.now))) //force a NPE
-      case FindByName(_) => sender ! LookupResult(Nil)
-      case FindAll => sender ! LookupResult(Seq(ingestorInfo))
-    }
-  }, "ingestor_registry")
+  val registry = TestActorRef(
+    new Actor {
+
+      override def receive = {
+        case FindByName("tester") => sender ! LookupResult(Seq(ingestorInfo))
+        case FindByName("fail") =>
+          sender ! LookupResult(
+            Seq(IngestorInfo("fail", "f", null, DateTime.now))
+          ) //force a NPE
+        case FindByName(_) => sender ! LookupResult(Nil)
+        case FindAll       => sender ! LookupResult(Seq(ingestorInfo))
+      }
+    },
+    "ingestor_registry"
+  )
 
   describe("The default ingestion handler actor") {
     it("completes an ingestion") {
@@ -62,30 +82,41 @@ class DefaultIngestionHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
         .withMetadata(RequestParams.HYDRA_INGESTOR_PARAM -> "fail")
       system.actorOf(DefaultIngestionHandler.props(request, registry, self))
       expectMsgPF() {
-        case HydraApplicationError(e) => e shouldBe an[ActorInitializationException]
+        case HydraApplicationError(e) =>
+          e shouldBe an[ActorInitializationException]
       }
     }
 
     it("broadcasts a request") {
       val registryProbe = TestProbe()
       val request = HydraRequest("123", "test payload")
-      system.actorOf(DefaultIngestionHandler.props(request, registryProbe.ref, self))
+      system.actorOf(
+        DefaultIngestionHandler.props(request, registryProbe.ref, self)
+      )
       registryProbe.expectMsgType[FindAll.type]
     }
 
     it("looks up a target ingestor by name") {
       val registryProbe = TestProbe()
       val request = HydraRequest("123", "test payload")
-        .withMetadata(RequestParams.HYDRA_INGESTOR_PARAM -> ActorUtils.actorName(ingestor))
-      system.actorOf(DefaultIngestionHandler.props(request, registryProbe.ref, self))
+        .withMetadata(
+          RequestParams.HYDRA_INGESTOR_PARAM -> ActorUtils.actorName(ingestor)
+        )
+      system.actorOf(
+        DefaultIngestionHandler.props(request, registryProbe.ref, self)
+      )
       registryProbe.expectMsg(FindByName(ActorUtils.actorName(ingestor)))
     }
 
     it("publishes to an ingestor") {
       val registryProbe = TestProbe()
       val request = HydraRequest("123", "test payload")
-        .withMetadata(RequestParams.HYDRA_INGESTOR_PARAM -> ActorUtils.actorName(ingestor))
-      system.actorOf(DefaultIngestionHandler.props(request, registryProbe.ref, self))
+        .withMetadata(
+          RequestParams.HYDRA_INGESTOR_PARAM -> ActorUtils.actorName(ingestor)
+        )
+      system.actorOf(
+        DefaultIngestionHandler.props(request, registryProbe.ref, self)
+      )
       registryProbe.expectMsgType[FindByName]
     }
 
@@ -105,16 +136,16 @@ class DefaultIngestionHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
 
     it("times out") {
       import scala.concurrent.duration._
-      val request = HydraRequest("123", "test payload").withMetadata("timeout" -> "true")
-      val props = DefaultIngestionHandler.props(request, registry, self, 500.millis)
+      val request =
+        HydraRequest("123", "test payload").withMetadata("timeout" -> "true")
+      val props =
+        DefaultIngestionHandler.props(request, registry, self, 500.millis)
       system.actorOf(props)
       expectMsgPF() {
         case i: IngestionReport =>
           i.statusCode shouldBe 408
       }
     }
-
-
     //    it("receives HydraRequest cluster pubsub events") {
     //      val request = HydraRequest("123", "test payload")
     //      val mediator = DistributedPubSub(system).mediator
@@ -130,4 +161,3 @@ class DefaultIngestionHandlerSpec extends TestKit(ActorSystem("hydra")) with Mat
 
   }
 }
-

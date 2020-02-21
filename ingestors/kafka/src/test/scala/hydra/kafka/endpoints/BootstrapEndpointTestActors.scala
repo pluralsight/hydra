@@ -14,26 +14,64 @@ import org.joda.time.DateTime
 
 trait BootstrapEndpointTestActors extends BootstrapEndpointActors {
 
-  class StreamsActorTest(bootstrapKafkaConfig: Config,
-                         bootstrapServers: String,
-                         schemaRegistryClient: SchemaRegistryClient) extends StreamsManagerActor(bootstrapKafkaConfig, bootstrapServers, schemaRegistryClient) {
-    override val metadataMap: Map[String, TopicMetadata] = Map[String, TopicMetadata]{
-      "exp.test-existing.v1.SubjectPreexisted" -> TopicMetadata("exp.test-existing.v1.SubjectPreexisted",0,"",derived = false, None, "", "", None, None, UUID.randomUUID(),DateTime.now().minusSeconds(10))
-    }
+  class StreamsActorTest(
+      bootstrapKafkaConfig: Config,
+      bootstrapServers: String,
+      schemaRegistryClient: SchemaRegistryClient
+  ) extends StreamsManagerActor(
+        bootstrapKafkaConfig,
+        bootstrapServers,
+        schemaRegistryClient
+      ) {
+
+    override val metadataMap: Map[String, TopicMetadata] =
+      Map[String, TopicMetadata] {
+        "exp.test-existing.v1.SubjectPreexisted" -> TopicMetadata(
+          "exp.test-existing.v1.SubjectPreexisted",
+          0,
+          "",
+          derived = false,
+          None,
+          "",
+          "",
+          None,
+          None,
+          UUID.randomUUID(),
+          DateTime.now().minusSeconds(10)
+        )
+      }
   }
 
   object StreamsActorTest {
-    def props(bootstrapKafkaConfig: Config,
-              bootstrapServers: String,
-              schemaRegistryClient: SchemaRegistryClient) = {
-      Props(new StreamsActorTest(bootstrapKafkaConfig, bootstrapServers, schemaRegistryClient))
+
+    def props(
+        bootstrapKafkaConfig: Config,
+        bootstrapServers: String,
+        schemaRegistryClient: SchemaRegistryClient
+    ) = {
+      Props(
+        new StreamsActorTest(
+          bootstrapKafkaConfig,
+          bootstrapServers,
+          schemaRegistryClient
+        )
+      )
     }
   }
 
-  private[kafka] val streamsManagerPropsTest = StreamsActorTest.props(bootstrapKafkaConfig,
-    KafkaUtils.BootstrapServers, ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient)
+  private[kafka] val streamsManagerPropsTest = StreamsActorTest.props(
+    bootstrapKafkaConfig,
+    KafkaUtils.BootstrapServers,
+    ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient
+  )
 
   override val bootstrapActor: ActorRef = system.actorOf(
-    TopicBootstrapActor.props(schemaRegistryActor, kafkaIngestor, streamsManagerPropsTest, Some(bootstrapKafkaConfig)))
+    TopicBootstrapActor.props(
+      schemaRegistryActor,
+      kafkaIngestor,
+      streamsManagerPropsTest,
+      Some(bootstrapKafkaConfig)
+    )
+  )
 
 }

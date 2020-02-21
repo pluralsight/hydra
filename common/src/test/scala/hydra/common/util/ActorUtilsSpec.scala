@@ -16,5 +16,3 @@ class ActorUtilsSpec extends Matchers with FunSpecLike {
   }
 
 }
-
-

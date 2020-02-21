@@ -22,12 +22,14 @@ class TryWithSpec extends WordSpec with Matchers {
 
   "TryWith" should {
     "catch exceptions getting the resource" in {
-      TryWith(throw getResourceException)(println) shouldBe Failure(getResourceException)
+      TryWith(throw getResourceException)(println) shouldBe Failure(
+        getResourceException
+      )
     }
 
     "catch exceptions in the function" in {
-      TryWith(goodResource){
-        _ => throw inFunctionException
+      TryWith(goodResource) { _ =>
+        throw inFunctionException
       } shouldBe Failure(inFunctionException)
     }
 
@@ -56,9 +58,7 @@ class TryWithSpec extends WordSpec with Matchers {
 
     "propagate errors in the function" in {
       intercept[OutOfMemoryError] {
-        TryWith(goodResource){
-          _ => throw inFunctionError
-        }
+        TryWith(goodResource) { _ => throw inFunctionError }
       } shouldBe inFunctionError
     }
 

@@ -41,17 +41,29 @@ object KafkaTopicsActor {
 
   case class GetTopicRequest(topic: String)
 
-  case class GetTopicResponse(topic: String, lookupDate: DateTime, exists: Boolean)
+  case class GetTopicResponse(
+      topic: String,
+      lookupDate: DateTime,
+      exists: Boolean
+  )
 
   case class GetTopicsResponse(topics: Seq[String])
 
   case class GetTopicsFailure(cause: Throwable)
 
-  def fetchTopics(createAdminClient: () => Admin, kafkaTimeoutSeconds: Long): Future[GetTopicsResponse] = {
+  def fetchTopics(
+      createAdminClient: () => Admin,
+      kafkaTimeoutSeconds: Long
+  ): Future[GetTopicsResponse] = {
     Future.fromTry {
       Try(createAdminClient()).map { c =>
         try {
-          val t = c.listTopics().names.get(kafkaTimeoutSeconds, TimeUnit.SECONDS).asScala.toSeq
+          val t = c
+            .listTopics()
+            .names
+            .get(kafkaTimeoutSeconds, TimeUnit.SECONDS)
+            .asScala
+            .toSeq
           GetTopicsResponse(t)
         } finally {
           Try(c.close(Duration.ofSeconds(kafkaTimeoutSeconds)))
@@ -60,15 +72,23 @@ object KafkaTopicsActor {
     }
   }
 
-  def props(cfg: Config, checkInterval: FiniteDuration = 5.seconds, kafkaTimeoutSeconds: Long = 2): Props =
+  def props(
+      cfg: Config,
+      checkInterval: FiniteDuration = 5.seconds,
+      kafkaTimeoutSeconds: Long = 2
+  ): Props =
     Props(new KafkaTopicsActor(cfg, checkInterval, kafkaTimeoutSeconds))
 
 }
 
-class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration, kafkaTimeoutSeconds: Long) extends Actor
-  with Timers
-  with LoggingAdapter
-  with Stash {
+class KafkaTopicsActor(
+    cfg: Config,
+    checkInterval: FiniteDuration,
+    kafkaTimeoutSeconds: Long
+) extends Actor
+    with Timers
+    with LoggingAdapter
+    with Stash {
 
   import KafkaTopicsActor._
 
@@ -82,7 +102,8 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration, kafkaTimeoutS
     Admin.create(ConfigSupport.toMap(cfg).asJava)
 
   val initialReceive: Receive = {
-    case RefreshTopicList => pipe(fetchTopics(createAdminClient, kafkaTimeoutSeconds)) to self
+    case RefreshTopicList =>
+      pipe(fetchTopics(createAdminClient, kafkaTimeoutSeconds)) to self
 
     case GetTopicsResponse(topics) =>
       context.become(withTopics(topics) orElse handleFailure)
@@ -99,7 +120,8 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration, kafkaTimeoutS
       val topicR = topicList.find(_ == topic)
       sender ! GetTopicResponse(topic, DateTime.now, topicR.isDefined)
 
-    case RefreshTopicList => pipe(fetchTopics(createAdminClient, kafkaTimeoutSeconds)) to self
+    case RefreshTopicList =>
+      pipe(fetchTopics(createAdminClient, kafkaTimeoutSeconds)) to self
 
     case GetTopicsResponse(topics) =>
       context.become(withTopics(topics) orElse handleFailure)
@@ -107,7 +129,10 @@ class KafkaTopicsActor(cfg: Config, checkInterval: FiniteDuration, kafkaTimeoutS
 
   private def handleFailure: Receive = {
     case Failure(ex) =>
-      log.error(s"Error occurred while attempting to retrieve topics: ${ex.getMessage}", ex: Throwable)
+      log.error(
+        s"Error occurred while attempting to retrieve topics: ${ex.getMessage}",
+        ex: Throwable
+      )
       context.system.eventStream.publish(GetTopicsFailure(ex))
   }
 

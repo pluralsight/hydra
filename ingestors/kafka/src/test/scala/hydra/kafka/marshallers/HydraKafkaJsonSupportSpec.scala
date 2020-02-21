@@ -3,7 +3,10 @@ package hydra.kafka.marshallers
 import org.apache.kafka.common.{Node, PartitionInfo}
 import org.scalatest.{FunSpecLike, Matchers}
 
-class HydraKafkaJsonSupportSpec extends Matchers with FunSpecLike with HydraKafkaJsonSupport {
+class HydraKafkaJsonSupportSpec
+    extends Matchers
+    with FunSpecLike
+    with HydraKafkaJsonSupport {
 
   import spray.json._
 
@@ -11,7 +14,8 @@ class HydraKafkaJsonSupportSpec extends Matchers with FunSpecLike with HydraKafk
     it("converts Nodes") {
       val node = new Node(1, "host", 9092)
       node.toJson shouldBe """{"id":1,"host":"host","port":9092}""".parseJson
-      val nodeJ = """{"id":1,"host":"host","port":9092}""".parseJson.convertTo[Node]
+      val nodeJ =
+        """{"id":1,"host":"host","port":9092}""".parseJson.convertTo[Node]
       nodeJ.id shouldBe 1
       nodeJ.host shouldBe "host"
       nodeJ.port shouldBe 9092
@@ -23,7 +27,8 @@ class HydraKafkaJsonSupportSpec extends Matchers with FunSpecLike with HydraKafk
       val p = new PartitionInfo("topic", 0, node, Array(node), Array(node))
       p.toJson shouldBe """{"partition":0,"leader":{"id":1,"host":"host","port":9092},"isr":[[{"id":1,"host":"host","port":9092}]]}""".parseJson
       intercept[NotImplementedError] {
-        """{"partition":0,"leader":{"id":1,"host":"host","port":9092},"isr":[[{"id":1,"host":"host","port":9092}]]}""".parseJson.convertTo[PartitionInfo]
+        """{"partition":0,"leader":{"id":1,"host":"host","port":9092},"isr":[[{"id":1,"host":"host","port":9092}]]}""".parseJson
+          .convertTo[PartitionInfo]
       }
     }
 

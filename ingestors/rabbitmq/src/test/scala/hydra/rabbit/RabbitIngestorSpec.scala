@@ -26,28 +26,42 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
-class RabbitIngestorSpec extends TestKit(ActorSystem("rabbit-ingestor-spec")) with Matchers with FunSpecLike with ImplicitSender
-  with BeforeAndAfterAll {
+class RabbitIngestorSpec
+    extends TestKit(ActorSystem("rabbit-ingestor-spec"))
+    with Matchers
+    with FunSpecLike
+    with ImplicitSender
+    with BeforeAndAfterAll {
 
   val ingestor = system.actorOf(Props[RabbitIngestor])
 
   val probe = TestProbe()
 
-  val rabbitTransport = system.actorOf(Props(new ForwardActor(probe.ref)), "rabbit_transport")
+  val rabbitTransport =
+    system.actorOf(Props(new ForwardActor(probe.ref)), "rabbit_transport")
 
-  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
+  override def afterAll =
+    TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 
   describe("When using the rabbit ingestor") {
     it("Joins if exchange provided") {
-      val request = HydraRequest("123", "{'name': 'test'}", None,
-        Map(RabbitRecord.HYDRA_RABBIT_EXCHANGE -> "test.exchange"))
+      val request = HydraRequest(
+        "123",
+        "{'name': 'test'}",
+        None,
+        Map(RabbitRecord.HYDRA_RABBIT_EXCHANGE -> "test.exchange")
+      )
       ingestor ! Publish(request)
       expectMsg(10.seconds, Join)
     }
 
     it("Joins if queue provided") {
-      val request = HydraRequest("123", "{'name': 'test'}", None,
-        Map(RabbitRecord.HYDRA_RABBIT_QUEUE -> "test.queue"))
+      val request = HydraRequest(
+        "123",
+        "{'name': 'test'}",
+        None,
+        Map(RabbitRecord.HYDRA_RABBIT_QUEUE -> "test.queue")
+      )
       ingestor ! Publish(request)
       expectMsg(10.seconds, Join)
     }
@@ -59,10 +73,24 @@ class RabbitIngestorSpec extends TestKit(ActorSystem("rabbit-ingestor-spec")) wi
     }
 
     it("transports") {
-      ingestor ! Ingest(TestRecord("test", "test", "", AckStrategy.NoAck), AckStrategy.NoAck)
-      probe.expectMsg(Produce(TestRecord("test", "test", "", AckStrategy.NoAck), self, AckStrategy.NoAck))
+      ingestor ! Ingest(
+        TestRecord("test", "test", "", AckStrategy.NoAck),
+        AckStrategy.NoAck
+      )
+      probe.expectMsg(
+        Produce(
+          TestRecord("test", "test", "", AckStrategy.NoAck),
+          self,
+          AckStrategy.NoAck
+        )
+      )
     }
   }
 }
 
-case class TestRecord(destination: String, payload: String, key: String, ackStrategy: AckStrategy) extends HydraRecord[String, String]
+case class TestRecord(
+    destination: String,
+    payload: String,
+    key: String,
+    ackStrategy: AckStrategy
+) extends HydraRecord[String, String]

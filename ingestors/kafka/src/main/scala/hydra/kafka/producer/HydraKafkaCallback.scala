@@ -9,15 +9,17 @@ import org.apache.kafka.clients.producer.{Callback, RecordMetadata}
 /**
   * Created by alexsilva on 2/22/17.
   */
-case class HydraKafkaCallback(deliveryId: Long,
-                              record: KafkaRecord[_, _],
-                              producer: ActorSelection,
-                              callback: TransportCallback) extends Callback {
+case class HydraKafkaCallback(
+    deliveryId: Long,
+    record: KafkaRecord[_, _],
+    producer: ActorSelection,
+    callback: TransportCallback
+) extends Callback {
 
   override def onCompletion(metadata: RecordMetadata, e: Exception): Unit = {
     Option(e) match {
       case Some(err) => ackError(err)
-      case None => doAck(metadata)
+      case None      => doAck(metadata)
     }
   }
 

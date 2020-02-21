@@ -16,8 +16,12 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 9/30/16.
   */
-class KafkaHealthCheckActor(bootstrapServers: String, healthCheckTopic: String, val interval: FiniteDuration)
-  extends Actor with ClusterHealthCheck {
+class KafkaHealthCheckActor(
+    bootstrapServers: String,
+    healthCheckTopic: String,
+    val interval: FiniteDuration
+) extends Actor
+    with ClusterHealthCheck {
 
   override val name = s"Kafka [$bootstrapServers]"
 
@@ -29,11 +33,14 @@ class KafkaHealthCheckActor(bootstrapServers: String, healthCheckTopic: String, 
     "client.id" -> "hydra.health.check",
     "retries" -> "0",
     "key.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
-    "value.serializer" -> "org.apache.kafka.common.serialization.StringSerializer")
+    "value.serializer" -> "org.apache.kafka.common.serialization.StringSerializer"
+  )
 
-  private val producer = new KafkaProducer[String, String](producerConfig.asJava)
+  private val producer =
+    new KafkaProducer[String, String](producerConfig.asJava)
 
-  override def postStop(): Unit = producer.close(java.time.Duration.ofSeconds(5))
+  override def postStop(): Unit =
+    producer.close(java.time.Duration.ofSeconds(5))
 
   override def checkHealth(): Future[HealthInfo] = {
     val time = System.currentTimeMillis().toString
@@ -41,9 +48,12 @@ class KafkaHealthCheckActor(bootstrapServers: String, healthCheckTopic: String, 
     Future {
       try {
         val md = producer.send(record).get(5, TimeUnit.SECONDS)
-        HealthInfo(name, details = s"Metadata request succeeded at ${DateTime.now.toString()} : [${md.topic()}]}.")
-      }
-      catch {
+        HealthInfo(
+          name,
+          details =
+            s"Metadata request succeeded at ${DateTime.now.toString()} : [${md.topic()}]}."
+        )
+      } catch {
         case e: Exception => critical(e)
       }
     }
@@ -52,14 +62,28 @@ class KafkaHealthCheckActor(bootstrapServers: String, healthCheckTopic: String, 
 
   private def critical(e: Throwable): HealthInfo = {
     context.system.eventStream.publish(HydraApplicationError(e))
-    HealthInfo(name, state = HealthState.CRITICAL,
-      details = s"Metadata request failed at ${DateTime.now.toString()}. Error: ${e.getMessage}", extra = None)
+    HealthInfo(
+      name,
+      state = HealthState.CRITICAL,
+      details =
+        s"Metadata request failed at ${DateTime.now.toString()}. Error: ${e.getMessage}",
+      extra = None
+    )
   }
 }
 
 object KafkaHealthCheckActor extends ConfigSupport {
 
-  def props(bootstrapServers: String, healthCheckTopic: String, interval: FiniteDuration) = {
-    Props(classOf[KafkaHealthCheckActor], bootstrapServers, healthCheckTopic, interval)
+  def props(
+      bootstrapServers: String,
+      healthCheckTopic: String,
+      interval: FiniteDuration
+  ) = {
+    Props(
+      classOf[KafkaHealthCheckActor],
+      bootstrapServers,
+      healthCheckTopic,
+      interval
+    )
   }
 }

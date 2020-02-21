@@ -28,9 +28,12 @@ import scala.concurrent.duration._
   * All this actor does is forward the requests to an instance of the IngestRequestHandler actor.
   *
   */
-class IngestionHandlerGateway(registryPath: String) extends Actor with ActorLogging {
+class IngestionHandlerGateway(registryPath: String)
+    extends Actor
+    with ActorLogging {
 
-  private lazy val registry = context.actorSelection(registryPath).resolveOne()(Timeout(10.seconds))
+  private lazy val registry =
+    context.actorSelection(registryPath).resolveOne()(Timeout(10.seconds))
 
   private implicit val ec = context.dispatcher
 
@@ -38,20 +41,24 @@ class IngestionHandlerGateway(registryPath: String) extends Actor with ActorLogg
     case InitiateRequest(request, timeout, requestorOpt) =>
       val requestor = requestorOpt getOrElse sender
       ingest(
-        registryRef => DefaultIngestionHandler.props(request, registryRef, requestor, timeout),
+        registryRef =>
+          DefaultIngestionHandler
+            .props(request, registryRef, requestor, timeout),
         requestor
       )
 
     case InitiateHttpRequest(request, timeout, ctx) =>
       val requestor = sender
       ingest(
-        registryRef => HttpIngestionHandler.props(request, timeout, ctx, registryRef),
+        registryRef =>
+          HttpIngestionHandler.props(request, timeout, ctx, registryRef),
         requestor
       )
   }
 
   private def ingest(props: ActorRef => Props, requestor: ActorRef) = {
-    registry.map(registryRef => context.actorOf(props(registryRef)))
+    registry
+      .map(registryRef => context.actorOf(props(registryRef)))
       .recover { case e: Exception => requestor ! e }
   }
 
@@ -65,6 +72,7 @@ object IngestionHandlerGateway {
 
   val GroupName = "ingestion-handlers"
 
-  def props(registryPath: String) = Props(classOf[IngestionHandlerGateway], registryPath)
+  def props(registryPath: String) =
+    Props(classOf[IngestionHandlerGateway], registryPath)
 
 }

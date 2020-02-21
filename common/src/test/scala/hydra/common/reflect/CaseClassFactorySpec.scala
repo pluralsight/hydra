@@ -11,7 +11,8 @@ import scala.concurrent.duration._
 class CaseClassFactorySpec extends Matchers with FunSpecLike {
   describe("When using ReflectionUtils") {
     it("Instantiates a case class with constructor params") {
-      new CaseClassFactory(classOf[TestCase]).buildWith(Seq("name", 120,2.seconds)) shouldBe
+      new CaseClassFactory(classOf[TestCase])
+        .buildWith(Seq("name", 120, 2.seconds)) shouldBe
         TestCase("name", 120, 2 seconds)
     }
 
@@ -23,10 +24,3 @@ class CaseClassFactorySpec extends Matchers with FunSpecLike {
   }
 
 }
-
-
-
-
-
-
-

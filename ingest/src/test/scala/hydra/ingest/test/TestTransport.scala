@@ -12,4 +12,3 @@ class TestTransport extends Transport {
     case Deliver(record, deliveryId, callback) => sender ! "DONE"
   }
 }
-

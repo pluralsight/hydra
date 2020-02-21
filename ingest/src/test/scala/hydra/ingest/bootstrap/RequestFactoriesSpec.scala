@@ -9,13 +9,19 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
 
-class RequestFactoriesSpec extends TestKit(ActorSystem("RequestFactoriesSpec"))
-  with Matchers
-  with FunSpecLike
-  with BeforeAndAfterAll
-  with ScalaFutures {
+class RequestFactoriesSpec
+    extends TestKit(ActorSystem("RequestFactoriesSpec"))
+    with Matchers
+    with FunSpecLike
+    with BeforeAndAfterAll
+    with ScalaFutures {
 
-  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10.seconds)
+  override def afterAll =
+    TestKit.shutdownActorSystem(
+      system,
+      verifySystemShutdown = true,
+      duration = 10.seconds
+    )
 
   import RequestFactories._
 
@@ -23,9 +29,7 @@ class RequestFactoriesSpec extends TestKit(ActorSystem("RequestFactoriesSpec"))
     it("build a Hydra request from an HTTP request") {
       val hr = HttpRequest(entity = "test")
       val hydraReq = createRequest("1", hr)
-      whenReady(hydraReq) { r =>
-        r.payload shouldBe "test"
-      }
+      whenReady(hydraReq) { r => r.payload shouldBe "test" }
     }
   }
 }

@@ -15,17 +15,29 @@ trait BootstrapEndpointActors extends ConfigSupport {
   implicit val system: ActorSystem
   implicit val e: ExecutionContext
 
-  private[kafka] val kafkaIngestor = system.actorSelection(path = applicationConfig.getString("kafka-ingestor-path"))
+  private[kafka] val kafkaIngestor = system.actorSelection(path =
+    applicationConfig.getString("kafka-ingestor-path")
+  )
 
-  private[kafka] val schemaRegistryActor = system.actorOf(SchemaRegistryActor.props(applicationConfig))
+  private[kafka] val schemaRegistryActor =
+    system.actorOf(SchemaRegistryActor.props(applicationConfig))
 
-  private[kafka] val bootstrapKafkaConfig = applicationConfig.getConfig("bootstrap-config")
+  private[kafka] val bootstrapKafkaConfig =
+    applicationConfig.getConfig("bootstrap-config")
 
-  private[kafka] val streamsManagerProps = StreamsManagerActor.props(bootstrapKafkaConfig,
-    KafkaUtils.BootstrapServers, ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient)
-
+  private[kafka] val streamsManagerProps = StreamsManagerActor.props(
+    bootstrapKafkaConfig,
+    KafkaUtils.BootstrapServers,
+    ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient
+  )
 
   val bootstrapActor: ActorRef = system.actorOf(
-    TopicBootstrapActor.props(schemaRegistryActor, kafkaIngestor, streamsManagerProps, Some(bootstrapKafkaConfig)))
+    TopicBootstrapActor.props(
+      schemaRegistryActor,
+      kafkaIngestor,
+      streamsManagerProps,
+      Some(bootstrapKafkaConfig)
+    )
+  )
 
 }

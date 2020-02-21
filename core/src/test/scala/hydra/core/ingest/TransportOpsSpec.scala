@@ -18,11 +18,13 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 3/22/17.
   */
-class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers
-  with FunSpecLike
-  with BeforeAndAfterAll
-  with ImplicitSender
-  with ScalaFutures {
+class TransportOpsSpec
+    extends TestKit(ActorSystem("test"))
+    with Matchers
+    with FunSpecLike
+    with BeforeAndAfterAll
+    with ImplicitSender
+    with ScalaFutures {
 
   override def afterAll() = TestKit.shutdownActorSystem(system)
 
@@ -30,12 +32,13 @@ class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers
 
   val tm = TestProbe()
 
-  val transport = system.actorOf(Props(new ForwardActor(tm.ref)), "test-transport")
-
+  val transport =
+    system.actorOf(Props(new ForwardActor(tm.ref)), "test-transport")
 
   describe("TransportOps") {
     it("looks up a transport") {
-      val t = system.actorOf(Props(classOf[TestTransportIngestor], supervisor.ref))
+      val t =
+        system.actorOf(Props(classOf[TestTransportIngestor], supervisor.ref))
       t ! "hello"
       expectMsg("hi!")
     }
@@ -48,15 +51,20 @@ class TransportOpsSpec extends TestKit(ActorSystem("test")) with Matchers
 
     it("transports a record") {
       val req = HydraRequest("123", "test-produce")
-      val t = system.actorOf(Props(classOf[TestTransportIngestor], supervisor.ref))
+      val t =
+        system.actorOf(Props(classOf[TestTransportIngestor], supervisor.ref))
       t ! req
-      whenReady(TestRecordFactory.build(req))(r => tm.expectMsg(Produce(r, self, NoAck)))
+      whenReady(TestRecordFactory.build(req))(r =>
+        tm.expectMsg(Produce(r, self, NoAck))
+      )
     }
   }
 }
 
 @DoNotScan
-class TestTransportIngestor(supervisor: ActorRef) extends Ingestor with TransportOps {
+class TestTransportIngestor(supervisor: ActorRef)
+    extends Ingestor
+    with TransportOps {
 
   override val recordFactory = TestRecordFactory
 

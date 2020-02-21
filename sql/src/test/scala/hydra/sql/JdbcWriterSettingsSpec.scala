@@ -9,8 +9,7 @@ import org.scalatest.{FlatSpecLike, Matchers}
 class JdbcWriterSettingsSpec extends Matchers with FlatSpecLike {
 
   "The JdbcWriterSettings" should "be properly configured" in {
-    val config = ConfigFactory.parseString(
-      """
+    val config = ConfigFactory.parseString("""
         |db.syntax = hydra.sql.NoOpSyntax
         |auto.evolve= true
         |
@@ -22,8 +21,7 @@ class JdbcWriterSettingsSpec extends Matchers with FlatSpecLike {
   }
 
   it should "use defaults" in {
-    val config = ConfigFactory.parseString(
-      """
+    val config = ConfigFactory.parseString("""
         |connection.url = url
         |connection.user = test
         |connection.password = password

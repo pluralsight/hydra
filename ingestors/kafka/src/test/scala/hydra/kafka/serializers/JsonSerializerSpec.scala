@@ -1,6 +1,5 @@
 package hydra.kafka.serializers
 
-
 import com.fasterxml.jackson.databind.ObjectMapper
 
 import scala.collection.JavaConverters._
@@ -15,7 +14,9 @@ class JsonSerializerSpec extends Matchers with FunSpecLike {
       val jsonSerializer = new JsonSerializer()
       jsonSerializer.configure(Map.empty[String, Any].asJava, false)
       val node = mapper.readTree("""{"name":"hydra"}""")
-      jsonSerializer.serialize("topic", node) shouldBe mapper.writeValueAsBytes(node)
+      jsonSerializer.serialize("topic", node) shouldBe mapper.writeValueAsBytes(
+        node
+      )
       jsonSerializer.close()
     }
   }

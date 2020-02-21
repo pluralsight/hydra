@@ -92,7 +92,6 @@ object RequestParams {
 
   val HydraClientId = "hydra-client-id"
 
-
   /**
     * The amount of time, in milliseconds, to wait before a timeout error is returned to the client.
     *

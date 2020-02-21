@@ -37,25 +37,33 @@ object ReflectionUtils {
   }
 
   def companionOf[T](implicit tt: ru.TypeTag[T]) = {
-    val companionMirror = universeMirror.reflectModule(ru.typeOf[T].typeSymbol.companion.asModule)
+    val companionMirror =
+      universeMirror.reflectModule(ru.typeOf[T].typeSymbol.companion.asModule)
     companionMirror.instance
   }
 
   def companionOf[T](cls: Class[T]) = {
     val tpe = universeMirror.classSymbol(cls).toType
-    val companionMirror = universeMirror.reflectModule(tpe.typeSymbol.companion.asModule)
+    val companionMirror =
+      universeMirror.reflectModule(tpe.typeSymbol.companion.asModule)
     companionMirror.instance.asInstanceOf[T]
   }
 
-  def instantiateClassByName[M: TypeTag](clazz: String, args: List[Any] = List.empty): M = {
+  def instantiateClassByName[M: TypeTag](
+      clazz: String,
+      args: List[Any] = List.empty
+  ): M = {
     val cl = cm.classSymbol(Class.forName(clazz))
     instance(cl, args)
   }
 
   def fieldsOf[T: TypeTag]: Seq[MethodSymbol] = {
-    ru.typeOf[T].members.collect {
-      case m: MethodSymbol if m.isGetter && m.isPublic => m
-    }.toSeq
+    ru.typeOf[T]
+      .members
+      .collect {
+        case m: MethodSymbol if m.isGetter && m.isPublic => m
+      }
+      .toSeq
   }
 
   def getObjectInstance[T](clazz: Class[T]): T = {
@@ -71,4 +79,3 @@ object ReflectionUtils {
     obj
   }
 }
-

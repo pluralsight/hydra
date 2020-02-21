@@ -8,8 +8,7 @@ import org.scalatest.{FunSpecLike, Matchers}
   */
 class BufferedRecordsSpec extends Matchers with FunSpecLike {
 
-  val schema = new Schema.Parser().parse(
-    """
+  val schema = new Schema.Parser().parse("""
       |{
       |	"type": "record",
       |	"name": "User",
@@ -32,10 +31,6 @@ class BufferedRecordsSpec extends Matchers with FunSpecLike {
       |}
     """.stripMargin)
 
-  describe("The BufferedRecords class") {
-
-
-
-  }
+  describe("The BufferedRecords class") {}
 
 }

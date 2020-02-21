@@ -47,13 +47,15 @@ object AvroUtils {
   def cleanName(name: String) = {
     pattern findFirstIn name match {
       case Some(str) => "_" + name.substring(1)
-      case None => name
+      case None      => name
     }
   }
 
   def getField(name: String, schema: Schema): Field = {
     Option(schema.getField(name))
-      .getOrElse(throw new IllegalArgumentException(s"Field $name is not in schema."))
+      .getOrElse(
+        throw new IllegalArgumentException(s"Field $name is not in schema.")
+      )
   }
 
   /**
@@ -69,7 +71,7 @@ object AvroUtils {
   def getPrimaryKeys(schema: Schema): Seq[Field] = {
     Option(schema.getProp("hydra.key")).map(_.split(",")) match {
       case Some(ids) => ids.map(getField(_, schema))
-      case None => Seq.empty
+      case None      => Seq.empty
     }
   }
 
@@ -88,7 +90,9 @@ object AvroUtils {
       if (seen.contains(here)) return true
       if (one eq other) return true
       if (one.getFullName != other.getFullName) return false
-      one.getFields.asScala.map(_.name()).toSet == other.getFields.asScala.map(_.name()).toSet
+      one.getFields.asScala.map(_.name()).toSet == other.getFields.asScala
+        .map(_.name())
+        .toSet
     }
 
     if (equals) seen.add(here)
@@ -98,14 +102,18 @@ object AvroUtils {
 
   def improveException(ex: Throwable, schema: SchemaResource) = {
     ex match {
-      case e: JsonToAvroConversionException => JsonToAvroConversionExceptionWithMetadata(e, schema)
+      case e: JsonToAvroConversionException =>
+        JsonToAvroConversionExceptionWithMetadata(e, schema)
       case e: Exception => e
     }
   }
 
-  private[avro] case class SeenPair private(s1: Int, s2: Int) {
+  private[avro] case class SeenPair private (s1: Int, s2: Int) {
+
     override def equals(o: Any): Boolean =
-      (this.s1 == o.asInstanceOf[SeenPair].s1) && (this.s2 == o.asInstanceOf[SeenPair].s2)
+      (this.s1 == o.asInstanceOf[SeenPair].s1) && (this.s2 == o
+        .asInstanceOf[SeenPair]
+        .s2)
 
     override def hashCode: Int = s1 + s2
   }

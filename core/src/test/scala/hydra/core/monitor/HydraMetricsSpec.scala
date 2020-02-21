@@ -12,20 +12,23 @@ import scalacache.guava.GuavaCache
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Random, Try}
 
-
-class HydraMetricsSpec extends Matchers
-  with FlatSpecLike
-  with Eventually
-  with BeforeAndAfterAll
-  with BeforeAndAfterEach
-  with MockFactory
-  with ScalaFutures {
+class HydraMetricsSpec
+    extends Matchers
+    with FlatSpecLike
+    with Eventually
+    with BeforeAndAfterAll
+    with BeforeAndAfterEach
+    with MockFactory
+    with ScalaFutures {
 
   import HydraMetrics._
   import scalacache.modes.try_._
 
   implicit override val patienceConfig =
-    PatienceConfig(timeout = scaled(Span(2, Seconds)), interval = scaled(Span(5, Millis)))
+    PatienceConfig(
+      timeout = scaled(Span(2, Seconds)),
+      interval = scaled(Span(5, Millis))
+    )
 
   override def beforeEach() = {
     gaugesCache.removeAll()
@@ -70,19 +73,21 @@ class HydraMetricsSpec extends Matchers
     }
   }
 
-  private def shouldCreateNewMetric[A](f: (String, String, => Seq[(String, String)]) => Unit, cache: GuavaCache[A]) = {
-    cache.get(lookup).map { result =>
-      result shouldBe None
-    }
+  private def shouldCreateNewMetric[A](
+      f: (String, String, => Seq[(String, String)]) => Unit,
+      cache: GuavaCache[A]
+  ) = {
+    cache.get(lookup).map { result => result shouldBe None }
 
     f(lookup, "metric" + Random.nextInt(Integer.MAX_VALUE), generateTags)
 
-    cache.get(lookup).map { result =>
-      result shouldBe a[Some[_]]
-    }
+    cache.get(lookup).map { result => result shouldBe a[Some[_]] }
   }
 
-  private def shouldLookupExistingMetric[A](f: (String, String, => Seq[(String, String)]) => Unit, cache: GuavaCache[A]) = {
+  private def shouldLookupExistingMetric[A](
+      f: (String, String, => Seq[(String, String)]) => Unit,
+      cache: GuavaCache[A]
+  ) = {
     val metric = "metric" + Random.nextInt(Integer.MAX_VALUE)
 
     f(lookup, metric, generateTags) shouldEqual f(lookup, metric, generateTags)

@@ -25,23 +25,34 @@ import hydra.core.transport.Transport.Deliver
 import hydra.core.transport.{AckStrategy, RecordMetadata, TransportCallback}
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
-class RabbitTransportSpec extends TestKit(ActorSystem("rabbit-transport-spec")) with Matchers with FunSpecLike
-  with ImplicitSender
-  with BeforeAndAfterAll
-  with ConfigSupport {
+class RabbitTransportSpec
+    extends TestKit(ActorSystem("rabbit-transport-spec"))
+    with Matchers
+    with FunSpecLike
+    with ImplicitSender
+    with BeforeAndAfterAll
+    with ConfigSupport {
 
   val probe = TestProbe()
 
   val testRabbitControl = Props[RabbitControlMock]
 
-
-  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
+  override def afterAll =
+    TestKit.shutdownActorSystem(system, verifySystemShutdown = true)
 
   describe("When using the RabbitTransport") {
     it("sends valid exchange messages and receive ack") {
-      val rabbitTransport = system.actorOf(RabbitTransport.props(testRabbitControl))
-      val rec = RabbitRecord("test.exchange", RabbitRecord.DESTINATION_TYPE_EXCHANGE, "exchange-ack", AckStrategy.NoAck)
-      val ack: TransportCallback = (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) => probe.ref ! md.get
+      val rabbitTransport =
+        system.actorOf(RabbitTransport.props(testRabbitControl))
+      val rec = RabbitRecord(
+        "test.exchange",
+        RabbitRecord.DESTINATION_TYPE_EXCHANGE,
+        "exchange-ack",
+        AckStrategy.NoAck
+      )
+      val ack: TransportCallback =
+        (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) =>
+          probe.ref ! md.get
       val m = Deliver(rec, 1, ack)
       rabbitTransport ! m
       probe.expectMsgPF() {
@@ -53,9 +64,17 @@ class RabbitTransportSpec extends TestKit(ActorSystem("rabbit-transport-spec")) 
     }
 
     it("sends valid queue messages and receive ack") {
-      val rabbitTransport = system.actorOf(RabbitTransport.props(testRabbitControl))
-      val rec = RabbitRecord("test.queue", RabbitRecord.DESTINATION_TYPE_QUEUE, "queue-ack", AckStrategy.NoAck)
-      val ack: TransportCallback = (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) => probe.ref ! md.get
+      val rabbitTransport =
+        system.actorOf(RabbitTransport.props(testRabbitControl))
+      val rec = RabbitRecord(
+        "test.queue",
+        RabbitRecord.DESTINATION_TYPE_QUEUE,
+        "queue-ack",
+        AckStrategy.NoAck
+      )
+      val ack: TransportCallback =
+        (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) =>
+          probe.ref ! md.get
       val m = Deliver(rec, 1, ack)
       rabbitTransport ! m
       probe.expectMsgPF() {
@@ -67,18 +86,34 @@ class RabbitTransportSpec extends TestKit(ActorSystem("rabbit-transport-spec")) 
     }
 
     it("receives error on Fail condition") {
-      val rabbitTransport = system.actorOf(RabbitTransport.props(testRabbitControl))
-      val rec = RabbitRecord("test.exchange", RabbitRecord.DESTINATION_TYPE_EXCHANGE, "exchange-Fail", AckStrategy.NoAck)
-      val err: TransportCallback = (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) => probe.ref ! err.get
+      val rabbitTransport =
+        system.actorOf(RabbitTransport.props(testRabbitControl))
+      val rec = RabbitRecord(
+        "test.exchange",
+        RabbitRecord.DESTINATION_TYPE_EXCHANGE,
+        "exchange-Fail",
+        AckStrategy.NoAck
+      )
+      val err: TransportCallback =
+        (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) =>
+          probe.ref ! err.get
       val m = Deliver(rec, 1, err)
       rabbitTransport ! m
       probe.expectMsgType[IllegalArgumentException]
     }
 
     it("receives error on Nack condition") {
-      val rabbitTransport = system.actorOf(RabbitTransport.props(testRabbitControl))
-      val rec = RabbitRecord("test.exchange", RabbitRecord.DESTINATION_TYPE_EXCHANGE, "exchange-Nack", AckStrategy.NoAck)
-      val err: TransportCallback = (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) => probe.ref ! err.get
+      val rabbitTransport =
+        system.actorOf(RabbitTransport.props(testRabbitControl))
+      val rec = RabbitRecord(
+        "test.exchange",
+        RabbitRecord.DESTINATION_TYPE_EXCHANGE,
+        "exchange-Nack",
+        AckStrategy.NoAck
+      )
+      val err: TransportCallback =
+        (d: Long, md: Option[RecordMetadata], err: Option[Throwable]) =>
+          probe.ref ! err.get
       val m = Deliver(rec, 1, err)
       rabbitTransport ! m
       probe.expectMsgType[RabbitProducerException]
@@ -88,6 +123,7 @@ class RabbitTransportSpec extends TestKit(ActorSystem("rabbit-transport-spec")) 
 }
 
 class RabbitControlMock extends Actor with ActorLogging {
+
   override def receive = {
     case m: Message if (new String(m.data) == "exchange-ack") =>
       sender ! Ack(11)
@@ -99,6 +135,3 @@ class RabbitControlMock extends Actor with ActorLogging {
       sender ! Nack(14)
   }
 }
-
-
-

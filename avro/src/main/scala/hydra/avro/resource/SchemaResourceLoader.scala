@@ -17,7 +17,10 @@ package hydra.avro.resource
 
 import java.net.ConnectException
 import hydra.avro.registry.SchemaRegistryException
-import io.confluent.kafka.schemaregistry.client.{SchemaMetadata, SchemaRegistryClient}
+import io.confluent.kafka.schemaregistry.client.{
+  SchemaMetadata,
+  SchemaRegistryClient
+}
 import org.apache.avro.Schema
 import org.slf4j.LoggerFactory
 import scalacache._
@@ -35,74 +38,113 @@ import scala.concurrent.{ExecutionContext, Future}
   * @param registryUrl
   * @param registry
   */
-class SchemaResourceLoader(registryUrl: String,
-                           registry: SchemaRegistryClient,
-                           metadataCheckInterval: FiniteDuration = 1 minute) {
+class SchemaResourceLoader(
+    registryUrl: String,
+    registry: SchemaRegistryClient,
+    metadataCheckInterval: FiniteDuration = 1 minute
+) {
 
   import SchemaResourceLoader._
 
   private implicit val guava = SchemaResourceLoader.cache
 
-  def retrieveValueSchema(subject: String, version: Int = 0)(implicit ec: ExecutionContext): Future[SchemaResource] = {
-    if (version == 0) getLatestSchema(subject.withValueSuffix) else loadFromCache(subject.withValueSuffix, version.toString)
+  def retrieveValueSchema(subject: String, version: Int = 0)(
+      implicit ec: ExecutionContext
+  ): Future[SchemaResource] = {
+    if (version == 0) getLatestSchema(subject.withValueSuffix)
+    else loadFromCache(subject.withValueSuffix, version.toString)
   }
 
-  def retrieveKeySchema(subject: String, version: Int = 0)(implicit ec: ExecutionContext): Future[SchemaResource] = {
-    if (version == 0) getLatestSchema(subject.withKeySuffix) else loadFromCache(subject.withKeySuffix, version.toString)
+  def retrieveKeySchema(subject: String, version: Int = 0)(
+      implicit ec: ExecutionContext
+  ): Future[SchemaResource] = {
+    if (version == 0) getLatestSchema(subject.withKeySuffix)
+    else loadFromCache(subject.withKeySuffix, version.toString)
   }
 
-  def loadValueSchemaIntoCache(schemaResource: SchemaResource)
-                              (implicit ec: ExecutionContext): Future[SchemaResource] = {
+  def loadValueSchemaIntoCache(
+      schemaResource: SchemaResource
+  )(implicit ec: ExecutionContext): Future[SchemaResource] = {
     require(schemaResource.id > 0, "A schema id is required.")
-    loadSchemaIntoCache(schemaResource.schema.getFullName.withValueSuffix, schemaResource)
+    loadSchemaIntoCache(
+      schemaResource.schema.getFullName.withValueSuffix,
+      schemaResource
+    )
   }
 
-  def loadKeySchemaIntoCache(schemaResource: SchemaResource)
-                            (implicit ec: ExecutionContext): Future[SchemaResource] = {
+  def loadKeySchemaIntoCache(
+      schemaResource: SchemaResource
+  )(implicit ec: ExecutionContext): Future[SchemaResource] = {
     require(schemaResource.id > 0, "A schema id is required.")
-    loadSchemaIntoCache(schemaResource.schema.getFullName.withKeySuffix, schemaResource)
+    loadSchemaIntoCache(
+      schemaResource.schema.getFullName.withKeySuffix,
+      schemaResource
+    )
   }
 
-  private def loadSchemaIntoCache(srSubject: String, schemaResource: SchemaResource)
-                                 (implicit ec: ExecutionContext): Future[SchemaResource] = Future.sequence {
-    Seq(
-      schemaCache.put(schemaResource.id)(schemaResource.schema, ttl = None),
-      put(srSubject)(schemaResource, ttl = Some(metadataCheckInterval)),
-      put(srSubject, schemaResource.version)(schemaResource, ttl = None))
-  }.map(_ => schemaResource)
+  private def loadSchemaIntoCache(
+      srSubject: String,
+      schemaResource: SchemaResource
+  )(implicit ec: ExecutionContext): Future[SchemaResource] =
+    Future
+      .sequence {
+        Seq(
+          schemaCache.put(schemaResource.id)(schemaResource.schema, ttl = None),
+          put(srSubject)(schemaResource, ttl = Some(metadataCheckInterval)),
+          put(srSubject, schemaResource.version)(schemaResource, ttl = None)
+        )
+      }
+      .map(_ => schemaResource)
 
-  private def getLatestSchema(subject: String)(implicit ec: ExecutionContext): Future[SchemaResource] = {
+  private def getLatestSchema(
+      subject: String
+  )(implicit ec: ExecutionContext): Future[SchemaResource] = {
     cachingF(subject)(ttl = Some(metadataCheckInterval)) {
       log.debug(s"Fetching latest metadata for $subject")
-      Future(registry.getLatestSchemaMetadata(subject)).flatMap { md =>
-        schemaCache.caching(md.getId)(ttl = None) { //the schema itself is immutable and never expires
-          log.debug(s"Caching new schema $subject [version=${md.getVersion} id=${md.getId}]")
-          new Schema.Parser().parse(md.getSchema)
-        }.map(SchemaResource(md.getId, md.getVersion, _))
-      }.recoverWith {
-        case e: ConnectException => throw e
-        case e: Exception => throw new SchemaRegistryException(e, subject)
-      }
+      Future(registry.getLatestSchemaMetadata(subject))
+        .flatMap { md =>
+          schemaCache
+            .caching(md.getId)(ttl = None) { //the schema itself is immutable and never expires
+              log.debug(
+                s"Caching new schema $subject [version=${md.getVersion} id=${md.getId}]"
+              )
+              new Schema.Parser().parse(md.getSchema)
+            }
+            .map(SchemaResource(md.getId, md.getVersion, _))
+        }
+        .recoverWith {
+          case e: ConnectException => throw e
+          case e: Exception        => throw new SchemaRegistryException(e, subject)
+        }
     }
   }
 
-  private def loadFromCache(subject: String, version: String)(implicit ec: ExecutionContext): Future[SchemaResource] = {
+  private def loadFromCache(subject: String, version: String)(
+      implicit ec: ExecutionContext
+  ): Future[SchemaResource] = {
     cachingF(subject, version)(ttl = None) {
       log.debug(s"Fetching version $version for $subject schema")
       loadFromRegistry(subject, version)
     }
   }
 
-  private def loadFromRegistry(subject: String, version: String)(implicit ec: ExecutionContext): Future[SchemaResource] = {
-    log.debug(s"Loading schema $subject, version $version from schema registry $registryUrl.")
-    Future(version.toInt).map(v => registry.getSchemaMetadata(subject, v)).map(toSchemaResource)
+  private def loadFromRegistry(subject: String, version: String)(
+      implicit ec: ExecutionContext
+  ): Future[SchemaResource] = {
+    log.debug(
+      s"Loading schema $subject, version $version from schema registry $registryUrl."
+    )
+    Future(version.toInt)
+      .map(v => registry.getSchemaMetadata(subject, v))
+      .map(toSchemaResource)
       .map(m => {
-        registry.getById(m.id) //this is what will throw if the schema does not exist
+        registry
+          .getById(m.id) //this is what will throw if the schema does not exist
         m
       })
       .recoverWith {
         case e: ConnectException => throw e
-        case e: Exception => throw new SchemaRegistryException(e, subject)
+        case e: Exception        => throw new SchemaRegistryException(e, subject)
       }
   }
 
@@ -120,7 +162,11 @@ class SchemaResourceLoader(registryUrl: String,
   }
 
   def toSchemaResource(md: SchemaMetadata): SchemaResource = {
-    SchemaResource(md.getId, md.getVersion, new Schema.Parser().parse(md.getSchema))
+    SchemaResource(
+      md.getId,
+      md.getVersion,
+      new Schema.Parser().parse(md.getSchema)
+    )
   }
 
 }

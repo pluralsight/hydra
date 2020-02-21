@@ -16,8 +16,11 @@ class NoOpDialectSpec extends Matchers with FunSpecLike {
 
     it("does not upsert") {
       intercept[UnsupportedOperationException] {
-        NoopDialect.buildUpsert("table",
-          SchemaWrapper.from(Schema.create(Schema.Type.NULL)), UnderscoreSyntax)
+        NoopDialect.buildUpsert(
+          "table",
+          SchemaWrapper.from(Schema.create(Schema.Type.NULL)),
+          UnderscoreSyntax
+        )
       }
     }
 
@@ -27,7 +30,11 @@ class NoOpDialectSpec extends Matchers with FunSpecLike {
 
     it("does not support dropping constraints by default") {
       intercept[UnsupportedOperationException] {
-        NoopDialect.dropNotNullConstraintQueries("table", null, UnderscoreSyntax)
+        NoopDialect.dropNotNullConstraintQueries(
+          "table",
+          null,
+          UnderscoreSyntax
+        )
       }
     }
   }

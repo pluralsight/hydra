@@ -26,7 +26,10 @@ import hydra.core.monitor.HydraMetrics
 import hydra.core.transport.Transport
 import hydra.core.transport.Transport.Deliver
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata}
-import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitializationError}
+import hydra.kafka.transport.KafkaProducerProxy.{
+  ProduceToKafka,
+  ProducerInitializationError
+}
 import hydra.kafka.transport.KafkaTransport.{RecordProduceError, ReportMetrics}
 import hydra.kafka.util.KafkaUtils
 
@@ -36,12 +39,14 @@ import scala.language.existentials
 /**
   * Created by alexsilva on 10/28/15.
   */
-class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) extends Transport
-  with Timers {
+class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]])
+    extends Transport
+    with Timers {
 
   private type KR = KafkaRecord[_, _]
 
-  private[kafka] lazy val metrics = KafkaMetrics(applicationConfig)(context.system)
+  private[kafka] lazy val metrics =
+    KafkaMetrics(applicationConfig)(context.system)
 
   private[kafka] val msgCounter = new AtomicLong()
 
@@ -49,7 +54,9 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 
   override def transport: Receive = {
     case Deliver(kr: KafkaRecord[_, _], deliveryId, ack) =>
-      withProducer(kr.formatName)(_ ! ProduceToKafka(deliveryId, kr, ack))(e => ack.onCompletion(deliveryId, None, e))
+      withProducer(kr.formatName)(_ ! ProduceToKafka(deliveryId, kr, ack))(e =>
+        ack.onCompletion(deliveryId, None, e)
+      )
 
     case kmd: KafkaRecordMetadata =>
       msgCounter.incrementAndGet()
@@ -61,22 +68,30 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
     case p: ProducerInitializationError => context.system.eventStream.publish(p)
   }
 
-  private def withProducer(id: String)(success: ActorRef => Unit)(fail: Option[Throwable] => Unit) = {
+  private def withProducer(
+      id: String
+  )(success: ActorRef => Unit)(fail: Option[Throwable] => Unit) = {
     context.child(id) match {
       case Some(producer) => success(producer)
-      case None => fail(Some(new IllegalArgumentException(s"No Kafka producer named $id found.")))
+      case None =>
+        fail(
+          Some(
+            new IllegalArgumentException(s"No Kafka producer named $id found.")
+          )
+        )
     }
   }
 
   override val supervisorStrategy =
     OneForOneStrategy(maxNrOfRetries = -1, withinTimeRange = Duration.Inf) {
       case _: InvalidProducerSettingsException => Resume
-      case _: Exception => Restart
+      case _: Exception                        => Restart
     }
 
   override def preStart(): Unit = {
-    producerSettings.foreach { case (id, s) =>
-      context.actorOf(KafkaProducerProxy.props(id, s), id)
+    producerSettings.foreach {
+      case (id, s) =>
+        context.actorOf(KafkaProducerProxy.props(id, s), id)
     }
   }
 
@@ -85,11 +100,16 @@ class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]]) 
 
 object KafkaTransport {
 
-  private[kafka] val histogramMetricName = "hydra_ingest_records_published_total_minutes_bucket"
+  private[kafka] val histogramMetricName =
+    "hydra_ingest_records_published_total_minutes_bucket"
 
   private[kafka] val counterMetricName = "hydra_ingest_records_published_total"
 
-  case class RecordProduceError(deliveryId: Long, record: KafkaRecord[_, _], error: Throwable)
+  case class RecordProduceError(
+      deliveryId: Long,
+      record: KafkaRecord[_, _],
+      error: Throwable
+  )
 
   case object ReportMetrics
 
@@ -100,11 +120,7 @@ object KafkaTransport {
     * @param cfg - We are not using this (this is the rootConfig)
     * @return
     */
-  def props(cfg: Config): Props = Props(classOf[KafkaTransport], KafkaUtils.producerSettings(cfg))
+  def props(cfg: Config): Props =
+    Props(classOf[KafkaTransport], KafkaUtils.producerSettings(cfg))
 
 }
-
-
-
-
-

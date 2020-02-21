@@ -5,11 +5,14 @@ import configs.syntax._
 import hydra.common.reflect.ReflectionUtils
 
 case class JdbcWriterSettings(private val config: Config) {
+
   /**
     * The db syntax implementation to use.
     */
-  val dbSyntax: DbSyntax = config.get[String]("db.syntax")
-    .map(Class.forName).map(ReflectionUtils.getObjectInstance(_).asInstanceOf[DbSyntax])
+  val dbSyntax: DbSyntax = config
+    .get[String]("db.syntax")
+    .map(Class.forName)
+    .map(ReflectionUtils.getObjectInstance(_).asInstanceOf[DbSyntax])
     .valueOrElse(UnderscoreSyntax)
 
   /**

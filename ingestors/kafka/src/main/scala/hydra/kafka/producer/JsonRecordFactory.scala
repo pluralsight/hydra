@@ -27,17 +27,22 @@ object JsonRecordFactory extends KafkaRecordFactory[String, JsonNode] {
 
   val mapper = new ObjectMapper()
 
-  override def build(request: HydraRequest)
-                    (implicit ec: ExecutionContext): Future[KafkaRecord[String, JsonNode]] = {
+  override def build(
+      request: HydraRequest
+  )(implicit ec: ExecutionContext): Future[KafkaRecord[String, JsonNode]] = {
     for {
       topic <- Future.fromTry(getTopic(request))
       payload <- parseJson(request.payload)
-    } yield JsonRecord(topic, getKey(request, payload), payload, request.ackStrategy)
+    } yield JsonRecord(
+      topic,
+      getKey(request, payload),
+      payload,
+      request.ackStrategy
+    )
 
   }
 
-  private def parseJson(json: String)
-                       (implicit ec: ExecutionContext) = Future(mapper.reader().readTree(json))
+  private def parseJson(json: String)(implicit ec: ExecutionContext) =
+    Future(mapper.reader().readTree(json))
 
 }
-
