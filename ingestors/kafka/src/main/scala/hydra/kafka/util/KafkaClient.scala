@@ -13,6 +13,7 @@ import org.apache.kafka.clients.admin.NewTopic
 import hydra.kafka.producer.KafkaRecord
 
 import scala.concurrent.duration._
+import scala.util.control.NoStackTrace
 
 trait KafkaClient[F[_]]  {
   import KafkaClient._
@@ -23,7 +24,7 @@ trait KafkaClient[F[_]]  {
 
   def createTopic(name: TopicName, details: TopicDetails): F[Unit]
 
-  def publishMessage[K, V](name: TopicName, record: KafkaRecord[K, V]): F[Unit]
+  def publishMessage[K, V](name: TopicName, record: KafkaRecord[K, V]): F[Either[PublishError, Unit]]
 
 }
 
@@ -31,7 +32,10 @@ object KafkaClient {
 
   type TopicName = String
   final case class Topic(name: TopicName, numberPartitions: Int)
-  final case class PublishMessageTimeout(message: String)
+
+  sealed abstract class PublishError extends Exception with Product with Serializable
+  final case object PublishTimeoutError extends PublishError with NoStackTrace
+  final case class PublishFailed(ingestorResponse: IngestorStatus) extends PublishError
 
   def live[F[_]: Async: Concurrent: ContextShift](bootstrapServers: String, ingestActor: ActorSelection): F[KafkaClient[F]] = Sync[F].delay {
     new KafkaClient[F] {
@@ -50,17 +54,19 @@ object KafkaClient {
         getAdminClientResource.use(_.createTopic(newTopic))
       }
 
-      override def publishMessage[K, V](name: TopicName, record: KafkaRecord[K, V]): F[Unit] = {
+      override def publishMessage[K, V](name: TopicName, record: KafkaRecord[K, V]): F[Either[PublishError, Unit]] = {
         import akka.pattern.ask
 
         implicit val timeout: akka.util.Timeout = akka.util.Timeout(1.second)
         val ingestRecord = Async.fromFuture(Sync[F].delay((ingestActor ? Ingest(record, AckStrategy.Replicated)).mapTo[IngestorStatus]))
-        ingestRecord.map {
+        val ingestionResult: F[Unit] = ingestRecord.flatMap {
           case IngestorCompleted => Async[F].unit
           case IngestorError(error) => Async[F].raiseError(error)
-          case IngestorTimeout => Async[F].raiseError()
+          case IngestorTimeout => Async[F].raiseError(PublishTimeoutError)
+          case otherStatus => Async[F].raiseError(PublishFailed(otherStatus))
         }
 
+        ingestionResult.attemptNarrow[PublishError]
       }
 
 
