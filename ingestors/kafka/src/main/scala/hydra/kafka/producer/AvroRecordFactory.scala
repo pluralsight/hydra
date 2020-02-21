@@ -71,7 +71,7 @@ class AvroRecordFactory(schemaResourceLoader: ActorRef)
       val converted = converter.convert(request.payload)
       converted
     }).recover {
-        case ex => throw AvroUtils.improveException(ex, schemaResource)
-      }
+      case ex => throw AvroUtils.improveException(ex, schemaResource)
+    }
   }
 }

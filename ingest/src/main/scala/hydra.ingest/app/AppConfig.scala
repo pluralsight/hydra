@@ -55,13 +55,13 @@ object AppConfig {
         .default(Subject.createValidated("_hydra.v2.metadata").get),
       env("HYDRA_V2_METADATA_CREATE_ON_STARTUP").as[Boolean].default(false)
     ).parMapN { (subject, createOnStartup) =>
-        V2MetadataTopicConfig(
-          subject,
-          MetadataSchemaConfig.keySchema,
-          MetadataSchemaConfig.valueSchema,
-          createOnStartup
-        )
-      }
+      V2MetadataTopicConfig(
+        subject,
+        MetadataSchemaConfig.keySchema,
+        MetadataSchemaConfig.valueSchema,
+        createOnStartup
+      )
+    }
 
   final case class AppConfig(
       createTopicConfig: CreateTopicConfig,
