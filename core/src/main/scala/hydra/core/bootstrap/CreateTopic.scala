@@ -1,7 +1,6 @@
 package hydra.core.bootstrap
 
-import cats.Monad
-import cats.effect.{ExitCase, Resource, Sync}
+import cats.effect.{Bracket, ExitCase, Resource}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
@@ -10,7 +9,7 @@ import org.apache.avro.Schema
 import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy, _}
 
-final class CreateTopicProgram[F[_]: Sync: Sleep: Logger](
+final class CreateTopicProgram[F[_]: Bracket[*, Throwable]: Sleep: Logger](
     schemaRegistry: SchemaRegistry[F],
     retryPolicy: RetryPolicy[F]
 ) {
@@ -46,7 +45,7 @@ final class CreateTopicProgram[F[_]: Sync: Sleep: Logger](
         (exitCase, newVersionMaybe) match {
           case (ExitCase.Error(_), Some(newVersion)) =>
             schemaRegistry.deleteSchemaOfVersion(suffixedSubject, newVersion)
-          case _ => Sync[F].unit
+          case _ => Bracket[F, Throwable].unit
         }
       )
       .map(_ => ())
@@ -71,7 +70,7 @@ final class CreateTopicProgram[F[_]: Sync: Sleep: Logger](
   ): F[Unit] = {
     for {
       _ <- registerSchemas(subject, keySchema, valueSchema).use(_ =>
-        Sync[F].unit
+        Bracket[F, Throwable].unit
       )
     } yield ()
   }
