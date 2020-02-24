@@ -4,7 +4,14 @@ import cats.effect.{Bracket, ExitCase, Resource}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
-import hydra.kafka.model.{Subject, TopicMetadataV2Request}
+import hydra.core.transport.AckStrategy
+import hydra.kafka.model.{
+  Subject,
+  TopicMetadataV2Key,
+  TopicMetadataV2Request,
+  TopicMetadataV2Value
+}
+import hydra.kafka.producer.AvroKeyRecord
 import hydra.kafka.util.KafkaClient
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
@@ -15,7 +22,8 @@ import retry.{RetryDetails, RetryPolicy, _}
 final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     schemaRegistry: SchemaRegistry[F],
     kafkaClient: KafkaClient[F],
-    retryPolicy: RetryPolicy[F]
+    retryPolicy: RetryPolicy[F],
+    v2MetadataTopicName: String
 ) {
 
   private def registerSchema(
@@ -50,7 +58,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
           case (ExitCase.Error(_), Some(newVersion)) =>
             schemaRegistry.deleteSchemaOfVersion(suffixedSubject, newVersion)
           case _ => Bracket[F, Throwable].unit
-      })
+        }
+      )
       .map(_ => ())
   }
 
@@ -66,8 +75,21 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     )
   }
 
-  private def publishMetadata(): F[Unit] = {
-    kafkaClient.publishMessage()
+  private def publishMetadata(
+      createTopicRequest: TopicMetadataV2Request
+  ): F[Unit] = {
+    val (key, value) = createTopicRequest.toKeyAndValue
+    val keyRecord = TopicMetadataV2Key.recordFormat.to(key)
+    val valueRecord = TopicMetadataV2Value.recordFormat.to(value)
+    val record = AvroKeyRecord(
+      v2MetadataTopicName,
+      TopicMetadataV2Key.schema,
+      TopicMetadataV2Value.schema,
+      keyRecord,
+      valueRecord,
+      AckStrategy.Replicated
+    )
+    kafkaClient.publishMessage(record).rethrow
   }
 
   def createTopic(
@@ -75,13 +97,16 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       topicDetails: TopicDetails
   ): F[Unit] = {
     for {
-      _ <- registerSchemas(createTopicRequest.subject,
-                           createTopicRequest.schemas.key,
-                           createTopicRequest.schemas.value)
-        .use(
-          _ =>
-            kafkaClient.createTopic(createTopicRequest.subject.value,
-                                    topicDetails))
+      _ <- registerSchemas(
+        createTopicRequest.subject,
+        createTopicRequest.schemas.key,
+        createTopicRequest.schemas.value
+      ).use(_ =>
+          kafkaClient.createTopic(
+            createTopicRequest.subject.value,
+            topicDetails
+          ) *> publishMetadata(createTopicRequest)
+        )
     } yield ()
   }
 }

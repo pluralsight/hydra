@@ -45,13 +45,15 @@ final case class TopicMetadataV2Request(
 
   def toKeyAndValue: (TopicMetadataV2Key, TopicMetadataV2Value) = {
     val key = TopicMetadataV2Key(subject)
-    val value = TopicMetadataV2Value(streamType,
-                                     deprecated,
-                                     dataClassification,
-                                     contact,
-                                     createdDate,
-                                     parentSubjects,
-                                     notes)
+    val value = TopicMetadataV2Value(
+      streamType,
+      deprecated,
+      dataClassification,
+      contact,
+      createdDate,
+      parentSubjects,
+      notes
+    )
     (key, value)
   }
 }
