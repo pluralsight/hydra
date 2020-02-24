@@ -5,8 +5,8 @@ import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
 import hydra.core.transport.AckStrategy
+import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{
-  Subject,
   TopicMetadataV2Key,
   TopicMetadataV2Request,
   TopicMetadataV2Value
@@ -23,7 +23,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     schemaRegistry: SchemaRegistry[F],
     kafkaClient: KafkaClient[F],
     retryPolicy: RetryPolicy[F],
-    v2MetadataTopicName: String
+    v2MetadataTopicName: Subject
 ) {
 
   private def registerSchema(
@@ -58,8 +58,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
           case (ExitCase.Error(_), Some(newVersion)) =>
             schemaRegistry.deleteSchemaOfVersion(suffixedSubject, newVersion)
           case _ => Bracket[F, Throwable].unit
-        }
-      )
+      })
       .map(_ => ())
   }
 
@@ -82,7 +81,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     val keyRecord = TopicMetadataV2Key.recordFormat.to(key)
     val valueRecord = TopicMetadataV2Value.recordFormat.to(value)
     val record = AvroKeyRecord(
-      v2MetadataTopicName,
+      v2MetadataTopicName.value,
       TopicMetadataV2Key.schema,
       TopicMetadataV2Value.schema,
       keyRecord,
@@ -101,12 +100,12 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
         createTopicRequest.subject,
         createTopicRequest.schemas.key,
         createTopicRequest.schemas.value
-      ).use(_ =>
+      ).use(
+        _ =>
           kafkaClient.createTopic(
             createTopicRequest.subject.value,
             topicDetails
-          ) *> publishMetadata(createTopicRequest)
-        )
+          ) *> publishMetadata(createTopicRequest))
     } yield ()
   }
 }

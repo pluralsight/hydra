@@ -1,10 +1,23 @@
 package hydra.kafka.programs
 
+import java.time.Instant
+
+import cats.data.NonEmptyList
 import cats.effect.concurrent.Ref
 import cats.effect.{IO, Sync, Timer}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
+import hydra.core.marshallers.History
+import hydra.kafka.model.{
+  Email,
+  Public,
+  Schemas,
+  Subject,
+  TopicMetadataV2Request
+}
+import hydra.kafka.util.KafkaClient
+import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import org.apache.avro.{Schema, SchemaBuilder}
@@ -20,6 +33,22 @@ class CreateTopicSpec extends WordSpec with Matchers {
   private val keySchema = getSchema("key")
   private val valueSchema = getSchema("val")
 
+  private def createTopicMetadataRequest(
+      subject: String,
+      keySchema: Schema,
+      valueSchema: Schema): TopicMetadataV2Request =
+    TopicMetadataV2Request(
+      Subject.createValidated(subject).get,
+      Schemas(keySchema, valueSchema),
+      History,
+      deprecated = false,
+      Public,
+      NonEmptyList.of(Email("test@test.com")),
+      Instant.now,
+      List.empty,
+      None
+    )
+
   "CreateTopicSpec" must {
     "register the two avro schemas" in {
       val schemaRegistryIO = SchemaRegistry.test[IO]
@@ -27,12 +56,17 @@ class CreateTopicSpec extends WordSpec with Matchers {
 
       (for {
         schemaRegistry <- schemaRegistryIO
+        kafka <- KafkaClient.test[IO]
         registerInternalMetadata = new CreateTopicProgram[IO](
           schemaRegistry,
-          policy
+          kafka,
+          policy,
+          "v2Topic"
         )
         _ = registerInternalMetadata
-          .createTopic("subject", keySchema, valueSchema)
+          .createTopic(
+            createTopicMetadataRequest("subject", keySchema, valueSchema),
+            TopicDetails(1, 1))
           .unsafeRunSync()
         containsSingleKeyAndValue <- schemaRegistry.getAllSubjects.map(
           _.length == 2
@@ -75,21 +109,20 @@ class CreateTopicSpec extends WordSpec with Matchers {
           override def getAllVersions(subject: String): IO[List[Int]] = ???
           override def getAllSubjects: IO[List[String]] = ???
         }
-
-      Ref[IO]
-        .of(TestState(deleteSchemaWasCalled = false, 0))
-        .flatMap { ref =>
-          val schemaRegistry = getSchemaRegistry(ref)
-          val createTopic = new CreateTopicProgram[IO](schemaRegistry, policy)
-          for {
-            _ <- createTopic
-              .createTopic("subject", keySchema, valueSchema)
-              .attempt
-            result <- ref.get
-          } yield assert(result.deleteSchemaWasCalled)
-
-        }
-        .unsafeRunSync()
+      (for {
+        kafka <- KafkaClient.test[IO]
+        ref <- Ref[IO]
+          .of(TestState(deleteSchemaWasCalled = false, 0))
+        _ <- new CreateTopicProgram[IO](getSchemaRegistry(ref),
+                                        kafka,
+                                        policy,
+                                        "test")
+          .createTopic(
+            createTopicMetadataRequest("subject", keySchema, valueSchema),
+            TopicDetails(1, 1))
+          .attempt
+        result <- ref.get
+      } yield assert(result.deleteSchemaWasCalled)).unsafeRunSync()
     }
 
     "retry given number of attempts" in {
@@ -118,20 +151,19 @@ class CreateTopicSpec extends WordSpec with Matchers {
           override def getAllSubjects: IO[List[String]] = ???
         }
 
-      Ref[IO]
-        .of(0)
-        .flatMap { ref =>
-          val schemaRegistry = getSchemaRegistry(ref)
-          val createTopic = new CreateTopicProgram[IO](schemaRegistry, policy)
-          for {
-            _ <- createTopic
-              .createTopic("subject", keySchema, valueSchema)
-              .attempt
-            result <- ref.get
-          } yield result shouldBe numberRetries + 1
-
-        }
-        .unsafeRunSync()
+      (for {
+        kafka <- KafkaClient.test[IO]
+        ref <- Ref[IO].of(0)
+        _ <- new CreateTopicProgram[IO](getSchemaRegistry(ref),
+                                        kafka,
+                                        policy,
+                                        "test")
+          .createTopic(
+            createTopicMetadataRequest("subject", keySchema, valueSchema),
+            TopicDetails(1, 1))
+          .attempt
+        result <- ref.get
+      } yield result shouldBe numberRetries + 1).unsafeRunSync()
     }
 
     "not remove existing schemas on rollback" in {
@@ -166,20 +198,20 @@ class CreateTopicSpec extends WordSpec with Matchers {
         }
 
       val schemaRegistryState = Map("subject-key" -> 1)
-      Ref[IO]
-        .of(TestState(schemaRegistryState))
-        .flatMap { ref =>
-          val schemaRegistry = getSchemaRegistry(ref)
-          val createTopic = new CreateTopicProgram[IO](schemaRegistry, policy)
-          for {
-            _ <- createTopic
-              .createTopic("subject", keySchema, valueSchema)
-              .attempt
-            result <- ref.get
-          } yield result.schemas shouldBe schemaRegistryState
-
-        }
-        .unsafeRunSync()
+      (for {
+        kafka <- KafkaClient.test[IO]
+        ref <- Ref[IO]
+          .of(TestState(schemaRegistryState))
+        _ <- new CreateTopicProgram[IO](getSchemaRegistry(ref),
+                                        kafka,
+                                        policy,
+                                        "test")
+          .createTopic(
+            createTopicMetadataRequest("subject", keySchema, valueSchema),
+            TopicDetails(1, 1))
+          .attempt
+        result <- ref.get
+      } yield result.schemas shouldBe schemaRegistryState).unsafeRunSync()
     }
 
   }

@@ -25,11 +25,13 @@ import hydra.core.http.CorsSupport
 import hydra.kafka.model.TopicMetadataV2Request
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.serializers.TopicMetadataV2Parser
+import hydra.kafka.util.KafkaUtils.TopicDetails
 
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
-final class BootstrapEndpointV2(createTopicProgram: CreateTopicProgram[IO])(
+final class BootstrapEndpointV2(createTopicProgram: CreateTopicProgram[IO],
+                                defaultTopicDetails: TopicDetails)(
     implicit val system: ActorSystem,
     implicit val e: ExecutionContext
 ) extends CorsSupport {
@@ -43,7 +45,7 @@ final class BootstrapEndpointV2(createTopicProgram: CreateTopicProgram[IO])(
           entity(as[TopicMetadataV2Request]) { t =>
             onComplete(
               createTopicProgram
-                .createTopic(t.subject.value, t.schemas.key, t.schemas.value)
+                .createTopic(t, defaultTopicDetails)
                 .unsafeToFuture()
             ) {
               case Success(_) => complete(StatusCodes.OK)

@@ -13,6 +13,8 @@ import hydra.core.marshallers.History
 import hydra.kafka.model._
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.serializers.TopicMetadataV2Parser
+import hydra.kafka.util.KafkaClient
+import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import org.apache.avro.{Schema, SchemaBuilder}
@@ -30,14 +32,20 @@ final class BootstrapEndpointV2Spec
   private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
 
   private def getTestCreateTopicProgram(
-      s: SchemaRegistry[IO]
+      s: SchemaRegistry[IO],
+      k: KafkaClient[IO]
   ): BootstrapEndpointV2 = {
     val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-    new BootstrapEndpointV2(new CreateTopicProgram[IO](s, retryPolicy))
+    new BootstrapEndpointV2(
+      new CreateTopicProgram[IO](s, k, retryPolicy, "test"),
+      TopicDetails(1, 1))
   }
 
   private val testCreateTopicProgram: IO[BootstrapEndpointV2] =
-    SchemaRegistry.test[IO].map(getTestCreateTopicProgram)
+    for {
+      s <- SchemaRegistry.test[IO]
+      k <- KafkaClient.test[IO]
+    } yield getTestCreateTopicProgram(s, k)
 
   "BootstrapEndpointV2" must {
 
@@ -105,11 +113,16 @@ final class BootstrapEndpointV2Spec
         override def getAllVersions(subject: String): IO[List[Int]] = err
         override def getAllSubjects: IO[List[String]] = err
       }
-      Post("/v2/streams", validRequest) ~> Route.seal(
-        getTestCreateTopicProgram(failingSchemaRegistry).route
-      ) ~> check {
-        response.status shouldBe StatusCodes.InternalServerError
-      }
+      KafkaClient
+        .test[IO]
+        .map { kafka =>
+          Post("/v2/streams", validRequest) ~> Route.seal(
+            getTestCreateTopicProgram(failingSchemaRegistry, kafka).route
+          ) ~> check {
+            response.status shouldBe StatusCodes.InternalServerError
+          }
+        }
+        .unsafeRunSync()
     }
   }
 

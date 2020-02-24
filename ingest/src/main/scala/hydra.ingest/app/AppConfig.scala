@@ -1,9 +1,8 @@
 package hydra.ingest.app
 
 import cats.implicits._
-import ciris.{ConfigValue, _}
-import hydra.kafka.model.Subject
-import org.apache.avro.Schema
+import ciris.{ConfigValue, env, _}
+import hydra.kafka.model.{ContactMethod, Subject}
 
 import scala.concurrent.duration._
 
@@ -25,7 +24,8 @@ object AppConfig {
   final case class CreateTopicConfig(
       schemaRegistryConfig: SchemaRegistryConfig,
       numRetries: Int,
-      baseBackoffDelay: FiniteDuration
+      baseBackoffDelay: FiniteDuration,
+      bootstrapServers: String
   )
 
   private val createTopicConfig: ConfigValue[CreateTopicConfig] =
@@ -34,33 +34,36 @@ object AppConfig {
       env("CREATE_TOPIC_NUM_RETRIES").as[Int].default(1),
       env("CREATE_TOPIC_BASE_BACKOFF_DELAY")
         .as[FiniteDuration]
-        .default(1.second)
+        .default(1.second),
+      env("HYDRA_KAFKA_PRODUCER_BOOTSTRAP_SERVERS").as[String]
     ).parMapN(CreateTopicConfig)
 
   private implicit val subjectConfigDecoder: ConfigDecoder[String, Subject] =
-    ConfigDecoder[String, String].mapOption("Subject")(Subject.createValidated)
+    ConfigDecoder.identity[String].mapOption("Subject")(Subject.createValidated)
 
   final case class V2MetadataTopicConfig(
       topicName: Subject,
-      keySchema: Schema,
-      valueSchema: Schema,
-      createOnStartup: Boolean
+      createOnStartup: Boolean,
+      createV2TopicsEnabled: Boolean,
+      contactMethod: ContactMethod
   )
+
+  private implicit def contactMethodDecoder
+    : ConfigDecoder[String, ContactMethod] =
+    ConfigDecoder
+      .identity[String]
+      .mapOption("ContactMethod")(ContactMethod.create)
 
   private val v2MetadataTopicConfig: ConfigValue[V2MetadataTopicConfig] =
     (
       env("HYDRA_V2_METADATA_TOPIC_NAME")
         .as[Subject]
         .default(Subject.createValidated("_hydra.v2.metadata").get),
-      env("HYDRA_V2_METADATA_CREATE_ON_STARTUP").as[Boolean].default(false)
-    ).parMapN { (subject, createOnStartup) =>
-      V2MetadataTopicConfig(
-        subject,
-        MetadataSchemaConfig.keySchema,
-        MetadataSchemaConfig.valueSchema,
-        createOnStartup
-      )
-    }
+      env("HYDRA_V2_METADATA_CREATE_ON_STARTUP").as[Boolean].default(false),
+      env("HYDRA_V2_CREATE_TOPICS_ENABLED").as[Boolean].default(false),
+      env("HYDRA_V2_METADATA_CONTACTS")
+        .as[ContactMethod] // TODO this will be a required config - alternative?
+    ).parMapN(V2MetadataTopicConfig)
 
   final case class AppConfig(
       createTopicConfig: CreateTopicConfig,

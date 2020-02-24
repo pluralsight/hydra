@@ -7,6 +7,8 @@ import cats.data.NonEmptyList
 import com.sksamuel.avro4s.{AvroName, AvroNamespace, AvroSchema, RecordFormat}
 import hydra.core.marshallers.StreamType
 import org.apache.avro.Schema
+import com.sksamuel.avro4s.refined._
+import hydra.kafka.model.TopicMetadataV2Request.Subject
 
 /**
   * Created by alexsilva on 3/30/17.

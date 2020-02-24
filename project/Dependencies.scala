@@ -30,6 +30,7 @@ object Dependencies {
   val log4jVersion = "2.7"
   val opRabbitVersion = "2.0.0"
   val powerMockVersion = "2.0.0-beta.5" //needed for mocking static java methods
+  val refinedVersion = "0.9.12"
   val reflectionsVersion = "0.9.11"
   val scalaCacheVersion = "0.28.0"
   val scalaMockVersion = "4.1.0"
@@ -41,7 +42,13 @@ object Dependencies {
 
   object Compile {
 
-    val avro4s = "com.sksamuel.avro4s" %% "avro4s-core" % avro4sVersion
+    val refined = "eu.timepit" %% "refined" % refinedVersion
+
+    val avro4s =
+      Seq(
+        "com.sksamuel.avro4s" %% "avro4s-core",
+        "com.sksamuel.avro4s" %% "avro4s-refined"
+      ).map(_ % avro4sVersion)
 
     val cats = Seq(
       "com.github.cb372" %% "cats-retry" % catsRetryVersion,
@@ -229,8 +236,8 @@ object Dependencies {
     akkaKafkaStream,
     jsonLenses,
     fs2Kafka,
-    avro4s
-  ) ++ kafka ++ akkaHttpHal
+    refined
+  ) ++ avro4s ++ kafka ++ akkaHttpHal
 
   val sandboxDeps: Seq[ModuleID] = kafkaDeps ++ sqlDeps ++
     Seq("com.h2database" % "h2" % "1.4.196") ++ Seq(embeddedKafka)
