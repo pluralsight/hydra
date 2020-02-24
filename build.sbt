@@ -15,6 +15,9 @@ lazy val defaultSettings = Seq(
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
   excludeDependencies += "org.slf4j" % "slf4j-log4j12",
   excludeDependencies += "log4j" % "log4j",
+  addCompilerPlugin(
+    "org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full
+  ),
   packageOptions in (Compile, packageBin) +=
     Package.ManifestAttributes("Implementation-Build" -> buildNumber),
   logLevel := Level.Info,
