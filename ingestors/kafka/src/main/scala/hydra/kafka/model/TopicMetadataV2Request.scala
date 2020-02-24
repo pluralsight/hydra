@@ -78,4 +78,11 @@ final case class TopicMetadataV2Request(
 object TopicMetadataV2Request {
   type SubjectRegex = MatchesRegex[W.`"""^[a-zA-Z0-9_-.]+$"""`.T]
   type Subject = String Refined SubjectRegex
+
+  object Subject {
+
+    def createValidated(value: String): Option[Subject] = {
+      refineV[SubjectRegex](value).toOption
+    }
+  }
 }

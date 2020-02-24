@@ -10,6 +10,8 @@ import cats.effect.{IO, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.core.marshallers.History
+import hydra.kafka.model.ContactMethod.Email
+import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.serializers.TopicMetadataV2Parser
@@ -37,7 +39,10 @@ final class BootstrapEndpointV2Spec
   ): BootstrapEndpointV2 = {
     val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
     new BootstrapEndpointV2(
-      new CreateTopicProgram[IO](s, k, retryPolicy, "test"),
+      new CreateTopicProgram[IO](s,
+                                 k,
+                                 retryPolicy,
+                                 Subject.createValidated("test").get),
       TopicDetails(1, 1))
   }
 
@@ -75,7 +80,7 @@ final class BootstrapEndpointV2Spec
       History,
       deprecated = false,
       Public,
-      NonEmptyList.of(Email("test@pluralsight.com")),
+      NonEmptyList.of(Email.create("test@pluralsight.com").get),
       Instant.now,
       List.empty,
       None

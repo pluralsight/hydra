@@ -9,13 +9,9 @@ import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.core.marshallers.History
-import hydra.kafka.model.{
-  Email,
-  Public,
-  Schemas,
-  Subject,
-  TopicMetadataV2Request
-}
+import hydra.kafka.model.ContactMethod.Email
+import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.model.{Public, Schemas, TopicMetadataV2Request}
 import hydra.kafka.util.KafkaClient
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
@@ -43,7 +39,7 @@ class CreateTopicSpec extends WordSpec with Matchers {
       History,
       deprecated = false,
       Public,
-      NonEmptyList.of(Email("test@test.com")),
+      NonEmptyList.of(Email.create("test@test.com").get),
       Instant.now,
       List.empty,
       None
@@ -61,7 +57,7 @@ class CreateTopicSpec extends WordSpec with Matchers {
           schemaRegistry,
           kafka,
           policy,
-          "v2Topic"
+          Subject.createValidated("v2Topic").get
         )
         _ = registerInternalMetadata
           .createTopic(
@@ -116,7 +112,7 @@ class CreateTopicSpec extends WordSpec with Matchers {
         _ <- new CreateTopicProgram[IO](getSchemaRegistry(ref),
                                         kafka,
                                         policy,
-                                        "test")
+                                        Subject.createValidated("test").get)
           .createTopic(
             createTopicMetadataRequest("subject", keySchema, valueSchema),
             TopicDetails(1, 1))
@@ -157,7 +153,7 @@ class CreateTopicSpec extends WordSpec with Matchers {
         _ <- new CreateTopicProgram[IO](getSchemaRegistry(ref),
                                         kafka,
                                         policy,
-                                        "test")
+                                        Subject.createValidated("test").get)
           .createTopic(
             createTopicMetadataRequest("subject", keySchema, valueSchema),
             TopicDetails(1, 1))
@@ -205,7 +201,7 @@ class CreateTopicSpec extends WordSpec with Matchers {
         _ <- new CreateTopicProgram[IO](getSchemaRegistry(ref),
                                         kafka,
                                         policy,
-                                        "test")
+                                        Subject.createValidated("test").get)
           .createTopic(
             createTopicMetadataRequest("subject", keySchema, valueSchema),
             TopicDetails(1, 1))
