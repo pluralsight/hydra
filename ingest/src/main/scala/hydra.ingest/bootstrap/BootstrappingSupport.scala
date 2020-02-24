@@ -16,12 +16,9 @@ import hydra.avro.registry.SchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
 import hydra.common.reflect.{ComponentInstantiator, ReflectionUtils}
-import hydra.core.bootstrap.{
-  CreateTopicProgram,
-  ReflectionsWrapper,
-  ServiceProvider
-}
+import hydra.core.bootstrap.{CreateTopicProgram, ReflectionsWrapper, ServiceProvider}
 import hydra.kafka.endpoints.BootstrapEndpointV2
+import hydra.kafka.programs.CreateTopicProgram
 import io.chrisdavenport.log4cats.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import retry.{RetryPolicies, RetryPolicy}

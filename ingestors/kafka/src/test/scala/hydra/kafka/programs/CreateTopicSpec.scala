@@ -1,4 +1,4 @@
-package hydra.core.bootstrap
+package hydra.kafka.programs
 
 import cats.effect.concurrent.Ref
 import cats.effect.{IO, Sync, Timer}

@@ -31,7 +31,7 @@ object Subject {
     else None
 }
 
-case class TopicMetadataV2Request(
+final case class TopicMetadataV2Request(
     subject: Subject,
     schemas: Schemas,
     streamType: StreamType,
@@ -41,4 +41,17 @@ case class TopicMetadataV2Request(
     createdDate: Instant,
     parentSubjects: List[Subject],
     notes: Option[String]
-)
+) {
+
+  def toKeyAndValue: (TopicMetadataV2Key, TopicMetadataV2Value) = {
+    val key = TopicMetadataV2Key(subject)
+    val value = TopicMetadataV2Value(streamType,
+                                     deprecated,
+                                     dataClassification,
+                                     contact,
+                                     createdDate,
+                                     parentSubjects,
+                                     notes)
+    (key, value)
+  }
+}

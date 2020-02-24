@@ -9,9 +9,9 @@ import cats.data.NonEmptyList
 import cats.effect.{IO, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
-import hydra.core.bootstrap.CreateTopicProgram
 import hydra.core.marshallers.History
 import hydra.kafka.model._
+import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.serializers.TopicMetadataV2Parser
 import io.chrisdavenport.log4cats.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger

@@ -9,8 +9,10 @@ object Dependencies {
   val akkaKryoVersion = "0.5.2"
   val akkaVersion = "2.6.1"
   val avroVersion = "1.9.1"
+  val avro4sVersion = "3.0.8"
   val catsEffectVersion = "2.0.0"
   val catsLoggerVersion = "1.0.1"
+  val catsMtlVersion = "0.7.0"
   val catsRetryVersion = "1.0.0"
   val catsVersion = "2.0.0"
   val cirisVersion = "1.0.3"
@@ -40,9 +42,15 @@ object Dependencies {
 
   object Compile {
 
-    val cats = "org.typelevel" %% "cats-core" % catsVersion
+    val avro4s = "com.sksamuel.avro4s" %% "avro4s-core" % avro4sVersion
 
-    val catsLogger = "io.chrisdavenport" %% "log4cats-slf4j" % catsLoggerVersion
+    val cats = Seq(
+      "com.github.cb372" %% "cats-retry" % catsRetryVersion,
+      "io.chrisdavenport" %% "log4cats-slf4j" % catsLoggerVersion,
+      "org.typelevel" %% "cats-core" % catsVersion,
+      "org.typelevel" %% "cats-effect" % catsEffectVersion,
+      "org.typelevel" %% "cats-mtl-core" % catsMtlVersion
+    )
 
     lazy val catsEffect = Seq(
       "org.typelevel" %% "cats-effect" % catsEffectVersion,
@@ -193,7 +201,7 @@ object Dependencies {
       powerMock ++ akkaTest
 
   val baseDeps: Seq[ModuleID] =
-    akka ++ Seq(scalaz, scalaConfigs, avro, cats) ++ logging ++ joda ++ testDeps
+    akka ++ Seq(scalaz, scalaConfigs, avro) ++ cats ++ logging ++ joda ++ testDeps
 
   val sqlDeps: Seq[ModuleID] =
     logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
@@ -210,8 +218,7 @@ object Dependencies {
       sdNotify,
       postgres,
       h2db,
-      retry,
-      catsLogger
+      retry
     ) ++
     confluent ++ kamon ++ aeron
 
@@ -223,7 +230,8 @@ object Dependencies {
   val kafkaDeps: Seq[ModuleID] = coreDeps ++ Seq(
     akkaKafkaStream,
     jsonLenses,
-    fs2Kafka
+    fs2Kafka,
+    avro4s
   ) ++ kafka ++ akkaHttpHal
 
   val sandboxDeps: Seq[ModuleID] = kafkaDeps ++ sqlDeps ++

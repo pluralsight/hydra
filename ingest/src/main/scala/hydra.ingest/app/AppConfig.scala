@@ -2,7 +2,6 @@ package hydra.ingest.app
 
 import cats.implicits._
 import ciris.{ConfigValue, _}
-import hydra.kafka.config.MetadataSchemaConfig
 import hydra.kafka.model.Subject
 import org.apache.avro.Schema
 

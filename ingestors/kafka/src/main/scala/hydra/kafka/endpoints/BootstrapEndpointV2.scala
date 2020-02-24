@@ -21,9 +21,9 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import cats.effect.IO
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
-import hydra.core.bootstrap.CreateTopicProgram
 import hydra.core.http.CorsSupport
 import hydra.kafka.model.TopicMetadataV2Request
+import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.serializers.TopicMetadataV2Parser
 
 import scala.concurrent.ExecutionContext
