@@ -9,7 +9,7 @@ import org.apache.avro.Schema
 import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy, _}
 
-final class CreateTopicProgram[F[_]: Bracket[*, Throwable]: Sleep: Logger](
+final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     schemaRegistry: SchemaRegistry[F],
     retryPolicy: RetryPolicy[F]
 ) {
