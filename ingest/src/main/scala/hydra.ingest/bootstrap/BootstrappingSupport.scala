@@ -35,11 +35,12 @@ class BootstrapEndpoints(
 ) extends RoutedEndpoints {
 
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
-  private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
 
   private implicit val contextShift: ContextShift[IO] =
     IO.contextShift(ExecutionContext.global)
   private implicit val concurrent: ConcurrentEffect[IO] = IO.ioConcurrentEffect
+
+  private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
 
   private val config = AppConfig.appConfig.load[IO].unsafeRunSync()
 

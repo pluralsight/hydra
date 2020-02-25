@@ -93,7 +93,7 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
            |""".stripMargin
       val jsValue = json.parseJson
       val contactList = ContactFormat.read(jsValue)
-      contactList.head shouldBe Email.create(email)
+      contactList.head shouldBe Email.create(email).get
       contactList should have length 1
     }
 
@@ -244,7 +244,7 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
       assert(
         containsAllOf(
           error,
-          "Field `subject`",
+          //"Field `subject`",
           "Field `schemas`",
           "Field `streamType`",
           "Field `deprecated`",
@@ -253,27 +253,6 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
           "Field `createdDate`",
           "Field `parentSubjects`"
         )
-      )
-    }
-
-    "accumulate errors from improper provided data" in {
-      val (jsonData, subject, _, _, _, email, slack, createdDate, _, _) =
-        createJsValueOfTopicMetadataV2Request(
-          Subject.createValidated("a_valid_subject").get,
-          "NOT a slack channel",
-          "invalid@address",
-          "2020-01-20"
-        )()
-      val error = the[DeserializationException] thrownBy {
-        TopicMetadataV2Format.read(jsonData)
-      }
-      containsAllOf(
-        error,
-        Errors
-          .CreatedDateNotSpecifiedAsISO8601(JsString(createdDate))
-          .errorMessage,
-        Errors.invalidEmailProvided(JsString(email.address.value)),
-        Errors.invalidSlackChannelProvided(JsString(slack.channel.value))
       )
     }
 
