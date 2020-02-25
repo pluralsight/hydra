@@ -16,6 +16,7 @@ import hydra.core.transport.AckStrategy
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.kafka.clients.admin.NewTopic
 import hydra.kafka.producer.KafkaRecord
+import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
 
 import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
@@ -67,6 +68,9 @@ object KafkaClient {
           .map(_.headOption.map(_._2).map { td =>
             Topic(td.name(), td.partitions().size())
           })
+          .recover {
+            case _: UnknownTopicOrPartitionException => None
+          }
       }
 
       override def getTopicNames: F[List[TopicName]] =
