@@ -21,6 +21,9 @@ sealed trait ContactMethod
 
 object ContactMethod {
 
+  def create(s: String): Option[ContactMethod] =
+    Email.create(s).orElse(Slack.create(s))
+
   type EmailRegex =
     MatchesRegex[W.`"""^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+.[A-Za-z]{2,64}$"""`.T]
   private type EmailAddress = String Refined EmailRegex

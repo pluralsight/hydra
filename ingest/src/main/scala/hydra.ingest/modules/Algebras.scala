@@ -1,23 +1,31 @@
 package hydra.ingest.modules
 
-import hydra.avro.registry.SchemaRegistry
-import hydra.ingest.app.AppConfig.SchemaRegistryConfig
-import cats.effect.Sync
+import akka.actor.ActorSelection
+import cats.effect.{Async, Concurrent, ContextShift}
 import cats.implicits._
+import hydra.avro.registry.SchemaRegistry
+import hydra.ingest.app.AppConfig.{CreateTopicConfig, SchemaRegistryConfig}
+import hydra.kafka.util.KafkaClient
 
 final class Algebras[F[_]] private (
-    val schemaRegistry: SchemaRegistry[F]
+    val schemaRegistry: SchemaRegistry[F],
+    val kafkaClient: KafkaClient[F]
 )
 
 object Algebras {
 
-  def make[F[_]: Sync](
-      schemaRegistryConfig: SchemaRegistryConfig
+  def make[F[_]: Async: Concurrent: ContextShift](
+      createTopicConfig: CreateTopicConfig,
+      ingestActorSelection: ActorSelection
   ): F[Algebras[F]] =
     for {
       schemaRegistry <- SchemaRegistry.live[F](
-        schemaRegistryConfig.fullUrl,
-        schemaRegistryConfig.maxCacheSize
+        createTopicConfig.schemaRegistryConfig.fullUrl,
+        createTopicConfig.schemaRegistryConfig.maxCacheSize
       )
-    } yield new Algebras[F](schemaRegistry)
+      kafkaClient <- KafkaClient.live[F](
+        createTopicConfig.bootstrapServers,
+        ingestActorSelection
+      )
+    } yield new Algebras[F](schemaRegistry, kafkaClient)
 }

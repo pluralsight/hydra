@@ -21,6 +21,7 @@ import hydra.ingest.app.AppConfig
 import hydra.kafka.endpoints.BootstrapEndpointV2
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.util.KafkaClient
+import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import retry.{RetryPolicies, RetryPolicy}
@@ -64,6 +65,10 @@ class BootstrapEndpoints(
   private val v2MetadataTopicName =
     config.v2MetadataTopicConfig.topicName
 
+  private val topicDetails =
+    TopicDetails(config.createTopicConfig.defaultNumPartions,
+      config.createTopicConfig.defaultReplicationFactor)
+
   private val bootstrapV2Endpoint = {
     if (isBootstrapV2Enabled) {
       val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
@@ -71,7 +76,9 @@ class BootstrapEndpoints(
         new CreateTopicProgram[IO](schemaRegistry,
                                    kafkaClient,
                                    retryPolicy,
-                                   v2MetadataTopicName)
+                                   v2MetadataTopicName
+        ),
+        topicDetails
       ).route
     } else {
       RouteDirectives.reject

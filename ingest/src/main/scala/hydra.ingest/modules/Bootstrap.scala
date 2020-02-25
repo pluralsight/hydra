@@ -2,21 +2,17 @@ package hydra.ingest.modules
 
 import java.time.Instant
 
+import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.Sync
 import cats.implicits._
 import hydra.core.marshallers.History
 import hydra.ingest.app.AppConfig.V2MetadataTopicConfig
-import hydra.kafka.model.{
-  InternalUseOnly,
-  Schemas,
-  TopicMetadataV2Key,
-  TopicMetadataV2Request,
-  TopicMetadataV2Value
-}
+import hydra.kafka.model._
 import hydra.kafka.programs.CreateTopicProgram
+import hydra.kafka.util.KafkaUtils.TopicDetails
 
-final class Bootstrap[F[_]: Sync] private (
+final class Bootstrap[F[_]: Applicative] private(
     createTopicProgram: CreateTopicProgram[F],
     cfg: V2MetadataTopicConfig
 ) {
@@ -35,15 +31,16 @@ final class Bootstrap[F[_]: Sync] private (
           History,
           false,
           InternalUseOnly,
-          NonEmptyList.of(cfg.emailContact, cfg.slackContact),
+          NonEmptyList.of(cfg.contactMethod),
           Instant.now,
           List.empty,
           Some(
             "This is the topic that Hydra uses to keep track of metadata for topics.")
-        )
+        ),
+        TopicDetails(cfg.numPartitions, cfg.replicationFactor)
       )
     } else {
-      Sync[F].unit
+      Applicative[F].unit
     }
 
 }

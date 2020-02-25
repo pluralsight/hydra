@@ -3,6 +3,7 @@ package hydra.ingest.app
 import akka.actor.ActorSystem
 import cats.effect.{ExitCode, IO, IOApp}
 import cats.implicits._
+import com.typesafe.config.ConfigFactory
 import configs.syntax._
 import hydra.common.logging.LoggingAdapter
 import hydra.ingest.bootstrap.BootstrappingSupport
@@ -43,10 +44,12 @@ object Main extends IOApp with BootstrappingSupport with LoggingAdapter {
   })
 
   private val mainProgram = AppConfig.appConfig.load[IO].flatMap { config =>
+    val ingestActorSelection = system.actorSelection(
+      path = ConfigFactory.load().getString("hydra.kafka-ingestor-path"))
     for {
       algebras <- Algebras
-        .make[IO](config.createTopicConfig.schemaRegistryConfig)
-      programs <- Programs.make[IO](config.createTopicConfig, algebras)
+        .make[IO](config.createTopicConfig, ingestActorSelection)
+      programs <- Programs.make[IO](config, algebras)
       bootstrap <- Bootstrap
         .make[IO](programs.createTopic, config.v2MetadataTopicConfig)
       _ <- bootstrap.bootstrapAll
