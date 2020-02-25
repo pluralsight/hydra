@@ -12,7 +12,7 @@ import hydra.kafka.model._
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.util.KafkaUtils.TopicDetails
 
-final class Bootstrap[F[_]: Applicative] private(
+final class Bootstrap[F[_]: Applicative] private (
     createTopicProgram: CreateTopicProgram[F],
     cfg: V2MetadataTopicConfig
 ) {
@@ -35,7 +35,8 @@ final class Bootstrap[F[_]: Applicative] private(
           Instant.now,
           List.empty,
           Some(
-            "This is the topic that Hydra uses to keep track of metadata for topics.")
+            "This is the topic that Hydra uses to keep track of metadata for topics."
+          )
         ),
         TopicDetails(cfg.numPartitions, cfg.replicationFactor)
       )

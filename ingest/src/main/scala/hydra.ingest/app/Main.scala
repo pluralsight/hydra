@@ -45,7 +45,8 @@ object Main extends IOApp with BootstrappingSupport with LoggingAdapter {
 
   private val mainProgram = AppConfig.appConfig.load[IO].flatMap { config =>
     val ingestActorSelection = system.actorSelection(
-      path = ConfigFactory.load().getString("hydra.kafka-ingestor-path"))
+      path = ConfigFactory.load().getString("hydra.kafka-ingestor-path")
+    )
     for {
       algebras <- Algebras
         .make[IO](config.createTopicConfig, ingestActorSelection)

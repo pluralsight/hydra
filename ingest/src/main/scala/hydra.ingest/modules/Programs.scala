@@ -9,8 +9,8 @@ import retry.RetryPolicies._
 import retry.RetryPolicy
 
 final class Programs[F[_]: Logger: Sync: Timer] private (
-                                                          cfg: AppConfig,
-                                                          algebras: Algebras[F]
+    cfg: AppConfig,
+    algebras: Algebras[F]
 ) {
 
   val retryPolicy: RetryPolicy[F] =

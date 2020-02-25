@@ -39,11 +39,14 @@ final class BootstrapEndpointV2Spec
   ): BootstrapEndpointV2 = {
     val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
     new BootstrapEndpointV2(
-      new CreateTopicProgram[IO](s,
-                                 k,
-                                 retryPolicy,
-                                 Subject.createValidated("test").get),
-      TopicDetails(1, 1))
+      new CreateTopicProgram[IO](
+        s,
+        k,
+        retryPolicy,
+        Subject.createValidated("test").get
+      ),
+      TopicDetails(1, 1)
+    )
   }
 
   private val testCreateTopicProgram: IO[BootstrapEndpointV2] =

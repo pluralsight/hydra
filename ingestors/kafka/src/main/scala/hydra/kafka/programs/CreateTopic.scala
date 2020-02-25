@@ -58,7 +58,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
           case (ExitCase.Error(_), Some(newVersion)) =>
             schemaRegistry.deleteSchemaOfVersion(suffixedSubject, newVersion)
           case _ => Bracket[F, Throwable].unit
-      })
+        }
+      )
       .map(_ => ())
   }
 
@@ -100,12 +101,12 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
         createTopicRequest.subject,
         createTopicRequest.schemas.key,
         createTopicRequest.schemas.value
-      ).use(
-        _ =>
-          kafkaClient.createTopic(
-            createTopicRequest.subject.value,
-            topicDetails
-          ) *> publishMetadata(createTopicRequest))
+      ).use(_ =>
+        kafkaClient.createTopic(
+          createTopicRequest.subject.value,
+          topicDetails
+        ) *> publishMetadata(createTopicRequest)
+      )
     } yield ()
   }
 }

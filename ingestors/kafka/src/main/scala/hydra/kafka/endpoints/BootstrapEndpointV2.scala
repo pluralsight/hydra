@@ -30,8 +30,10 @@ import hydra.kafka.util.KafkaUtils.TopicDetails
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
-final class BootstrapEndpointV2(createTopicProgram: CreateTopicProgram[IO],
-                                defaultTopicDetails: TopicDetails)(
+final class BootstrapEndpointV2(
+    createTopicProgram: CreateTopicProgram[IO],
+    defaultTopicDetails: TopicDetails
+)(
     implicit val system: ActorSystem,
     implicit val e: ExecutionContext
 ) extends CorsSupport {

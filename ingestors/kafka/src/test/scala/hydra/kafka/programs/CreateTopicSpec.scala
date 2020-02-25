@@ -32,7 +32,8 @@ class CreateTopicSpec extends WordSpec with Matchers {
   private def createTopicMetadataRequest(
       subject: String,
       keySchema: Schema,
-      valueSchema: Schema): TopicMetadataV2Request =
+      valueSchema: Schema
+  ): TopicMetadataV2Request =
     TopicMetadataV2Request(
       Subject.createValidated(subject).get,
       Schemas(keySchema, valueSchema),
@@ -62,7 +63,8 @@ class CreateTopicSpec extends WordSpec with Matchers {
         _ = registerInternalMetadata
           .createTopic(
             createTopicMetadataRequest("subject", keySchema, valueSchema),
-            TopicDetails(1, 1))
+            TopicDetails(1, 1)
+          )
           .unsafeRunSync()
         containsSingleKeyAndValue <- schemaRegistry.getAllSubjects.map(
           _.length == 2
@@ -109,13 +111,15 @@ class CreateTopicSpec extends WordSpec with Matchers {
         kafka <- KafkaClient.test[IO]
         ref <- Ref[IO]
           .of(TestState(deleteSchemaWasCalled = false, 0))
-        _ <- new CreateTopicProgram[IO](getSchemaRegistry(ref),
-                                        kafka,
-                                        policy,
-                                        Subject.createValidated("test").get)
-          .createTopic(
+        _ <- new CreateTopicProgram[IO](
+          getSchemaRegistry(ref),
+          kafka,
+          policy,
+          Subject.createValidated("test").get
+        ).createTopic(
             createTopicMetadataRequest("subject", keySchema, valueSchema),
-            TopicDetails(1, 1))
+            TopicDetails(1, 1)
+          )
           .attempt
         result <- ref.get
       } yield assert(result.deleteSchemaWasCalled)).unsafeRunSync()
@@ -150,13 +154,15 @@ class CreateTopicSpec extends WordSpec with Matchers {
       (for {
         kafka <- KafkaClient.test[IO]
         ref <- Ref[IO].of(0)
-        _ <- new CreateTopicProgram[IO](getSchemaRegistry(ref),
-                                        kafka,
-                                        policy,
-                                        Subject.createValidated("test").get)
-          .createTopic(
+        _ <- new CreateTopicProgram[IO](
+          getSchemaRegistry(ref),
+          kafka,
+          policy,
+          Subject.createValidated("test").get
+        ).createTopic(
             createTopicMetadataRequest("subject", keySchema, valueSchema),
-            TopicDetails(1, 1))
+            TopicDetails(1, 1)
+          )
           .attempt
         result <- ref.get
       } yield result shouldBe numberRetries + 1).unsafeRunSync()
@@ -198,13 +204,15 @@ class CreateTopicSpec extends WordSpec with Matchers {
         kafka <- KafkaClient.test[IO]
         ref <- Ref[IO]
           .of(TestState(schemaRegistryState))
-        _ <- new CreateTopicProgram[IO](getSchemaRegistry(ref),
-                                        kafka,
-                                        policy,
-                                        Subject.createValidated("test").get)
-          .createTopic(
+        _ <- new CreateTopicProgram[IO](
+          getSchemaRegistry(ref),
+          kafka,
+          policy,
+          Subject.createValidated("test").get
+        ).createTopic(
             createTopicMetadataRequest("subject", keySchema, valueSchema),
-            TopicDetails(1, 1))
+            TopicDetails(1, 1)
+          )
           .attempt
         result <- ref.get
       } yield result.schemas shouldBe schemaRegistryState).unsafeRunSync()

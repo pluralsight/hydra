@@ -25,7 +25,9 @@ object ContactMethod {
     Email.create(s).orElse(Slack.create(s))
 
   type EmailRegex =
-    MatchesRegex[W.`"""^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}$"""`.T]
+    MatchesRegex[
+      W.`"""^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}$"""`.T
+    ]
   private type EmailAddress = String Refined EmailRegex
 
   final case class Email(address: EmailAddress) extends ContactMethod
@@ -37,6 +39,7 @@ object ContactMethod {
   }
 
   type SlackRegex = MatchesRegex[W.`"""^[#][^\\sA-Z]{1,79}$"""`.T]
+
   private type SlackChannel =
     String Refined SlackRegex
 

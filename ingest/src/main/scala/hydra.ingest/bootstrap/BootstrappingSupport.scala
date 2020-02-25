@@ -55,7 +55,8 @@ class BootstrapEndpoints(
 
   private val ingestorSelection =
     system.actorSelection(
-      path = ConfigFactory.load().getString("hydra.kafka-ingestor-path"))
+      path = ConfigFactory.load().getString("hydra.kafka-ingestor-path")
+    )
 
   private val kafkaClient =
     KafkaClient.live[IO](bootstrapServers, ingestorSelection).unsafeRunSync()
@@ -67,17 +68,20 @@ class BootstrapEndpoints(
     config.v2MetadataTopicConfig.topicName
 
   private val topicDetails =
-    TopicDetails(config.createTopicConfig.defaultNumPartions,
-      config.createTopicConfig.defaultReplicationFactor)
+    TopicDetails(
+      config.createTopicConfig.defaultNumPartions,
+      config.createTopicConfig.defaultReplicationFactor
+    )
 
   private val bootstrapV2Endpoint = {
     if (isBootstrapV2Enabled) {
       val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
       new BootstrapEndpointV2(
-        new CreateTopicProgram[IO](schemaRegistry,
-                                   kafkaClient,
-                                   retryPolicy,
-                                   v2MetadataTopicName
+        new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafkaClient,
+          retryPolicy,
+          v2MetadataTopicName
         ),
         topicDetails
       ).route
