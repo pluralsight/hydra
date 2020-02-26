@@ -58,8 +58,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
           case (ExitCase.Error(_), Some(newVersion)) =>
             schemaRegistry.deleteSchemaOfVersion(suffixedSubject, newVersion)
           case _ => Bracket[F, Throwable].unit
-        }
-      )
+      })
       .map(_ => ())
   }
 
@@ -74,6 +73,16 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       isKey = false
     )
   }
+
+  private def createTopicResource(
+      subject: Subject,
+      topicDetails: TopicDetails): Resource[F, Unit] =
+    Resource.makeCase(kafkaClient.createTopic(subject.value, topicDetails))(
+      (_, exitCase) =>
+        exitCase match {
+          case ExitCase.Error(_) => kafkaClient.deleteTopic(subject.value)
+          case _                 => Bracket[F, Throwable].unit
+      })
 
   private def publishMetadata(
       createTopicRequest: TopicMetadataV2Request
@@ -96,17 +105,14 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       createTopicRequest: TopicMetadataV2Request,
       topicDetails: TopicDetails
   ): F[Unit] = {
-    for {
+    (for {
       _ <- registerSchemas(
         createTopicRequest.subject,
         createTopicRequest.schemas.key,
         createTopicRequest.schemas.value
-      ).use(_ =>
-        kafkaClient.createTopic(
-          createTopicRequest.subject.value,
-          topicDetails
-        ) *> publishMetadata(createTopicRequest)
       )
-    } yield ()
+      _ <- createTopicResource(createTopicRequest.subject, topicDetails)
+      _ <- Resource.liftF(publishMetadata(createTopicRequest))
+    } yield ()).use(_ => Bracket[F, Throwable].unit)
   }
 }

@@ -12,22 +12,13 @@ import hydra.core.marshallers.History
 import hydra.core.transport.AckStrategy
 import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{
-  InternalUseOnly,
-  Public,
-  Schemas,
-  TopicMetadataV2Key,
-  TopicMetadataV2Request,
-  TopicMetadataV2Value
-}
+import hydra.kafka.model._
 import hydra.kafka.producer.{AvroKeyRecord, KafkaRecord}
 import hydra.kafka.util.KafkaClient
 import hydra.kafka.util.KafkaClient.{PublishError, Topic, TopicName}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
-import kafka.admin.TopicCommand.TopicDescription
-import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.{Matchers, WordSpec}
 import retry.{RetryPolicies, RetryPolicy}
@@ -233,7 +224,7 @@ class CreateTopicSpec extends WordSpec with Matchers {
     "create the topic in Kafka" in {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
       val subject = "subject"
-      for {
+      (for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafkaClient <- KafkaClient.test[IO]
         _ <- new CreateTopicProgram[IO](
@@ -244,7 +235,7 @@ class CreateTopicSpec extends WordSpec with Matchers {
           createTopicMetadataRequest(subject, keySchema, valueSchema),
           TopicDetails(1, 1))
         topic <- kafkaClient.describeTopic(subject)
-      } yield topic.get shouldBe Topic(subject, 1)
+      } yield topic.get shouldBe Topic(subject, 1)).unsafeRunSync()
     }
 
     "ingest metadata into the metadata topic" in {
@@ -255,7 +246,7 @@ class CreateTopicSpec extends WordSpec with Matchers {
       val (key, value) = request.toKeyAndValue
       val expectedKeyRecord = TopicMetadataV2Key.recordFormat.to(key)
       val expectedValueRecord = TopicMetadataV2Value.recordFormat.to(value)
-      for {
+      (for {
         schemaRegistry <- SchemaRegistry.test[IO]
         underlyingKafkaClient <- KafkaClient.test[IO]
         publishTo <- Ref[IO].of(List.empty[KafkaRecord[_, _]])
@@ -269,19 +260,46 @@ class CreateTopicSpec extends WordSpec with Matchers {
           .createTopic(request, TopicDetails(1, 1))
         published <- publishTo.get
       } yield
-        published shouldBe AvroKeyRecord(metadataTopic,
-                                         TopicMetadataV2Key.schema,
-                                         TopicMetadataV2Value.schema,
-                                         expectedKeyRecord,
-                                         expectedValueRecord,
-                                         AckStrategy.Replicated)
+        published shouldBe List(
+          AvroKeyRecord(metadataTopic,
+                        TopicMetadataV2Key.schema,
+                        TopicMetadataV2Value.schema,
+                        expectedKeyRecord,
+                        expectedValueRecord,
+                        AckStrategy.Replicated)))
+        .unsafeRunSync()
+    }
+
+    "rollback kafka topic creation when error encountered in publishing metadata" in {
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      val subject = "subject"
+      val metadataTopic = "test-metadata-topic"
+      val request = createTopicMetadataRequest(subject, keySchema, valueSchema)
+      (for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        underlyingKafkaClient <- KafkaClient.test[IO]
+        publishTo <- Ref[IO].of(List.empty[KafkaRecord[_, _]])
+        kafkaClient <- IO(
+          new TestKafkaClientWithPublishTo(underlyingKafkaClient,
+                                           publishTo,
+                                           failOnPublish = true))
+        _ <- new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafkaClient,
+          policy,
+          Subject.createValidated(metadataTopic).get)
+          .createTopic(request, TopicDetails(1, 1))
+          .attempt
+        topic <- kafkaClient.describeTopic(subject)
+      } yield topic should not be defined).unsafeRunSync()
     }
 
   }
 
   private final class TestKafkaClientWithPublishTo(
       underlying: KafkaClient[IO],
-      publishTo: Ref[IO, List[KafkaRecord[_, _]]])
+      publishTo: Ref[IO, List[KafkaRecord[_, _]]],
+      failOnPublish: Boolean = false)
       extends KafkaClient[IO] {
     override def describeTopic(name: TopicName): IO[Option[Topic]] =
       underlying.describeTopic(name)
@@ -292,7 +310,11 @@ class CreateTopicSpec extends WordSpec with Matchers {
       underlying.deleteTopic(name)
     override def publishMessage[K, V](
         record: KafkaRecord[K, V]): IO[Either[KafkaClient.PublishError, Unit]] =
-      publishTo.update(_ :+ record).attemptNarrow[PublishError]
+      if (failOnPublish) {
+        IO.pure(Left(PublishError.Timeout))
+      } else {
+        publishTo.update(_ :+ record).attemptNarrow[PublishError]
+      }
   }
 
   private def getSchema(name: String): Schema =
