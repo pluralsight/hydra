@@ -9,15 +9,25 @@ import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.core.marshallers.History
+import hydra.core.transport.AckStrategy
 import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{Public, Schemas, TopicMetadataV2Request}
+import hydra.kafka.model.{
+  InternalUseOnly,
+  Public,
+  Schemas,
+  TopicMetadataV2Key,
+  TopicMetadataV2Request,
+  TopicMetadataV2Value
+}
+import hydra.kafka.producer.{AvroKeyRecord, KafkaRecord}
 import hydra.kafka.util.KafkaClient
-import hydra.kafka.util.KafkaClient.Topic
+import hydra.kafka.util.KafkaClient.{PublishError, Topic, TopicName}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import kafka.admin.TopicCommand.TopicDescription
+import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.{Matchers, WordSpec}
 import retry.{RetryPolicies, RetryPolicy}
@@ -237,8 +247,52 @@ class CreateTopicSpec extends WordSpec with Matchers {
       } yield topic.get shouldBe Topic(subject, 1)
     }
 
-    "ingest metadata into the metadata topic" in {}
+    "ingest metadata into the metadata topic" in {
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      val subject = "subject"
+      val metadataTopic = "test-metadata-topic"
+      val request = createTopicMetadataRequest(subject, keySchema, valueSchema)
+      val (key, value) = request.toKeyAndValue
+      val expectedKeyRecord = TopicMetadataV2Key.recordFormat.to(key)
+      val expectedValueRecord = TopicMetadataV2Value.recordFormat.to(value)
+      for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        underlyingKafkaClient <- KafkaClient.test[IO]
+        publishTo <- Ref[IO].of(List.empty[KafkaRecord[_, _]])
+        kafkaClient <- IO(
+          new TestKafkaClientWithPublishTo(underlyingKafkaClient, publishTo))
+        _ <- new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafkaClient,
+          policy,
+          Subject.createValidated(metadataTopic).get)
+          .createTopic(request, TopicDetails(1, 1))
+        published <- publishTo.get
+      } yield
+        published shouldBe AvroKeyRecord(metadataTopic,
+                                         TopicMetadataV2Key.schema,
+                                         TopicMetadataV2Value.schema,
+                                         expectedKeyRecord,
+                                         expectedValueRecord,
+                                         AckStrategy.Replicated)
+    }
 
+  }
+
+  private final class TestKafkaClientWithPublishTo(
+      underlying: KafkaClient[IO],
+      publishTo: Ref[IO, List[KafkaRecord[_, _]]])
+      extends KafkaClient[IO] {
+    override def describeTopic(name: TopicName): IO[Option[Topic]] =
+      underlying.describeTopic(name)
+    override def getTopicNames: IO[List[TopicName]] = underlying.getTopicNames
+    override def createTopic(name: TopicName, details: TopicDetails): IO[Unit] =
+      underlying.createTopic(name, details)
+    override def deleteTopic(name: String): IO[Unit] =
+      underlying.deleteTopic(name)
+    override def publishMessage[K, V](
+        record: KafkaRecord[K, V]): IO[Either[KafkaClient.PublishError, Unit]] =
+      publishTo.update(_ :+ record).attemptNarrow[PublishError]
   }
 
   private def getSchema(name: String): Schema =
