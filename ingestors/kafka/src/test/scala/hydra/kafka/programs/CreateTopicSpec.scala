@@ -13,9 +13,11 @@ import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{Public, Schemas, TopicMetadataV2Request}
 import hydra.kafka.util.KafkaClient
+import hydra.kafka.util.KafkaClient.Topic
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import kafka.admin.TopicCommand.TopicDescription
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.{Matchers, WordSpec}
 import retry.{RetryPolicies, RetryPolicy}
@@ -72,7 +74,7 @@ class CreateTopicSpec extends WordSpec with Matchers {
       } yield assert(containsSingleKeyAndValue)).unsafeRunSync()
     }
 
-    "retry on Error" in {
+    "rollback schema creation on error" in {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
 
       case class TestState(
@@ -217,6 +219,25 @@ class CreateTopicSpec extends WordSpec with Matchers {
         result <- ref.get
       } yield result.schemas shouldBe schemaRegistryState).unsafeRunSync()
     }
+
+    "create the topic in Kafka" in {
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      val subject = "subject"
+      for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        kafkaClient <- KafkaClient.test[IO]
+        _ <- new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafkaClient,
+          policy,
+          Subject.createValidated("test-metadata-topic").get).createTopic(
+          createTopicMetadataRequest(subject, keySchema, valueSchema),
+          TopicDetails(1, 1))
+        topic <- kafkaClient.describeTopic(subject)
+      } yield topic.get shouldBe Topic(subject, 1)
+    }
+
+    "ingest metadata into the metadata topic" in {}
 
   }
 
