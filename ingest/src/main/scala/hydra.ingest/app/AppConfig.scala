@@ -56,7 +56,7 @@ object AppConfig {
   )
 
   private implicit def contactMethodDecoder
-      : ConfigDecoder[String, ContactMethod] =
+    : ConfigDecoder[String, ContactMethod] =
     ConfigDecoder
       .identity[String]
       .mapOption("ContactMethod")(ContactMethod.create)
@@ -70,8 +70,7 @@ object AppConfig {
       env("HYDRA_V2_CREATE_TOPICS_ENABLED").as[Boolean].default(false),
       env(
         "HYDRA_V2_METADATA_CONTACT"
-      ) // TODO this will be a required config - alternative?
-        .as[ContactMethod],
+      ).as[ContactMethod],
       env("HYDRA_DEFAULT_PARTIONS").as[Int].default(10),
       env("HYDRA_REPLICATION_FACTOR").as[Short].default(3)
     ).parMapN(V2MetadataTopicConfig)
