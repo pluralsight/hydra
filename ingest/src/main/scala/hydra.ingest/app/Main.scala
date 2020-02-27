@@ -48,13 +48,13 @@ object Main extends IOApp with BootstrappingSupport with LoggingAdapter {
       path = ConfigFactory.load().getString("hydra.kafka-ingestor-path")
     )
     for {
+      _ <- oldBoostrap
       algebras <- Algebras
         .make[IO](config.createTopicConfig, ingestActorSelection)
       programs <- Programs.make[IO](config, algebras)
       bootstrap <- Bootstrap
         .make[IO](programs.createTopic, config.v2MetadataTopicConfig)
       _ <- bootstrap.bootstrapAll
-      _ <- oldBoostrap
     } yield ()
   }
 
