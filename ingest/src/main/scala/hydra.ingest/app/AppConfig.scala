@@ -56,7 +56,7 @@ object AppConfig {
   )
 
   private implicit def contactMethodDecoder
-    : ConfigDecoder[String, ContactMethod] =
+      : ConfigDecoder[String, ContactMethod] =
     ConfigDecoder
       .identity[String]
       .mapOption("ContactMethod")(ContactMethod.create)
