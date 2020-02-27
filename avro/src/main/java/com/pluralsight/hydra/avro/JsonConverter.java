@@ -218,7 +218,7 @@ public class JsonConverter<T extends GenericRecord> {
 
         if (usedFields.size() < raw.size()) {
             Set unknownFields = Sets.difference(raw.keySet(), usedFields);
-            LOG.warn("There are unused JSON fields: " + Sets.difference(raw.keySet(), usedFields));
+            LOG.debug("There are unused JSON fields: " + Sets.difference(raw.keySet(), usedFields));
             conversionStats.reportUnknownFields(unknownFields);
         }
 
