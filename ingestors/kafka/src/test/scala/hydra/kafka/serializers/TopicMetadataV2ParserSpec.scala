@@ -244,7 +244,6 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
       assert(
         containsAllOf(
           error,
-          //"Field `subject`",
           "Field `schemas`",
           "Field `streamType`",
           "Field `deprecated`",
