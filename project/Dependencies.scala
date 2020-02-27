@@ -48,7 +48,7 @@ object Dependencies {
       Seq(
         "com.sksamuel.avro4s" %% "avro4s-core",
         "com.sksamuel.avro4s" %% "avro4s-refined"
-      ).map(_ % avro4sVersion)
+      ).map(_ % avro4sVersion).map(_.excludeAll(ExclusionRule("org.json4s")))
 
     val cats = Seq(
       "com.github.cb372" %% "cats-retry" % catsRetryVersion,
