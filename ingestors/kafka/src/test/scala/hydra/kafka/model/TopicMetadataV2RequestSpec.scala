@@ -3,7 +3,7 @@ package hydra.kafka.model
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.scalatest.{Matchers, WordSpec}
 
-class TopicMetadataV2RequestSpec extends WordSpec with Matchers{
+class TopicMetadataV2RequestSpec extends WordSpec with Matchers {
 
   "TopicMetadataV2Request" must {
 
@@ -11,7 +11,7 @@ class TopicMetadataV2RequestSpec extends WordSpec with Matchers{
       val correctEmailAddress = "data-platform-team@pluralsight.com"
       val correctEmail = ContactMethod.Email.create(correctEmailAddress)
       correctEmail.get shouldBe a[ContactMethod.Email]
-      correctEmail.get.address.value shouldEqual(correctEmailAddress)
+      correctEmail.get.address.value shouldEqual (correctEmailAddress)
     }
 
     "Return None for incorrect emails" in {
@@ -22,7 +22,7 @@ class TopicMetadataV2RequestSpec extends WordSpec with Matchers{
       val correctSlackChannel = "#dev-data-platform"
       val correctSlack = ContactMethod.Slack.create(correctSlackChannel)
       correctSlack.get shouldBe a[ContactMethod.Slack]
-      correctSlack.get.channel.value shouldEqual(correctSlackChannel)
+      correctSlack.get.channel.value shouldEqual (correctSlackChannel)
     }
 
     "Return None for incorrect slacks" in {
@@ -33,7 +33,7 @@ class TopicMetadataV2RequestSpec extends WordSpec with Matchers{
       val correctSubjectString = "Foo"
       val correctSubject = Subject.createValidated(correctSubjectString)
       correctSubject.get shouldBe a[Subject]
-      correctSubject.get.value shouldEqual(correctSubjectString)
+      correctSubject.get.value shouldEqual (correctSubjectString)
     }
 
     "Return None for incorrect Subjects" in {

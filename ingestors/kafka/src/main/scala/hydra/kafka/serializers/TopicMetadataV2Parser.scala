@@ -40,7 +40,13 @@ sealed trait TopicMetadataV2Parser
 
     override def read(json: JsValue): Subject = json match {
       case JsString(value) =>
-        Subject.createValidated(value).getOrElse(throw DeserializationException(InvalidSubject(JsString(value)).errorMessage))
+        Subject
+          .createValidated(value)
+          .getOrElse(
+            throw DeserializationException(
+              InvalidSubject(JsString(value)).errorMessage
+            )
+          )
       case j => throw DeserializationException(InvalidSubject(j).errorMessage)
     }
   }

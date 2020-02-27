@@ -231,9 +231,11 @@ class CreateTopicSpec extends WordSpec with Matchers {
           schemaRegistry,
           kafkaClient,
           policy,
-          Subject.createValidated("test-metadata-topic").get).createTopic(
+          Subject.createValidated("test-metadata-topic").get
+        ).createTopic(
           createTopicMetadataRequest(subject, keySchema, valueSchema),
-          TopicDetails(1, 1))
+          TopicDetails(1, 1)
+        )
         topic <- kafkaClient.describeTopic(subject)
       } yield topic.get shouldBe Topic(subject, 1)).unsafeRunSync()
     }
@@ -251,23 +253,25 @@ class CreateTopicSpec extends WordSpec with Matchers {
         underlyingKafkaClient <- KafkaClient.test[IO]
         publishTo <- Ref[IO].of(List.empty[KafkaRecord[_, _]])
         kafkaClient <- IO(
-          new TestKafkaClientWithPublishTo(underlyingKafkaClient, publishTo))
+          new TestKafkaClientWithPublishTo(underlyingKafkaClient, publishTo)
+        )
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
           kafkaClient,
           policy,
-          Subject.createValidated(metadataTopic).get)
-          .createTopic(request, TopicDetails(1, 1))
+          Subject.createValidated(metadataTopic).get
+        ).createTopic(request, TopicDetails(1, 1))
         published <- publishTo.get
-      } yield
-        published shouldBe List(
-          AvroKeyRecord(metadataTopic,
-                        TopicMetadataV2Key.schema,
-                        TopicMetadataV2Value.schema,
-                        expectedKeyRecord,
-                        expectedValueRecord,
-                        AckStrategy.Replicated)))
-        .unsafeRunSync()
+      } yield published shouldBe List(
+        AvroKeyRecord(
+          metadataTopic,
+          TopicMetadataV2Key.schema,
+          TopicMetadataV2Value.schema,
+          expectedKeyRecord,
+          expectedValueRecord,
+          AckStrategy.Replicated
+        )
+      )).unsafeRunSync()
     }
 
     "rollback kafka topic creation when error encountered in publishing metadata" in {
@@ -280,15 +284,18 @@ class CreateTopicSpec extends WordSpec with Matchers {
         underlyingKafkaClient <- KafkaClient.test[IO]
         publishTo <- Ref[IO].of(List.empty[KafkaRecord[_, _]])
         kafkaClient <- IO(
-          new TestKafkaClientWithPublishTo(underlyingKafkaClient,
-                                           publishTo,
-                                           failOnPublish = true))
+          new TestKafkaClientWithPublishTo(
+            underlyingKafkaClient,
+            publishTo,
+            failOnPublish = true
+          )
+        )
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
           kafkaClient,
           policy,
-          Subject.createValidated(metadataTopic).get)
-          .createTopic(request, TopicDetails(1, 1))
+          Subject.createValidated(metadataTopic).get
+        ).createTopic(request, TopicDetails(1, 1))
           .attempt
         topic <- kafkaClient.describeTopic(subject)
       } yield topic should not be defined).unsafeRunSync()
@@ -299,17 +306,22 @@ class CreateTopicSpec extends WordSpec with Matchers {
   private final class TestKafkaClientWithPublishTo(
       underlying: KafkaClient[IO],
       publishTo: Ref[IO, List[KafkaRecord[_, _]]],
-      failOnPublish: Boolean = false)
-      extends KafkaClient[IO] {
+      failOnPublish: Boolean = false
+  ) extends KafkaClient[IO] {
+
     override def describeTopic(name: TopicName): IO[Option[Topic]] =
       underlying.describeTopic(name)
     override def getTopicNames: IO[List[TopicName]] = underlying.getTopicNames
+
     override def createTopic(name: TopicName, details: TopicDetails): IO[Unit] =
       underlying.createTopic(name, details)
+
     override def deleteTopic(name: String): IO[Unit] =
       underlying.deleteTopic(name)
+
     override def publishMessage[K, V](
-        record: KafkaRecord[K, V]): IO[Either[KafkaClient.PublishError, Unit]] =
+        record: KafkaRecord[K, V]
+    ): IO[Either[KafkaClient.PublishError, Unit]] =
       if (failOnPublish) {
         IO.pure(Left(PublishError.Timeout))
       } else {
