@@ -295,8 +295,7 @@ class CreateTopicSpec extends WordSpec with Matchers {
           kafkaClient,
           policy,
           Subject.createValidated(metadataTopic).get
-        ).createTopic(request, TopicDetails(1, 1))
-          .attempt
+        ).createTopic(request, TopicDetails(1, 1)).attempt
         topic <- kafkaClient.describeTopic(subject)
       } yield topic should not be defined).unsafeRunSync()
     }
