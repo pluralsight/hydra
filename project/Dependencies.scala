@@ -9,7 +9,6 @@ object Dependencies {
   val akkaKryoVersion = "0.5.2"
   val akkaVersion = "2.6.1"
   val avroVersion = "1.9.1"
-  val avro4sVersion = "3.0.8"
   val catsEffectVersion = "2.0.0"
   val catsLoggerVersion = "1.0.1"
   val catsRetryVersion = "1.0.0"
@@ -36,19 +35,20 @@ object Dependencies {
   val scalaMockVersion = "4.1.0"
   val scalaTestVersion = "3.0.5"
   val scalazVersion = "7.2.9"
-  val serviceContainerVersion = "2.0.7"
+  val serviceContainerVersion = "2.1.0"
   val sprayJsonVersion = "1.3.5"
   val typesafeConfigVersion = "1.3.2"
+  val vulcanVersion = "1.0.1"
 
   object Compile {
 
     val refined = "eu.timepit" %% "refined" % refinedVersion
 
-    val avro4s =
-      Seq(
-        "com.sksamuel.avro4s" %% "avro4s-core",
-        "com.sksamuel.avro4s" %% "avro4s-refined"
-      ).map(_ % avro4sVersion).map(_.excludeAll(ExclusionRule("org.json4s")))
+    val vulcan = Seq(
+      "com.github.fd4s" %% "vulcan",
+      "com.github.fd4s" %% "vulcan-generic",
+      "com.github.fd4s" %% "vulcan-refined"
+    ).map(_ % vulcanVersion)
 
     val cats = Seq(
       "com.github.cb372" %% "cats-retry" % catsRetryVersion,
@@ -237,7 +237,7 @@ object Dependencies {
     jsonLenses,
     fs2Kafka,
     refined
-  ) ++ avro4s ++ kafka ++ akkaHttpHal
+  ) ++ kafka ++ akkaHttpHal ++ vulcan
 
   val sandboxDeps: Seq[ModuleID] = kafkaDeps ++ sqlDeps ++
     Seq("com.h2database" % "h2" % "1.4.196") ++ Seq(embeddedKafka)

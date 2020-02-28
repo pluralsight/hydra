@@ -43,17 +43,21 @@ object KafkaClient {
   type TopicName = String
   final case class Topic(name: TopicName, numberPartitions: Int)
 
-  sealed abstract class PublishError
-      extends Exception
+  sealed abstract class PublishError(message: String)
+      extends Exception(message)
       with Product
       with Serializable
 
   object PublishError {
-    final case object Timeout extends PublishError with NoStackTrace
+    final case object Timeout
+        extends PublishError("Timeout while ingesting message.")
+        with NoStackTrace
 
     final case class UnexpectedResponse(ingestorResponse: IngestorStatus)
-        extends PublishError
-    final case class Failed(cause: Throwable) extends PublishError
+        extends PublishError(
+          s"Unexpected response from ingestor: $ingestorResponse")
+    final case class Failed(cause: Throwable)
+        extends PublishError(cause.getMessage)
   }
 
   def live[F[_]: Async: Concurrent: ContextShift](

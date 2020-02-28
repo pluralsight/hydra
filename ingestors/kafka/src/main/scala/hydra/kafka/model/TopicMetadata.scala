@@ -3,12 +3,18 @@ package hydra.kafka.model
 import java.time.Instant
 import java.util.UUID
 
-import cats.data.NonEmptyList
-import com.sksamuel.avro4s.{AvroName, AvroNamespace, AvroSchema, RecordFormat}
+import cats.{Applicative, ApplicativeError, Monad, MonadError}
+import cats.data.Validated.{Invalid, Valid}
+import cats.data.{NonEmptyList, Validated}
 import hydra.core.marshallers.StreamType
-import org.apache.avro.Schema
-import com.sksamuel.avro4s.refined._
 import hydra.kafka.model.TopicMetadataV2Request.Subject
+import vulcan.{AvroError, AvroNamespace, Codec}
+import vulcan.generic._
+import vulcan.refined._
+import cats.implicits._
+import org.apache.avro.generic.GenericRecord
+
+import scala.util.control.NoStackTrace
 
 /**
   * Created by alexsilva on 3/30/17.
@@ -27,21 +33,59 @@ case class TopicMetadata(
     createdDate: org.joda.time.DateTime
 )
 
+object TopicMetadataV2 {
+
+  def getSchemas[F[_]: ApplicativeError[*[_], Throwable]]: F[Schemas] = {
+    (Validated.fromEither(TopicMetadataV2Key.codec.schema).toValidatedNel,
+     Validated.fromEither(TopicMetadataV2Value.codec.schema).toValidatedNel)
+      .mapN(Schemas) match {
+      case Valid(s) => Applicative[F].pure(s)
+      case Invalid(e) =>
+        ApplicativeError[F, Throwable].raiseError(MetadataAvroSchemaFailure(e))
+    }
+  }
+
+  def encode[F[_]: MonadError[*[_], Throwable]](
+      key: TopicMetadataV2Key,
+      value: TopicMetadataV2Value): F[(GenericRecord, GenericRecord)] = {
+    Monad[F]
+      .pure(
+        (Validated
+           .fromEither(TopicMetadataV2Key.codec.encode(key))
+           .toValidatedNel,
+         Validated
+           .fromEither(TopicMetadataV2Value.codec.encode(value))
+           .toValidatedNel).tupled.toEither.leftMap(MetadataAvroSchemaFailure))
+      .rethrow
+      .flatMap {
+        case (k: GenericRecord, v: GenericRecord) => Monad[F].pure((k, v))
+        case (k, v) =>
+          MonadError[F, Throwable].raiseError(
+            AvroEncodingFailure(
+              NonEmptyList.of(k, v).map(_.getClass.getSimpleName)))
+      }
+  }
+
+  final case class MetadataAvroSchemaFailure(errors: NonEmptyList[AvroError])
+      extends NoStackTrace
+
+  final case class AvroEncodingFailure(unexpectedTypes: NonEmptyList[String])
+      extends NoStackTrace
+
+}
+
 @AvroNamespace("_hydra.v2")
-@AvroName("metadata")
 final case class TopicMetadataV2Key(
     subject: Subject
 )
 
 object TopicMetadataV2Key {
-  val schema: Schema = AvroSchema[TopicMetadataV2Key]
 
-  val recordFormat: RecordFormat[TopicMetadataV2Key] =
-    RecordFormat[TopicMetadataV2Key]
+  val codec: Codec[TopicMetadataV2Key] =
+    Codec.derive[TopicMetadataV2Key]
 }
 
 @AvroNamespace("_hydra.v2")
-@AvroName("metadata")
 final case class TopicMetadataV2Value(
     streamType: StreamType,
     deprecated: Boolean,
@@ -53,8 +97,16 @@ final case class TopicMetadataV2Value(
 )
 
 object TopicMetadataV2Value {
-  val schema: Schema = AvroSchema[TopicMetadataV2Value]
 
-  val recordFormat: RecordFormat[TopicMetadataV2Value] =
-    RecordFormat[TopicMetadataV2Value]
+  private implicit val streamTypeCodec: Codec[StreamType] =
+    Codec.derive[StreamType]
+
+  private implicit val dataClassificationCodec: Codec[DataClassification] =
+    Codec.derive[DataClassification]
+
+  private implicit val contactMethodCodec: Codec[ContactMethod] =
+    Codec.derive[ContactMethod]
+
+  val codec: Codec[TopicMetadataV2Value] =
+    Codec.derive[TopicMetadataV2Value]
 }

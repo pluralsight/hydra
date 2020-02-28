@@ -7,6 +7,7 @@ import hydra.avro.registry.SchemaRegistry.SchemaVersion
 import hydra.core.transport.AckStrategy
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{
+  TopicMetadataV2,
   TopicMetadataV2Key,
   TopicMetadataV2Request,
   TopicMetadataV2Value
@@ -58,8 +59,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
           case (ExitCase.Error(_), Some(newVersion)) =>
             schemaRegistry.deleteSchemaOfVersion(suffixedSubject, newVersion)
           case _ => Bracket[F, Throwable].unit
-        }
-      )
+      })
       .map(_ => ())
   }
 
@@ -84,24 +84,27 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
         exitCase match {
           case ExitCase.Error(_) => kafkaClient.deleteTopic(subject.value)
           case _                 => Bracket[F, Throwable].unit
-        }
+      }
     )
 
   private def publishMetadata(
       createTopicRequest: TopicMetadataV2Request
   ): F[Unit] = {
     val (key, value) = createTopicRequest.toKeyAndValue
-    val keyRecord = TopicMetadataV2Key.recordFormat.to(key)
-    val valueRecord = TopicMetadataV2Value.recordFormat.to(value)
-    val record = AvroKeyRecord(
-      v2MetadataTopicName.value,
-      TopicMetadataV2Key.schema,
-      TopicMetadataV2Value.schema,
-      keyRecord,
-      valueRecord,
-      AckStrategy.Replicated
-    )
-    kafkaClient.publishMessage(record).rethrow
+    for {
+      records <- TopicMetadataV2.encode[F](key, value)
+      schemas <- TopicMetadataV2.getSchemas[F]
+    } yield {
+      val record = AvroKeyRecord(
+        v2MetadataTopicName.value,
+        schemas.key,
+        schemas.value,
+        records._1,
+        records._2,
+        AckStrategy.Replicated
+      )
+      kafkaClient.publishMessage(record).rethrow
+    }
   }
 
   def createTopic(

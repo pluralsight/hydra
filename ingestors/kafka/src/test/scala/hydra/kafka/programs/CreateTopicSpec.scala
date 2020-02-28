@@ -19,6 +19,7 @@ import hydra.kafka.util.KafkaClient.{PublishError, Topic, TopicName}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import org.apache.avro.generic.GenericRecord
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.{Matchers, WordSpec}
 import retry.{RetryPolicies, RetryPolicy}
@@ -246,8 +247,9 @@ class CreateTopicSpec extends WordSpec with Matchers {
       val metadataTopic = "test-metadata-topic"
       val request = createTopicMetadataRequest(subject, keySchema, valueSchema)
       val (key, value) = request.toKeyAndValue
-      val expectedKeyRecord = TopicMetadataV2Key.recordFormat.to(key)
-      val expectedValueRecord = TopicMetadataV2Value.recordFormat.to(value)
+      val expectedKeyRecord = TopicMetadataV2Key.codec.encode(key).toOption.get
+      val expectedValueRecord =
+        TopicMetadataV2Value.codec.encode(value).toOption.get
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
         underlyingKafkaClient <- KafkaClient.test[IO]
@@ -262,16 +264,17 @@ class CreateTopicSpec extends WordSpec with Matchers {
           Subject.createValidated(metadataTopic).get
         ).createTopic(request, TopicDetails(1, 1))
         published <- publishTo.get
-      } yield published shouldBe List(
-        AvroKeyRecord(
-          metadataTopic,
-          TopicMetadataV2Key.schema,
-          TopicMetadataV2Value.schema,
-          expectedKeyRecord,
-          expectedValueRecord,
-          AckStrategy.Replicated
-        )
-      )).unsafeRunSync()
+      } yield
+        published shouldBe List(
+          AvroKeyRecord(
+            metadataTopic,
+            TopicMetadataV2Key.codec.schema.toOption.get,
+            TopicMetadataV2Value.codec.schema.toOption.get,
+            expectedKeyRecord.asInstanceOf[GenericRecord],
+            expectedValueRecord.asInstanceOf[GenericRecord],
+            AckStrategy.Replicated
+          )
+        )).unsafeRunSync()
     }
 
     "rollback kafka topic creation when error encountered in publishing metadata" in {
