@@ -264,17 +264,16 @@ class CreateTopicSpec extends WordSpec with Matchers {
           Subject.createValidated(metadataTopic).get
         ).createTopic(request, TopicDetails(1, 1))
         published <- publishTo.get
-      } yield
-        published shouldBe List(
-          AvroKeyRecord(
-            metadataTopic,
-            TopicMetadataV2Key.codec.schema.toOption.get,
-            TopicMetadataV2Value.codec.schema.toOption.get,
-            expectedKeyRecord.asInstanceOf[GenericRecord],
-            expectedValueRecord.asInstanceOf[GenericRecord],
-            AckStrategy.Replicated
-          )
-        )).unsafeRunSync()
+      } yield published shouldBe List(
+        AvroKeyRecord(
+          metadataTopic,
+          TopicMetadataV2Key.codec.schema.toOption.get,
+          TopicMetadataV2Value.codec.schema.toOption.get,
+          expectedKeyRecord.asInstanceOf[GenericRecord],
+          expectedValueRecord.asInstanceOf[GenericRecord],
+          AckStrategy.Replicated
+        )
+      )).unsafeRunSync()
     }
 
     "rollback kafka topic creation when error encountered in publishing metadata" in {

@@ -36,9 +36,10 @@ case class TopicMetadata(
 object TopicMetadataV2 {
 
   def getSchemas[F[_]: ApplicativeError[*[_], Throwable]]: F[Schemas] = {
-    (Validated.fromEither(TopicMetadataV2Key.codec.schema).toValidatedNel,
-     Validated.fromEither(TopicMetadataV2Value.codec.schema).toValidatedNel)
-      .mapN(Schemas) match {
+    (
+      Validated.fromEither(TopicMetadataV2Key.codec.schema).toValidatedNel,
+      Validated.fromEither(TopicMetadataV2Value.codec.schema).toValidatedNel
+    ).mapN(Schemas) match {
       case Valid(s) => Applicative[F].pure(s)
       case Invalid(e) =>
         ApplicativeError[F, Throwable].raiseError(MetadataAvroSchemaFailure(e))
@@ -47,22 +48,28 @@ object TopicMetadataV2 {
 
   def encode[F[_]: MonadError[*[_], Throwable]](
       key: TopicMetadataV2Key,
-      value: TopicMetadataV2Value): F[(GenericRecord, GenericRecord)] = {
+      value: TopicMetadataV2Value
+  ): F[(GenericRecord, GenericRecord)] = {
     Monad[F]
       .pure(
-        (Validated
-           .fromEither(TopicMetadataV2Key.codec.encode(key))
-           .toValidatedNel,
-         Validated
-           .fromEither(TopicMetadataV2Value.codec.encode(value))
-           .toValidatedNel).tupled.toEither.leftMap(MetadataAvroSchemaFailure))
+        (
+          Validated
+            .fromEither(TopicMetadataV2Key.codec.encode(key))
+            .toValidatedNel,
+          Validated
+            .fromEither(TopicMetadataV2Value.codec.encode(value))
+            .toValidatedNel
+        ).tupled.toEither.leftMap(MetadataAvroSchemaFailure)
+      )
       .rethrow
       .flatMap {
         case (k: GenericRecord, v: GenericRecord) => Monad[F].pure((k, v))
         case (k, v) =>
           MonadError[F, Throwable].raiseError(
             AvroEncodingFailure(
-              NonEmptyList.of(k, v).map(_.getClass.getSimpleName)))
+              NonEmptyList.of(k, v).map(_.getClass.getSimpleName)
+            )
+          )
       }
   }
 

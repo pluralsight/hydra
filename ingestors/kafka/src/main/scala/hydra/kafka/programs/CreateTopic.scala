@@ -6,12 +6,7 @@ import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
 import hydra.core.transport.AckStrategy
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{
-  TopicMetadataV2,
-  TopicMetadataV2Key,
-  TopicMetadataV2Request,
-  TopicMetadataV2Value
-}
+import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Request}
 import hydra.kafka.producer.AvroKeyRecord
 import hydra.kafka.util.KafkaClient
 import hydra.kafka.util.KafkaUtils.TopicDetails
@@ -59,7 +54,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
           case (ExitCase.Error(_), Some(newVersion)) =>
             schemaRegistry.deleteSchemaOfVersion(suffixedSubject, newVersion)
           case _ => Bracket[F, Throwable].unit
-      })
+        }
+      )
       .map(_ => ())
   }
 
@@ -84,7 +80,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
         exitCase match {
           case ExitCase.Error(_) => kafkaClient.deleteTopic(subject.value)
           case _                 => Bracket[F, Throwable].unit
-      }
+        }
     )
 
   private def publishMetadata(
