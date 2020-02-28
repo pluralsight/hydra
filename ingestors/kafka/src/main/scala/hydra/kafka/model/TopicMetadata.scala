@@ -6,7 +6,13 @@ import java.util.UUID
 import cats.{Applicative, ApplicativeError, Monad, MonadError}
 import cats.data.Validated.{Invalid, Valid}
 import cats.data.{NonEmptyList, Validated}
-import hydra.core.marshallers.StreamType
+import hydra.core.marshallers.{
+  CurrentState,
+  History,
+  Notification,
+  StreamType,
+  Telemetry
+}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import vulcan.{AvroError, AvroNamespace, Codec}
 import vulcan.generic._
@@ -106,10 +112,48 @@ final case class TopicMetadataV2Value(
 object TopicMetadataV2Value {
 
   private implicit val streamTypeCodec: Codec[StreamType] =
-    Codec.derive[StreamType]
+    Codec.deriveEnum[StreamType](
+      symbols = List("Notification", "CurrentState", "History", "Telemetry"),
+      encode = {
+        case History      => "History"
+        case Telemetry    => "Telemetry"
+        case CurrentState => "CurrentState"
+        case Notification => "Notification"
+      },
+      decode = {
+        case "History"      => Right(History)
+        case "Telemetry"    => Right(Telemetry)
+        case "CurrentState" => Right(CurrentState)
+        case "Notification" => Right(Notification)
+        case other          => Left(AvroError(s"$other is not a StreamType"))
+      }
+    )
 
   private implicit val dataClassificationCodec: Codec[DataClassification] =
-    Codec.derive[DataClassification]
+    Codec.deriveEnum[DataClassification](
+      symbols = List(
+        "Public",
+        "InternalUseOnly",
+        "ConfidentialPII",
+        "RestrictedFinancial",
+        "RestrictedEmployeeData"
+      ),
+      encode = {
+        case Public                 => "Public"
+        case InternalUseOnly        => "InternalUseOnly"
+        case ConfidentialPII        => "ConfidentialPII"
+        case RestrictedFinancial    => "RestrictedFinancial"
+        case RestrictedEmployeeData => "RestrictedEmployeeData"
+      },
+      decode = {
+        case "Public"                 => Right(Public)
+        case "InternalUseOnly"        => Right(InternalUseOnly)
+        case "ConfidentialPII"        => Right(ConfidentialPII)
+        case "RestrictedFinancial"    => Right(RestrictedFinancial)
+        case "RestrictedEmployeeData" => Right(RestrictedEmployeeData)
+        case other                    => Left(AvroError(s"$other is not a DataClassification"))
+      }
+    )
 
   private implicit val contactMethodCodec: Codec[ContactMethod] =
     Codec.derive[ContactMethod]
