@@ -132,7 +132,7 @@ trait BootstrappingSupport extends ConfigSupport with LoggingAdapter {
       )
   }
 
-  def containerService: ContainerService = {
+  lazy val containerService: ContainerService = {
     log.info(
       s"The following services will be started: ${services.map(_._1).mkString(", ")}"
     )
