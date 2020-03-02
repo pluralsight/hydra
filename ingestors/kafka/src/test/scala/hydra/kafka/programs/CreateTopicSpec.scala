@@ -302,6 +302,34 @@ class CreateTopicSpec extends WordSpec with Matchers {
       } yield topic should not be defined).unsafeRunSync()
     }
 
+    "not delete an existing topic when rolling back" in {
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      val subject = "subject"
+      val metadataTopic = "test-metadata-topic"
+      val topicDetails = TopicDetails(1, 1)
+      val request = createTopicMetadataRequest(subject, keySchema, valueSchema)
+      (for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        underlyingKafkaClient <- KafkaClient.test[IO]
+        publishTo <- Ref[IO].of(List.empty[KafkaRecord[_, _]])
+        kafkaClient <- IO(
+          new TestKafkaClientWithPublishTo(
+            underlyingKafkaClient,
+            publishTo,
+            failOnPublish = true
+          )
+        )
+        _ <- kafkaClient.createTopic(subject, topicDetails)
+        _ <- new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafkaClient,
+          policy,
+          Subject.createValidated(metadataTopic).get
+        ).createTopic(request, topicDetails).attempt
+        topic <- kafkaClient.describeTopic(subject)
+      } yield topic shouldBe defined).unsafeRunSync()
+    }
+
   }
 
   private final class TestKafkaClientWithPublishTo(

@@ -56,7 +56,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
           case _ => Bracket[F, Throwable].unit
         }
       )
-      .map(_ => ())
+      .void
   }
 
   private def registerSchemas(
@@ -74,14 +74,23 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   private def createTopicResource(
       subject: Subject,
       topicDetails: TopicDetails
-  ): Resource[F, Unit] =
-    Resource.makeCase(kafkaClient.createTopic(subject.value, topicDetails))(
-      (_, exitCase) =>
-        exitCase match {
-          case ExitCase.Error(_) => kafkaClient.deleteTopic(subject.value)
-          case _                 => Bracket[F, Throwable].unit
-        }
-    )
+  ): Resource[F, Unit] = {
+    val createTopic: F[Option[Subject]] =
+      kafkaClient.describeTopic(subject.value).flatMap {
+        case Some(_) => Bracket[F, Throwable].pure(None)
+        case None =>
+          kafkaClient
+            .createTopic(subject.value, topicDetails) *> Bracket[F, Throwable]
+            .pure(Some(subject))
+      }
+    Resource
+      .makeCase(createTopic)({
+        case (Some(_), ExitCase.Error(_)) =>
+          kafkaClient.deleteTopic(subject.value)
+        case _ => Bracket[F, Throwable].unit
+      })
+      .void
+  }
 
   private def publishMetadata(
       createTopicRequest: TopicMetadataV2Request
