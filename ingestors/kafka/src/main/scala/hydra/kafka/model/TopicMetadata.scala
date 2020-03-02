@@ -18,6 +18,7 @@ import vulcan.{AvroError, AvroNamespace, Codec}
 import vulcan.generic._
 import vulcan.refined._
 import cats.implicits._
+import hydra.avro.convert.{ISODateConverter, IsoDate}
 import org.apache.avro.generic.GenericRecord
 
 import scala.util.control.NoStackTrace
@@ -111,7 +112,7 @@ final case class TopicMetadataV2Value(
 
 object TopicMetadataV2Value {
 
-  private implicit val streamTypeCodec: Codec[StreamType] =
+  implicit val streamTypeCodec: Codec[StreamType] =
     Codec.deriveEnum[StreamType](
       symbols = List("Notification", "CurrentState", "History", "Telemetry"),
       encode = {
@@ -129,7 +130,7 @@ object TopicMetadataV2Value {
       }
     )
 
-  private implicit val dataClassificationCodec: Codec[DataClassification] =
+  implicit val dataClassificationCodec: Codec[DataClassification] =
     Codec.deriveEnum[DataClassification](
       symbols = List(
         "Public",
@@ -154,6 +155,16 @@ object TopicMetadataV2Value {
         case other                    => Left(AvroError(s"$other is not a DataClassification"))
       }
     )
+
+  private implicit val instantCodec: Codec[Instant] = Codec.string.imap { str =>
+    new ISODateConverter()
+      .fromCharSequence(
+        str,
+        org.apache.avro.SchemaBuilder.builder.stringType,
+        IsoDate
+      )
+      .toInstant
+  } { instant => instant.toString }
 
   private implicit val contactMethodCodec: Codec[ContactMethod] =
     Codec.derive[ContactMethod]
