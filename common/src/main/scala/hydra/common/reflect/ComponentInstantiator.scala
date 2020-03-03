@@ -14,10 +14,17 @@ import scala.util.Try
   */
 object ComponentInstantiator {
 
-  def instantiate[T](clazz: Class[T], params: List[AnyRef], companionMethodName: String = "apply"): Try[T] = {
-    Try(companion(clazz, companionMethodName, params.map(_.getClass)).map { c =>
-      c._2.invoke(c._1, params: _*)
-    }.getOrElse(ReflectionUtils.instantiateClass(clazz)).asInstanceOf[T])
+  def instantiate[T](
+      clazz: Class[T],
+      params: List[AnyRef],
+      companionMethodName: String = "apply"
+  ): Try[T] = {
+    Try(
+      companion(clazz, companionMethodName, params.map(_.getClass))
+        .map { c => c._2.invoke(c._1, params: _*) }
+        .getOrElse(ReflectionUtils.instantiateClass(clazz))
+        .asInstanceOf[T]
+    )
   }
 
   /**
@@ -26,22 +33,33 @@ object ComponentInstantiator {
     * @param clazz The class to look for the companion object
     * @return
     */
-  private def companion[T](clazz: Class[T], methodName: String, parameterTypes: List[Class[_]]): Option[(T, Method)] = {
+  private def companion[T](
+      clazz: Class[T],
+      methodName: String,
+      parameterTypes: List[Class[_]]
+  ): Option[(T, Method)] = {
     try {
       val companion = ReflectionUtils.companionOf(clazz)
-      companion.getClass.getMethods.toList.filter(m => m.getName == methodName
-        && areParamsAssignable(m.getParameterTypes.toList, parameterTypes)) match {
-        case Nil => None
+      companion.getClass.getMethods.toList.filter(m =>
+        m.getName == methodName
+          && areParamsAssignable(m.getParameterTypes.toList, parameterTypes)
+      ) match {
+        case Nil           => None
         case method :: Nil => Some(companion, method)
-        case _ => None
+        case _             => None
       }
     } catch {
       case _: ClassNotFoundException => None
     }
   }
 
-  private def areParamsAssignable(methodParamTypes: List[Class[_]], argParamTypes: List[Class[_]]): Boolean = {
-    methodParamTypes.zip(argParamTypes).filter(x => x._1.isAssignableFrom(x._2)).size > 0
+  private def areParamsAssignable(
+      methodParamTypes: List[Class[_]],
+      argParamTypes: List[Class[_]]
+  ): Boolean = {
+    methodParamTypes
+      .zip(argParamTypes)
+      .filter(x => x._1.isAssignableFrom(x._2))
+      .size > 0
   }
 }
-

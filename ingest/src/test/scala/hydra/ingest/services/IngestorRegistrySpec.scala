@@ -14,15 +14,20 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 3/9/17.
   */
-class IngestorRegistrySpec extends TestKit(ActorSystem("IngestorRegistrySpec"))
-  with Matchers
-  with FunSpecLike
-  with ImplicitSender
-  with Eventually
-  with BeforeAndAfterAll {
+class IngestorRegistrySpec
+    extends TestKit(ActorSystem("IngestorRegistrySpec"))
+    with Matchers
+    with FunSpecLike
+    with ImplicitSender
+    with Eventually
+    with BeforeAndAfterAll {
 
-  override def afterAll = TestKit.shutdownActorSystem(system, verifySystemShutdown = true,
-    duration = 10 seconds)
+  override def afterAll =
+    TestKit.shutdownActorSystem(
+      system,
+      verifySystemShutdown = true,
+      duration = 10 seconds
+    )
 
   val registry = system.actorOf(Props[IngestorRegistry], "registry")
 
@@ -40,11 +45,19 @@ class IngestorRegistrySpec extends TestKit(ActorSystem("IngestorRegistrySpec"))
       expectMsgType[IngestorAlreadyRegistered]
     }
     it("allows same class to be registered under a different name") {
-      registry ! RegisterWithClass(classOf[TestIngestor], "global", Some("test"))
+      registry ! RegisterWithClass(
+        classOf[TestIngestor],
+        "global",
+        Some("test")
+      )
       expectMsgType[IngestorInfo]
     }
     it("unregisters") {
-      registry ! RegisterWithClass(classOf[TestIngestor], "global", Some("toDelete"))
+      registry ! RegisterWithClass(
+        classOf[TestIngestor],
+        "global",
+        Some("toDelete")
+      )
       expectMsgType[IngestorInfo]
 
       registry ! Unregister("toDelete")
@@ -55,7 +68,11 @@ class IngestorRegistrySpec extends TestKit(ActorSystem("IngestorRegistrySpec"))
     }
 
     it("finds by name") {
-      registry ! RegisterWithClass(classOf[TestIngestor], "global", Some("find"))
+      registry ! RegisterWithClass(
+        classOf[TestIngestor],
+        "global",
+        Some("find")
+      )
       expectMsgType[IngestorInfo]
 
       registry ! FindByName("find")
@@ -67,7 +84,11 @@ class IngestorRegistrySpec extends TestKit(ActorSystem("IngestorRegistrySpec"))
     }
 
     it("finds all") {
-      registry ! RegisterWithClass(classOf[TestIngestor], "global", Some("find-all"))
+      registry ! RegisterWithClass(
+        classOf[TestIngestor],
+        "global",
+        Some("find-all")
+      )
       expectMsgType[IngestorInfo]
 
       registry ! FindAll
@@ -83,7 +104,11 @@ class IngestorRegistrySpec extends TestKit(ActorSystem("IngestorRegistrySpec"))
     }
 
     it("is notified of ingestor termination") {
-      registry ! RegisterWithClass(classOf[TestIngestor], "global", Some("terminator"))
+      registry ! RegisterWithClass(
+        classOf[TestIngestor],
+        "global",
+        Some("terminator")
+      )
       expectMsgType[IngestorInfo]
 
       registry ! FindByName("terminator")
@@ -91,7 +116,9 @@ class IngestorRegistrySpec extends TestKit(ActorSystem("IngestorRegistrySpec"))
         case LookupResult(i) =>
           i.size shouldBe 1
           i(0).name shouldBe "terminator"
-          system.actorSelection("akka://IngestorRegistrySpec/user/registry/terminator") ! PoisonPill
+          system.actorSelection(
+            "akka://IngestorRegistrySpec/user/registry/terminator"
+          ) ! PoisonPill
 
           eventually {
             listenerActor ! "ingestor"
@@ -103,12 +130,12 @@ class IngestorRegistrySpec extends TestKit(ActorSystem("IngestorRegistrySpec"))
 }
 
 private class ListenerTestActor extends Actor {
+
   @volatile
   var ingestor: String = ""
 
   override def receive = {
     case IngestorTerminated(s) => ingestor = s
-    case "ingestor" => sender ! ingestor
+    case "ingestor"            => sender ! ingestor
   }
 }
-

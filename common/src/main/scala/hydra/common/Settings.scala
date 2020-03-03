@@ -9,7 +9,8 @@ import scala.concurrent.duration._
 class Settings(config: Config) {
   val IngestTopicName: String = "hydra-ingest"
 
-  val SchemaMetadataRefreshInterval = config.get[FiniteDuration]("schema.metadata.refresh.interval")
+  val SchemaMetadataRefreshInterval = config
+    .get[FiniteDuration]("schema.metadata.refresh.interval")
     .valueOrElse(1 minute)
 }
 

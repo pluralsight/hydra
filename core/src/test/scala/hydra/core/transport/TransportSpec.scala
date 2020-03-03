@@ -12,12 +12,13 @@ import hydra.core.transport.Transport.{Confirm, Deliver, TransportError}
 import org.iq80.leveldb.util.FileUtils
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
-class TransportSpec extends TestKit(ActorSystem("TransportSupervisorSpec"))
-  with Matchers
-  with FunSpecLike
-  with BeforeAndAfterAll
-  with ImplicitSender
-  with ConfigSupport {
+class TransportSpec
+    extends TestKit(ActorSystem("TransportSupervisorSpec"))
+    with Matchers
+    with FunSpecLike
+    with BeforeAndAfterAll
+    with ImplicitSender
+    with ConfigSupport {
 
   override def afterAll() {
     super.afterAll()
@@ -33,7 +34,8 @@ class TransportSpec extends TestKit(ActorSystem("TransportSupervisorSpec"))
 
   private val storageLocations = List(
     new File(rootConfig.getString("akka.persistence.journal.leveldb.dir")),
-    new File(rootConfig.getString("akka.persistence.snapshot-store.local.dir")))
+    new File(rootConfig.getString("akka.persistence.snapshot-store.local.dir"))
+  )
 
   override def beforeAll() {
     super.beforeAll()
@@ -77,7 +79,11 @@ class TransportSpec extends TestKit(ActorSystem("TransportSupervisorSpec"))
           deliveryId shouldBe -1 //we don't save transport acks to the journal
 
           //simulate an callback from the transport
-          callback.onCompletion(-1, Some(HydraRecordMetadata(System.currentTimeMillis, "", Replicated)), None)
+          callback.onCompletion(
+            -1,
+            Some(HydraRecordMetadata(System.currentTimeMillis, "", Replicated)),
+            None
+          )
           transport ! Confirm(-1)
           expectMsgPF() { //ingestor receives this message
             case RecordProduced(_, sup) =>
@@ -85,7 +91,11 @@ class TransportSpec extends TestKit(ActorSystem("TransportSupervisorSpec"))
           }
 
           //simulate an error from the transport
-          callback.onCompletion(-1, None, Some(new IllegalArgumentException("ERROR!!")))
+          callback.onCompletion(
+            -1,
+            None,
+            Some(new IllegalArgumentException("ERROR!!"))
+          )
           transport ! TransportError(-1)
           expectMsgPF() { //ingestor receives this message
             case RecordNotProduced(r, e, s) =>
@@ -100,8 +110,9 @@ class TransportSpec extends TestKit(ActorSystem("TransportSupervisorSpec"))
 }
 
 class TestTransport(forwardActor: ActorRef) extends Transport {
+
   override def transport: Receive = {
-    case d@Deliver(_, _, _) =>
+    case d @ Deliver(_, _, _) =>
       forwardActor ! d
   }
 }

@@ -16,17 +16,28 @@ trait TransportCallback {
     *
     * Exactly one of the optional arguments will be a `Some`.
     */
-  def onCompletion(deliveryId: Long, md: Option[RecordMetadata], exception: Option[Throwable]): Unit
+  def onCompletion(
+      deliveryId: Long,
+      md: Option[RecordMetadata],
+      exception: Option[Throwable]
+  ): Unit
 }
 
-class IngestorCallback[K, V](record: HydraRecord[K, V], ingestor: ActorRef, supervisor: ActorRef, transport: ActorRef)
-  extends TransportCallback {
+class IngestorCallback[K, V](
+    record: HydraRecord[K, V],
+    ingestor: ActorRef,
+    supervisor: ActorRef,
+    transport: ActorRef
+) extends TransportCallback {
 
-
-  override def onCompletion(deliveryId: Long, md: Option[RecordMetadata], exception: Option[Throwable]): Unit = {
+  override def onCompletion(
+      deliveryId: Long,
+      md: Option[RecordMetadata],
+      exception: Option[Throwable]
+  ): Unit = {
     md match {
       case Some(recordMetadata) => onSuccess(deliveryId, recordMetadata)
-      case None => onError(deliveryId, exception.get)
+      case None                 => onError(deliveryId, exception.get)
     }
   }
 
@@ -42,17 +53,28 @@ class IngestorCallback[K, V](record: HydraRecord[K, V], ingestor: ActorRef, supe
 }
 
 object NoCallback extends TransportCallback {
-  override def onCompletion(deliveryId: Long, md: Option[RecordMetadata], exception: Option[Throwable]): Unit = {}
+
+  override def onCompletion(
+      deliveryId: Long,
+      md: Option[RecordMetadata],
+      exception: Option[Throwable]
+  ): Unit = {}
 }
 
 /**
   * Does not ack ingestor/supervisor; only sends the record production messages to the transport supervisor.
   */
-class TransportSupervisorCallback(transport: ActorRef) extends TransportCallback {
-  override def onCompletion(deliveryId: Long, md: Option[RecordMetadata], exception: Option[Throwable]): Unit = {
+class TransportSupervisorCallback(transport: ActorRef)
+    extends TransportCallback {
+
+  override def onCompletion(
+      deliveryId: Long,
+      md: Option[RecordMetadata],
+      exception: Option[Throwable]
+  ): Unit = {
     md match {
       case Some(_) => transport ! Confirm(deliveryId)
-      case None => transport ! TransportError(deliveryId)
+      case None    => transport ! TransportError(deliveryId)
     }
   }
 }

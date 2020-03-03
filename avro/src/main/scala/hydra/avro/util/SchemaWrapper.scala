@@ -28,19 +28,24 @@ case class SchemaWrapper(schema: Schema, primaryKeys: Seq[String]) {
       val mappedKeys = primaryKeys.map(k => k -> Option(schema.getField(k)))
       val errors = mappedKeys.filter(_._2.isEmpty).toMap
       if (!errors.isEmpty) {
-        val err = s"The field(s) '${errors.keys.mkString(",")}' were specified as " +
-          "primary keys, but they don't exist in the schema. " +
-          s"Possible fields are: ${schema.getFields.asScala.map(_.name()).mkString(",")}. " +
-          s"Please revise your request."
+        val err =
+          s"The field(s) '${errors.keys.mkString(",")}' were specified as " +
+            "primary keys, but they don't exist in the schema. " +
+            s"Possible fields are: ${schema.getFields.asScala.map(_.name()).mkString(",")}. " +
+            s"Please revise your request."
         throw new IllegalArgumentException(err)
       }
 
-      val unionMap = primaryKeys.map(schema.getField)
-        .map(f => f.name() -> isNullableUnion(f.schema())).filter(_._2).toMap
+      val unionMap = primaryKeys
+        .map(schema.getField)
+        .map(f => f.name() -> isNullableUnion(f.schema()))
+        .filter(_._2)
+        .toMap
 
       if (!unionMap.isEmpty) {
-        val err = s"The field(s) '${unionMap.keys.mkString(",")}' were specified as " +
-          "primary keys, but they are nullable.  This is currently not supported."
+        val err =
+          s"The field(s) '${unionMap.keys.mkString(",")}' were specified as " +
+            "primary keys, but they are nullable.  This is currently not supported."
         throw new IllegalArgumentException(err)
       }
 
@@ -50,14 +55,15 @@ case class SchemaWrapper(schema: Schema, primaryKeys: Seq[String]) {
   def getFields: mutable.Buffer[Field] = schema.getFields.asScala
 
   private def isNullableUnion(schema: Schema): Boolean =
-    schema.getType == Type.UNION && schema.getTypes.size == 2 && schema.getTypes()
+    schema.getType == Type.UNION && schema.getTypes.size == 2 && schema
+      .getTypes()
       .contains(Schema.create(Type.NULL))
 
   def getName: String = schema.getName
 }
 
-
 object SchemaWrapper {
+
   def from(schema: Schema): SchemaWrapper = {
     SchemaWrapper(schema, schemaPKs(schema))
   }
@@ -79,7 +85,7 @@ object SchemaWrapper {
     Option(schema.getProp("hydra.key"))
       .map(_.replaceAll("\\s", "").split(",")) match {
       case Some(ids) => ids
-      case None => Seq.empty
+      case None      => Seq.empty
     }
   }
 }

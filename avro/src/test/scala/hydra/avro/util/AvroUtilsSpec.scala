@@ -50,8 +50,7 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
     }
 
     it("tests for equality ignoring props") {
-      val schema1 = new Schema.Parser().parse(
-        """
+      val schema1 = new Schema.Parser().parse("""
           |{
           |	"type": "record",
           |	"name": "User",
@@ -74,8 +73,7 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
           |	]
           |}""".stripMargin)
 
-      val schema2 = new Schema.Parser().parse(
-        """
+      val schema2 = new Schema.Parser().parse("""
           |{
           |	"type": "record",
           |	"name": "User",
@@ -101,8 +99,7 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
     }
 
     it("returns false for schemas with different names") {
-      val schema1 = new Schema.Parser().parse(
-        """
+      val schema1 = new Schema.Parser().parse("""
           |{
           |	"type": "record",
           |	"name": "User",
@@ -125,8 +122,7 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
           |	]
           |}""".stripMargin)
 
-      val schema2 = new Schema.Parser().parse(
-        """
+      val schema2 = new Schema.Parser().parse("""
           |{
           |	"type": "record",
           |	"name": "User",
@@ -154,8 +150,7 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
 
     it("returns false for schemas with same fields but different doc tags") {
 
-      val schema1 = new Schema.Parser().parse(
-        """
+      val schema1 = new Schema.Parser().parse("""
           |{
           |	"type": "record",
           |	"name": "User",
@@ -168,8 +163,7 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
           |	]
           |}""".stripMargin)
 
-      val schema2 = new Schema.Parser().parse(
-        """
+      val schema2 = new Schema.Parser().parse("""
           |{
           |	"type": "record",
           |	"name": "User",
@@ -187,8 +181,7 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
     }
 
     it("returns false for schemas with different fields") {
-      val schema1 = new Schema.Parser().parse(
-        """
+      val schema1 = new Schema.Parser().parse("""
           |{
           |	"type": "record",
           |	"name": "User",
@@ -206,8 +199,7 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
           |	]
           |}""".stripMargin)
 
-      val schema2 = new Schema.Parser().parse(
-        """
+      val schema2 = new Schema.Parser().parse("""
           |{
           |	"type": "record",
           |	"name": "User",
@@ -225,8 +217,7 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
     }
 
     it("uses the equals cache") {
-      val schema1 = new Schema.Parser().parse(
-        """
+      val schema1 = new Schema.Parser().parse("""
           |{
           |	"type": "record",
           |	"name": "User",
@@ -239,8 +230,7 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
           |	]
           |}""".stripMargin)
 
-      val schema2 = new Schema.Parser().parse(
-        """
+      val schema2 = new Schema.Parser().parse("""
           |{
           |	"type": "record",
           |	"name": "User",
@@ -254,7 +244,9 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
           |}""".stripMargin)
 
       AvroUtils.areEqual(schema1, schema2) shouldBe true
-      AvroUtils.SEEN_EQUALS.get().contains(SeenPair(schema1.hashCode(), schema2.hashCode())) shouldBe true
+      AvroUtils.SEEN_EQUALS
+        .get()
+        .contains(SeenPair(schema1.hashCode(), schema2.hashCode())) shouldBe true
 
       AvroUtils.areEqual(schema1, schema2) shouldBe true
 
@@ -284,9 +276,9 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
 
       val metadata = SchemaResource(1, 1, tschema)
 
-      AvroUtils.improveException(
-        new IllegalArgumentException(""),
-        metadata) shouldBe an[IllegalArgumentException]
+      AvroUtils.improveException(new IllegalArgumentException(""), metadata) shouldBe an[
+        IllegalArgumentException
+      ]
 
       val ex = new RequiredFieldMissingException("testEnum", tschema)
       val improved = AvroUtils.improveException(ex, metadata)

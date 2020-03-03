@@ -1,0 +1,70 @@
+---
+version: '3.1'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:5.0.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - 2181:2181
+    expose:
+      - 2181
+
+  kafka:
+    image: confluentinc/cp-kafka:5.0.0
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_ZOOKEEPER_CONNECTION_TIMEOUT_MS: 30000
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 100
+      KAFKA_JMX_PORT: 30001
+      KAFKA_JMX_HOSTNAME: kafka
+    ports:
+      - 9092:9092
+      - 29092:29092
+      - 9999:9999
+    expose:
+      - 9092
+      - 29092
+      - 9999
+
+  schema-registry:
+      image: confluentinc/cp-schema-registry:5.0.0
+      environment:
+        SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: zookeeper:2181
+        SCHEMA_REGISTRY_HOST_NAME: schema-registry
+        SCHEMA_REGISTRY_LISTENERS: http://schema-registry:8081
+      depends_on:
+        - zookeeper
+        - kafka
+      ports:
+        - 8081:8081
+      expose:
+        - 8081
+  hydra:
+    image: pluralsight/hydra:0.11.0
+    command: bash
+    volumes:
+      - /app
+    ports:
+      - 8088:8088
+    expose:
+      - 8088
+    depends_on:
+      - kafka
+      - schema-registry
+    environment:
+      HYDRA_ZOOKEEPER_QUORUM: zookeeper:2181
+      HYDRA_KAFKA_PRODUCER_BOOTSTRAP_SERVERS: kafka:9092
+      HYDRA_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      LOG_LEVEL: debug
+      CONTAINER_HTTP_PORT: 8088

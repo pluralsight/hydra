@@ -27,11 +27,14 @@ import scala.language.postfixOps
 /**
   * Created by alexsilva on 12/22/15.
   */
-class DefaultIngestionHandler(val request: HydraRequest,
-                              val registry: ActorRef, val requestor: ActorRef,
-                              val timeout: FiniteDuration) extends Actor
-  with IngestionHandler with ActorLogging {
-
+class DefaultIngestionHandler(
+    val request: HydraRequest,
+    val registry: ActorRef,
+    val requestor: ActorRef,
+    val timeout: FiniteDuration
+) extends Actor
+    with IngestionHandler
+    with ActorLogging {
 
   private implicit val ec = context.dispatcher
 
@@ -51,19 +54,27 @@ class DefaultIngestionHandler(val request: HydraRequest,
 }
 
 object DefaultIngestionHandler extends ConfigSupport {
-  def props(request: HydraRequest, registry: ActorRef, requestor: ActorRef): Props = {
+
+  def props(
+      request: HydraRequest,
+      registry: ActorRef,
+      requestor: ActorRef
+  ): Props = {
     import configs.syntax._
 
-    val timeout = applicationConfig.get[FiniteDuration]("ingestion.timeout")
+    val timeout = applicationConfig
+      .get[FiniteDuration]("ingestion.timeout")
       .valueOrElse(3.seconds)
 
     props(request, registry, requestor, timeout)
   }
 
-  def props(request: HydraRequest, registry: ActorRef, requestor: ActorRef,
-            timeout: FiniteDuration): Props = {
+  def props(
+      request: HydraRequest,
+      registry: ActorRef,
+      requestor: ActorRef,
+      timeout: FiniteDuration
+  ): Props = {
     Props(new DefaultIngestionHandler(request, registry, requestor, timeout))
   }
 }
-
-

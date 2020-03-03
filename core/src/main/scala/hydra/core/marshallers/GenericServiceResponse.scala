@@ -9,6 +9,5 @@ trait ServiceResponse {
   def message: String
 }
 
-case class GenericServiceResponse(status: Int, message: String) extends ServiceResponse
-
-
+case class GenericServiceResponse(status: Int, message: String)
+    extends ServiceResponse

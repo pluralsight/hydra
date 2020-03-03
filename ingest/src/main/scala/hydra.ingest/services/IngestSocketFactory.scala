@@ -10,18 +10,21 @@ trait IngestSocketFactory {
   def ingestFlow(): Flow[String, OutgoingMessage, NotUsed]
 }
 
-
 object IngestSocketFactory {
-  def createSocket(fact: ActorRefFactory): IngestSocketFactory = {
-    () => {
+
+  def createSocket(fact: ActorRefFactory): IngestSocketFactory = { () =>
+    {
 
       val socketActor = fact.actorOf(Props[IngestionSocketActor])
 
-      def actorSink = Sink.actorRefWithBackpressure(socketActor,
-      onInitMessage = SocketInit,
-      ackMessage = SocketAck,
-      onCompleteMessage = SocketEnded,
-      onFailureMessage = SocketFailed.apply)
+      def actorSink =
+        Sink.actorRefWithBackpressure(
+          socketActor,
+          onInitMessage = SocketInit,
+          ackMessage = SocketAck,
+          onCompleteMessage = SocketEnded,
+          onFailureMessage = SocketFailed.apply
+        )
 
       val in =
         Flow[String]
@@ -29,7 +32,12 @@ object IngestSocketFactory {
           .to(actorSink)
 
       val out =
-        Source.actorRefWithBackpressure[OutgoingMessage](SocketAck, PartialFunction.empty, PartialFunction.empty)
+        Source
+          .actorRefWithBackpressure[OutgoingMessage](
+            SocketAck,
+            PartialFunction.empty,
+            PartialFunction.empty
+          )
           .mapMaterializedValue(socketActor ! SocketStarted(_))
 
       Flow.fromSinkAndSourceCoupled(in, out)
@@ -54,6 +62,8 @@ case class SocketFailed(ex: Throwable)
 
 sealed trait OutgoingMessage extends SocketEvent
 
-case class SimpleOutgoingMessage(status: Int, message:String) extends OutgoingMessage
+case class SimpleOutgoingMessage(status: Int, message: String)
+    extends OutgoingMessage
 
-case class IngestionOutgoingMessage(report:IngestionReport) extends OutgoingMessage
+case class IngestionOutgoingMessage(report: IngestionReport)
+    extends OutgoingMessage

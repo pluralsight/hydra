@@ -8,8 +8,12 @@ import org.scalatest.{FunSpecLike, Matchers}
 class ReflectionUtilsSpec extends Matchers with FunSpecLike {
   describe("When using ReflectionUtils") {
     it("Instantiates a class with constructor params") {
-      ReflectionUtils.instantiateType[TestClass](List("value")) shouldBe TestClass("value")
-      ReflectionUtils.instantiateClass(classOf[TestClass], List("value")) shouldBe TestClass("value")
+      ReflectionUtils.instantiateType[TestClass](List("value")) shouldBe TestClass(
+        "value"
+      )
+      ReflectionUtils.instantiateClass(classOf[TestClass], List("value")) shouldBe TestClass(
+        "value"
+      )
     }
 
     it("Identifies companion objects") {
@@ -18,12 +22,16 @@ class ReflectionUtilsSpec extends Matchers with FunSpecLike {
     }
 
     it("Instantiates classes by name") {
-      val obj = ReflectionUtils.instantiateClassByName[TestClass]("hydra.common.reflect.TestClass", List("value"))
+      val obj = ReflectionUtils.instantiateClassByName[TestClass](
+        "hydra.common.reflect.TestClass",
+        List("value")
+      )
       obj shouldBe TestClass("value")
     }
 
     it("Instantiates classes with empty constructor lists") {
-      val obj = ReflectionUtils.instantiateClass(classOf[TestDefaultConstructor])
+      val obj =
+        ReflectionUtils.instantiateClass(classOf[TestDefaultConstructor])
       obj shouldBe a[TestDefaultConstructor]
     }
 
@@ -38,5 +46,3 @@ case class TestClass(value: String)
 object TestClass {
   def apply(n: Int) = new TestClass(n.toString)
 }
-
-

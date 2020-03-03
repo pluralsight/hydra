@@ -23,8 +23,11 @@ import scala.util.{Failure, Success, Try}
   *
   * Created by alexsilva on 12/5/16.
   */
-class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSettings]) extends Actor
-  with LoggingAdapter {
+class SchemaRegistryActor(
+    config: Config,
+    settings: Option[CircuitBreakerSettings]
+) extends Actor
+    with LoggingAdapter {
 
   import SchemaRegistryActor._
   import context.dispatcher
@@ -32,38 +35,49 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
   val breakerSettings = settings getOrElse new CircuitBreakerSettings(config)
 
   private val registryFailure: Try[SchemaRegistryResponse] => Boolean = {
-    case Success(_) => false
+    case Success(_)                                              => false
     case Failure(ex) if ex.isInstanceOf[SchemaRegistryException] => false
-    case Failure(_) => true
+    case Failure(_)                                              => true
   }
 
   private val breaker = CircuitBreaker(
     context.system.scheduler,
     maxFailures = breakerSettings.maxFailures,
     callTimeout = breakerSettings.callTimeout,
-    resetTimeout = breakerSettings.resetTimeout)
-    .onOpen(notifyOnOpen())
+    resetTimeout = breakerSettings.resetTimeout
+  ).onOpen(notifyOnOpen())
 
   val registry = ConfluentSchemaRegistry.forConfig(config)
 
   log.debug(s"Creating new SchemaRegistryActor for ${registry.registryUrl}")
 
-  val loader = new SchemaResourceLoader(registry.registryUrl, registry.registryClient,
-    metadataCheckInterval = Settings.HydraSettings.SchemaMetadataRefreshInterval)
+  val loader = new SchemaResourceLoader(
+    registry.registryUrl,
+    registry.registryClient,
+    metadataCheckInterval = Settings.HydraSettings.SchemaMetadataRefreshInterval
+  )
 
   def getSubject(schema: Schema): String = addSchemaSuffix(schema.getFullName)
 
-  private def errorHandler[U](schema: String): PartialFunction[Throwable, Future[U]] = {
-    case e: SchemaRegistryException if e.getCause.isInstanceOf[RestClientException] && isServerError(e) =>
-      throw new IllegalArgumentException(s"Schema '$schema' doesnt exist. [Schema registry URL: ${registry.registryUrl}]")
+  private def errorHandler[U](
+      schema: String
+  ): PartialFunction[Throwable, Future[U]] = {
+    case e: SchemaRegistryException
+        if e.getCause.isInstanceOf[RestClientException] && isServerError(e) =>
+      throw new IllegalArgumentException(
+        s"Schema '$schema' doesnt exist. [Schema registry URL: ${registry.registryUrl}]"
+      )
     case e: Throwable =>
       throw e
   }
 
-  private def isServerError(e: SchemaRegistryException) = e.getCause.asInstanceOf[RestClientException].getErrorCode < 500
+  private def isServerError(e: SchemaRegistryException) =
+    e.getCause.asInstanceOf[RestClientException].getErrorCode < 500
 
   private def fetchSchema(location: String) = {
-    loader.retrieveValueSchema(location).map(resource => FetchSchemaResponse(resource))
+    loader
+      .retrieveValueSchema(location)
+      .map(resource => FetchSchemaResponse(resource))
       .recoverWith(errorHandler(location))
   }
 
@@ -79,44 +93,51 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
       pipe(registerSchemaResponse) to sender
 
     case SchemaRegistered(id, version, schemaString) =>
-      val schemaResource = SchemaResource(id, version, new Schema.Parser().parse(schemaString))
+      val schemaResource =
+        SchemaResource(id, version, new Schema.Parser().parse(schemaString))
       loader.loadValueSchemaIntoCache(schemaResource) pipeTo sender
 
     case FetchAllSchemaVersionsRequest(subject: String) =>
       val allVersionsRequest = for {
         resource <- loader.retrieveValueSchema(addSchemaSuffix(subject))
-        allVersions <- Future.sequence((1 to resource.version).map { versionNumber =>
-          loader.retrieveValueSchema(subject, versionNumber)
+        allVersions <- Future.sequence((1 to resource.version).map {
+          versionNumber => loader.retrieveValueSchema(subject, versionNumber)
         })
       } yield FetchAllSchemaVersionsResponse(allVersions)
       breaker.withCircuitBreaker(allVersionsRequest, registryFailure) pipeTo sender
 
     case FetchSubjectsRequest =>
       val allSubjectsRequest = Future {
-        val subjects = registry.registryClient.getAllSubjects.asScala.map { subject =>
-          removeSchemaSuffix(subject)
+        val subjects = registry.registryClient.getAllSubjects.asScala.map {
+          subject => removeSchemaSuffix(subject)
         }
         FetchSubjectsResponse(subjects)
       }
       breaker.withCircuitBreaker(allSubjectsRequest, registryFailure) pipeTo sender
 
     case FetchSchemaMetadataRequest(subject) =>
-      val metadataRequest = loader.retrieveValueSchema(subject)
+      val metadataRequest = loader
+        .retrieveValueSchema(subject)
         .map(FetchSchemaMetadataResponse(_))
       breaker.withCircuitBreaker(metadataRequest, registryFailure) pipeTo sender
 
     case FetchSchemaVersionRequest(subject, version) =>
-      val metadataRequest = loader.retrieveValueSchema(subject, version)
+      val metadataRequest = loader
+        .retrieveValueSchema(subject, version)
         .map(FetchSchemaVersionResponse(_))
       breaker.withCircuitBreaker(metadataRequest, registryFailure) pipeTo sender
   }
 
-  private def tryHandleRegisterSchema(json: String): Try[RegisterSchemaResponse] = {
+  private def tryHandleRegisterSchema(
+      json: String
+  ): Try[RegisterSchemaResponse] = {
     val schemaParser = new Schema.Parser()
     Try {
       val schema = schemaParser.parse(json)
       if (!isValidSchemaName(schema.getName)) {
-        throw new SchemaParseException("Schema name may only contain letters and numbers.")
+        throw new SchemaParseException(
+          "Schema name may only contain letters and numbers."
+        )
       }
 
       SchemaWrapper.from(schema).validate() match {
@@ -135,7 +156,8 @@ class SchemaRegistryActor(config: Config, settings: Option[CircuitBreakerSetting
   private def notifyOnOpen() = {
     val msg = s"Schema registry at ${registry.registryUrl} is not responding."
     log.error(msg)
-    context.system.eventStream.publish(HydraApplicationError(new RuntimeException(msg)))
+    context.system.eventStream
+      .publish(HydraApplicationError(new RuntimeException(msg)))
   }
 }
 
@@ -143,17 +165,24 @@ class CircuitBreakerSettings(config: Config) {
 
   import configs.syntax._
 
-  val maxFailures = config.get[Int]("schema-fetcher.max-failures").valueOrElse(5)
-  val callTimeout = config.get[FiniteDuration]("schema-fetcher.call-timeout")
+  val maxFailures =
+    config.get[Int]("schema-fetcher.max-failures").valueOrElse(5)
+
+  val callTimeout = config
+    .get[FiniteDuration]("schema-fetcher.call-timeout")
     .valueOrElse(5 seconds)
-  val resetTimeout = config.get[FiniteDuration]("schema-fetcher.reset-timeout")
+
+  val resetTimeout = config
+    .get[FiniteDuration]("schema-fetcher.reset-timeout")
     .valueOrElse(30 seconds)
 }
 
 object SchemaRegistryActor {
 
-  def props(config: Config, settings: Option[CircuitBreakerSettings] = None): Props = Props(
-    classOf[SchemaRegistryActor], config, settings)
+  def props(
+      config: Config,
+      settings: Option[CircuitBreakerSettings] = None
+  ): Props = Props(classOf[SchemaRegistryActor], config, settings)
 
   sealed trait SchemaRegistryRequest
 
@@ -161,31 +190,41 @@ object SchemaRegistryActor {
 
   case class FetchSchemaRequest(location: String) extends SchemaRegistryRequest
 
-  case class FetchSchemaResponse(schemaResource: SchemaResource) extends SchemaRegistryResponse
+  case class FetchSchemaResponse(schemaResource: SchemaResource)
+      extends SchemaRegistryResponse
 
-  case class FetchSchemaMetadataRequest(subject: String) extends SchemaRegistryRequest
+  case class FetchSchemaMetadataRequest(subject: String)
+      extends SchemaRegistryRequest
 
-  case class FetchSchemaMetadataResponse(schemaResource: SchemaResource) extends SchemaRegistryResponse
+  case class FetchSchemaMetadataResponse(schemaResource: SchemaResource)
+      extends SchemaRegistryResponse
 
   case class FetchSubjectsRequest() extends SchemaRegistryRequest
 
-  case class FetchSubjectsResponse(subjects: Iterable[String]) extends SchemaRegistryResponse
+  case class FetchSubjectsResponse(subjects: Iterable[String])
+      extends SchemaRegistryResponse
 
-  case class FetchAllSchemaVersionsRequest(subject: String) extends SchemaRegistryRequest
+  case class FetchAllSchemaVersionsRequest(subject: String)
+      extends SchemaRegistryRequest
 
-  case class FetchAllSchemaVersionsResponse(versions: Iterable[SchemaResource]) extends SchemaRegistryResponse
+  case class FetchAllSchemaVersionsResponse(versions: Iterable[SchemaResource])
+      extends SchemaRegistryResponse
 
-  case class FetchSchemaVersionRequest(subject: String, version: Int) extends SchemaRegistryRequest
+  case class FetchSchemaVersionRequest(subject: String, version: Int)
+      extends SchemaRegistryRequest
 
-  case class FetchSchemaVersionResponse(schemaResource: SchemaResource) extends SchemaRegistryResponse
+  case class FetchSchemaVersionResponse(schemaResource: SchemaResource)
+      extends SchemaRegistryResponse
 
   case class RegisterSchemaRequest(json: String) extends SchemaRegistryRequest
 
-  case class RegisterSchemaResponse(schemaResource: SchemaResource) extends SchemaRegistryResponse
+  case class RegisterSchemaResponse(schemaResource: SchemaResource)
+      extends SchemaRegistryResponse
 
   case class SchemaRegistered(id: Int, version: Int, schemaString: String)
 
-  val SchemaRegisteredTopic = "hydra.core.akka.SchemaRegistryActor.SchemaRegistered"
+  val SchemaRegisteredTopic =
+    "hydra.core.akka.SchemaRegistryActor.SchemaRegistered"
 
   val validSchemaNameRegex = "^[a-zA-Z0-9]*$".r
   val schemaParser = new Schema.Parser()
@@ -193,7 +232,13 @@ object SchemaRegistryActor {
   val hasSuffix = ".*-value$".r
 
   def validateSchemaName(schemaName: String): Try[Boolean] = {
-    if (isValidSchemaName(schemaName)) Success(true) else Failure(new SchemaParseException("Schema name may only contain letters and numbers."))
+    if (isValidSchemaName(schemaName)) Success(true)
+    else
+      Failure(
+        new SchemaParseException(
+          "Schema name may only contain letters and numbers."
+        )
+      )
   }
 
   def isValidSchemaName(schemaName: String): Boolean = {
@@ -202,13 +247,12 @@ object SchemaRegistryActor {
 
   def addSchemaSuffix(subject: String): String = subject match {
     case hasSuffix() => subject
-    case _ => subject + schemaSuffix
+    case _           => subject + schemaSuffix
   }
 
   def removeSchemaSuffix(subject: String): String = subject match {
     case hasSuffix() => subject.dropRight(schemaSuffix.length)
-    case _ => subject
+    case _           => subject
   }
-
 
 }

@@ -20,7 +20,6 @@ import org.scalatest.{FunSpecLike, Matchers}
 
 import scala.collection.JavaConverters._
 
-
 /**
   * Created by alexsilva on 5/4/17.
   */
@@ -164,27 +163,45 @@ class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       val ts = System.currentTimeMillis
       val ctx = new MathContext(4, RoundingMode.HALF_EVEN)
       val decimal = new java.math.BigDecimal("0.2", ctx).setScale(2)
-      val dt = LocalDate.ofEpochDay(1234).atStartOfDay(ZoneId.systemDefault()).toInstant.toEpochMilli
-      val isoDate = new ISODateConverter().fromCharSequence("2015-07-28T19:55:57.693217+00:00",
-        Schema.create(Schema.Type.STRING), IsoDate).toInstant.toEpochMilli
+      val dt = LocalDate
+        .ofEpochDay(1234)
+        .atStartOfDay(ZoneId.systemDefault())
+        .toInstant
+        .toEpochMilli
+      val isoDate = new ISODateConverter()
+        .fromCharSequence(
+          "2015-07-28T19:55:57.693217+00:00",
+          Schema.create(Schema.Type.STRING),
+          IsoDate
+        )
+        .toInstant
+        .toEpochMilli
 
       val uuid = UUID.randomUUID()
-      val uuidV = new UUIDConversion().fromCharSequence(uuid.toString,
-        Schema.create(Schema.Type.STRING), AvroUuid)
+      val uuidV = new UUIDConversion().fromCharSequence(
+        uuid.toString,
+        Schema.create(Schema.Type.STRING),
+        AvroUuid
+      )
 
       val mockedStmt = mock[PreparedStatement]
       val connection = mock[Connection]
       val friends = Lists.newArrayList("friend1", "friend2")
       (mockedStmt.getConnection _).expects().returning(connection)
       val mockArray = new MockArray(friends)
-      (connection.createArrayOf(_, _)).expects("VARCHAR", *).returning(mockArray)
+      (connection
+        .createArrayOf(_, _))
+        .expects("VARCHAR", *)
+        .returning(mockArray)
       (mockedStmt.setInt _).expects(1, 1)
       (mockedStmt.setString _).expects(2, "alex")
       (mockedStmt.setBigDecimal _).expects(3, decimal)
       (mockedStmt.setBoolean _).expects(4, true)
       (mockedStmt.setFloat _).expects(5, 10f)
       (mockedStmt.setDouble _).expects(6, 2.5d)
-      (mockedStmt.setTimestamp(_: Int, _: Timestamp)).expects(7, new Timestamp(ts))
+      (mockedStmt
+        .setTimestamp(_: Int, _: Timestamp))
+        .expects(7, new Timestamp(ts))
       (mockedStmt.setDate(_: Int, _: Date)).expects(8, new Date(dt))
       (mockedStmt.setString _).expects(9, "test")
       (mockedStmt.setNull(_: Int, _: Int)).expects(10, java.sql.Types.VARCHAR)
@@ -192,10 +209,16 @@ class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       (mockedStmt.setString _).expects(12, "test1")
       (mockedStmt.setString _).expects(13, """{"street": "happy drive"}""")
       (mockedStmt.setLong _).expects(14, 12342134223L)
-      (mockedStmt.setBytes _).expects(15, *) //todo: how to verify the contents of an array in scala mock?
-      (mockedStmt.setTimestamp(_: Int, _: Timestamp)).expects(16, new Timestamp(isoDate))
+      (mockedStmt.setBytes _).expects(
+        15,
+        *
+      ) //todo: how to verify the contents of an array in scala mock?
+      (mockedStmt
+        .setTimestamp(_: Int, _: Timestamp))
+        .expects(16, new Timestamp(isoDate))
       (mockedStmt.setObject(_: Int, _: Any)).expects(17, *)
-      (mockedStmt.setString _).expects(18, """[{"id": "authorId", "authorHandle": "theHandle"}]""")
+      (mockedStmt.setString _)
+        .expects(18, """[{"id": "authorId", "authorHandle": "theHandle"}]""")
       (mockedStmt.addBatch _).expects()
 
       val avroSchema = schema.schema
@@ -208,19 +231,29 @@ class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
       record.put("scored", 2.5d)
       record.put("signupTimestamp", ts)
       record.put("signupDate", 1234)
-      record.put("friends", new GenericData.Array[String](avroSchema.getField("friends").schema(), friends))
+      record.put(
+        "friends",
+        new GenericData.Array[String](
+          avroSchema.getField("friends").schema(),
+          friends
+        )
+      )
       record.put("testUnion", "test")
       record.put("testNullUnion", null)
       record.put("testEnum", "test1")
-      val address = new GenericData.Record(avroSchema.getField("address").schema)
+      val address =
+        new GenericData.Record(avroSchema.getField("address").schema)
       address.put("street", "happy drive")
       record.put("address", address)
       record.put("bigNumber", 12342134223L)
       record.put("byteField", ByteBuffer.wrap("test".getBytes))
       record.put("isoDate", "2015-07-28T19:55:57.693217+00:00")
-      val authors = new GenericData.Array[GenericData.Record](1, avroSchema.getField("authors").schema)
-      val eleSch = new Schema.Parser().parse(
-        """
+      val authors = new GenericData.Array[GenericData.Record](
+        1,
+        avroSchema.getField("authors").schema
+      )
+      val eleSch =
+        new Schema.Parser().parse("""
           | {"type": "record",
           |          "name": "authors_record",
           |          "fields": [
@@ -245,7 +278,8 @@ class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
     it("gets insert fields from the dialect") {
       val binder = new AvroValueSetter(schema, PostgresDialect)
       binder.fieldTypes shouldBe schema.getFields
-        .map(f => f -> JdbcUtils.getJdbcType(f.schema(), PostgresDialect)).toMap
+        .map(f => f -> JdbcUtils.getJdbcType(f.schema(), PostgresDialect))
+        .toMap
     }
 
     it("gets upsert fields from the dialect") {
@@ -270,8 +304,10 @@ class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
 
       val sch = SchemaWrapper.from(new Schema.Parser().parse(schemaStr))
       val binder = new AvroValueSetter(sch, PostgresDialect)
-      binder.fieldTypes shouldBe PostgresDialect.upsertFields(sch)
-        .map(f => f -> JdbcUtils.getJdbcType(f.schema(), PostgresDialect)).toMap
+      binder.fieldTypes shouldBe PostgresDialect
+        .upsertFields(sch)
+        .map(f => f -> JdbcUtils.getJdbcType(f.schema(), PostgresDialect))
+        .toMap
     }
 
     it("works with json arrays") {
@@ -329,16 +365,29 @@ class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
           |{ "type": "record", "name": "ComplexTest", "namespace": "hydra.json", "fields": [{ "name": "id", "type": "string", "doc": "GUID Identifier" }, { "name": "assessment", "type": ["null", { "type": "record", "name": "assessment_record", "fields": [{ "name": "id", "type": "string" }] }], "default": null }, { "name": "contentPillar", "type": "string" }, { "name": "description", "type": "string" }, { "name": "highlights", "type": "string" }, { "name": "numberOfCourses", "type": "int" }, { "name": "numberOfHours", "type": "int" }, { "name": "prerequisites", "type": "string" }, { "name": "retired", "type": "boolean" }, { "name": "replacedById", "type": ["null", "string"], "default": null }, { "name": "status", "type": "string" }, { "name": "title", "type": "string", "doc": "Title for the Path" }, { "name": "thumbnailUrl", "type": "string" }, { "name": "type", "type": "string" }, { "name": "url", "type": "string" }, { "name": "urlSlug", "type": "string" }, { "name": "version", "type": "int" }, { "name": "createdAt", "type": { "type": "string", "logicalType": "iso-datetime" } }, { "name": "updatedAt", "type": { "type": "string", "logicalType": "iso-datetime" } }, { "name": "publishedAt", "type": { "type": "string", "logicalType": "iso-datetime" } }, { "name": "authors", "type": { "type": "array", "items": { "type": "record", "name": "authors_Record", "fields": [{ "name": "id", "type": "string" }, { "name": "authorHandle", "type": "string" }] } } }, { "name": "pathLevels", "type": { "type": "array", "items": { "type": "record", "name": "pathLevels_Record", "fields": [{ "name": "id", "type": "string" }, { "name": "transcenderExamId", "type": ["null", "string"], "default": null }, { "name": "title", "type": "string" }, { "name": "description", "type": "string" }, { "name": "courses", "type": { "type": "array", "items": { "type": "record", "name": "courses_Record", "fields": [{ "name": "id", "type": "string" }, { "name": "deprecatedCourseId", "type": "string" }] } } }, { "name": "comingSoonCourses", "type": ["null", { "type": "array", "items": { "type": "record", "name": "comingSoonCoursesRecord", "fields": [{ "name": "id", "type": "string" }] } }], "default": null }] } } }, { "name": "relatedTopics", "type": { "type": "array", "items": { "type": "record", "name": "relatedTopicsRecord", "fields": [{ "name": "title", "type": "string" }] } } }] }{ "type": "record", "name": "ComplexTest", "namespace": "hydra.json", "fields": [{ "name": "id", "type": "string", "doc": "GUID Identifier" }, { "name": "assessment", "type": ["null", { "type": "record", "name": "assessment_record", "fields": [{ "name": "id", "type": "string" }] }], "default": null }, { "name": "contentPillar", "type": "string" }, { "name": "description", "type": "string" }, { "name": "highlights", "type": "string" }, { "name": "numberOfCourses", "type": "int" }, { "name": "numberOfHours", "type": "int", "default": null }, { "name": "prerequisites", "type": "string" }, { "name": "retired", "type": "boolean" }, { "name": "replacedById", "type": ["null", "string"], "default": null }, { "name": "status", "type": "string" }, { "name": "title", "type": "string", "doc": "Title for the Path" }, { "name": "thumbnailUrl", "type": "string" }, { "name": "type", "type": "string" }, { "name": "url", "type": "string" }, { "name": "urlSlug", "type": "string" }, { "name": "version", "type": "int" }, { "name": "createdAt", "type": { "type": "string", "logicalType": "iso-datetime" } }, { "name": "updatedAt", "type": { "type": "string", "logicalType": "iso-datetime" } }, { "name": "publishedAt", "type": { "type": "string", "logicalType": "iso-datetime" } }, { "name": "authors", "type": { "type": "array", "items": { "type": "record", "name": "authors_Record", "fields": [{ "name": "id", "type": "string" }, { "name": "authorHandle", "type": "string" }] } } }, { "name": "pathLevels", "type": { "type": "array", "items": { "type": "record", "name": "pathLevels_Record", "fields": [{ "name": "id", "type": "string" }, { "name": "transcenderExamId", "type": ["null", "string"], "default": null }, { "name": "title", "type": "string" }, { "name": "description", "type": "string" }, { "name": "courses", "type": { "type": "array", "items": { "type": "record", "name": "courses_Record", "fields": [{ "name": "id", "type": "string" }, { "name": "deprecatedCourseId", "type": "string" }] } } }, { "name": "comingSoonCourses", "type": ["null", { "type": "array", "items": { "type": "record", "name": "comingSoonCoursesRecord", "fields": [{ "name": "id", "type": "string" }] } }], "default": null }] } } }, { "name": "relatedTopics", "type": { "type": "array", "items": { "type": "record", "name": "relatedTopicsRecord", "fields": [{ "name": "title", "type": "string" }] } } }] }
           |""".stripMargin
 
-      val record = new JsonConverter[GenericRecord](new Schema.Parser().parse(schema)).convert(json)
+      val record = new JsonConverter[GenericRecord](
+        new Schema.Parser().parse(schema)
+      ).convert(json)
       //in avro complex types are Lists
       record.get("relatedTopics") shouldBe a[java.util.List[_]]
-      val s = new AvroValueSetter(SchemaWrapper.from(record.getSchema), PostgresDialect)
+      val s = new AvroValueSetter(
+        SchemaWrapper.from(record.getSchema),
+        PostgresDialect
+      )
       val mockedStmt = mock[PreparedStatement]
       val expected = """[{"title": "PRINCE2"},{"title": "PMP"}]"""
       (mockedStmt.setString _).expects(1, expected)
 
-      s.arrayValue(record.get("relatedTopics").asInstanceOf[java.util.List[_]].asScala.toList,
-        record.getSchema().getField("relatedTopics").schema(), mockedStmt, 1)
+      s.arrayValue(
+        record
+          .get("relatedTopics")
+          .asInstanceOf[java.util.List[_]]
+          .asScala
+          .toList,
+        record.getSchema().getField("relatedTopics").schema(),
+        mockedStmt,
+        1
+      )
 
     }
 
@@ -355,7 +404,8 @@ class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
           |     ]
           |}
         """.stripMargin
-      val schemaWrapper = SchemaWrapper.from(new Schema.Parser().parse(simpleSchemaString))
+      val schemaWrapper =
+        SchemaWrapper.from(new Schema.Parser().parse(simpleSchemaString))
 
       val testRecord = {
         val tr = new GenericData.Record(schemaWrapper.schema)
@@ -400,7 +450,10 @@ class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
         ps
       }
 
-      avroValueSetter.bindForDeletion(Map(schema.getField("id") -> 100.asInstanceOf[AnyRef]), preparedStatement)
+      avroValueSetter.bindForDeletion(
+        Map(schema.getField("id") -> 100.asInstanceOf[AnyRef]),
+        preparedStatement
+      )
     }
   }
 }

@@ -8,15 +8,19 @@ import hydra.core.transport.{AckStrategy, ValidationStrategy}
   *
   * Created by alexsilva on 12/3/16.
   */
-case class HydraRequest(correlationId: String = CorrelationIdBuilder.generate(),
-                        payload: String,
-                        clientId: Option[String] = None,
-                        metadata: Map[String, String] = Map.empty,
-                        validationStrategy: ValidationStrategy = Strict,
-                        ackStrategy: AckStrategy = AckStrategy.NoAck) {
+case class HydraRequest(
+    correlationId: String = CorrelationIdBuilder.generate(),
+    payload: String,
+    clientId: Option[String] = None,
+    metadata: Map[String, String] = Map.empty,
+    validationStrategy: ValidationStrategy = Strict,
+    ackStrategy: AckStrategy = AckStrategy.NoAck
+) {
 
   def metadataValue(name: String): Option[String] = {
-    metadata.get(name).orElse(metadata.find(_._1.equalsIgnoreCase(name)).map(_._2))
+    metadata
+      .get(name)
+      .orElse(metadata.find(_._1.equalsIgnoreCase(name)).map(_._2))
   }
 
   /**
@@ -30,12 +34,14 @@ case class HydraRequest(correlationId: String = CorrelationIdBuilder.generate(),
     metadataValue(name).map(_.equals(value)).getOrElse(false)
   }
 
-  def withCorrelationId(correlationId: String) = copy(correlationId = correlationId)
+  def withCorrelationId(correlationId: String) =
+    copy(correlationId = correlationId)
 
   def withMetadata(meta: (String, String)*) =
     copy(metadata = this.metadata ++ meta)
 
-  def hasMetadata(key: String): Boolean = metadata.find(_._1.equalsIgnoreCase(key)).isDefined
+  def hasMetadata(key: String): Boolean =
+    metadata.find(_._1.equalsIgnoreCase(key)).isDefined
 
   def withAckStrategy(strategy: AckStrategy) = copy(ackStrategy = strategy)
 

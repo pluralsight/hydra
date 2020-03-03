@@ -18,24 +18,27 @@ import scala.io.Source
 /**
   * Created by alexsilva on 5/12/17.
   */
-class SchemasEndpointSpec extends Matchers
-  with WordSpecLike
-  with ScalatestRouteTest
-  with HydraJsonSupport
-  with ConfigSupport {
+class SchemasEndpointSpec
+    extends Matchers
+    with WordSpecLike
+    with ScalatestRouteTest
+    with HydraJsonSupport
+    with ConfigSupport {
 
   override def createActorSystem(): ActorSystem =
     ActorSystem(actorSystemNameFrom(getClass))
 
-
   val schemasRoute = new SchemasEndpoint().route
   implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
 
-  private val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
+  private val schemaRegistry =
+    ConfluentSchemaRegistry.forConfig(applicationConfig)
 
-  val schema = new Schema.Parser().parse(Source.fromResource("schema.avsc").mkString)
+  val schema =
+    new Schema.Parser().parse(Source.fromResource("schema.avsc").mkString)
 
-  val schemaEvolved = new Schema.Parser().parse(Source.fromResource("schema2.avsc").mkString)
+  val schemaEvolved =
+    new Schema.Parser().parse(Source.fromResource("schema2.avsc").mkString)
 
   override def beforeAll = {
     super.beforeAll()
@@ -56,7 +59,11 @@ class SchemasEndpointSpec extends Matchers
 
   override def afterAll = {
     super.afterAll()
-    TestKit.shutdownActorSystem(system, verifySystemShutdown = true, duration = 10 seconds)
+    TestKit.shutdownActorSystem(
+      system,
+      verifySystemShutdown = true,
+      duration = 10 seconds
+    )
   }
 
   "The schemas endpoint" should {
@@ -71,7 +78,10 @@ class SchemasEndpointSpec extends Matchers
       Get("/schemas/hydra.test.Tester") ~> schemasRoute ~> check {
         val rep = responseAs[SchemasEndpointResponse]
         val id = schemaRegistry.registryClient
-          .getId("hydra.test.Tester-value", new Schema.Parser().parse(rep.schema))
+          .getId(
+            "hydra.test.Tester-value",
+            new Schema.Parser().parse(rep.schema)
+          )
         rep.id shouldBe id
         rep.version shouldBe 2
         new Schema.Parser().parse(rep.schema) shouldBe schemaEvolved
@@ -82,7 +92,10 @@ class SchemasEndpointSpec extends Matchers
       Get("/schemas/hydra.test.Tester") ~> schemasRoute ~> check {
         val rep = responseAs[SchemasEndpointResponse]
         val id = schemaRegistry.registryClient
-          .getId("hydra.test.Tester-value", new Schema.Parser().parse(rep.schema))
+          .getId(
+            "hydra.test.Tester-value",
+            new Schema.Parser().parse(rep.schema)
+          )
         rep.id shouldBe id
         rep.version shouldBe 2
         new Schema.Parser().parse(rep.schema) shouldBe schemaEvolved
@@ -97,7 +110,8 @@ class SchemasEndpointSpec extends Matchers
 
     "return 404 if schema doesn't exist" in {
       Get("/schemas/tester") ~> schemasRoute ~> check {
-        response.status.intValue() should be >= 400 //have to do this bc the mock registry returns an IOException
+        response.status
+          .intValue() should be >= 400 //have to do this bc the mock registry returns an IOException
       }
     }
 
@@ -126,7 +140,8 @@ class SchemasEndpointSpec extends Matchers
       val statusCode = 409
       val errorCode = 23
       val errorMessage = "someErrorOccurred"
-      val url = s"/throwRestClientException?statusCode=$statusCode&errorCode=$errorCode&errorMessage=$errorMessage"
+      val url =
+        s"/throwRestClientException?statusCode=$statusCode&errorCode=$errorCode&errorMessage=$errorMessage"
       Get(url) ~> Route.seal(mockRoute) ~> check {
         response.status.intValue() shouldBe statusCode
         val res = responseAs[GenericServiceResponse]
@@ -137,4 +152,3 @@ class SchemasEndpointSpec extends Matchers
     }
   }
 }
-

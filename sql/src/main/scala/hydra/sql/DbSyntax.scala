@@ -10,6 +10,7 @@ trait DbSyntax {
 }
 
 object UnderscoreSyntax extends DbSyntax {
+
   override def format(identifier: String): String = {
     CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, identifier)
   }

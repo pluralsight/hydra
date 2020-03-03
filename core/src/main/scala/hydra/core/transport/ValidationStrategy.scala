@@ -18,7 +18,6 @@ package hydra.core.transport
 /**
   * Created by alexsilva on 1/11/17.
   */
-
 sealed trait ValidationStrategy
 
 object ValidationStrategy {
@@ -31,9 +30,9 @@ object ValidationStrategy {
     */
   def apply(strategy: String): ValidationStrategy = {
     Option(strategy).map(_.trim.toLowerCase) match {
-      case Some(s) if (s.equals("strict")) => Strict
+      case Some(s) if (s.equals("strict"))  => Strict
       case Some(s) if (s.equals("relaxed")) => Relaxed
-      case _ => Strict
+      case _                                => Strict
     }
   }
 

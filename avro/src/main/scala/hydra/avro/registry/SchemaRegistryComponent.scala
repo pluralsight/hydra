@@ -9,5 +9,5 @@ trait SchemaRegistryComponent {
 
   def registryClient: SchemaRegistryClient
 
-  def registryUrl:String
+  def registryUrl: String
 }

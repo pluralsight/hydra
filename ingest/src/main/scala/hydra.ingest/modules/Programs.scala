@@ -14,7 +14,9 @@ final class Programs[F[_]: Logger: Sync: Timer] private (
 ) {
 
   val retryPolicy: RetryPolicy[F] =
-    limitRetries[F](cfg.numRetries) |+| exponentialBackoff[F](cfg.baseBackoffDelay)
+    limitRetries[F](cfg.numRetries) |+| exponentialBackoff[F](
+      cfg.baseBackoffDelay
+    )
 
   val createTopic: CreateTopicProgram[F] = new CreateTopicProgram[F](
     algebras.schemaRegistry,
@@ -26,9 +28,9 @@ final class Programs[F[_]: Logger: Sync: Timer] private (
 object Programs {
 
   def make[F[_]: Logger: Sync: Timer](
-                                       createTopicConfig: CreateTopicConfig,
-                                       algebras: Algebras[F]
-                                     ): F[Programs[F]] = Sync[F].delay {
+      createTopicConfig: CreateTopicConfig,
+      algebras: Algebras[F]
+  ): F[Programs[F]] = Sync[F].delay {
     new Programs[F](createTopicConfig, algebras)
   }
 

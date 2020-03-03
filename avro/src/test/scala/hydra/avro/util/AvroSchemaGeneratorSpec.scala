@@ -29,8 +29,14 @@ class AvroSchemaGeneratorSpec extends Matchers with FunSpecLike {
   val mapper = new ObjectMapper
   val converter = new AvroSchemaGenerator()
 
-  val json = Source.fromFile(Thread.currentThread.getContextClassLoader.getResource("avro-test.json").getFile)
-    .getLines().mkString
+  val json = Source
+    .fromFile(
+      Thread.currentThread.getContextClassLoader
+        .getResource("avro-test.json")
+        .getFile
+    )
+    .getLines()
+    .mkString
 
   describe("The json to avro schema converter") {
     it("Should include a valid namespace and a valid name") {

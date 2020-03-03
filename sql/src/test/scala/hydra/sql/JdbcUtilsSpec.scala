@@ -17,19 +17,24 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 5/18/17.
   */
-class JdbcUtilsSpec extends Matchers
-  with FunSpecLike
-  with BeforeAndAfterAll {
+class JdbcUtilsSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
 
   DriverManager.registerDriver(new org.h2.Driver)
 
-  val provider = new DriverManagerConnectionProvider("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1",
-    "", "", 1, 1.millis)
+  val provider = new DriverManagerConnectionProvider(
+    "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1",
+    "",
+    "",
+    1,
+    1.millis
+  )
 
-
-  LogicalTypes.register(AvroUuid.AvroUuidLogicalTypeName, new LogicalTypeFactory {
-    override def fromSchema(schema: Schema): LogicalType = AvroUuid
-  })
+  LogicalTypes.register(
+    AvroUuid.AvroUuidLogicalTypeName,
+    new LogicalTypeFactory {
+      override def fromSchema(schema: Schema): LogicalType = AvroUuid
+    }
+  )
 
   override def afterAll() = provider.connection.close()
 
@@ -117,29 +122,69 @@ class JdbcUtilsSpec extends Matchers
 
   describe("The JDBCUtils class") {
     it("converts a schema") {
-      JdbcUtils.getCommonJDBCType(avro.getField("username").schema()).get shouldBe JdbcType("TEXT", VARCHAR)
-      JdbcUtils.getCommonJDBCType(avro.getField("passwordHash").schema()).get shouldBe JdbcType("BYTE", TINYINT)
-      JdbcUtils.getCommonJDBCType(avro.getField("rate").schema()) shouldBe Some(JdbcType("DECIMAL(4,2)", DECIMAL))
-      JdbcUtils.getCommonJDBCType(avro.getField("active").schema()) shouldBe Some(JdbcType("BIT(1)", BIT))
-      JdbcUtils.getCommonJDBCType(avro.getField("score").schema()) shouldBe Some(JdbcType("REAL", FLOAT))
-      JdbcUtils.getCommonJDBCType(avro.getField("scored").schema()) shouldBe Some(JdbcType("DOUBLE PRECISION", DOUBLE))
-      JdbcUtils.getCommonJDBCType(avro.getField("testUnion").schema()) shouldBe Some(JdbcType("TEXT", VARCHAR))
+      JdbcUtils
+        .getCommonJDBCType(avro.getField("username").schema())
+        .get shouldBe JdbcType("TEXT", VARCHAR)
+      JdbcUtils
+        .getCommonJDBCType(avro.getField("passwordHash").schema())
+        .get shouldBe JdbcType("BYTE", TINYINT)
+      JdbcUtils.getCommonJDBCType(avro.getField("rate").schema()) shouldBe Some(
+        JdbcType("DECIMAL(4,2)", DECIMAL)
+      )
+      JdbcUtils.getCommonJDBCType(avro.getField("active").schema()) shouldBe Some(
+        JdbcType("BIT(1)", BIT)
+      )
+      JdbcUtils.getCommonJDBCType(avro.getField("score").schema()) shouldBe Some(
+        JdbcType("REAL", FLOAT)
+      )
+      JdbcUtils.getCommonJDBCType(avro.getField("scored").schema()) shouldBe Some(
+        JdbcType("DOUBLE PRECISION", DOUBLE)
+      )
+      JdbcUtils.getCommonJDBCType(avro.getField("testUnion").schema()) shouldBe Some(
+        JdbcType("TEXT", VARCHAR)
+      )
       JdbcUtils.getCommonJDBCType(avro.getField("friends").schema()) shouldBe None
-      JdbcUtils.getCommonJDBCType(avro.getField("signupDate").schema()) shouldBe Some(JdbcType("DATE", DATE))
-      JdbcUtils.getCommonJDBCType(avro.getField("signupTimestamp").schema()) shouldBe Some(JdbcType("TIMESTAMP", TIMESTAMP))
-      JdbcUtils.getCommonJDBCType(avro.getField("scoreLong").schema()) shouldBe Some(JdbcType("BIGINT", BIGINT))
-      JdbcUtils.getCommonJDBCType(avro.getField("justANumber").schema()) shouldBe Some(JdbcType("INTEGER", INTEGER))
+      JdbcUtils.getCommonJDBCType(avro.getField("signupDate").schema()) shouldBe Some(
+        JdbcType("DATE", DATE)
+      )
+      JdbcUtils.getCommonJDBCType(avro.getField("signupTimestamp").schema()) shouldBe Some(
+        JdbcType("TIMESTAMP", TIMESTAMP)
+      )
+      JdbcUtils.getCommonJDBCType(avro.getField("scoreLong").schema()) shouldBe Some(
+        JdbcType("BIGINT", BIGINT)
+      )
+      JdbcUtils.getCommonJDBCType(avro.getField("justANumber").schema()) shouldBe Some(
+        JdbcType("INTEGER", INTEGER)
+      )
     }
 
     it("extracts the right column list") {
-      JdbcUtils.columnNames(avro) shouldBe Seq("id", "username", "rate", "rateb", "active", "score", "scored",
-        "passwordHash", "signupTimestamp", "scoreLong", "signupDate", "justANumber", "testUnion", "friends")
+      JdbcUtils.columnNames(avro) shouldBe Seq(
+        "id",
+        "username",
+        "rate",
+        "rateb",
+        "active",
+        "score",
+        "scored",
+        "passwordHash",
+        "signupTimestamp",
+        "scoreLong",
+        "signupDate",
+        "justANumber",
+        "testUnion",
+        "friends"
+      )
     }
 
     it("gets non-nullable types for unions") {
       import scala.collection.JavaConverters._
-      val u1 = Schema.createUnion(List(Schema.create(Type.INT), Schema.create(Type.NULL)).asJava)
-      val u2 = Schema.createUnion(List(Schema.create(Type.NULL), Schema.create(Type.INT)).asJava)
+      val u1 = Schema.createUnion(
+        List(Schema.create(Type.INT), Schema.create(Type.NULL)).asJava
+      )
+      val u2 = Schema.createUnion(
+        List(Schema.create(Type.NULL), Schema.create(Type.INT)).asJava
+      )
       JdbcUtils.getNonNullableUnionType(u1) shouldBe Schema.create(Type.INT)
       JdbcUtils.getNonNullableUnionType(u2) shouldBe Schema.create(Type.INT)
     }
@@ -189,10 +234,22 @@ class JdbcUtilsSpec extends Matchers
       val avro = new Schema.Parser().parse(schema)
 
       JdbcUtils.columns(avro, NoopDialect) shouldBe Seq(
-        Column("id", avro.getField("id").schema(), JdbcType("INTEGER", JDBCType.INTEGER), false, Some("doc")),
-        Column("username", avro.getField("username").schema(), JdbcType("TEXT", JDBCType.VARCHAR), true, None))
+        Column(
+          "id",
+          avro.getField("id").schema(),
+          JdbcType("INTEGER", JDBCType.INTEGER),
+          false,
+          Some("doc")
+        ),
+        Column(
+          "username",
+          avro.getField("username").schema(),
+          JdbcType("TEXT", JDBCType.VARCHAR),
+          true,
+          None
+        )
+      )
     }
-
 
     it("returns CHAR for enums") {
       val schema =
@@ -216,7 +273,9 @@ class JdbcUtilsSpec extends Matchers
 
       val avro = new Schema.Parser().parse(schema)
 
-      JdbcUtils.getCommonJDBCType(avro.getField("testEnum").schema()).get shouldBe JdbcType("TEXT", VARCHAR)
+      JdbcUtils
+        .getCommonJDBCType(avro.getField("testEnum").schema())
+        .get shouldBe JdbcType("TEXT", VARCHAR)
 
     }
 
@@ -296,10 +355,11 @@ class JdbcUtilsSpec extends Matchers
         """.stripMargin
 
       val avro = new Schema.Parser().parse(schema)
-      val columns = "\"id\" INTEGER NOT NULL,\"username\" TEXT NOT NULL,\"rate\" DECIMAL(4,2) NOT NULL,\"rateb\" BYTE" +
-        " NOT NULL,\"active\" BIT(1) NOT NULL,\"score\" REAL NOT NULL,\"scored\" DOUBLE PRECISION NOT NULL," +
-        "\"passwordHash\" BYTE NOT NULL,\"signupTimestamp\" TIMESTAMP NOT NULL,\"scoreLong\" BIGINT NOT NULL," +
-        "\"signupDate\" DATE NOT NULL,\"justANumber\" INTEGER NOT NULL,\"testUnion\" TEXT "
+      val columns =
+        "\"id\" INTEGER NOT NULL,\"username\" TEXT NOT NULL,\"rate\" DECIMAL(4,2) NOT NULL,\"rateb\" BYTE" +
+          " NOT NULL,\"active\" BIT(1) NOT NULL,\"score\" REAL NOT NULL,\"scored\" DOUBLE PRECISION NOT NULL," +
+          "\"passwordHash\" BYTE NOT NULL,\"signupTimestamp\" TIMESTAMP NOT NULL,\"scoreLong\" BIGINT NOT NULL," +
+          "\"signupDate\" DATE NOT NULL,\"justANumber\" INTEGER NOT NULL,\"testUnion\" TEXT "
 
       JdbcUtils.schemaString(SchemaWrapper.from(avro), "User", NoopDialect) shouldBe columns
     }
@@ -342,7 +402,11 @@ class JdbcUtilsSpec extends Matchers
 
       val avro = new Schema.Parser().parse(schema)
 
-      val stmt = JdbcUtils.schemaString(SchemaWrapper.from((avro)), "User", PostgresDialect)
+      val stmt = JdbcUtils.schemaString(
+        SchemaWrapper.from((avro)),
+        "User",
+        PostgresDialect
+      )
       stmt shouldBe "\"id\" INTEGER NOT NULL,\"username\" TEXT NOT NULL,\"uuidTest\"" +
         " UUID NOT NULL,\"testEnum\" TEXT NOT NULL,CONSTRAINT \"User_PK\" PRIMARY KEY (\"id\")"
     }
@@ -395,7 +459,11 @@ class JdbcUtilsSpec extends Matchers
 
       val avro = new Schema.Parser().parse(schema)
 
-      val stmt = JdbcUtils.schemaString(SchemaWrapper.from((avro)), "User", PostgresDialect)
+      val stmt = JdbcUtils.schemaString(
+        SchemaWrapper.from((avro)),
+        "User",
+        PostgresDialect
+      )
       stmt shouldBe "\"id\" INTEGER NOT NULL DEFAULT 100,\"username\" TEXT NOT NULL DEFAULT 'defaultUser',\"uuidTest\"" +
         " UUID NOT NULL,\"testEnum\" TEXT NOT NULL,\"eventName\" TEXT ,CONSTRAINT \"User_PK\" PRIMARY KEY (\"id\")"
     }
@@ -434,7 +502,11 @@ class JdbcUtilsSpec extends Matchers
         """.stripMargin
 
       val avro = new Schema.Parser().parse(schema)
-      val stmt = JdbcUtils.schemaString(SchemaWrapper.from((avro)), "User", PostgresDialect)
+      val stmt = JdbcUtils.schemaString(
+        SchemaWrapper.from((avro)),
+        "User",
+        PostgresDialect
+      )
       stmt shouldBe "\"id1\" INTEGER NOT NULL,\"id2\" INTEGER NOT NULL,\"username\" TEXT NOT NULL," +
         "\"testEnum\" TEXT NOT NULL,CONSTRAINT \"User_PK\" PRIMARY KEY (\"id1\",\"id2\")"
     }
@@ -463,7 +535,9 @@ class JdbcUtilsSpec extends Matchers
 
     it("Drops a table") {
       TryWith(provider.getConnection().createStatement()) { stmt =>
-        val rs = stmt.executeUpdate("CREATE TABLE drop_test (\"id\" INTEGER NOT NULL,\"username\" TEXT ) ")
+        val rs = stmt.executeUpdate(
+          "CREATE TABLE drop_test (\"id\" INTEGER NOT NULL,\"username\" TEXT ) "
+        )
         rs shouldBe 0
       }.get
       JdbcUtils.dropTable(provider.getConnection(), "drop_test")

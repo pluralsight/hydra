@@ -17,8 +17,11 @@ class ISODateConverterSpec extends Matchers with FlatSpecLike {
     val c = new ISODateConverter()
     c.getConvertedType shouldBe classOf[ZonedDateTime]
     c.getLogicalTypeName shouldBe "iso-datetime"
-    val dt = c.fromCharSequence("2015-07-28T19:55:57.693217+00:00",
-      Schema.create(Schema.Type.STRING), IsoDate)
+    val dt = c.fromCharSequence(
+      "2015-07-28T19:55:57.693217+00:00",
+      Schema.create(Schema.Type.STRING),
+      IsoDate
+    )
 
     dt.getYear shouldBe 2015
     dt.getMonthValue shouldBe 7
@@ -33,8 +36,11 @@ class ISODateConverterSpec extends Matchers with FlatSpecLike {
     val c = new ISODateConverter()
     c.getConvertedType shouldBe classOf[ZonedDateTime]
     c.getLogicalTypeName shouldBe "iso-datetime"
-    val dt = c.fromCharSequence("2015-07-28T19:55:57.693217",
-      Schema.create(Schema.Type.STRING), IsoDate)
+    val dt = c.fromCharSequence(
+      "2015-07-28T19:55:57.693217",
+      Schema.create(Schema.Type.STRING),
+      IsoDate
+    )
 
     dt.getYear shouldBe 2015
     dt.getMonthValue shouldBe 7
@@ -49,8 +55,11 @@ class ISODateConverterSpec extends Matchers with FlatSpecLike {
     val c = new ISODateConverter()
     c.getConvertedType shouldBe classOf[ZonedDateTime]
     c.getLogicalTypeName shouldBe "iso-datetime"
-    val dt = c.fromCharSequence("2019-09-18T02:44:32+0000",
-      Schema.create(Schema.Type.STRING), IsoDate)
+    val dt = c.fromCharSequence(
+      "2019-09-18T02:44:32+0000",
+      Schema.create(Schema.Type.STRING),
+      IsoDate
+    )
 
     dt.getYear shouldBe 2019
     dt.getMonthValue shouldBe 9
@@ -63,8 +72,11 @@ class ISODateConverterSpec extends Matchers with FlatSpecLike {
 
   it should "return the epoch on bad formed dates" in {
     val c = new ISODateConverter()
-    c.fromCharSequence("2015-07-281",
-      Schema.create(Schema.Type.STRING), IsoDate) shouldBe Instant.EPOCH.atZone(ZoneOffset.UTC)
+    c.fromCharSequence(
+      "2015-07-281",
+      Schema.create(Schema.Type.STRING),
+      IsoDate
+    ) shouldBe Instant.EPOCH.atZone(ZoneOffset.UTC)
   }
 
   it should "use the logical type when parsing a schema" in {

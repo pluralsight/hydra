@@ -30,21 +30,34 @@ import scala.concurrent.duration._
 /**
   * Created by alexsilva on 1/20/17.
   */
-class SchemaResourceLoaderSpec extends Matchers
-  with FunSpecLike
-  with BeforeAndAfterEach
-  with Eventually
-  with ScalaFutures {
+class SchemaResourceLoaderSpec
+    extends Matchers
+    with FunSpecLike
+    with BeforeAndAfterEach
+    with Eventually
+    with ScalaFutures {
 
   implicit override val patienceConfig =
-    PatienceConfig(timeout = scaled(Span(1, Seconds)), interval = scaled(Span(10, Millis)))
+    PatienceConfig(
+      timeout = scaled(Span(1, Seconds)),
+      interval = scaled(Span(10, Millis))
+    )
 
   val schemaParser = new Schema.Parser()
+
   val testValueSchema = schemaParser.parse(
-    Thread.currentThread().getContextClassLoader.getResourceAsStream("resource-loader-spec.avsc"))
+    Thread
+      .currentThread()
+      .getContextClassLoader
+      .getResourceAsStream("resource-loader-spec.avsc")
+  )
 
   val testKeySchema = schemaParser.parse(
-    Thread.currentThread().getContextClassLoader.getResourceAsStream("resource-loader-spec-key.avsc"))
+    Thread
+      .currentThread()
+      .getContextClassLoader
+      .getResourceAsStream("resource-loader-spec-key.avsc")
+  )
 
   val subject = testValueSchema.getFullName
 
@@ -95,12 +108,16 @@ class SchemaResourceLoaderSpec extends Matchers
 
     it("errors when a value schema subject is not known") {
       val loader = fixture()
-      whenReady(loader.retrieveValueSchema("registry:tester").failed)(_ shouldBe a[SchemaRegistryException])
+      whenReady(loader.retrieveValueSchema("registry:tester").failed)(
+        _ shouldBe a[SchemaRegistryException]
+      )
     }
 
     it("errors when a key schema subject is not known") {
       val loader = fixture()
-      whenReady(loader.retrieveKeySchema("registry:tester").failed)(_ shouldBe a[SchemaRegistryException])
+      whenReady(loader.retrieveKeySchema("registry:tester").failed)(
+        _ shouldBe a[SchemaRegistryException]
+      )
     }
 
     it("loads a previously cached value schema from the cache") {
@@ -151,84 +168,128 @@ class SchemaResourceLoaderSpec extends Matchers
       }
     }
 
-    it("returns the same underlying value schema instance if the registry metadata hasn't changed") {
+    it(
+      "returns the same underlying value schema instance if the registry metadata hasn't changed"
+    ) {
       val client = new MockSchemaRegistryClient
       client.register(testValueSchema.getFullName + "-value", testValueSchema)
-      val loader = new SchemaResourceLoader("http://localhost:48223", client,
-        metadataCheckInterval = 5.millis)
-      whenReady(loader.retrieveValueSchema(testValueSchema.getFullName)) { schemaResource =>
-        schemaResource.schema shouldBe testValueSchema
+      val loader = new SchemaResourceLoader(
+        "http://localhost:48223",
+        client,
+        metadataCheckInterval = 5.millis
+      )
+      whenReady(loader.retrieveValueSchema(testValueSchema.getFullName)) {
+        schemaResource => schemaResource.schema shouldBe testValueSchema
       }
 
       eventually {
-        whenReady(loader.retrieveValueSchema(testValueSchema.getFullName)) { schemaResource =>
-          (schemaResource.schema eq testValueSchema) shouldBe true
+        whenReady(loader.retrieveValueSchema(testValueSchema.getFullName)) {
+          schemaResource =>
+            (schemaResource.schema eq testValueSchema) shouldBe true
         }
       }
     }
 
-    it("returns the same underlying key schema instance if the registry metadata hasn't changed") {
+    it(
+      "returns the same underlying key schema instance if the registry metadata hasn't changed"
+    ) {
       val client = new MockSchemaRegistryClient
       client.register(testKeySchema.getFullName + "-key", testKeySchema)
-      val loader = new SchemaResourceLoader("http://localhost:48223", client,
-        metadataCheckInterval = 5.millis)
-      whenReady(loader.retrieveKeySchema(testKeySchema.getFullName)) { schemaResource =>
-        schemaResource.schema shouldBe testKeySchema
+      val loader = new SchemaResourceLoader(
+        "http://localhost:48223",
+        client,
+        metadataCheckInterval = 5.millis
+      )
+      whenReady(loader.retrieveKeySchema(testKeySchema.getFullName)) {
+        schemaResource => schemaResource.schema shouldBe testKeySchema
       }
 
       eventually {
-        whenReady(loader.retrieveKeySchema(testKeySchema.getFullName)) { schemaResource =>
-          (schemaResource.schema eq testKeySchema) shouldBe true
+        whenReady(loader.retrieveKeySchema(testKeySchema.getFullName)) {
+          schemaResource =>
+            (schemaResource.schema eq testKeySchema) shouldBe true
         }
       }
     }
 
-    it("updates the underlying schema instance when the registry metadata changes") {
+    it(
+      "updates the underlying schema instance when the registry metadata changes"
+    ) {
       val nschema = newValueSchema(testValueSchema.getNamespace, "ntest")
       val client = new MockSchemaRegistryClient
       client.register(nschema.getFullName + "-value", nschema)
-      val loader = new SchemaResourceLoader("http://localhost:48223", client,
-        metadataCheckInterval = 5.millis)
-      whenReady(loader.retrieveValueSchema(nschema.getFullName)) { schemaResource =>
-        schemaResource.schema shouldBe nschema
+      val loader = new SchemaResourceLoader(
+        "http://localhost:48223",
+        client,
+        metadataCheckInterval = 5.millis
+      )
+      whenReady(loader.retrieveValueSchema(nschema.getFullName)) {
+        schemaResource => schemaResource.schema shouldBe nschema
       }
 
       //evolve the schema
-      val field = new Schema.Field("new_field", SchemaBuilder.builder().intType(), "NewField", 10)
+      val field = new Schema.Field(
+        "new_field",
+        SchemaBuilder.builder().intType(),
+        "NewField",
+        10
+      )
       val fields = nschema.getFields.asScala.map { f =>
         new Schema.Field(f.name(), f.schema(), f.doc(), f.defaultVal())
       } :+ field
-      val evolvedSchema = Schema.createRecord(nschema.getName(),
-        "evolve", nschema.getNamespace(), false, fields.asJava)
+      val evolvedSchema = Schema.createRecord(
+        nschema.getName(),
+        "evolve",
+        nschema.getNamespace(),
+        false,
+        fields.asJava
+      )
       client.register(nschema.getFullName + "-value", evolvedSchema)
       eventually {
-        whenReady(loader.retrieveValueSchema(nschema.getFullName)) { schemaResource =>
-          (schemaResource.schema eq nschema) shouldBe false
+        whenReady(loader.retrieveValueSchema(nschema.getFullName)) {
+          schemaResource => (schemaResource.schema eq nschema) shouldBe false
         }
       }
     }
 
-    it("updates the underlying key schema instance when the registry metadata changes") {
+    it(
+      "updates the underlying key schema instance when the registry metadata changes"
+    ) {
       val nschema = newKeySchema(testKeySchema.getNamespace, "ntest")
       val client = new MockSchemaRegistryClient
       client.register(nschema.getFullName + "-value", nschema)
-      val loader = new SchemaResourceLoader("http://localhost:48223", client,
-        metadataCheckInterval = 5.millis)
-      whenReady(loader.retrieveValueSchema(nschema.getFullName)) { schemaResource =>
-        schemaResource.schema shouldBe nschema
+      val loader = new SchemaResourceLoader(
+        "http://localhost:48223",
+        client,
+        metadataCheckInterval = 5.millis
+      )
+      eventually {
+        whenReady(loader.retrieveValueSchema(nschema.getFullName)) {
+          schemaResource => schemaResource.schema shouldBe nschema
+        }
       }
 
       //evolve the schema
-      val field = new Schema.Field("new_field", SchemaBuilder.builder().intType(), "NewField", 10)
+      val field = new Schema.Field(
+        "new_field",
+        SchemaBuilder.builder().intType(),
+        "NewField",
+        10
+      )
       val fields = nschema.getFields.asScala.map { f =>
         new Schema.Field(f.name(), f.schema(), f.doc(), f.defaultVal())
       } :+ field
-      val evolvedSchema = Schema.createRecord(nschema.getName(),
-        "evolve", nschema.getNamespace(), false, fields.asJava)
+      val evolvedSchema = Schema.createRecord(
+        nschema.getName(),
+        "evolve",
+        nschema.getNamespace(),
+        false,
+        fields.asJava
+      )
       client.register(nschema.getFullName + "-value", evolvedSchema)
       eventually {
-        whenReady(loader.retrieveValueSchema(nschema.getFullName)) { schemaResource =>
-          (schemaResource.schema eq nschema) shouldBe false
+        whenReady(loader.retrieveValueSchema(nschema.getFullName)) {
+          schemaResource => (schemaResource.schema eq nschema) shouldBe false
         }
       }
     }

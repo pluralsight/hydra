@@ -11,6 +11,7 @@ import scala.reflect.ClassTag
   * Created by alexsilva on 2/17/17.
   */
 object ActorUtils extends LoggingAdapter {
+
   /**
     * @see StringUtils.camel2underscores
     * @return The "standard" default name for actors used in Hydra, which is created by converting the

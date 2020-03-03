@@ -13,4 +13,8 @@ trait RecordMetadata {
 
 }
 
-case class HydraRecordMetadata(timestamp: Long, destination: String, ackStrategy: AckStrategy) extends RecordMetadata
+case class HydraRecordMetadata(
+    timestamp: Long,
+    destination: String,
+    ackStrategy: AckStrategy
+) extends RecordMetadata

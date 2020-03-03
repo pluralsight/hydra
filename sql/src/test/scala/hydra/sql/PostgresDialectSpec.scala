@@ -13,15 +13,17 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 /**
   * Created by alexsilva on 5/4/17.
   */
-class PostgresDialectSpec extends Matchers
-  with FunSpecLike
-  with BeforeAndAfterAll {
+class PostgresDialectSpec
+    extends Matchers
+    with FunSpecLike
+    with BeforeAndAfterAll {
 
   LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, new LogicalTypeFactory {
     override def fromSchema(schema: Schema): LogicalType = IsoDate
   })
 
-  implicit def fromSchema(schema: Schema): SchemaWrapper = SchemaWrapper.from(schema)
+  implicit def fromSchema(schema: Schema): SchemaWrapper =
+    SchemaWrapper.from(schema)
 
   val schema =
     """
@@ -111,7 +113,6 @@ class PostgresDialectSpec extends Matchers
       |}
     """.stripMargin
 
-
   describe("The postgres dialect") {
     it("has the right truncate statement") {
       PostgresDialect.isCascadingTruncateTable() shouldBe Some(true)
@@ -120,17 +121,37 @@ class PostgresDialectSpec extends Matchers
 
     it("converts a schema") {
       val avro = new Schema.Parser().parse(schema)
-      PostgresDialect.getJDBCType(avro.getField("username").schema()).get shouldBe JdbcType("TEXT", VARCHAR)
-      PostgresDialect.getJDBCType(avro.getField("passwordHash").schema()).get shouldBe JdbcType("BYTEA", BINARY)
-      PostgresDialect.getJDBCType(avro.getField("rate").schema()) shouldBe Some(JdbcType("DECIMAL(4,2)", DECIMAL))
-      PostgresDialect.getJDBCType(avro.getField("active").schema()) shouldBe Some(JdbcType("BOOLEAN", BOOLEAN))
-      PostgresDialect.getJDBCType(avro.getField("score").schema()) shouldBe Some(JdbcType("FLOAT4", FLOAT))
-      PostgresDialect.getJDBCType(avro.getField("scored").schema()) shouldBe Some(JdbcType("FLOAT8", DOUBLE))
-      PostgresDialect.getJDBCType(avro.getField("testUnion").schema()) shouldBe Some(JdbcType("TEXT", VARCHAR))
-      PostgresDialect.getJDBCType(avro.getField("friends").schema()) shouldBe Some(JdbcType("TEXT[]", ARRAY))
+      PostgresDialect
+        .getJDBCType(avro.getField("username").schema())
+        .get shouldBe JdbcType("TEXT", VARCHAR)
+      PostgresDialect
+        .getJDBCType(avro.getField("passwordHash").schema())
+        .get shouldBe JdbcType("BYTEA", BINARY)
+      PostgresDialect.getJDBCType(avro.getField("rate").schema()) shouldBe Some(
+        JdbcType("DECIMAL(4,2)", DECIMAL)
+      )
+      PostgresDialect.getJDBCType(avro.getField("active").schema()) shouldBe Some(
+        JdbcType("BOOLEAN", BOOLEAN)
+      )
+      PostgresDialect.getJDBCType(avro.getField("score").schema()) shouldBe Some(
+        JdbcType("FLOAT4", FLOAT)
+      )
+      PostgresDialect.getJDBCType(avro.getField("scored").schema()) shouldBe Some(
+        JdbcType("FLOAT8", DOUBLE)
+      )
+      PostgresDialect.getJDBCType(avro.getField("testUnion").schema()) shouldBe Some(
+        JdbcType("TEXT", VARCHAR)
+      )
+      PostgresDialect.getJDBCType(avro.getField("friends").schema()) shouldBe Some(
+        JdbcType("TEXT[]", ARRAY)
+      )
       PostgresDialect.getJDBCType(avro.getField("signupDate").schema()) shouldBe None
-      PostgresDialect.getJDBCType(avro.getField("testTS").schema()).get shouldBe JdbcType("TIMESTAMP", TIMESTAMP)
-      PostgresDialect.getJDBCType(avro.getField("testUUID").schema()).get shouldBe JdbcType("UUID", OTHER)
+      PostgresDialect
+        .getJDBCType(avro.getField("testTS").schema())
+        .get shouldBe JdbcType("TIMESTAMP", TIMESTAMP)
+      PostgresDialect
+        .getJDBCType(avro.getField("testUUID").schema())
+        .get shouldBe JdbcType("UUID", OTHER)
     }
 
     it("works with record types") {
@@ -156,7 +177,8 @@ class PostgresDialectSpec extends Matchers
         """.stripMargin
 
       val avro = new Schema.Parser().parse(schema)
-      PostgresDialect.getJDBCType(avro.getField("address").schema())
+      PostgresDialect
+        .getJDBCType(avro.getField("address").schema())
         .get shouldBe JdbcType("JSON", JDBCType.VARCHAR)
     }
 
@@ -199,8 +221,7 @@ class PostgresDialectSpec extends Matchers
 
       val avro = new Schema.Parser().parse(schema)
 
-      PostgresDialect.insertStatement("table", avro,
-        UnderscoreSyntax) shouldBe "INSERT INTO table (\"id\",\"username\",\"address\") VALUES (?,?,to_json(?::json))"
+      PostgresDialect.insertStatement("table", avro, UnderscoreSyntax) shouldBe "INSERT INTO table (\"id\",\"username\",\"address\") VALUES (?,?,to_json(?::json))"
     }
 
     it("builds an upsert") {
@@ -307,8 +328,11 @@ class PostgresDialectSpec extends Matchers
 
       val avro = new Schema.Parser().parse(schema)
 
-      PostgresDialect.upsertFields(avro) shouldBe Seq(avro.getField("id1"), avro.getField("id2"),
-        avro.getField("username"))
+      PostgresDialect.upsertFields(avro) shouldBe Seq(
+        avro.getField("id1"),
+        avro.getField("id2"),
+        avro.getField("username")
+      )
     }
 
     it("returns the correct field list for upserts") {
@@ -338,14 +362,16 @@ class PostgresDialectSpec extends Matchers
 
       val avro = new Schema.Parser().parse(schema)
 
-      PostgresDialect.upsertFields(avro) shouldBe Seq(avro.getField("id1"), avro.getField("id2"),
-        avro.getField("username"))
+      PostgresDialect.upsertFields(avro) shouldBe Seq(
+        avro.getField("id1"),
+        avro.getField("id2"),
+        avro.getField("username")
+      )
     }
 
     it("Creates the correct alter table statements") {
       import scala.collection.JavaConverters._
-      val schema = new Schema.Parser().parse(
-        """
+      val schema = new Schema.Parser().parse("""
           |{
           |	"type": "record",
           |	"name": "User",
@@ -371,15 +397,19 @@ class PostgresDialectSpec extends Matchers
       val expected = Seq(
         """alter table test add column "id1" INTEGER""",
         """alter table test add column "id2" INTEGER""",
-        """alter table test add column "username" TEXT""")
+        """alter table test add column "username" TEXT"""
+      )
 
-      PostgresDialect.alterTableQueries("test", schema.getFields().asScala, UnderscoreSyntax) shouldBe expected
+      PostgresDialect.alterTableQueries(
+        "test",
+        schema.getFields().asScala,
+        UnderscoreSyntax
+      ) shouldBe expected
     }
   }
 
   it("creates delete DML") {
-    val schema = new Schema.Parser().parse(
-      """
+    val schema = new Schema.Parser().parse("""
         |{
         |	"type": "record",
         |	"name": "User",
@@ -406,18 +436,27 @@ class PostgresDialectSpec extends Matchers
       PostgresDialect.deleteStatement("test_table", Seq.empty, UnderscoreSyntax)
     }
 
-    val singleKey = PostgresDialect.deleteStatement("test_table",
-      Seq("id1"), UnderscoreSyntax)
+    val singleKey = PostgresDialect.deleteStatement(
+      "test_table",
+      Seq("id1"),
+      UnderscoreSyntax
+    )
 
     singleKey shouldBe """DELETE FROM test_table WHERE "id1" = ?"""
 
-    val stmt = PostgresDialect.deleteStatement("test_table",
-      Seq("id1", "id2"), UnderscoreSyntax)
+    val stmt = PostgresDialect.deleteStatement(
+      "test_table",
+      Seq("id1", "id2"),
+      UnderscoreSyntax
+    )
     stmt shouldBe """DELETE FROM test_table WHERE "id1" = ? AND "id2" = ?"""
   }
 
   it("handles nested array json types") {
-    val schemaR = Thread.currentThread().getContextClassLoader.getResourceAsStream("nested-json.avsc")
+    val schemaR = Thread
+      .currentThread()
+      .getContextClassLoader
+      .getResourceAsStream("nested-json.avsc")
     val schema = new Schema.Parser().parse(schemaR)
     val field = schema.getField("authors")
     getJdbcType(field.schema(), PostgresDialect).databaseTypeDefinition shouldBe "JSON" //the conversion is made by postgres
@@ -468,10 +507,14 @@ class PostgresDialectSpec extends Matchers
 
     val tp = PostgresDialect
       .dropNotNullConstraintQueries("user", schema, UnderscoreSyntax)
-    tp shouldBe Seq("""alter table user alter column "username" drop not null""")
+    tp shouldBe Seq(
+      """alter table user alter column "username" drop not null"""
+    )
   }
 
   it("removes null bytes in the format string function") {
-    PostgresDialect.formatStringForPreparedStatement("Hello thi\u0000s is a string\u0000") shouldBe "Hello this is a string"
+    PostgresDialect.formatStringForPreparedStatement(
+      "Hello thi\u0000s is a string\u0000"
+    ) shouldBe "Hello this is a string"
   }
 }

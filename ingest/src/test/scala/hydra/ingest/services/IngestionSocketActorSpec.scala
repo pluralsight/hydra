@@ -7,7 +7,10 @@ import akka.actor.ActorSystem
 import akka.actor.Props
 import akka.testkit.TestProbe
 
-class IngestionSocketActorSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
+class IngestionSocketActorSpec
+    extends FlatSpec
+    with Matchers
+    with BeforeAndAfterAll {
 
   private implicit val system: ActorSystem = ActorSystem()
 
@@ -44,7 +47,7 @@ class IngestionSocketActorSpec extends FlatSpec with Matchers with BeforeAndAfte
         probe.expectMsgClass(classOf[SimpleOutgoingMessage])
         probe.expectMsg(SocketAck)
       }
-    } 
+    }
   }
 
   testIngestionMessageAck(IncomingMessage("-c HELP"))

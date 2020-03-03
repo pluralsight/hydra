@@ -51,52 +51,75 @@ trait Ingestor extends InitializingActor {
     * @param request
     * @return
     */
-  def validateRequest(request: HydraRequest): Try[HydraRequest] = Success(request)
+  def validateRequest(request: HydraRequest): Try[HydraRequest] =
+    Success(request)
 
   def doValidate(request: HydraRequest): Future[MessageValidationResult] = {
-    Future.fromTry(validateRequest(request))
+    Future
+      .fromTry(validateRequest(request))
       .flatMap[MessageValidationResult] { r =>
-      recordFactory.build(r).map { r =>
+        recordFactory.build(r).map { r =>
+          val destination = r.destination
 
-        val destination = r.destination
+          val ackStrategy = r.ackStrategy.toString
 
-        val ackStrategy = r.ackStrategy.toString
+          HydraMetrics.incrementGauge(
+            lookupKey =
+              ReconciliationMetricName + s"_${destination}_$ackStrategy",
+            metricName = ReconciliationMetricName,
+            tags = Seq(
+              "ingestor" -> name,
+              "destination" -> destination,
+              "ackStrategy" -> ackStrategy
+            )
+          )
 
-        HydraMetrics.incrementGauge(
-          lookupKey = ReconciliationMetricName + s"_${destination}_$ackStrategy",
-          metricName = ReconciliationMetricName,
-          tags = Seq("ingestor" -> name, "destination" -> destination, "ackStrategy" -> ackStrategy)
-        )
+          HydraMetrics.incrementCounter(
+            lookupKey =
+              IngestCounterMetricName + s"_${destination}_$ackStrategy",
+            metricName = IngestCounterMetricName,
+            tags = Seq(
+              "ingestor" -> name,
+              "destination" -> destination,
+              "ackStrategy" -> ackStrategy
+            )
+          )
 
-        HydraMetrics.incrementCounter(
-          lookupKey = IngestCounterMetricName + s"_${destination}_$ackStrategy",
-          metricName = IngestCounterMetricName,
-          tags = Seq("ingestor" -> name, "destination" -> destination, "ackStrategy" -> ackStrategy)
-        )
-
-        ValidRequest(r)
+          ValidRequest(r)
+        }
       }
-    }.recover { case e => InvalidRequest(e) }
+      .recover { case e => InvalidRequest(e) }
   }
 
   override def initializationError(ex: Throwable): Receive = {
     case Publish(req) =>
       sender ! IngestorError(ex)
-      context.system.eventStream.publish(IngestorUnavailable(thisActorName, ex, req))
+      context.system.eventStream
+        .publish(IngestorUnavailable(thisActorName, ex, req))
     case _ =>
       sender ! IngestorError(ex)
   }
 
   def ingest(next: Actor.Receive) = compose(next)
 
-  override val supervisorStrategy = OneForOneStrategy() { case _ => SupervisorStrategy.Restart }
+  override val supervisorStrategy = OneForOneStrategy() {
+    case _ => SupervisorStrategy.Restart
+  }
 
-  def decrementGaugeOnReceipt(destination: String, ackStrategy: String): Future[Unit] = {
+  def decrementGaugeOnReceipt(
+      destination: String,
+      ackStrategy: String
+  ): Future[Unit] = {
     Future {
       HydraMetrics.decrementGauge(
-        lookupKey = Ingestor.ReconciliationMetricName + s"_${destination}_$ackStrategy",
+        lookupKey =
+          Ingestor.ReconciliationMetricName + s"_${destination}_$ackStrategy",
         metricName = Ingestor.ReconciliationMetricName,
-        tags = Seq("ingestor" -> name, "destination" -> destination, "ackStrategy" -> ackStrategy)
+        tags = Seq(
+          "ingestor" -> name,
+          "destination" -> destination,
+          "ackStrategy" -> ackStrategy
+        )
       )
     }
   }

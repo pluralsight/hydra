@@ -7,7 +7,11 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 /**
   * Created by alexsilva on 3/7/17.
   */
-class LoggingAdapterSpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike with BeforeAndAfterAll {
+class LoggingAdapterSpec
+    extends TestKit(ActorSystem("test"))
+    with Matchers
+    with FunSpecLike
+    with BeforeAndAfterAll {
 
   override def afterAll = TestKit.shutdownActorSystem(system)
 
@@ -20,7 +24,6 @@ class LoggingAdapterSpec extends TestKit(ActorSystem("test")) with Matchers with
           case _ => log.info("got it"); sender ! "got it"
         }
       }, "logger-test")
-
 
       act.underlyingActor.log.getName shouldBe "akka.testkit.TestActorRef"
 

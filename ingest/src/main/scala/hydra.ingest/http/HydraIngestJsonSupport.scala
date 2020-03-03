@@ -21,7 +21,6 @@ import hydra.core.marshallers.HydraJsonSupport
 import hydra.core.protocol.IngestorStatus
 import hydra.ingest.IngestorInfo
 
-
 /**
   * Created by alexsilva on 2/18/16.
   */
@@ -29,25 +28,26 @@ trait HydraIngestJsonSupport extends HydraJsonSupport {
 
   import spray.json._
 
-
   implicit val ingestorInfoFormat = jsonFormat4(IngestorInfo)
 
   implicit object IngestorStatusFormat extends RootJsonFormat[IngestorStatus] {
 
     override def write(obj: IngestorStatus): JsValue = {
-      JsObject(Map(
-        "code" -> JsNumber(obj.statusCode.intValue()),
-        "message" -> JsString(obj.message)
-      )
+      JsObject(
+        Map(
+          "code" -> JsNumber(obj.statusCode.intValue()),
+          "message" -> JsString(obj.message)
+        )
       )
     }
 
     override def read(json: JsValue): IngestorStatus = ???
   }
 
-  implicit object IngestionReportFormat extends RootJsonFormat[IngestionReport] {
+  implicit object IngestionReportFormat
+      extends RootJsonFormat[IngestionReport] {
 
-    def writeState[T <: IngestorStatus : JsonWriter](t: T) = t.toJson
+    def writeState[T <: IngestorStatus: JsonWriter](t: T) = t.toJson
 
     override def write(obj: IngestionReport): JsValue = {
 

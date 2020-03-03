@@ -20,11 +20,18 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
   val cfg = ConfigFactory.load().getConfig("db-cfg")
 
   val properties = new Properties
-  cfg.entrySet().asScala.foreach(e => properties.setProperty(e.getKey(), cfg.getString(e.getKey())))
+  cfg
+    .entrySet()
+    .asScala
+    .foreach(e => properties.setProperty(e.getKey(), cfg.getString(e.getKey())))
 
-
-  val provider = new DriverManagerConnectionProvider("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1",
-    "", "", 1, 1.millis)
+  val provider = new DriverManagerConnectionProvider(
+    "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1",
+    "",
+    "",
+    1,
+    1.millis
+  )
 
   val store = new JdbcCatalog(provider, NoOpSyntax, H2Dialect)
 
@@ -51,11 +58,12 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
   override def beforeAll() = {
     store.createOrAlterTable(Table("test_table", schema))
     store.createSchema("test_schema") shouldBe true
-    store.createOrAlterTable(Table("test_table", schema, dbSchema = Some("test_schema")))
+    store.createOrAlterTable(
+      Table("test_table", schema, dbSchema = Some("test_schema"))
+    )
   }
 
   override def afterAll() = provider.connection.close()
-
 
   describe("The jdbc Catalog") {
 
@@ -70,7 +78,9 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
     }
 
     it("checks if a table with a schema exists") {
-      store.tableExists(TableIdentifier("test_table", None, Some("test_schema"))) shouldBe true
+      store.tableExists(
+        TableIdentifier("test_table", None, Some("test_schema"))
+      ) shouldBe true
       store.tableExists(TableIdentifier("table", None, Some("unknown"))) shouldBe false
     }
 
@@ -97,18 +107,24 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
       store.getTableMetadata(TableIdentifier("unknown")).isFailure shouldBe true
       store.getTableMetadata(TableIdentifier("unknown")).isFailure shouldBe true
       intercept[NoSuchSchemaException] {
-        store.getTableMetadata(TableIdentifier("unknown", None, Some("unknown")))
+        store.getTableMetadata(
+          TableIdentifier("unknown", None, Some("unknown"))
+        )
       }
-      val cols = List(DbColumn("id", JDBCType.INTEGER, false, Some("")),
-        DbColumn("username", JDBCType.CLOB, true, Some("")))
-      store.getTableMetadata(TableIdentifier("test_table", None, Some(""))).get shouldBe DbTable("test_table"
-        , cols, None)
+      val cols = List(
+        DbColumn("id", JDBCType.INTEGER, false, Some("")),
+        DbColumn("username", JDBCType.CLOB, true, Some(""))
+      )
+      store
+        .getTableMetadata(TableIdentifier("test_table", None, Some("")))
+        .get shouldBe DbTable("test_table", cols, None)
     }
 
-
-    it("throws exception when trying to alter a table adding an optional field with no default value") {
-      val newSchema = SchemaWrapper.from(new Schema.Parser().parse(
-        """
+    it(
+      "throws exception when trying to alter a table adding an optional field with no default value"
+    ) {
+      val newSchema = SchemaWrapper.from(
+        new Schema.Parser().parse("""
           |{
           |	"type": "record",
           |	"name": "User",
@@ -127,7 +143,8 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
           |			"type": ["null", "string"]
           |		}
           |	]
-          |}""".stripMargin))
+          |}""".stripMargin)
+      )
 
       intercept[AvroRuntimeException] {
         store.createOrAlterTable(Table("test_table", newSchema))
@@ -135,8 +152,8 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
     }
 
     it("alters a table") {
-      val newSchema = SchemaWrapper.from(new Schema.Parser().parse(
-        """
+      val newSchema = SchemaWrapper.from(
+        new Schema.Parser().parse("""
           |{
           |	"type": "record",
           |	"name": "User",
@@ -156,20 +173,25 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
           |     "default":"test"
           |		}
           |	]
-          |}""".stripMargin), Seq("id"))
+          |}""".stripMargin),
+        Seq("id")
+      )
 
       val dbTable = store.createOrAlterTable(Table("test_table", newSchema))
 
       val cols = List(
         DbColumn("id", JDBCType.INTEGER, false, Some("")),
         DbColumn("username", JDBCType.CLOB, true, Some("")),
-        DbColumn("optional", JDBCType.CLOB, true, Some("")))
-      store.getTableMetadata(TableIdentifier("test_table", None, Some(""))).get shouldBe DbTable("test_table", cols, None)
+        DbColumn("optional", JDBCType.CLOB, true, Some(""))
+      )
+      store
+        .getTableMetadata(TableIdentifier("test_table", None, Some("")))
+        .get shouldBe DbTable("test_table", cols, None)
     }
 
     it("finds the missing fields for a schema") {
-      val sc = SchemaWrapper.from(new Schema.Parser().parse(
-        """
+      val sc =
+        SchemaWrapper.from(new Schema.Parser().parse("""
           |{
           |	"type": "record",
           |	"name": "User",
@@ -191,16 +213,19 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
 
       val cols = List(
         DbColumn("id", JDBCType.INTEGER, false, Some("")),
-        DbColumn("first_name", JDBCType.INTEGER, true, Some("")))
+        DbColumn("first_name", JDBCType.INTEGER, true, Some(""))
+      )
 
       val catalog = new JdbcCatalog(provider, UnderscoreSyntax, PostgresDialect)
 
-      catalog.findMissingFields(sc, cols) shouldBe Seq(sc.schema.getField("lastName"))
+      catalog.findMissingFields(sc, cols) shouldBe Seq(
+        sc.schema.getField("lastName")
+      )
     }
 
     it("drops constraints from a table upon altering") {
-      val schema = SchemaWrapper.from(new Schema.Parser().parse(
-        """
+      val schema = SchemaWrapper.from(
+        new Schema.Parser().parse("""
           |{
           |	"type": "record",
           |	"name": "User",
@@ -220,19 +245,23 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
           |     "default":"test"
           |		}
           |	]
-          |}""".stripMargin), Seq("id"))
+          |}""".stripMargin),
+        Seq("id")
+      )
 
       store.createOrAlterTable(Table("test_constraint", schema))
 
       val cols = List(
         DbColumn("id", JDBCType.INTEGER, false, Some("")),
         DbColumn("username", JDBCType.CLOB, false, Some("")),
-        DbColumn("testColumn", JDBCType.CLOB, false, Some("")))
-      store.getTableMetadata(TableIdentifier("test_constraint", None, Some("")))
+        DbColumn("testColumn", JDBCType.CLOB, false, Some(""))
+      )
+      store
+        .getTableMetadata(TableIdentifier("test_constraint", None, Some("")))
         .get shouldBe DbTable("test_constraint", cols, None)
 
-      val newSchema = SchemaWrapper.from(new Schema.Parser().parse(
-        """
+      val newSchema = SchemaWrapper.from(
+        new Schema.Parser().parse("""
           |{
           |	"type": "record",
           |	"name": "User",
@@ -252,15 +281,19 @@ class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
           |     "default":"test"
           |		}
           |	]
-          |}""".stripMargin), Seq("id"))
+          |}""".stripMargin),
+        Seq("id")
+      )
 
       store.createOrAlterTable(Table("test_constraint", newSchema))
 
       val ncols = List(
         DbColumn("id", JDBCType.INTEGER, false, Some("")),
         DbColumn("username", JDBCType.CLOB, true, Some("")),
-        DbColumn("testColumn", JDBCType.CLOB, true, Some("")))
-      store.getTableMetadata(TableIdentifier("test_constraint", None, Some("")))
+        DbColumn("testColumn", JDBCType.CLOB, true, Some(""))
+      )
+      store
+        .getTableMetadata(TableIdentifier("test_constraint", None, Some("")))
         .get shouldBe DbTable("test_constraint", ncols, None)
     }
   }

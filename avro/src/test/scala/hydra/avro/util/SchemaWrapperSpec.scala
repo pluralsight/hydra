@@ -33,7 +33,6 @@ class SchemaWrapperSpec extends Matchers with FlatSpecLike {
 
   }
 
-
   it should "return a single primary key" in {
     val schema =
       """
@@ -254,7 +253,6 @@ class SchemaWrapperSpec extends Matchers with FlatSpecLike {
 
     SchemaWrapper.from(avro, Seq.empty).primaryKeys shouldBe Seq.empty
   }
-
 
   it should "reject a schema when a primary key given does not exist" in {
     val schema =

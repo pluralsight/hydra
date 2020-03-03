@@ -36,16 +36,25 @@ trait HydraComponentLoader {
   def transports: Seq[Class[_ <: Transport]]
 }
 
-object ClasspathHydraComponentLoader extends HydraComponentLoader with ConfigSupport with LoggingAdapter {
+object ClasspathHydraComponentLoader
+    extends HydraComponentLoader
+    with ConfigSupport
+    with LoggingAdapter {
 
   import hydra.core.bootstrap.ReflectionsWrapper._
 
-  override lazy val ingestors = reflections.getSubTypesOf(classOf[Ingestor])
-    .asScala.filterNot(c => Modifier.isAbstract(c.getModifiers))
-    .filterNot(c => c.isAnnotationPresent(classOf[DoNotScan])).toSeq
+  override lazy val ingestors = reflections
+    .getSubTypesOf(classOf[Ingestor])
+    .asScala
+    .filterNot(c => Modifier.isAbstract(c.getModifiers))
+    .filterNot(c => c.isAnnotationPresent(classOf[DoNotScan]))
+    .toSeq
 
-  override lazy val transports = reflections.getSubTypesOf(classOf[Transport])
-    .asScala.filterNot(c => Modifier.isAbstract(c.getModifiers))
-    .filterNot(c => c.isAnnotationPresent(classOf[DoNotScan])).toSeq
+  override lazy val transports = reflections
+    .getSubTypesOf(classOf[Transport])
+    .asScala
+    .filterNot(c => Modifier.isAbstract(c.getModifiers))
+    .filterNot(c => c.isAnnotationPresent(classOf[DoNotScan]))
+    .toSeq
 
 }

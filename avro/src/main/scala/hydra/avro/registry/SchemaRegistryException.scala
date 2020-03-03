@@ -16,8 +16,11 @@
 package hydra.avro.registry
 
 /**
- * Created by alexsilva on 1/23/17.
- */
-case class SchemaRegistryException(cause: Throwable, subject: String) extends RuntimeException(cause) {
-  override def getMessage: String = s"Schema '$subject' cannot be loaded. Cause: ${super.getMessage}"
+  * Created by alexsilva on 1/23/17.
+  */
+case class SchemaRegistryException(cause: Throwable, subject: String)
+    extends RuntimeException(cause) {
+
+  override def getMessage: String =
+    s"Schema '$subject' cannot be loaded. Cause: ${super.getMessage}"
 }

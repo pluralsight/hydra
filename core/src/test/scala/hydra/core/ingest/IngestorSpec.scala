@@ -14,8 +14,12 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSpecLike with BeforeAndAfterAll
-  with ImplicitSender {
+class IngestorSpec
+    extends TestKit(ActorSystem("test"))
+    with Matchers
+    with FunSpecLike
+    with BeforeAndAfterAll
+    with ImplicitSender {
 
   override def afterAll = TestKit.shutdownActorSystem(system)
 
@@ -35,13 +39,16 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
       expectMsg("test")
     }
 
-
     it("allows for custom validation") {
       val ing = system.actorOf(Props(classOf[TestIngestor], true, false))
-      ing ! Validate(HydraRequest("1", "test").withMetadata("invalid" -> "true"))
+      ing ! Validate(
+        HydraRequest("1", "test").withMetadata("invalid" -> "true")
+      )
       expectMsgType[InvalidRequest]
       ing ! Validate(HydraRequest("1", "test"))
-      expectMsg(ValidRequest(TestRecord("test-topic", "1", "test", AckStrategy.NoAck)))
+      expectMsg(
+        ValidRequest(TestRecord("test-topic", "1", "test", AckStrategy.NoAck))
+      )
     }
 
     it("calls the default init method") {
@@ -51,9 +58,10 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
       expectMsg("hi!")
 
       act ! "timeout"
-      expectMsg(1.second) //testing that override with a val won't take effect until after the constructor ends
+      expectMsg(
+        1.second
+      ) //testing that override with a val won't take effect until after the constructor ends
     }
-
 
     it("handle the base ingestion protocol") {
       val sup = TestProbe()
@@ -62,10 +70,19 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
       ing ! Publish(req)
       expectMsg(Ignore)
       ing ! Validate(req)
-      expectMsg(ValidRequest(TestRecord("test-topic", "1", "test", AckStrategy.NoAck)))
-      ing ! RecordProduced(TestRecordMetadata(0, 0, "", AckStrategy.NoAck), self)
+      expectMsg(
+        ValidRequest(TestRecord("test-topic", "1", "test", AckStrategy.NoAck))
+      )
+      ing ! RecordProduced(
+        TestRecordMetadata(0, 0, "", AckStrategy.NoAck),
+        self
+      )
       expectMsg(IngestorCompleted)
-      ing ! RecordNotProduced(TestRecord("test-topic", "1", "test", AckStrategy.NoAck), new IllegalArgumentException, sup.ref)
+      ing ! RecordNotProduced(
+        TestRecord("test-topic", "1", "test", AckStrategy.NoAck),
+        new IllegalArgumentException,
+        sup.ref
+      )
       sup.expectMsgPF() {
         case i: IngestorError =>
           i.cause shouldBe a[IllegalArgumentException]
@@ -79,7 +96,6 @@ class IngestorSpec extends TestKit(ActorSystem("test")) with Matchers with FunSp
 
 class TestIngestorDefault extends Ingestor {
 
-
   /**
     * This will _not_ override; instead it will use the default value of 1.second. We'll test it.
     */
@@ -88,7 +104,7 @@ class TestIngestorDefault extends Ingestor {
   val to = context.receiveTimeout
 
   ingest {
-    case "hello" => sender ! "hi!"
+    case "hello"   => sender ! "hi!"
     case "timeout" => sender ! to
   }
 
@@ -120,10 +136,10 @@ class TestIngestor(completeInit: Boolean, delayInit: Boolean) extends Ingestor {
   }
 
   override def validateRequest(request: HydraRequest): Try[HydraRequest] = {
-    if (request.hasMetadata("invalid")) Failure(new IllegalArgumentException) else Success(request)
+    if (request.hasMetadata("invalid")) Failure(new IllegalArgumentException)
+    else Success(request)
   }
 }
-
 
 @DoNotScan
 class SucceedAfterRetryIngestor(retries: Int) extends Ingestor {
@@ -150,6 +166,7 @@ class SucceedAfterRetryIngestor(retries: Int) extends Ingestor {
   }
 
   override def validateRequest(request: HydraRequest): Try[HydraRequest] = {
-    if (request.hasMetadata("invalid")) Failure(new IllegalArgumentException) else Success(request)
+    if (request.hasMetadata("invalid")) Failure(new IllegalArgumentException)
+    else Success(request)
   }
 }

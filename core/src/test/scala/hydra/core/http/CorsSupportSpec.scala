@@ -9,10 +9,15 @@ import scala.collection.immutable
 class CorsSupportSpec extends Matchers with FunSpecLike with CorsSupport {
 
   describe("Cors Support") {
-    it ("has sensible defaults") {
+    it("has sensible defaults") {
       settings.allowCredentials shouldBe false
       settings.exposedHeaders shouldBe immutable.Seq("Link")
-      settings.allowedMethods shouldBe Seq(HttpMethods.GET, HttpMethods.POST, HttpMethods.HEAD, HttpMethods.OPTIONS)
+      settings.allowedMethods shouldBe Seq(
+        HttpMethods.GET,
+        HttpMethods.POST,
+        HttpMethods.HEAD,
+        HttpMethods.OPTIONS
+      )
       settings.allowedOrigins shouldBe HttpOriginMatcher.*
       settings.maxAge shouldBe Some(1800)
       settings.allowGenericHttpRequests shouldBe true

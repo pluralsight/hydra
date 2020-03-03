@@ -8,6 +8,7 @@ import org.apache.avro.Schema.Field
   * Created by alexsilva on 5/4/17.
   */
 abstract class JdbcDialect extends Serializable {
+
   /**
     * The table name to be used when querying the resultset metadata API.
     *
@@ -95,13 +96,22 @@ abstract class JdbcDialect extends Serializable {
     * A default implementation for insert statements
     *
     */
-  def insertStatement(table: String, schema: SchemaWrapper, dbs: DbSyntax): String = {
+  def insertStatement(
+      table: String,
+      schema: SchemaWrapper,
+      dbs: DbSyntax
+  ): String = {
     val columns = schema.getFields
-    val cols = columns.map(c => quoteIdentifier(dbs.format(c.name))).mkString(",")
+    val cols =
+      columns.map(c => quoteIdentifier(dbs.format(c.name))).mkString(",")
     s"INSERT INTO $table ($cols) VALUES (${parameterize(columns).mkString(",")})"
   }
 
-  def deleteStatement(table: String, keys: Seq[String], dbs: DbSyntax): String = {
+  def deleteStatement(
+      table: String,
+      keys: Seq[String],
+      dbs: DbSyntax
+  ): String = {
     //guard against some rogue caller trying to delete the entire table
     assert(!keys.isEmpty, "Whoa! At least one primary key is required.")
     val colTuples = keys.map(f => s"${quoteIdentifier(dbs.format(f))} = ?")
@@ -113,8 +123,14 @@ abstract class JdbcDialect extends Serializable {
     * Optional operation; default implementation throws a UnsupportedOperationException
     */
   @throws[UnsupportedOperationException]
-  def buildUpsert(table: String, schema: SchemaWrapper, dbs: DbSyntax): String = {
-    throw new UnsupportedOperationException("Upserts are not supported by this dialect.")
+  def buildUpsert(
+      table: String,
+      schema: SchemaWrapper,
+      dbs: DbSyntax
+  ): String = {
+    throw new UnsupportedOperationException(
+      "Upserts are not supported by this dialect."
+    )
   }
 
   /**
@@ -125,7 +141,9 @@ abstract class JdbcDialect extends Serializable {
     */
   @throws[UnsupportedOperationException]
   def upsertFields(schemaWrapper: SchemaWrapper): Seq[Field] = {
-    throw new UnsupportedOperationException("Upserts are not supported by this dialect.")
+    throw new UnsupportedOperationException(
+      "Upserts are not supported by this dialect."
+    )
   }
 
   /**
@@ -145,26 +163,47 @@ abstract class JdbcDialect extends Serializable {
 
   protected def parameterize(fields: Seq[Schema.Field]): Seq[String] = {
     fields.map { c =>
-      if (JdbcUtils.getJdbcType(c.schema(), this).databaseTypeDefinition.startsWith("JSON")) jsonPlaceholder else "?"
+      if (JdbcUtils
+            .getJdbcType(c.schema(), this)
+            .databaseTypeDefinition
+            .startsWith("JSON")) jsonPlaceholder
+      else "?"
     }
   }
 
   /*
    * Optional operation; default implementation throws a UnsupportedOperationException
-    */
+   */
   @throws[UnsupportedOperationException]
-  def alterTableQueries(tableName: String, missingFields: Seq[Field], dbs: DbSyntax): Seq[String] = {
-    throw new UnsupportedOperationException("Alter tables are not supported by this dialect.")
+  def alterTableQueries(
+      tableName: String,
+      missingFields: Seq[Field],
+      dbs: DbSyntax
+  ): Seq[String] = {
+    throw new UnsupportedOperationException(
+      "Alter tables are not supported by this dialect."
+    )
   }
 
   @throws[UnsupportedOperationException]
-  def dropNotNullConstraintQueries(tableName: String, schema: SchemaWrapper, dbs: DbSyntax): Seq[String] = {
-    throw new UnsupportedOperationException("Dropping NOT NULL constraints are not supported by this dialect.")
+  def dropNotNullConstraintQueries(
+      tableName: String,
+      schema: SchemaWrapper,
+      dbs: DbSyntax
+  ): Seq[String] = {
+    throw new UnsupportedOperationException(
+      "Dropping NOT NULL constraints are not supported by this dialect."
+    )
   }
 
   def getArrayType(schema: Schema) = {
-    getJDBCType(schema.getElementType).map(_.databaseTypeDefinition)
-      .orElse(JdbcUtils.getCommonJDBCType(schema.getElementType).map(_.databaseTypeDefinition))
+    getJDBCType(schema.getElementType)
+      .map(_.databaseTypeDefinition)
+      .orElse(
+        JdbcUtils
+          .getCommonJDBCType(schema.getElementType)
+          .map(_.databaseTypeDefinition)
+      )
       .map(typeName => JdbcType(s"$typeName[]", java.sql.JDBCType.ARRAY))
   }
 
@@ -224,7 +263,11 @@ object JdbcDialects {
 private object NoopDialect extends JdbcDialect {
   override def canHandle(url: String): Boolean = true
 
-  override def buildUpsert(table: String, schema: SchemaWrapper, dbs: DbSyntax): String = {
+  override def buildUpsert(
+      table: String,
+      schema: SchemaWrapper,
+      dbs: DbSyntax
+  ): String = {
     throw new UnsupportedOperationException("Not supported.")
   }
 }

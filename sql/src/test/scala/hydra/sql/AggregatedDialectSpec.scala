@@ -10,6 +10,7 @@ import org.scalatest.{FunSpecLike, Matchers}
   * Created by alexsilva on 5/4/17.
   */
 class AggregatedDialectSpec extends Matchers with FunSpecLike {
+
   val schema =
     """
       |{
@@ -89,17 +90,19 @@ class AggregatedDialectSpec extends Matchers with FunSpecLike {
   describe("The Aggregate dialect") {
 
     it("handles the right urls") {
-      val dialect = new AggregatedDialect(List(PostgresDialect, new JdbcDialect() {
-        override def canHandle(url: String): Boolean = url.startsWith("jdbc:postgresql")
-      }))
+      val dialect =
+        new AggregatedDialect(List(PostgresDialect, new JdbcDialect() {
+          override def canHandle(url: String): Boolean =
+            url.startsWith("jdbc:postgresql")
+        }))
       dialect.canHandle("jdbc:postgresql") shouldBe true
       dialect.canHandle("jdbc:db2") shouldBe false
     }
 
     it("builds upserts") {
 
-      val schema = SchemaWrapper.from(new Schema.Parser().parse(
-        """
+      val schema =
+        SchemaWrapper.from(new Schema.Parser().parse("""
           |{
           |	"type": "record",
           |	"name": "User",
@@ -122,10 +125,11 @@ class AggregatedDialectSpec extends Matchers with FunSpecLike {
           |}
         """.stripMargin))
 
-
-      val dialect = new AggregatedDialect(List(PostgresDialect, new JdbcDialect() {
-        override def canHandle(url: String): Boolean = url.startsWith("jdbc:postgresql")
-      }))
+      val dialect =
+        new AggregatedDialect(List(PostgresDialect, new JdbcDialect() {
+          override def canHandle(url: String): Boolean =
+            url.startsWith("jdbc:postgresql")
+        }))
 
       val upsert =
         """insert into table ("id","username","active") values (?,?,?)
@@ -136,13 +140,21 @@ class AggregatedDialectSpec extends Matchers with FunSpecLike {
 
     it("converts a schema") {
       val dialect = new AggregatedDialect(List(PostgresDialect, DB2Dialect))
-      dialect.getJDBCType(avro.getField("username").schema()).get shouldBe JdbcType("TEXT", VARCHAR)
+      dialect
+        .getJDBCType(avro.getField("username").schema())
+        .get shouldBe JdbcType("TEXT", VARCHAR)
 
-      dialect.getJDBCType(avro.getField("passwordHash").schema()).get shouldBe JdbcType("BYTEA", BINARY)
+      dialect
+        .getJDBCType(avro.getField("passwordHash").schema())
+        .get shouldBe JdbcType("BYTEA", BINARY)
 
       val dialect1 = new AggregatedDialect(List(DB2Dialect, PostgresDialect))
-      dialect1.getJDBCType(avro.getField("username").schema()).get shouldBe JdbcType("CLOB", CLOB)
-      dialect1.getJDBCType(avro.getField("rate").schema()) shouldBe Some(JdbcType("DECIMAL(4,2)", DECIMAL))
+      dialect1
+        .getJDBCType(avro.getField("username").schema())
+        .get shouldBe JdbcType("CLOB", CLOB)
+      dialect1.getJDBCType(avro.getField("rate").schema()) shouldBe Some(
+        JdbcType("DECIMAL(4,2)", DECIMAL)
+      )
     }
   }
 }
