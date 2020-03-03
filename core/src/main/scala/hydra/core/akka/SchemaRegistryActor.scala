@@ -75,10 +75,15 @@ class SchemaRegistryActor(
     e.getCause.asInstanceOf[RestClientException].getErrorCode < 500
 
   private def fetchSchema(location: String) = {
-    loader
-      .retrieveValueSchema(location)
-      .map(resource => FetchSchemaResponse(resource))
-      .recoverWith(errorHandler(location))
+    for {
+      valueSchema <- loader
+        .retrieveValueSchema(location)
+        .recoverWith(errorHandler(location))
+      keySchema <- loader.retrieveKeySchema(location).map(Some(_)).recover {
+        case _ => None
+      }
+    } yield FetchSchemaResponse(valueSchema, keySchema)
+
   }
 
   override def receive = {
@@ -101,7 +106,8 @@ class SchemaRegistryActor(
       val allVersionsRequest = for {
         resource <- loader.retrieveValueSchema(addSchemaSuffix(subject))
         allVersions <- Future.sequence((1 to resource.version).map {
-          versionNumber => loader.retrieveValueSchema(subject, versionNumber)
+          versionNumber =>
+            loader.retrieveValueSchema(subject, versionNumber)
         })
       } yield FetchAllSchemaVersionsResponse(allVersions)
       breaker.withCircuitBreaker(allVersionsRequest, registryFailure) pipeTo sender
@@ -109,7 +115,8 @@ class SchemaRegistryActor(
     case FetchSubjectsRequest =>
       val allSubjectsRequest = Future {
         val subjects = registry.registryClient.getAllSubjects.asScala.map {
-          subject => removeSchemaSuffix(subject)
+          subject =>
+            removeSchemaSuffix(subject)
         }
         FetchSubjectsResponse(subjects)
       }
@@ -190,7 +197,8 @@ object SchemaRegistryActor {
 
   case class FetchSchemaRequest(location: String) extends SchemaRegistryRequest
 
-  case class FetchSchemaResponse(schemaResource: SchemaResource)
+  case class FetchSchemaResponse(schemaResource: SchemaResource,
+                                 keySchemaResource: Option[SchemaResource])
       extends SchemaRegistryResponse
 
   case class FetchSchemaMetadataRequest(subject: String)

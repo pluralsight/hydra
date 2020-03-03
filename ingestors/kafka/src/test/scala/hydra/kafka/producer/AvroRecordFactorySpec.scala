@@ -84,7 +84,8 @@ class AvroRecordFactorySpec
             1,
             if (name == "avro-factory-test") testSchema
             else testKeyedSchema
-          )
+          ),
+          None
         )
     }
   }))

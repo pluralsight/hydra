@@ -63,7 +63,7 @@ class KafkaRecordFactoriesSpec
 
     override def receive: Receive = {
       case FetchSchemaRequest(_) =>
-        sender ! FetchSchemaResponse(SchemaResource(1, 1, testSchema))
+        sender ! FetchSchemaResponse(SchemaResource(1, 1, testSchema), None)
     }
   }))
 
@@ -166,8 +166,7 @@ class KafkaRecordFactoriesSpec
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = factories.build(request)
       whenReady(rec.failed)(ex =>
-        ex shouldBe InvalidRequest(_: IllegalArgumentException)
-      )
+        ex shouldBe InvalidRequest(_: IllegalArgumentException))
     }
 
     it("throws error with unknown formats") {
