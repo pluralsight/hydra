@@ -35,9 +35,10 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
   "TopicMetadataV2Deserializer" must {
 
     "return instant.now" in {
-      InstantFormat.read(JsNull).toEpochMilli shouldBe (Instant.now.toEpochMilli +- 10.seconds.toMillis)
+      InstantFormat
+        .read(JsNull)
+        .toEpochMilli shouldBe (Instant.now.toEpochMilli +- 10.seconds.toMillis)
     }
-
 
     "parse list of contact method with email and slack channel" in {
       val email = "dataplatform@pluralsight.com"
@@ -195,7 +196,8 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
         createJsValueOfTopicMetadataV2Request(
           Subject.createValidated("Foo").get,
           "#slack_channel",
-          "email@address.com")()
+          "email@address.com"
+        )()
       val tmv2 = TopicMetadataV2Format.read(jsonData)
 
       tmv2 shouldBe
@@ -226,12 +228,13 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
         slackChannel,
         _,
         notes
-        ) =
+      ) =
         createJsValueOfTopicMetadataV2Request(
           Subject.createValidated("Foo").get,
           "#slack_channel",
           "email@address.com",
-          allOptionalFieldsPresent = false)()
+          allOptionalFieldsPresent = false
+        )()
       val tmv2 = TopicMetadataV2Format.read(jsonData)
 
       tmv2 shouldBe
@@ -270,7 +273,8 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
           "Field `schemas`",
           "Field `streamType`",
           "Field `dataClassification`",
-          "Field `contact`")
+          "Field `contact`"
+        )
       )
     }
 
@@ -280,7 +284,8 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
       subject: Subject,
       slackChannel: String,
       email: String,
-      allOptionalFieldsPresent: Boolean = true)(
+      allOptionalFieldsPresent: Boolean = true
+  )(
       streamType: StreamType = History,
       deprecated: Boolean = false,
       dataClassification: DataClassification = Public,
@@ -313,9 +318,8 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
          |    "email": "$email"
          |  }
          |  ${if (allOptionalFieldsPresent) {
-                s""","parentSubjects": ${parentSubjects.toJson.compactPrint},"deprecated":$deprecated,"createdDate":"${createdDate.toString}""""
-              } else ""
-            }
+                       s""","parentSubjects": ${parentSubjects.toJson.compactPrint},"deprecated":$deprecated,"createdDate":"${createdDate.toString}""""
+                     } else ""}
          |  ${if (notes.isDefined) s""","notes": "${notes.get}"""" else ""}}
          |""".stripMargin.parseJson
     (
@@ -428,7 +432,8 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
         createJsValueOfTopicMetadataV2Request(
           subject,
           slack.channel.value,
-          email.address.value)(
+          email.address.value
+        )(
           streamType,
           deprecated,
           dataClassification,

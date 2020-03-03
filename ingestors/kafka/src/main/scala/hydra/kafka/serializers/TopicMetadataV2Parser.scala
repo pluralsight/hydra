@@ -14,7 +14,15 @@ import hydra.kafka.model.TopicMetadataV2Request.{Subject, SubjectRegex}
 import hydra.kafka.model._
 import hydra.kafka.serializers.Errors._
 import org.apache.avro.Schema
-import spray.json.{DefaultJsonProtocol, DeserializationException, JsNull, JsObject, JsString, JsValue, RootJsonFormat}
+import spray.json.{
+  DefaultJsonProtocol,
+  DeserializationException,
+  JsNull,
+  JsObject,
+  JsString,
+  JsValue,
+  RootJsonFormat
+}
 
 import scala.util.{Failure, Success, Try}
 
