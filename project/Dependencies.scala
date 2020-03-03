@@ -44,7 +44,7 @@ object Dependencies {
 
     val refined = "eu.timepit" %% "refined" % refinedVersion
 
-    val vulcan = Seq(
+    val vulcan: Seq[ModuleID] = Seq(
       "com.github.fd4s" %% "vulcan",
       "com.github.fd4s" %% "vulcan-generic",
       "com.github.fd4s" %% "vulcan-refined"
@@ -238,9 +238,6 @@ object Dependencies {
     fs2Kafka,
     refined
   ) ++ kafka ++ akkaHttpHal ++ vulcan
-
-  val sandboxDeps: Seq[ModuleID] = kafkaDeps ++ sqlDeps ++
-    Seq("com.h2database" % "h2" % "1.4.196") ++ Seq(embeddedKafka)
 
   val overrides = Set(logging, typesafeConfig, joda)
 }
