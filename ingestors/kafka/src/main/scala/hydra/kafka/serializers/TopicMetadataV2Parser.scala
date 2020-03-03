@@ -14,14 +14,7 @@ import hydra.kafka.model.TopicMetadataV2Request.{Subject, SubjectRegex}
 import hydra.kafka.model._
 import hydra.kafka.serializers.Errors._
 import org.apache.avro.Schema
-import spray.json.{
-  DefaultJsonProtocol,
-  DeserializationException,
-  JsObject,
-  JsString,
-  JsValue,
-  RootJsonFormat
-}
+import spray.json.{DefaultJsonProtocol, DeserializationException, JsNull, JsObject, JsString, JsValue, RootJsonFormat}
 
 import scala.util.{Failure, Success, Try}
 
@@ -54,19 +47,7 @@ sealed trait TopicMetadataV2Parser
   implicit object InstantFormat extends RootJsonFormat[Instant] {
     override def write(obj: Instant): JsValue = JsString(obj.toString)
 
-    override def read(json: JsValue): Instant = json match {
-      case JsString(value) =>
-        Try(Instant.parse(value)).getOrElse(
-          throw DeserializationException(
-            CreatedDateNotSpecifiedAsISO8601(json).errorMessage
-          )
-        )
-      case _ =>
-        throwDeserializationError(
-          "createdDate",
-          "ISO-8601 DateString formatted YYYY-MM-DDThh:mm:ssZ"
-        )
-    }
+    override def read(json: JsValue): Instant = Instant.now()
   }
 
   implicit object ContactFormat
@@ -300,18 +281,12 @@ sealed trait TopicMetadataV2Parser
               .getOrElse(throwDeserializationError("contact", "JsObject"))
           )
         )
-        val createdDate = toResult(
-          InstantFormat.read(
-            j.getFields("createdDate").headOption.getOrElse(JsString.empty)
-          )
-        )
+        val createdDate = toResult(InstantFormat.read(j))
         val parentSubjects = toResult(
           j.getFields("parentSubjects")
             .headOption
             .map(_.convertTo[List[Subject]])
-            .getOrElse(
-              throwDeserializationError("parentSubjects", "List of Subject")
-            )
+            .getOrElse(List())
         )
         val notes = toResult(
           j.getFields("notes").headOption.map(_.convertTo[String])
@@ -343,8 +318,7 @@ sealed trait TopicMetadataV2Parser
     json
       .getFields(key)
       .headOption
-      .map(_.convertTo[Boolean])
-      .getOrElse(throwDeserializationError(key, "Boolean"))
+      .exists(_.convertTo[Boolean])
   }
 }
 
@@ -373,12 +347,6 @@ final case class ExceptionThrownOnParseWithException(message: String)
 }
 
 object Errors {
-
-  final case class CreatedDateNotSpecifiedAsISO8601(value: JsValue) {
-
-    def errorMessage: String =
-      s"Field `createdDate` expected ISO-8601 DateString formatted YYYY-MM-DDThh:mm:ssZ, received ${value.compactPrint}."
-  }
 
   def invalidPayloadProvided(actual: JsValue): String = {
     import spray.json._
