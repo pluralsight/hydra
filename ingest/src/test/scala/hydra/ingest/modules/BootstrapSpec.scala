@@ -21,23 +21,27 @@ class BootstrapSpec extends WordSpec with Matchers {
 
   implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
     Slf4jLogger.getLogger[F]
+
   implicit private val timer: Timer[IO] =
     IO.timer(concurrent.ExecutionContext.global)
 
   private val metadataSubject = Subject.createValidated("metadata").get
 
-  private def createTestCase(config: V2MetadataTopicConfig)
-    : IO[(Option[Topic], List[String], List[KafkaRecord[_, _]])] = {
+  private def createTestCase(
+      config: V2MetadataTopicConfig
+  ): IO[(Option[Topic], List[String], List[KafkaRecord[_, _]])] = {
     val retry = RetryPolicies.alwaysGiveUp[IO]
     for {
       schemaRegistry <- SchemaRegistry.test[IO]
       underlying <- KafkaClient.test[IO]
       ref <- Ref[IO].of(List.empty[KafkaRecord[_, _]])
       kafkaClient = new TestKafkaClientWithPublishTo(underlying, ref)
-      c = new CreateTopicProgram[IO](schemaRegistry,
-                                     kafkaClient,
-                                     retry,
-                                     metadataSubject)
+      c = new CreateTopicProgram[IO](
+        schemaRegistry,
+        kafkaClient,
+        retry,
+        metadataSubject
+      )
       boot <- Bootstrap.make[IO](c, config)
       _ <- boot.bootstrapAll
       topicCreated <- kafkaClient.describeTopic(metadataSubject.value)
@@ -49,12 +53,14 @@ class BootstrapSpec extends WordSpec with Matchers {
   "Bootstrap" must {
     "create the metadata topic" in {
       val config =
-        V2MetadataTopicConfig(metadataSubject,
-                              createOnStartup = true,
-                              createV2TopicsEnabled = true,
-                              ContactMethod.create("test@test.com").get,
-                              1,
-                              1)
+        V2MetadataTopicConfig(
+          metadataSubject,
+          createOnStartup = true,
+          createV2TopicsEnabled = true,
+          ContactMethod.create("test@test.com").get,
+          1,
+          1
+        )
       createTestCase(config)
         .map {
           case (topicCreated, schemasAdded, messagesPublished) =>
@@ -67,12 +73,14 @@ class BootstrapSpec extends WordSpec with Matchers {
 
     "not create the metadata topic" in {
       val config =
-        V2MetadataTopicConfig(metadataSubject,
-                              createOnStartup = false,
-                              createV2TopicsEnabled = false,
-                              ContactMethod.create("test@test.com").get,
-                              1,
-                              1)
+        V2MetadataTopicConfig(
+          metadataSubject,
+          createOnStartup = false,
+          createV2TopicsEnabled = false,
+          ContactMethod.create("test@test.com").get,
+          1,
+          1
+        )
       createTestCase(config)
         .map {
           case (topicCreated, schemasAdded, messagesPublished) =>
