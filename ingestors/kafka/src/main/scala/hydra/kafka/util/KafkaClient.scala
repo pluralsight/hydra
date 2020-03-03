@@ -16,6 +16,7 @@ import hydra.core.transport.AckStrategy
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.kafka.clients.admin.NewTopic
 import hydra.kafka.producer.KafkaRecord
+import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
 
 import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
@@ -29,6 +30,8 @@ trait KafkaClient[F[_]] {
 
   def createTopic(name: TopicName, details: TopicDetails): F[Unit]
 
+  def deleteTopic(name: String): F[Unit]
+
   def publishMessage[K, V](
       record: KafkaRecord[K, V]
   ): F[Either[PublishError, Unit]]
@@ -40,17 +43,24 @@ object KafkaClient {
   type TopicName = String
   final case class Topic(name: TopicName, numberPartitions: Int)
 
-  sealed abstract class PublishError
-      extends Exception
+  sealed abstract class PublishError(message: String)
+      extends Exception(message)
       with Product
       with Serializable
 
   object PublishError {
-    final case object Timeout extends PublishError with NoStackTrace
+
+    final case object Timeout
+        extends PublishError("Timeout while ingesting message.")
+        with NoStackTrace
 
     final case class UnexpectedResponse(ingestorResponse: IngestorStatus)
-        extends PublishError
-    final case class Failed(cause: Throwable) extends PublishError
+        extends PublishError(
+          s"Unexpected response from ingestor: $ingestorResponse"
+        )
+
+    final case class Failed(cause: Throwable)
+        extends PublishError(cause.getMessage)
   }
 
   def live[F[_]: Async: Concurrent: ContextShift](
@@ -65,6 +75,9 @@ object KafkaClient {
           .map(_.headOption.map(_._2).map { td =>
             Topic(td.name(), td.partitions().size())
           })
+          .recover {
+            case _: UnknownTopicOrPartitionException => None
+          }
       }
 
       override def getTopicNames: F[List[TopicName]] =
@@ -76,6 +89,9 @@ object KafkaClient {
           .configs(d.configs.asJava)
         getAdminClientResource.use(_.createTopic(newTopic))
       }
+
+      override def deleteTopic(name: String): F[Unit] =
+        getAdminClientResource.use(_.deleteTopic(name))
 
       override def publishMessage[K, V](
           record: KafkaRecord[K, V]
@@ -129,6 +145,9 @@ object KafkaClient {
         val entry = name -> Topic(name, details.numPartitions)
         ref.update(old => old + entry)
       }
+
+      override def deleteTopic(name: String): F[Unit] =
+        ref.update(_ - name)
 
       override def publishMessage[K, V](
           record: KafkaRecord[K, V]

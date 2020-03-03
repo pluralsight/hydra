@@ -29,6 +29,7 @@ object Dependencies {
   val log4jVersion = "2.7"
   val opRabbitVersion = "2.0.0"
   val powerMockVersion = "2.0.0-beta.5" //needed for mocking static java methods
+  val refinedVersion = "0.9.12"
   val reflectionsVersion = "0.9.11"
   val scalaCacheVersion = "0.28.0"
   val scalaMockVersion = "4.1.0"
@@ -37,12 +38,24 @@ object Dependencies {
   val serviceContainerVersion = "2.0.7"
   val sprayJsonVersion = "1.3.5"
   val typesafeConfigVersion = "1.3.2"
+  val vulcanVersion = "1.0.1"
 
   object Compile {
 
-    val cats = "org.typelevel" %% "cats-core" % catsVersion
+    val refined = "eu.timepit" %% "refined" % refinedVersion
 
-    val catsLogger = "io.chrisdavenport" %% "log4cats-slf4j" % catsLoggerVersion
+    val vulcan = Seq(
+      "com.github.fd4s" %% "vulcan",
+      "com.github.fd4s" %% "vulcan-generic",
+      "com.github.fd4s" %% "vulcan-refined"
+    ).map(_ % vulcanVersion)
+
+    val cats = Seq(
+      "com.github.cb372" %% "cats-retry" % catsRetryVersion,
+      "io.chrisdavenport" %% "log4cats-slf4j" % catsLoggerVersion,
+      "org.typelevel" %% "cats-core" % catsVersion,
+      "org.typelevel" %% "cats-effect" % catsEffectVersion
+    )
 
     lazy val catsEffect = Seq(
       "org.typelevel" %% "cats-effect" % catsEffectVersion,
@@ -193,7 +206,7 @@ object Dependencies {
       powerMock ++ akkaTest
 
   val baseDeps: Seq[ModuleID] =
-    akka ++ Seq(scalaz, scalaConfigs, avro, cats) ++ logging ++ joda ++ testDeps
+    akka ++ Seq(scalaz, scalaConfigs, avro) ++ cats ++ logging ++ joda ++ testDeps
 
   val sqlDeps: Seq[ModuleID] =
     logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
@@ -210,8 +223,7 @@ object Dependencies {
       sdNotify,
       postgres,
       h2db,
-      retry,
-      catsLogger
+      retry
     ) ++
     confluent ++ kamon ++ aeron
 
@@ -223,8 +235,9 @@ object Dependencies {
   val kafkaDeps: Seq[ModuleID] = coreDeps ++ Seq(
     akkaKafkaStream,
     jsonLenses,
-    fs2Kafka
-  ) ++ kafka ++ akkaHttpHal
+    fs2Kafka,
+    refined
+  ) ++ kafka ++ akkaHttpHal ++ vulcan
 
   val sandboxDeps: Seq[ModuleID] = kafkaDeps ++ sqlDeps ++
     Seq("com.h2database" % "h2" % "1.4.196") ++ Seq(embeddedKafka)
