@@ -30,7 +30,7 @@ object Dependencies {
   val opRabbitVersion = "2.0.0"
   val powerMockVersion = "2.0.5" //needed for mocking static java methods
   val refinedVersion = "0.9.12"
-  val reflectionsVersion = "0.9.11"
+  val reflectionsVersion = "0.9.12"
   val scalaCacheVersion = "0.28.0"
   val scalaMockVersion = "4.1.0"
   val scalaTestVersion = "3.0.8"
