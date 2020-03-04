@@ -28,7 +28,7 @@ object Dependencies {
   val kxbmapConfigVersion = "0.4.4"
   val log4jVersion = "2.7"
   val opRabbitVersion = "2.0.0"
-  val powerMockVersion = "2.0.0-beta.5" //needed for mocking static java methods
+  val powerMockVersion = "2.0.5" //needed for mocking static java methods
   val refinedVersion = "0.9.12"
   val reflectionsVersion = "0.9.11"
   val scalaCacheVersion = "0.28.0"
