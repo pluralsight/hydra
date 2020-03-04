@@ -23,7 +23,7 @@ object Dependencies {
   val jodaConvertVersion = "1.8.1"
   val jodaTimeVersion = "2.9.9"
   val kafkaVersion = "2.4.0"
-  val kamonPVersion = "2.0.4"
+  val kamonPVersion = "2.0.1"
   val kamonVersion = "2.0.4"
   val kxbmapConfigVersion = "0.4.4"
   val log4jVersion = "2.7"
