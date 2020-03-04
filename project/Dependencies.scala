@@ -112,7 +112,7 @@ object Dependencies {
       "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
       "com.typesafe.akka" %% "akka-http-spray-json" % akkaHTTPVersion,
       "ch.megard" %% "akka-http-cors" % akkaHTTPCorsVersion,
-      "org.iq80.leveldb" % "leveldb" % "0.7",
+      "org.iq80.leveldb" % "leveldb" % "0.12",
       "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8"
     )
 
