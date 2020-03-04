@@ -240,9 +240,7 @@ class AvroKeyRecordFactorySpec
       ).withMetadata(HYDRA_SCHEMA_PARAM -> "no-key")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = factory.build(request)
-      whenReady(rec.failed) { e =>
-        e shouldBe NoKeySchemaFound
-      }
+      whenReady(rec.failed) { e => e shouldBe NoKeySchemaFound }
     }
 
   }
