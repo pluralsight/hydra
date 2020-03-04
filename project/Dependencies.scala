@@ -20,7 +20,7 @@ object Dependencies {
   val hikariCPVersion = "2.6.2"
   val h2DbVersion = "1.4.196"
   val jacksonVersion = "2.9.5"
-  val jodaConvertVersion = "1.8.1"
+  val jodaConvertVersion = "1.8.3"
   val jodaTimeVersion = "2.9.9"
   val kafkaVersion = "2.4.0"
   val kamonPVersion = "2.0.1"
