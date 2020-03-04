@@ -33,6 +33,7 @@ import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams._
 import hydra.core.protocol.MissingMetadataException
 import hydra.core.transport.AckStrategy
+import hydra.kafka.producer.AvroKeyRecordFactory.NoKeySchemaFound
 import org.apache.avro.Schema
 import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
 import org.scalatest.concurrent.ScalaFutures
@@ -76,13 +77,15 @@ class AvroKeyRecordFactorySpec
             1,
             testSchema
           ),
-          Some(
-            SchemaResource(
-              1,
-              1,
-              testKeySchema
+          if (name != "no-key")
+            Some(
+              SchemaResource(
+                1,
+                1,
+                testKeySchema
+              )
             )
-          )
+          else None
         )
     }
   }))
@@ -227,6 +230,18 @@ class AvroKeyRecordFactorySpec
           AckStrategy.NoAck
         )
         rec shouldBe avroRecord
+      }
+    }
+
+    it("throws NoKeySchemaFound if key schema is not returned") {
+      val request = HydraRequest(
+        "123",
+        """{"key": {"id":"test"}, "value":{"name":"test", "rank":10}}"""
+      ).withMetadata(HYDRA_SCHEMA_PARAM -> "no-key")
+        .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
+      val rec = factory.build(request)
+      whenReady(rec.failed) { e =>
+        e shouldBe NoKeySchemaFound
       }
     }
 
