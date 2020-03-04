@@ -27,50 +27,91 @@ import hydra.core.akka.SchemaRegistryActor.{
   FetchSchemaResponse
 }
 import hydra.core.ingest.HydraRequest
+import hydra.core.transport.ValidationStrategy
 import hydra.core.transport.ValidationStrategy.Strict
+import hydra.kafka.producer.AvroKeyRecordFactory.NoKeySchemaFound
 import org.apache.avro.generic.GenericRecord
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.control.NoStackTrace
 
 class AvroKeyRecordFactory(schemaResourceLoader: ActorRef)
-  extends KafkaRecordFactory[String, GenericRecord]
+    extends KafkaRecordFactory[GenericRecord, GenericRecord]
     with ConfigSupport {
 
   private implicit val timeout = util.Timeout(3.seconds)
 
   override def build(
-                      request: HydraRequest
-                    )(implicit ec: ExecutionContext): Future[AvroKeyRecord] = {
+      request: HydraRequest
+  )(implicit ec: ExecutionContext): Future[AvroKeyRecord] = {
     for {
       (topic, subject) <- Future.fromTry(getTopicAndSchemaSubject(request))
       response <- (schemaResourceLoader ? FetchSchemaRequest(subject))
         .mapTo[FetchSchemaResponse]
-      keySchemaResource = response.keySchemaResource.getOrElse(throw )
-      record <- convert(response.schemaResource, request)
-      keyRecord <- convert(keySchemaResource, request)
+      keySchemaResource = response.keySchemaResource.getOrElse(
+        throw NoKeySchemaFound
+      )
+      records <- convertKeyAndValue(
+        keySchemaResource,
+        response.schemaResource,
+        request
+      )
     } yield AvroKeyRecord(
       topic,
-      response.schemaResource.schema,
       keySchemaResource.schema,
-      keyRecord,
-      record,
+      response.schemaResource.schema,
+      records._1,
+      records._2,
       request.ackStrategy
     )
   }
 
-  private def convert(schemaResource: SchemaResource, request: HydraRequest)(
-    implicit ec: ExecutionContext
+  private def convertKeyAndValue(
+      keySchemaR: SchemaResource,
+      valueSchemaR: SchemaResource,
+      request: HydraRequest
+  )(
+      implicit ec: ExecutionContext
+  ): Future[(GenericRecord, GenericRecord)] = {
+    import spray.json._
+    val payload = request.payload.parseJson.asJsObject
+    def getFieldAsString(fieldName: String): String =
+      payload.fields(fieldName).compactPrint
+    for {
+      key <- convert(
+        keySchemaR,
+        request.validationStrategy,
+        getFieldAsString("key")
+      )
+      value <- convert(
+        valueSchemaR,
+        request.validationStrategy,
+        getFieldAsString("value")
+      )
+    } yield (key -> value)
+  }
+
+  private def convert(
+      schemaResource: SchemaResource,
+      validationStrategy: ValidationStrategy,
+      payload: String
+  )(
+      implicit ec: ExecutionContext
   ): Future[GenericRecord] = {
     val converter = new JsonConverter[GenericRecord](
       schemaResource.schema,
-      request.validationStrategy == Strict
+      validationStrategy == Strict
     )
     Future({
-      val converted = converter.convert(request.payload)
+      val converted = converter.convert(payload)
       converted
     }).recover {
       case ex => throw AvroUtils.improveException(ex, schemaResource)
     }
   }
+}
+
+object AvroKeyRecordFactory {
+  case object NoKeySchemaFound extends NoStackTrace
 }

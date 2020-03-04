@@ -124,8 +124,10 @@ class SchemaRegistryActorSpec
   it should "respond with FetchSchemaResponse with a key" in {
     val (probe, schemaRegistryActor) = fixture
 
-    schemaRegistryActor.tell(FetchSchemaRequest("hydra.test.TesterWithKey"),
-                             probe.ref)
+    schemaRegistryActor.tell(
+      FetchSchemaRequest("hydra.test.TesterWithKey"),
+      probe.ref
+    )
     probe.expectMsgPF() {
       case FetchSchemaResponse(schema, keySchema) =>
         schema shouldBe SchemaResource(1, 1, testSchema)

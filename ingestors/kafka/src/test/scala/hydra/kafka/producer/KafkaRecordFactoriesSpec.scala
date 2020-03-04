@@ -166,7 +166,8 @@ class KafkaRecordFactoriesSpec
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = factories.build(request)
       whenReady(rec.failed)(ex =>
-        ex shouldBe InvalidRequest(_: IllegalArgumentException))
+        ex shouldBe InvalidRequest(_: IllegalArgumentException)
+      )
     }
 
     it("throws error with unknown formats") {
