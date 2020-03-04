@@ -117,7 +117,7 @@ object Dependencies {
     )
 
     val akkaHttpHal = Seq(
-      ("com.github.marcuslange" % "akka-http-hal" % "1.2.1")
+      ("com.github.marcuslange" % "akka-http-hal" % "1.2.5")
         .excludeAll(ExclusionRule(organization = "io.spray"))
     )
 
