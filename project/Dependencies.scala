@@ -13,7 +13,7 @@ object Dependencies {
   val catsLoggerVersion = "1.0.1"
   val catsRetryVersion = "1.0.0"
   val catsVersion = "2.0.0"
-  val cirisVersion = "1.0.3"
+  val cirisVersion = "1.0.4"
   val confluentVersion = "5.4.0"
   val easyMockVersion = "3.5" //needed for mocking static java methods
   val fs2KafkaVersion = "1.0.0"
