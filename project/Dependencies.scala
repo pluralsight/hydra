@@ -74,7 +74,7 @@ object Dependencies {
 
     val scalaz = "org.scalaz" %% "scalaz-core" % scalazVersion
 
-    val retry = "com.softwaremill.retry" %% "retry" % "0.3.2"
+    val retry = "com.softwaremill.retry" %% "retry" % "0.3.3"
 
     val embeddedKafka = "net.manub" %% "scalatest-embedded-kafka" % "2.0.0"
 
