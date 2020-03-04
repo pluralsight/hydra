@@ -15,27 +15,27 @@ object Dependencies {
   val catsVersion = "2.0.0"
   val cirisVersion = "1.0.4"
   val confluentVersion = "5.4.0"
-  val easyMockVersion = "3.5" //needed for mocking static java methods
+  val easyMockVersion = "3.5.1" //needed for mocking static java methods
   val fs2KafkaVersion = "1.0.0"
-  val hikariCPVersion = "2.6.3"
+  val hikariCPVersion = "2.7.9"
   val h2DbVersion = "1.4.196"
-  val jacksonVersion = "2.9.10.3"
-  val jodaConvertVersion = "1.8.1"
+  val jacksonVersion = "2.9.10"
+  val jodaConvertVersion = "1.8.3"
   val jodaTimeVersion = "2.9.9"
   val kafkaVersion = "2.4.0"
   val kamonPVersion = "2.0.1"
   val kamonVersion = "2.0.1"
   val kxbmapConfigVersion = "0.4.4"
   val log4jVersion = "2.7"
-  val opRabbitVersion = "2.0.0"
+  val opRabbitVersion = "2.1.0"
   val powerMockVersion = "2.0.5" //needed for mocking static java methods
   val refinedVersion = "0.9.12"
   val reflectionsVersion = "0.9.12"
   val scalaCacheVersion = "0.28.0"
-  val scalaMockVersion = "4.1.0"
-  val scalaTestVersion = "3.0.8"
+  val scalaMockVersion = "4.4.0"
+  val scalaTestVersion = "3.1.1"
   val scalazVersion = "7.2.30"
-  val serviceContainerVersion = "2.0.7"
+  val serviceContainerVersion = "2.1.0"
   val sprayJsonVersion = "1.3.5"
   val typesafeConfigVersion = "1.3.2"
   val vulcanVersion = "1.0.1"
@@ -195,7 +195,7 @@ object Dependencies {
     val h2db = "com.h2database" % "h2" % h2DbVersion % "test"
 
     val embeddedPostgres =
-      "com.opentable.components" % "otj-pg-embedded" % "0.12.11" % "test"
+      "com.opentable.components" % "otj-pg-embedded" % "0.13.3" % "test"
   }
 
   import Compile._
