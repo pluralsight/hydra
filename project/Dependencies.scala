@@ -165,7 +165,7 @@ object Dependencies {
       "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion
     )
 
-    val postgres = "org.postgresql" % "postgresql" % "42.2.4"
+    val postgres = "org.postgresql" % "postgresql" % "42.2.10"
 
     val aeron: Seq[ModuleID] = Seq(
       "io.aeron" % "aeron-driver",
