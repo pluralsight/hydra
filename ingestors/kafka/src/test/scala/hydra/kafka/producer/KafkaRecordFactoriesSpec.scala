@@ -63,7 +63,10 @@ class KafkaRecordFactoriesSpec
 
     override def receive: Receive = {
       case FetchSchemaRequest(_) =>
-        sender ! FetchSchemaResponse(SchemaResource(1, 1, testSchema), None)
+        sender ! FetchSchemaResponse(
+          SchemaResource(1, 1, testSchema),
+          Some(SchemaResource(2, 1, testSchema))
+        )
     }
   }))
 
@@ -89,6 +92,35 @@ class KafkaRecordFactoriesSpec
           avroSchema,
           None,
           genericRecord,
+          AckStrategy.NoAck
+        )
+      )
+    }
+
+    it("handles avro keys") {
+      val json =
+        """{"key":{"name":"test1", "rank":11}, "value":{"name":"test", "rank":10}}"""
+      val request = HydraRequest("123", json)
+        .withMetadata(HYDRA_SCHEMA_PARAM -> "kafka-factories-test")
+        .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
+        .withMetadata(HYDRA_RECORD_FORMAT_PARAM -> "avro-key")
+      val record = factories.build(request)
+      val keyRecord = new GenericRecordBuilder(avroSchema)
+        .set("name", "test1")
+        .set("rank", 11)
+        .build()
+      val valueRecord = new GenericRecordBuilder(avroSchema)
+        .set("name", "test")
+        .set("rank", 10)
+        .build()
+
+      whenReady(record)(
+        _ shouldBe AvroKeyRecord(
+          "test-topic",
+          avroSchema,
+          avroSchema,
+          keyRecord,
+          valueRecord,
           AckStrategy.NoAck
         )
       )
