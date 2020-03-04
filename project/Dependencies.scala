@@ -78,7 +78,7 @@ object Dependencies {
 
     val embeddedKafka = "net.manub" %% "scalatest-embedded-kafka" % "2.0.0"
 
-    val sdNotify = "info.faljse" % "SDNotify" % "1.1"
+    val sdNotify = "info.faljse" % "SDNotify" % "1.3"
 
     lazy val kamon = Seq(
       "io.kamon" %% "kamon-core" % kamonVersion,
