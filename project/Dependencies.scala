@@ -4,7 +4,7 @@ object Dependencies {
 
   val aeronVersion = "1.24.0"
   val akkaHTTPCorsVersion = "0.4.2"
-  val akkaHTTPVersion = "10.1.10"
+  val akkaHTTPVersion = "10.1.11"
   val akkaKafkaStreamVersion = "2.0.2"
   val akkaKryoVersion = "0.5.2"
   val akkaVersion = "2.6.1"
