@@ -195,7 +195,7 @@ object Dependencies {
     val h2db = "com.h2database" % "h2" % h2DbVersion % "test"
 
     val embeddedPostgres =
-      "com.opentable.components" % "otj-pg-embedded" % "0.12.11" % "test"
+      "com.opentable.components" % "otj-pg-embedded" % "0.13.3" % "test"
   }
 
   import Compile._
