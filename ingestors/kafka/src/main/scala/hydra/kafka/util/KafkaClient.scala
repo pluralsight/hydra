@@ -24,7 +24,7 @@ import scala.util.control.NoStackTrace
 /**
   * Internal interface to interact with the KafkaAdminClient from FS2 Kafka.
   * Provides a live version for production usage and a test version for integration testing.
-  * @tparam F - higher kinded type which in application must conform to Sync, Async, Concurrent, and ContextShift
+  * @tparam F - higher kinded type - polymorphic effect type
   */
 trait KafkaClient[F[_]] {
   import KafkaClient._
@@ -60,8 +60,8 @@ trait KafkaClient[F[_]] {
   /**
     * Publishes the Hydra record to Kafka
     * @param record - the hydra record that is to be ingested in Kafka
-    * @tparam K - the value representing the Key Schema
-    * @tparam V - the value representing the Value Schema
+    * @tparam K - Key type
+    * @tparam V - Value type
     * @return Either[PublishError, Unit] - Unit is returned upon success, PublishError on failure.
     */
   def publishMessage[K, V](

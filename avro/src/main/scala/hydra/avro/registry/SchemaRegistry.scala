@@ -12,7 +12,7 @@ import org.apache.avro.Schema
   * Internal interface to interact with the SchemaRegistryClient from Confluent.
   * Abstraction allows pure functional interface for working with underlying Java implementation.
   * Provides a live version for production usage and a test version for integration testing.
-  * @tparam F - higher kinded type which in application must conform to Sync
+  * @tparam F - higher kinded type - polymorphic effect type
   */
 trait SchemaRegistry[F[_]] {
 
@@ -54,7 +54,7 @@ trait SchemaRegistry[F[_]] {
   def getAllVersions(subject: String): F[List[SchemaVersion]]
 
   /**
-    * Retrieves all subjects found in the SchemaRegistry WITHOUT suffix (-key | -value)
+    * Retrieves all subjects found in the SchemaRegistry
     * @return List[String]
     */
   def getAllSubjects: F[List[String]]
