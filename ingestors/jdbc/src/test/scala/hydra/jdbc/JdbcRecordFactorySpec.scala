@@ -48,7 +48,7 @@ class JdbcRecordFactorySpec
           case "schemaPK"  => schemaPK
           case "jdbc-test" => schemaNPK
         }
-        sender ! FetchSchemaResponse(SchemaResource(1, 1, schemaToUse))
+        sender ! FetchSchemaResponse(SchemaResource(1, 1, schemaToUse), None)
     }
   }))
 
