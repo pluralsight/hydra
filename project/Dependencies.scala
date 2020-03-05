@@ -2,7 +2,6 @@ import sbt.{ExclusionRule, _}
 
 object Dependencies {
 
-  val aeronVersion = "1.24.0"
   val akkaHTTPCorsVersion = "0.4.2"
   val akkaHTTPVersion = "10.1.11"
   val akkaKafkaStreamVersion = "2.0.2"
@@ -166,11 +165,6 @@ object Dependencies {
     )
 
     val postgres = "org.postgresql" % "postgresql" % "42.2.4"
-
-    val aeron: Seq[ModuleID] = Seq(
-      "io.aeron" % "aeron-driver",
-      "io.aeron" % "aeron-client"
-    ).map(_ % aeronVersion)
   }
 
   object Test {
@@ -225,7 +219,7 @@ object Dependencies {
       h2db,
       retry
     ) ++
-    confluent ++ kamon ++ aeron
+    confluent ++ kamon
 
   val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(ciris)
 
