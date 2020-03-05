@@ -21,17 +21,49 @@ import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
 import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
 
+/**
+  * Internal interface to interact with the KafkaAdminClient from FS2 Kafka.
+  * Provides a live version for production usage and a test version for integration testing.
+  * @tparam F - higher kinded type which in application must conform to Sync, Async, Concurrent, and ContextShift
+  */
 trait KafkaClient[F[_]] {
   import KafkaClient._
 
+  /**
+    * Retrieves Topic if found in Kafka. Provides minimal detail about the topic.
+    * @param name - name of the topic in Kafka
+    * @return Option[Topic]
+    */
   def describeTopic(name: TopicName): F[Option[Topic]]
 
+  /**
+    * Retrieves a list of all TopicName(s) found in Kafka
+    * @return List[TopicName]
+    */
   def getTopicNames: F[List[TopicName]]
 
+  /**
+    * Creates the Topic in Kafka
+    * @param name - name of the topic to be created in Kafka
+    * @param details - config and settings for the topic
+    * @return
+    */
   def createTopic(name: TopicName, details: TopicDetails): F[Unit]
 
+  /**
+    * Deletes the topic in Kafka
+    * @param name - name of the topic in Kafka
+    * @return
+    */
   def deleteTopic(name: String): F[Unit]
 
+  /**
+    * Publishes the Hydra record to Kafka
+    * @param record - the hydra record that is to be ingested in Kafka
+    * @tparam K - the value representing the Key Schema
+    * @tparam V - the value representing the Value Schema
+    * @return Either[PublishError, Unit] - Unit is returned upon success, PublishError on failure.
+    */
   def publishMessage[K, V](
       record: KafkaRecord[K, V]
   ): F[Either[PublishError, Unit]]
