@@ -33,6 +33,7 @@ import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams._
 import hydra.core.protocol.MissingMetadataException
 import hydra.core.transport.AckStrategy
+import hydra.kafka.producer.AvroKeyRecordFactory.NoKeySchemaFound
 import org.apache.avro.Schema
 import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
 import org.scalatest.concurrent.ScalaFutures
@@ -42,10 +43,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.io.Source
 
-/**
-  * Created by alexsilva on 1/11/17.
-  */
-class AvroRecordFactorySpec
+class AvroKeyRecordFactorySpec
     extends TestKit(ActorSystem("hydra"))
     with Matchers
     with FunSpecLike
@@ -55,23 +53,18 @@ class AvroRecordFactorySpec
   val testSchema = new Schema.Parser()
     .parse(Source.fromResource("avro-factory-test.avsc").mkString)
 
-  val testKeyedSchema = new Schema.Parser().parse("""
-      |{
-      |  "namespace": "hydra.test",
-      |  "type": "record",
-      |  "name": "Tester",
-      |  "hydra.key":"name",
-      |  "fields": [
-      |    {
-      |      "name": "name",
-      |      "type": "string"
-      |    },
-      |    {
-      |      "name": "rank",
-      |      "type": "int"
-      |    }
-      |  ]
-      |}
+  val testKeySchema = new Schema.Parser().parse("""
+                                                    |{
+                                                    |  "namespace": "hydra.test",
+                                                    |  "type": "record",
+                                                    |  "name": "Tester",
+                                                    |  "fields": [
+                                                    |    {
+                                                    |      "name": "id",
+                                                    |      "type": "string"
+                                                    |    }
+                                                    |  ]
+                                                    |}
     """.stripMargin)
 
   val loader = system.actorOf(Props(new Actor() {
@@ -82,15 +75,22 @@ class AvroRecordFactorySpec
           SchemaResource(
             1,
             1,
-            if (name == "avro-factory-test") testSchema
-            else testKeyedSchema
+            testSchema
           ),
-          None
+          if (name != "no-key")
+            Some(
+              SchemaResource(
+                1,
+                1,
+                testKeySchema
+              )
+            )
+          else None
         )
     }
   }))
 
-  val factory = new AvroRecordFactory(loader)
+  val factory = new AvroKeyRecordFactory(loader)
 
   override def afterAll = TestKit.shutdownActorSystem(system)
 
@@ -99,9 +99,12 @@ class AvroRecordFactorySpec
 
   describe("When performing validation") {
     it("handles Avro default value errors") {
-      val request = HydraRequest("123", """{"name":"test"}""")
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-test")
-        .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
+      val request =
+        HydraRequest(
+          "123",
+          """{"key": {"id":"test"}, "value":{"name":"test"}}"""
+        ).withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-test")
+          .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = factory.build(request)
       whenReady(rec.failed) { e =>
         val ex = e.asInstanceOf[JsonToAvroConversionExceptionWithMetadata]
@@ -112,8 +115,10 @@ class AvroRecordFactorySpec
 
     it("handles fields not defined in the schema") {
       val request =
-        HydraRequest("123", """{"name":"test","rank":1,"new-field":"new"}""")
-          .withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-test")
+        HydraRequest(
+          "123",
+          """{"key": {"id":"test", "blah":"blah"}, "value":{"name":"test", "a":"a"}}"""
+        ).withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-test")
           .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
           .withMetadata(HYDRA_VALIDATION_STRATEGY -> "strict")
       val rec = new KafkaRecordFactories(loader).build(request)
@@ -125,8 +130,10 @@ class AvroRecordFactorySpec
     }
 
     it("handles Avro datatype errors") {
-      val request = HydraRequest("123", """{"name":"test", "rank":"booyah"}""")
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-test")
+      val request = HydraRequest(
+        "123",
+        """{"key": {"id":"test"}, "value":{"name":"test", "rank":"shouldBeInt"}}"""
+      ).withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-test")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = factory.build(request)
       whenReady(rec.failed) { e =>
@@ -135,58 +142,33 @@ class AvroRecordFactorySpec
       }
     }
 
-    it("builds keyless messages") {
-      val json = """{"name":"test", "rank":10}"""
+    it("builds messages") {
+      val keyJson = """{"id":"keyId"}"""
+      val valueJson = """{"name":"test", "rank":10}"""
+      val json =
+        s"""{"key": $keyJson, "value":$valueJson}"""
       val request = HydraRequest("123", json)
         .withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-test")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       whenReady(factory.build(request)) { msg =>
         msg.destination shouldBe "test-topic"
-        msg.key shouldBe null
-        msg.schema shouldBe testSchema
+        msg.key.get("id") shouldBe "keyId"
+        msg.key shouldBe new JsonConverter[GenericRecord](testKeySchema)
+          .convert(keyJson)
+        msg.valueSchema shouldBe testSchema
+        msg.keySchema shouldBe testKeySchema
         msg.payload.get("name") shouldBe "test"
         msg.payload.get("rank") shouldBe 10
         msg.payload shouldBe new JsonConverter[GenericRecord](testSchema)
-          .convert(json)
-      }
-    }
-
-    it("builds keyed messages using HYDRA_RECORD_KEY_PARAM") {
-      val json = """{"name":"test", "rank":10}"""
-      val request = HydraRequest("123", json)
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-test")
-        .withMetadata(HYDRA_RECORD_KEY_PARAM -> "{$.name}")
-        .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      whenReady(factory.build(request)) { msg =>
-        msg.destination shouldBe "test-topic"
-        msg.schema shouldBe testSchema
-        msg.payload.get("name") shouldBe "test"
-        msg.payload.get("rank") shouldBe 10
-        msg.key shouldBe "test"
-        msg.payload shouldBe new JsonConverter[GenericRecord](testSchema)
-          .convert(json)
-      }
-    }
-
-    it("builds keyed messages using hydra.key") {
-      val json = """{"name":"thisIsTheKey", "rank":10}"""
-      val request = HydraRequest("123", json)
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-keyed-test")
-        .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
-      whenReady(factory.build(request)) { msg =>
-        msg.destination shouldBe "test-topic"
-        msg.schema shouldBe testKeyedSchema
-        msg.payload.get("name") shouldBe "thisIsTheKey"
-        msg.payload.get("rank") shouldBe 10
-        msg.key shouldBe "thisIsTheKey"
-        msg.payload shouldBe new JsonConverter[GenericRecord](testKeyedSchema)
-          .convert(json)
+          .convert(valueJson)
       }
     }
 
     it("has the right subject when a schema is specified") {
-      val request = HydraRequest("123", """{"name":"test", "rank":10}""")
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-test")
+      val request = HydraRequest(
+        "123",
+        """{"key": {"id":"keyId"}, "value":{"name":"test", "rank":10}}"""
+      ).withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-test")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       factory
         .getTopicAndSchemaSubject(request)
@@ -195,13 +177,18 @@ class AvroRecordFactorySpec
     }
 
     it("defaults to target as the subject") {
-      val request = HydraRequest("123", """{"name":"test", "rank":10}""")
-        .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
+      val request = HydraRequest(
+        "123",
+        """{"key": {"id":"keyId"}, "value":{"name":"test", "rank":10}}"""
+      ).withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       factory.getTopicAndSchemaSubject(request).get._2 shouldBe "test-topic"
     }
 
     it("throws an error if no topic is in the request") {
-      val request = HydraRequest("123", """{"name":test"}""")
+      val request = HydraRequest(
+        "123",
+        """{"key": {"id":"keyId"}, "value":{"name":"test", "rank":10}}"""
+      )
       whenReady(factory.build(request).failed)(
         _ shouldBe an[MissingMetadataException]
       )
@@ -209,8 +196,10 @@ class AvroRecordFactorySpec
 
     //validation
     it("returns invalid for payloads that do not conform to the schema") {
-      val r = HydraRequest("1", """{"name":"test"}""")
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-test.avsc")
+      val r = HydraRequest(
+        "1",
+        """{"key": {"id":"keyId"}, "value":{"failure":"test", "rank":10}}"""
+      ).withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-test.avsc")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       val rec = factory.build(r)
       whenReady(rec.failed)(
@@ -219,23 +208,39 @@ class AvroRecordFactorySpec
     }
 
     it("validates good avro payloads") {
-      val r = HydraRequest("1", """{"name":"test","rank":10}""")
-        .withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-test")
+      val r = HydraRequest(
+        "1",
+        """{"key": {"id":"keyId"}, "value":{"name":"test", "rank":10}}"""
+      ).withMetadata(HYDRA_SCHEMA_PARAM -> "avro-factory-test")
         .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
       whenReady(factory.build(r)) { rec =>
-        val genericRecord = new GenericRecordBuilder(testSchema)
+        val keyRecord = new GenericRecordBuilder(testKeySchema)
+          .set("id", "keyId")
+          .build()
+        val valueRecord = new GenericRecordBuilder(testSchema)
           .set("name", "test")
           .set("rank", 10)
           .build()
-        val avroRecord = AvroRecord(
+        val avroRecord = AvroKeyRecord(
           "test-topic",
+          testKeySchema,
           testSchema,
-          None,
-          genericRecord,
+          keyRecord,
+          valueRecord,
           AckStrategy.NoAck
         )
         rec shouldBe avroRecord
       }
+    }
+
+    it("throws NoKeySchemaFound if key schema is not returned") {
+      val request = HydraRequest(
+        "123",
+        """{"key": {"id":"test"}, "value":{"name":"test", "rank":10}}"""
+      ).withMetadata(HYDRA_SCHEMA_PARAM -> "no-key")
+        .withMetadata(HYDRA_KAFKA_TOPIC_PARAM -> "test-topic")
+      val rec = factory.build(request)
+      whenReady(rec.failed) { e => e shouldBe NoKeySchemaFound }
     }
 
   }
