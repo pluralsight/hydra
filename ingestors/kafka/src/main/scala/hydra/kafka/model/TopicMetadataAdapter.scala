@@ -1,7 +1,7 @@
 package hydra.kafka.model
 
-import akka.http.rest.hal.{Link, ResourceBuilder}
 import hydra.core.marshallers.HydraJsonSupport
+import io.pileworx.akka.http.rest.hal.{Link, ResourceBuilder}
 import spray.json._
 
 /**
