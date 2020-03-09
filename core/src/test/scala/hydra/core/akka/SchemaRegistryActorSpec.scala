@@ -12,6 +12,7 @@ import hydra.avro.resource.SchemaResource
 import hydra.core.akka.SchemaRegistryActor._
 import hydra.core.protocol.HydraApplicationError
 import org.apache.avro.Schema.Parser
+import org.apache.avro.SchemaBuilder
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
@@ -43,8 +44,19 @@ class SchemaRegistryActorSpec
   val testSchemaString = Source.fromResource("schema.avsc").mkString
   val testSchema = new Parser().parse(testSchemaString)
 
+  val testKeySchema = SchemaBuilder
+    .record("keySchema")
+    .fields()
+    .name("test")
+    .`type`
+    .stringType
+    .noDefault
+    .endRecord
+
   override def beforeAll() = {
     client.register("hydra.test.Tester-value", testSchema)
+    client.register("hydra.test.TesterWithKey-key", testKeySchema)
+    client.register("hydra.test.TesterWithKey-value", testSchema)
   }
 
   val listener = TestProbe()
@@ -102,8 +114,24 @@ class SchemaRegistryActorSpec
 
     schemaRegistryActor.tell(FetchSchemaRequest("hydra.test.Tester"), probe.ref)
     probe.expectMsgPF() {
-      case FetchSchemaResponse(schema) =>
+      case FetchSchemaResponse(schema, keySchema) =>
         schema shouldBe SchemaResource(1, 1, testSchema)
+        keySchema shouldBe empty
+    }
+    listener.expectNoMessage(3.seconds)
+  }
+
+  it should "respond with FetchSchemaResponse with a key" in {
+    val (probe, schemaRegistryActor) = fixture
+
+    schemaRegistryActor.tell(
+      FetchSchemaRequest("hydra.test.TesterWithKey"),
+      probe.ref
+    )
+    probe.expectMsgPF() {
+      case FetchSchemaResponse(schema, keySchema) =>
+        schema shouldBe SchemaResource(1, 1, testSchema)
+        keySchema shouldBe Some(SchemaResource(2, 1, testKeySchema))
     }
     listener.expectNoMessage(3.seconds)
   }
@@ -144,8 +172,9 @@ class SchemaRegistryActorSpec
     )
 
     senderProbe.expectMsgPF() {
-      case FetchSchemaResponse(actualSchema) =>
+      case FetchSchemaResponse(actualSchema, keySchema) =>
         actualSchema shouldBe SchemaResource(1, 1, testSchema)
+        keySchema shouldBe empty
     }
   }
 
