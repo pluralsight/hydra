@@ -14,7 +14,7 @@ object Dependencies {
   val catsVersion = "2.0.0"
   val cirisVersion = "1.0.4"
   val confluentVersion = "5.4.1"
-  val easyMockVersion = "3.6" //needed for mocking static java methods
+  val easyMockVersion = "4.2" //needed for mocking static java methods
   val fs2KafkaVersion = "1.0.0"
   val hikariCPVersion = "3.4.2"
   val h2DbVersion = "1.4.200"
