@@ -2,7 +2,6 @@ import sbt.{ExclusionRule, _}
 
 object Dependencies {
 
-  val aeronVersion = "1.24.0"
   val akkaHTTPCorsVersion = "0.4.2"
   val akkaHTTPVersion = "10.1.11"
   val akkaKafkaStreamVersion = "2.0.2"
@@ -14,7 +13,7 @@ object Dependencies {
   val catsRetryVersion = "1.1.0"
   val catsVersion = "2.0.0"
   val cirisVersion = "1.0.4"
-  val confluentVersion = "5.4.0"
+  val confluentVersion = "5.4.1"
   val easyMockVersion = "3.5.1" //needed for mocking static java methods
   val fs2KafkaVersion = "1.0.0"
   val hikariCPVersion = "2.7.9"
@@ -24,12 +23,12 @@ object Dependencies {
   val jodaTimeVersion = "2.9.9"
   val kafkaVersion = "2.4.0"
   val kamonPVersion = "2.0.1"
-  val kamonVersion = "2.0.1"
+  val kamonVersion = "2.0.4"
   val kxbmapConfigVersion = "0.4.4"
   val log4jVersion = "2.7"
   val opRabbitVersion = "2.1.0"
   val powerMockVersion = "2.0.5" //needed for mocking static java methods
-  val refinedVersion = "0.9.12"
+  val refinedVersion = "0.9.13"
   val reflectionsVersion = "0.9.12"
   val scalaCacheVersion = "0.28.0"
   val scalaMockVersion = "4.4.0"
@@ -78,7 +77,7 @@ object Dependencies {
 
     val embeddedKafka = "net.manub" %% "scalatest-embedded-kafka" % "2.0.0"
 
-    val sdNotify = "info.faljse" % "SDNotify" % "1.1"
+    val sdNotify = "info.faljse" % "SDNotify" % "1.3"
 
     lazy val kamon = Seq(
       "io.kamon" %% "kamon-core" % kamonVersion,
@@ -166,11 +165,6 @@ object Dependencies {
     )
 
     val postgres = "org.postgresql" % "postgresql" % "42.2.4"
-
-    val aeron: Seq[ModuleID] = Seq(
-      "io.aeron" % "aeron-driver",
-      "io.aeron" % "aeron-client"
-    ).map(_ % aeronVersion)
   }
 
   object Test {
@@ -225,7 +219,7 @@ object Dependencies {
       h2db,
       retry
     ) ++
-    confluent ++ kamon ++ aeron
+    confluent ++ kamon
 
   val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(ciris)
 

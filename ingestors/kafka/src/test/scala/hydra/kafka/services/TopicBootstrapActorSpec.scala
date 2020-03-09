@@ -86,7 +86,7 @@ class TopicBootstrapActorSpec
         new Actor {
           override def receive: Receive = {
             case msg: FetchSchemaRequest =>
-              sender ! FetchSchemaResponse(testSchemaResource)
+              sender ! FetchSchemaResponse(testSchemaResource, None)
               probe.ref forward msg
 
             case msg: RegisterSchemaRequest =>

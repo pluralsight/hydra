@@ -27,6 +27,8 @@ class KafkaRecordFactories(schemaLoader: ActorRef)
           JsonRecordFactory
         case Some(value) if (value.equalsIgnoreCase("avro")) =>
           avroRecordFactory
+        case Some(value) if (value.equalsIgnoreCase("avro-key")) =>
+          new AvroKeyRecordFactory(schemaLoader)
         case Some(value) =>
           throw new IllegalArgumentException(s"'$value' is not a valid format.")
         case _ => avroRecordFactory
