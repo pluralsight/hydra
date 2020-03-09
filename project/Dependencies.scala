@@ -14,16 +14,16 @@ object Dependencies {
   val catsVersion = "2.0.0"
   val cirisVersion = "1.0.4"
   val confluentVersion = "5.4.1"
-  val easyMockVersion = "3.5.1" //needed for mocking static java methods
+  val easyMockVersion = "3.6" //needed for mocking static java methods
   val fs2KafkaVersion = "1.0.0"
-  val hikariCPVersion = "2.7.9"
+  val hikariCPVersion = "3.4.2"
   val h2DbVersion = "1.4.200"
   val jacksonVersion = "2.9.10"
   val jodaConvertVersion = "1.8.3"
   val jodaTimeVersion = "2.9.9"
   val kafkaVersion = "2.4.0"
   val kamonPVersion = "2.0.1"
-  val kamonVersion = "2.0.4"
+  val kamonVersion = "2.0.5"
   val kxbmapConfigVersion = "0.4.4"
   val log4jVersion = "2.7"
   val opRabbitVersion = "2.1.0"
@@ -164,7 +164,7 @@ object Dependencies {
       "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion
     )
 
-    val postgres = "org.postgresql" % "postgresql" % "42.2.4"
+    val postgres = "org.postgresql" % "postgresql" % "42.2.10"
   }
 
   object Test {
