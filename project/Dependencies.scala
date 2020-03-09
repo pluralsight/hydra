@@ -8,10 +8,10 @@ object Dependencies {
   val akkaKryoVersion = "0.5.2"
   val akkaVersion = "2.6.1"
   val avroVersion = "1.9.2"
-  val catsEffectVersion = "2.0.0"
+  val catsEffectVersion = "2.1.1"
   val catsLoggerVersion = "1.0.1"
   val catsRetryVersion = "1.1.0"
-  val catsVersion = "2.0.0"
+  val catsVersion = "2.1.1"
   val cirisVersion = "1.0.4"
   val confluentVersion = "5.4.1"
   val easyMockVersion = "3.6" //needed for mocking static java methods
