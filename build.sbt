@@ -92,7 +92,6 @@ lazy val common = Project(
   base = file("common")
 ).settings(
   moduleSettings,
-  crossScalaVersions := Seq("2.11.8", "2.12.8"),
   name := "hydra-common",
   libraryDependencies ++= Dependencies.baseDeps
 )
@@ -123,7 +122,6 @@ lazy val avro = Project(
 ).dependsOn(common)
   .settings(
     moduleSettings,
-    crossScalaVersions := Seq("2.11.8", "2.12.8"),
     name := "hydra-avro",
     libraryDependencies ++= Dependencies.avroDeps
   )
@@ -134,7 +132,6 @@ lazy val sql = Project(
 ).dependsOn(avro)
   .settings(
     moduleSettings,
-    crossScalaVersions := Seq("2.11.8", "2.12.8"),
     name := "hydra-sql",
     libraryDependencies ++= Dependencies.sqlDeps
   )
