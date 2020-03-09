@@ -18,15 +18,15 @@ object Dependencies {
   val fs2KafkaVersion = "1.0.0"
   val hikariCPVersion = "3.4.2"
   val h2DbVersion = "1.4.200"
-  val jacksonCoreVersion = "2.9.10"
+  val jacksonCoreVersion = "2.10.3"
   val jacksonDatabindVersion = "2.9.10.3"
   val jodaConvertVersion = "1.9.2"
-  val jodaTimeVersion = "2.9.9"
+  val jodaTimeVersion = "2.10.5"
   val kafkaVersion = "2.4.0"
   val kamonPVersion = "2.0.1"
   val kamonVersion = "2.0.5"
   val kxbmapConfigVersion = "0.4.4"
-  val log4jVersion = "2.7"
+  val log4jVersion = "2.13.1"
   val opRabbitVersion = "2.1.0"
   val powerMockVersion = "2.0.5" //needed for mocking static java methods
   val refinedVersion = "0.9.13"
@@ -117,7 +117,7 @@ object Dependencies {
     )
 
     val akkaHttpHal = Seq(
-      ("com.github.marcuslange" % "akka-http-hal" % "1.2.1")
+      ("com.github.marcuslange" % "akka-http-hal" % "1.2.5")
         .excludeAll(ExclusionRule(organization = "io.spray"))
     )
 
