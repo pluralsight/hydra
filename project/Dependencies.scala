@@ -17,7 +17,7 @@ object Dependencies {
   val easyMockVersion = "3.6" //needed for mocking static java methods
   val fs2KafkaVersion = "1.0.0"
   val hikariCPVersion = "3.4.2"
-  val h2DbVersion = "1.4.196"
+  val h2DbVersion = "1.4.200"
   val jacksonVersion = "2.9.10"
   val jodaConvertVersion = "1.8.3"
   val jodaTimeVersion = "2.9.9"
