@@ -25,6 +25,5 @@ object HydraSandbox extends App with BootstrappingSupport {
   implicit val config =
     EmbeddedKafkaConfig(kafkaPort = 9092, zooKeeperPort = 2181)
   EmbeddedKafka.start()
-  containerService.start()
 }
 // $COVERAGE-ON$

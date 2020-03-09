@@ -1,7 +1,8 @@
 package hydra.kafka.health
 
 import akka.actor.Actor
-import com.github.vonnagy.service.container.health._
+import hydra.core.bootstrap.{HealthInfo, HealthState}
+import hydra.kafka.health.ClusterHealthCheck.{CheckHealth, GetHealth}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
@@ -10,15 +11,13 @@ import scala.util.{Failure, Success}
 /**
   * Created by alexsilva on 10/1/16.
   */
-trait ClusterHealthCheck extends RegisteredHealthCheckActor {
-
-  this: Actor =>
+class ClusterHealthCheck(
+    name: String,
+    checkHealth: () => Future[HealthInfo],
+    interval: FiniteDuration
+) extends Actor {
 
   implicit val ec = context.dispatcher
-
-  def interval: FiniteDuration
-
-  def name: String
 
   @volatile
   private[health] var currentHealth = HealthInfo(name, details = "")
@@ -42,7 +41,7 @@ trait ClusterHealthCheck extends RegisteredHealthCheckActor {
   override def receive: Receive = {
     case GetHealth => sender ! currentHealth
     case CheckHealth =>
-      checkHealth() onComplete {
+      checkHealth.apply() onComplete {
         case Success(health) => maybePublish(health)
         case Failure(ex) =>
           maybePublish(
@@ -54,7 +53,10 @@ trait ClusterHealthCheck extends RegisteredHealthCheckActor {
           )
       }
   }
+}
 
-  def checkHealth(): Future[HealthInfo]
+object ClusterHealthCheck {
+  case object CheckHealth
 
+  case object GetHealth
 }

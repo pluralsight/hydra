@@ -2,24 +2,15 @@ package hydra.kafka.endpoints
 
 import java.util.concurrent.TimeUnit
 
-import akka.actor.ActorSystem
+import akka.actor.ActorSelection
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.ExceptionHandler
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
-import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
-import hydra.common.logging.LoggingAdapter
-import hydra.common.util.ActorUtils
-import hydra.core.http.{CorsSupport, HydraDirectives, NotFoundException}
-import hydra.kafka.consumer.KafkaConsumerProxy
-import hydra.kafka.consumer.KafkaConsumerProxy.{
-  GetPartitionInfo,
-  ListTopics,
-  ListTopicsResponse,
-  PartitionInfoResponse
-}
+import hydra.core.http.{CorsSupport, NotFoundException, RouteSupport}
+import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.util.KafkaUtils
 import hydra.kafka.util.KafkaUtils.TopicDetails
@@ -38,13 +29,8 @@ import scala.util.Try
   *
   * Created by alexsilva on 3/18/17.
   */
-class TopicMetadataEndpoint(
-    implicit system: ActorSystem,
-    implicit val ec: ExecutionContext
-) extends RoutedEndpoints
-    with LoggingAdapter
-    with HydraDirectives
-    with HydraKafkaJsonSupport
+class TopicMetadataEndpoint(consumerProxy:ActorSelection)(implicit ec:ExecutionContext) extends RouteSupport
+  with HydraKafkaJsonSupport
     with CorsSupport {
 
   private implicit val cache = GuavaCache[Map[String, Seq[PartitionInfo]]]
@@ -52,14 +38,6 @@ class TopicMetadataEndpoint(
   private val showSystemTopics = applicationConfig
     .get[Boolean]("transports.kafka.show-system-topics")
     .valueOrElse(false)
-
-  private val consumerPath = applicationConfig
-    .get[String]("actors.kafka.consumer_proxy.path")
-    .valueOrElse(
-      s"/user/service/${ActorUtils.actorName(classOf[KafkaConsumerProxy])}"
-    )
-
-  private val consumerProxy = system.actorSelection(consumerPath)
 
   private implicit val createTopicFormat = jsonFormat4(CreateTopicReq)
 

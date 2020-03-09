@@ -72,7 +72,7 @@ class BootstrapEndpointSpec
   val ingestorRegistry =
     system.actorOf(Props(new IngestorRegistry), "ingestor_registry")
 
-  private val bootstrapRoute = new BootstrapEndpoint().route
+  private val bootstrapRoute = new BootstrapEndpoint(system).route
 
   implicit val f = jsonFormat11(TopicMetadata)
 
@@ -366,7 +366,7 @@ class BootstrapEndpointSpec
       )
 
       val bootstrapRouteWithOverridenStreamManager =
-        (new BootstrapEndpoint() with BootstrapEndpointTestActors).route
+        (new BootstrapEndpoint(system) with BootstrapEndpointTestActors).route
       Post("/streams", testEntity) ~> bootstrapRouteWithOverridenStreamManager ~> check {
         status shouldBe StatusCodes.OK
       }
@@ -400,7 +400,7 @@ class BootstrapEndpointSpec
       )
 
       val bootstrapRouteWithOverridenStreamManager =
-        (new BootstrapEndpoint() with BootstrapEndpointTestActors).route
+        (new BootstrapEndpoint(system) with BootstrapEndpointTestActors).route
       Get("/streams/exp.test-existing.v1.SubjectPreexisted") ~> bootstrapRouteWithOverridenStreamManager ~> check {
         val originalTopicData = responseAs[Seq[TopicMetadata]]
         val originalTopicCreationDate = originalTopicData.head.createdDate

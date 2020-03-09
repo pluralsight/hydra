@@ -2,6 +2,9 @@ package hydra.kafka.endpoints
 
 import akka.actor.{Actor, Props}
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
+import hydra.common.config.ConfigSupport
+import hydra.common.util.ActorUtils
+import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{
   GetPartitionInfo,
   ListTopics,
@@ -19,11 +22,14 @@ class TopicMetadataEndpointSpec
     with ScalatestRouteTest
     with HydraKafkaJsonSupport
     with BeforeAndAfterAll
-    with EmbeddedKafka {
+    with EmbeddedKafka
+    with ConfigSupport {
 
   import spray.json._
 
   import scala.concurrent.duration._
+
+  import configs.syntax._
 
   implicit val kafkaConfig =
     EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
@@ -38,7 +44,15 @@ class TopicMetadataEndpointSpec
     EmbeddedKafka.stop()
   }
 
-  val route = new TopicMetadataEndpoint().route
+  val consumerPath = applicationConfig
+    .get[String]("actors.kafka.consumer_proxy.path")
+    .valueOrElse(
+      s"/user/service/${ActorUtils.actorName(classOf[KafkaConsumerProxy])}"
+    )
+
+  val consumerProxy = system.actorSelection(consumerPath)
+
+  val route = new TopicMetadataEndpoint(consumerProxy).route
 
   val node = new Node(0, "host", 1)
 

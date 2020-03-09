@@ -90,7 +90,7 @@ class IngestionErrorHandlerSpec
       val cause =
         new JsonToAvroConversionException("test-exception", "field", schema)
       val except =
-        new JsonToAvroConversionExceptionWithMetadata(cause, schemaResource)
+        new JsonToAvroConversionExceptionWithMetadata(cause, schemaResource, "mock")
       val err = GenericIngestionError("test", except, request, 400)
       val record = handlerRef.underlyingActor.buildPayload(err)
       record.key shouldBe "topic"

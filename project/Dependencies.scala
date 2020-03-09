@@ -34,7 +34,6 @@ object Dependencies {
   val scalaMockVersion = "4.1.0"
   val scalaTestVersion = "3.0.5"
   val scalazVersion = "7.2.9"
-  val serviceContainerVersion = "2.0.7"
   val sprayJsonVersion = "1.3.5"
   val typesafeConfigVersion = "1.3.2"
 
@@ -107,14 +106,6 @@ object Dependencies {
       ("com.github.marcuslange" % "akka-http-hal" % "1.2.1")
         .excludeAll(ExclusionRule(organization = "io.spray"))
     )
-
-    val serviceContainer =
-      ("com.github.vonnagy" %% "service-container" % serviceContainerVersion)
-        .excludeAll(
-          ExclusionRule(organization = "ch.qos.logback"),
-          ExclusionRule(organization = "org.slf4j"),
-          ExclusionRule(organization = "com.typesafe.akka")
-        )
 
     val akkaKryo =
       ("com.github.romix.akka" %% "akka-kryo-serialization" % akkaKryoVersion)
@@ -206,7 +197,6 @@ object Dependencies {
       guavacache,
       reflections,
       akkaKryo,
-      serviceContainer,
       sdNotify,
       postgres,
       h2db,

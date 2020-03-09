@@ -4,23 +4,16 @@ import akka.actor.ActorRef
 import akka.pattern.ask
 import akka.util
 import com.pluralsight.hydra.avro.JsonConverter
+import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.avro.resource.SchemaResource
 import hydra.avro.util.{AvroUtils, SchemaWrapper}
 import hydra.common.config.ConfigSupport
-import hydra.core.akka.SchemaRegistryActor.{
-  FetchSchemaRequest,
-  FetchSchemaResponse
-}
+import hydra.core.akka.SchemaRegistryActor.{FetchSchemaRequest, FetchSchemaResponse}
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_SCHEMA_PARAM
 import hydra.core.protocol.MissingMetadataException
 import hydra.core.transport.ValidationStrategy.Strict
-import hydra.core.transport.{
-  AckStrategy,
-  HydraRecord,
-  RecordFactory,
-  RecordMetadata
-}
+import hydra.core.transport.{AckStrategy, HydraRecord, RecordFactory, RecordMetadata}
 import hydra.jdbc.JdbcRecordFactory.{DB_PROFILE_PARAM, TABLE_PARAM}
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
@@ -58,7 +51,8 @@ class JdbcRecordFactory(schemaResourceLoader: ActorRef)
     )
     Future(converter.convert(request.payload))
       .recover {
-        case ex => throw AvroUtils.improveException(ex, schemaResource)
+        case ex => throw AvroUtils.improveException(ex, schemaResource,
+          ConfluentSchemaRegistry.registryUrl(applicationConfig))
       }
   }
 
