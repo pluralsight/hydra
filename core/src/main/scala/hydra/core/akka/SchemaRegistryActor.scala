@@ -75,10 +75,15 @@ class SchemaRegistryActor(
     e.getCause.asInstanceOf[RestClientException].getErrorCode < 500
 
   private def fetchSchema(location: String) = {
-    loader
-      .retrieveValueSchema(location)
-      .map(resource => FetchSchemaResponse(resource))
-      .recoverWith(errorHandler(location))
+    for {
+      valueSchema <- loader
+        .retrieveValueSchema(location)
+        .recoverWith(errorHandler(location))
+      keySchema <- loader.retrieveKeySchema(location).map(Some(_)).recover {
+        case _ => None
+      }
+    } yield FetchSchemaResponse(valueSchema, keySchema)
+
   }
 
   override def receive = {
@@ -190,8 +195,10 @@ object SchemaRegistryActor {
 
   case class FetchSchemaRequest(location: String) extends SchemaRegistryRequest
 
-  case class FetchSchemaResponse(schemaResource: SchemaResource)
-      extends SchemaRegistryResponse
+  case class FetchSchemaResponse(
+      schemaResource: SchemaResource,
+      keySchemaResource: Option[SchemaResource]
+  ) extends SchemaRegistryResponse
 
   case class FetchSchemaMetadataRequest(subject: String)
       extends SchemaRegistryRequest
