@@ -18,7 +18,8 @@ object Dependencies {
   val fs2KafkaVersion = "1.0.0"
   val hikariCPVersion = "3.4.2"
   val h2DbVersion = "1.4.200"
-  val jacksonVersion = "2.9.10"
+  val jacksonCoreVersion = "2.9.10"
+  val jacksonDatabindVersion = "2.9.10.3"
   val jodaConvertVersion = "1.8.3"
   val jodaTimeVersion = "2.9.9"
   val kafkaVersion = "2.4.0"
@@ -160,8 +161,8 @@ object Dependencies {
     )
 
     val jackson = Seq(
-      "com.fasterxml.jackson.core" % "jackson-core" % jacksonVersion,
-      "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion
+      "com.fasterxml.jackson.core" % "jackson-core" % jacksonCoreVersion,
+      "com.fasterxml.jackson.core" % "jackson-databind" % jacksonDatabindVersion
     )
 
     val postgres = "org.postgresql" % "postgresql" % "42.2.10"
