@@ -55,8 +55,7 @@ lazy val defaultSettings = Seq(
 )
 
 lazy val restartSettings = Seq(
-  javaOptions in reStart += jvmMaxMemoryFlag,
-  mainClass in reStart := Some("hydra.sandbox.app.HydraSandbox")
+  javaOptions in reStart += jvmMaxMemoryFlag
 )
 
 val noPublishSettings = Seq(
@@ -86,14 +85,13 @@ lazy val root = Project(
   id = "hydra",
   base = file(".")
 ).settings(defaultSettings)
-  .aggregate(common, core, avro, ingest, kafka, sql, jdbc, rabbitmq, sandbox)
+  .aggregate(common, core, avro, ingest, kafka, sql, jdbc, rabbitmq)
 
 lazy val common = Project(
   id = "common",
   base = file("common")
 ).settings(
   moduleSettings,
-  crossScalaVersions := Seq("2.11.8", "2.12.8"),
   name := "hydra-common",
   libraryDependencies ++= Dependencies.baseDeps
 )
@@ -124,7 +122,6 @@ lazy val avro = Project(
 ).dependsOn(common)
   .settings(
     moduleSettings,
-    crossScalaVersions := Seq("2.11.8", "2.12.8"),
     name := "hydra-avro",
     libraryDependencies ++= Dependencies.avroDeps
   )
@@ -135,7 +132,6 @@ lazy val sql = Project(
 ).dependsOn(avro)
   .settings(
     moduleSettings,
-    crossScalaVersions := Seq("2.11.8", "2.12.8"),
     name := "hydra-sql",
     libraryDependencies ++= Dependencies.sqlDeps
   )
@@ -162,16 +158,6 @@ lazy val rabbitmq = Project(
 
 val sbSettings =
   defaultSettings ++ Test.testSettings ++ noPublishSettings ++ restartSettings
-
-lazy val sandbox = Project(
-  id = "sandbox",
-  base = file("sandbox")
-).dependsOn(ingest, jdbc)
-  .settings(
-    sbSettings,
-    name := "hydra-examples",
-    libraryDependencies ++= Dependencies.sandboxDeps
-  )
 
 lazy val ingest = Project(
   id = "ingest",

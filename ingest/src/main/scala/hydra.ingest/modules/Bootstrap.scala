@@ -1,11 +1,18 @@
 package hydra.ingest.modules
 
-import cats.effect.Sync
-import hydra.core.bootstrap.CreateTopicProgram
-import cats.implicits._
-import hydra.ingest.app.AppConfig.V2MetadataTopicConfig
+import java.time.Instant
 
-final class Bootstrap[F[_]: Sync] private (
+import cats.data.NonEmptyList
+import cats.effect.Sync
+import cats.implicits._
+import cats.{Monad, MonadError}
+import hydra.core.marshallers.History
+import hydra.ingest.app.AppConfig.V2MetadataTopicConfig
+import hydra.kafka.model._
+import hydra.kafka.programs.CreateTopicProgram
+import hydra.kafka.util.KafkaUtils.TopicDetails
+
+final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
     createTopicProgram: CreateTopicProgram[F],
     cfg: V2MetadataTopicConfig
 ) {
@@ -17,13 +24,26 @@ final class Bootstrap[F[_]: Sync] private (
 
   private def bootstrapMetadataTopic: F[Unit] =
     if (cfg.createOnStartup) {
-      createTopicProgram.createTopic(
-        cfg.topicName.value,
-        cfg.keySchema,
-        cfg.valueSchema
-      )
+      TopicMetadataV2.getSchemas[F].flatMap { schemas =>
+        createTopicProgram.createTopic(
+          TopicMetadataV2Request(
+            cfg.topicName,
+            schemas,
+            History,
+            false,
+            InternalUseOnly,
+            NonEmptyList.of(cfg.contactMethod),
+            Instant.now,
+            List.empty,
+            Some(
+              "This is the topic that Hydra uses to keep track of metadata for topics."
+            )
+          ),
+          TopicDetails(cfg.numPartitions, cfg.replicationFactor)
+        )
+      }
     } else {
-      Sync[F].unit
+      Monad[F].unit
     }
 
 }

@@ -1,31 +1,24 @@
 package hydra.ingest.bootstrap
 
-import java.lang.reflect.Modifier
-
-import akka.actor.{ActorSystem, Props}
+import akka.actor.ActorSystem
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.RouteDirectives
-import cats.effect.{ExitCode, IO, Resource, Timer}
-import com.pluralsight.hydra.reflect.DoNotScan
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import com.typesafe.config.ConfigFactory
 import hydra.avro.registry.SchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
-import hydra.common.reflect.ReflectionUtils
-import hydra.core.bootstrap.{
-  CreateTopicProgram,
-  ReflectionsWrapper,
-  ServiceProvider
-}
 import hydra.core.http.RouteSupport
+import hydra.ingest.app.AppConfig
 import hydra.kafka.endpoints.BootstrapEndpointV2
+import hydra.kafka.programs.CreateTopicProgram
+import hydra.kafka.util.KafkaClient
+import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import retry.{RetryPolicies, RetryPolicy}
-import cats.implicits._
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
-import scala.util.Try
+import scala.concurrent.ExecutionContext
 
 class BootstrapEndpoints(
     implicit val system: ActorSystem,
@@ -33,22 +26,55 @@ class BootstrapEndpoints(
 ) extends RouteSupport {
 
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
+
+  private implicit val contextShift: ContextShift[IO] =
+    IO.contextShift(ExecutionContext.global)
+  private implicit val concurrent: ConcurrentEffect[IO] = IO.ioConcurrentEffect
+
   private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
 
+  private val config = AppConfig.appConfig.load[IO].unsafeRunSync()
+
   private val schemaRegistryUrl =
-    ConfigFactory.load().getString("hydra.schema.registry.url")
+    config.createTopicConfig.schemaRegistryConfig.fullUrl
+
+  private val bootstrapServers =
+    config.createTopicConfig.bootstrapServers
 
   private val schemaRegistry =
     SchemaRegistry.live[IO](schemaRegistryUrl, 100).unsafeRunSync()
 
+  private val ingestorSelection =
+    system.actorSelection(
+      path = ConfigFactory.load().getString("hydra.kafka-ingestor-path")
+    )
+
+  private val kafkaClient =
+    KafkaClient.live[IO](bootstrapServers, ingestorSelection).unsafeRunSync()
+
   private val isBootstrapV2Enabled =
-    ConfigFactory.load().getBoolean("hydra.v2.create-topic.enabled")
+    config.v2MetadataTopicConfig.createV2TopicsEnabled
+
+  private val v2MetadataTopicName =
+    config.v2MetadataTopicConfig.topicName
+
+  private val topicDetails =
+    TopicDetails(
+      config.createTopicConfig.defaultNumPartions,
+      config.createTopicConfig.defaultReplicationFactor
+    )
 
   private val bootstrapV2Endpoint = {
     if (isBootstrapV2Enabled) {
       val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
       new BootstrapEndpointV2(
-        new CreateTopicProgram[IO](schemaRegistry, retryPolicy)
+        new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafkaClient,
+          retryPolicy,
+          v2MetadataTopicName
+        ),
+        topicDetails
       ).route
     } else {
       RouteDirectives.reject
@@ -64,32 +90,5 @@ trait BootstrappingSupport extends ConfigSupport with LoggingAdapter {
 
   private val exceptionLogger = handling(classOf[Exception]) by { ex =>
     log.error("Could not instantiate class.", ex); None
-  }
-
-  getActorSystem.use { system =>
-    buildProgram(system) *> IO.never.map(_ => ExitCode.Success)
-  }
-
-  private def buildProgram(system: ActorSystem): IO[Unit] = {
-    implicit val actorSystem: ActorSystem = system
-    implicit val executionContext: ExecutionContextExecutor = system.dispatcher
-
-    for {
-      config <- IO(ConfigFactory.load)
-      routes <- IO(RouteFactory.getRoutes())
-      actors <- IO(ActorFactory.getActors())
-    } yield ()
-  }
-
-  private def getActorSystem: Resource[IO, ActorSystem] = {
-    val registerCoordinatedShutdown: ActorSystem => IO[Unit] = system =>
-      IO(system.terminate())
-
-    val system = for {
-      config <- IO(ConfigFactory.load)
-      system <- IO(ActorSystem("hydra", config))
-    } yield system
-
-    Resource.make(system)(registerCoordinatedShutdown)
   }
 }

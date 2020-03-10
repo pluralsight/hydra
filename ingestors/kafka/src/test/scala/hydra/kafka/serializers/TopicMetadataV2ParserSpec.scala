@@ -1,24 +1,16 @@
 package hydra.kafka.serializers
 
-import java.time.{Instant, ZoneOffset}
+import java.time.Instant
 
-import hydra.core.marshallers._
-import hydra.kafka.model.{
-  ConfidentialPII,
-  DataClassification,
-  Email,
-  InternalUseOnly,
-  Public,
-  RestrictedEmployeeData,
-  RestrictedFinancial,
-  Schemas,
-  Slack,
-  Subject,
-  TopicMetadataV2Request
-}
-import org.scalatest.{Matchers, WordSpec}
-import Errors._
 import cats.data.NonEmptyList
+import hydra.core.marshallers._
+import hydra.kafka.model.ContactMethod.{Email, Slack}
+import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.model._
+import hydra.kafka.serializers.Errors._
+import org.scalatest.{Matchers, WordSpec}
+
+import scala.concurrent.duration._
 
 class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
   import TopicMetadataV2Parser._
@@ -42,23 +34,10 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
 
   "TopicMetadataV2Deserializer" must {
 
-    "parse a valid ISO-8601 date in Zulu time" in {
-      val instant = InstantFormat
-        .read(JsString("2020-01-20T12:34:56Z"))
-        .atOffset(ZoneOffset.UTC)
-      instant.getMonth.getValue shouldBe 1
-      instant.getDayOfMonth shouldBe 20
-      instant.getYear shouldBe 2020
-      instant.getHour shouldBe 12
-      instant.getMinute shouldBe 34
-      instant.getSecond shouldBe 56
-    }
-
-    "throw a Deserialization error with invalid date string" in {
-      val invalidJsString = JsString.empty
-      the[DeserializationException] thrownBy {
-        InstantFormat.read(invalidJsString)
-      } should have message CreatedDateNotSpecifiedAsISO8601(invalidJsString).errorMessage
+    "return instant.now" in {
+      InstantFormat
+        .read(JsNull)
+        .toEpochMilli shouldBe (Instant.now.toEpochMilli +- 10.seconds.toMillis)
     }
 
     "parse list of contact method with email and slack channel" in {
@@ -72,9 +51,11 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
           |}
           |""".stripMargin
       val jsValue = json.parseJson
-      ContactFormat.read(jsValue).toList should contain allOf (Slack(
-        slackChannel
-      ), Email(email))
+      ContactFormat.read(jsValue).toList should contain allOf (Slack
+        .create(
+          slackChannel
+        )
+        .get, Email.create(email).get)
     }
 
     "parse list of contact method with only slack channel" in {
@@ -87,7 +68,7 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
            |""".stripMargin
       val jsValue = json.parseJson
       val contactList = ContactFormat.read(jsValue)
-      contactList.head shouldBe Slack(slackChannel)
+      contactList.head shouldBe Slack.create(slackChannel).get
       contactList should have length 1
     }
 
@@ -101,7 +82,7 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
            |""".stripMargin
       val jsValue = json.parseJson
       val contactList = ContactFormat.read(jsValue)
-      contactList.head shouldBe Email(email)
+      contactList.head shouldBe Email.create(email).get
       contactList should have length 1
     }
 
@@ -209,17 +190,17 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
         dataClassification,
         email,
         slackChannel,
-        createdDateString,
         parentSubjects,
         notes
       ) =
         createJsValueOfTopicMetadataV2Request(
           Subject.createValidated("Foo").get,
           "#slack_channel",
-          "email@address.com",
-          "2020-01-20T12:34:56Z"
+          "email@address.com"
         )()
-      TopicMetadataV2Format.read(jsonData) shouldBe
+      val tmv2 = TopicMetadataV2Format.read(jsonData)
+
+      tmv2 shouldBe
         TopicMetadataV2Request(
           subject,
           Schemas(
@@ -230,8 +211,45 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
           deprecated,
           dataClassification,
           NonEmptyList(email, slackChannel :: Nil),
-          Instant.parse(createdDateString),
+          tmv2.createdDate,
           parentSubjects,
+          notes
+        )
+    }
+
+    "parse a complete object with no optional fields and return a TopicMetadataV2Request" in {
+      val (
+        jsonData,
+        subject,
+        streamType,
+        _,
+        dataClassification,
+        email,
+        slackChannel,
+        _,
+        notes
+      ) =
+        createJsValueOfTopicMetadataV2Request(
+          Subject.createValidated("Foo").get,
+          "#slack_channel",
+          "email@address.com",
+          allOptionalFieldsPresent = false
+        )()
+      val tmv2 = TopicMetadataV2Format.read(jsonData)
+
+      tmv2 shouldBe
+        TopicMetadataV2Request(
+          subject,
+          Schemas(
+            new SchemaFormat(isKey = true).read(validAvroSchema),
+            new SchemaFormat(isKey = false).read(validAvroSchema)
+          ),
+          streamType,
+          deprecated = false,
+          dataClassification,
+          NonEmptyList(email, slackChannel :: Nil),
+          tmv2.createdDate,
+          parentSubjects = List(),
           notes
         )
     }
@@ -252,36 +270,11 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
       assert(
         containsAllOf(
           error,
-          "Field `subject`",
           "Field `schemas`",
           "Field `streamType`",
-          "Field `deprecated`",
           "Field `dataClassification`",
-          "Field `contact`",
-          "Field `createdDate`",
-          "Field `parentSubjects`"
+          "Field `contact`"
         )
-      )
-    }
-
-    "accumulate errors from improper provided data" in {
-      val (jsonData, subject, _, _, _, email, slack, createdDate, _, _) =
-        createJsValueOfTopicMetadataV2Request(
-          Subject.createValidated("a_valid_subject").get,
-          "NOT a slack channel",
-          "invalid@address",
-          "2020-01-20"
-        )()
-      val error = the[DeserializationException] thrownBy {
-        TopicMetadataV2Format.read(jsonData)
-      }
-      containsAllOf(
-        error,
-        Errors
-          .CreatedDateNotSpecifiedAsISO8601(JsString(createdDate))
-          .errorMessage,
-        Errors.invalidEmailProvided(JsString(email.address)),
-        Errors.invalidSlackChannelProvided(JsString(slack.channel))
       )
     }
 
@@ -291,14 +284,15 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
       subject: Subject,
       slackChannel: String,
       email: String,
-      createdDate: String
+      allOptionalFieldsPresent: Boolean = true
   )(
       streamType: StreamType = History,
       deprecated: Boolean = false,
       dataClassification: DataClassification = Public,
       validAvroSchema: JsValue = validAvroSchema,
       parentSubjects: List[Subject] = List(),
-      notes: Option[String] = None
+      notes: Option[String] = None,
+      createdDate: Instant = Instant.now()
   ): (
       JsValue,
       Subject,
@@ -307,7 +301,6 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
       DataClassification,
       Email,
       Slack,
-      String,
       List[Subject],
       Option[String]
   ) = {
@@ -319,14 +312,14 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
          |   "value": ${validAvroSchema.compactPrint}
          |  },
          |  "streamType": "${streamType.toString}",
-         |  "deprecated": $deprecated,
          |  "dataClassification":"${dataClassification.toString}",
          |  "contact": {
          |    "slackChannel": "$slackChannel",
          |    "email": "$email"
-         |  },
-         |  "createdDate": "$createdDate",
-         |  "parentSubjects": ${parentSubjects.toJson.compactPrint}
+         |  }
+         |  ${if (allOptionalFieldsPresent) {
+                       s""","parentSubjects": ${parentSubjects.toJson.compactPrint},"deprecated":$deprecated,"createdDate":"${createdDate.toString}""""
+                     } else ""}
          |  ${if (notes.isDefined) s""","notes": "${notes.get}"""" else ""}}
          |""".stripMargin.parseJson
     (
@@ -335,9 +328,8 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
       streamType,
       deprecated,
       dataClassification,
-      Email(email),
-      Slack(slackChannel),
-      createdDate,
+      Email.create(email).get,
+      Slack.create(slackChannel).get,
       parentSubjects,
       notes
     )
@@ -358,19 +350,19 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
     }
 
     "serialize a list of contactMethod objects" in {
-      val email = Email("some@address.com")
-      val slack = Slack("#this_is_my_slack_channel")
+      val email = Email.create("some@address.com").get
+      val slack = Slack.create("#this_is_my_slack_channel").get
 
       ContactFormat.write(NonEmptyList(email, Nil)) shouldBe JsObject(
-        Map("email" -> JsString(email.address))
+        Map("email" -> JsString(email.address.value))
       )
       ContactFormat.write(NonEmptyList(slack, Nil)) shouldBe JsObject(
-        Map("slackChannel" -> JsString(slack.channel))
+        Map("slackChannel" -> JsString(slack.channel.value))
       )
       val jObject = JsObject(
         Map(
-          "email" -> JsString(email.address),
-          "slackChannel" -> JsString(slack.channel)
+          "email" -> JsString(email.address.value),
+          "slackChannel" -> JsString(slack.channel.value)
         )
       )
       ContactFormat.write(NonEmptyList(email, slack :: Nil)) shouldBe jObject
@@ -411,8 +403,8 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
       val streamType = History
       val deprecated = false
       val dataClassification = Public
-      val email = Email("some@address.com")
-      val slack = Slack("#valid_slack_channel")
+      val email = Email.create("some@address.com").get
+      val slack = Slack.create("#valid_slack_channel").get
       val contact = NonEmptyList(email, slack :: Nil)
       val createdDate = Instant.now
       val parentSubjects = List(
@@ -439,16 +431,16 @@ class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
       TopicMetadataV2Format.write(topicMetadataV2) shouldBe
         createJsValueOfTopicMetadataV2Request(
           subject,
-          slack.channel,
-          email.address,
-          createdDate.toString
+          slack.channel.value,
+          email.address.value
         )(
           streamType,
           deprecated,
           dataClassification,
           validAvroSchema,
           parentSubjects,
-          notes
+          notes,
+          createdDate
         )._1
     }
 

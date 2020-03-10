@@ -2,25 +2,27 @@ package hydra.ingest.modules
 
 import cats.effect._
 import cats.implicits._
-import hydra.core.bootstrap.CreateTopicProgram
-import hydra.ingest.app.AppConfig.CreateTopicConfig
+import hydra.ingest.app.AppConfig.{AppConfig, CreateTopicConfig}
+import hydra.kafka.programs.CreateTopicProgram
 import io.chrisdavenport.log4cats.Logger
 import retry.RetryPolicies._
 import retry.RetryPolicy
 
 final class Programs[F[_]: Logger: Sync: Timer] private (
-    cfg: CreateTopicConfig,
+    cfg: AppConfig,
     algebras: Algebras[F]
 ) {
 
   val retryPolicy: RetryPolicy[F] =
-    limitRetries[F](cfg.numRetries) |+| exponentialBackoff[F](
-      cfg.baseBackoffDelay
+    limitRetries[F](cfg.createTopicConfig.numRetries) |+| exponentialBackoff[F](
+      cfg.createTopicConfig.baseBackoffDelay
     )
 
   val createTopic: CreateTopicProgram[F] = new CreateTopicProgram[F](
     algebras.schemaRegistry,
-    retryPolicy
+    algebras.kafkaClient,
+    retryPolicy,
+    cfg.v2MetadataTopicConfig.topicName
   )
 
 }
@@ -28,10 +30,10 @@ final class Programs[F[_]: Logger: Sync: Timer] private (
 object Programs {
 
   def make[F[_]: Logger: Sync: Timer](
-      createTopicConfig: CreateTopicConfig,
+      appConfig: AppConfig,
       algebras: Algebras[F]
   ): F[Programs[F]] = Sync[F].delay {
-    new Programs[F](createTopicConfig, algebras)
+    new Programs[F](appConfig, algebras)
   }
 
 }

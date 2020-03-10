@@ -79,6 +79,15 @@ final class KafkaClientSpec
         kafkaClient.getTopicNames.unsafeRunSync() shouldBe List("Topic1")
       }
 
+      "delete a topic" in {
+        val topicToDelete = "topic_to_delete"
+        (for {
+          _ <- kafkaClient.createTopic(topicToDelete, TopicDetails(1, 1))
+          _ <- kafkaClient.deleteTopic(topicToDelete)
+          maybeTopic <- kafkaClient.describeTopic(topicToDelete)
+        } yield maybeTopic should not be defined).unsafeRunSync()
+      }
+
     }
   }
 

@@ -4,10 +4,8 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
-import akka.stream.{ActorMaterializer, Materializer}
 import cats.effect.{ExitCode, IO, IOApp, Resource}
 import cats.implicits._
-import com.typesafe.config.ConfigFactory
 import configs.syntax._
 import hydra.common.Settings
 import hydra.common.logging.LoggingAdapter

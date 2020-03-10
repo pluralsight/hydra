@@ -4,50 +4,26 @@ import java.time.Instant
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import cats.data.Validated.{Invalid, Valid}
-import cats.data.{
-  NonEmptyChain,
-  NonEmptyList,
-  Validated,
-  ValidatedNec,
-  ValidatedNel
-}
+import cats.data._
 import cats.implicits._
-import hydra.core.marshallers.{
-  CurrentState,
-  GenericServiceResponse,
-  History,
-  Notification,
-  StreamType,
-  Telemetry
-}
-import hydra.kafka.model.{
-  ConfidentialPII,
-  ContactMethod,
-  DataClassification,
-  Email,
-  InternalUseOnly,
-  Public,
-  RestrictedEmployeeData,
-  RestrictedFinancial,
-  Schemas,
-  Slack,
-  Subject,
-  TopicMetadataV2Request
-}
+import eu.timepit.refined._
+import eu.timepit.refined.auto._
+import hydra.core.marshallers._
+import hydra.kafka.model.ContactMethod.{Email, Slack}
+import hydra.kafka.model.TopicMetadataV2Request.{Subject, SubjectRegex}
+import hydra.kafka.model._
 import hydra.kafka.serializers.Errors._
 import org.apache.avro.Schema
 import spray.json.{
   DefaultJsonProtocol,
   DeserializationException,
-  JsArray,
-  JsBoolean,
+  JsNull,
   JsObject,
   JsString,
   JsValue,
   RootJsonFormat
 }
 
-import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
 
 object TopicMetadataV2Parser extends TopicMetadataV2Parser
@@ -65,11 +41,13 @@ sealed trait TopicMetadataV2Parser
 
     override def read(json: JsValue): Subject = json match {
       case JsString(value) =>
-        Subject.createValidated(value) match {
-          case Some(subject) => subject
-          case None =>
-            throw DeserializationException(InvalidSubject(json).errorMessage)
-        }
+        Subject
+          .createValidated(value)
+          .getOrElse(
+            throw DeserializationException(
+              InvalidSubject(JsString(value)).errorMessage
+            )
+          )
       case j => throw DeserializationException(InvalidSubject(j).errorMessage)
     }
   }
@@ -77,19 +55,7 @@ sealed trait TopicMetadataV2Parser
   implicit object InstantFormat extends RootJsonFormat[Instant] {
     override def write(obj: Instant): JsValue = JsString(obj.toString)
 
-    override def read(json: JsValue): Instant = json match {
-      case JsString(value) =>
-        Try(Instant.parse(value)).getOrElse(
-          throw DeserializationException(
-            CreatedDateNotSpecifiedAsISO8601(json).errorMessage
-          )
-        )
-      case _ =>
-        throwDeserializationError(
-          "createdDate",
-          "ISO-8601 DateString formatted YYYY-MM-DDThh:mm:ssZ"
-        )
-    }
+    override def read(json: JsValue): Instant = Instant.now()
   }
 
   implicit object ContactFormat
@@ -97,14 +63,15 @@ sealed trait TopicMetadataV2Parser
 
     def extractContactMethod[A](
         optionalField: Option[JsValue],
-        regex: Regex,
-        f: String => A,
+        f: String => Option[A],
         e: JsValue => String
     ): Either[String, Option[A]] = {
       optionalField match {
         case Some(JsString(value)) =>
-          if (regex.pattern.matcher(value).matches()) Right(Some(f(value)))
-          else Left(e(JsString(value)))
+          f(value) match {
+            case Some(fval) => Right(Some(fval))
+            case _          => Left(e(JsString(value)))
+          }
         case _ =>
           Right(None)
       }
@@ -131,19 +98,15 @@ sealed trait TopicMetadataV2Parser
             if fields.isDefinedAt("email") || fields.isDefinedAt(
               "slackChannel"
             ) =>
-          val emailRegex =
-            """^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+.[A-Za-z]{2,64}$""".r
           val email = extractContactMethod(
             fields.get("email"),
-            emailRegex,
-            Email.apply,
+            Email.create,
             Errors.invalidEmailProvided
           )
-          val slackRegex = """^[#][^\sA-Z]{1,79}$""".r
+
           val slackChannel = extractContactMethod(
             fields.get("slackChannel"),
-            slackRegex,
-            Slack.apply,
+            Slack.create,
             Errors.invalidSlackChannelProvided
           )
           separateEithers(email, slackChannel) match {
@@ -282,7 +245,7 @@ sealed trait TopicMetadataV2Parser
       extends RootJsonFormat[TopicMetadataV2Request] {
 
     override def write(obj: TopicMetadataV2Request): JsValue =
-      jsonFormat9(TopicMetadataV2Request).write(obj)
+      jsonFormat9(TopicMetadataV2Request.apply).write(obj)
 
     override def read(json: JsValue): TopicMetadataV2Request = json match {
       case j: JsObject =>
@@ -326,18 +289,12 @@ sealed trait TopicMetadataV2Parser
               .getOrElse(throwDeserializationError("contact", "JsObject"))
           )
         )
-        val createdDate = toResult(
-          InstantFormat.read(
-            j.getFields("createdDate").headOption.getOrElse(JsString.empty)
-          )
-        )
+        val createdDate = toResult(InstantFormat.read(j))
         val parentSubjects = toResult(
           j.getFields("parentSubjects")
             .headOption
             .map(_.convertTo[List[Subject]])
-            .getOrElse(
-              throwDeserializationError("parentSubjects", "List of Subject")
-            )
+            .getOrElse(List())
         )
         val notes = toResult(
           j.getFields("notes").headOption.map(_.convertTo[String])
@@ -352,7 +309,7 @@ sealed trait TopicMetadataV2Parser
           createdDate,
           parentSubjects,
           notes
-        ).mapN(TopicMetadataV2Request) match {
+        ).mapN(TopicMetadataV2Request.apply) match {
           case Valid(topicMetadataRequest) => topicMetadataRequest
           case Invalid(e) =>
             throw DeserializationException(e.map(_.errorMessage).mkString_(" "))
@@ -369,8 +326,7 @@ sealed trait TopicMetadataV2Parser
     json
       .getFields(key)
       .headOption
-      .map(_.convertTo[Boolean])
-      .getOrElse(throwDeserializationError(key, "Boolean"))
+      .exists(_.convertTo[Boolean])
   }
 }
 
@@ -399,12 +355,6 @@ final case class ExceptionThrownOnParseWithException(message: String)
 }
 
 object Errors {
-
-  final case class CreatedDateNotSpecifiedAsISO8601(value: JsValue) {
-
-    def errorMessage: String =
-      s"Field `createdDate` expected ISO-8601 DateString formatted YYYY-MM-DDThh:mm:ssZ, received ${value.compactPrint}."
-  }
 
   def invalidPayloadProvided(actual: JsValue): String = {
     import spray.json._

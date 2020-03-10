@@ -9,7 +9,7 @@ import hydra.common.util.TryWith
 import org.apache.avro.LogicalTypes.LogicalTypeFactory
 import org.apache.avro.Schema.Type
 import org.apache.avro.{LogicalType, LogicalTypes, Schema}
-import org.h2.jdbc.JdbcSQLException
+import org.h2.jdbc.JdbcSQLSyntaxErrorException
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 
 import scala.concurrent.duration._
@@ -540,8 +540,9 @@ class JdbcUtilsSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
         )
         rs shouldBe 0
       }.get
+
       JdbcUtils.dropTable(provider.getConnection(), "drop_test")
-      intercept[JdbcSQLException] {
+      intercept[JdbcSQLSyntaxErrorException] {
         TryWith(provider.getConnection().createStatement()) { stmt =>
           stmt.executeUpdate("""insert into drop_test values(1,'test')""") shouldBe 1
         }.get
