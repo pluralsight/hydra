@@ -5,20 +5,18 @@ import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
 import hydra.kafka.consumer.KafkaConsumerProxy
-import hydra.kafka.consumer.KafkaConsumerProxy.{
-  GetPartitionInfo,
-  ListTopics,
-  ListTopicsResponse,
-  PartitionInfoResponse
-}
+import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.common.{Node, PartitionInfo}
-import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
+
 
 class TopicMetadataEndpointSpec
     extends Matchers
-    with WordSpecLike
+    with AnyWordSpecLike
     with ScalatestRouteTest
     with HydraKafkaJsonSupport
     with BeforeAndAfterAll

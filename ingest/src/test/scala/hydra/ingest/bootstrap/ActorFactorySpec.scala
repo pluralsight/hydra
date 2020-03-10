@@ -2,7 +2,7 @@ package hydra.ingest.bootstrap
 
 import akka.actor.Props
 import hydra.core.bootstrap.ServiceProvider
-import hydra.core.ingest.TestIngestorDefault
+import hydra.ingest.test.TestIngestorDefault
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.flatspec.AnyFlatSpecLike
 
