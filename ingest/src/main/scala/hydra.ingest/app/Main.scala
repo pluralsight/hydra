@@ -6,20 +6,21 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
 import cats.effect.{ExitCode, IO, IOApp, Resource}
 import cats.implicits._
-import configs.syntax._
 import hydra.common.Settings
+import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
-import hydra.ingest.bootstrap.{ActorFactory, BootstrappingSupport, RouteFactory}
+import hydra.ingest.bootstrap.{ActorFactory, RouteFactory}
 import hydra.ingest.modules.{Algebras, Bootstrap, Programs}
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import kamon.Kamon
+import configs.syntax._
 import kamon.prometheus.PrometheusReporter
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 // $COVERAGE-OFF$Disabling highlighting by default until a workaround for https://issues.scala-lang.org/browse/SI-8596 is found
-object Main extends IOApp with BootstrappingSupport with LoggingAdapter {
+object Main extends IOApp with ConfigSupport with LoggingAdapter {
 
   private implicit val catsLogger: SelfAwareStructuredLogger[IO] =
     Slf4jLogger.getLogger[IO]
@@ -61,11 +62,14 @@ object Main extends IOApp with BootstrappingSupport with LoggingAdapter {
   }
 
   private def buildProgram()(implicit system: ActorSystem): IO[Unit] = {
+    val ingestActorSelection = system.actorSelection(
+      path = applicationConfig.getString("kafka-ingestor-path")
+    )
     AppConfig.appConfig.load[IO].flatMap { config =>
       for {
         algebras <- Algebras
-          .make[IO](config.createTopicConfig.schemaRegistryConfig)
-        programs <- Programs.make[IO](config.createTopicConfig, algebras)
+          .make[IO](config.createTopicConfig, ingestActorSelection)
+        programs <- Programs.make[IO](config, algebras)
         bootstrap <- Bootstrap
           .make[IO](programs.createTopic, config.v2MetadataTopicConfig)
         _ <- bootstrap.bootstrapAll
@@ -85,8 +89,3 @@ object Main extends IOApp with BootstrappingSupport with LoggingAdapter {
 }
 
 // $COVERAGE-ON
-//ActorFactory.getActors().foreach {
-//  case (name, props) =>
-//  log.debug(s"Instantiating actor $name.")
-//  system.actorOf(props, name)
-//}

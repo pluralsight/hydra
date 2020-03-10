@@ -83,12 +83,3 @@ class BootstrapEndpoints(
 
   override def route: Route = bootstrapV2Endpoint
 }
-
-trait BootstrappingSupport extends ConfigSupport with LoggingAdapter {
-
-  import scala.util.control.Exception._
-
-  private val exceptionLogger = handling(classOf[Exception]) by { ex =>
-    log.error("Could not instantiate class.", ex); None
-  }
-}

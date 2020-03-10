@@ -107,7 +107,8 @@ class AvroKeyRecordFactory(schemaResourceLoader: ActorRef)
       val converted = converter.convert(payload)
       converted
     }).recover {
-      case ex => throw AvroUtils.improveException(ex, schemaResource)
+      case ex => throw AvroUtils.improveException(ex, schemaResource,
+        applicationConfig.getString("schema.registry.url"))
     }
   }
 }
