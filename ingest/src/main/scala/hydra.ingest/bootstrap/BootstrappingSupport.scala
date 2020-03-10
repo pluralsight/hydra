@@ -6,8 +6,6 @@ import akka.http.scaladsl.server.directives.RouteDirectives
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import com.typesafe.config.ConfigFactory
 import hydra.avro.registry.SchemaRegistry
-import hydra.common.config.ConfigSupport
-import hydra.common.logging.LoggingAdapter
 import hydra.core.http.RouteSupport
 import hydra.ingest.app.AppConfig
 import hydra.kafka.endpoints.BootstrapEndpointV2
@@ -20,6 +18,7 @@ import retry.{RetryPolicies, RetryPolicy}
 
 import scala.concurrent.ExecutionContext
 
+// $COVERAGE-OFF$
 class BootstrapEndpoints(
     implicit val system: ActorSystem,
     implicit val ec: ExecutionContext
@@ -83,3 +82,5 @@ class BootstrapEndpoints(
 
   override def route: Route = bootstrapV2Endpoint
 }
+
+// $COVERAGE-ON
