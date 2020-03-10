@@ -1,26 +1,16 @@
 package hydra.ingest.bootstrap
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.server
-import akka.http.scaladsl.server.RouteConcatenation
+import akka.http.scaladsl.server.{Route, RouteConcatenation}
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
-import hydra.ingest.http.{
-  IngestionEndpoint,
-  IngestionWebSocketEndpoint,
-  IngestorRegistryEndpoint,
-  SchemasEndpoint
-}
+import hydra.ingest.http.{HealthEndpoint, IngestionEndpoint, IngestionWebSocketEndpoint, IngestorRegistryEndpoint, SchemasEndpoint}
 import hydra.kafka.consumer.KafkaConsumerProxy
-import hydra.kafka.endpoints.{
-  BootstrapEndpoint,
-  TopicMetadataEndpoint,
-  TopicsEndpoint
-}
+import hydra.kafka.endpoints.{BootstrapEndpoint, TopicMetadataEndpoint, TopicsEndpoint}
 
 object RouteFactory extends RouteConcatenation with ConfigSupport {
 
-  def getRoutes()(implicit system: ActorSystem): server.Route = {
+  def getRoutes()(implicit system: ActorSystem): Route = {
     import configs.syntax._
 
     //TODO: remove this lookup
@@ -38,6 +28,7 @@ object RouteFactory extends RouteConcatenation with ConfigSupport {
       new IngestorRegistryEndpoint().route ~
       new IngestionWebSocketEndpoint().route ~
       new IngestionEndpoint().route ~
-      new TopicsEndpoint(consumerProxy)(system.dispatcher).route
+      new TopicsEndpoint(consumerProxy)(system.dispatcher).route ~
+      HealthEndpoint.route
   }
 }
