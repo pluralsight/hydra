@@ -9,7 +9,9 @@ import hydra.core.ingest.RequestParams.HYDRA_SCHEMA_PARAM
 import hydra.core.protocol._
 import hydra.core.transport.AckStrategy.NoAck
 import hydra.core.transport.{AckStrategy, HydraRecord}
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
 
 import scala.io.Source
@@ -20,7 +22,7 @@ import hydra.avro.registry.ConfluentSchemaRegistry
 class JdbcIngestorSpec
     extends TestKit(ActorSystem("jdbc-ingestor-spec"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with ImplicitSender
     with ConfigSupport
     with BeforeAndAfterAll {

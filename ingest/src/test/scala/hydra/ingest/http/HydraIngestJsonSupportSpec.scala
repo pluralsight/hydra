@@ -12,11 +12,12 @@ import hydra.core.protocol.{
 }
 import hydra.ingest.IngestorInfo
 import org.joda.time.DateTime
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
 class HydraIngestJsonSupportSpec
     extends Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with HydraIngestJsonSupport
     with SprayJsonSupport {
 

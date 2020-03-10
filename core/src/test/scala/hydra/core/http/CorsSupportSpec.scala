@@ -2,11 +2,12 @@ package hydra.core.http
 
 import akka.http.scaladsl.model.HttpMethods
 import ch.megard.akka.http.cors.scaladsl.model.HttpOriginMatcher
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
 import scala.collection.immutable
 
-class CorsSupportSpec extends Matchers with FunSpecLike with CorsSupport {
+class CorsSupportSpec extends Matchers with AnyFunSpecLike with CorsSupport {
 
   describe("Cors Support") {
     it("has sensible defaults") {

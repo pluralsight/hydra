@@ -1,11 +1,12 @@
 package hydra.common.reflect
 
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
 /**
   * Created by alexsilva on 3/3/17.
   */
-class ReflectionUtilsSpec extends Matchers with FunSpecLike {
+class ReflectionUtilsSpec extends Matchers with AnyFunSpecLike {
   describe("When using ReflectionUtils") {
     it("Instantiates a class with constructor params") {
       ReflectionUtils.instantiateType[TestClass](List("value")) shouldBe TestClass(

@@ -8,7 +8,9 @@ import hydra.core.akka.InitializingActor.{InitializationError, Initialized}
 import hydra.core.protocol._
 import hydra.core.test.{TestRecord, TestRecordFactory, TestRecordMetadata}
 import hydra.core.transport.AckStrategy
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -17,7 +19,7 @@ import scala.util.{Failure, Success, Try}
 class IngestorSpec
     extends TestKit(ActorSystem("test"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with BeforeAndAfterAll
     with ImplicitSender {
 

@@ -3,9 +3,10 @@ package hydra.ingest.bootstrap
 import akka.actor.Props
 import hydra.core.bootstrap.ServiceProvider
 import hydra.core.ingest.TestIngestorDefault
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 
-class ActorFactorySpec extends Matchers with FlatSpecLike {
+class ActorFactorySpec extends Matchers with AnyFlatSpecLike {
 
   "The ActorFactory object" should "load actor Props from the classpath" in {
     ActorFactory

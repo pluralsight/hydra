@@ -1,8 +1,9 @@
 package hydra.common.util
 
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 
-class Base62Spec extends Matchers with FlatSpecLike {
+class Base62Spec extends Matchers with AnyFlatSpecLike {
 
   private val base62 = new Base62()
 

@@ -14,7 +14,9 @@ import hydra.core.transport.Transport.Deliver
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecordBuilder
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -26,7 +28,7 @@ import scala.io.Source
 class IngestionErrorHandlerSpec
     extends TestKit(ActorSystem("ingestion-error-handler-spec"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with ImplicitSender
     with ConfigSupport
     with BeforeAndAfterAll

@@ -1,11 +1,12 @@
 package hydra.kafka.marshallers
 
 import org.apache.kafka.common.{Node, PartitionInfo}
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
 class HydraKafkaJsonSupportSpec
     extends Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with HydraKafkaJsonSupport {
 
   import spray.json._

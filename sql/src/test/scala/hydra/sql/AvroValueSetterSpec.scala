@@ -16,14 +16,15 @@ import org.apache.avro.LogicalTypes.LogicalTypeFactory
 import org.apache.avro.generic.{GenericData, GenericRecord}
 import org.apache.avro.{LogicalType, LogicalTypes, Schema}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
 import scala.collection.JavaConverters._
 
 /**
   * Created by alexsilva on 5/4/17.
   */
-class AvroValueSetterSpec extends Matchers with FunSpecLike with MockFactory {
+class AvroValueSetterSpec extends Matchers with AnyFunSpecLike with MockFactory {
 
   LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, new LogicalTypeFactory {
     override def fromSchema(schema: Schema): LogicalType = IsoDate

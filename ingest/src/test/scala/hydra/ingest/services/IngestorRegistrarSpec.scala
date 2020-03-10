@@ -16,7 +16,9 @@ import hydra.ingest.services.IngestorRegistry.{
 import hydra.ingest.test.TestIngestor
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Seconds, Span}
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 import scala.concurrent.duration._
 
@@ -26,7 +28,7 @@ import scala.concurrent.duration._
 class IngestorRegistrarSpec
     extends TestKit(ActorSystem("IngestorRegistrarSpec"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with ImplicitSender
     with ScalaFutures
     with BeforeAndAfterAll

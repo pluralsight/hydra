@@ -5,11 +5,13 @@ import hydra.avro.util.SchemaWrapper
 import hydra.common.util.TryWith
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecordBuilder
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 
 class PostgresOpsSpec
     extends Matchers
-    with FlatSpecLike
+    with AnyFlatSpecLike
     with BeforeAndAfterAll {
 
   lazy val pg = EmbeddedPostgres.start()

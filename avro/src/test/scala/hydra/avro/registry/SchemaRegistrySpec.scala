@@ -4,9 +4,10 @@ import cats.effect.IO
 import cats.implicits._
 import cats.{Applicative, Monad}
 import org.apache.avro.{Schema, SchemaBuilder}
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 
-class SchemaRegistrySpec extends FlatSpec with Matchers {
+class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
 
   private def getSchema[F[_]: Applicative](name: String): F[Schema] =
     Applicative[F].pure {

@@ -22,14 +22,16 @@ import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import hydra.core.ingest.HydraRequest
 import hydra.core.protocol._
 import hydra.core.transport.{AckStrategy, HydraRecord}
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 import scala.concurrent.duration._
 
 class RabbitIngestorSpec
     extends TestKit(ActorSystem("rabbit-ingestor-spec"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with ImplicitSender
     with BeforeAndAfterAll {
 

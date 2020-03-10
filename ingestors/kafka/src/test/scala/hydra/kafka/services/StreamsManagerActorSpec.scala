@@ -24,7 +24,9 @@ import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
+import org.scalatest.BeforeAndAfterAll
 import spray.json._
 
 import scala.concurrent.duration._
@@ -33,7 +35,7 @@ import akka.actor.ActorRef
 
 class StreamsManagerActorSpec
     extends TestKit(ActorSystem("metadata-stream-actor-spec"))
-    with FlatSpecLike
+    with AnyFlatSpecLike
     with Matchers
     with BeforeAndAfterAll
     with MockFactory

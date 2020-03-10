@@ -8,13 +8,14 @@ import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import hydra.core.marshallers._
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
 import scala.util.{Success, Try}
 
 class HydraJsonSupportSpec
     extends Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with HydraJsonSupport
     with SprayJsonSupport {
 

@@ -2,9 +2,10 @@ package hydra.avro.util
 
 import org.apache.avro.Schema
 import org.apache.avro.Schema.{Field, Parser}
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 
-class SchemaWrapperSpec extends Matchers with FlatSpecLike {
+class SchemaWrapperSpec extends Matchers with AnyFlatSpecLike {
 
   "The schema wrapper" should "allow overriding of primary keys via the method argument" in {
     val schema =

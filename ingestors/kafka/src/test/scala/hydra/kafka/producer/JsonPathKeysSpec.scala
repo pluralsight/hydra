@@ -15,12 +15,13 @@
 
 package hydra.kafka.producer
 
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
 /**
   * Created by alexsilva on 1/11/17.
   */
-class JsonPathKeysSpec extends Matchers with FunSpecLike {
+class JsonPathKeysSpec extends Matchers with AnyFunSpecLike {
   import spray.json._
 
   describe("When using json path") {

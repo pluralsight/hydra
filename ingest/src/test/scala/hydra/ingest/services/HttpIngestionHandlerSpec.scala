@@ -16,7 +16,9 @@ import hydra.ingest.services.IngestorRegistry.{
 import hydra.ingest.test.TestRecordFactory
 import org.joda.time.DateTime
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -27,7 +29,7 @@ import scala.concurrent.duration._
 class HttpIngestionHandlerSpec
     extends TestKit(ActorSystem("hydra"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with ImplicitSender
     with BeforeAndAfterAll
     with HydraDirectives

@@ -10,14 +10,16 @@ import org.apache.avro.LogicalTypes.LogicalTypeFactory
 import org.apache.avro.Schema.Type
 import org.apache.avro.{LogicalType, LogicalTypes, Schema}
 import org.h2.jdbc.JdbcSQLSyntaxErrorException
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 import scala.concurrent.duration._
 
 /**
   * Created by alexsilva on 5/18/17.
   */
-class JdbcUtilsSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
+class JdbcUtilsSpec extends Matchers with AnyFunSpecLike with BeforeAndAfterAll {
 
   DriverManager.registerDriver(new org.h2.Driver)
 

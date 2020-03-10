@@ -2,12 +2,13 @@ package hydra.common.util
 
 import org.joda.time.format.{DateTimeFormat, ISODateTimeFormat}
 import org.joda.time.{DateTime, DateTimeZone}
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
 /**
   * Created by alexsilva on 3/2/17.
   */
-class DateUtilsSpec extends Matchers with FunSpecLike {
+class DateUtilsSpec extends Matchers with AnyFunSpecLike {
 
   private val iso8601format = ISODateTimeFormat.dateTimeNoMillis()
   private val iso8601withMillis = ISODateTimeFormat.dateTime()

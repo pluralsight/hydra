@@ -1,6 +1,8 @@
 package hydra.core.bootstrap
 
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 import test.scan.TestServiceProvider
 
 /**
@@ -8,7 +10,7 @@ import test.scan.TestServiceProvider
   */
 class ReflectionsWrapperSpec
     extends Matchers
-    with FlatSpecLike
+    with AnyFlatSpecLike
     with BeforeAndAfterAll {
 
   "The ReflectionsWrapper object" should "load package list from configs in" in {

@@ -1,12 +1,13 @@
 package hydra.sql
 
 import hydra.avro.io.SaveMode
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
 /**
   * Created by alexsilva on 5/4/17.
   */
-class SaveModeSpec extends Matchers with FunSpecLike {
+class SaveModeSpec extends Matchers with AnyFunSpecLike {
 
   describe("SaveMode") {
 

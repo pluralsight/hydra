@@ -23,12 +23,14 @@ import com.spingo.op_rabbit.Message._
 import hydra.common.config.ConfigSupport
 import hydra.core.transport.Transport.Deliver
 import hydra.core.transport.{AckStrategy, RecordMetadata, TransportCallback}
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 class RabbitTransportSpec
     extends TestKit(ActorSystem("rabbit-transport-spec"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with ImplicitSender
     with BeforeAndAfterAll
     with ConfigSupport {

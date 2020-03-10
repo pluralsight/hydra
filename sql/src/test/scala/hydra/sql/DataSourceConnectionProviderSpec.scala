@@ -5,7 +5,9 @@ import java.util.Properties
 
 import com.typesafe.config.ConfigFactory
 import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.flatspec.AnyFlatSpecLike
+import org.scalatest.matchers.should.Matchers
 
 import scala.collection.JavaConverters._
 
@@ -14,7 +16,7 @@ import scala.collection.JavaConverters._
   */
 class DataSourceConnectionProviderSpec
     extends Matchers
-    with FlatSpecLike
+    with AnyFlatSpecLike
     with BeforeAndAfterAll {
 
   val properties = new Properties

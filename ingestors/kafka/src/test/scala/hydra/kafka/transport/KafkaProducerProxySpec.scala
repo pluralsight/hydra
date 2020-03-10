@@ -5,12 +5,7 @@ import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import hydra.common.config.ConfigSupport
 import hydra.core.protocol.{RecordNotProduced, RecordProduced}
 import hydra.core.transport
-import hydra.core.transport.{
-  AckStrategy,
-  HydraRecord,
-  NoCallback,
-  TransportCallback
-}
+import hydra.core.transport.{AckStrategy, HydraRecord, NoCallback, TransportCallback}
 import hydra.kafka.producer.{JsonRecord, KafkaRecordMetadata, StringRecord}
 import hydra.kafka.transport.KafkaProducerProxy.ProduceToKafka
 import hydra.kafka.transport.KafkaTransport.RecordProduceError
@@ -18,7 +13,9 @@ import hydra.kafka.util.KafkaUtils
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.clients.producer.RecordMetadata
 import org.apache.kafka.common.{KafkaException, TopicPartition}
-import org.scalatest._
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.duration._
 
@@ -28,7 +25,7 @@ import scala.concurrent.duration._
 class KafkaProducerProxySpec
     extends TestKit(ActorSystem("KafkaProducerProxySpec"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with ImplicitSender
     with BeforeAndAfterAll
     with ConfigSupport {

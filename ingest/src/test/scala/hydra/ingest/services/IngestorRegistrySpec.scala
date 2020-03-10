@@ -7,7 +7,9 @@ import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestorRegistry._
 import hydra.ingest.test.TestIngestor
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 import scala.concurrent.duration._
 
@@ -17,7 +19,7 @@ import scala.concurrent.duration._
 class IngestorRegistrySpec
     extends TestKit(ActorSystem("IngestorRegistrySpec"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with ImplicitSender
     with Eventually
     with BeforeAndAfterAll {

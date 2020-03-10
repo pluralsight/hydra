@@ -5,12 +5,13 @@ import hydra.avro.registry.JsonToAvroConversionExceptionWithMetadata
 import hydra.avro.resource.SchemaResource
 import hydra.avro.util.AvroUtils.SeenPair
 import org.apache.avro.Schema
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
 /**
   * Created by alexsilva on 7/6/17.
   */
-class AvroUtilsSpec extends Matchers with FunSpecLike {
+class AvroUtilsSpec extends Matchers with AnyFunSpecLike {
 
   describe("When using AvroUtils") {
     it("replaces invalid characters") {

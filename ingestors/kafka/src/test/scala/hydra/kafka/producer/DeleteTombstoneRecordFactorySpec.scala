@@ -21,7 +21,8 @@ import hydra.core.ingest.RequestParams.{
   HYDRA_RECORD_KEY_PARAM
 }
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -31,7 +32,7 @@ import scala.concurrent.duration._
   */
 class DeleteTombstoneRecordFactorySpec
     extends Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with ScalaFutures {
 
   override implicit val patienceConfig = PatienceConfig(

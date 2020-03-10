@@ -5,14 +5,16 @@ import akka.http.scaladsl.model.HttpRequest
 import akka.stream.ActorMaterializer
 import akka.testkit.TestKit
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 import scala.concurrent.duration._
 
 class RequestFactoriesSpec
     extends TestKit(ActorSystem("RequestFactoriesSpec"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with BeforeAndAfterAll
     with ScalaFutures {
 

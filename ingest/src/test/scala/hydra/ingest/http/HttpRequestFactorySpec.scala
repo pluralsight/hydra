@@ -8,7 +8,9 @@ import akka.testkit.TestKit
 import hydra.core.ingest.RequestParams
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 import scala.collection.immutable._
 import scala.concurrent.duration._
@@ -19,7 +21,7 @@ import scala.concurrent.duration._
 class HttpRequestFactorySpec
     extends TestKit(ActorSystem())
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with ScalaFutures
     with BeforeAndAfterAll {
 

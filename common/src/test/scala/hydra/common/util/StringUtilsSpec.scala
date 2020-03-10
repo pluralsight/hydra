@@ -1,11 +1,12 @@
 package hydra.common.util
 
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
 /**
   * Created by alexsilva on 3/2/17.
   */
-class StringUtilsSpec extends Matchers with FunSpecLike {
+class StringUtilsSpec extends Matchers with AnyFunSpecLike {
 
   describe("When using StringUtils") {
     it("converts camel case to underscore case") {
