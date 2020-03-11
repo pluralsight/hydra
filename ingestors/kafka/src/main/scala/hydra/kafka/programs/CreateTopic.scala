@@ -75,13 +75,22 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       subject: Subject,
       topicDetails: TopicDetails
   ): Resource[F, Unit] = {
+    val onFailure: (Throwable, RetryDetails) => F[Unit] = {
+      (error, retryDetails) =>
+        Logger[F].info(
+          s"Retrying due to failure: $error. RetryDetails: $retryDetails"
+        )
+    }
     val createTopic: F[Option[Subject]] =
       kafkaClient.describeTopic(subject.value).flatMap {
         case Some(_) => Bracket[F, Throwable].pure(None)
         case None =>
           kafkaClient
-            .createTopic(subject.value, topicDetails) *> Bracket[F, Throwable]
-            .pure(Some(subject))
+            .createTopic(subject.value, topicDetails)
+            .retryingOnAllErrors(retryPolicy, onFailure) *> Bracket[
+            F,
+            Throwable
+          ].pure(Some(subject))
       }
     Resource
       .makeCase(createTopic)({
