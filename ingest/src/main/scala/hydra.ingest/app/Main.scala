@@ -72,8 +72,8 @@ object Main extends IOApp with ConfigSupport with LoggingAdapter {
         programs <- Programs.make[IO](config, algebras)
         bootstrap <- Bootstrap
           .make[IO](programs.createTopic, config.v2MetadataTopicConfig)
-        _ <- bootstrap.bootstrapAll
         _ <- actorsIO()
+        _ <- bootstrap.bootstrapAll
         routes <- routesIO()
         _ <- report
         _ <- serverIO(routes, Settings.HydraSettings)
