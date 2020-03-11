@@ -22,7 +22,7 @@ object Dependencies {
   val jacksonDatabindVersion = "2.10.3"
   val jodaConvertVersion = "2.2.1"
   val jodaTimeVersion = "2.10.5"
-  val kafkaVersion = "2.4.0"
+  val kafkaVersion = "2.4.1"
   val kamonPVersion = "2.0.1"
   val kamonVersion = "2.0.5"
   val kxbmapConfigVersion = "0.4.4"
