@@ -6,9 +6,11 @@ import com.pluralsight.hydra.reflect.DoNotScan
 import hydra.core.akka.ActorInitializationException
 import hydra.core.akka.InitializingActor.{InitializationError, Initialized}
 import hydra.core.protocol._
-import hydra.core.test.{TestRecord, TestRecordFactory, TestRecordMetadata}
+import hydra.core.test.{TestIngestorDefault, TestRecord, TestRecordFactory, TestRecordMetadata}
 import hydra.core.transport.AckStrategy
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -17,7 +19,7 @@ import scala.util.{Failure, Success, Try}
 class IngestorSpec
     extends TestKit(ActorSystem("test"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with BeforeAndAfterAll
     with ImplicitSender {
 
@@ -92,23 +94,6 @@ class IngestorSpec
       sup.expectMsg(IngestorCompleted)
     }
   }
-}
-
-class TestIngestorDefault extends Ingestor {
-
-  /**
-    * This will _not_ override; instead it will use the default value of 1.second. We'll test it.
-    */
-  override val initTimeout = 2.millisecond
-
-  val to = context.receiveTimeout
-
-  ingest {
-    case "hello"   => sender ! "hi!"
-    case "timeout" => sender ! to
-  }
-
-  override val recordFactory = TestRecordFactory
 }
 
 @DoNotScan

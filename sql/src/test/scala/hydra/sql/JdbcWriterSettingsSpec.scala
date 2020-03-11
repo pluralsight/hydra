@@ -1,12 +1,13 @@
 package hydra.sql
 
 import com.typesafe.config.ConfigFactory
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 
 /**
   * Created by alexsilva on 7/14/17.
   */
-class JdbcWriterSettingsSpec extends Matchers with FlatSpecLike {
+class JdbcWriterSettingsSpec extends Matchers with AnyFlatSpecLike {
 
   "The JdbcWriterSettings" should "be properly configured" in {
     val config = ConfigFactory.parseString("""

@@ -3,9 +3,10 @@ package hydra.kafka.serializers
 import com.fasterxml.jackson.databind.ObjectMapper
 
 import scala.collection.JavaConverters._
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
-class JsonSerializerSpec extends Matchers with FunSpecLike {
+class JsonSerializerSpec extends Matchers with AnyFunSpecLike {
 
   val mapper = new ObjectMapper()
 

@@ -17,7 +17,9 @@ import hydra.core.transport.{
 }
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericData
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 import retry.RetryDetails._
 import retry.RetryPolicies._
 import retry.{RetryPolicy, _}
@@ -29,7 +31,7 @@ import scala.io.Source
 class JdbcTransportSpec
     extends TestKit(ActorSystem("jdbc-transport-spec"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with ImplicitSender
     with BeforeAndAfterAll
     with LoggingAdapter {

@@ -5,9 +5,7 @@ import configs.syntax._
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
 import hydra.core.bootstrap.ServiceProvider
-import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.consumer.KafkaConsumerProxy
-import hydra.kafka.health.KafkaHealthCheckActor
 
 import scala.concurrent.duration._
 
@@ -22,11 +20,6 @@ object KafkaServicesProvider extends ServiceProvider with ConfigSupport {
     .value
 
   override val services = Seq(
-    Tuple2(
-      ActorUtils.actorName[KafkaHealthCheckActor],
-      KafkaHealthCheckActor
-        .props(KafkaConfigSupport.bootstrapServers, healthCheckTopic, interval)
-    ),
     Tuple2(ActorUtils.actorName[KafkaConsumerProxy], Props[KafkaConsumerProxy])
   )
 }

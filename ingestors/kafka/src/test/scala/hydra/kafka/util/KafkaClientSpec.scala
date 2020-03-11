@@ -4,25 +4,20 @@ import akka.actor.ActorSystem
 import akka.testkit.TestProbe
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
-import hydra.core.protocol.{
-  Ingest,
-  IngestorCompleted,
-  IngestorError,
-  IngestorStatus,
-  IngestorTimeout,
-  RequestPublished
-}
+import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError, IngestorStatus, IngestorTimeout, RequestPublished}
 import hydra.core.transport.AckStrategy
 import hydra.kafka.producer.StringRecord
 import hydra.kafka.util.KafkaClient.PublishError
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
-import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
+import org.scalatest.wordspec.AnyWordSpecLike
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.ExecutionContext
 
 final class KafkaClientSpec
-    extends WordSpec
+    extends AnyWordSpecLike
     with Matchers
     with BeforeAndAfterAll
     with EmbeddedKafka {

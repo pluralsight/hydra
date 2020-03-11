@@ -2,17 +2,14 @@ package hydra.kafka.services
 
 import hydra.common.util.ActorUtils
 import hydra.kafka.consumer.KafkaConsumerProxy
-import hydra.kafka.health.KafkaHealthCheckActor
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 
-class KafkaServicesProviderSpec extends Matchers with FlatSpecLike {
+class KafkaServicesProviderSpec extends Matchers with AnyFlatSpecLike {
 
   "KafkaServiceProviders" should "contain the right services" in {
-    KafkaServicesProvider.services.map(_._1) should contain
-    allOf(
-      ActorUtils.actorName[KafkaHealthCheckActor],
+    KafkaServicesProvider.services.map(_._1) should contain(
       ActorUtils.actorName[KafkaConsumerProxy]
     )
   }
-
 }

@@ -30,7 +30,9 @@ import org.apache.kafka.common.serialization.StringSerializer
 import org.joda.time.DateTime
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
+import org.scalatest.BeforeAndAfterAll
 import spray.json._
 
 import scala.concurrent.Future
@@ -39,7 +41,7 @@ import scala.io.Source
 
 class TopicBootstrapActorSpec
     extends TestKit(ActorSystem("topic-bootstrap-actor-spec"))
-    with FlatSpecLike
+    with AnyFlatSpecLike
     with Matchers
     with BeforeAndAfterAll
     with MockFactory

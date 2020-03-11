@@ -10,12 +10,14 @@ import hydra.core.test.TestRecord
 import hydra.core.transport.AckStrategy.{NoAck, Persisted, Replicated}
 import hydra.core.transport.Transport.{Confirm, Deliver, TransportError}
 import org.iq80.leveldb.util.FileUtils
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 class TransportSpec
     extends TestKit(ActorSystem("TransportSupervisorSpec"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with BeforeAndAfterAll
     with ImplicitSender
     with ConfigSupport {

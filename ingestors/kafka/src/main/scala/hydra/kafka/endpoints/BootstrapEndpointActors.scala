@@ -13,7 +13,6 @@ import scala.concurrent.ExecutionContext
 trait BootstrapEndpointActors extends ConfigSupport {
 
   implicit val system: ActorSystem
-  implicit val e: ExecutionContext
 
   private[kafka] val kafkaIngestor = system.actorSelection(path =
     applicationConfig.getString("kafka-ingestor-path")

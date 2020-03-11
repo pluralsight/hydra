@@ -1,14 +1,15 @@
 package hydra.common.reflect
 
 import hydra.common.testing.{DummyActor, TestCase}
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
 import scala.concurrent.duration._
 
 /**
   * Created by alexsilva on 3/3/17.
   */
-class CaseClassFactorySpec extends Matchers with FunSpecLike {
+class CaseClassFactorySpec extends Matchers with AnyFunSpecLike {
   describe("When using ReflectionUtils") {
     it("Instantiates a case class with constructor params") {
       new CaseClassFactory(classOf[TestCase])

@@ -3,12 +3,13 @@ package hydra.sql
 import java.sql.JDBCType._
 
 import org.apache.avro.Schema
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
 /**
   * Created by alexsilva on 5/4/17.
   */
-class DB2DialectSpec extends Matchers with FunSpecLike {
+class DB2DialectSpec extends Matchers with AnyFunSpecLike {
 
   val schema =
     """

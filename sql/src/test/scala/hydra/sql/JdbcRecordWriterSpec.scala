@@ -8,7 +8,9 @@ import hydra.avro.util.SchemaWrapper
 import hydra.common.util.TryWith
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericData
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 import scala.concurrent.duration._
 
@@ -17,7 +19,7 @@ import scala.concurrent.duration._
   */
 class JdbcRecordWriterSpec
     extends Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with BeforeAndAfterAll {
 
   import scala.collection.JavaConverters._

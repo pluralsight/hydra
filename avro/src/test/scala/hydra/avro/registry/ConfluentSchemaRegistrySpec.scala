@@ -16,25 +16,19 @@
 package hydra.avro.registry
 
 import com.typesafe.config.ConfigFactory
-import io.confluent.kafka.schemaregistry.client.{
-  CachedSchemaRegistryClient,
-  MockSchemaRegistryClient
-}
+import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, MockSchemaRegistryClient}
 import org.apache.avro.Schema
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{
-  BeforeAndAfterAll,
-  FunSpecLike,
-  Matchers,
-  PrivateMethodTester
-}
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.{BeforeAndAfterAll, PrivateMethodTester}
 
 /**
   * Created by alexsilva on 9/16/16.
   */
 class ConfluentSchemaRegistrySpec
     extends Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with BeforeAndAfterAll
     with ScalaFutures
     with PrivateMethodTester {

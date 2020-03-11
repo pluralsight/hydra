@@ -6,7 +6,9 @@ import akka.testkit.TestKit
 import com.romix.akka.serialization.kryo.KryoSerializer
 import hydra.core.protocol.InitiateRequest
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 import scala.concurrent.duration._
 
@@ -16,7 +18,7 @@ import scala.concurrent.duration._
 class HydraRequestSpec
     extends TestKit(ActorSystem("hydra"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with BeforeAndAfterAll {
 
   override def afterAll = TestKit.shutdownActorSystem(system)

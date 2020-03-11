@@ -6,7 +6,9 @@ import com.typesafe.config.ConfigFactory
 import hydra.core.transport.AckStrategy
 import hydra.kafka.producer.KafkaRecordMetadata
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 import spray.json.DefaultJsonProtocol
 
 /**
@@ -15,7 +17,7 @@ import spray.json.DefaultJsonProtocol
 class KafkaMetricsSpec
     extends TestKit(ActorSystem("hydra"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with BeforeAndAfterAll
     with DefaultJsonProtocol {
 

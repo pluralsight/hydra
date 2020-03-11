@@ -20,7 +20,9 @@ import akka.testkit.{ImplicitSender, TestKit}
 import hydra.kafka.consumer.KafkaConsumerProxy._
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.common.TopicPartition
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 import scala.concurrent.duration._
 
@@ -30,7 +32,7 @@ import scala.concurrent.duration._
 class KafkaConsumerProxySpec
     extends TestKit(ActorSystem("test"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with BeforeAndAfterAll
     with ImplicitSender {
 

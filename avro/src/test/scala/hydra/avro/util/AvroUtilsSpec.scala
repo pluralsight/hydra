@@ -5,12 +5,13 @@ import hydra.avro.registry.JsonToAvroConversionExceptionWithMetadata
 import hydra.avro.resource.SchemaResource
 import hydra.avro.util.AvroUtils.SeenPair
 import org.apache.avro.Schema
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
 /**
   * Created by alexsilva on 7/6/17.
   */
-class AvroUtilsSpec extends Matchers with FunSpecLike {
+class AvroUtilsSpec extends Matchers with AnyFunSpecLike {
 
   describe("When using AvroUtils") {
     it("replaces invalid characters") {
@@ -276,18 +277,18 @@ class AvroUtilsSpec extends Matchers with FunSpecLike {
 
       val metadata = SchemaResource(1, 1, tschema)
 
-      AvroUtils.improveException(new IllegalArgumentException(""), metadata) shouldBe an[
+      AvroUtils.improveException(new IllegalArgumentException(""), metadata, "mock") shouldBe an[
         IllegalArgumentException
       ]
 
       val ex = new RequiredFieldMissingException("testEnum", tschema)
-      val improved = AvroUtils.improveException(ex, metadata)
+      val improved = AvroUtils.improveException(ex, metadata, "mock")
       improved shouldBe an[JsonToAvroConversionExceptionWithMetadata]
       val iex = improved.asInstanceOf[JsonToAvroConversionExceptionWithMetadata]
       iex.getMessage should not be null
       iex.cause shouldBe a[RequiredFieldMissingException]
       iex.metadata shouldBe metadata
-      iex.location shouldBe "localhost/schemas/ids/1"
+      iex.location shouldBe "mock/schemas/ids/1"
     }
   }
 }

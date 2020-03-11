@@ -19,13 +19,11 @@ import akka.actor.ActorRef
 import akka.pattern.ask
 import akka.util
 import com.pluralsight.hydra.avro.JsonConverter
+import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.avro.resource.SchemaResource
 import hydra.avro.util.AvroUtils
 import hydra.common.config.ConfigSupport
-import hydra.core.akka.SchemaRegistryActor.{
-  FetchSchemaRequest,
-  FetchSchemaResponse
-}
+import hydra.core.akka.SchemaRegistryActor.{FetchSchemaRequest, FetchSchemaResponse}
 import hydra.core.ingest.HydraRequest
 import hydra.core.transport.ValidationStrategy.Strict
 import org.apache.avro.generic.GenericRecord
@@ -71,7 +69,8 @@ class AvroRecordFactory(schemaResourceLoader: ActorRef)
       val converted = converter.convert(request.payload)
       converted
     }).recover {
-      case ex => throw AvroUtils.improveException(ex, schemaResource)
+      case ex => throw AvroUtils.improveException(ex, schemaResource,
+        ConfluentSchemaRegistry.registryUrl(applicationConfig))
     }
   }
 }

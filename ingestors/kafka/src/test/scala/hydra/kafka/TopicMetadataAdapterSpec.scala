@@ -4,11 +4,12 @@ import java.util.UUID
 
 import hydra.kafka.model.{TopicMetadata, TopicMetadataAdapter}
 import org.joda.time.DateTime
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 
 class TopicMetadataAdapterSpec
     extends Matchers
-    with FlatSpecLike
+    with AnyFlatSpecLike
     with TopicMetadataAdapter {
 
   "The TopicMetadataAdapter" should "build a resource" in {

@@ -3,7 +3,9 @@ package hydra.common.config
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestKit}
 import hydra.common.testing.DummyActor
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 /**
   * Created by alexsilva on 3/2/17.
@@ -11,7 +13,7 @@ import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
 class ActorConfigSupportSpec
     extends TestKit(ActorSystem("test"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with BeforeAndAfterAll
     with ConfigSupport {
 

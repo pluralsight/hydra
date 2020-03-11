@@ -12,6 +12,10 @@ class Settings(config: Config) {
   val SchemaMetadataRefreshInterval = config
     .get[FiniteDuration]("schema.metadata.refresh.interval")
     .valueOrElse(1 minute)
+
+  val httpPort = config.getInt("http.port")
+
+  val httpInterface = config.getString("http.interface")
 }
 
 object Settings extends ConfigSupport {

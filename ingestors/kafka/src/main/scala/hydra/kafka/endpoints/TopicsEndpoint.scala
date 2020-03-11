@@ -1,20 +1,13 @@
 package hydra.kafka.endpoints
 
-import akka.actor.ActorSystem
+import akka.actor.ActorSelection
 import akka.http.scaladsl.common.EntityStreamingSupport
 import akka.kafka.Subscriptions
 import akka.kafka.scaladsl.Consumer
+import akka.pattern.ask
 import akka.util.Timeout
-import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
-import hydra.common.logging.LoggingAdapter
-import hydra.common.util.ActorUtils
-import hydra.core.http.HydraDirectives
-import hydra.kafka.consumer.KafkaConsumerProxy
-import hydra.kafka.consumer.KafkaConsumerProxy.{
-  GetLatestOffsets,
-  LatestOffsetsResponse
-}
-import hydra.kafka.marshallers.HydraKafkaJsonSupport
+import hydra.core.http.RouteSupport
+import hydra.kafka.consumer.KafkaConsumerProxy.{GetLatestOffsets, LatestOffsetsResponse}
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
 
@@ -27,22 +20,11 @@ import scala.concurrent.{Await, ExecutionContext, Future}
   *
   * Created by alexsilva on 3/18/17.
   */
-class TopicsEndpoint(
-    implicit system: ActorSystem,
-    implicit val e: ExecutionContext
-) extends RoutedEndpoints
-    with LoggingAdapter
-    with HydraDirectives
-    with HydraKafkaJsonSupport {
+class TopicsEndpoint(consumerProxy:ActorSelection)(implicit ec:ExecutionContext) extends RouteSupport {
 
   import hydra.kafka.util.KafkaUtils._
 
   implicit val jsonStreamingSupport = EntityStreamingSupport.json()
-
-  private val consumerProxy = system
-    .actorSelection(
-      s"/user/service/${ActorUtils.actorName(classOf[KafkaConsumerProxy])}"
-    )
 
   override val route =
     path("transports" / "kafka" / "consumer" / "topics" / Segment) {
@@ -98,7 +80,6 @@ class TopicsEndpoint(
       topic: String
   ): Future[Map[TopicPartition, Long]] = {
     implicit val timeout = Timeout(5 seconds)
-    import akka.pattern.ask
     (consumerProxy ? GetLatestOffsets(topic))
       .mapTo[LatestOffsetsResponse]
       .map(_.offsets)

@@ -4,8 +4,10 @@ import akka.japi.Option.Some
 import kamon.Kamon
 import kamon.metric.{Counter, Gauge}
 import org.scalamock.scalatest.proxy.MockFactory
-import org.scalatest._
+import org.scalatest.{BeforeAndAfterAll, _}
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import org.scalatest.flatspec.AnyFlatSpecLike
+import org.scalatest.matchers.should.Matchers
 import org.scalatest.time.{Millis, Seconds, Span}
 import scalacache.guava.GuavaCache
 
@@ -14,7 +16,7 @@ import scala.util.{Random, Try}
 
 class HydraMetricsSpec
     extends Matchers
-    with FlatSpecLike
+    with AnyFlatSpecLike
     with Eventually
     with BeforeAndAfterAll
     with BeforeAndAfterEach

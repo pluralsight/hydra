@@ -100,10 +100,10 @@ object AvroUtils {
     equals
   }
 
-  def improveException(ex: Throwable, schema: SchemaResource) = {
+  def improveException(ex: Throwable, schema: SchemaResource, registryUrl:String) = {
     ex match {
       case e: JsonToAvroConversionException =>
-        JsonToAvroConversionExceptionWithMetadata(e, schema)
+        JsonToAvroConversionExceptionWithMetadata(e, schema, registryUrl)
       case e: Exception => e
     }
   }

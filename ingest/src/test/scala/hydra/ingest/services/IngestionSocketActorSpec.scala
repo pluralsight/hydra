@@ -1,14 +1,14 @@
 package hydra.ingest.services
 
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.BeforeAndAfterAll
 import akka.actor.ActorSystem
 import akka.actor.Props
 import akka.testkit.TestProbe
 
 class IngestionSocketActorSpec
-    extends FlatSpec
+    extends AnyFlatSpecLike
     with Matchers
     with BeforeAndAfterAll {
 

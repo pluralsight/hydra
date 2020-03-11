@@ -4,9 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import hydra.core.ingest
 import hydra.core.ingest.RequestParams
 import hydra.kafka.producer.KafkaRecordFactory.RecordKeyExtractor.JsonRecordKeyExtractor
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 
-class JsonRecordKeyExtractorSpec extends Matchers with FlatSpecLike {
+class JsonRecordKeyExtractorSpec extends Matchers with AnyFlatSpecLike {
   val mapper = new ObjectMapper()
 
   "The JsonRecordKeyExtractor" should "return none when no key is present" in {

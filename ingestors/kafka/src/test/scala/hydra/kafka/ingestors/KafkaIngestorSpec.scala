@@ -20,7 +20,9 @@ import org.apache.avro.Schema
 import org.apache.avro.Schema.Parser
 import org.apache.avro.generic.GenericRecordBuilder
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -30,7 +32,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class KafkaIngestorSpec
     extends TestKit(ActorSystem("kafka-ingestor-spec"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with ConfigSupport
     with BeforeAndAfterAll
     with ScalaFutures

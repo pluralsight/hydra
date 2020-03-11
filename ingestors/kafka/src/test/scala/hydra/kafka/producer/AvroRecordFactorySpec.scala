@@ -36,7 +36,9 @@ import hydra.core.transport.AckStrategy
 import org.apache.avro.Schema
 import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -48,7 +50,7 @@ import scala.io.Source
 class AvroRecordFactorySpec
     extends TestKit(ActorSystem("hydra"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with ScalaFutures
     with BeforeAndAfterAll {
 

@@ -2,11 +2,12 @@ package hydra.common.util
 
 import java.io.Closeable
 
-import org.scalatest.{Matchers, WordSpec}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.util.{Failure, Success}
 
-class TryWithSpec extends WordSpec with Matchers {
+class TryWithSpec extends AnyWordSpecLike with Matchers {
   // Exceptions and errors here so we don't pay the stack trace creation cost multiple times
   val getResourceException = new RuntimeException
   val inFunctionException = new RuntimeException

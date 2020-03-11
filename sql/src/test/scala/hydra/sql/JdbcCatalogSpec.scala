@@ -6,14 +6,16 @@ import java.util.Properties
 import com.typesafe.config.ConfigFactory
 import hydra.avro.util.SchemaWrapper
 import org.apache.avro.{AvroRuntimeException, Schema}
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 import scala.concurrent.duration._
 
 /**
   * Created by alexsilva on 7/12/17.
   */
-class JdbcCatalogSpec extends Matchers with FunSpecLike with BeforeAndAfterAll {
+class JdbcCatalogSpec extends Matchers with AnyFunSpecLike with BeforeAndAfterAll {
 
   import scala.collection.JavaConverters._
 

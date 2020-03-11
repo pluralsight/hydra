@@ -9,7 +9,9 @@ import hydra.core.protocol.{IngestorError, Produce}
 import hydra.core.test.TestRecordFactory
 import hydra.core.transport.AckStrategy.NoAck
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -21,7 +23,7 @@ import scala.concurrent.duration._
 class TransportOpsSpec
     extends TestKit(ActorSystem("test"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with BeforeAndAfterAll
     with ImplicitSender
     with ScalaFutures {

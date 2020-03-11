@@ -1,12 +1,13 @@
 package hydra.common.reflect
 
 import com.typesafe.config.{Config, ConfigFactory}
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 
 /**
   * Created by alexsilva on 3/3/17.
   */
-class ComponentInstantiatorSpec extends Matchers with FlatSpecLike {
+class ComponentInstantiatorSpec extends Matchers with AnyFlatSpecLike {
 
   "The ComponentInstantiator" should "instantiate a class with no args" in {
     val c = ComponentInstantiator.instantiate(

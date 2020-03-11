@@ -1,8 +1,9 @@
 package hydra.core.transport
 
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 
-class ValidationStrategySpec extends Matchers with FlatSpecLike {
+class ValidationStrategySpec extends Matchers with AnyFlatSpecLike {
 
   "the validation strategy companion" should "parse strings" in {
     ValidationStrategy("relaxed") shouldBe ValidationStrategy.Relaxed

@@ -2,12 +2,14 @@ package hydra.core.akka
 
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 
 class ComposeReceiveSpec
     extends TestKit(ActorSystem("test"))
     with Matchers
-    with FlatSpecLike
+    with AnyFlatSpecLike
     with BeforeAndAfterAll
     with ImplicitSender {
 

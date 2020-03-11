@@ -8,8 +8,10 @@ import hydra.kafka.ingestors.KafkaTopicsActor._
 import net.manub.embeddedkafka.EmbeddedKafka
 import org.apache.kafka.clients.admin.{AdminClient, ListTopicsResult}
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+import org.scalatest.flatspec.AnyFlatSpecLike
+import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.duration._
 
@@ -18,7 +20,7 @@ class KafkaTopicsActorSpec
       ActorSystem("kafka-topics-spec", config = ConfigFactory.parseString(""))
     )
     with Matchers
-    with FlatSpecLike
+    with AnyFlatSpecLike
     with ConfigSupport
     with Eventually
     with EmbeddedKafka
