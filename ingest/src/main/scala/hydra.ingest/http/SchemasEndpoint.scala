@@ -23,6 +23,7 @@ import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.pattern.ask
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
+import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.avro.resource.SchemaResource
 import hydra.common.config.ConfigSupport
 import hydra.common.logging.LoggingAdapter
@@ -32,8 +33,7 @@ import hydra.core.http.CorsSupport
 import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.SchemaParseException
-import akka.http.scaladsl.server.Directives._
-import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
+import spray.json.RootJsonFormat
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -52,15 +52,16 @@ class SchemasEndpoint(
     with HydraJsonSupport
     with CorsSupport {
 
-  implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
-  implicit val timeout = Timeout(3.seconds)
+  implicit val endpointFormat: RootJsonFormat[SchemasEndpointResponse] = jsonFormat3(SchemasEndpointResponse.apply)
+  implicit val v2EndpointFormat: RootJsonFormat[SchemasWithKeyEndpointResponse] = jsonFormat2(SchemasWithKeyEndpointResponse.apply)
+  implicit val timeout: Timeout = Timeout(3.seconds)
 
   private val schemaRegistryActor =
     system.actorOf(SchemaRegistryActor.props(applicationConfig))
 
   override def route: Route = cors(settings) {
-    pathPrefix("schemas") {
-      handleExceptions(excptHandler) {
+    handleExceptions(excptHandler) {
+      pathPrefix("schemas") {
         get {
           pathEndOrSingleSlash {
             onSuccess(
@@ -69,18 +70,7 @@ class SchemasEndpoint(
             ) { response => complete(OK, response.subjects) }
           } ~ path(Segment) { subject =>
             parameters('schema ?) { schemaOnly: Option[String] =>
-              //TODO: make field selection more generic, i.e. /<subject>?fields=schema
-              onSuccess(
-                (schemaRegistryActor ? FetchSchemaMetadataRequest(subject))
-                  .mapTo[FetchSchemaMetadataResponse]
-              ) { response =>
-                val schemaResource = response.schemaResource
-                schemaOnly
-                  .map(_ => complete(OK, schemaResource.schema.toString))
-                  .getOrElse(
-                    complete(OK, SchemasEndpointResponse(schemaResource))
-                  )
-              }
+              getSchema(includeKeySchema = false, subject, schemaOnly)
             }
           } ~ path(Segment / "versions") { subject =>
             onSuccess(
@@ -103,11 +93,38 @@ class SchemasEndpoint(
           post {
             registerNewSchema
           }
+      } ~ v2Route
+    }
+  }
+
+  private val v2Route =
+    pathPrefix("v2") {
+      get {
+        path("schemas" / Segment) { subject =>
+          getSchema(includeKeySchema = true, subject, None)
+        }
+      }
+    }
+
+  def getSchema(includeKeySchema: Boolean, subject: String, schemaOnly: Option[String]): Route = {
+    onSuccess(
+      (schemaRegistryActor ? FetchSchemaMetadataRequest(subject))
+        .mapTo[FetchSchemaResponse]
+    ) { response =>
+
+      if (includeKeySchema) {
+        complete(OK, SchemasWithKeyEndpointResponse.apply(response))
+      } else {
+        val schemaResource = response.schemaResource
+        schemaOnly.map(_ => complete(OK, schemaResource.schema.toString))
+          .getOrElse(
+            complete(OK, SchemasEndpointResponse(schemaResource))
+          )
       }
     }
   }
 
-  def registerNewSchema = {
+  private def registerNewSchema: Route = {
     entity(as[String]) { json =>
       extractRequest { request =>
         onSuccess(
@@ -128,8 +145,8 @@ class SchemasEndpoint(
     }
   }
 
-  val excptHandler = ExceptionHandler {
-    case e: RestClientException if (e.getErrorCode == 40401) =>
+  private val excptHandler: ExceptionHandler = ExceptionHandler {
+    case e: RestClientException if e.getErrorCode == 40401 =>
       complete(NotFound, GenericServiceResponse(404, e.getMessage))
 
     case e: RestClientException =>
@@ -164,6 +181,16 @@ class SchemasEndpoint(
         )
       }
   }
+}
+
+case class SchemasWithKeyEndpointResponse(keySchemaResponse: Option[SchemasEndpointResponse], valueSchemaResponse: SchemasEndpointResponse)
+
+object SchemasWithKeyEndpointResponse {
+  def apply(f: FetchSchemaResponse): SchemasWithKeyEndpointResponse =
+    new SchemasWithKeyEndpointResponse(
+      f.keySchemaResource.map(SchemasEndpointResponse.apply),
+      SchemasEndpointResponse.apply(f.schemaResource)
+    )
 }
 
 case class SchemasEndpointResponse(id: Int, version: Int, schema: String)
