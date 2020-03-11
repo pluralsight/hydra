@@ -1,9 +1,10 @@
 package hydra.core.transport
 
 import hydra.core.transport.AckStrategy.NoAck
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 
-class AckStrategySpec extends Matchers with FlatSpecLike {
+class AckStrategySpec extends Matchers with AnyFlatSpecLike {
 
   "the ack strategy companion" should "parse strings" in {
     AckStrategy("replicated").get shouldBe AckStrategy.Replicated

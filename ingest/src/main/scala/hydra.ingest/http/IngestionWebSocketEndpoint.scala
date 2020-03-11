@@ -22,11 +22,9 @@ import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.Route
 import akka.stream.StreamLimitReachedException
 import akka.stream.scaladsl.{Flow, RestartFlow, Source}
-import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.config.ConfigSupport
-import hydra.common.logging.LoggingAdapter
-import hydra.core.http.HydraDirectives
+import hydra.core.http.RouteSupport
 import hydra.core.marshallers.GenericServiceResponse
 import hydra.ingest.services.{
   IngestSocketFactory,
@@ -42,13 +40,9 @@ import scala.util.Failure
 /**
   * Created by alexsilva on 12/22/15.
   */
-class IngestionWebSocketEndpoint(
-    implicit system: ActorSystem,
-    e: ExecutionContext
-) extends RoutedEndpoints
-    with LoggingAdapter
-    with HydraIngestJsonSupport
-    with HydraDirectives {
+class IngestionWebSocketEndpoint()(implicit system: ActorSystem)
+    extends RouteSupport
+    with HydraIngestJsonSupport {
 
   //visible for testing
   private[http] val enabled = applicationConfig
@@ -116,7 +110,7 @@ class IngestionWebSocketEndpoint(
         f.onComplete {
           case Failure(cause) => log.error(s"WS stream failed with $cause")
           case _              => //ignore
-        }(e)
+        }(system.dispatcher)
       )
 
 }

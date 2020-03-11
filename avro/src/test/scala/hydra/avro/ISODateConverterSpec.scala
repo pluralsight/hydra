@@ -5,9 +5,10 @@ import java.time.{Instant, ZoneOffset, ZonedDateTime}
 import hydra.avro.convert.{ISODateConverter, IsoDate}
 import org.apache.avro.LogicalTypes.LogicalTypeFactory
 import org.apache.avro.{LogicalType, LogicalTypes, Schema}
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 
-class ISODateConverterSpec extends Matchers with FlatSpecLike {
+class ISODateConverterSpec extends Matchers with AnyFlatSpecLike {
 
   LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, new LogicalTypeFactory {
     override def fromSchema(schema: Schema): LogicalType = IsoDate

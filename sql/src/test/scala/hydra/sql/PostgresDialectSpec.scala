@@ -8,14 +8,16 @@ import hydra.avro.util.SchemaWrapper
 import hydra.sql.JdbcUtils.getJdbcType
 import org.apache.avro.LogicalTypes.LogicalTypeFactory
 import org.apache.avro.{LogicalType, LogicalTypes, Schema}
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 /**
   * Created by alexsilva on 5/4/17.
   */
 class PostgresDialectSpec
     extends Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with BeforeAndAfterAll {
 
   LogicalTypes.register(IsoDate.IsoDateLogicalTypeName, new LogicalTypeFactory {

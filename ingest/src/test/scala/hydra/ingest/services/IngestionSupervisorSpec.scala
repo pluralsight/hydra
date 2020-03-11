@@ -11,14 +11,11 @@ import hydra.ingest.test.{TestRecordFactory, TimeoutRecord}
 import org.joda.time.DateTime
 import akka.pattern.pipe
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import org.scalatest.{
-  BeforeAndAfterAll,
-  BeforeAndAfterEach,
-  FunSpecLike,
-  Matchers
-}
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -29,7 +26,7 @@ import scala.concurrent.duration._
 class IngestionSupervisorSpec
     extends TestKit(ActorSystem("hydra"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with ImplicitSender
     with BeforeAndAfterAll
     with BeforeAndAfterEach

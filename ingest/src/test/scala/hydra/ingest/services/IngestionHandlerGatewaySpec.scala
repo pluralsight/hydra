@@ -9,15 +9,13 @@ import hydra.core.http.ImperativeRequestContext
 import hydra.core.ingest.{HydraRequest, IngestionReport}
 import hydra.core.protocol._
 import hydra.ingest.IngestorInfo
-import hydra.ingest.services.IngestorRegistry.{
-  FindAll,
-  FindByName,
-  LookupResult
-}
+import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.TestRecordFactory
 import org.joda.time.DateTime
-import org.scalatest._
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.Eventually
+import org.scalatest.flatspec.AnyFlatSpecLike
+import org.scalatest.matchers.should.Matchers
 import org.scalatest.time.{Seconds, Span}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -26,7 +24,7 @@ import scala.concurrent.duration._
 class IngestionHandlerGatewaySpec
     extends TestKit(ActorSystem("hydra"))
     with Matchers
-    with FlatSpecLike
+    with AnyFlatSpecLike
     with BeforeAndAfterAll
     with Eventually
     with ImplicitSender {

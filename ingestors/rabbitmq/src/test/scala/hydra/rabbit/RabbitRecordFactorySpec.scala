@@ -18,13 +18,14 @@ package hydra.rabbit
 
 import hydra.core.ingest.HydraRequest
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class RabbitRecordFactorySpec
     extends Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with ScalaFutures {
   describe("The Rabbit record factory") {
     it("throws an error if no exchange or queue metadata provided") {

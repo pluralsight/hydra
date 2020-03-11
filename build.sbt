@@ -162,14 +162,19 @@ val sbSettings =
 lazy val ingest = Project(
   id = "ingest",
   base = file("ingest")
-).dependsOn(core, kafka)
+)
+  .dependsOn(core, kafka)
   .settings(
     moduleSettings ++ dockerSettings,
+    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
+    buildInfoPackage := "hydra.ingest.bootstrap",
+    buildInfoOptions += BuildInfoOption.ToJson,
+    buildInfoOptions += BuildInfoOption.BuildTime,
     javaAgents += "org.aspectj" % "aspectjweaver" % "1.8.13",
     name := "hydra-ingest",
     libraryDependencies ++= Dependencies.ingestDeps
   )
-  .enablePlugins(JavaAppPackaging, JavaAgent, sbtdocker.DockerPlugin)
+  .enablePlugins(BuildInfoPlugin, JavaAppPackaging, JavaAgent, sbtdocker.DockerPlugin)
 
 //scala style
 lazy val testScalastyle = taskKey[Unit]("testScalastyle")

@@ -18,9 +18,11 @@ package hydra.avro.resource
 import hydra.avro.registry.SchemaRegistryException
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
 import org.apache.avro.{Schema, SchemaBuilder}
+import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.matchers.should.Matchers
 import org.scalatest.time.{Millis, Seconds, Span}
-import org.scalatest.{BeforeAndAfterEach, FunSpecLike, Matchers}
 import scalacache.modes.sync._
 
 import scala.collection.JavaConverters._
@@ -32,7 +34,7 @@ import scala.concurrent.duration._
   */
 class SchemaResourceLoaderSpec
     extends Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with BeforeAndAfterEach
     with Eventually
     with ScalaFutures {

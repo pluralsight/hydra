@@ -9,9 +9,10 @@ import com.romix.scala.serialization.kryo.{
   ScalaImmutableAbstractMapSerializer,
   ScalaMutableMapSerializer
 }
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 
-class KryoInitSpec extends Matchers with FlatSpecLike {
+class KryoInitSpec extends Matchers with AnyFlatSpecLike {
 
   "The custom KryoInit" should "register serializers" in {
     val kryo = new Kryo()

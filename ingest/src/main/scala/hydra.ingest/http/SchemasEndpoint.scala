@@ -26,15 +26,13 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.avro.resource.SchemaResource
 import hydra.common.config.ConfigSupport
-import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.akka.SchemaRegistryActor._
-import hydra.core.http.CorsSupport
-import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
+import hydra.core.http.{CorsSupport, RouteSupport}
+import hydra.core.marshallers.GenericServiceResponse
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.SchemaParseException
 import spray.json.RootJsonFormat
-
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
@@ -43,13 +41,9 @@ import scala.concurrent.duration._
   *
   * Created by alexsilva on 2/13/16.
   */
-class SchemasEndpoint(
-    implicit system: ActorSystem,
-    implicit val e: ExecutionContext
-) extends RoutedEndpoints
+class SchemasEndpoint()(implicit system: ActorSystem)
+    extends RouteSupport
     with ConfigSupport
-    with LoggingAdapter
-    with HydraJsonSupport
     with CorsSupport {
 
   implicit val endpointFormat: RootJsonFormat[SchemasEndpointResponse] = jsonFormat3(SchemasEndpointResponse.apply)

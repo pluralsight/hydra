@@ -1,11 +1,12 @@
 package hydra.sql
 
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
 /**
   * Created by alexsilva on 7/14/17.
   */
-class DbSyntaxSpec extends Matchers with FunSpecLike {
+class DbSyntaxSpec extends Matchers with AnyFunSpecLike {
 
   describe("The Underscore syntax") {
     it("formats property") {

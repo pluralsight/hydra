@@ -8,10 +8,11 @@ import hydra.core.marshallers._
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.generic.{GenericDatumReader, GenericRecordBuilder}
 import org.apache.avro.io.DecoderFactory
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 import vulcan.Codec
 
-final class TopicMetadataSpec extends FlatSpec with Matchers {
+final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
 
   private def testCodec[A: Codec](a: A): Unit = {
     val schema = Codec[A].schema.toOption.get

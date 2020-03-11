@@ -8,11 +8,12 @@ import hydra.kafka.model.ContactMethod.{Email, Slack}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import hydra.kafka.serializers.Errors._
-import org.scalatest.{Matchers, WordSpec}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.duration._
 
-class TopicMetadataV2ParserSpec extends WordSpec with Matchers {
+class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
   import TopicMetadataV2Parser._
   import spray.json._
 

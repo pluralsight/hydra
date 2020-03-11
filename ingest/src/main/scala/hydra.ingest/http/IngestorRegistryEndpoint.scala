@@ -16,31 +16,23 @@
 
 package hydra.ingest.http
 
-import akka.actor._
+import akka.actor.ActorSystem
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import akka.util.Timeout
-import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import configs.syntax._
 import hydra.common.config.ConfigSupport
-import hydra.common.logging.LoggingAdapter
-import hydra.core.http.HydraDirectives
+import hydra.core.http.RouteSupport
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestorRegistry.{FindAll, LookupResult}
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{FiniteDuration, _}
 
 /**
   * Created by alexsilva on 12/22/15.
   */
-class IngestorRegistryEndpoint(
-    implicit val system: ActorSystem,
-    implicit val e: ExecutionContext
-) extends RoutedEndpoints
-    with LoggingAdapter
+class IngestorRegistryEndpoint()(implicit system:ActorSystem) extends RouteSupport
     with HydraIngestJsonSupport
-    with HydraDirectives
     with ConfigSupport {
 
   private val registryLookupTimeout = applicationConfig

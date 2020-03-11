@@ -13,8 +13,10 @@ import hydra.core.akka.SchemaRegistryActor._
 import hydra.core.protocol.HydraApplicationError
 import org.apache.avro.Schema.Parser
 import org.apache.avro.SchemaBuilder
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+import org.scalatest.flatspec.AnyFlatSpecLike
+import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.duration._
 import scala.io.Source
@@ -25,7 +27,7 @@ import scala.io.Source
 class SchemaRegistryActorSpec
     extends TestKit(ActorSystem("SchemaRegistryActorSpec"))
     with Matchers
-    with FlatSpecLike
+    with AnyFlatSpecLike
     with ImplicitSender
     with Eventually
     with BeforeAndAfterAll {
@@ -72,6 +74,8 @@ class SchemaRegistryActorSpec
   def fixture() = {
     val config = ConfigFactory.parseString("""
         |schema.registry.url = "mock"
+        |http.port = 8080
+        |http.interace = 0.0.0.0
       """.stripMargin)
     val schemaRegistryActor =
       system.actorOf(SchemaRegistryActor.props(config, Some(settings)))

@@ -2,6 +2,7 @@ package hydra.ingest.modules
 
 import cats.effect.concurrent.Ref
 import cats.effect.{IO, Sync, Timer}
+import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.ingest.app.AppConfig.V2MetadataTopicConfig
 import hydra.kafka.model.ContactMethod
@@ -13,11 +14,11 @@ import hydra.kafka.util.KafkaClient.{PublishError, Topic, TopicName}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
-import org.scalatest.{Matchers, WordSpec}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
 import retry.RetryPolicies
-import cats.implicits._
 
-class BootstrapSpec extends WordSpec with Matchers {
+class BootstrapSpec extends AnyWordSpecLike with Matchers {
 
   implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
     Slf4jLogger.getLogger[F]

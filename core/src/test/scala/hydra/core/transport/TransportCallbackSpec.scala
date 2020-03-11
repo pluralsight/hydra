@@ -5,13 +5,15 @@ import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import hydra.core.protocol.{RecordNotProduced, RecordProduced}
 import hydra.core.test.{TestRecord, TestRecordMetadata}
 import hydra.core.transport.Transport.{Confirm, TransportError}
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 import scala.concurrent.duration._
 
 class TransportCallbackSpec
     extends TestKit(ActorSystem("test"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with BeforeAndAfterAll
     with ImplicitSender {
 

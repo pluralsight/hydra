@@ -6,23 +6,23 @@ object Dependencies {
   val akkaHTTPVersion = "10.1.11"
   val akkaKafkaStreamVersion = "2.0.2"
   val akkaKryoVersion = "0.5.2"
-  val akkaVersion = "2.6.1"
+  val akkaVersion = "2.6.3"
   val avroVersion = "1.9.2"
-  val catsEffectVersion = "2.0.0"
+  val catsEffectVersion = "2.1.2"
   val catsLoggerVersion = "1.0.1"
   val catsRetryVersion = "1.1.0"
-  val catsVersion = "2.0.0"
+  val catsVersion = "2.1.1"
   val cirisVersion = "1.0.4"
   val confluentVersion = "5.4.1"
-  val easyMockVersion = "3.6" //needed for mocking static java methods
+  val easyMockVersion = "4.2" //needed for mocking static java methods
   val fs2KafkaVersion = "1.0.0"
   val hikariCPVersion = "3.4.2"
   val h2DbVersion = "1.4.200"
   val jacksonCoreVersion = "2.10.3"
-  val jacksonDatabindVersion = "2.9.10.3"
-  val jodaConvertVersion = "1.9.2"
+  val jacksonDatabindVersion = "2.10.3"
+  val jodaConvertVersion = "2.2.1"
   val jodaTimeVersion = "2.10.5"
-  val kafkaVersion = "2.4.0"
+  val kafkaVersion = "2.4.1"
   val kamonPVersion = "2.0.1"
   val kamonVersion = "2.0.5"
   val kxbmapConfigVersion = "0.4.4"
@@ -35,7 +35,6 @@ object Dependencies {
   val scalaMockVersion = "4.4.0"
   val scalaTestVersion = "3.1.1"
   val scalazVersion = "7.2.30"
-  val serviceContainerVersion = "2.1.0"
   val sprayJsonVersion = "1.3.5"
   val typesafeConfigVersion = "1.3.2"
   val vulcanVersion = "1.0.1"
@@ -78,8 +77,6 @@ object Dependencies {
 
     val embeddedKafka = "net.manub" %% "scalatest-embedded-kafka" % "2.0.0"
 
-    val sdNotify = "info.faljse" % "SDNotify" % "1.3"
-
     lazy val kamon = Seq(
       "io.kamon" %% "kamon-core" % kamonVersion,
       "io.kamon" %% "kamon-prometheus" % kamonPVersion
@@ -121,14 +118,6 @@ object Dependencies {
         .excludeAll(ExclusionRule(organization = "io.spray"))
     )
 
-    val serviceContainer =
-      ("com.github.vonnagy" %% "service-container" % serviceContainerVersion)
-        .excludeAll(
-          ExclusionRule(organization = "ch.qos.logback"),
-          ExclusionRule(organization = "org.slf4j"),
-          ExclusionRule(organization = "com.typesafe.akka")
-        )
-
     val akkaKryo =
       ("com.github.romix.akka" %% "akka-kryo-serialization" % akkaKryoVersion)
         .excludeAll {
@@ -165,7 +154,7 @@ object Dependencies {
       "com.fasterxml.jackson.core" % "jackson-databind" % jacksonDatabindVersion
     )
 
-    val postgres = "org.postgresql" % "postgresql" % "42.2.10"
+    val postgres = "org.postgresql" % "postgresql" % "42.2.11"
   }
 
   object Test {
@@ -214,8 +203,6 @@ object Dependencies {
       guavacache,
       reflections,
       akkaKryo,
-      serviceContainer,
-      sdNotify,
       postgres,
       h2db,
       retry

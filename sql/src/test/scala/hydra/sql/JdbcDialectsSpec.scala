@@ -1,11 +1,12 @@
 package hydra.sql
 
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
 /**
   * Created by alexsilva on 5/4/17.
   */
-class JdbcDialectsSpec extends Matchers with FunSpecLike {
+class JdbcDialectsSpec extends Matchers with AnyFunSpecLike {
 
   describe("The JDBCDialects Object") {
 

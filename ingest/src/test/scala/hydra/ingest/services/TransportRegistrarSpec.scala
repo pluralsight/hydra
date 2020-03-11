@@ -8,14 +8,16 @@ import hydra.core.transport.{AckStrategy, Transport}
 import hydra.core.transport.Transport.Deliver
 import hydra.ingest.services.TransportRegistrar._
 import hydra.ingest.test.TestRecord
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
 
 import scala.concurrent.duration._
 
 class TransportRegistrarSpec
     extends TestKit(ActorSystem("test"))
     with Matchers
-    with FunSpecLike
+    with AnyFunSpecLike
     with BeforeAndAfterAll
     with ImplicitSender
     with ConfigSupport {

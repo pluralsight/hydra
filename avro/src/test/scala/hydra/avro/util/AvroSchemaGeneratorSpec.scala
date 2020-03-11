@@ -17,14 +17,15 @@ package hydra.avro.util
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 
 import scala.io.Source
 
 /**
   * Created by alexsilva on 10/11/16.
   */
-class AvroSchemaGeneratorSpec extends Matchers with FunSpecLike {
+class AvroSchemaGeneratorSpec extends Matchers with AnyFunSpecLike {
 
   val mapper = new ObjectMapper
   val converter = new AvroSchemaGenerator()

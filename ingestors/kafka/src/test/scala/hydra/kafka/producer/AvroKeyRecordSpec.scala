@@ -3,9 +3,10 @@ package hydra.kafka.producer
 import hydra.core.transport.AckStrategy
 import org.apache.avro.SchemaBuilder
 import org.apache.avro.generic.GenericRecordBuilder
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 
-class AvroKeyRecordSpec extends FlatSpec with Matchers {
+class AvroKeyRecordSpec extends AnyFlatSpecLike with Matchers {
 
   it must "construct an AvroKeyRecord" in {
     def schema(name: String) =

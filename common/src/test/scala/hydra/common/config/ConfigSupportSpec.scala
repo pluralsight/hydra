@@ -3,7 +3,8 @@ package hydra.common.config
 import java.util.Properties
 
 import com.typesafe.config.{ConfigException, ConfigFactory}
-import org.scalatest.{FunSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpecLike
 import ConfigSupport._
 
 import scala.collection.JavaConverters._
@@ -11,7 +12,7 @@ import scala.collection.JavaConverters._
 /**
   * Created by alexsilva on 3/2/17.
   */
-class ConfigSupportSpec extends Matchers with FunSpecLike with ConfigSupport {
+class ConfigSupportSpec extends Matchers with AnyFunSpecLike with ConfigSupport {
 
   describe("When configuring") {
     it("has the correct application name") {

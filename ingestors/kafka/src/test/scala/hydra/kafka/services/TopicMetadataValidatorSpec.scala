@@ -2,11 +2,12 @@ package hydra.kafka.services
 
 import hydra.core.marshallers.GenericSchema
 import hydra.kafka.services.ErrorMessages._
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 
 import scala.util.{Failure, Success}
 
-class TopicMetadataValidatorSpec extends FlatSpec with Matchers {
+class TopicMetadataValidatorSpec extends AnyFlatSpecLike with Matchers {
 
   "A TopicNameValidator" should "return Valid for a valid topic" in {
     TopicMetadataValidator.validate(

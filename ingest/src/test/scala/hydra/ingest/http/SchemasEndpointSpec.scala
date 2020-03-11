@@ -10,7 +10,8 @@ import hydra.common.config.ConfigSupport
 import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
 import hydra.ingest.http.mock.MockEndpoint
 import org.apache.avro.Schema
-import org.scalatest.{Matchers, WordSpecLike}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.duration._
 import scala.io.Source
@@ -20,7 +21,7 @@ import scala.io.Source
   */
 class SchemasEndpointSpec
     extends Matchers
-    with WordSpecLike
+    with AnyWordSpecLike
     with ScalatestRouteTest
     with HydraJsonSupport
     with ConfigSupport {

@@ -1,10 +1,10 @@
 package hydra.core.protocol
 
 import akka.http.scaladsl.model.StatusCodes
-import org.scalatest.Matchers
-import org.scalatest.FlatSpecLike
+import org.scalatest.flatspec.AnyFlatSpecLike
+import org.scalatest.matchers.should.Matchers
 
-class IngestorStatusSpec extends Matchers with FlatSpecLike {
+class IngestorStatusSpec extends Matchers with AnyFlatSpecLike {
 
   it should "return the right status codes" in {
     val ex = new IllegalArgumentException("")

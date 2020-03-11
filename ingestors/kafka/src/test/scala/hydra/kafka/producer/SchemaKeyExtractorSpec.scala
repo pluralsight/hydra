@@ -5,9 +5,10 @@ import hydra.core.ingest.{HydraRequest, RequestParams}
 import hydra.kafka.producer.KafkaRecordFactory.RecordKeyExtractor.SchemaKeyExtractor
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 
-class SchemaKeyExtractorSpec extends Matchers with FlatSpecLike {
+class SchemaKeyExtractorSpec extends Matchers with AnyFlatSpecLike {
 
   private def buildRecord(schemaStr: String, payload: String) = {
     val schema = new Schema.Parser().parse(schemaStr)

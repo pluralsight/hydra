@@ -19,30 +19,20 @@ package hydra.ingest.http
 import akka.actor._
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
-import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
-import com.typesafe.config.ConfigFactory
 import configs.syntax._
-import hydra.common.logging.LoggingAdapter
-import hydra.core.http.HydraDirectives
+import hydra.core.http.RouteSupport
 import hydra.core.ingest.{CorrelationIdBuilder, RequestParams}
-import hydra.core.marshallers.{GenericError, HydraJsonSupport}
+import hydra.core.marshallers.GenericError
 import hydra.core.protocol.InitiateHttpRequest
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestionHandlerGateway
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{FiniteDuration, _}
 
 /**
   * Created by alexsilva on 12/22/15.
   */
-class IngestionEndpoint(
-    implicit val system: ActorSystem,
-    implicit val e: ExecutionContext
-) extends RoutedEndpoints
-    with LoggingAdapter
-    with HydraJsonSupport
-    with HydraDirectives {
+class IngestionEndpoint(implicit system: ActorSystem) extends RouteSupport {
 
   import hydra.ingest.bootstrap.RequestFactories._
 

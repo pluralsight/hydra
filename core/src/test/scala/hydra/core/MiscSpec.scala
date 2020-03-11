@@ -3,11 +3,12 @@ package hydra.core
 import hydra.core.ingest.HydraRequest
 import hydra.core.protocol._
 import org.joda.time.DateTime
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpecLike
 
 import scala.concurrent.duration._
 
-class MiscSpec extends Matchers with FlatSpecLike {
+class MiscSpec extends Matchers with AnyFlatSpecLike {
   "The Hydra Exception " should "be instantiated without a cause" in {
     val ex = new HydraException("error")
     ex.getCause shouldBe null
