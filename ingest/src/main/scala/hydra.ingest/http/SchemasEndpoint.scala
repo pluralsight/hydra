@@ -31,8 +31,8 @@ import hydra.core.http.{CorsSupport, RouteSupport}
 import hydra.core.marshallers.GenericServiceResponse
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.SchemaParseException
+import spray.json.RootJsonFormat
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 /**
@@ -45,15 +45,16 @@ class SchemasEndpoint()(implicit system: ActorSystem)
     with ConfigSupport
     with CorsSupport {
 
-  implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
-  implicit val timeout = Timeout(3.seconds)
+  implicit val endpointFormat: RootJsonFormat[SchemasEndpointResponse] = jsonFormat3(SchemasEndpointResponse.apply)
+  implicit val v2EndpointFormat: RootJsonFormat[SchemasWithKeyEndpointResponse] = jsonFormat2(SchemasWithKeyEndpointResponse.apply)
+  implicit val timeout: Timeout = Timeout(3.seconds)
 
   private val schemaRegistryActor =
     system.actorOf(SchemaRegistryActor.props(applicationConfig))
 
-  override val route: Route = cors(settings) {
-    pathPrefix("schemas") {
-      handleExceptions(excptHandler) {
+  override def route: Route = cors(settings) {
+    handleExceptions(excptHandler) {
+      pathPrefix("schemas") {
         get {
           pathEndOrSingleSlash {
             onSuccess(
@@ -62,18 +63,7 @@ class SchemasEndpoint()(implicit system: ActorSystem)
             ) { response => complete(OK, response.subjects) }
           } ~ path(Segment) { subject =>
             parameters('schema ?) { schemaOnly: Option[String] =>
-              //TODO: make field selection more generic, i.e. /<subject>?fields=schema
-              onSuccess(
-                (schemaRegistryActor ? FetchSchemaMetadataRequest(subject))
-                  .mapTo[FetchSchemaMetadataResponse]
-              ) { response =>
-                val schemaResource = response.schemaResource
-                schemaOnly
-                  .map(_ => complete(OK, schemaResource.schema.toString))
-                  .getOrElse(
-                    complete(OK, SchemasEndpointResponse(schemaResource))
-                  )
-              }
+              getSchema(includeKeySchema = false, subject, schemaOnly)
             }
           } ~ path(Segment / "versions") { subject =>
             onSuccess(
@@ -96,11 +86,38 @@ class SchemasEndpoint()(implicit system: ActorSystem)
           post {
             registerNewSchema
           }
+      } ~ v2Route
+    }
+  }
+
+  private val v2Route =
+    pathPrefix("v2") {
+      get {
+        path("schemas" / Segment) { subject =>
+          getSchema(includeKeySchema = true, subject, None)
+        }
+      }
+    }
+
+  def getSchema(includeKeySchema: Boolean, subject: String, schemaOnly: Option[String]): Route = {
+    onSuccess(
+      (schemaRegistryActor ? FetchSchemaRequest(subject))
+        .mapTo[FetchSchemaResponse]
+    ) { response =>
+
+      if (includeKeySchema) {
+        complete(OK, SchemasWithKeyEndpointResponse.apply(response))
+      } else {
+        val schemaResource = response.schemaResource
+        schemaOnly.map(_ => complete(OK, schemaResource.schema.toString))
+          .getOrElse(
+            complete(OK, SchemasEndpointResponse(schemaResource))
+          )
       }
     }
   }
 
-  def registerNewSchema = {
+  private def registerNewSchema: Route = {
     entity(as[String]) { json =>
       extractRequest { request =>
         onSuccess(
@@ -121,8 +138,8 @@ class SchemasEndpoint()(implicit system: ActorSystem)
     }
   }
 
-  val excptHandler = ExceptionHandler {
-    case e: RestClientException if (e.getErrorCode == 40401) =>
+  private[http] val excptHandler: ExceptionHandler = ExceptionHandler {
+    case e: RestClientException if e.getErrorCode == 40401 =>
       complete(NotFound, GenericServiceResponse(404, e.getMessage))
 
     case e: RestClientException =>
@@ -157,6 +174,16 @@ class SchemasEndpoint()(implicit system: ActorSystem)
         )
       }
   }
+}
+
+case class SchemasWithKeyEndpointResponse(keySchemaResponse: Option[SchemasEndpointResponse], valueSchemaResponse: SchemasEndpointResponse)
+
+object SchemasWithKeyEndpointResponse {
+  def apply(f: FetchSchemaResponse): SchemasWithKeyEndpointResponse =
+    new SchemasWithKeyEndpointResponse(
+      f.keySchemaResource.map(SchemasEndpointResponse.apply),
+      SchemasEndpointResponse.apply(f.schemaResource)
+    )
 }
 
 case class SchemasEndpointResponse(id: Int, version: Int, schema: String)

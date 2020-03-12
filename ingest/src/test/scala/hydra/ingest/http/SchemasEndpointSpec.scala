@@ -31,6 +31,8 @@ class SchemasEndpointSpec
 
   val schemasRoute = new SchemasEndpoint().route
   implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
+  implicit val endpointV2Format = jsonFormat2(SchemasWithKeyEndpointResponse.apply)
+
 
   private val schemaRegistry =
     ConfluentSchemaRegistry.forConfig(applicationConfig)
@@ -152,4 +154,25 @@ class SchemasEndpointSpec
       }
     }
   }
+
+  "The V2 Schemas Endpoint" must {
+    "returns a single schema by name with no key schema" in {
+      Get("/v2/schemas/hydra.test.Tester") ~> schemasRoute ~> check {
+        val rep = responseAs[SchemasWithKeyEndpointResponse]
+        val valueSchema = rep.valueSchemaResponse
+        val id = schemaRegistry.registryClient
+          .getId(
+            "hydra.test.Tester-value",
+            new Schema.Parser().parse(valueSchema.schema)
+          )
+        valueSchema.id shouldBe id
+        valueSchema.version shouldBe 2
+        new Schema.Parser().parse(valueSchema.schema) shouldBe schemaEvolved
+      }
+    }
+
+  }
+
+
+
 }

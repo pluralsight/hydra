@@ -152,11 +152,11 @@ class SchemaResourceLoader(
     private val valueSuffix = "-value"
     private val keySuffix = "-key"
 
-    def withValueSuffix = {
+    def withValueSuffix: String = {
       if (subject.endsWith(valueSuffix)) subject else subject + valueSuffix
     }
 
-    def withKeySuffix = {
+    def withKeySuffix: String = {
       if (subject.endsWith(keySuffix)) subject else subject + keySuffix
     }
   }
