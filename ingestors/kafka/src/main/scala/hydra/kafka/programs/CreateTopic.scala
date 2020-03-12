@@ -22,17 +22,18 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     v2MetadataTopicName: Subject
 ) {
 
+  private def onFailure(resourceTried: String): (Throwable, RetryDetails) => F[Unit] = {
+    (error, retryDetails) =>
+      Logger[F].info(
+        s"Retrying due to failure in $resourceTried: $error. RetryDetails: $retryDetails"
+      )
+  }
+
   private def registerSchema(
       subject: Subject,
       schema: Schema,
       isKey: Boolean
   ): Resource[F, Unit] = {
-    val onFailure: (Throwable, RetryDetails) => F[Unit] = {
-      (error, retryDetails) =>
-        Logger[F].info(
-          s"Retrying due to failure: $error. RetryDetails: $retryDetails"
-        )
-    }
     val suffixedSubject = subject.value + (if (isKey) "-key" else "-value")
     val registerSchema: F[Option[SchemaVersion]] = {
       schemaRegistry
@@ -47,7 +48,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
                 else Some(newSchemaVersion)
             }
         }
-    }.retryingOnAllErrors(retryPolicy, onFailure)
+    }.retryingOnAllErrors(retryPolicy, onFailure("RegisterSchema"))
     Resource
       .makeCase(registerSchema)((newVersionMaybe, exitCase) =>
         (exitCase, newVersionMaybe) match {
@@ -75,19 +76,13 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       subject: Subject,
       topicDetails: TopicDetails
   ): Resource[F, Unit] = {
-    val onFailure: (Throwable, RetryDetails) => F[Unit] = {
-      (error, retryDetails) =>
-        Logger[F].info(
-          s"Retrying due to failure: $error. RetryDetails: $retryDetails"
-        )
-    }
     val createTopic: F[Option[Subject]] =
       kafkaClient.describeTopic(subject.value).flatMap {
         case Some(_) => Bracket[F, Throwable].pure(None)
         case None =>
           kafkaClient
             .createTopic(subject.value, topicDetails)
-            .retryingOnAllErrors(retryPolicy, onFailure) *> Bracket[
+            .retryingOnAllErrors(retryPolicy, onFailure("CreateTopicResource")) *> Bracket[
             F,
             Throwable
           ].pure(Some(subject))
