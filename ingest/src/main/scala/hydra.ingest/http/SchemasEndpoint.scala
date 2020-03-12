@@ -23,7 +23,6 @@ import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.pattern.ask
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
-import com.github.vonnagy.service.container.http.routing.RoutedEndpoints
 import hydra.avro.resource.SchemaResource
 import hydra.common.config.ConfigSupport
 import hydra.core.akka.SchemaRegistryActor
@@ -33,7 +32,7 @@ import hydra.core.marshallers.GenericServiceResponse
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.SchemaParseException
 import spray.json.RootJsonFormat
-import scala.concurrent.ExecutionContext
+
 import scala.concurrent.duration._
 
 /**
@@ -102,7 +101,7 @@ class SchemasEndpoint()(implicit system: ActorSystem)
 
   def getSchema(includeKeySchema: Boolean, subject: String, schemaOnly: Option[String]): Route = {
     onSuccess(
-      (schemaRegistryActor ? FetchSchemaMetadataRequest(subject))
+      (schemaRegistryActor ? FetchSchemaRequest(subject))
         .mapTo[FetchSchemaResponse]
     ) { response =>
 
@@ -139,7 +138,7 @@ class SchemasEndpoint()(implicit system: ActorSystem)
     }
   }
 
-  private val excptHandler: ExceptionHandler = ExceptionHandler {
+  private[http] val excptHandler: ExceptionHandler = ExceptionHandler {
     case e: RestClientException if e.getErrorCode == 40401 =>
       complete(NotFound, GenericServiceResponse(404, e.getMessage))
 
