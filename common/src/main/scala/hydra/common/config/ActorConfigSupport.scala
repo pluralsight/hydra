@@ -18,8 +18,8 @@ package hydra.common.config
 
 import akka.actor.Actor
 import com.typesafe.config.{Config, ConfigFactory}
-import configs.syntax._
 import hydra.common.util.ActorUtils
+import ConfigSupport._
 
 /**
   * Created by alexsilva on 10/28/15.
@@ -39,7 +39,8 @@ trait ActorConfigSupport extends ConfigSupport {
     *
     * @return The configuration object for this actor; empty if path not found.
     */
-  val actorConfig: Config = applicationConfig
-    .get[Config](s"actors.${thisActorName}")
-    .valueOrElse(ConfigFactory.empty())
+  val actorConfig: Config =
+    applicationConfig
+      .getConfigOpt(s"actors.${thisActorName}")
+      .getOrElse(ConfigFactory.empty())
 }

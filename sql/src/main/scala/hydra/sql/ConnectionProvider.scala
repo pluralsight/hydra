@@ -4,7 +4,7 @@ import java.sql.{Connection, DriverManager, SQLException}
 
 import com.typesafe.config.Config
 import com.zaxxer.hikari.HikariDataSource
-import configs.syntax._
+import hydra.common.config.ConfigSupport._
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration.{FiniteDuration, _}
@@ -103,12 +103,12 @@ object DriverManagerConnectionProvider {
   def apply(config: Config): DriverManagerConnectionProvider = {
     new DriverManagerConnectionProvider(
       config.getString("connection.url"),
-      config.get[String]("connection.user").valueOrElse(""),
-      config.get[String]("connection.password").valueOrElse(""),
-      config.get[Int]("connection.max.retries").valueOrElse(3),
+      config.getStringOpt("connection.user").getOrElse(""),
+      config.getStringOpt("connection.password").getOrElse(""),
+      config.getIntOpt("connection.max.retries").getOrElse(3),
       config
-        .get[FiniteDuration]("connection.retry.backoff ")
-        .valueOrElse(3.seconds)
+        .getDurationOpt("connection.retry.backoff ")
+        .getOrElse(3.seconds)
     )
   }
 }

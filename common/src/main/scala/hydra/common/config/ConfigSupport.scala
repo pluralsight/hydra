@@ -17,10 +17,12 @@
 package hydra.common.config
 
 import java.util.Properties
+import java.util.concurrent.TimeUnit
 
+import cats.implicits._
 import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
-import configs.syntax._
 
+import scala.concurrent.duration.FiniteDuration
 import scala.language.implicitConversions
 
 /**
@@ -36,6 +38,8 @@ import scala.language.implicitConversions
   */
 trait ConfigSupport extends ConfigComponent {
 
+  import ConfigSupport._
+
   private val defaultConfig = ConfigFactory.load()
 
   val externalConfig = loadExternalConfig(defaultConfig)
@@ -47,12 +51,8 @@ trait ConfigSupport extends ConfigComponent {
   val applicationConfig: Config = rootConfig.getConfig(applicationName)
 
   def loadExternalConfig(c: Config): Config = {
-    c.getOrElse[String](
-        "application.config.location",
-        s"/etc/hydra/$applicationName.conf"
-      )
-      .map(f => ConfigFactory.parseFile(new java.io.File(f)))
-      .valueOrThrow(err => err.configException)
+    val filePath = c.getStringOpt("application.config.location").getOrElse(s"/etc/hydra/$applicationName.conf")
+    ConfigFactory.parseFile(new java.io.File(filePath))
   }
 }
 
@@ -85,4 +85,33 @@ object ConfigSupport {
         a
     }
   }
+
+  implicit class ConfigImplicits(config: Config) {
+    def getDurationOpt(path: String): Option[FiniteDuration] =
+      getOptional(path, config.getDuration).map(d => FiniteDuration(d.toNanos, TimeUnit.NANOSECONDS))
+
+    def getStringOpt(path: String): Option[String] =
+      getOptional(path, config.getString)
+
+    def getConfigOpt(path: String): Option[Config] =
+      getOptional(path, config.getConfig)
+
+    def getIntOpt(path: String): Option[Int] =
+      getOptional(path, config.getInt)
+
+    def getBooleanOpt(path: String): Option[Boolean] =
+      getOptional(path, config.getBoolean)
+
+    def getStringListOpt(path: String): Option[List[String]] =
+      getOptional(path, config.getStringList).map(_.asScala.toList)
+
+    private def getOptional[A](path: String, method: String => A): Option[A] = {
+      if (config.hasPath(path)) {
+        method(path).some
+      } else {
+        none
+      }
+    }
+  }
+
 }

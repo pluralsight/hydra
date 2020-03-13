@@ -41,7 +41,7 @@ case class ConfluentSchemaRegistry(
 
 object ConfluentSchemaRegistry extends LoggingAdapter {
 
-  import configs.syntax._
+  import hydra.common.config.ConfigSupport._
 
   case class SchemaRegistryClientInfo(
       url: String,
@@ -70,18 +70,15 @@ object ConfluentSchemaRegistry extends LoggingAdapter {
 
   val mockRegistry = new MockSchemaRegistryClient()
 
-  def registryUrl(config: Config) =
-    config
-      .get[String]("schema.registry.url")
-      .valueOrThrow(_ =>
-        new IllegalArgumentException("A schema registry url is required.")
-      )
+  def registryUrl(config: Config): String =
+    config.getStringOpt("schema.registry.url")
+      .getOrElse(throw new IllegalArgumentException("A schema registry url is required."))
 
   def forConfig(
       config: Config = ConfigFactory.load()
   ): ConfluentSchemaRegistry = {
     val identityMapCapacity =
-      config.get[Int]("max.schemas.per.subject").valueOrElse(1000)
+      config.getIntOpt("max.schemas.per.subject").getOrElse(1000)
     cachedClients.get(
       SchemaRegistryClientInfo(registryUrl(config), identityMapCapacity)
     )

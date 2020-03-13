@@ -168,18 +168,18 @@ class SchemaRegistryActor(
 
 class CircuitBreakerSettings(config: Config) {
 
-  import configs.syntax._
+  import hydra.common.config.ConfigSupport._
 
   val maxFailures =
-    config.get[Int]("schema-fetcher.max-failures").valueOrElse(5)
+    config.getIntOpt("schema-fetcher.max-failures").getOrElse(5)
 
   val callTimeout = config
-    .get[FiniteDuration]("schema-fetcher.call-timeout")
-    .valueOrElse(5 seconds)
+    .getDurationOpt("schema-fetcher.call-timeout")
+    .getOrElse(5 seconds)
 
   val resetTimeout = config
-    .get[FiniteDuration]("schema-fetcher.reset-timeout")
-    .valueOrElse(30 seconds)
+    .getDurationOpt("schema-fetcher.reset-timeout")
+    .getOrElse(30 seconds)
 }
 
 object SchemaRegistryActor {
