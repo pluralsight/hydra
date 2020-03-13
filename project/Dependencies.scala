@@ -6,7 +6,7 @@ object Dependencies {
   val akkaHTTPVersion = "10.1.11"
   val akkaKafkaStreamVersion = "2.0.2"
   val akkaKryoVersion = "0.5.2"
-  val akkaVersion = "2.6.3"
+  val akkaVersion = "2.6.4"
   val avroVersion = "1.9.2"
   val catsEffectVersion = "2.1.2"
   val catsLoggerVersion = "1.0.1"
