@@ -23,11 +23,10 @@ import hydra.ingest.services.IngestorRegistry.{
 class IngestorRegistrar extends Actor with ConfigSupport with LoggingAdapter {
 
   private val ingestorRegistry = {
-    val path = applicationConfig
-      .get[String]("ingest.ingestor-registry.path")
-      .valueOrElse("/user/service/ingestor_registry")
     context.actorSelection(
-      path
+      applicationConfig
+        .get[String]("ingest.ingestor-registry.path")
+        .valueOrElse("/user/service/ingestor_registry")
     )
   }
 
