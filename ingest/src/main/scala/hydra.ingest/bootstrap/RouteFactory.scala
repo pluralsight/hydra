@@ -24,6 +24,7 @@ object RouteFactory extends RouteConcatenation with ConfigSupport {
 
     new SchemasEndpoint().route ~
       new BootstrapEndpoint(system).route ~
+      new BootstrapEndpoints()(system, system.dispatcher).route ~
       new TopicMetadataEndpoint(consumerProxy)(system.dispatcher).route ~
       new IngestorRegistryEndpoint().route ~
       new IngestionWebSocketEndpoint().route ~

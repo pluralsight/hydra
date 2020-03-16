@@ -22,11 +22,13 @@ import hydra.ingest.services.IngestorRegistry.{
   */
 class IngestorRegistrar extends Actor with ConfigSupport with LoggingAdapter {
 
-  private val ingestorRegistry = context.actorSelection(
-    applicationConfig
-      .get[String]("ingest.ingestor-registry.path")
-      .valueOrElse("/user/service/ingestor_registry")
-  )
+  private val ingestorRegistry = {
+    context.actorSelection(
+      applicationConfig
+        .get[String]("ingest.ingestor-registry.path")
+        .valueOrElse("/user/service/ingestor_registry")
+    )
+  }
 
   lazy val ingestors = ClasspathHydraComponentLoader.ingestors.map(h =>
     ActorUtils.actorName(h) -> h
