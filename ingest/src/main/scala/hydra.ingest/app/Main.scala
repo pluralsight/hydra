@@ -1,6 +1,6 @@
 package hydra.ingest.app
 
-import akka.actor.ActorSystem
+import akka.actor.{Actor, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
@@ -43,10 +43,22 @@ object Main extends IOApp with ConfigSupport with LoggingAdapter {
       }
     })
 
-  private def actorsIO()(implicit system: ActorSystem): IO[Unit] =
-    IO(ActorFactory.getActors().foreach {
-      case (name, props) => system.actorOf(props, name)
-    })
+  private def actorsIO()(implicit system: ActorSystem): IO[Unit] = {
+    IO {
+      class Service extends Actor {
+        override def preStart(): Unit = {
+          ActorFactory.getActors().foreach {
+            case (name, props) =>
+              context.actorOf(props, name)
+          }
+        }
+        override def receive: Receive = {
+          case _ => ()
+        }
+      }
+      system.actorOf(Props[Service], "service")
+    }
+  }
 
   private def routesIO()(implicit system: ActorSystem): IO[Route] =
     IO(RouteFactory.getRoutes())

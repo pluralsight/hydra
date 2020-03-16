@@ -42,7 +42,7 @@ trait ConfigSupport extends ConfigComponent {
 
   val applicationName: String = defaultConfig.getString("application.name")
 
-  val rootConfig: Config = externalConfig.withFallback(defaultConfig)
+  val rootConfig: Config = externalConfig.withFallback(defaultConfig).resolve()
 
   val applicationConfig: Config = rootConfig.getConfig(applicationName)
 
