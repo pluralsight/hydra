@@ -10,24 +10,20 @@ import akka.kafka.scaladsl.Consumer.Control
 import akka.kafka.{ConsumerSettings, Subscriptions}
 import akka.pattern.pipe
 import akka.stream.scaladsl.{Keep, RunnableGraph, Sink}
-import akka.stream.{ActorMaterializer, Materializer}
 import com.typesafe.config.Config
-import configs.syntax._
 import hydra.common.config.ConfigSupport
-import hydra.common.util.MonadUtils.booleanToOption
-import hydra.core.marshallers.{History, HydraJsonSupport}
+import hydra.common.config.ConfigSupport._
+import hydra.core.marshallers.HydraJsonSupport
 import hydra.kafka.model.TopicMetadata
-import hydra.kafka.util.KafkaUtils
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import io.confluent.kafka.serializers.KafkaAvroDeserializer
 import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.joda.time.format.ISODateTimeFormat
-import spray.json._
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 class StreamsManagerActor(
     bootstrapKafkaConfig: Config,
@@ -45,8 +41,8 @@ class StreamsManagerActor(
   private implicit val system = context.system
 
   private val metadataTopicName = bootstrapKafkaConfig
-    .get[String]("metadata-topic-name")
-    .valueOrElse("_hydra.metadata.topic")
+    .getStringOpt("metadata-topic-name")
+    .getOrElse("_hydra.metadata.topic")
 
   private[kafka] val metadataMap = Map[String, TopicMetadata]()
 
@@ -114,8 +110,8 @@ object StreamsManagerActor {
   case object InitializedStream
 
   def getMetadataTopicName(c: Config) =
-    c.get[String]("metadata-topic-name")
-      .valueOrElse("_hydra.metadata.topic")
+    c.getStringOpt("metadata-topic-name")
+      .getOrElse("_hydra.metadata.topic")
 
   private[services] def createMetadataStream[K, V](
       config: Config,

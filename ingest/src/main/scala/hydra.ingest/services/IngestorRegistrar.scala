@@ -1,8 +1,8 @@
 package hydra.ingest.services
 
 import akka.actor.Actor
-import configs.syntax._
 import hydra.common.config.ConfigSupport
+import ConfigSupport._
 import hydra.common.logging.LoggingAdapter
 import hydra.common.util.ActorUtils
 import hydra.ingest.IngestorInfo
@@ -22,13 +22,11 @@ import hydra.ingest.services.IngestorRegistry.{
   */
 class IngestorRegistrar extends Actor with ConfigSupport with LoggingAdapter {
 
-  private val ingestorRegistry = {
-    context.actorSelection(
-      applicationConfig
-        .get[String]("ingest.ingestor-registry.path")
-        .valueOrElse("/user/service/ingestor_registry")
-    )
-  }
+  private val ingestorRegistry = context.actorSelection(
+    applicationConfig
+      .getStringOpt("ingest.ingestor-registry.path")
+      .getOrElse("/user/service/ingestor_registry")
+  )
 
   lazy val ingestors = ClasspathHydraComponentLoader.ingestors.map(h =>
     ActorUtils.actorName(h) -> h

@@ -7,11 +7,10 @@ import org.reflections.util.ConfigurationBuilder
 
 object ReflectionsWrapper extends ConfigSupport {
 
-  import configs.syntax._
+  import ConfigSupport._
 
   private[bootstrap] val scanPkgs = "hydra" +: applicationConfig
-    .getOrElse[Seq[String]]("scan-packages", Seq.empty)
-    .value
+    .getStringListOpt("scan-packages").getOrElse(List.empty)
 
   private def reflectionsCfg =
     new ConfigurationBuilder()

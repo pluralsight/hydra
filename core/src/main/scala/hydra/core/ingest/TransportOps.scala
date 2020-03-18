@@ -1,7 +1,7 @@
 package hydra.core.ingest
 
-import configs.syntax._
 import hydra.common.config.ConfigSupport
+import ConfigSupport._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.InitializingActor.{InitializationError, Initialized}
 import hydra.core.protocol._
@@ -24,12 +24,7 @@ trait TransportOps extends ConfigSupport with LoggingAdapter {
   implicit val ec = context.dispatcher
 
   override def initTimeout =
-    applicationConfig
-      .getOrElse[FiniteDuration](
-        s"transports.$transportName.resolve-timeout",
-        30 seconds
-      )
-      .value
+    applicationConfig.getDurationOpt(s"transports.$transportName.resolve-timeout").getOrElse(30 seconds)
 
   /**
     * Always override this with a def due to how Scala initializes val in subtraits.
@@ -37,8 +32,8 @@ trait TransportOps extends ConfigSupport with LoggingAdapter {
   def transportName: String
 
   private val transportPath = applicationConfig
-    .get[String](s"transports.$transportName.path")
-    .valueOrElse(
+    .getStringOpt(s"transports.$transportName.path")
+    .getOrElse(
       s"/user/service/transport_registrar/${transportName}_transport"
     )
 

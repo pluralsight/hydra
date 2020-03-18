@@ -11,12 +11,12 @@ import hydra.kafka.endpoints.{BootstrapEndpoint, TopicMetadataEndpoint, TopicsEn
 object RouteFactory extends RouteConcatenation with ConfigSupport {
 
   def getRoutes()(implicit system: ActorSystem): Route = {
-    import configs.syntax._
+    import ConfigSupport._
 
     //TODO: remove this lookup
     val consumerPath = applicationConfig
-      .get[String]("actors.kafka.consumer_proxy.path")
-      .valueOrElse(
+      .getStringOpt("actors.kafka.consumer_proxy.path")
+      .getOrElse(
         s"/user/service/${ActorUtils.actorName(classOf[KafkaConsumerProxy])}"
       )
 

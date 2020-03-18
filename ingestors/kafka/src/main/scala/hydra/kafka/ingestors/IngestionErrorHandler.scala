@@ -2,7 +2,7 @@ package hydra.kafka.ingestors
 
 import akka.actor.Actor
 import com.pluralsight.hydra.avro.JsonToAvroConversionException
-import configs.syntax._
+import hydra.common.config.ConfigSupport._
 import hydra.avro.registry.JsonToAvroConversionExceptionWithMetadata
 import hydra.common.config.ConfigSupport
 import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
@@ -33,14 +33,14 @@ class IngestionErrorHandler
   )
 
   private val errorTopic = applicationConfig
-    .get[String]("ingest.error-topic")
-    .valueOrElse("_hydra_ingest_errors")
+    .getStringOpt("ingest.error-topic")
+    .getOrElse("_hydra_ingest_errors")
 
   private lazy val kafkaTransport = context
     .actorSelection(
       applicationConfig
-        .get[String](s"transports.kafka.path")
-        .valueOrElse(s"/user/service/kafka_transport")
+        .getStringOpt(s"transports.kafka.path")
+        .getOrElse(s"/user/service/kafka_transport")
     )
 
   private val errorSchema = new Schema.Parser()

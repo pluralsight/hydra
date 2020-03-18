@@ -2,8 +2,8 @@ package hydra.kafka.util
 
 import akka.kafka.{ConsumerSettings, ProducerSettings}
 import com.typesafe.config.{Config, ConfigFactory}
-import configs.syntax._
 import hydra.common.config.ConfigSupport
+import ConfigSupport._
 import hydra.common.logging.LoggingAdapter
 import hydra.common.util.TryWith
 import hydra.kafka.config.KafkaConfigSupport
@@ -160,8 +160,8 @@ object KafkaUtils extends ConfigSupport {
   private def settingsConfig(tpe: String, id: String, cfg: Config): Config = {
     val defaults = cfg.getConfig(s"$applicationName.kafka.$tpe")
     val clientConfig = cfg
-      .get[Config](s"$applicationName.kafka.clients.$id.$tpe")
-      .valueOrElse(ConfigFactory.empty)
+      .getConfigOpt(s"$applicationName.kafka.clients.$id.$tpe")
+      .getOrElse(ConfigFactory.empty)
       .withFallback(defaults)
     val akkaConfig = cfg.getConfig(s"akka.kafka.$tpe")
     clientConfig.atKey("kafka-clients").withFallback(akkaConfig)

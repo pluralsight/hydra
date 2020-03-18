@@ -25,7 +25,6 @@ object Dependencies {
   val kafkaVersion = "2.4.1"
   val kamonPVersion = "2.0.1"
   val kamonVersion = "2.0.5"
-  val kxbmapConfigVersion = "0.4.4"
   val log4jVersion = "2.13.1"
   val opRabbitVersion = "2.1.0"
   val powerMockVersion = "2.0.5" //needed for mocking static java methods
@@ -65,7 +64,6 @@ object Dependencies {
 
     val ciris = "is.cir" %% "ciris" % cirisVersion
 
-    val scalaConfigs = "com.github.kxbmap" %% "configs" % kxbmapConfigVersion
 
     val typesafeConfig = "com.typesafe" % "config" % typesafeConfigVersion
 
@@ -190,10 +188,10 @@ object Dependencies {
       powerMock ++ akkaTest
 
   val baseDeps: Seq[ModuleID] =
-    akka ++ Seq(scalaz, scalaConfigs, avro) ++ cats ++ logging ++ joda ++ testDeps
+    akka ++ Seq(scalaz, avro) ++ cats ++ logging ++ joda ++ testDeps
 
   val sqlDeps: Seq[ModuleID] =
-    logging ++ Seq(scalaConfigs, avro, hikariCP, h2db) ++ joda ++ testDeps
+    logging ++ Seq(avro, hikariCP, h2db) ++ joda ++ testDeps
 
   val avroDeps: Seq[ModuleID] =
     baseDeps ++ confluent ++ jackson ++ Seq(guavacache) ++ catsEffect
@@ -212,7 +210,7 @@ object Dependencies {
   val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(ciris)
 
   val rabbitDeps: Seq[ModuleID] =
-    logging ++ Seq(scalaConfigs) ++ joda ++ opRabbit ++ testDeps
+    logging ++ joda ++ opRabbit ++ testDeps
 
   val kafkaDeps: Seq[ModuleID] = coreDeps ++ Seq(
     akkaKafkaStream,

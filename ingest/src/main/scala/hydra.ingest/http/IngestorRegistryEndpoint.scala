@@ -20,8 +20,8 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import akka.util.Timeout
-import configs.syntax._
 import hydra.common.config.ConfigSupport
+import ConfigSupport._
 import hydra.core.http.RouteSupport
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestorRegistry.{FindAll, LookupResult}
@@ -36,8 +36,8 @@ class IngestorRegistryEndpoint()(implicit system:ActorSystem) extends RouteSuppo
     with ConfigSupport {
 
   private val registryLookupTimeout = applicationConfig
-    .get[FiniteDuration]("ingest.service-lookup.timeout")
-    .valueOrElse(5.seconds)
+    .getDurationOpt("ingest.service-lookup.timeout")
+    .getOrElse(5.seconds)
 
   lazy val registry = HydraIngestorRegistryClient(applicationConfig).registry
 

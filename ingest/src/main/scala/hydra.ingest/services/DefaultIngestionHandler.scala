@@ -60,11 +60,11 @@ object DefaultIngestionHandler extends ConfigSupport {
       registry: ActorRef,
       requestor: ActorRef
   ): Props = {
-    import configs.syntax._
+    import ConfigSupport._
 
     val timeout = applicationConfig
-      .get[FiniteDuration]("ingestion.timeout")
-      .valueOrElse(3.seconds)
+      .getDurationOpt("ingestion.timeout")
+      .getOrElse(3.seconds)
 
     props(request, registry, requestor, timeout)
   }

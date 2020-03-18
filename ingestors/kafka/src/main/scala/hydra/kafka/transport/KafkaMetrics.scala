@@ -48,15 +48,15 @@ class PublishMetrics(topic: String)(implicit system: ActorSystem)
 
 object KafkaMetrics {
 
-  import configs.syntax._
+  import ConfigSupport._
 
   def apply(config: Config)(implicit system: ActorSystem): KafkaMetrics = {
     val metricsEnabled =
-      config.get[Boolean]("transports.kafka.metrics.enabled").valueOrElse(false)
+      config.getBooleanOpt("transports.kafka.metrics.enabled").getOrElse(false)
 
     val metricsTopic = config
-      .get[String]("transports.kafka.metrics.topic")
-      .valueOrElse("HydraKafkaError")
+      .getStringOpt("transports.kafka.metrics.topic")
+      .getOrElse("HydraKafkaError")
 
     if (metricsEnabled) new PublishMetrics(metricsTopic) else NoOpMetrics
   }

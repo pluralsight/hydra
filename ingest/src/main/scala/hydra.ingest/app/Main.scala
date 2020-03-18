@@ -8,13 +8,13 @@ import cats.effect.{ExitCode, IO, IOApp, Resource}
 import cats.implicits._
 import hydra.common.Settings
 import hydra.common.config.ConfigSupport
+import ConfigSupport._
 import hydra.common.logging.LoggingAdapter
 import hydra.ingest.bootstrap.{ActorFactory, RouteFactory}
 import hydra.ingest.modules.{Algebras, Bootstrap, Programs}
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import kamon.Kamon
-import configs.syntax._
 import kamon.prometheus.PrometheusReporter
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -35,8 +35,8 @@ object Main extends IOApp with ConfigSupport with LoggingAdapter {
   private def report =
     IO({
       val enablePrometheus = applicationConfig
-        .get[Boolean]("monitoring.prometheus.enable")
-        .valueOrElse(false)
+        .getBooleanOpt("monitoring.prometheus.enable")
+        .getOrElse(false)
       if (enablePrometheus) {
         val module = new PrometheusReporter()
         Kamon.registerModule("MainModule", module)
