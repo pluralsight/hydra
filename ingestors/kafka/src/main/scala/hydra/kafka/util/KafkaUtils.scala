@@ -2,8 +2,8 @@ package hydra.kafka.util
 
 import akka.kafka.{ConsumerSettings, ProducerSettings}
 import com.typesafe.config.{Config, ConfigFactory}
-import hydra.common.config.ConfigSupport._
 import hydra.common.config.ConfigSupport
+import ConfigSupport._
 import hydra.common.logging.LoggingAdapter
 import hydra.common.util.TryWith
 import hydra.kafka.config.KafkaConfigSupport

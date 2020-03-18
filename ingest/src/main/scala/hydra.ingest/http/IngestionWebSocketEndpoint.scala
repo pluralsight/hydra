@@ -22,8 +22,8 @@ import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.Route
 import akka.stream.StreamLimitReachedException
 import akka.stream.scaladsl.{Flow, RestartFlow, Source}
-import configs.syntax._
 import hydra.common.config.ConfigSupport
+import ConfigSupport._
 import hydra.core.http.RouteSupport
 import hydra.core.marshallers.GenericServiceResponse
 import hydra.ingest.services.{
@@ -46,8 +46,8 @@ class IngestionWebSocketEndpoint()(implicit system: ActorSystem)
 
   //visible for testing
   private[http] val enabled = applicationConfig
-    .get[Boolean]("ingest.websocket.enabled")
-    .valueOrElse(false)
+    .getBooleanOpt("ingest.websocket.enabled")
+    .getOrElse(false)
 
   private val socketFactory = IngestSocketFactory.createSocket(system)
 

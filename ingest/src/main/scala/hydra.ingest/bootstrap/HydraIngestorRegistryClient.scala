@@ -28,12 +28,12 @@ class HydraIngestorRegistryClient(registryPath: String)(
 
 object HydraIngestorRegistryClient {
 
-  import configs.syntax._
+  import hydra.common.config.ConfigSupport._
 
   def registryPath(config: Config) =
     config
-      .get[String]("ingest.ingestor-registry.path")
-      .valueOrElse(
+      .getStringOpt("ingest.ingestor-registry.path")
+      .getOrElse(
         s"/user/service/${ActorUtils.actorName(classOf[IngestorRegistry])}"
       )
 

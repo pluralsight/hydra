@@ -1,7 +1,7 @@
 package hydra.core.ingest
 
-import hydra.common.config.ConfigSupport._
 import hydra.common.config.ConfigSupport
+import ConfigSupport._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.InitializingActor.{InitializationError, Initialized}
 import hydra.core.protocol._

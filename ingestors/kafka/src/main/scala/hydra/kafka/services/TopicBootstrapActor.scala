@@ -17,8 +17,8 @@ import akka.actor.{
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import com.typesafe.config.Config
-import hydra.common.config.ConfigSupport._
 import hydra.common.config.ConfigSupport
+import ConfigSupport._
 import hydra.core.akka.SchemaRegistryActor.{
   RegisterSchemaRequest,
   RegisterSchemaResponse

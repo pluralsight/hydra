@@ -27,7 +27,7 @@ class TopicMetadataEndpointSpec
 
   import scala.concurrent.duration._
 
-  import configs.syntax._
+  import ConfigSupport._
 
   implicit val kafkaConfig =
     EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
@@ -43,8 +43,8 @@ class TopicMetadataEndpointSpec
   }
 
   val consumerPath = applicationConfig
-    .get[String]("actors.kafka.consumer_proxy.path")
-    .valueOrElse(
+    .getStringOpt("actors.kafka.consumer_proxy.path")
+    .getOrElse(
       s"/user/service/${ActorUtils.actorName(classOf[KafkaConsumerProxy])}"
     )
 

@@ -18,7 +18,6 @@ package hydra.ingest.services
 
 import akka.actor.{Props, _}
 import akka.routing.{FromConfig, RoundRobinPool}
-import com.typesafe.config.Config
 import hydra.common.config.ActorConfigSupport
 import hydra.common.util.ActorUtils
 import hydra.core.ingest.{HydraRequest, Ingestor}
@@ -126,17 +125,17 @@ class IngestorRegistry extends Actor with ActorLogging with ActorConfigSupport {
       name: String,
       ingestor: Class[_ <: Ingestor]
   ): Props = {
-    import configs.syntax._
+    import hydra.common.config.ConfigSupport._
     val path = self.path / name
     val routerPath = path.elements.drop(1).mkString("/", "/", "")
     val ip = Props(ingestor)
     rootConfig
-      .get[Config](s"akka.actor.deployment.$routerPath")
+      .getConfigOpt(s"akka.actor.deployment.$routerPath")
       .map { cfg =>
         log.debug(s"Using router $routerPath for ingestor $name")
         FromConfig.props(ip)
       }
-      .valueOrElse {
+      .getOrElse {
         log.debug(s"Using default round robin router for ingestor $name")
         Try(
           new RoundRobinPool(

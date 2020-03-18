@@ -19,7 +19,7 @@ package hydra.ingest.http
 import akka.actor._
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
-import configs.syntax._
+import hydra.common.config.ConfigSupport._
 import hydra.core.http.RouteSupport
 import hydra.core.ingest.{CorrelationIdBuilder, RequestParams}
 import hydra.core.marshallers.GenericError
@@ -46,8 +46,8 @@ class IngestionEndpoint(implicit system: ActorSystem) extends RouteSupport {
   )
 
   private val ingestTimeout = applicationConfig
-    .get[FiniteDuration]("ingest.timeout")
-    .valueOrElse(500 millis)
+    .getDurationOpt("ingest.timeout")
+    .getOrElse(500.millis)
 
   override val route: Route =
     pathPrefix("ingest") {
@@ -86,8 +86,8 @@ class IngestionEndpoint(implicit system: ActorSystem) extends RouteSupport {
   private def exceptionHandler = ExceptionHandler {
     case e: IllegalArgumentException =>
       if (applicationConfig
-            .get[Boolean]("hydra.ingest.shouldLog400s")
-            .valueOrElse(false)) {
+            .getBooleanOpt("hydra.ingest.shouldLog400s")
+            .getOrElse(false)) {
         log.error("Ingestion 400 ERROR: " + e.getMessage)
       }
       complete(400, GenericError(400, e.getMessage))

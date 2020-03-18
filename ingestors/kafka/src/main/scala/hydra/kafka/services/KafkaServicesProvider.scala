@@ -1,8 +1,8 @@
 package hydra.kafka.services
 
 import akka.actor.Props
-import hydra.common.config.ConfigSupport._
 import hydra.common.config.ConfigSupport
+import ConfigSupport._
 import hydra.common.util.ActorUtils
 import hydra.core.bootstrap.ServiceProvider
 import hydra.kafka.consumer.KafkaConsumerProxy
