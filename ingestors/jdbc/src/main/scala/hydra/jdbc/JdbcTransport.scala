@@ -1,20 +1,15 @@
 package hydra.jdbc
 
-import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
+import com.typesafe.config.{ConfigFactory, ConfigObject}
 import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
-import configs.syntax._
 import hydra.avro.io.{DeleteByKey, SaveMode, Upsert}
 import hydra.avro.util.SchemaWrapper
 import hydra.common.config.ConfigSupport
+import hydra.common.config.ConfigSupport._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.transport.Transport
 import hydra.core.transport.Transport.Deliver
-import hydra.sql.{
-  DataSourceConnectionProvider,
-  JdbcRecordWriter,
-  JdbcWriterSettings,
-  TableIdentifier
-}
+import hydra.sql.{DataSourceConnectionProvider, JdbcRecordWriter, JdbcWriterSettings, TableIdentifier}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -69,7 +64,7 @@ class JdbcTransport extends Transport with ConfigSupport with LoggingAdapter {
   override def preStart(): Unit = {
     writers.clear()
     applicationConfig
-      .getOrElse[Config]("transports.jdbc.profiles", ConfigFactory.empty)
+        .getConfigOpt("transports.jdbc.profiles")
       .map { cfg =>
         cfg.root().entrySet().asScala.foreach { e =>
           Try {
@@ -84,6 +79,7 @@ class JdbcTransport extends Transport with ConfigSupport with LoggingAdapter {
           }
         }
       }
+      .getOrElse(ConfigFactory.empty)
 
     log.debug(
       s"Available database profiles: ${dbProfiles.keySet.mkString(",")}"

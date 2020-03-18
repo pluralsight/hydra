@@ -1,7 +1,7 @@
 package hydra.jdbc
 
 import com.typesafe.config.Config
-import configs.syntax._
+import hydra.common.config.ConfigSupport._
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.ingest.{HydraRequest, Ingestor, TransportOps}
 import hydra.core.protocol._
@@ -20,11 +20,9 @@ class JdbcIngestor extends Ingestor with TransportOps {
       val profile =
         request.metadataValue(JdbcRecordFactory.DB_PROFILE_PARAM).get
       applicationConfig
-        .get[Config](s"transports.jdbc.profiles.$profile")
+        .getConfigOpt(s"transports.jdbc.profiles.$profile")
         .map(_ => request)
-        .valueOrThrow(_ =>
-          new IllegalArgumentException(s"No db profile named '$profile' found.")
-        )
+        .getOrElse(new IllegalArgumentException(s"No db profile named '$profile' found."))
     }
   }
 

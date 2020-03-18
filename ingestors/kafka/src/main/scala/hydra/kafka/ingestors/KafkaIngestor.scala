@@ -17,7 +17,7 @@
 package hydra.kafka.ingestors
 
 import akka.pattern.ask
-import configs.syntax._
+import hydra.common.config.ConfigSupport._
 import akka.util.Timeout
 import hydra.core.ingest.RequestParams._
 import hydra.core.ingest.{HydraRequest, Ingestor, RequestParams}
@@ -42,8 +42,8 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
   override val recordFactory = new KafkaRecordFactories(schemaRegistryActor)
 
   private val timeoutDuration = applicationConfig
-    .get[FiniteDuration]("kafka-ingestor-timeout")
-    .valueOrElse(2.seconds)
+    .getDurationOpt("kafka-ingestor-timeout")
+    .getOrElse(2.seconds)
 
   private implicit val timeout = Timeout(timeoutDuration)
 

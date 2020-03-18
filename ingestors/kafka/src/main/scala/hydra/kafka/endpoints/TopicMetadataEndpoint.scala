@@ -8,7 +8,7 @@ import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.ExceptionHandler
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
-import configs.syntax._
+import hydra.common.config.ConfigSupport._
 import hydra.core.http.{CorsSupport, NotFoundException, RouteSupport}
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
@@ -36,8 +36,8 @@ class TopicMetadataEndpoint(consumerProxy:ActorSelection)(implicit ec:ExecutionC
   private implicit val cache = GuavaCache[Map[String, Seq[PartitionInfo]]]
 
   private val showSystemTopics = applicationConfig
-    .get[Boolean]("transports.kafka.show-system-topics")
-    .valueOrElse(false)
+    .getBooleanOpt("transports.kafka.show-system-topics")
+    .getOrElse(false)
 
   private implicit val createTopicFormat = jsonFormat4(CreateTopicReq)
 

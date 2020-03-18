@@ -17,7 +17,7 @@ import akka.actor.{
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import com.typesafe.config.Config
-import configs.syntax._
+import hydra.common.config.ConfigSupport._
 import hydra.common.config.ConfigSupport
 import hydra.core.akka.SchemaRegistryActor.{
   RegisterSchemaRequest,
@@ -83,8 +83,8 @@ class TopicBootstrapActor(
   )
 
   private val failureRetryInterval = bootstrapKafkaConfig
-    .get[Int]("failure-retry-millis")
-    .value
+    .getIntOpt("failure-retry-millis")
+    .getOrElse(2000)
 
   private val streamsManagerActor = context.actorOf(streamsManagerProps)
 
@@ -250,8 +250,8 @@ class TopicBootstrapActor(
 
     val jsonString = metadata.toJson.compactPrint
     val metadataTopicName = bootstrapKafkaConfig
-      .get[String]("metadata-topic-name")
-      .valueOrElse("_hydra.metadata.topic")
+      .getStringOpt("metadata-topic-name")
+      .getOrElse("_hydra.metadata.topic")
     new AvroRecordFactory(schemaRegistryActor).build(
       HydraRequest(
         "0",
