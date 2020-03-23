@@ -5,7 +5,7 @@ import cats.effect.{Async, Concurrent, ContextShift}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.ingest.app.AppConfig.{CreateTopicConfig, SchemaRegistryConfig}
-import hydra.kafka.util.KafkaClient
+import hydra.kafka.algebras.KafkaClient
 
 final class Algebras[F[_]] private (
     val schemaRegistry: SchemaRegistry[F],

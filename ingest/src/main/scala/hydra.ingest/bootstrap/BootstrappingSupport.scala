@@ -8,9 +8,9 @@ import com.typesafe.config.ConfigFactory
 import hydra.avro.registry.SchemaRegistry
 import hydra.core.http.RouteSupport
 import hydra.ingest.app.AppConfig
+import hydra.kafka.algebras.KafkaClient
 import hydra.kafka.endpoints.BootstrapEndpointV2
 import hydra.kafka.programs.CreateTopicProgram
-import hydra.kafka.util.KafkaClient
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger

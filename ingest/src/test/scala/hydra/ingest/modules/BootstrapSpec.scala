@@ -5,11 +5,11 @@ import cats.effect.{IO, Sync, Timer}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.ingest.app.AppConfig.V2MetadataTopicConfig
+import hydra.kafka.algebras.KafkaClient
 import hydra.kafka.model.ContactMethod
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.producer.KafkaRecord
 import hydra.kafka.programs.CreateTopicProgram
-import hydra.kafka.util.KafkaClient
 import hydra.kafka.util.KafkaClient.{PublishError, Topic, TopicName}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger

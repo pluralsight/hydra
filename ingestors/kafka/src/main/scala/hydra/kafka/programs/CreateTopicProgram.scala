@@ -5,10 +5,10 @@ import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
 import hydra.core.transport.AckStrategy
+import hydra.kafka.algebras.KafkaClient
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Request}
 import hydra.kafka.producer.AvroKeyRecord
-import hydra.kafka.util.KafkaClient
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
 import org.apache.avro.Schema

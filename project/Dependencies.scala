@@ -60,7 +60,10 @@ object Dependencies {
       "com.github.cb372" %% "cats-retry" % catsRetryVersion
     )
 
-    val fs2Kafka = "com.github.fd4s" %% "fs2-kafka" % fs2KafkaVersion
+    val fs2Kafka = Seq(
+      "com.github.fd4s" %% "fs2-kafka" % fs2KafkaVersion,
+      "com.github.fd4s" %% "fs2-kafka-vulcan" % fs2KafkaVersion
+    )
 
     val ciris = "is.cir" %% "ciris" % cirisVersion
 
@@ -215,9 +218,8 @@ object Dependencies {
   val kafkaDeps: Seq[ModuleID] = coreDeps ++ Seq(
     akkaKafkaStream,
     jsonLenses,
-    fs2Kafka,
     refined
-  ) ++ kafka ++ akkaHttpHal ++ vulcan
+  ) ++ kafka ++ akkaHttpHal ++ vulcan ++ fs2Kafka
 
   val overrides = Set(logging, typesafeConfig, joda)
 }

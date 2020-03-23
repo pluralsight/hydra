@@ -6,6 +6,7 @@ import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError, IngestorStatus, IngestorTimeout, RequestPublished}
 import hydra.core.transport.AckStrategy
+import hydra.kafka.algebras.KafkaClient
 import hydra.kafka.producer.StringRecord
 import hydra.kafka.util.KafkaClient.PublishError
 import hydra.kafka.util.KafkaUtils.TopicDetails
