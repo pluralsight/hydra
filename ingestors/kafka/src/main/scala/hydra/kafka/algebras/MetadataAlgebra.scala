@@ -31,8 +31,10 @@ object MetadataAlgebra {
   }
 
   def test[F[_]: Sync]: F[MetadataAlgebra[F]] = {
-    Ref[F].of(MetadataStorageFacade.empty)
-    getMetadataAlgebra[F]
+    for {
+      ref <- Ref[F].of(MetadataStorageFacade.empty)
+      algebra <- getMetadataAlgebra[F](ref)
+    } yield algebra
   }
 
   private def getMetadataAlgebra[F[_]: Sync](cache: Ref[F, MetadataStorageFacade]): F[MetadataAlgebra[F]] =

@@ -10,7 +10,7 @@ import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.core.marshallers.History
 import hydra.core.transport.AckStrategy
-import hydra.kafka.algebras.KafkaClient
+import hydra.kafka.algebras.KafkaAdminAlgebra
 import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
@@ -58,7 +58,7 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
 
       (for {
         schemaRegistry <- schemaRegistryIO
-        kafka <- KafkaClient.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
         registerInternalMetadata = new CreateTopicProgram[IO](
           schemaRegistry,
           kafka,
@@ -113,7 +113,7 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
           override def getAllSubjects: IO[List[String]] = ???
         }
       (for {
-        kafka <- KafkaClient.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
         ref <- Ref[IO]
           .of(TestState(deleteSchemaWasCalled = false, 0))
         _ <- new CreateTopicProgram[IO](
@@ -157,7 +157,7 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
         }
 
       (for {
-        kafka <- KafkaClient.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
         ref <- Ref[IO].of(0)
         _ <- new CreateTopicProgram[IO](
           getSchemaRegistry(ref),
@@ -206,7 +206,7 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
 
       val schemaRegistryState = Map("subject-key" -> 1)
       (for {
-        kafka <- KafkaClient.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
         ref <- Ref[IO]
           .of(TestState(schemaRegistryState))
         _ <- new CreateTopicProgram[IO](
@@ -228,7 +228,7 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
       val subject = "subject"
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafkaClient <- KafkaClient.test[IO]
+        kafkaClient <- KafkaAdminAlgebra.test[IO]
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
           kafkaClient,
@@ -253,10 +253,10 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
         TopicMetadataV2Value.codec.encode(value).toOption.get
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        underlyingKafkaClient <- KafkaClient.test[IO]
+        underlyingKafkaClient <- KafkaAdminAlgebra.test[IO]
         publishTo <- Ref[IO].of(List.empty[KafkaRecord[_, _]])
         kafkaClient <- IO(
-          new TestKafkaClientWithPublishTo(underlyingKafkaClient, publishTo)
+          new TestKafkaAdminAlgebraWithPublishTo(underlyingKafkaClient, publishTo)
         )
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
@@ -284,10 +284,10 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
       val request = createTopicMetadataRequest(subject, keySchema, valueSchema)
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        underlyingKafkaClient <- KafkaClient.test[IO]
+        underlyingKafkaClient <- KafkaAdminAlgebra.test[IO]
         publishTo <- Ref[IO].of(List.empty[KafkaRecord[_, _]])
         kafkaClient <- IO(
-          new TestKafkaClientWithPublishTo(
+          new TestKafkaAdminAlgebraWithPublishTo(
             underlyingKafkaClient,
             publishTo,
             failOnPublish = true
@@ -311,10 +311,10 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
       val request = createTopicMetadataRequest(subject, keySchema, valueSchema)
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        underlyingKafkaClient <- KafkaClient.test[IO]
+        underlyingKafkaClient <- KafkaAdminAlgebra.test[IO]
         publishTo <- Ref[IO].of(List.empty[KafkaRecord[_, _]])
         kafkaClient <- IO(
-          new TestKafkaClientWithPublishTo(
+          new TestKafkaAdminAlgebraWithPublishTo(
             underlyingKafkaClient,
             publishTo,
             failOnPublish = true
@@ -333,11 +333,11 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
 
   }
 
-  private final class TestKafkaClientWithPublishTo(
-      underlying: KafkaClient[IO],
-      publishTo: Ref[IO, List[KafkaRecord[_, _]]],
-      failOnPublish: Boolean = false
-  ) extends KafkaClient[IO] {
+  private final class TestKafkaAdminAlgebraWithPublishTo(
+                                                          underlying: KafkaAdminAlgebra[IO],
+                                                          publishTo: Ref[IO, List[KafkaRecord[_, _]]],
+                                                          failOnPublish: Boolean = false
+  ) extends KafkaAdminAlgebra[IO] {
 
     override def describeTopic(name: TopicName): IO[Option[Topic]] =
       underlying.describeTopic(name)
@@ -351,7 +351,7 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
 
     override def publishMessage[K, V](
         record: KafkaRecord[K, V]
-    ): IO[Either[KafkaClient.PublishError, Unit]] =
+    ): IO[Either[KafkaAdminAlgebra.PublishError, Unit]] =
       if (failOnPublish) {
         IO.pure(Left(PublishError.Timeout))
       } else {

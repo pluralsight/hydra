@@ -5,7 +5,7 @@ import cats.effect.{IO, Sync, Timer}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.ingest.app.AppConfig.V2MetadataTopicConfig
-import hydra.kafka.algebras.KafkaClient
+import hydra.kafka.algebras.KafkaAdminAlgebra
 import hydra.kafka.model.ContactMethod
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.producer.KafkaRecord
@@ -34,9 +34,9 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
     val retry = RetryPolicies.alwaysGiveUp[IO]
     for {
       schemaRegistry <- SchemaRegistry.test[IO]
-      underlying <- KafkaClient.test[IO]
+      underlying <- KafkaAdminAlgebra.test[IO]
       ref <- Ref[IO].of(List.empty[KafkaRecord[_, _]])
-      kafkaClient = new TestKafkaClientWithPublishTo(underlying, ref)
+      kafkaClient = new TestKafkaAdminAlgebraWithPublishTo(underlying, ref)
       c = new CreateTopicProgram[IO](
         schemaRegistry,
         kafkaClient,
@@ -93,10 +93,10 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
     }
   }
 
-  private final class TestKafkaClientWithPublishTo(
-      underlying: KafkaClient[IO],
-      publishTo: Ref[IO, List[KafkaRecord[_, _]]]
-  ) extends KafkaClient[IO] {
+  private final class TestKafkaAdminAlgebraWithPublishTo(
+                                                          underlying: KafkaAdminAlgebra[IO],
+                                                          publishTo: Ref[IO, List[KafkaRecord[_, _]]]
+  ) extends KafkaAdminAlgebra[IO] {
 
     override def describeTopic(name: TopicName): IO[Option[Topic]] =
       underlying.describeTopic(name)
@@ -110,7 +110,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
 
     override def publishMessage[K, V](
         record: KafkaRecord[K, V]
-    ): IO[Either[KafkaClient.PublishError, Unit]] =
+    ): IO[Either[KafkaAdminAlgebra.PublishError, Unit]] =
       publishTo.update(_ :+ record).attemptNarrow[PublishError]
   }
 

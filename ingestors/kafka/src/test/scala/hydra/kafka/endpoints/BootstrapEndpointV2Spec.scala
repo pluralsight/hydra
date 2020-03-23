@@ -10,7 +10,7 @@ import cats.effect.{IO, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.core.marshallers.History
-import hydra.kafka.algebras.KafkaClient
+import hydra.kafka.algebras.KafkaAdminAlgebra
 import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
@@ -35,7 +35,7 @@ final class BootstrapEndpointV2Spec
 
   private def getTestCreateTopicProgram(
       s: SchemaRegistry[IO],
-      k: KafkaClient[IO]
+      k: KafkaAdminAlgebra[IO]
   ): BootstrapEndpointV2 = {
     val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
     new BootstrapEndpointV2(
@@ -52,7 +52,7 @@ final class BootstrapEndpointV2Spec
   private val testCreateTopicProgram: IO[BootstrapEndpointV2] =
     for {
       s <- SchemaRegistry.test[IO]
-      k <- KafkaClient.test[IO]
+      k <- KafkaAdminAlgebra.test[IO]
     } yield getTestCreateTopicProgram(s, k)
 
   "BootstrapEndpointV2" must {
@@ -121,7 +121,7 @@ final class BootstrapEndpointV2Spec
         override def getAllVersions(subject: String): IO[List[Int]] = err
         override def getAllSubjects: IO[List[String]] = err
       }
-      KafkaClient
+      KafkaAdminAlgebra
         .test[IO]
         .map { kafka =>
           Post("/v2/streams", validRequest) ~> Route.seal(

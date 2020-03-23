@@ -5,11 +5,11 @@ import cats.effect.{Async, Concurrent, ContextShift}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.ingest.app.AppConfig.{CreateTopicConfig, SchemaRegistryConfig}
-import hydra.kafka.algebras.KafkaClient
+import hydra.kafka.algebras.KafkaAdminAlgebra
 
 final class Algebras[F[_]] private (
     val schemaRegistry: SchemaRegistry[F],
-    val kafkaClient: KafkaClient[F]
+    val kafkaClient: KafkaAdminAlgebra[F]
 )
 
 object Algebras {
@@ -23,7 +23,7 @@ object Algebras {
         createTopicConfig.schemaRegistryConfig.fullUrl,
         createTopicConfig.schemaRegistryConfig.maxCacheSize
       )
-      kafkaClient <- KafkaClient.live[F](
+      kafkaClient <- KafkaAdminAlgebra.live[F](
         createTopicConfig.bootstrapServers,
         ingestActorSelection
       )

@@ -6,7 +6,7 @@ import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError, IngestorStatus, IngestorTimeout, RequestPublished}
 import hydra.core.transport.AckStrategy
-import hydra.kafka.algebras.KafkaClient
+import hydra.kafka.algebras.KafkaAdminAlgebra
 import hydra.kafka.producer.StringRecord
 import hydra.kafka.util.KafkaClient.PublishError
 import hydra.kafka.util.KafkaUtils.TopicDetails
@@ -17,7 +17,7 @@ import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.ExecutionContext
 
-final class KafkaClientSpec
+final class KafkaAdminAlgebraSpec
     extends AnyWordSpecLike
     with Matchers
     with BeforeAndAfterAll
@@ -46,9 +46,9 @@ final class KafkaClientSpec
   }
 
   (for {
-    live <- KafkaClient
+    live <- KafkaAdminAlgebra
       .live[IO](s"localhost:$port", system.actorSelection(TestProbe().ref.path))
-    test <- KafkaClient.test[IO]
+    test <- KafkaAdminAlgebra.test[IO]
   } yield {
     runTests(live, isTest = false)
     runTests(test, isTest = true)
@@ -56,7 +56,7 @@ final class KafkaClientSpec
 
   runLiveOnlyTests()
 
-  private def runTests(kafkaClient: KafkaClient[IO], isTest: Boolean): Unit = {
+  private def runTests(kafkaClient: KafkaAdminAlgebra[IO], isTest: Boolean): Unit = {
     (if (isTest) "KafkaClient#test" else "KafkaClient#live") must {
       "create a topic" in {
         val topicName = "Topic1"
@@ -89,7 +89,7 @@ final class KafkaClientSpec
 
   private def runLiveOnlyTests(): Unit = {
     val probe = TestProbe()
-    KafkaClient
+    KafkaAdminAlgebra
       .live[IO](s"test", system.actorSelection(probe.ref.path))
       .map { kafkaClient =>
         def testCase(

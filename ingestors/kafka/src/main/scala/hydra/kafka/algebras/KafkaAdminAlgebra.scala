@@ -1,18 +1,14 @@
 package hydra.kafka.algebras
 
-import akka.actor.ActorSelection
 import cats.effect.concurrent.Ref
-import cats.effect.{Async, Concurrent, ConcurrentEffect, ContextShift, Resource, Sync, Timer}
+import cats.effect.{Async, Concurrent, ContextShift, Resource, Sync}
 import cats.implicits._
 import fs2.kafka._
 import hydra.core.protocol._
-import hydra.core.transport.AckStrategy
-import hydra.kafka.producer.KafkaRecord
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.kafka.clients.admin.NewTopic
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
 
-import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
 
 /**
@@ -20,8 +16,8 @@ import scala.util.control.NoStackTrace
   * Provides a live version for production usage and a test version for integration testing.
   * @tparam F - higher kinded type - polymorphic effect type
   */
-trait KafkaClient[F[_], K, V] {
-  import KafkaClient._
+trait KafkaAdminAlgebra[F[_]] {
+  import KafkaAdminAlgebra._
 
   /**
     * Retrieves Topic if found in Kafka. Provides minimal detail about the topic.
@@ -50,24 +46,9 @@ trait KafkaClient[F[_], K, V] {
     * @return
     */
   def deleteTopic(name: String): F[Unit]
-
-  /**
-    * Publishes the Hydra record to Kafka
-    * @param record - the hydra record that is to be ingested in Kafka
-    * @return Either[PublishError, Unit] - Unit is returned upon success, PublishError on failure.
-    */
-  def publishMessage(
-      record: KafkaRecord[K, V]
-  ): F[Either[PublishError, Unit]]
-
-  def consumeMessages(
-      topicName: TopicName,
-      consumerGroup: String
-  ): fs2.Stream[F, (K,V)]
-
 }
 
-object KafkaClient {
+object KafkaAdminAlgebra {
 
   type TopicName = String
   final case class Topic(name: TopicName, numberPartitions: Int)
@@ -92,11 +73,10 @@ object KafkaClient {
         extends PublishError(cause.getMessage)
   }
 
-  def live[F[_]: Async: Concurrent: ContextShift: ConcurrentEffect: Timer, K: Deserializer[F, *], V: Deserializer[F, *]](
+  def live[F[_]: Sync: Concurrent: ContextShift](
       bootstrapServers: String,
-      ingestActor: ActorSelection
-  ): F[KafkaClient[F, K, V]] = Sync[F].delay {
-    new KafkaClient[F, K, V] {
+  ): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
+    new KafkaAdminAlgebra[F] {
 
       override def describeTopic(name: TopicName): F[Option[Topic]] = {
         getAdminClientResource
@@ -122,59 +102,21 @@ object KafkaClient {
       override def deleteTopic(name: String): F[Unit] =
         getAdminClientResource.use(_.deleteTopic(name))
 
-      override def publishMessage(
-          record: KafkaRecord[K, V]
-      ): F[Either[PublishError, Unit]] = {
-        import akka.pattern.ask
-
-        implicit val timeout: akka.util.Timeout = akka.util.Timeout(1.second)
-        val ingestRecord = Async.fromFuture(
-          Sync[F].delay(
-            (ingestActor ? Ingest(record, AckStrategy.Replicated))
-              .mapTo[IngestorStatus]
-          )
-        )
-        val ingestionResult: F[Unit] = ingestRecord.flatMap {
-          case IngestorCompleted => Async[F].unit
-          case IngestorError(error) =>
-            Async[F].raiseError(PublishError.Failed(error))
-          case IngestorTimeout => Async[F].raiseError(PublishError.Timeout)
-          case otherStatus =>
-            Async[F].raiseError(PublishError.UnexpectedResponse(otherStatus))
-        }
-
-        ingestionResult.attemptNarrow[PublishError]
-      }
-
       private def getAdminClientResource: Resource[F, KafkaAdminClient[F]] = {
         adminClientResource(
           AdminClientSettings.apply.withBootstrapServers(bootstrapServers)
         )
       }
-
-      override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[F, (K, V)] = {
-        val consumerSettings = ConsumerSettings[F, K, V]
-          .withAutoOffsetReset(AutoOffsetReset.Earliest)
-          .withBootstrapServers(bootstrapServers)
-          .withGroupId(consumerGroup)
-        consumerStream(consumerSettings)
-          .evalTap(_.subscribeTo(topicName))
-          .flatMap(_.stream)
-          .map { committable =>
-            val r = committable.record
-            (r.key, r.value)
-          }
-      }
     }
   }
 
-  def test[F[_]: Sync, K, V]: F[KafkaClient[F, K, V]] =
-    Ref[F].of(Map[TopicName, Topic]()).flatMap(getTestKafkaClient[F, K, V])
+  def test[F[_]: Sync, K, V]: F[KafkaAdminAlgebra[F]] =
+    Ref[F].of(Map[TopicName, Topic]()).flatMap(getTestKafkaClient[F])
 
-  private[this] def getTestKafkaClient[F[_]: Sync, K, V](
+  private[this] def getTestKafkaClient[F[_]: Sync](
       ref: Ref[F, Map[TopicName, Topic]]
-  ): F[KafkaClient[F, K, V]] = Sync[F].delay {
-    new KafkaClient[F, K, V] {
+  ): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
+    new KafkaAdminAlgebra[F] {
       override def describeTopic(name: TopicName): F[Option[Topic]] =
         ref.get.map(_.get(name))
 
@@ -191,15 +133,6 @@ object KafkaClient {
 
       override def deleteTopic(name: String): F[Unit] =
         ref.update(_ - name)
-
-      override def publishMessage(
-          record: KafkaRecord[K, V]
-      ): F[Either[PublishError, Unit]] =
-        Sync[F].pure(Right(()))
-
-      override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[F, (K, V)] = {
-        fs2.Stream.empty
-      }
     }
   }
 
