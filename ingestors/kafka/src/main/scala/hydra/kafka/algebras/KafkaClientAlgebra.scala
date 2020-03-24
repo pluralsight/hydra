@@ -3,11 +3,11 @@ package hydra.kafka.algebras
 import akka.actor.ActorSelection
 import cats.effect.{Async, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.implicits._
-import fs2.kafka.{AutoOffsetReset, ConsumerSettings, Deserializer, consumerStream}
+import fs2.kafka.{AutoOffsetReset, ConsumerSettings, Deserializer, Serializer, consumerStream}
 import hydra.core.protocol._
 import hydra.core.transport.AckStrategy
 import hydra.kafka.algebras.KafkaAdminAlgebra.{PublishError, TopicName}
-import hydra.kafka.producer.KafkaRecord
+import hydra.kafka.producer.{AvroKeyRecord, KafkaRecord}
 
 import scala.concurrent.duration._
 
@@ -18,7 +18,7 @@ trait KafkaClientAlgebra[F[_], K, V] {
     * @return Either[PublishError, Unit] - Unit is returned upon success, PublishError on failure.
     */
   def publishMessage(
-    record: KafkaRecord[K, V]
+    record: (K, V)
   ): F[Either[PublishError, Unit]]
 
 
@@ -36,23 +36,23 @@ trait KafkaClientAlgebra[F[_], K, V] {
 }
 
 object KafkaClientAlgebra {
-  def live[F[_]: Async: ContextShift: ConcurrentEffect: Timer, K: Deserializer[F, *], V: Deserializer[F, *]](
+  def live[F[_]: Async: ContextShift: ConcurrentEffect: Timer, K: Deserializer[F, *]: Serializer[F, *], V: Deserializer[F, *]: Serializer[F, *]](
       ingestActor: ActorSelection,
       bootstrapServers: String
   ): F[KafkaClientAlgebra[F, K, V]] = Sync[F].delay {
     new KafkaClientAlgebra[F, K, V] {
       override def publishMessage(
-                                   record: KafkaRecord[K, V]
+                                   record: (K, V)
                                  ): F[Either[PublishError, Unit]] = {
         import akka.pattern.ask
 
         implicit val timeout: akka.util.Timeout = akka.util.Timeout(1.second)
         val ingestRecord = Async.fromFuture(
-          Sync[F].delay(
-            (ingestActor ? Ingest(record, AckStrategy.Replicated))
+          Sync[F].delay {
+        (ingestActor ? Ingest(record, AckStrategy.Replicated))
               .mapTo[IngestorStatus]
           )
-        )
+          }
         val ingestionResult: F[Unit] = ingestRecord.flatMap {
           case IngestorCompleted => Async[F].unit
           case IngestorError(error) =>

@@ -8,7 +8,7 @@ import org.apache.kafka.clients.producer.ProducerRecord
   * Created by alexsilva on 2/22/17.
   */
 trait KafkaRecord[K, V] extends HydraRecord[K, V] {
-  val timestamp = System.currentTimeMillis()
+  val timestamp: Long = System.currentTimeMillis()
 
   def partition: Option[Int] = None
 
@@ -32,10 +32,10 @@ trait KafkaRecord[K, V] extends HydraRecord[K, V] {
 
 object KafkaRecord {
 
-  implicit def toProducerRecord[K, V](record: KafkaRecord[K, V]) = {
+  implicit def toProducerRecord[K, V](record: KafkaRecord[K, V]): ProducerRecord[K, V] = {
     new ProducerRecord[K, V](
       record.destination,
-      record.partition.getOrElse(null).asInstanceOf[Integer],
+      record.partition.orNull.asInstanceOf[Integer],
       record.timestamp,
       record.key,
       record.payload

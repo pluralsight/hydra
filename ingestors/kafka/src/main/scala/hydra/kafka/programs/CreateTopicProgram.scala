@@ -105,16 +105,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       records <- TopicMetadataV2.encode[F](key, value)
       schemas <- TopicMetadataV2.getSchemas[F]
       _ <- kafkaClient
-        .publishMessage(
-          AvroKeyRecord(
-            v2MetadataTopicName.value,
-            schemas.key,
-            schemas.value,
-            records._1,
-            records._2,
-            AckStrategy.Replicated
-          )
-        )
+        .publishMessage(createTopicRequest.toKeyAndValue)
         .rethrow
     } yield ()
   }
