@@ -1,9 +1,11 @@
 package hydra.kafka.algebras
 
+import java.util.UUID
+
 import akka.actor.ActorSelection
-import cats.effect.{Async, ConcurrentEffect, ContextShift, Sync, Timer}
+import cats.effect.{Async, Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.implicits._
-import fs2.kafka.{AutoOffsetReset, ConsumerSettings, Deserializer, Serializer, consumerStream}
+import fs2.kafka.{AutoOffsetReset, ConsumerSettings, Deserializer, ProducerRecord, ProducerRecords, ProducerSettings, Serializer, consumerStream}
 import hydra.core.protocol._
 import hydra.core.transport.AckStrategy
 import hydra.kafka.algebras.KafkaAdminAlgebra.{PublishError, TopicName}
@@ -18,7 +20,8 @@ trait KafkaClientAlgebra[F[_], K, V] {
     * @return Either[PublishError, Unit] - Unit is returned upon success, PublishError on failure.
     */
   def publishMessage(
-    record: (K, V)
+    record: (K, V),
+    topicName: TopicName
   ): F[Either[PublishError, Unit]]
 
 
@@ -31,38 +34,37 @@ trait KafkaClientAlgebra[F[_], K, V] {
   def consumeMessages(
      topicName: TopicName,
      consumerGroup: String
-   ): fs2.Stream[F, (K,V)]
+   ): fs2.Stream[F, (K, V)]
 
 }
 
 object KafkaClientAlgebra {
+
+
+  private def getProducerQueue[F[_]: ConcurrentEffect: Async: ContextShift, K: Serializer[F, *], V: Serializer[F, *]](bootstrapServers: String): F[fs2.concurrent.Queue[F, (K, V, TopicName)]] = {
+    import fs2.kafka._
+    val producerSettings =
+      ProducerSettings[F, K, V]
+        .withBootstrapServers(bootstrapServers)
+    for {
+      queue <- fs2.concurrent.Queue.unbounded[F, (K, V, TopicName)]
+      _ <- Concurrent[F].start(queue.dequeue.map { record =>
+        ProducerRecords.one(ProducerRecord(record._3, record._1, record._2), UUID.randomUUID)
+      }.through(produce(producerSettings)).map(i => i.passthrough).compile.drain)
+    } yield queue
+  }
+
   def live[F[_]: Async: ContextShift: ConcurrentEffect: Timer, K: Deserializer[F, *]: Serializer[F, *], V: Deserializer[F, *]: Serializer[F, *]](
       ingestActor: ActorSelection,
       bootstrapServers: String
-  ): F[KafkaClientAlgebra[F, K, V]] = Sync[F].delay {
+  ): F[KafkaClientAlgebra[F, K, V]] = getProducerQueue[F, K, V](bootstrapServers).map { queue =>
+
     new KafkaClientAlgebra[F, K, V] {
       override def publishMessage(
-                                   record: (K, V)
+                                   record: (K, V),
+                                   topicName: TopicName
                                  ): F[Either[PublishError, Unit]] = {
-        import akka.pattern.ask
-
-        implicit val timeout: akka.util.Timeout = akka.util.Timeout(1.second)
-        val ingestRecord = Async.fromFuture(
-          Sync[F].delay {
-        (ingestActor ? Ingest(record, AckStrategy.Replicated))
-              .mapTo[IngestorStatus]
-          )
-          }
-        val ingestionResult: F[Unit] = ingestRecord.flatMap {
-          case IngestorCompleted => Async[F].unit
-          case IngestorError(error) =>
-            Async[F].raiseError(PublishError.Failed(error))
-          case IngestorTimeout => Async[F].raiseError(PublishError.Timeout)
-          case otherStatus =>
-            Async[F].raiseError(PublishError.UnexpectedResponse(otherStatus))
-        }
-
-        ingestionResult.attemptNarrow[PublishError]
+        queue.enqueue1((record._1, record._2, topicName))
       }
 
       override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[F, (K, V)] = {
