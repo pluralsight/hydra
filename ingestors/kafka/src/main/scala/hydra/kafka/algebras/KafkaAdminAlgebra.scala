@@ -53,26 +53,6 @@ object KafkaAdminAlgebra {
   type TopicName = String
   final case class Topic(name: TopicName, numberPartitions: Int)
 
-  sealed abstract class PublishError(message: String)
-      extends Exception(message)
-      with Product
-      with Serializable
-
-  object PublishError {
-
-    final case object Timeout
-        extends PublishError("Timeout while ingesting message.")
-        with NoStackTrace
-
-    final case class UnexpectedResponse(ingestorResponse: IngestorStatus)
-        extends PublishError(
-          s"Unexpected response from ingestor: $ingestorResponse"
-        )
-
-    final case class Failed(cause: Throwable)
-        extends PublishError(cause.getMessage)
-  }
-
   def live[F[_]: Sync: Concurrent: ContextShift](
       bootstrapServers: String,
   ): F[KafkaAdminAlgebra[F]] = Sync[F].delay {

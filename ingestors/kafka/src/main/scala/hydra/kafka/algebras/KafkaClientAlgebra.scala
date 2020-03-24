@@ -1,17 +1,14 @@
 package hydra.kafka.algebras
 
-import java.util.UUID
-
-import akka.actor.ActorSelection
-import cats.effect.{Async, Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
+import cats.effect.concurrent.Deferred
+import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.implicits._
-import fs2.kafka.{AutoOffsetReset, ConsumerSettings, Deserializer, ProducerRecord, ProducerRecords, ProducerSettings, Serializer, consumerStream}
+import fs2.kafka._
 import hydra.core.protocol._
-import hydra.core.transport.AckStrategy
-import hydra.kafka.algebras.KafkaAdminAlgebra.{PublishError, TopicName}
-import hydra.kafka.producer.{AvroKeyRecord, KafkaRecord}
+import hydra.kafka.algebras.KafkaClientAlgebra.{PublishError, TopicName}
 
 import scala.concurrent.duration._
+import scala.util.control.NoStackTrace
 
 trait KafkaClientAlgebra[F[_], K, V] {
   /**
@@ -40,22 +37,46 @@ trait KafkaClientAlgebra[F[_], K, V] {
 
 object KafkaClientAlgebra {
 
+  type TopicName = String
 
-  private def getProducerQueue[F[_]: ConcurrentEffect: Async: ContextShift, K: Serializer[F, *], V: Serializer[F, *]](bootstrapServers: String): F[fs2.concurrent.Queue[F, (K, V, TopicName)]] = {
+  sealed abstract class PublishError(message: String)
+    extends Exception(message)
+      with Product
+      with Serializable
+
+  object PublishError {
+
+    final case object Timeout
+      extends PublishError("Timeout while ingesting message.")
+        with NoStackTrace
+
+    final case class UnexpectedResponse(ingestorResponse: IngestorStatus)
+      extends PublishError(
+        s"Unexpected response from ingestor: $ingestorResponse"
+      )
+
+    final case class Failed(cause: Throwable)
+      extends PublishError(cause.getMessage)
+  }
+
+
+  private def getProducerQueue[F[_]: ConcurrentEffect: ContextShift,
+    K: Serializer[F, *],
+    V: Serializer[F, *]]
+  (bootstrapServers: String): F[fs2.concurrent.Queue[F, (K, V, TopicName, Deferred[F, Unit])]] = {
     import fs2.kafka._
     val producerSettings =
       ProducerSettings[F, K, V]
         .withBootstrapServers(bootstrapServers)
     for {
-      queue <- fs2.concurrent.Queue.unbounded[F, (K, V, TopicName)]
+      queue <- fs2.concurrent.Queue.unbounded[F, (K, V, TopicName, Deferred[F, Unit])]
       _ <- Concurrent[F].start(queue.dequeue.map { record =>
-        ProducerRecords.one(ProducerRecord(record._3, record._1, record._2), UUID.randomUUID)
-      }.through(produce(producerSettings)).map(i => i.passthrough).compile.drain)
+        ProducerRecords.one(ProducerRecord(record._3, record._1, record._2), record._4)
+      }.through(produce(producerSettings)).map(i => i.passthrough.complete(())).compile.drain)
     } yield queue
   }
 
-  def live[F[_]: Async: ContextShift: ConcurrentEffect: Timer, K: Deserializer[F, *]: Serializer[F, *], V: Deserializer[F, *]: Serializer[F, *]](
-      ingestActor: ActorSelection,
+  def live[F[_]: ContextShift: ConcurrentEffect: Timer, K: Deserializer[F, *]: Serializer[F, *], V: Deserializer[F, *]: Serializer[F, *]](
       bootstrapServers: String
   ): F[KafkaClientAlgebra[F, K, V]] = getProducerQueue[F, K, V](bootstrapServers).map { queue =>
 
@@ -64,7 +85,11 @@ object KafkaClientAlgebra {
                                    record: (K, V),
                                    topicName: TopicName
                                  ): F[Either[PublishError, Unit]] = {
-        queue.enqueue1((record._1, record._2, topicName))
+
+        Deferred[F, Unit].flatMap { d =>
+          queue.enqueue1((record._1, record._2, topicName, d)) *>
+            Concurrent.timeoutTo[F, Either[PublishError, Unit]](d.get.map(Right(_)), 3.seconds, Sync[F].pure(PublishError.Timeout))
+        }
       }
 
       override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[F, (K, V)] = {
@@ -85,14 +110,11 @@ object KafkaClientAlgebra {
 
   def test[F[_]: Sync, K, V]: F[KafkaClientAlgebra[F, K, V]] = Sync[F].delay {
     new KafkaClientAlgebra[F, K, V] {
-      override def publishMessage(
-                                   record: KafkaRecord[K, V]
-                                 ): F[Either[PublishError, Unit]] =
+      override def publishMessage(record: (K, V), topicName: TopicName): F[Either[PublishError, Unit]] =
         Sync[F].pure(Right(()))
 
-      override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[F, (K, V)] = {
+      override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[F, (K, V)] =
         fs2.Stream.empty
-      }
     }
   }
 
