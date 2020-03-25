@@ -100,12 +100,10 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   private def publishMetadata(
       createTopicRequest: TopicMetadataV2Request
   ): F[Unit] = {
-    val (key, value) = createTopicRequest.toKeyAndValue
+    val message = createTopicRequest.toKeyAndValue
     for {
-      records <- TopicMetadataV2.encode[F](key, value)
-      schemas <- TopicMetadataV2.getSchemas[F]
       _ <- kafkaClient
-        .publishMessage(createTopicRequest.toKeyAndValue)
+        .publishMessage(message, message._1.subject.value)
         .rethrow
     } yield ()
   }

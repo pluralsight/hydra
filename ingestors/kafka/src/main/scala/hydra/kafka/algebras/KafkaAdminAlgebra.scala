@@ -90,7 +90,7 @@ object KafkaAdminAlgebra {
     }
   }
 
-  def test[F[_]: Sync, K, V]: F[KafkaAdminAlgebra[F]] =
+  def test[F[_]: Sync]: F[KafkaAdminAlgebra[F]] =
     Ref[F].of(Map[TopicName, Topic]()).flatMap(getTestKafkaClient[F])
 
   private[this] def getTestKafkaClient[F[_]: Sync](

@@ -10,12 +10,13 @@ import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.core.marshallers.History
 import hydra.core.transport.AckStrategy
-import hydra.kafka.algebras.KafkaAdminAlgebra
+import hydra.kafka.algebras.KafkaAdminAlgebra.{Topic, TopicName}
+import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
 import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import hydra.kafka.producer.{AvroKeyRecord, KafkaRecord}
-import hydra.kafka.util.KafkaClient.{PublishError, Topic, TopicName}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
@@ -59,9 +60,11 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
       (for {
         schemaRegistry <- schemaRegistryIO
         kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO, TopicMetadataV2Key, TopicMetadataV2Value]
         registerInternalMetadata = new CreateTopicProgram[IO](
           schemaRegistry,
           kafka,
+          kafkaClient,
           policy,
           Subject.createValidated("v2Topic").get
         )
@@ -109,16 +112,18 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
           ): IO[SchemaVersion] = ref.get.map { testState =>
             testState.numSchemasRegistered + 1
           }
-          override def getAllVersions(subject: String): IO[List[Int]] = ???
-          override def getAllSubjects: IO[List[String]] = ???
+          override def getAllVersions(subject: String): IO[List[Int]] = IO.pure(List())
+          override def getAllSubjects: IO[List[String]] = IO.pure(List())
         }
       (for {
         kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO, TopicMetadataV2Key, TopicMetadataV2Value]
         ref <- Ref[IO]
           .of(TestState(deleteSchemaWasCalled = false, 0))
         _ <- new CreateTopicProgram[IO](
           getSchemaRegistry(ref),
           kafka,
+          kafkaClient,
           policy,
           Subject.createValidated("test").get
         ).createTopic(
@@ -152,16 +157,18 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
               subject: String,
               schema: Schema
           ): IO[SchemaVersion] = IO.pure(1)
-          override def getAllVersions(subject: String): IO[List[Int]] = ???
-          override def getAllSubjects: IO[List[String]] = ???
+          override def getAllVersions(subject: String): IO[List[Int]] = IO.pure(Nil)
+          override def getAllSubjects: IO[List[String]] = IO.pure(Nil)
         }
 
       (for {
         kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO, TopicMetadataV2Key, TopicMetadataV2Value]
         ref <- Ref[IO].of(0)
         _ <- new CreateTopicProgram[IO](
           getSchemaRegistry(ref),
           kafka,
+          kafkaClient,
           policy,
           Subject.createValidated("test").get
         ).createTopic(
@@ -200,18 +207,20 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
               subject: String,
               schema: Schema
           ): IO[SchemaVersion] = ref.get.map(_.schemas(subject))
-          override def getAllVersions(subject: String): IO[List[Int]] = ???
-          override def getAllSubjects: IO[List[String]] = ???
+          override def getAllVersions(subject: String): IO[List[Int]] = IO.pure(Nil)
+          override def getAllSubjects: IO[List[String]] = IO.pure(Nil)
         }
 
       val schemaRegistryState = Map("subject-key" -> 1)
       (for {
         kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO, TopicMetadataV2Key, TopicMetadataV2Value]
         ref <- Ref[IO]
           .of(TestState(schemaRegistryState))
         _ <- new CreateTopicProgram[IO](
           getSchemaRegistry(ref),
           kafka,
+          kafkaClient,
           policy,
           Subject.createValidated("test").get
         ).createTopic(
@@ -228,9 +237,11 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
       val subject = "subject"
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafkaClient <- KafkaAdminAlgebra.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO, TopicMetadataV2Key, TopicMetadataV2Value]
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
+          kafka,
           kafkaClient,
           policy,
           Subject.createValidated("test-metadata-topic").get
@@ -238,7 +249,7 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
           createTopicMetadataRequest(subject, keySchema, valueSchema),
           TopicDetails(1, 1)
         )
-        topic <- kafkaClient.describeTopic(subject)
+        topic <- kafka.describeTopic(subject)
       } yield topic.get shouldBe Topic(subject, 1)).unsafeRunSync()
     }
 
@@ -253,13 +264,14 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
         TopicMetadataV2Value.codec.encode(value).toOption.get
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        underlyingKafkaClient <- KafkaAdminAlgebra.test[IO]
-        publishTo <- Ref[IO].of(List.empty[KafkaRecord[_, _]])
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        publishTo <- Ref[IO].of(Map.empty[String, (TopicMetadataV2Key, TopicMetadataV2Value)])
         kafkaClient <- IO(
-          new TestKafkaAdminAlgebraWithPublishTo(underlyingKafkaClient, publishTo)
+          new TestKafkaClientAlgebraWithPublishTo(publishTo)
         )
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
+          kafkaAdmin,
           kafkaClient,
           policy,
           Subject.createValidated(metadataTopic).get
@@ -284,22 +296,22 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
       val request = createTopicMetadataRequest(subject, keySchema, valueSchema)
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        underlyingKafkaClient <- KafkaAdminAlgebra.test[IO]
-        publishTo <- Ref[IO].of(List.empty[KafkaRecord[_, _]])
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        publishTo <- Ref[IO].of(Map.empty[String, (TopicMetadataV2Key, TopicMetadataV2Value)])
         kafkaClient <- IO(
-          new TestKafkaAdminAlgebraWithPublishTo(
-            underlyingKafkaClient,
+          new TestKafkaClientAlgebraWithPublishTo(
             publishTo,
             failOnPublish = true
           )
         )
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
+          kafkaAdmin,
           kafkaClient,
           policy,
           Subject.createValidated(metadataTopic).get
         ).createTopic(request, TopicDetails(1, 1)).attempt
-        topic <- kafkaClient.describeTopic(subject)
+        topic <- kafkaAdmin.describeTopic(subject)
       } yield topic should not be defined).unsafeRunSync()
     }
 
@@ -311,53 +323,42 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
       val request = createTopicMetadataRequest(subject, keySchema, valueSchema)
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        underlyingKafkaClient <- KafkaAdminAlgebra.test[IO]
-        publishTo <- Ref[IO].of(List.empty[KafkaRecord[_, _]])
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        publishTo <- Ref[IO].of(Map.empty[String, (TopicMetadataV2Key, TopicMetadataV2Value)])
         kafkaClient <- IO(
-          new TestKafkaAdminAlgebraWithPublishTo(
-            underlyingKafkaClient,
+          new TestKafkaClientAlgebraWithPublishTo(
             publishTo,
             failOnPublish = true
           )
         )
-        _ <- kafkaClient.createTopic(subject, topicDetails)
+        _ <- kafkaAdmin.createTopic(subject, topicDetails)
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
+          kafkaAdmin,
           kafkaClient,
           policy,
           Subject.createValidated(metadataTopic).get
         ).createTopic(request, topicDetails).attempt
-        topic <- kafkaClient.describeTopic(subject)
+        topic <- kafkaAdmin.describeTopic(subject)
       } yield topic shouldBe defined).unsafeRunSync()
     }
 
   }
 
-  private final class TestKafkaAdminAlgebraWithPublishTo(
-                                                          underlying: KafkaAdminAlgebra[IO],
-                                                          publishTo: Ref[IO, List[KafkaRecord[_, _]]],
+  private final class TestKafkaClientAlgebraWithPublishTo(
+                                                          publishTo: Ref[IO, Map[TopicName, (TopicMetadataV2Key, TopicMetadataV2Value)]],
                                                           failOnPublish: Boolean = false
-  ) extends KafkaAdminAlgebra[IO] {
+  ) extends KafkaClientAlgebra[IO, TopicMetadataV2Key, TopicMetadataV2Value] {
 
-    override def describeTopic(name: TopicName): IO[Option[Topic]] =
-      underlying.describeTopic(name)
-    override def getTopicNames: IO[List[TopicName]] = underlying.getTopicNames
-
-    override def createTopic(name: TopicName, details: TopicDetails): IO[Unit] =
-      underlying.createTopic(name, details)
-
-    override def deleteTopic(name: String): IO[Unit] =
-      underlying.deleteTopic(name)
-
-    override def publishMessage[K, V](
-        record: KafkaRecord[K, V]
-    ): IO[Either[KafkaAdminAlgebra.PublishError, Unit]] =
+    override def publishMessage(record: (TopicMetadataV2Key, TopicMetadataV2Value), topicName: TopicName): IO[Either[PublishError, Unit]] =
       if (failOnPublish) {
         IO.pure(Left(PublishError.Timeout))
       } else {
-        publishTo.update(_ :+ record).attemptNarrow[PublishError]
+        publishTo.update(_ + (topicName -> record)).attemptNarrow[PublishError]
       }
-  }
+
+    override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (TopicMetadataV2Key, TopicMetadataV2Value)] = fs2.Stream.empty
+}
 
   private def getSchema(name: String): Schema =
     SchemaBuilder

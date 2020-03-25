@@ -5,27 +5,24 @@ import cats.effect.{Async, Concurrent, ContextShift}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.ingest.app.AppConfig.{CreateTopicConfig, SchemaRegistryConfig}
-import hydra.kafka.algebras.KafkaAdminAlgebra
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
+import hydra.kafka.model.{TopicMetadataV2Key, TopicMetadataV2Value}
 
 final class Algebras[F[_]] private (
     val schemaRegistry: SchemaRegistry[F],
-    val kafkaClient: KafkaAdminAlgebra[F]
+    val kafkaAdmin: KafkaAdminAlgebra[F],
+    val kafkaClient: KafkaClientAlgebra[F, TopicMetadataV2Key, TopicMetadataV2Value]
 )
 
 object Algebras {
 
-  def make[F[_]: Async: Concurrent: ContextShift](
-      createTopicConfig: CreateTopicConfig,
-      ingestActorSelection: ActorSelection
-  ): F[Algebras[F]] =
+  def make[F[_]: Async: Concurrent: ContextShift](createTopicConfig: CreateTopicConfig): F[Algebras[F]] =
     for {
       schemaRegistry <- SchemaRegistry.live[F](
         createTopicConfig.schemaRegistryConfig.fullUrl,
         createTopicConfig.schemaRegistryConfig.maxCacheSize
       )
-      kafkaClient <- KafkaAdminAlgebra.live[F](
-        createTopicConfig.bootstrapServers,
-        ingestActorSelection
-      )
-    } yield new Algebras[F](schemaRegistry, kafkaClient)
+      kafkaAdmin <- KafkaAdminAlgebra.live[F](createTopicConfig.bootstrapServers)
+      kafkaClient <- KafkaClientAlgebra.live[F, TopicMetadataV2Key, TopicMetadataV2Value](createTopicConfig.bootstrapServers)
+    } yield new Algebras[F](schemaRegistry, kafkaAdmin, kafkaClient)
 }

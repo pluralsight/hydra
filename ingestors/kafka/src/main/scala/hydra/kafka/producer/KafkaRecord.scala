@@ -35,7 +35,7 @@ object KafkaRecord {
   implicit def toProducerRecord[K, V](record: KafkaRecord[K, V]): ProducerRecord[K, V] = {
     new ProducerRecord[K, V](
       record.destination,
-      record.partition.orNull.asInstanceOf[Integer],
+      record.partition.getOrElse(null).asInstanceOf[Integer],
       record.timestamp,
       record.key,
       record.payload

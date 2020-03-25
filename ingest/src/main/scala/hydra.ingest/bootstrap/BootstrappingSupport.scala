@@ -8,8 +8,9 @@ import com.typesafe.config.ConfigFactory
 import hydra.avro.registry.SchemaRegistry
 import hydra.core.http.RouteSupport
 import hydra.ingest.app.AppConfig
-import hydra.kafka.algebras.KafkaAdminAlgebra
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
 import hydra.kafka.endpoints.BootstrapEndpointV2
+import hydra.kafka.model.{TopicMetadataV2Key, TopicMetadataV2Value}
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
@@ -48,8 +49,11 @@ class BootstrapEndpoints(
       path = ConfigFactory.load().getString("hydra.kafka-ingestor-path")
     )
 
+  private val kafkaAdmin =
+    KafkaAdminAlgebra.live[IO](bootstrapServers).unsafeRunSync()
+
   private val kafkaClient =
-    KafkaAdminAlgebra.live[IO](bootstrapServers, ingestorSelection).unsafeRunSync()
+    KafkaClientAlgebra.live[IO, TopicMetadataV2Key, TopicMetadataV2Value](bootstrapServers).unsafeRunSync()
 
   private val isBootstrapV2Enabled =
     config.v2MetadataTopicConfig.createV2TopicsEnabled
@@ -69,6 +73,7 @@ class BootstrapEndpoints(
       new BootstrapEndpointV2(
         new CreateTopicProgram[IO](
           schemaRegistry,
+          kafkaAdmin,
           kafkaClient,
           retryPolicy,
           v2MetadataTopicName

@@ -10,7 +10,7 @@ import cats.effect.{IO, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.core.marshallers.History
-import hydra.kafka.algebras.KafkaAdminAlgebra
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
 import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
@@ -35,13 +35,15 @@ final class BootstrapEndpointV2Spec
 
   private def getTestCreateTopicProgram(
       s: SchemaRegistry[IO],
-      k: KafkaAdminAlgebra[IO]
+      ka: KafkaAdminAlgebra[IO],
+      kc: KafkaClientAlgebra[IO, TopicMetadataV2Key, TopicMetadataV2Value]
   ): BootstrapEndpointV2 = {
     val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
     new BootstrapEndpointV2(
       new CreateTopicProgram[IO](
         s,
-        k,
+        ka,
+        kc,
         retryPolicy,
         Subject.createValidated("test").get
       ),
@@ -53,7 +55,8 @@ final class BootstrapEndpointV2Spec
     for {
       s <- SchemaRegistry.test[IO]
       k <- KafkaAdminAlgebra.test[IO]
-    } yield getTestCreateTopicProgram(s, k)
+      kc <- KafkaClientAlgebra.test[IO, TopicMetadataV2Key, TopicMetadataV2Value]
+    } yield getTestCreateTopicProgram(s, k, kc)
 
   "BootstrapEndpointV2" must {
 
@@ -121,16 +124,18 @@ final class BootstrapEndpointV2Spec
         override def getAllVersions(subject: String): IO[List[Int]] = err
         override def getAllSubjects: IO[List[String]] = err
       }
-      KafkaAdminAlgebra
-        .test[IO]
-        .map { kafka =>
-          Post("/v2/streams", validRequest) ~> Route.seal(
-            getTestCreateTopicProgram(failingSchemaRegistry, kafka).route
-          ) ~> check {
-            response.status shouldBe StatusCodes.InternalServerError
+      KafkaClientAlgebra.test[IO, TopicMetadataV2Key, TopicMetadataV2Value].map { client =>
+        KafkaAdminAlgebra
+          .test[IO]
+          .map { kafka =>
+            Post("/v2/streams", validRequest) ~> Route.seal(
+              getTestCreateTopicProgram(failingSchemaRegistry, kafka, client).route
+            ) ~> check {
+              response.status shouldBe StatusCodes.InternalServerError
+            }
           }
-        }
-        .unsafeRunSync()
+          .unsafeRunSync()
+      }
     }
   }
 
