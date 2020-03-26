@@ -9,6 +9,7 @@ import eu.timepit.refined.string._
 import hydra.core.marshallers.StreamType
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.Schema
+import org.apache.avro.generic.GenericRecord
 
 sealed trait DataClassification
 case object Public extends DataClassification

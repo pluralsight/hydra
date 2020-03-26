@@ -18,7 +18,7 @@ import retry.{RetryDetails, RetryPolicy, _}
 final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
                                                                                schemaRegistry: SchemaRegistry[F],
                                                                                kafkaAdmin: KafkaAdminAlgebra[F],
-                                                                               kafkaClient: KafkaClientAlgebra[F, TopicMetadataV2Key, TopicMetadataV2Value],
+                                                                               kafkaClient: KafkaClientAlgebra[F],
                                                                                retryPolicy: RetryPolicy[F],
                                                                                v2MetadataTopicName: Subject
 ) {
@@ -102,8 +102,9 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   ): F[Unit] = {
     val message = createTopicRequest.toKeyAndValue
     for {
+      records <- TopicMetadataV2.encode[F](message._1, message._2)
       _ <- kafkaClient
-        .publishMessage(message, message._1.subject.value)
+        .publishMessage(records, message._1.subject.value)
         .rethrow
     } yield ()
   }

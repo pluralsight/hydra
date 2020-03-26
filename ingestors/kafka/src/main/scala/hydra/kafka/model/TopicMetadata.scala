@@ -6,20 +6,16 @@ import java.util.UUID
 import cats.{Applicative, ApplicativeError, Monad, MonadError}
 import cats.data.Validated.{Invalid, Valid}
 import cats.data.{NonEmptyList, Validated}
-import hydra.core.marshallers.{
-  CurrentState,
-  History,
-  Notification,
-  StreamType,
-  Telemetry
-}
+import hydra.core.marshallers.{CurrentState, History, Notification, StreamType, Telemetry}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import vulcan.{AvroError, AvroNamespace, Codec}
 import vulcan.generic._
 import vulcan.refined._
 import cats.implicits._
+import fs2.kafka.Deserializer
 import hydra.avro.convert.{ISODateConverter, IsoDate}
 import org.apache.avro.generic.GenericRecord
+
 
 import scala.util.control.NoStackTrace
 
@@ -95,7 +91,7 @@ final case class TopicMetadataV2Key(
 
 object TopicMetadataV2Key {
 
-  val codec: Codec[TopicMetadataV2Key] =
+  implicit val codec: Codec[TopicMetadataV2Key] =
     Codec.derive[TopicMetadataV2Key]
 }
 
@@ -169,6 +165,6 @@ object TopicMetadataV2Value {
   private implicit val contactMethodCodec: Codec[ContactMethod] =
     Codec.derive[ContactMethod]
 
-  val codec: Codec[TopicMetadataV2Value] =
+  implicit val codec: Codec[TopicMetadataV2Value] =
     Codec.derive[TopicMetadataV2Value]
 }

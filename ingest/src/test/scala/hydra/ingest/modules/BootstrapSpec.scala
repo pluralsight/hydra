@@ -5,15 +5,17 @@ import cats.effect.{IO, Sync, Timer}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.ingest.app.AppConfig.V2MetadataTopicConfig
-import hydra.kafka.algebras.KafkaAdminAlgebra
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
+import hydra.kafka.algebras.KafkaAdminAlgebra.Topic
+import hydra.kafka.algebras.KafkaClientAlgebra.{PublishError, TopicName}
 import hydra.kafka.model.ContactMethod
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.producer.KafkaRecord
 import hydra.kafka.programs.CreateTopicProgram
-import hydra.kafka.util.KafkaClient.{PublishError, Topic, TopicName}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import org.apache.avro.generic.GenericRecord
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import retry.RetryPolicies
@@ -30,22 +32,23 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
 
   private def createTestCase(
       config: V2MetadataTopicConfig
-  ): IO[(Option[Topic], List[String], List[KafkaRecord[_, _]])] = {
+  ): IO[(Option[Topic], List[String], Map[String, (GenericRecord, GenericRecord)])] = {
     val retry = RetryPolicies.alwaysGiveUp[IO]
     for {
       schemaRegistry <- SchemaRegistry.test[IO]
-      underlying <- KafkaAdminAlgebra.test[IO]
-      ref <- Ref[IO].of(List.empty[KafkaRecord[_, _]])
-      kafkaClient = new TestKafkaAdminAlgebraWithPublishTo(underlying, ref)
+      kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+      ref <- Ref[IO].of(Map.empty[String, (GenericRecord, GenericRecord)])
+      kafkaClient = new TestKafkaClientAlgebraWithPublishTo(ref)
       c = new CreateTopicProgram[IO](
         schemaRegistry,
+        kafkaAdmin,
         kafkaClient,
         retry,
         metadataSubject
       )
       boot <- Bootstrap.make[IO](c, config)
       _ <- boot.bootstrapAll
-      topicCreated <- kafkaClient.describeTopic(metadataSubject.value)
+      topicCreated <- kafkaAdmin.describeTopic(metadataSubject.value)
       schemasAdded <- schemaRegistry.getAllSubjects
       messagesPublished <- ref.get
     } yield (topicCreated, schemasAdded, messagesPublished)
@@ -67,7 +70,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
           case (topicCreated, schemasAdded, messagesPublished) =>
             topicCreated shouldBe Some(Topic(metadataSubject.value, 1))
             schemasAdded should contain allOf (metadataSubject.value + "-key", metadataSubject.value + "-value")
-            messagesPublished.length shouldBe 1
+            messagesPublished.keys.toList should have length 1
         }
         .unsafeRunSync()
     }
@@ -93,25 +96,14 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
     }
   }
 
-  private final class TestKafkaAdminAlgebraWithPublishTo(
-                                                          underlying: KafkaAdminAlgebra[IO],
-                                                          publishTo: Ref[IO, List[KafkaRecord[_, _]]]
-  ) extends KafkaAdminAlgebra[IO] {
+  private final class TestKafkaClientAlgebraWithPublishTo(publishTo: Ref[IO, Map[String, (GenericRecord, GenericRecord)]]
+  ) extends KafkaClientAlgebra[IO] {
+    override def publishMessage(
+        record: (GenericRecord, GenericRecord),
+        topicName: TopicName): IO[Either[PublishError, Unit]] =
+      publishTo.update(_ + (topicName -> record)).attemptNarrow[PublishError]
 
-    override def describeTopic(name: TopicName): IO[Option[Topic]] =
-      underlying.describeTopic(name)
-    override def getTopicNames: IO[List[TopicName]] = underlying.getTopicNames
-
-    override def createTopic(name: TopicName, details: TopicDetails): IO[Unit] =
-      underlying.createTopic(name, details)
-
-    override def deleteTopic(name: String): IO[Unit] =
-      underlying.deleteTopic(name)
-
-    override def publishMessage[K, V](
-        record: KafkaRecord[K, V]
-    ): IO[Either[KafkaAdminAlgebra.PublishError, Unit]] =
-      publishTo.update(_ :+ record).attemptNarrow[PublishError]
+    override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (GenericRecord, GenericRecord)] = fs2.Stream.empty
   }
 
 }

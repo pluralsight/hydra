@@ -36,7 +36,7 @@ final class BootstrapEndpointV2Spec
   private def getTestCreateTopicProgram(
       s: SchemaRegistry[IO],
       ka: KafkaAdminAlgebra[IO],
-      kc: KafkaClientAlgebra[IO, TopicMetadataV2Key, TopicMetadataV2Value]
+      kc: KafkaClientAlgebra[IO]
   ): BootstrapEndpointV2 = {
     val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
     new BootstrapEndpointV2(

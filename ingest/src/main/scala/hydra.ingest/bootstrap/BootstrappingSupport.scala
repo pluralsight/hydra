@@ -5,6 +5,8 @@ import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.RouteDirectives
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import com.typesafe.config.ConfigFactory
+import fs2.kafka.{Deserializer, Serializer}
+import fs2.kafka.vulcan.{AvroSettings, SchemaRegistryClientSettings, avroDeserializer, avroSerializer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.core.http.RouteSupport
 import hydra.ingest.app.AppConfig
@@ -44,16 +46,11 @@ class BootstrapEndpoints(
   private val schemaRegistry =
     SchemaRegistry.live[IO](schemaRegistryUrl, 100).unsafeRunSync()
 
-  private val ingestorSelection =
-    system.actorSelection(
-      path = ConfigFactory.load().getString("hydra.kafka-ingestor-path")
-    )
-
   private val kafkaAdmin =
     KafkaAdminAlgebra.live[IO](bootstrapServers).unsafeRunSync()
 
   private val kafkaClient =
-    KafkaClientAlgebra.live[IO, TopicMetadataV2Key, TopicMetadataV2Value](bootstrapServers).unsafeRunSync()
+    KafkaClientAlgebra.live[IO](bootstrapServers).unsafeRunSync()
 
   private val isBootstrapV2Enabled =
     config.v2MetadataTopicConfig.createV2TopicsEnabled

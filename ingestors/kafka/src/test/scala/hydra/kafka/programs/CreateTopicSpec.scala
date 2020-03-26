@@ -265,7 +265,7 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafkaAdmin <- KafkaAdminAlgebra.test[IO]
-        publishTo <- Ref[IO].of(Map.empty[String, (TopicMetadataV2Key, TopicMetadataV2Value)])
+        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, GenericRecord)])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(publishTo)
         )
@@ -297,7 +297,7 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafkaAdmin <- KafkaAdminAlgebra.test[IO]
-        publishTo <- Ref[IO].of(Map.empty[String, (TopicMetadataV2Key, TopicMetadataV2Value)])
+        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, GenericRecord)])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(
             publishTo,
@@ -324,7 +324,7 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafkaAdmin <- KafkaAdminAlgebra.test[IO]
-        publishTo <- Ref[IO].of(Map.empty[String, (TopicMetadataV2Key, TopicMetadataV2Value)])
+        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, GenericRecord)])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(
             publishTo,
@@ -346,18 +346,18 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
   }
 
   private final class TestKafkaClientAlgebraWithPublishTo(
-                                                          publishTo: Ref[IO, Map[TopicName, (TopicMetadataV2Key, TopicMetadataV2Value)]],
+                                                          publishTo: Ref[IO, Map[TopicName, (GenericRecord, GenericRecord)]],
                                                           failOnPublish: Boolean = false
-  ) extends KafkaClientAlgebra[IO, TopicMetadataV2Key, TopicMetadataV2Value] {
+  ) extends KafkaClientAlgebra[IO] {
 
-    override def publishMessage(record: (TopicMetadataV2Key, TopicMetadataV2Value), topicName: TopicName): IO[Either[PublishError, Unit]] =
+    override def publishMessage(record: (GenericRecord, GenericRecord), topicName: TopicName): IO[Either[PublishError, Unit]] =
       if (failOnPublish) {
         IO.pure(Left(PublishError.Timeout))
       } else {
         publishTo.update(_ + (topicName -> record)).attemptNarrow[PublishError]
       }
 
-    override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (TopicMetadataV2Key, TopicMetadataV2Value)] = fs2.Stream.empty
+    override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (GenericRecord, GenericRecord)] = fs2.Stream.empty
 }
 
   private def getSchema(name: String): Schema =
