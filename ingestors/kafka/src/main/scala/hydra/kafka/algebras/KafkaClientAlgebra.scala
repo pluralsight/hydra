@@ -110,7 +110,7 @@ object KafkaClientAlgebra {
     }
   }
 
-  def test[F[_]: Sync, K, V]: F[KafkaClientAlgebra[F]] = Sync[F].delay {
+  def test[F[_]: Sync]: F[KafkaClientAlgebra[F]] = Sync[F].delay {
     new KafkaClientAlgebra[F] {
       override def publishMessage(record: (GenericRecord, GenericRecord), topicName: TopicName): F[Either[PublishError, Unit]] =
         Sync[F].pure(Right(()))

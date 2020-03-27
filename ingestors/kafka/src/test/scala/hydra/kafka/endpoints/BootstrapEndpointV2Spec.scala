@@ -55,7 +55,7 @@ final class BootstrapEndpointV2Spec
     for {
       s <- SchemaRegistry.test[IO]
       k <- KafkaAdminAlgebra.test[IO]
-      kc <- KafkaClientAlgebra.test[IO, TopicMetadataV2Key, TopicMetadataV2Value]
+      kc <- KafkaClientAlgebra.test[IO]
     } yield getTestCreateTopicProgram(s, k, kc)
 
   "BootstrapEndpointV2" must {
@@ -124,7 +124,7 @@ final class BootstrapEndpointV2Spec
         override def getAllVersions(subject: String): IO[List[Int]] = err
         override def getAllSubjects: IO[List[String]] = err
       }
-      KafkaClientAlgebra.test[IO, TopicMetadataV2Key, TopicMetadataV2Value].map { client =>
+      KafkaClientAlgebra.test[IO].map { client =>
         KafkaAdminAlgebra
           .test[IO]
           .map { kafka =>

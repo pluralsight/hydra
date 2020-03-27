@@ -9,14 +9,12 @@ import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.core.marshallers.History
-import hydra.core.transport.AckStrategy
 import hydra.kafka.algebras.KafkaAdminAlgebra.{Topic, TopicName}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
 import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
-import hydra.kafka.producer.AvroKeyRecord
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
@@ -26,7 +24,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import retry.{RetryPolicies, RetryPolicy}
 
-class CreateTopicSpec extends AnyWordSpecLike with Matchers {
+class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
   implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
     Slf4jLogger.getLogger[F]
@@ -60,7 +58,7 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
       (for {
         schemaRegistry <- schemaRegistryIO
         kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO, TopicMetadataV2Key, TopicMetadataV2Value]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
         registerInternalMetadata = new CreateTopicProgram[IO](
           schemaRegistry,
           kafka,
@@ -117,7 +115,7 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
         }
       (for {
         kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO, TopicMetadataV2Key, TopicMetadataV2Value]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
         ref <- Ref[IO]
           .of(TestState(deleteSchemaWasCalled = false, 0))
         _ <- new CreateTopicProgram[IO](
@@ -163,7 +161,7 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
 
       (for {
         kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO, TopicMetadataV2Key, TopicMetadataV2Value]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
         ref <- Ref[IO].of(0)
         _ <- new CreateTopicProgram[IO](
           getSchemaRegistry(ref),
@@ -214,7 +212,7 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
       val schemaRegistryState = Map("subject-key" -> 1)
       (for {
         kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO, TopicMetadataV2Key, TopicMetadataV2Value]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
         ref <- Ref[IO]
           .of(TestState(schemaRegistryState))
         _ <- new CreateTopicProgram[IO](
@@ -238,7 +236,7 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO, TopicMetadataV2Key, TopicMetadataV2Value]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
           kafka,
@@ -259,9 +257,6 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
       val metadataTopic = "test-metadata-topic"
       val request = createTopicMetadataRequest(subject, keySchema, valueSchema)
       val (key, value) = request.toKeyAndValue
-      val expectedKeyRecord = TopicMetadataV2Key.codec.encode(key).toOption.get
-      val expectedValueRecord =
-        TopicMetadataV2Value.codec.encode(value).toOption.get
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafkaAdmin <- KafkaAdminAlgebra.test[IO]
@@ -269,6 +264,7 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(publishTo)
         )
+        m <- TopicMetadataV2.encode[IO](key, value)
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
           kafkaAdmin,
@@ -277,11 +273,7 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
           Subject.createValidated(metadataTopic).get
         ).createTopic(request, TopicDetails(1, 1))
         published <- publishTo.get
-      } yield published shouldBe Map(subject ->
-          (expectedKeyRecord.asInstanceOf[GenericRecord],
-          expectedValueRecord.asInstanceOf[GenericRecord])
-        )
-      ).unsafeRunSync()
+      } yield published shouldBe Map(subject -> (m._1, m._2))).unsafeRunSync()
     }
 
     "rollback kafka topic creation when error encountered in publishing metadata" in {

@@ -3,19 +3,17 @@ package hydra.kafka.model
 import java.time.Instant
 import java.util.UUID
 
-import cats.{Applicative, ApplicativeError, Monad, MonadError}
 import cats.data.Validated.{Invalid, Valid}
 import cats.data.{NonEmptyList, Validated}
-import hydra.core.marshallers.{CurrentState, History, Notification, StreamType, Telemetry}
+import cats.implicits._
+import cats.{Applicative, ApplicativeError, Monad, MonadError}
+import hydra.avro.convert.{ISODateConverter, IsoDate}
+import hydra.core.marshallers._
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import vulcan.{AvroError, AvroNamespace, Codec}
+import org.apache.avro.generic.GenericRecord
 import vulcan.generic._
 import vulcan.refined._
-import cats.implicits._
-import fs2.kafka.Deserializer
-import hydra.avro.convert.{ISODateConverter, IsoDate}
-import org.apache.avro.generic.GenericRecord
-
+import vulcan.{AvroError, AvroNamespace, Codec}
 
 import scala.util.control.NoStackTrace
 
@@ -62,7 +60,10 @@ object TopicMetadataV2 {
           Validated
             .fromEither(TopicMetadataV2Value.codec.encode(value))
             .toValidatedNel
-        ).tupled.toEither.leftMap(MetadataAvroSchemaFailure)
+        ).tupled.toEither.leftMap{ a =>
+          a.toList.foreach(println)
+          MetadataAvroSchemaFailure(a)
+        }
       )
       .rethrow
       .flatMap {
@@ -93,6 +94,7 @@ object TopicMetadataV2Key {
 
   implicit val codec: Codec[TopicMetadataV2Key] =
     Codec.derive[TopicMetadataV2Key]
+
 }
 
 @AvroNamespace("_hydra.v2")
