@@ -59,6 +59,12 @@ trait SchemaRegistry[F[_]] {
     */
   def getAllSubjects: F[List[String]]
 
+  /**
+    * Retrieves the SchemaRegistryClient from the algebra
+    * @return SchemaRegistryClient
+    */
+  def getSchemaRegistryClient: F[SchemaRegistryClient]
+
 }
 
 object SchemaRegistry {
@@ -122,6 +128,7 @@ object SchemaRegistry {
           schemaRegistryClient.getAllSubjects.asScala.toList
         }
 
+      override def getSchemaRegistryClient: F[SchemaRegistryClient] = Sync[F].pure(schemaRegistryClient)
     }
 
 }

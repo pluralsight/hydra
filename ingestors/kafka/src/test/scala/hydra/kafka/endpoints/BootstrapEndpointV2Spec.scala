@@ -19,6 +19,7 @@ import hydra.kafka.serializers.TopicMetadataV2Parser
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.{Matchers, WordSpecLike}
 import retry.{RetryPolicies, RetryPolicy}
@@ -123,6 +124,8 @@ final class BootstrapEndpointV2Spec
         ): IO[SchemaVersion] = err
         override def getAllVersions(subject: String): IO[List[Int]] = err
         override def getAllSubjects: IO[List[String]] = err
+
+        override def getSchemaRegistryClient: IO[SchemaRegistryClient] = err
       }
       KafkaClientAlgebra.test[IO].map { client =>
         KafkaAdminAlgebra

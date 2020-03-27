@@ -50,7 +50,7 @@ class BootstrapEndpoints(
     KafkaAdminAlgebra.live[IO](bootstrapServers).unsafeRunSync()
 
   private val kafkaClient =
-    KafkaClientAlgebra.live[IO](bootstrapServers).unsafeRunSync()
+    KafkaClientAlgebra.live[IO](bootstrapServers, schemaRegistry).unsafeRunSync()
 
   private val isBootstrapV2Enabled =
     config.v2MetadataTopicConfig.createV2TopicsEnabled

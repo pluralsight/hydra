@@ -1,12 +1,10 @@
 package hydra.ingest.modules
 
-import akka.actor.ActorSelection
-import cats.effect.{Async, Concurrent, ConcurrentEffect, ContextShift, Timer}
+import cats.effect.{Async, ConcurrentEffect, ContextShift, Timer}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
-import hydra.ingest.app.AppConfig.{CreateTopicConfig, SchemaRegistryConfig}
+import hydra.ingest.app.AppConfig.CreateTopicConfig
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
-import hydra.kafka.model.{TopicMetadataV2Key, TopicMetadataV2Value}
 
 final class Algebras[F[_]] private (
     val schemaRegistry: SchemaRegistry[F],
@@ -23,6 +21,6 @@ object Algebras {
         createTopicConfig.schemaRegistryConfig.maxCacheSize
       )
       kafkaAdmin <- KafkaAdminAlgebra.live[F](createTopicConfig.bootstrapServers)
-      kafkaClient <- KafkaClientAlgebra.live[F](createTopicConfig.bootstrapServers)
+      kafkaClient <- KafkaClientAlgebra.live[F](createTopicConfig.bootstrapServers, schemaRegistry)
     } yield new Algebras[F](schemaRegistry, kafkaAdmin, kafkaClient)
 }

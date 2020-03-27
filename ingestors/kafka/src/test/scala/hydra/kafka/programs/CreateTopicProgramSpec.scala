@@ -18,6 +18,7 @@ import hydra.kafka.model._
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.apache.avro.generic.GenericRecord
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.matchers.should.Matchers
@@ -112,6 +113,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           }
           override def getAllVersions(subject: String): IO[List[Int]] = IO.pure(List())
           override def getAllSubjects: IO[List[String]] = IO.pure(List())
+
+          override def getSchemaRegistryClient: IO[SchemaRegistryClient] = IO.raiseError(new Exception("Something horrible went wrong!"))
         }
       (for {
         kafka <- KafkaAdminAlgebra.test[IO]
@@ -157,6 +160,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           ): IO[SchemaVersion] = IO.pure(1)
           override def getAllVersions(subject: String): IO[List[Int]] = IO.pure(Nil)
           override def getAllSubjects: IO[List[String]] = IO.pure(Nil)
+          override def getSchemaRegistryClient: IO[SchemaRegistryClient] = IO.raiseError(new Exception("Something horrible went wrong!"))
         }
 
       (for {
@@ -207,6 +211,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           ): IO[SchemaVersion] = ref.get.map(_.schemas(subject))
           override def getAllVersions(subject: String): IO[List[Int]] = IO.pure(Nil)
           override def getAllSubjects: IO[List[String]] = IO.pure(Nil)
+          override def getSchemaRegistryClient: IO[SchemaRegistryClient] = IO.raiseError(new Exception)
         }
 
       val schemaRegistryState = Map("subject-key" -> 1)

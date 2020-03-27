@@ -4,12 +4,14 @@ import cats.effect.concurrent.Deferred
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.implicits._
 import fs2.kafka._
-import fs2.kafka.vulcan.KafkaAvroSerializer
+import fs2.kafka.vulcan.{KafkaAvroSerializer, SchemaRegistryClient}
+import hydra.avro.registry.SchemaRegistry
 import hydra.core.protocol._
 import hydra.kafka.algebras.KafkaClientAlgebra.{PublishError, TopicName}
-import io.confluent.kafka.serializers.KafkaAvroDeserializer
+import io.confluent.kafka.serializers.{AbstractKafkaAvroSerDeConfig, KafkaAvroDeserializer}
 import org.apache.avro.generic.GenericRecord
 
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
 
@@ -64,48 +66,52 @@ object KafkaClientAlgebra {
 
 
   private def getProducerQueue[F[_]: ConcurrentEffect: ContextShift]
-  (bootstrapServers: String): F[fs2.concurrent.Queue[F, (GenericRecord, GenericRecord, TopicName, Deferred[F, Unit])]] = {
+  (bootstrapServers: String, schemaRegistryClient: SchemaRegistryClient): F[fs2.concurrent.Queue[F, (GenericRecord, GenericRecord, TopicName, Deferred[F, Unit])]] = {
     import fs2.kafka._
-    val genericRecordSerializer = getGenericRecordSerializer
     val producerSettings =
-      ProducerSettings(keySerializer = genericRecordSerializer, valueSerializer = genericRecordSerializer)
+      ProducerSettings(keySerializer = getGenericRecordSerializer(schemaRegistryClient)(isKey = true), valueSerializer = getGenericRecordSerializer(schemaRegistryClient)())
         .withBootstrapServers(bootstrapServers)
     for {
       queue <- fs2.concurrent.Queue.unbounded[F, (GenericRecord, GenericRecord, TopicName, Deferred[F, Unit])]
-      _ <- Concurrent[F].start(queue.dequeue.map { record =>
-        ProducerRecords.one(ProducerRecord(record._3, record._1, record._2), record._4)
-      }.through(produce(producerSettings)).map(i => i.passthrough.complete(())).compile.drain)
+      _ <- Concurrent[F].start(queue.dequeue.map { payload =>
+        val record = ProducerRecord(payload._3, payload._1, payload._2)
+        ProducerRecords.one(record, payload._4)
+      }.through(produce(producerSettings)).evalMap { i => i.passthrough.complete(()) }.compile.drain)
     } yield queue
   }
 
   def live[F[_]: ContextShift: ConcurrentEffect: Timer](
-      bootstrapServers: String
-  ): F[KafkaClientAlgebra[F]] = getProducerQueue[F](bootstrapServers).map { queue =>
-    val genericRecordDeserializer = getGenericRecordDeserializer
-    new KafkaClientAlgebra[F] {
-      override def publishMessage(
-                                   record: (GenericRecord, GenericRecord),
-                                   topicName: TopicName
-                                 ): F[Either[PublishError, Unit]] = {
-
-        Deferred[F, Unit].flatMap { d =>
-          queue.enqueue1((record._1, record._2, topicName, d)) *>
-            Concurrent.timeoutTo[F, Either[PublishError, Unit]](d.get.map(Right(_)), 3.seconds, Sync[F].pure(Left(PublishError.Timeout)))
-        }
-      }
-
-      override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[F, (GenericRecord, GenericRecord)] = {
-        val consumerSettings = ConsumerSettings(keyDeserializer = genericRecordDeserializer, valueDeserializer = genericRecordDeserializer)
-          .withAutoOffsetReset(AutoOffsetReset.Earliest)
-          .withBootstrapServers(bootstrapServers)
-          .withGroupId(consumerGroup)
-        consumerStream(consumerSettings)
-          .evalTap(_.subscribeTo(topicName))
-          .flatMap(_.stream)
-          .map { committable =>
-            val r = committable.record
-            (r.key, r.value)
+      bootstrapServers: String,
+      schemaRegistryAlgebra: SchemaRegistry[F]
+  ): F[KafkaClientAlgebra[F]] = schemaRegistryAlgebra.getSchemaRegistryClient.flatMap { schemaRegistryClient =>
+    getProducerQueue[F](bootstrapServers, schemaRegistryClient).map { queue =>
+      new KafkaClientAlgebra[F] {
+        override def publishMessage(
+                                     record: (GenericRecord, GenericRecord),
+                                     topicName: TopicName
+                                   ): F[Either[PublishError, Unit]] = {
+          Deferred[F, Unit].flatMap { d =>
+            queue.enqueue1((record._1, record._2, topicName, d)) *>
+              Concurrent.timeoutTo[F, Either[PublishError, Unit]](d.get.map(Right(_)), 3.seconds, Sync[F].pure(Left(PublishError.Timeout)))
           }
+        }
+
+        override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[F, (GenericRecord, GenericRecord)] = {
+          val consumerSettings = ConsumerSettings(
+            keyDeserializer = getGenericRecordDeserializer(schemaRegistryClient)(isKey = true),
+            valueDeserializer = getGenericRecordDeserializer(schemaRegistryClient)()
+          )
+            .withAutoOffsetReset(AutoOffsetReset.Earliest)
+            .withBootstrapServers(bootstrapServers)
+            .withGroupId(consumerGroup)
+          consumerStream(consumerSettings)
+            .evalTap(_.subscribeTo(topicName))
+            .flatMap(_.stream)
+            .map { committable =>
+              val r = committable.record
+              (r.key, r.value)
+            }
+        }
       }
     }
   }
@@ -120,17 +126,21 @@ object KafkaClientAlgebra {
     }
   }
 
-  private def getGenericRecordDeserializer[F[_]: Sync]: Deserializer[F, GenericRecord] =
+  private def getGenericRecordDeserializer[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient)(isKey: Boolean = false): Deserializer[F, GenericRecord] =
     Deserializer.delegate[F, GenericRecord] {
     (topic: TopicName, data: Array[Byte]) => {
-      new KafkaAvroDeserializer().deserialize(topic, data).asInstanceOf[GenericRecord]
+      val deserializer = new KafkaAvroDeserializer(schemaRegistryClient)
+      deserializer.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "").asJava, isKey)
+      deserializer.deserialize(topic, data).asInstanceOf[GenericRecord]
     }
   }
 
-  private def getGenericRecordSerializer[F[_]: Sync]: Serializer[F, GenericRecord] =
+  private def getGenericRecordSerializer[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient)(isKey: Boolean = false): Serializer[F, GenericRecord] =
     Serializer.delegate[F, GenericRecord] {
       (topic: TopicName, data: GenericRecord) => {
-        new KafkaAvroSerializer().serialize(topic, data)
+        val serializer = new KafkaAvroSerializer(schemaRegistryClient)
+        serializer.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "").asJava, isKey)
+        serializer.serialize(topic, data)
       }
     }
 

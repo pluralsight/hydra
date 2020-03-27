@@ -1,7 +1,7 @@
 package hydra.kafka.algebras
 
-import akka.actor.ActorSystem
 import cats.effect.{ContextShift, IO, Timer}
+import hydra.avro.registry.SchemaRegistry
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.avro.generic.GenericRecord
 import org.scalatest.BeforeAndAfterAll
@@ -9,6 +9,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import vulcan.Codec
 import vulcan.generic._
+import cats.implicits._
 
 import scala.concurrent.ExecutionContext
 
@@ -30,10 +31,6 @@ class KafkaClientAlgebraSpec
 
   implicit private val timer: Timer[IO] = IO.timer(ExecutionContext.global)
 
-  implicit private val system: ActorSystem = ActorSystem(
-    "kafka-client-spec-system"
-  )
-
   override def beforeAll(): Unit = {
     super.beforeAll()
     EmbeddedKafka.start()
@@ -44,19 +41,37 @@ class KafkaClientAlgebraSpec
     EmbeddedKafka.stop()
   }
 
+
   (for {
-    live <- KafkaClientAlgebra.live[IO](s"localhost:$port")
+    schemaRegistryAlgebra <- SchemaRegistry.test[IO]
+    live <- KafkaClientAlgebra.live[IO](s"localhost:$port", schemaRegistryAlgebra)
     test <- KafkaClientAlgebra.test[IO]
   } yield {
-    runTest(live)
+    runTest(schemaRegistryAlgebra, live)
   }).unsafeRunSync()
 
-  private def runTest(kafkaClient: KafkaClientAlgebra[IO], isTest: Boolean = false): Unit = {
+  private def runTest(schemaRegistry: SchemaRegistry[IO], kafkaClient: KafkaClientAlgebra[IO], isTest: Boolean = false): Unit = {
     (if (isTest) "KafkaClient#test" else "KafkaClient#live") must {
-      "publish message to fs2.kafka" in {
+      "publish message to kafka" in {
         val (topic, key, value) = topicAndKeyAndValue("topic1","key1","value1")
-        kafkaClient.publishMessage((key, value), topic).map(r => assert(r.isRight))
+        (schemaRegistry.registerSchema(subject = s"$topic-key", key.getSchema) *>
+          schemaRegistry.registerSchema(subject = s"$topic-value", value.getSchema) *>
+          schemaRegistry.getAllSubjects.map(_.foreach(println)) *>
+        kafkaClient.publishMessage((key, value), topic).map{ r =>
+          println(r)
+          assert(r.isRight)}).unsafeRunSync()
       }
+
+      "consume message from kafka" in {
+        val (topic, key, value) = topicAndKeyAndValue("topic1","key1","value1")
+        val records = kafkaClient.consumeMessages(topic,"newConsumerGroup").compile.toList.unsafeRunSync()
+        records should have length 1
+        records.head shouldBe (key, value)
+      }
+
+//      "consume nothing from kafka" in {
+//        kafkaClient.consumeMessages("unknownTopic","newConsumerGroup").compile.toList.map(l => assert(l.length == 100)).unsafeRunSync()
+//      }
 
 //      "handle ingestor timeout" in {
 //        testCase(IngestorTimeout, Left(PublishError.Timeout))
@@ -98,7 +113,7 @@ object KafkaClientAlgebraSpec {
 
   def topicAndKeyAndValue(topic: String, key: String, value: String): (String, GenericRecord, GenericRecord) = {
     (topic,
-      SimpleCaseClassKey.codec.encode(SimpleCaseClassKey(key)).asInstanceOf[GenericRecord],
-      SimpleCaseClassValue.codec.encode(SimpleCaseClassValue(value)).asInstanceOf[GenericRecord])
+      SimpleCaseClassKey.codec.encode(SimpleCaseClassKey(key)).map(_.asInstanceOf[GenericRecord]).toOption.get,
+      SimpleCaseClassValue.codec.encode(SimpleCaseClassValue(value)).map(_.asInstanceOf[GenericRecord]).toOption.get)
   }
 }
