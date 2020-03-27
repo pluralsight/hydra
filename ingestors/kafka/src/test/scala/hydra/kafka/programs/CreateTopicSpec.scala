@@ -16,7 +16,7 @@ import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
 import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
-import hydra.kafka.producer.{AvroKeyRecord, KafkaRecord}
+import hydra.kafka.producer.AvroKeyRecord
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
@@ -277,16 +277,11 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
           Subject.createValidated(metadataTopic).get
         ).createTopic(request, TopicDetails(1, 1))
         published <- publishTo.get
-      } yield published shouldBe List(
-        AvroKeyRecord(
-          metadataTopic,
-          TopicMetadataV2Key.codec.schema.toOption.get,
-          TopicMetadataV2Value.codec.schema.toOption.get,
-          expectedKeyRecord.asInstanceOf[GenericRecord],
-          expectedValueRecord.asInstanceOf[GenericRecord],
-          AckStrategy.Replicated
+      } yield published shouldBe Map(subject ->
+          (expectedKeyRecord.asInstanceOf[GenericRecord],
+          expectedValueRecord.asInstanceOf[GenericRecord])
         )
-      )).unsafeRunSync()
+      ).unsafeRunSync()
     }
 
     "rollback kafka topic creation when error encountered in publishing metadata" in {
