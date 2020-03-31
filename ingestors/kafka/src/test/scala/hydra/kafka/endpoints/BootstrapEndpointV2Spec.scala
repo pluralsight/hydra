@@ -6,7 +6,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import cats.data.NonEmptyList
-import cats.effect.{IO, Timer}
+import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.core.marshallers.History
@@ -33,6 +33,8 @@ final class BootstrapEndpointV2Spec
 
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
   private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
+  private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+  private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
 
   private def getTestCreateTopicProgram(
       s: SchemaRegistry[IO],

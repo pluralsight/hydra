@@ -4,7 +4,7 @@ import java.time.Instant
 
 import cats.data.NonEmptyList
 import cats.effect.concurrent.Ref
-import cats.effect.{IO, Sync, Timer}
+import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
@@ -25,11 +25,16 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import retry.{RetryPolicies, RetryPolicy}
 
+import scala.concurrent.ExecutionContext
+
 class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
   implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
     Slf4jLogger.getLogger[F]
   implicit val timer: Timer[IO] = IO.timer(concurrent.ExecutionContext.global)
+  private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+  private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
+
 
   private val keySchema = getSchema("key")
   private val valueSchema = getSchema("val")

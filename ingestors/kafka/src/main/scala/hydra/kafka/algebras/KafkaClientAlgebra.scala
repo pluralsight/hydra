@@ -1,8 +1,9 @@
 package hydra.kafka.algebras
 
-import cats.effect.concurrent.Deferred
+import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.implicits._
+import fs2.concurrent.Queue
 import fs2.kafka._
 import fs2.kafka.vulcan.{KafkaAvroSerializer, SchemaRegistryClient}
 import hydra.avro.registry.SchemaRegistry
@@ -10,19 +11,22 @@ import hydra.core.protocol._
 import hydra.kafka.algebras.KafkaClientAlgebra.{PublishError, TopicName}
 import io.confluent.kafka.serializers.{AbstractKafkaAvroSerDeConfig, KafkaAvroDeserializer}
 import org.apache.avro.generic.GenericRecord
+import org.apache.kafka.clients.producer.MockProducer
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
+import scala.util.Try
 import scala.util.control.NoStackTrace
 
 trait KafkaClientAlgebra[F[_]] {
+  import KafkaClientAlgebra._
   /**
     * Publishes the Hydra record to Kafka
     * @param record - the hydra record that is to be ingested in Kafka
     * @return Either[PublishError, Unit] - Unit is returned upon success, PublishError on failure.
     */
   def publishMessage(
-    record: (GenericRecord, GenericRecord),
+    record: Record,
     topicName: TopicName
   ): F[Either[PublishError, Unit]]
 
@@ -35,14 +39,16 @@ trait KafkaClientAlgebra[F[_]] {
     */
   def consumeMessages(
      topicName: TopicName,
-     consumerGroup: String
-   ): fs2.Stream[F, (GenericRecord, GenericRecord)]
+     consumerGroup: ConsumerGroup
+   ): fs2.Stream[F, Record]
 
 }
 
 object KafkaClientAlgebra {
 
   type TopicName = String
+  type ConsumerGroup = String
+  type Record = (GenericRecord, GenericRecord)
 
   sealed abstract class PublishError(message: String)
     extends Exception(message)
@@ -87,7 +93,7 @@ object KafkaClientAlgebra {
     getProducerQueue[F](bootstrapServers, schemaRegistryClient).map { queue =>
       new KafkaClientAlgebra[F] {
         override def publishMessage(
-                                     record: (GenericRecord, GenericRecord),
+                                     record: Record,
                                      topicName: TopicName
                                    ): F[Either[PublishError, Unit]] = {
           Deferred[F, Unit].flatMap { d =>
@@ -116,13 +122,39 @@ object KafkaClientAlgebra {
     }
   }
 
-  def test[F[_]: Sync]: F[KafkaClientAlgebra[F]] = Sync[F].delay {
+  def test[F[_]: Sync: Concurrent]: F[KafkaClientAlgebra[F]] = Ref[F].of(MockFS2Kafka.empty).map { cache =>
     new KafkaClientAlgebra[F] {
-      override def publishMessage(record: (GenericRecord, GenericRecord), topicName: TopicName): F[Either[PublishError, Unit]] =
-        Sync[F].pure(Right(()))
+      override def publishMessage(record: Record, topicName: TopicName): F[Either[PublishError, Unit]] =
+        cache.getAndUpdate(_.publishMessage(topicName, record)) *>
+          cache.get.flatMap(_.getConsumerQueuesFor(topicName).traverse(_.enqueue1(record))) *>
+          Sync[F].pure(Right(()))
 
-      override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[F, (GenericRecord, GenericRecord)] =
-        fs2.Stream.empty
+      def consumeMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, Record] = {
+
+
+
+        for {
+          maybeQueue <- cache.get.map(_.getConsumerQueue(topicName, consumerGroup))
+          queue <- maybeQueue match {
+            case Some(q) => Sync[F].pure(q)
+            case None => for {
+              streamRecords <- cache.get.map(_.getStreamFor(topicName))
+              newQueue <- fs2.concurrent.Queue.unbounded[F, Record]
+            } yield {
+              streamRecords.evalMap(newQueue.enqueue1).as(newQueue)
+            }
+          }
+        } yield ( queue)
+
+        for {
+          q <- fs2.concurrent.Queue.unbounded[F, Record]
+
+        } yield (cache.getAndUpdate(q))
+        fs2.Stream.force(
+          cache.getAndUpdate(_.addConsumerQueue(topicName, consumerGroup)) *>
+          cache.get.flatMap(_.getConsumerQueueEffect(topicName, consumerGroup)).map(_.dequeue)
+        )
+      }
     }
   }
 
@@ -143,5 +175,31 @@ object KafkaClientAlgebra {
         serializer.serialize(topic, data)
       }
     }
+
+  private final case class MockFS2Kafka[F[_]: Concurrent](
+                                                   private val topics: Map[TopicName, fs2.Stream[F, Record]],
+                                                   consumerQueues: Map[(TopicName, ConsumerGroup), fs2.concurrent.Queue[F, Record]]
+                                                 ) {
+    def publishMessage(topicName: TopicName, record: Record): MockFS2Kafka[F] = {
+      val updatedStream: fs2.Stream[F, Record] = this.topics.getOrElse(topicName, fs2.Stream.empty) ++ fs2.Stream(record)
+      this.copy(topics = this.topics + (topicName -> updatedStream))
+    }
+
+    def addConsumerQueue(topicName: TopicName, consumerGroup: ConsumerGroup): MockFS2Kafka[F] = {
+      lazy val stream = getStreamFor(topicName)
+      val queue: Queue[F, Record] = this.consumerQueues.getOrElse((topicName, consumerGroup), fs2.concurrent.Queue.unbounded[F, Record].map(_.enqueue(stream))) // Want to Queue up the entire stream for topic if not found)
+      this.copy(consumerQueues = this.consumerQueues + ((topicName, consumerGroup) -> queue))
+    }
+
+    def getConsumerQueuesFor(topicName: TopicName): List[Queue[F, Record]] = this.consumerQueues.toList.filter(_._1._1 == topicName).map(_._2)
+
+    def getConsumerQueue(topicName: TopicName, consumerGroup: ConsumerGroup): Option[Queue[F, Record]] = this.consumerQueues.get((topicName, consumerGroup))
+
+    def getStreamFor(topicName: TopicName): fs2.Stream[F, Record] = this.topics.getOrElse(topicName, throw new Exception)
+  }
+
+  private object MockFS2Kafka {
+    def empty[F[_]: Concurrent]: MockFS2Kafka[F] = MockFS2Kafka[F](Map.empty, Map.empty)
+  }
 
 }

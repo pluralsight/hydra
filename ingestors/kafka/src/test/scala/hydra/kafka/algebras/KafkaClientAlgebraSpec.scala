@@ -1,6 +1,6 @@
 package hydra.kafka.algebras
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import hydra.avro.registry.SchemaRegistry
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.avro.generic.GenericRecord
@@ -28,7 +28,7 @@ class KafkaClientAlgebraSpec
 
   implicit private val contextShift: ContextShift[IO] =
     IO.contextShift(ExecutionContext.global)
-
+  private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
   implicit private val timer: Timer[IO] = IO.timer(ExecutionContext.global)
 
   override def beforeAll(): Unit = {
@@ -56,41 +56,16 @@ class KafkaClientAlgebraSpec
         val (topic, key, value) = topicAndKeyAndValue("topic1","key1","value1")
         (schemaRegistry.registerSchema(subject = s"$topic-key", key.getSchema) *>
           schemaRegistry.registerSchema(subject = s"$topic-value", value.getSchema) *>
-          schemaRegistry.getAllSubjects.map(_.foreach(println)) *>
         kafkaClient.publishMessage((key, value), topic).map{ r =>
-          println(r)
           assert(r.isRight)}).unsafeRunSync()
       }
 
       "consume message from kafka" in {
         val (topic, key, value) = topicAndKeyAndValue("topic1","key1","value1")
-        val records = kafkaClient.consumeMessages(topic,"newConsumerGroup").compile.toList.unsafeRunSync()
+        val records = kafkaClient.consumeMessages(topic,"newConsumerGroup").take(1).compile.toList.unsafeRunSync()
         records should have length 1
         records.head shouldBe (key, value)
       }
-
-//      "consume nothing from kafka" in {
-//        kafkaClient.consumeMessages("unknownTopic","newConsumerGroup").compile.toList.map(l => assert(l.length == 100)).unsafeRunSync()
-//      }
-
-//      "handle ingestor timeout" in {
-//        testCase(IngestorTimeout, Left(PublishError.Timeout))
-//      }
-//
-//      "handle unknown responses" in {
-//        testCase(
-//          RequestPublished,
-//          Left(PublishError.UnexpectedResponse(RequestPublished))
-//        )
-//      }
-//
-//      "handle ingestor error" in {
-//        val exception = new Exception("Error")
-//        testCase(
-//          IngestorError(exception),
-//          Left(PublishError.Failed(exception))
-//        )
-//      }
     }
   }
 }
