@@ -131,20 +131,25 @@ object KafkaClientAlgebra {
 
       def consumeMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, Record] = {
 
-
-
-        for {
-          maybeQueue <- cache.get.map(_.getConsumerQueue(topicName, consumerGroup))
+        val q: fs2.Stream[F, Queue[F, Record]] = for {
+          maybeQueue <- fs2.Stream.eval(cache.get.map(_.getConsumerQueue(topicName, consumerGroup)))
           queue <- maybeQueue match {
-            case Some(q) => Sync[F].pure(q)
-            case None => for {
+            case Some(q) => fs2.Stream.emit[F, Queue[F, Record]](q)
+            case None =>
+              val res: F[fs2.Stream[F, Queue[F, Record]]] = for {
               streamRecords <- cache.get.map(_.getStreamFor(topicName))
               newQueue <- fs2.concurrent.Queue.unbounded[F, Record]
             } yield {
-              streamRecords.evalMap(newQueue.enqueue1).as(newQueue)
+              newQueue.enqueue(streamRecords).as(newQueue)
             }
+              fs2.Stream.eval(res).flatten
           }
-        } yield ( queue)
+        } yield queue
+
+        (for {
+          myQueue <- q
+          _ <- fs2.Stream.eval(cache.getAndUpdate(_.addConsumerQueue(topicName, consumerGroup)))
+        } yield myQueue.dequeue).flatten
 
         for {
           q <- fs2.concurrent.Queue.unbounded[F, Record]
