@@ -48,6 +48,7 @@ class KafkaClientAlgebraSpec
     test <- KafkaClientAlgebra.test[IO]
   } yield {
     runTest(schemaRegistryAlgebra, live)
+    runTest(schemaRegistryAlgebra, test, isTest = true)
   }).unsafeRunSync()
 
   private def runTest(schemaRegistry: SchemaRegistry[IO], kafkaClient: KafkaClientAlgebra[IO], isTest: Boolean = false): Unit = {

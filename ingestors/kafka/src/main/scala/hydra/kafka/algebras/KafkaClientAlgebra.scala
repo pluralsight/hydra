@@ -130,37 +130,29 @@ object KafkaClientAlgebra {
           Sync[F].pure(Right(()))
 
       def consumeMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, Record] = {
-
-        val q: fs2.Stream[F, Queue[F, Record]] = for {
+        val streamOfQueue: fs2.Stream[F, Queue[F, Record]] = for {
           maybeQueue <- fs2.Stream.eval(cache.get.map(_.getConsumerQueue(topicName, consumerGroup)))
-          queue <- maybeQueue match {
-            case Some(q) => fs2.Stream.emit[F, Queue[F, Record]](q)
-            case None =>
-              val res: F[fs2.Stream[F, Queue[F, Record]]] = for {
-              streamRecords <- cache.get.map(_.getStreamFor(topicName))
-              newQueue <- fs2.concurrent.Queue.unbounded[F, Record]
-            } yield {
-              newQueue.enqueue(streamRecords).as(newQueue)
-            }
-              fs2.Stream.eval(res).flatten
+          s <- maybeQueue match {
+            case Some(q) => fs2.Stream(q)
+            case None => createNewStreamOfQueue(cache, topicName)
           }
-        } yield queue
+        } yield s
 
         (for {
-          myQueue <- q
-          _ <- fs2.Stream.eval(cache.getAndUpdate(_.addConsumerQueue(topicName, consumerGroup)))
-        } yield myQueue.dequeue).flatten
-
-        for {
-          q <- fs2.concurrent.Queue.unbounded[F, Record]
-
-        } yield (cache.getAndUpdate(q))
-        fs2.Stream.force(
-          cache.getAndUpdate(_.addConsumerQueue(topicName, consumerGroup)) *>
-          cache.get.flatMap(_.getConsumerQueueEffect(topicName, consumerGroup)).map(_.dequeue)
-        )
+          queue <- streamOfQueue
+          _ <- fs2.Stream.eval(cache.getAndUpdate(_.addConsumerQueue(topicName, consumerGroup, queue)))
+        } yield queue.dequeue).flatten
       }
     }
+  }
+
+  private def createNewStreamOfQueue[F[_]: Concurrent](cache: Ref[F, MockFS2Kafka[F]], topicName: TopicName): fs2.Stream[F, Queue[F, Record]] = {
+    fs2.Stream.eval(for {
+      streamRecords <- cache.get.map(_.getStreamFor(topicName))
+      newQueue <- fs2.concurrent.Queue.unbounded[F, Record]
+    } yield {
+      newQueue.enqueue(streamRecords).as(newQueue)
+    }).flatten
   }
 
   private def getGenericRecordDeserializer[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient)(isKey: Boolean = false): Deserializer[F, GenericRecord] =
@@ -190,9 +182,7 @@ object KafkaClientAlgebra {
       this.copy(topics = this.topics + (topicName -> updatedStream))
     }
 
-    def addConsumerQueue(topicName: TopicName, consumerGroup: ConsumerGroup): MockFS2Kafka[F] = {
-      lazy val stream = getStreamFor(topicName)
-      val queue: Queue[F, Record] = this.consumerQueues.getOrElse((topicName, consumerGroup), fs2.concurrent.Queue.unbounded[F, Record].map(_.enqueue(stream))) // Want to Queue up the entire stream for topic if not found)
+    def addConsumerQueue(topicName: TopicName, consumerGroup: ConsumerGroup, queue: Queue[F, Record]): MockFS2Kafka[F] = {
       this.copy(consumerQueues = this.consumerQueues + ((topicName, consumerGroup) -> queue))
     }
 
