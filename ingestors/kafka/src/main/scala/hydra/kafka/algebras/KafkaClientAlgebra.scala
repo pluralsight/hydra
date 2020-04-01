@@ -62,13 +62,6 @@ object KafkaClientAlgebra {
       extends PublishError("Timeout while ingesting message.")
         with NoStackTrace
 
-    final case class UnexpectedResponse(ingestorResponse: IngestorStatus)
-      extends PublishError(
-        s"Unexpected response from ingestor: $ingestorResponse"
-      )
-
-    final case class Failed(cause: Throwable)
-      extends PublishError(cause.getMessage)
   }
 
 
