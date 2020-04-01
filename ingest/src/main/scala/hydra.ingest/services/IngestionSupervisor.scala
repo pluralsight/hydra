@@ -100,12 +100,8 @@ class IngestionSupervisor(
     case ReceiveTimeout =>
       //get status for ingestors
       val errorMsg =
-        s"""${request.correlationId}:
-           |Ack:${request.ackStrategy};
-           |Validation: ${request.validationStrategy};
-           |Metadata:${request.metadata};
-           |Payload: ${request.payload}
-           |Ingestors:  ${ingestors.toString}""".stripMargin
+        s"${request.correlationId}: Ack:${request.ackStrategy}; Validation: ${request.validationStrategy};" +
+          s" Metadata:${request.metadata}; Payload: ${request.payload} Ingestors: ${ingestors.toString}; Timeout: $timeout"
       log.error(s"Ingestion timed out for request $errorMsg")
       context.system.eventStream.publish(
         IngestionTimedOut(request, start, timeout, ingestors.keys.mkString(","))
