@@ -32,7 +32,8 @@ trait KafkaClientAlgebra[F[_]] {
 
 
   /**
-    * Consume the Hydra record from Kafka
+    * Consume the Hydra record from Kafka.
+    * Does not commit offsets. Each time function is called will return
     * @param topicName - topic name to consume
     * @param consumerGroup - group id for consume
     * @return Stream that results in tupled K and V
