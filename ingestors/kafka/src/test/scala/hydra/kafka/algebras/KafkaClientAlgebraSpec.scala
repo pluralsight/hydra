@@ -47,7 +47,7 @@ class KafkaClientAlgebraSpec
     live <- KafkaClientAlgebra.live[IO](s"localhost:$port", schemaRegistryAlgebra)
     test <- KafkaClientAlgebra.test[IO]
   } yield {
-//    runTest(schemaRegistryAlgebra, live)
+    runTest(schemaRegistryAlgebra, live)
     runTest(schemaRegistryAlgebra, test, isTest = true)
   }).unsafeRunSync()
 
@@ -71,8 +71,8 @@ class KafkaClientAlgebraSpec
       val (_, key2, value2) = topicAndKeyAndValue("topic1","key2","value2")
       "publish a record to existing topic and consume only that value in existing consumer group" in {
         kafkaClient.publishMessage((key2, value2), topic).unsafeRunSync()
-        //        val records2 = kafkaClient.consumeMessages(topic, "secondConsumerGroup").take(1).compile.toList.unsafeRunSync()
-        //        records2 should contain allOf((key,value), (key2,value2))
+        val records2 = kafkaClient.consumeMessages(topic, "secondConsumerGroup").take(2).compile.toList.unsafeRunSync()
+        records2 should contain allOf((key,value), (key2,value2))
         val records = kafkaClient.consumeMessages(topic, "newConsumerGroup6").take(2).compile.toList.unsafeRunSync()
         records should contain allOf((key2, value2), (key, value))
       }

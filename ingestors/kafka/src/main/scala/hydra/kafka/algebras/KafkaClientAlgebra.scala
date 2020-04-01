@@ -130,37 +130,20 @@ object KafkaClientAlgebra {
           Sync[F].pure(Right(()))
 
       def consumeMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, Record] = {
-        val streamOfQueue: fs2.Stream[F, Queue[F, Record]] = for {
-//          maybeQueue <- fs2.Stream.eval(cache.get.map(_.getConsumerQueue(topicName, consumerGroup)))
-          s <- createNewStreamOfQueue(cache, topicName)
-//            maybeQueue match {
-//            case Some(q) => fs2.Stream(q)
-//            case None => createNewStreamOfQueue(cache, topicName)
-//          }
-        } yield s
-
-        (for {
-          queue <- streamOfQueue
-          _ <- fs2.Stream.eval(cache.getAndUpdate(_.addConsumerQueue(topicName, consumerGroup, queue)))
-        } yield queue.dequeue).flatten
+        fs2.Stream.force(for {
+          queue <- createNewStreamOfQueue(cache, topicName)
+          _ <- cache.getAndUpdate(_.addConsumerQueue(topicName, consumerGroup, queue))
+        } yield queue.dequeue)
       }
     }
   }
 
-  private def createNewStreamOfQueue[F[_]: Concurrent](cache: Ref[F, MockFS2Kafka[F]], topicName: TopicName): fs2.Stream[F, Queue[F, Record]] = {
-    fs2.Stream.eval(for {
+  private def createNewStreamOfQueue[F[_]: Concurrent](cache: Ref[F, MockFS2Kafka[F]], topicName: TopicName): F[Queue[F, Record]] = {
+    for {
       streamRecords <- cache.get.map(_.getStreamFor(topicName))
       newQueue <- fs2.concurrent.Queue.unbounded[F, Record]
-    } yield {
-      List().map(newQueue.enqueue1)
-      newQueue.enqueue(List[Record]())
-      streamRecords
-      streamRecords.evalMap { record =>
-        println(record)
-        newQueue.enqueue1(record)
-      }.as(newQueue)
-//      newQueue.enqueue(streamRecords).as(newQueue)
-    }).flatten
+      _ <- streamRecords.traverse(newQueue.enqueue1)
+    } yield newQueue
   }
 
   private def getGenericRecordDeserializer[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient)(isKey: Boolean = false): Deserializer[F, GenericRecord] =
@@ -182,12 +165,12 @@ object KafkaClientAlgebra {
     }
 
   private final case class MockFS2Kafka[F[_]: Concurrent](
-                                                   private val topics: Map[TopicName, fs2.Stream[F, Record]],
+                                                   private val topics: Map[TopicName, List[Record]],
                                                    consumerQueues: Map[(TopicName, ConsumerGroup), fs2.concurrent.Queue[F, Record]]
                                                  ) {
     def publishMessage(topicName: TopicName, record: Record): MockFS2Kafka[F] = {
       println("Publish Function Hit")
-      val updatedStream: fs2.Stream[F, Record] = this.topics.getOrElse(topicName, fs2.Stream.empty) ++ fs2.Stream(record)
+      val updatedStream: List[Record] = this.topics.getOrElse(topicName, List.empty) :+ record
       this.copy(topics = this.topics + (topicName -> updatedStream))
     }
 
@@ -199,7 +182,7 @@ object KafkaClientAlgebra {
 
     def getConsumerQueue(topicName: TopicName, consumerGroup: ConsumerGroup): Option[Queue[F, Record]] = this.consumerQueues.get((topicName, consumerGroup))
 
-    def getStreamFor(topicName: TopicName): fs2.Stream[F, Record] = this.topics.getOrElse(topicName, throw new Exception)
+    def getStreamFor(topicName: TopicName): List[Record] = this.topics.getOrElse(topicName, throw new Exception)
   }
 
   private object MockFS2Kafka {
