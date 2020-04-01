@@ -170,7 +170,6 @@ object KafkaClientAlgebra {
                                                    consumerQueues: Map[(TopicName, ConsumerGroup), fs2.concurrent.Queue[F, Record]]
                                                  ) {
     def publishMessage(topicName: TopicName, record: Record): MockFS2Kafka[F] = {
-      println("Publish Function Hit")
       val updatedStream: List[Record] = this.topics.getOrElse(topicName, List.empty) :+ record
       this.copy(topics = this.topics + (topicName -> updatedStream))
     }

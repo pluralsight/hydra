@@ -74,6 +74,25 @@ class KafkaClientAlgebraSpec
         val records = kafkaClient.consumeMessages(topic, "newConsumerGroup6").take(2).compile.toList.unsafeRunSync()
         records should contain allOf((key2, value2), (key, value))
       }
+
+      val (_, key3, value3) = topicAndKeyAndValue("topic1","key3","value3")
+      "continue consuming messages from the same stream" in {
+        val stream = kafkaClient.consumeMessages(topic, "doesNotReallyMatter")
+        stream.take(2).compile.toList.unsafeRunSync() should contain allOf((key2, value2), (key, value))
+        kafkaClient.publishMessage((key3, value3), topic).unsafeRunSync()
+        stream.take(3).compile.toList.unsafeRunSync().last shouldBe (key3, value3)
+      }
+
+      val (topic2, key4, value4) = topicAndKeyAndValue("topic2","key4","value4")
+      val (_, key5, value5) = topicAndKeyAndValue("topic2","key5","value5")
+      "consume from two different topics" in {
+        (kafkaClient.publishMessage((key4, value4), topic2) *> kafkaClient.publishMessage((key5, value5), topic2)).unsafeRunSync()
+        val topicOneStream = kafkaClient.consumeMessages(topic, "doesNotReallyMatter")
+        val topicTwoStream = kafkaClient.consumeMessages(topic2, "doesNotReallyMatter")
+
+        topicOneStream.take(3).compile.toList.unsafeRunSync() should contain allOf ((key3, value3), (key2, value2), (key, value))
+        topicTwoStream.take(2).compile.toList.unsafeRunSync() should contain allOf ((key4, value4), (key5, value5))
+      }
     }
   }
 }
