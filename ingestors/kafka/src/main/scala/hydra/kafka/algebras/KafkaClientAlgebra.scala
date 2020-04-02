@@ -142,21 +142,27 @@ object KafkaClientAlgebra {
 
   private def getGenericRecordDeserializer[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient)(isKey: Boolean = false): Deserializer[F, GenericRecord] =
     Deserializer.delegate[F, GenericRecord] {
+      val deserializer = {
+        val de = new KafkaAvroDeserializer(schemaRegistryClient)
+        de.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "").asJava, isKey)
+        de
+      }
     (topic: TopicName, data: Array[Byte]) => {
-      val deserializer = new KafkaAvroDeserializer(schemaRegistryClient)
-      deserializer.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "").asJava, isKey)
       deserializer.deserialize(topic, data).asInstanceOf[GenericRecord]
     }
-  }
+  }.suspend
 
   private def getGenericRecordSerializer[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient)(isKey: Boolean = false): Serializer[F, GenericRecord] =
     Serializer.delegate[F, GenericRecord] {
+      val serializer = {
+        val se = new KafkaAvroSerializer(schemaRegistryClient)
+        se.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "").asJava, isKey)
+        se
+      }
       (topic: TopicName, data: GenericRecord) => {
-        val serializer = new KafkaAvroSerializer(schemaRegistryClient)
-        serializer.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "").asJava, isKey)
         serializer.serialize(topic, data)
       }
-    }
+    }.suspend
 
   private final case class MockFS2Kafka[F[_]: Concurrent](
                                                    private val topics: Map[TopicName, List[Record]],
