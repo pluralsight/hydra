@@ -171,5 +171,5 @@ object KafkaUtils extends ConfigSupport {
     KafkaUtils(ConfigSupport.toMap(config))
 
   def apply(): KafkaUtils =
-    apply(KafkaConfigSupport.kafkaConfig.getConfig("kafka.producer"))
+    apply(KafkaConfigSupport.kafkaConfig.getConfig("kafka.admin"))
 }

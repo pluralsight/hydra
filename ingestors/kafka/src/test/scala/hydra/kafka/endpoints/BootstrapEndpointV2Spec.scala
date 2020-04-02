@@ -21,13 +21,14 @@ import io.chrisdavenport.log4cats.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.apache.avro.{Schema, SchemaBuilder}
-import org.scalatest.{Matchers, WordSpecLike}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
 import retry.{RetryPolicies, RetryPolicy}
 
 import scala.concurrent.ExecutionContext
 
 final class BootstrapEndpointV2Spec
-    extends WordSpecLike
+    extends AnyWordSpecLike
     with ScalatestRouteTest
     with Matchers {
 
