@@ -4,15 +4,11 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.RouteDirectives
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
-import com.typesafe.config.ConfigFactory
-import fs2.kafka.{Deserializer, Serializer}
-import fs2.kafka.vulcan.{AvroSettings, SchemaRegistryClientSettings, avroDeserializer, avroSerializer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.core.http.RouteSupport
 import hydra.ingest.app.AppConfig
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
 import hydra.kafka.endpoints.BootstrapEndpointV2
-import hydra.kafka.model.{TopicMetadataV2Key, TopicMetadataV2Value}
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger

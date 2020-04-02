@@ -5,17 +5,13 @@ import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.implicits._
 import fs2.concurrent.Queue
 import fs2.kafka._
-import fs2.kafka.vulcan.{KafkaAvroSerializer, SchemaRegistryClient}
 import hydra.avro.registry.SchemaRegistry
-import hydra.core.protocol._
-import hydra.kafka.algebras.KafkaClientAlgebra.{PublishError, TopicName}
-import io.confluent.kafka.serializers.{AbstractKafkaAvroSerDeConfig, KafkaAvroDeserializer}
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
+import io.confluent.kafka.serializers.{AbstractKafkaAvroSerDeConfig, KafkaAvroDeserializer, KafkaAvroSerializer}
 import org.apache.avro.generic.GenericRecord
-import org.apache.kafka.clients.producer.MockProducer
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
-import scala.util.Try
 import scala.util.control.NoStackTrace
 
 trait KafkaClientAlgebra[F[_]] {
@@ -92,7 +88,7 @@ object KafkaClientAlgebra {
                                    ): F[Either[PublishError, Unit]] = {
           Deferred[F, Unit].flatMap { d =>
             queue.enqueue1((record._1, record._2, topicName, d)) *>
-              Concurrent.timeoutTo[F, Either[PublishError, Unit]](d.get.map(Right(_)), 100.seconds, Sync[F].pure(Left(PublishError.Timeout)))
+              Concurrent.timeoutTo[F, Either[PublishError, Unit]](d.get.map(Right(_)), 5.seconds, Sync[F].pure(Left(PublishError.Timeout)))
           }
         }
 
