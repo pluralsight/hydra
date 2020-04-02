@@ -276,14 +276,14 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         )
         m <- TopicMetadataV2.encode[IO](key, value)
         _ <- new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafkaAdmin,
-          kafkaClient,
-          policy,
-          Subject.createValidated(metadataTopic).get
+          schemaRegistry = schemaRegistry,
+          kafkaAdmin = kafkaAdmin,
+          kafkaClient = kafkaClient,
+          retryPolicy = policy,
+          v2MetadataTopicName = Subject.createValidated(metadataTopic).get
         ).createTopic(request, TopicDetails(1, 1))
         published <- publishTo.get
-      } yield published shouldBe Map(subject -> (m._1, m._2))).unsafeRunSync()
+      } yield published shouldBe Map(metadataTopic -> (m._1, m._2))).unsafeRunSync()
     }
 
     "rollback kafka topic creation when error encountered in publishing metadata" in {

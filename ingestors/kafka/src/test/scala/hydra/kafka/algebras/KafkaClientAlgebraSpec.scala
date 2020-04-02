@@ -21,10 +21,10 @@ class KafkaClientAlgebraSpec
 
   import KafkaClientAlgebraSpec._
 
-  private val port = 8023
+  private val port = 8092
 
   implicit private val kafkaConfig: EmbeddedKafkaConfig =
-    EmbeddedKafkaConfig(kafkaPort = port, zooKeeperPort = 3027)
+    EmbeddedKafkaConfig(kafkaPort = port, zooKeeperPort = 3182)
 
   implicit private val contextShift: ContextShift[IO] =
     IO.contextShift(ExecutionContext.global)
