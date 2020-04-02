@@ -61,8 +61,7 @@ object Dependencies {
     )
 
     val fs2Kafka = Seq(
-      "com.github.fd4s" %% "fs2-kafka" % fs2KafkaVersion,
-      "com.github.fd4s" %% "fs2-kafka-vulcan" % fs2KafkaVersion
+      "com.github.fd4s" %% "fs2-kafka" % fs2KafkaVersion
     )
 
     val ciris = "is.cir" %% "ciris" % cirisVersion
