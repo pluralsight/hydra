@@ -49,7 +49,7 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
 
   private val topicActor = context.actorOf(
     KafkaTopicsActor
-      .props(KafkaConfigSupport.kafkaConfig.getConfig("kafka.producer"))
+      .props(KafkaConfigSupport.kafkaConfig.getConfig("kafka.admin"))
   )
 
   ingest {
