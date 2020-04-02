@@ -104,7 +104,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     for {
       records <- TopicMetadataV2.encode[F](message._1, message._2)
       _ <- kafkaClient
-        .publishMessage(records, message._1.subject.value)
+        .publishMessage(records, v2MetadataTopicName.value)
         .rethrow
     } yield ()
   }

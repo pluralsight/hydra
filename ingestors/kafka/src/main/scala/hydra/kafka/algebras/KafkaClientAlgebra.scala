@@ -92,7 +92,7 @@ object KafkaClientAlgebra {
                                    ): F[Either[PublishError, Unit]] = {
           Deferred[F, Unit].flatMap { d =>
             queue.enqueue1((record._1, record._2, topicName, d)) *>
-              Concurrent.timeoutTo[F, Either[PublishError, Unit]](d.get.map(Right(_)), 3.seconds, Sync[F].pure(Left(PublishError.Timeout)))
+              Concurrent.timeoutTo[F, Either[PublishError, Unit]](d.get.map(Right(_)), 100.seconds, Sync[F].pure(Left(PublishError.Timeout)))
           }
         }
 
