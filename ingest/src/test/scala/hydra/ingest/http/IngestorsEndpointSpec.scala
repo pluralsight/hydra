@@ -5,13 +5,10 @@ import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.testkit.{TestActorRef, TestKit, TestProbe}
 import hydra.common.util.ActorUtils
 import hydra.ingest.IngestorInfo
-import hydra.ingest.services.IngestorRegistry.{
-  FindAll,
-  FindByName,
-  LookupResult
-}
+import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import org.joda.time.DateTime
-import org.scalatest.{Matchers, WordSpecLike}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.duration._
 
@@ -20,7 +17,7 @@ import scala.concurrent.duration._
   */
 class IngestorsEndpointSpec
     extends Matchers
-    with WordSpecLike
+    with AnyWordSpecLike
     with ScalatestRouteTest
     with HydraIngestJsonSupport {
 

@@ -7,7 +7,9 @@ import hydra.kafka.util.KafkaUtils
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
-import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._
 
@@ -15,7 +17,7 @@ import scala.collection.JavaConverters._
   * Created by alexsilva on 5/17/17.
   */
 class KafkaUtilsSpec
-    extends WordSpec
+    extends AnyWordSpec
     with BeforeAndAfterAll
     with Matchers
     with Eventually

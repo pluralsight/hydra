@@ -20,7 +20,8 @@ import org.apache.avro.generic.GenericRecord
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{Matchers, WordSpecLike}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
 import spray.json._
 
 import scala.concurrent.duration._
@@ -28,7 +29,7 @@ import scala.io.Source
 
 class BootstrapEndpointSpec
     extends Matchers
-    with WordSpecLike
+    with AnyWordSpecLike
     with ScalatestRouteTest
     with HydraKafkaJsonSupport
     with ConfigSupport

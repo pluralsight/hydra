@@ -9,14 +9,11 @@ import akka.testkit.{TestActorRef, TestKit}
 import akka.util.ByteString
 import hydra.core.protocol._
 import hydra.ingest.IngestorInfo
-import hydra.ingest.services.IngestorRegistry.{
-  FindAll,
-  FindByName,
-  LookupResult
-}
+import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.TestRecordFactory
 import org.joda.time.DateTime
-import org.scalatest.{Matchers, WordSpecLike}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.duration._
 
@@ -25,7 +22,7 @@ import scala.concurrent.duration._
   */
 class IngestionWebSocketEndpointSpec
     extends Matchers
-    with WordSpecLike
+    with AnyWordSpecLike
     with ScalatestRouteTest {
 
   val endpt = new IngestionWebSocketEndpoint()

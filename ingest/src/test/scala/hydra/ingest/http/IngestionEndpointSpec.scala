@@ -3,25 +3,18 @@ package hydra.ingest.http
 import akka.actor.{Actor, Props}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.server.{
-  MethodRejection,
-  MissingHeaderRejection,
-  RequestEntityExpectedRejection
-}
+import akka.http.scaladsl.server.{MethodRejection, MissingHeaderRejection, RequestEntityExpectedRejection}
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.{TestActorRef, TestKit}
 import hydra.common.util.ActorUtils
 import hydra.core.ingest.RequestParams
 import hydra.core.marshallers.GenericError
 import hydra.ingest.IngestorInfo
-import hydra.ingest.services.IngestorRegistry.{
-  FindAll,
-  FindByName,
-  LookupResult
-}
+import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.TestIngestor
 import org.joda.time.DateTime
-import org.scalatest.{Matchers, WordSpecLike}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.duration._
 
@@ -30,7 +23,7 @@ import scala.concurrent.duration._
   */
 class IngestionEndpointSpec
     extends Matchers
-    with WordSpecLike
+    with AnyWordSpecLike
     with ScalatestRouteTest
     with HydraIngestJsonSupport {
 
