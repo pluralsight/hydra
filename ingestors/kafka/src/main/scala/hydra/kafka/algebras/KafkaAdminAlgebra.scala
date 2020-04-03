@@ -1,24 +1,14 @@
-package hydra.kafka.util
+package hydra.kafka.algebras
 
-import akka.actor.ActorSelection
 import cats.effect.concurrent.Ref
 import cats.effect.{Async, Concurrent, ContextShift, Resource, Sync}
 import cats.implicits._
 import fs2.kafka._
-import hydra.core.protocol.{
-  Ingest,
-  IngestorCompleted,
-  IngestorError,
-  IngestorStatus,
-  IngestorTimeout
-}
-import hydra.core.transport.AckStrategy
+import hydra.core.protocol._
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.kafka.clients.admin.NewTopic
-import hydra.kafka.producer.KafkaRecord
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
 
-import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
 
 /**
@@ -26,8 +16,8 @@ import scala.util.control.NoStackTrace
   * Provides a live version for production usage and a test version for integration testing.
   * @tparam F - higher kinded type - polymorphic effect type
   */
-trait KafkaClient[F[_]] {
-  import KafkaClient._
+trait KafkaAdminAlgebra[F[_]] {
+  import KafkaAdminAlgebra._
 
   /**
     * Retrieves Topic if found in Kafka. Provides minimal detail about the topic.
@@ -56,50 +46,17 @@ trait KafkaClient[F[_]] {
     * @return
     */
   def deleteTopic(name: String): F[Unit]
-
-  /**
-    * Publishes the Hydra record to Kafka
-    * @param record - the hydra record that is to be ingested in Kafka
-    * @tparam K - Key type
-    * @tparam V - Value type
-    * @return Either[PublishError, Unit] - Unit is returned upon success, PublishError on failure.
-    */
-  def publishMessage[K, V](
-      record: KafkaRecord[K, V]
-  ): F[Either[PublishError, Unit]]
-
 }
 
-object KafkaClient {
+object KafkaAdminAlgebra {
 
   type TopicName = String
   final case class Topic(name: TopicName, numberPartitions: Int)
 
-  sealed abstract class PublishError(message: String)
-      extends Exception(message)
-      with Product
-      with Serializable
-
-  object PublishError {
-
-    final case object Timeout
-        extends PublishError("Timeout while ingesting message.")
-        with NoStackTrace
-
-    final case class UnexpectedResponse(ingestorResponse: IngestorStatus)
-        extends PublishError(
-          s"Unexpected response from ingestor: $ingestorResponse"
-        )
-
-    final case class Failed(cause: Throwable)
-        extends PublishError(cause.getMessage)
-  }
-
-  def live[F[_]: Async: Concurrent: ContextShift](
+  def live[F[_]: Sync: Concurrent: ContextShift](
       bootstrapServers: String,
-      ingestActor: ActorSelection
-  ): F[KafkaClient[F]] = Sync[F].delay {
-    new KafkaClient[F] {
+  ): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
+    new KafkaAdminAlgebra[F] {
 
       override def describeTopic(name: TopicName): F[Option[Topic]] = {
         getAdminClientResource
@@ -125,30 +82,6 @@ object KafkaClient {
       override def deleteTopic(name: String): F[Unit] =
         getAdminClientResource.use(_.deleteTopic(name))
 
-      override def publishMessage[K, V](
-          record: KafkaRecord[K, V]
-      ): F[Either[PublishError, Unit]] = {
-        import akka.pattern.ask
-
-        implicit val timeout: akka.util.Timeout = akka.util.Timeout(1.second)
-        val ingestRecord = Async.fromFuture(
-          Sync[F].delay(
-            (ingestActor ? Ingest(record, AckStrategy.Replicated))
-              .mapTo[IngestorStatus]
-          )
-        )
-        val ingestionResult: F[Unit] = ingestRecord.flatMap {
-          case IngestorCompleted => Async[F].unit
-          case IngestorError(error) =>
-            Async[F].raiseError(PublishError.Failed(error))
-          case IngestorTimeout => Async[F].raiseError(PublishError.Timeout)
-          case otherStatus =>
-            Async[F].raiseError(PublishError.UnexpectedResponse(otherStatus))
-        }
-
-        ingestionResult.attemptNarrow[PublishError]
-      }
-
       private def getAdminClientResource: Resource[F, KafkaAdminClient[F]] = {
         adminClientResource(
           AdminClientSettings.apply.withBootstrapServers(bootstrapServers)
@@ -157,13 +90,13 @@ object KafkaClient {
     }
   }
 
-  def test[F[_]: Sync]: F[KafkaClient[F]] =
+  def test[F[_]: Sync]: F[KafkaAdminAlgebra[F]] =
     Ref[F].of(Map[TopicName, Topic]()).flatMap(getTestKafkaClient[F])
 
   private[this] def getTestKafkaClient[F[_]: Sync](
       ref: Ref[F, Map[TopicName, Topic]]
-  ): F[KafkaClient[F]] = Sync[F].delay {
-    new KafkaClient[F] {
+  ): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
+    new KafkaAdminAlgebra[F] {
       override def describeTopic(name: TopicName): F[Option[Topic]] =
         ref.get.map(_.get(name))
 
@@ -180,12 +113,6 @@ object KafkaClient {
 
       override def deleteTopic(name: String): F[Unit] =
         ref.update(_ - name)
-
-      override def publishMessage[K, V](
-          record: KafkaRecord[K, V]
-      ): F[Either[PublishError, Unit]] =
-        Sync[F].pure(Right(()))
-
     }
   }
 

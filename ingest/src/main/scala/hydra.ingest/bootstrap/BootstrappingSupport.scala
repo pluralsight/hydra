@@ -4,13 +4,12 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.RouteDirectives
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
-import com.typesafe.config.ConfigFactory
 import hydra.avro.registry.SchemaRegistry
 import hydra.core.http.RouteSupport
 import hydra.ingest.app.AppConfig
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
 import hydra.kafka.endpoints.BootstrapEndpointV2
 import hydra.kafka.programs.CreateTopicProgram
-import hydra.kafka.util.KafkaClient
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
@@ -43,13 +42,11 @@ class BootstrapEndpoints(
   private val schemaRegistry =
     SchemaRegistry.live[IO](schemaRegistryUrl, 100).unsafeRunSync()
 
-  private val ingestorSelection =
-    system.actorSelection(
-      path = ConfigFactory.load().getString("hydra.kafka-ingestor-path")
-    )
+  private val kafkaAdmin =
+    KafkaAdminAlgebra.live[IO](bootstrapServers).unsafeRunSync()
 
   private val kafkaClient =
-    KafkaClient.live[IO](bootstrapServers, ingestorSelection).unsafeRunSync()
+    KafkaClientAlgebra.live[IO](bootstrapServers, schemaRegistry).unsafeRunSync()
 
   private val isBootstrapV2Enabled =
     config.v2MetadataTopicConfig.createV2TopicsEnabled
@@ -69,6 +66,7 @@ class BootstrapEndpoints(
       new BootstrapEndpointV2(
         new CreateTopicProgram[IO](
           schemaRegistry,
+          kafkaAdmin,
           kafkaClient,
           retryPolicy,
           v2MetadataTopicName

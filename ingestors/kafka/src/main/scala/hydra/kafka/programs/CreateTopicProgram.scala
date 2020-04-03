@@ -5,10 +5,10 @@ import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
 import hydra.core.transport.AckStrategy
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Request}
+import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request, TopicMetadataV2Value}
 import hydra.kafka.producer.AvroKeyRecord
-import hydra.kafka.util.KafkaClient
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
 import org.apache.avro.Schema
@@ -16,10 +16,11 @@ import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy, _}
 
 final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
-    schemaRegistry: SchemaRegistry[F],
-    kafkaClient: KafkaClient[F],
-    retryPolicy: RetryPolicy[F],
-    v2MetadataTopicName: Subject
+                                                                               schemaRegistry: SchemaRegistry[F],
+                                                                               kafkaAdmin: KafkaAdminAlgebra[F],
+                                                                               kafkaClient: KafkaClientAlgebra[F],
+                                                                               retryPolicy: RetryPolicy[F],
+                                                                               v2MetadataTopicName: Subject
 ) {
 
   private def onFailure(resourceTried: String): (Throwable, RetryDetails) => F[Unit] = {
@@ -77,10 +78,10 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       topicDetails: TopicDetails
   ): Resource[F, Unit] = {
     val createTopic: F[Option[Subject]] =
-      kafkaClient.describeTopic(subject.value).flatMap {
+      kafkaAdmin.describeTopic(subject.value).flatMap {
         case Some(_) => Bracket[F, Throwable].pure(None)
         case None =>
-          kafkaClient
+          kafkaAdmin
             .createTopic(subject.value, topicDetails)
             .retryingOnAllErrors(retryPolicy, onFailure("CreateTopicResource")) *> Bracket[
             F,
@@ -90,7 +91,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     Resource
       .makeCase(createTopic)({
         case (Some(_), ExitCase.Error(_)) =>
-          kafkaClient.deleteTopic(subject.value)
+          kafkaAdmin.deleteTopic(subject.value)
         case _ => Bracket[F, Throwable].unit
       })
       .void
@@ -99,21 +100,11 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   private def publishMetadata(
       createTopicRequest: TopicMetadataV2Request
   ): F[Unit] = {
-    val (key, value) = createTopicRequest.toKeyAndValue
+    val message = createTopicRequest.toKeyAndValue
     for {
-      records <- TopicMetadataV2.encode[F](key, value)
-      schemas <- TopicMetadataV2.getSchemas[F]
+      records <- TopicMetadataV2.encode[F](message._1, message._2)
       _ <- kafkaClient
-        .publishMessage(
-          AvroKeyRecord(
-            v2MetadataTopicName.value,
-            schemas.key,
-            schemas.value,
-            records._1,
-            records._2,
-            AckStrategy.Replicated
-          )
-        )
+        .publishMessage(records, v2MetadataTopicName.value)
         .rethrow
     } yield ()
   }

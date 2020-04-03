@@ -6,19 +6,20 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import cats.data.NonEmptyList
-import cats.effect.{IO, Timer}
+import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.core.marshallers.History
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
 import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.serializers.TopicMetadataV2Parser
-import hydra.kafka.util.KafkaClient
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -33,16 +34,20 @@ final class BootstrapEndpointV2Spec
 
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
   private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
+  private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+  private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
 
   private def getTestCreateTopicProgram(
       s: SchemaRegistry[IO],
-      k: KafkaClient[IO]
+      ka: KafkaAdminAlgebra[IO],
+      kc: KafkaClientAlgebra[IO]
   ): BootstrapEndpointV2 = {
     val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
     new BootstrapEndpointV2(
       new CreateTopicProgram[IO](
         s,
-        k,
+        ka,
+        kc,
         retryPolicy,
         Subject.createValidated("test").get
       ),
@@ -53,8 +58,9 @@ final class BootstrapEndpointV2Spec
   private val testCreateTopicProgram: IO[BootstrapEndpointV2] =
     for {
       s <- SchemaRegistry.test[IO]
-      k <- KafkaClient.test[IO]
-    } yield getTestCreateTopicProgram(s, k)
+      k <- KafkaAdminAlgebra.test[IO]
+      kc <- KafkaClientAlgebra.test[IO]
+    } yield getTestCreateTopicProgram(s, k, kc)
 
   "BootstrapEndpointV2" must {
 
@@ -121,17 +127,21 @@ final class BootstrapEndpointV2Spec
         ): IO[SchemaVersion] = err
         override def getAllVersions(subject: String): IO[List[Int]] = err
         override def getAllSubjects: IO[List[String]] = err
+
+        override def getSchemaRegistryClient: IO[SchemaRegistryClient] = err
       }
-      KafkaClient
-        .test[IO]
-        .map { kafka =>
-          Post("/v2/streams", validRequest) ~> Route.seal(
-            getTestCreateTopicProgram(failingSchemaRegistry, kafka).route
-          ) ~> check {
-            response.status shouldBe StatusCodes.InternalServerError
+      KafkaClientAlgebra.test[IO].map { client =>
+        KafkaAdminAlgebra
+          .test[IO]
+          .map { kafka =>
+            Post("/v2/streams", validRequest) ~> Route.seal(
+              getTestCreateTopicProgram(failingSchemaRegistry, kafka, client).route
+            ) ~> check {
+              response.status shouldBe StatusCodes.InternalServerError
+            }
           }
-        }
-        .unsafeRunSync()
+          .unsafeRunSync()
+      }
     }
   }
 

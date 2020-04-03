@@ -4,32 +4,37 @@ import java.time.Instant
 
 import cats.data.NonEmptyList
 import cats.effect.concurrent.Ref
-import cats.effect.{IO, Sync, Timer}
+import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.core.marshallers.History
-import hydra.core.transport.AckStrategy
+import hydra.kafka.algebras.KafkaAdminAlgebra.{Topic, TopicName}
+import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
 import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
-import hydra.kafka.producer.{AvroKeyRecord, KafkaRecord}
-import hydra.kafka.util.KafkaClient
-import hydra.kafka.util.KafkaClient.{PublishError, Topic, TopicName}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.apache.avro.generic.GenericRecord
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import retry.{RetryPolicies, RetryPolicy}
 
-class CreateTopicSpec extends AnyWordSpecLike with Matchers {
+import scala.concurrent.ExecutionContext
+
+class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
   implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
     Slf4jLogger.getLogger[F]
   implicit val timer: Timer[IO] = IO.timer(concurrent.ExecutionContext.global)
+  private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+  private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
+
 
   private val keySchema = getSchema("key")
   private val valueSchema = getSchema("val")
@@ -58,10 +63,12 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
 
       (for {
         schemaRegistry <- schemaRegistryIO
-        kafka <- KafkaClient.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
         registerInternalMetadata = new CreateTopicProgram[IO](
           schemaRegistry,
           kafka,
+          kafkaClient,
           policy,
           Subject.createValidated("v2Topic").get
         )
@@ -109,16 +116,20 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
           ): IO[SchemaVersion] = ref.get.map { testState =>
             testState.numSchemasRegistered + 1
           }
-          override def getAllVersions(subject: String): IO[List[Int]] = ???
-          override def getAllSubjects: IO[List[String]] = ???
+          override def getAllVersions(subject: String): IO[List[Int]] = IO.pure(List())
+          override def getAllSubjects: IO[List[String]] = IO.pure(List())
+
+          override def getSchemaRegistryClient: IO[SchemaRegistryClient] = IO.raiseError(new Exception("Something horrible went wrong!"))
         }
       (for {
-        kafka <- KafkaClient.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
         ref <- Ref[IO]
           .of(TestState(deleteSchemaWasCalled = false, 0))
         _ <- new CreateTopicProgram[IO](
           getSchemaRegistry(ref),
           kafka,
+          kafkaClient,
           policy,
           Subject.createValidated("test").get
         ).createTopic(
@@ -152,16 +163,19 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
               subject: String,
               schema: Schema
           ): IO[SchemaVersion] = IO.pure(1)
-          override def getAllVersions(subject: String): IO[List[Int]] = ???
-          override def getAllSubjects: IO[List[String]] = ???
+          override def getAllVersions(subject: String): IO[List[Int]] = IO.pure(Nil)
+          override def getAllSubjects: IO[List[String]] = IO.pure(Nil)
+          override def getSchemaRegistryClient: IO[SchemaRegistryClient] = IO.raiseError(new Exception("Something horrible went wrong!"))
         }
 
       (for {
-        kafka <- KafkaClient.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
         ref <- Ref[IO].of(0)
         _ <- new CreateTopicProgram[IO](
           getSchemaRegistry(ref),
           kafka,
+          kafkaClient,
           policy,
           Subject.createValidated("test").get
         ).createTopic(
@@ -200,18 +214,21 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
               subject: String,
               schema: Schema
           ): IO[SchemaVersion] = ref.get.map(_.schemas(subject))
-          override def getAllVersions(subject: String): IO[List[Int]] = ???
-          override def getAllSubjects: IO[List[String]] = ???
+          override def getAllVersions(subject: String): IO[List[Int]] = IO.pure(Nil)
+          override def getAllSubjects: IO[List[String]] = IO.pure(Nil)
+          override def getSchemaRegistryClient: IO[SchemaRegistryClient] = IO.raiseError(new Exception)
         }
 
       val schemaRegistryState = Map("subject-key" -> 1)
       (for {
-        kafka <- KafkaClient.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
         ref <- Ref[IO]
           .of(TestState(schemaRegistryState))
         _ <- new CreateTopicProgram[IO](
           getSchemaRegistry(ref),
           kafka,
+          kafkaClient,
           policy,
           Subject.createValidated("test").get
         ).createTopic(
@@ -228,9 +245,11 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
       val subject = "subject"
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafkaClient <- KafkaClient.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
+          kafka,
           kafkaClient,
           policy,
           Subject.createValidated("test-metadata-topic").get
@@ -238,7 +257,7 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
           createTopicMetadataRequest(subject, keySchema, valueSchema),
           TopicDetails(1, 1)
         )
-        topic <- kafkaClient.describeTopic(subject)
+        topic <- kafka.describeTopic(subject)
       } yield topic.get shouldBe Topic(subject, 1)).unsafeRunSync()
     }
 
@@ -248,33 +267,23 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
       val metadataTopic = "test-metadata-topic"
       val request = createTopicMetadataRequest(subject, keySchema, valueSchema)
       val (key, value) = request.toKeyAndValue
-      val expectedKeyRecord = TopicMetadataV2Key.codec.encode(key).toOption.get
-      val expectedValueRecord =
-        TopicMetadataV2Value.codec.encode(value).toOption.get
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        underlyingKafkaClient <- KafkaClient.test[IO]
-        publishTo <- Ref[IO].of(List.empty[KafkaRecord[_, _]])
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, GenericRecord)])
         kafkaClient <- IO(
-          new TestKafkaClientWithPublishTo(underlyingKafkaClient, publishTo)
+          new TestKafkaClientAlgebraWithPublishTo(publishTo)
         )
+        m <- TopicMetadataV2.encode[IO](key, value)
         _ <- new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafkaClient,
-          policy,
-          Subject.createValidated(metadataTopic).get
+          schemaRegistry = schemaRegistry,
+          kafkaAdmin = kafkaAdmin,
+          kafkaClient = kafkaClient,
+          retryPolicy = policy,
+          v2MetadataTopicName = Subject.createValidated(metadataTopic).get
         ).createTopic(request, TopicDetails(1, 1))
         published <- publishTo.get
-      } yield published shouldBe List(
-        AvroKeyRecord(
-          metadataTopic,
-          TopicMetadataV2Key.codec.schema.toOption.get,
-          TopicMetadataV2Value.codec.schema.toOption.get,
-          expectedKeyRecord.asInstanceOf[GenericRecord],
-          expectedValueRecord.asInstanceOf[GenericRecord],
-          AckStrategy.Replicated
-        )
-      )).unsafeRunSync()
+      } yield published shouldBe Map(metadataTopic -> (m._1, m._2))).unsafeRunSync()
     }
 
     "rollback kafka topic creation when error encountered in publishing metadata" in {
@@ -284,22 +293,22 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
       val request = createTopicMetadataRequest(subject, keySchema, valueSchema)
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        underlyingKafkaClient <- KafkaClient.test[IO]
-        publishTo <- Ref[IO].of(List.empty[KafkaRecord[_, _]])
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, GenericRecord)])
         kafkaClient <- IO(
-          new TestKafkaClientWithPublishTo(
-            underlyingKafkaClient,
+          new TestKafkaClientAlgebraWithPublishTo(
             publishTo,
             failOnPublish = true
           )
         )
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
+          kafkaAdmin,
           kafkaClient,
           policy,
           Subject.createValidated(metadataTopic).get
         ).createTopic(request, TopicDetails(1, 1)).attempt
-        topic <- kafkaClient.describeTopic(subject)
+        topic <- kafkaAdmin.describeTopic(subject)
       } yield topic should not be defined).unsafeRunSync()
     }
 
@@ -311,53 +320,42 @@ class CreateTopicSpec extends AnyWordSpecLike with Matchers {
       val request = createTopicMetadataRequest(subject, keySchema, valueSchema)
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        underlyingKafkaClient <- KafkaClient.test[IO]
-        publishTo <- Ref[IO].of(List.empty[KafkaRecord[_, _]])
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, GenericRecord)])
         kafkaClient <- IO(
-          new TestKafkaClientWithPublishTo(
-            underlyingKafkaClient,
+          new TestKafkaClientAlgebraWithPublishTo(
             publishTo,
             failOnPublish = true
           )
         )
-        _ <- kafkaClient.createTopic(subject, topicDetails)
+        _ <- kafkaAdmin.createTopic(subject, topicDetails)
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
+          kafkaAdmin,
           kafkaClient,
           policy,
           Subject.createValidated(metadataTopic).get
         ).createTopic(request, topicDetails).attempt
-        topic <- kafkaClient.describeTopic(subject)
+        topic <- kafkaAdmin.describeTopic(subject)
       } yield topic shouldBe defined).unsafeRunSync()
     }
 
   }
 
-  private final class TestKafkaClientWithPublishTo(
-      underlying: KafkaClient[IO],
-      publishTo: Ref[IO, List[KafkaRecord[_, _]]],
-      failOnPublish: Boolean = false
-  ) extends KafkaClient[IO] {
+  private final class TestKafkaClientAlgebraWithPublishTo(
+                                                          publishTo: Ref[IO, Map[TopicName, (GenericRecord, GenericRecord)]],
+                                                          failOnPublish: Boolean = false
+  ) extends KafkaClientAlgebra[IO] {
 
-    override def describeTopic(name: TopicName): IO[Option[Topic]] =
-      underlying.describeTopic(name)
-    override def getTopicNames: IO[List[TopicName]] = underlying.getTopicNames
-
-    override def createTopic(name: TopicName, details: TopicDetails): IO[Unit] =
-      underlying.createTopic(name, details)
-
-    override def deleteTopic(name: String): IO[Unit] =
-      underlying.deleteTopic(name)
-
-    override def publishMessage[K, V](
-        record: KafkaRecord[K, V]
-    ): IO[Either[KafkaClient.PublishError, Unit]] =
+    override def publishMessage(record: (GenericRecord, GenericRecord), topicName: TopicName): IO[Either[PublishError, Unit]] =
       if (failOnPublish) {
         IO.pure(Left(PublishError.Timeout))
       } else {
-        publishTo.update(_ :+ record).attemptNarrow[PublishError]
+        publishTo.update(_ + (topicName -> record)).attemptNarrow[PublishError]
       }
-  }
+
+    override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (GenericRecord, GenericRecord)] = fs2.Stream.empty
+}
 
   private def getSchema(name: String): Schema =
     SchemaBuilder

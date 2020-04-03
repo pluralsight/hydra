@@ -74,13 +74,10 @@ object Main extends IOApp with ConfigSupport with LoggingAdapter {
   }
 
   private def buildProgram()(implicit system: ActorSystem): IO[Unit] = {
-    val ingestActorSelection = system.actorSelection(
-      path = applicationConfig.getString("kafka-ingestor-path")
-    )
     AppConfig.appConfig.load[IO].flatMap { config =>
       for {
         algebras <- Algebras
-          .make[IO](config.createTopicConfig, ingestActorSelection)
+          .make[IO](config.createTopicConfig)
         programs <- Programs.make[IO](config, algebras)
         bootstrap <- Bootstrap
           .make[IO](programs.createTopic, config.v2MetadataTopicConfig)

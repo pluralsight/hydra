@@ -20,6 +20,7 @@ final class Programs[F[_]: Logger: Sync: Timer] private (
 
   val createTopic: CreateTopicProgram[F] = new CreateTopicProgram[F](
     algebras.schemaRegistry,
+    algebras.kafkaAdmin,
     algebras.kafkaClient,
     retryPolicy,
     cfg.v2MetadataTopicConfig.topicName
