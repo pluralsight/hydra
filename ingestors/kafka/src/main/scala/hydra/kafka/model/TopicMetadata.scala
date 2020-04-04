@@ -61,7 +61,6 @@ object TopicMetadataV2 {
             .fromEither(TopicMetadataV2Value.codec.encode(value))
             .toValidatedNel
         ).tupled.toEither.leftMap{ a =>
-          a.toList.foreach(println)
           MetadataAvroSchemaFailure(a)
         }
       )
@@ -75,6 +74,29 @@ object TopicMetadataV2 {
             )
           )
       }
+  }
+
+  def decode[F[_]: MonadError[*[_], Throwable]](
+                                               key: GenericRecord,
+                                               value: GenericRecord
+                                               ): F[(TopicMetadataV2Key, TopicMetadataV2Value)] = {
+    getSchemas.flatMap { schemas =>
+      Monad[F]
+        .pure(
+          (
+            Validated
+              .fromEither(TopicMetadataV2Key.codec.decode(key, schemas.key))
+              .toValidatedNel,
+            Validated
+              .fromEither(TopicMetadataV2Value.codec.decode(value, schemas.value))
+              .toValidatedNel
+            ).tupled.toEither.leftMap{ a =>
+            MetadataAvroSchemaFailure(a)
+          }
+        )
+        .rethrow
+        .flatMap { case (k, v) => Monad[F].pure((k, v)) }
+    }
   }
 
   final case class MetadataAvroSchemaFailure(errors: NonEmptyList[AvroError])
