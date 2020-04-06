@@ -80,7 +80,7 @@ object TopicMetadataV2 {
                                                key: GenericRecord,
                                                value: GenericRecord
                                                ): F[(TopicMetadataV2Key, TopicMetadataV2Value)] = {
-    getSchemas.flatMap { schemas =>
+    getSchemas[F].flatMap { schemas =>
       Monad[F]
         .pure(
           (
@@ -90,12 +90,16 @@ object TopicMetadataV2 {
             Validated
               .fromEither(TopicMetadataV2Value.codec.decode(value, schemas.value))
               .toValidatedNel
-            ).tupled.toEither.leftMap{ a =>
+            ).tupled.toEither
+            .leftMap{ a =>
             MetadataAvroSchemaFailure(a)
           }
         )
         .rethrow
-        .flatMap { case (k, v) => Monad[F].pure((k, v)) }
+        .flatMap {
+          case (k, v) =>
+            Monad[F].pure((k, v))
+        }
     }
   }
 

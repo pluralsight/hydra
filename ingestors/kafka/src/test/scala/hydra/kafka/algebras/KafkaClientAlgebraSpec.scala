@@ -47,7 +47,7 @@ class KafkaClientAlgebraSpec
     live <- KafkaClientAlgebra.live[IO](s"localhost:$port", schemaRegistryAlgebra)
     test <- KafkaClientAlgebra.test[IO]
   } yield {
-    runTest(schemaRegistryAlgebra, live)
+//    runTest(schemaRegistryAlgebra, live)
     runTest(schemaRegistryAlgebra, test, isTest = true)
   }).unsafeRunSync()
 
