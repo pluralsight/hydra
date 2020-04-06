@@ -41,7 +41,8 @@ object TopicMetadataV2 {
       Validated.fromEither(TopicMetadataV2Key.codec.schema).toValidatedNel,
       Validated.fromEither(TopicMetadataV2Value.codec.schema).toValidatedNel
     ).mapN(Schemas) match {
-      case Valid(s) => Applicative[F].pure(s)
+      case Valid(s) =>
+        Applicative[F].pure(s)
       case Invalid(e) =>
         ApplicativeError[F, Throwable].raiseError(MetadataAvroSchemaFailure(e))
     }
@@ -96,10 +97,6 @@ object TopicMetadataV2 {
           }
         )
         .rethrow
-        .flatMap {
-          case (k, v) =>
-            Monad[F].pure((k, v))
-        }
     }
   }
 

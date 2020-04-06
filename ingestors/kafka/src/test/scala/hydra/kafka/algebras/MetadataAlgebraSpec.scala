@@ -5,6 +5,7 @@ import java.time.Instant
 import cats.data.NonEmptyList
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.implicits._
+import hydra.avro.registry.SchemaRegistry
 import hydra.core.marshallers.History
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataV2Container
 import hydra.kafka.model.ContactMethod.Slack
@@ -51,17 +52,15 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
       "retrieve metadata from metadataAlgebra cache" in {
         val subject = Subject.createValidated("subject1").get
         val (genericRecordsIO, key, value) = getMetadataGenericRecords(subject)
+
         genericRecordsIO.flatMap { record =>
           kafkaClientAlgebra.publishMessage(record, metadataTopicName)
         }.unsafeRunSync() shouldBe Right(())
 
         (for {
-          _ <- metadataAlgebra.getMetadataFor(subject).retryIfFalse { item =>
-            println(item)
-            item.isDefined
-          }
+          _ <- metadataAlgebra.getMetadataFor(subject).retryIfFalse(_.isDefined)
           metadata <- metadataAlgebra.getMetadataFor(subject)
-        } yield metadata shouldBe TopicMetadataV2Container(key, value)).unsafeRunSync()
+        } yield metadata shouldBe Some(TopicMetadataV2Container(key, value))).unsafeRunSync()
       }
     }
   }

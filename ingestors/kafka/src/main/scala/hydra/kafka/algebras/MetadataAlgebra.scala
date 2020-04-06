@@ -1,6 +1,5 @@
 package hydra.kafka.algebras
 
-import cats.MonadError
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, Sync}
 import cats.implicits._
@@ -31,10 +30,14 @@ object MetadataAlgebra {
     val metadataStream = kafkaClientAlgebra.consumeMessages(metadataTopicName, consumerGroup)
     for {
       ref <- Ref[F].of(MetadataStorageFacade.empty)
-      _ <- Concurrent[F].start(metadataStream.map { case (key, value) =>
-        fs2.Stream.eval(TopicMetadataV2.decode[F](key, value).flatMap { case (topicMetadataKey, topicMetadataValue) =>
+      _ <- Concurrent[F].start(metadataStream.flatMap { case (key, value) =>
+        fs2.Stream.eval{
+
+          val stupidPOS = TopicMetadataV2.decode[F](key, value).flatMap { whatever =>
+          val (topicMetadataKey, topicMetadataValue) = whatever
           ref.getAndUpdate(_.addMetadata(TopicMetadataV2Container(topicMetadataKey, topicMetadataValue)))
-        })
+        }
+        stupidPOS}
       }.compile.drain)
       algebra <- getMetadataAlgebra[F](ref)
     } yield algebra
