@@ -100,13 +100,10 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
     val (encodedKey, encodedValue) =
       TopicMetadataV2.encode[IO](key, value).unsafeRunSync()
 
-    TopicMetadataV2Key.codec
-      .decode(encodedKey, TopicMetadataV2Key.codec.schema.toOption.get)
-      .toOption
-      .get shouldBe key
-    TopicMetadataV2Value.codec
-      .decode(encodedValue, TopicMetadataV2Value.codec.schema.toOption.get)
-      .toOption
-      .get shouldBe value
+    val (decodedKey,decodedValue) =
+      TopicMetadataV2.decode[IO](encodedKey, encodedValue).unsafeRunSync()
+
+    decodedKey shouldBe key
+    decodedValue shouldBe value
   }
 }

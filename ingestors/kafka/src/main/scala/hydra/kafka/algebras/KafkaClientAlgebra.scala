@@ -112,17 +112,17 @@ object KafkaClientAlgebra {
     }
   }
 
-  def test[F[_]: Sync: Concurrent]: F[KafkaClientAlgebra[F]] = Ref[F].of(MockFS2Kafka.empty).map { cache =>
+  def test[F[_]: Sync: Concurrent]: F[KafkaClientAlgebra[F]] = Ref[F].of(MockFS2Kafka.empty[F]).map { cache =>
     new KafkaClientAlgebra[F] {
       override def publishMessage(record: Record, topicName: TopicName): F[Either[PublishError, Unit]] =
-        cache.getAndUpdate(_.publishMessage(topicName, record)) *>
+        cache.update(_.publishMessage(topicName, record)) *>
           cache.get.flatMap(_.getConsumerQueuesFor(topicName).traverse(_.enqueue1(record))) *>
           Sync[F].pure(Right(()))
 
       def consumeMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, Record] = {
         fs2.Stream.force(for {
           queue <- createNewStreamOfQueue(cache, topicName)
-          _ <- cache.getAndUpdate(_.addConsumerQueue(topicName, consumerGroup, queue))
+          _ <- cache.update(_.addConsumerQueue(topicName, consumerGroup, queue))
         } yield queue.dequeue)
       }
     }
@@ -160,7 +160,7 @@ object KafkaClientAlgebra {
       }
     }.suspend
 
-  private final case class MockFS2Kafka[F[_]: Concurrent](
+  private final case class MockFS2Kafka[F[_]](
                                                    private val topics: Map[TopicName, List[Record]],
                                                    consumerQueues: Map[(TopicName, ConsumerGroup), fs2.concurrent.Queue[F, Record]]
                                                  ) {
@@ -177,11 +177,11 @@ object KafkaClientAlgebra {
 
     def getConsumerQueue(topicName: TopicName, consumerGroup: ConsumerGroup): Option[Queue[F, Record]] = this.consumerQueues.get((topicName, consumerGroup))
 
-    def getStreamFor(topicName: TopicName): List[Record] = this.topics.getOrElse(topicName, throw new Exception)
+    def getStreamFor(topicName: TopicName): List[Record] = this.topics.getOrElse(topicName, List())
   }
 
   private object MockFS2Kafka {
-    def empty[F[_]: Concurrent]: MockFS2Kafka[F] = MockFS2Kafka[F](Map.empty, Map.empty)
+    def empty[F[_]]: MockFS2Kafka[F] = MockFS2Kafka[F](Map.empty, Map.empty)
   }
 
 }
