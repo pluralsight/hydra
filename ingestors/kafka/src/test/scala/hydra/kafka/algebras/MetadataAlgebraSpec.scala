@@ -5,7 +5,6 @@ import java.time.Instant
 import cats.data.NonEmptyList
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.implicits._
-import hydra.avro.registry.SchemaRegistry
 import hydra.core.marshallers.History
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataV2Container
 import hydra.kafka.model.ContactMethod.Slack
@@ -49,18 +48,33 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
 
   private def runTests(metadataAlgebra: MetadataAlgebra[IO], kafkaClientAlgebra: KafkaClientAlgebra[IO]): Unit = {
     "MetadataAlgebraSpec" should {
-      "retrieve metadata from metadataAlgebra cache" in {
+
+      "retrieve none for non-existant topic" in {
+        val subject = Subject.createValidated("Non-existantTopic").get
+        metadataAlgebra.getMetadataFor(subject).unsafeRunSync() shouldBe None
+      }
+
+      "retrieve metadata" in {
         val subject = Subject.createValidated("subject1").get
         val (genericRecordsIO, key, value) = getMetadataGenericRecords(subject)
 
-        genericRecordsIO.flatMap { record =>
-          kafkaClientAlgebra.publishMessage(record, metadataTopicName)
-        }.unsafeRunSync() shouldBe Right(())
-
         (for {
+          record <- genericRecordsIO
+          _ <- kafkaClientAlgebra.publishMessage(record, metadataTopicName)
           _ <- metadataAlgebra.getMetadataFor(subject).retryIfFalse(_.isDefined)
           metadata <- metadataAlgebra.getMetadataFor(subject)
         } yield metadata shouldBe Some(TopicMetadataV2Container(key, value))).unsafeRunSync()
+      }
+
+      "retrieve all metadata" in {
+        val subject = Subject.createValidated("subject2").get
+        val (genericRecordsIO, key, value) = getMetadataGenericRecords(subject)
+        (for {
+          record <- genericRecordsIO
+          _ <- kafkaClientAlgebra.publishMessage(record, metadataTopicName)
+          _ <- metadataAlgebra.getMetadataFor(subject).retryIfFalse(_.isDefined)
+          allMetadata <- metadataAlgebra.getAllMetadata
+        } yield allMetadata should have length 2).unsafeRunSync()
       }
     }
   }
