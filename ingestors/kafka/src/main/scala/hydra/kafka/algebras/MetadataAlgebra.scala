@@ -32,12 +32,10 @@ object MetadataAlgebra {
       ref <- Ref[F].of(MetadataStorageFacade.empty)
       _ <- Concurrent[F].start(metadataStream.flatMap { case (key, value) =>
         fs2.Stream.eval{
-
-          val stupidPOS = TopicMetadataV2.decode[F](key, value).flatMap { whatever =>
-          val (topicMetadataKey, topicMetadataValue) = whatever
-          ref.getAndUpdate(_.addMetadata(TopicMetadataV2Container(topicMetadataKey, topicMetadataValue)))
+          TopicMetadataV2.decode[F](key, value).flatMap { case (topicMetadataKey, topicMetadataValue) =>
+            ref.update(_.addMetadata(TopicMetadataV2Container(topicMetadataKey, topicMetadataValue)))
+          }
         }
-        stupidPOS}
       }.compile.drain)
       algebra <- getMetadataAlgebra[F](ref)
     } yield algebra
