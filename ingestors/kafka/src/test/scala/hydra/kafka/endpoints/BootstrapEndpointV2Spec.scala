@@ -33,9 +33,9 @@ final class BootstrapEndpointV2Spec
     with Matchers {
 
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
-  private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
+  private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
 
   private def getTestCreateTopicProgram(
       s: SchemaRegistry[IO],
