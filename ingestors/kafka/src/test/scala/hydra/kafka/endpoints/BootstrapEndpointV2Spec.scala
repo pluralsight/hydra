@@ -10,7 +10,7 @@ import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.core.marshallers.History
-import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
@@ -40,7 +40,8 @@ final class BootstrapEndpointV2Spec
   private def getTestCreateTopicProgram(
       s: SchemaRegistry[IO],
       ka: KafkaAdminAlgebra[IO],
-      kc: KafkaClientAlgebra[IO]
+      kc: KafkaClientAlgebra[IO],
+      m: MetadataAlgebra[IO]
   ): BootstrapEndpointV2 = {
     val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
     new BootstrapEndpointV2(
@@ -51,7 +52,8 @@ final class BootstrapEndpointV2Spec
         retryPolicy,
         Subject.createValidated("test").get
       ),
-      TopicDetails(1, 1)
+      TopicDetails(1, 1),
+      m
     )
   }
 
@@ -60,7 +62,8 @@ final class BootstrapEndpointV2Spec
       s <- SchemaRegistry.test[IO]
       k <- KafkaAdminAlgebra.test[IO]
       kc <- KafkaClientAlgebra.test[IO]
-    } yield getTestCreateTopicProgram(s, k, kc)
+      m <- MetadataAlgebra.make("_metadata.topic.name", "bootstrap.consumer.group", kc)
+    } yield getTestCreateTopicProgram(s, k, kc, m)
 
   "BootstrapEndpointV2" must {
 
@@ -130,18 +133,19 @@ final class BootstrapEndpointV2Spec
 
         override def getSchemaRegistryClient: IO[SchemaRegistryClient] = err
       }
-      KafkaClientAlgebra.test[IO].map { client =>
-        KafkaAdminAlgebra
-          .test[IO]
-          .map { kafka =>
-            Post("/v2/streams", validRequest) ~> Route.seal(
-              getTestCreateTopicProgram(failingSchemaRegistry, kafka, client).route
-            ) ~> check {
-              response.status shouldBe StatusCodes.InternalServerError
+      KafkaClientAlgebra.test[IO].flatMap { client =>
+        MetadataAlgebra.make("123", "456", client).flatMap { m =>
+          KafkaAdminAlgebra
+            .test[IO]
+            .map { kafka =>
+              Post("/v2/streams", validRequest) ~> Route.seal(
+                getTestCreateTopicProgram(failingSchemaRegistry, kafka, client, m).route
+              ) ~> check {
+                response.status shouldBe StatusCodes.InternalServerError
+              }
             }
-          }
-          .unsafeRunSync()
-      }
+        }
+      }.unsafeRunSync()
     }
   }
 

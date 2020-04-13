@@ -7,7 +7,7 @@ import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.core.http.RouteSupport
 import hydra.ingest.app.AppConfig
-import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.endpoints.BootstrapEndpointV2
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.util.KafkaUtils.TopicDetails
@@ -48,11 +48,18 @@ class BootstrapEndpoints(
   private val kafkaClient =
     KafkaClientAlgebra.live[IO](bootstrapServers, schemaRegistry).unsafeRunSync()
 
+  private val v2MetadataTopicName =
+    config.v2MetadataTopicConfig.topicName
+
+  private val v2MetadataConsumerGroup =
+    config.v2MetadataTopicConfig.consumerGroup
+
+  private val metadataAlgebra =
+    MetadataAlgebra.make(v2MetadataTopicName.value, v2MetadataConsumerGroup, kafkaClient).unsafeRunSync()
+
   private val isBootstrapV2Enabled =
     config.v2MetadataTopicConfig.createV2TopicsEnabled
 
-  private val v2MetadataTopicName =
-    config.v2MetadataTopicConfig.topicName
 
   private val topicDetails =
     TopicDetails(
@@ -71,7 +78,8 @@ class BootstrapEndpoints(
           retryPolicy,
           v2MetadataTopicName
         ),
-        topicDetails
+        topicDetails,
+        metadataAlgebra
       ).route
     } else {
       RouteDirectives.reject

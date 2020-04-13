@@ -63,7 +63,8 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
           createV2TopicsEnabled = true,
           ContactMethod.create("test@test.com").get,
           1,
-          1
+          1,
+          "consumerGroup"
         )
       createTestCase(config)
         .map {
@@ -83,7 +84,8 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
           createV2TopicsEnabled = false,
           ContactMethod.create("test@test.com").get,
           1,
-          1
+          1,
+          "consumerGroup"
         )
       createTestCase(config)
         .map {

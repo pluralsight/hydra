@@ -22,7 +22,8 @@ import akka.http.scaladsl.server.Route
 import cats.effect.IO
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
 import hydra.core.http.CorsSupport
-import hydra.kafka.model.TopicMetadataV2Request
+import hydra.kafka.algebras.MetadataAlgebra
+import hydra.kafka.model.{TopicMetadataV2Adapter, TopicMetadataV2Request}
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.serializers.TopicMetadataV2Parser
 import hydra.kafka.util.KafkaUtils.TopicDetails
@@ -32,16 +33,17 @@ import scala.util.{Failure, Success}
 
 final class BootstrapEndpointV2(
     createTopicProgram: CreateTopicProgram[IO],
-    defaultTopicDetails: TopicDetails
+    defaultTopicDetails: TopicDetails,
+    metadataAlgebra: MetadataAlgebra[IO]
 )(
     implicit val system: ActorSystem,
     implicit val e: ExecutionContext
-) extends CorsSupport {
+) extends CorsSupport with TopicMetadataV2Adapter {
 
   import TopicMetadataV2Parser._
 
   val route: Route = cors(settings) {
-    path("v2" / "streams") {
+    pathPrefix("v2" / "streams") {
       post {
         pathEndOrSingleSlash {
           entity(as[TopicMetadataV2Request]) { t =>
@@ -53,6 +55,14 @@ final class BootstrapEndpointV2(
               case Success(_) => complete(StatusCodes.OK)
               case Failure(e) => complete(StatusCodes.InternalServerError, e)
             }
+          }
+        }
+      } ~
+      get {
+        pathEndOrSingleSlash {
+          onComplete(metadataAlgebra.getAllMetadata.unsafeToFuture()) {
+            case Success(metadata) => complete(StatusCodes.OK, metadata.map(toResource))
+            case Failure(e) => complete(StatusCodes.InternalServerError, e)
           }
         }
       }
