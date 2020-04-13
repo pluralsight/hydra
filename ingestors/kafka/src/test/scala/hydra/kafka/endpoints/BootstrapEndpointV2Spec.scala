@@ -147,6 +147,18 @@ final class BootstrapEndpointV2Spec
         }
       }.unsafeRunSync()
     }
+
+    "retrieve empty array of metadata" in {
+      testCreateTopicProgram
+        .map { bootstrapEndpoint =>
+          Get("/v2/streams") ~> Route.seal(
+            bootstrapEndpoint.route
+          ) ~> check {
+            response.status shouldBe StatusCodes.OK
+          }
+        }
+        .unsafeRunSync()
+    }
   }
 
 }
