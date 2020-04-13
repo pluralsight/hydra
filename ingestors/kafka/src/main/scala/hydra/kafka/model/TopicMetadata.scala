@@ -11,6 +11,7 @@ import hydra.avro.convert.{ISODateConverter, IsoDate}
 import hydra.core.marshallers._
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.generic.GenericRecord
+import spray.json.DefaultJsonProtocol
 import vulcan.generic._
 import vulcan.refined._
 import vulcan.{AvroError, AvroNamespace, Codec}

@@ -2,6 +2,7 @@ package hydra.ingest.app
 
 import cats.implicits._
 import ciris.{ConfigValue, env, _}
+import hydra.kafka.algebras.KafkaClientAlgebra.ConsumerGroup
 import hydra.kafka.model.ContactMethod
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 
@@ -52,7 +53,8 @@ object AppConfig {
       createV2TopicsEnabled: Boolean,
       contactMethod: ContactMethod,
       numPartitions: Int,
-      replicationFactor: Short
+      replicationFactor: Short,
+      consumerGroup: ConsumerGroup
   )
 
   private implicit def contactMethodDecoder
@@ -72,7 +74,8 @@ object AppConfig {
         "HYDRA_V2_METADATA_CONTACT"
       ).as[ContactMethod],
       env("HYDRA_DEFAULT_PARTIONS").as[Int].default(10),
-      env("HYDRA_REPLICATION_FACTOR").as[Short].default(3)
+      env("HYDRA_REPLICATION_FACTOR").as[Short].default(3),
+      env("HYDRA_V2_METADATA_CONSUMER_GROUP")
     ).parMapN(V2MetadataTopicConfig)
 
   final case class AppConfig(
