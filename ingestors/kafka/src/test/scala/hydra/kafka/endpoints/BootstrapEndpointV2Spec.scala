@@ -42,7 +42,7 @@ final class BootstrapEndpointV2Spec
       ka: KafkaAdminAlgebra[IO],
       kc: KafkaClientAlgebra[IO],
       m: MetadataAlgebra[IO]
-  ): BootstrapEndpointV2 = {
+  ): BootstrapEndpointV2[IO] = {
     val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
     new BootstrapEndpointV2(
       new CreateTopicProgram[IO](
@@ -57,7 +57,7 @@ final class BootstrapEndpointV2Spec
     )
   }
 
-  private val testCreateTopicProgram: IO[BootstrapEndpointV2] =
+  private val testCreateTopicProgram: IO[BootstrapEndpointV2[IO]] =
     for {
       s <- SchemaRegistry.test[IO]
       k <- KafkaAdminAlgebra.test[IO]

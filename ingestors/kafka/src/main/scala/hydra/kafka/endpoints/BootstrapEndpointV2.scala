@@ -19,8 +19,8 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import cats.effect.IO
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
+import hydra.common.util.Futurable
 import hydra.core.http.CorsSupport
 import hydra.kafka.algebras.MetadataAlgebra
 import hydra.kafka.model.{TopicMetadataV2Adapter, TopicMetadataV2Request}
@@ -31,13 +31,10 @@ import hydra.kafka.util.KafkaUtils.TopicDetails
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
-final class BootstrapEndpointV2(
-    createTopicProgram: CreateTopicProgram[IO],
+final class BootstrapEndpointV2[F[_]: Futurable](
+    createTopicProgram: CreateTopicProgram[F],
     defaultTopicDetails: TopicDetails,
-    metadataAlgebra: MetadataAlgebra[IO]
-)(
-    implicit val system: ActorSystem,
-    implicit val e: ExecutionContext
+    metadataAlgebra: MetadataAlgebra[F]
 ) extends CorsSupport with TopicMetadataV2Adapter {
 
   import TopicMetadataV2Parser._
@@ -48,9 +45,8 @@ final class BootstrapEndpointV2(
         pathEndOrSingleSlash {
           entity(as[TopicMetadataV2Request]) { t =>
             onComplete(
-              createTopicProgram
-                .createTopic(t, defaultTopicDetails)
-                .unsafeToFuture()
+              Futurable[F].unsafeToFuture(createTopicProgram
+                .createTopic(t, defaultTopicDetails))
             ) {
               case Success(_) => complete(StatusCodes.OK)
               case Failure(e) => complete(StatusCodes.InternalServerError, e)
@@ -60,7 +56,7 @@ final class BootstrapEndpointV2(
       } ~
       get {
         pathEndOrSingleSlash {
-          onComplete(metadataAlgebra.getAllMetadata.unsafeToFuture()) {
+          onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getAllMetadata)) {
             case Success(metadata) => complete(StatusCodes.OK, metadata.map(toResource))
             case Failure(e) => complete(StatusCodes.InternalServerError, e)
           }
