@@ -28,7 +28,6 @@ import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.serializers.TopicMetadataV2Parser
 import hydra.kafka.util.KafkaUtils.TopicDetails
 
-import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
 final class BootstrapEndpointV2[F[_]: Futurable](

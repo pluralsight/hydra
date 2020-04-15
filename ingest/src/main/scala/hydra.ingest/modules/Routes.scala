@@ -7,7 +7,6 @@ import cats.effect.Sync
 import hydra.common.config.ConfigSupport
 import hydra.common.util.{ActorUtils, Futurable}
 import hydra.ingest.app.AppConfig.AppConfig
-import hydra.ingest.bootstrap.BootstrapEndpoints
 import hydra.ingest.http._
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.endpoints.{BootstrapEndpoint, BootstrapEndpointV2, TopicMetadataEndpoint, TopicsEndpoint}
@@ -41,7 +40,6 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
 
     new SchemasEndpoint().route ~
       new BootstrapEndpoint(system).route ~
-      new BootstrapEndpoints()(system, system.dispatcher).route ~
       new TopicMetadataEndpoint(consumerProxy)(system.dispatcher).route ~
       new IngestorRegistryEndpoint().route ~
       new IngestionWebSocketEndpoint().route ~
