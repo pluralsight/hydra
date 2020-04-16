@@ -43,7 +43,7 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
       new TopicMetadataEndpoint(consumerProxy)(system.dispatcher).route ~
       new IngestorRegistryEndpoint().route ~
       new IngestionWebSocketEndpoint().route ~
-      new IngestionEndpoint().route ~
+      new IngestionEndpoint(cfg.ingestConfig.alternateIngestEnabled, programs.ingestionFlow).route ~
       new TopicsEndpoint(consumerProxy)(system.dispatcher).route ~
       HealthEndpoint.route ~
       bootstrapEndpointV2

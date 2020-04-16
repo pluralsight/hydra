@@ -2,7 +2,9 @@ package hydra.ingest.modules
 
 import cats.effect._
 import cats.implicits._
+import hydra.core.ingest.HydraRequest
 import hydra.ingest.app.AppConfig.{AppConfig, CreateTopicConfig}
+import hydra.ingest.http.IngestionFlow
 import hydra.kafka.programs.CreateTopicProgram
 import io.chrisdavenport.log4cats.Logger
 import retry.RetryPolicies._
@@ -24,6 +26,11 @@ final class Programs[F[_]: Logger: Sync: Timer] private (
     algebras.kafkaClient,
     retryPolicy,
     cfg.v2MetadataTopicConfig.topicName
+  )
+
+  val ingestionFlow: IngestionFlow[F] = new IngestionFlow[F](
+    algebras.schemaRegistry,
+    algebras.kafkaClient
   )
 
 }
