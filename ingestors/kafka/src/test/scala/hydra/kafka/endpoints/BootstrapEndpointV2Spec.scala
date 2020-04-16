@@ -159,6 +159,34 @@ final class BootstrapEndpointV2Spec
         }
         .unsafeRunSync()
     }
+
+    "receive 404 with Subject not found body" in {
+      val subject = "nonexistanttopic"
+      testCreateTopicProgram
+        .map { bootstrapEndpoint =>
+          Get(s"/v2/streams/$subject") ~> Route.seal(
+            bootstrapEndpoint.route
+          ) ~> check {
+            response.status shouldBe StatusCodes.NotFound
+            responseAs[String] shouldBe s"Subject $subject could not be found."
+          }
+        }
+        .unsafeRunSync()
+    }
+
+    "receive 400 with Subject not properly formatted" in {
+      val subject = "invalid!topic&&"
+      testCreateTopicProgram
+        .map { bootstrapEndpoint =>
+          Get(s"/v2/streams/$subject") ~> Route.seal(
+            bootstrapEndpoint.route
+          ) ~> check {
+            response.status shouldBe StatusCodes.BadRequest
+            responseAs[String] shouldBe Subject.invalidFormat
+          }
+        }
+        .unsafeRunSync()
+    }
   }
 
 }
