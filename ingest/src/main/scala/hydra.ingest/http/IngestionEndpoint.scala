@@ -33,7 +33,10 @@ import scala.concurrent.duration.{FiniteDuration, _}
 /**
   * Created by alexsilva on 12/22/15.
   */
-class IngestionEndpoint[F[_]: Futurable](alternateIngestFlowEnabled: Boolean, ingestionFlow: IngestionFlow[F])(implicit system: ActorSystem) extends RouteSupport with HydraIngestJsonSupport {
+class IngestionEndpoint[F[_]: Futurable](
+                                          alternateIngestFlowEnabled: Boolean,
+                                          ingestionFlow: IngestionFlow[F]
+                                        )(implicit system: ActorSystem) extends RouteSupport with HydraIngestJsonSupport {
 
   import hydra.ingest.bootstrap.RequestFactories._
 
