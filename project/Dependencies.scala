@@ -137,7 +137,10 @@ object Dependencies {
     )
 
     val guavacache =
-      "com.github.cb372" %% "scalacache-guava" % scalaCacheVersion
+      Seq(
+        "com.github.cb372" %% "scalacache-guava",
+        "com.github.cb372" %% "scalacache-cats-effect"
+      ).map(_ % scalaCacheVersion)
 
     val reflections = "org.reflections" % "reflections" % reflectionsVersion
 
@@ -196,17 +199,16 @@ object Dependencies {
     logging ++ Seq(avro, hikariCP, h2db) ++ joda ++ testDeps
 
   val avroDeps: Seq[ModuleID] =
-    baseDeps ++ confluent ++ jackson ++ Seq(guavacache) ++ catsEffect
+    baseDeps ++ confluent ++ jackson ++ guavacache ++ catsEffect
 
   val coreDeps: Seq[ModuleID] = akka ++ baseDeps ++
     Seq(
-      guavacache,
       reflections,
       akkaKryo,
       postgres,
       h2db,
       retry
-    ) ++
+    ) ++ guavacache ++
     confluent ++ kamon
 
   val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(ciris)

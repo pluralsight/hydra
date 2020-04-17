@@ -55,6 +55,8 @@ class IngestionEndpointSpec
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
 
+  import scalacache.Mode
+  implicit val mode: Mode[IO] = scalacache.CatsEffect.modes.async
   val ingestRoute = new IngestionEndpoint(
     false,
     new IngestionFlow[IO](SchemaRegistry.test[IO].unsafeRunSync, KafkaClientAlgebra.test[IO].unsafeRunSync)

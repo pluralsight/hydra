@@ -24,7 +24,7 @@ import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
 import hydra.core.ingest.{CorrelationIdBuilder, IngestionReport, RequestParams}
 import hydra.core.marshallers.GenericError
-import hydra.core.protocol.{InitiateHttpRequest, RequestPublished}
+import hydra.core.protocol.{IngestorCompleted, InitiateHttpRequest, RequestPublished}
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestionHandlerGateway
 
@@ -72,12 +72,24 @@ class IngestionEndpoint[F[_]: Futurable](
 
   private def cId = CorrelationIdBuilder.generate()
 
+  /*
+  {
+    "correlationId": "3g7Nr1EEIzr",
+    "ingestors": {
+        "kafka": {
+            "code": 201,
+            "message": "Created"
+        }
+    }
+}
+   */
+
   private def publishRequest = parameter("correlationId" ?) { cIdOpt =>
     extractRequest { req =>
       onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>
         if (alternateIngestFlowEnabled) {
           onSuccess(Futurable[F].unsafeToFuture(ingestionFlow.ingest(hydraRequest))) {
-            complete(IngestionReport(hydraRequest.correlationId, Map("kafka" -> RequestPublished), 200))
+            complete(IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorCompleted), 200))
           }
         } else {
           imperativelyComplete { ctx =>
