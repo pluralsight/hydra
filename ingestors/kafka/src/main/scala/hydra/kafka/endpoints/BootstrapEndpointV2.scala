@@ -23,6 +23,7 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
 import hydra.common.util.Futurable
 import hydra.core.http.CorsSupport
 import hydra.kafka.algebras.MetadataAlgebra
+import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{TopicMetadataV2Adapter, TopicMetadataV2Request}
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.serializers.TopicMetadataV2Parser
@@ -58,6 +59,22 @@ final class BootstrapEndpointV2[F[_]: Futurable](
           onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getAllMetadata)) {
             case Success(metadata) => complete(StatusCodes.OK, metadata.map(toResource))
             case Failure(e) => complete(StatusCodes.InternalServerError, e)
+          }
+        } ~
+        path(Segment) { subjectInput =>
+          pathEndOrSingleSlash {
+            Subject.createValidated(subjectInput) match {
+              case None => complete(StatusCodes.BadRequest, Subject.invalidFormat)
+              case Some(subject) =>
+                onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getMetadataFor(subject))) {
+                  case Success(maybeContainer) =>
+                    maybeContainer match {
+                      case Some(container) =>complete(StatusCodes.OK, toResource(container))
+                      case None => complete(StatusCodes.NotFound, s"Subject ${subject.value} could not be found.")
+                    }
+                  case Failure(e) =>complete(StatusCodes.InternalServerError, e)
+                }
+            }
           }
         }
       }

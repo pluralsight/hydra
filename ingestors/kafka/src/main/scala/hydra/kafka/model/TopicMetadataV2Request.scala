@@ -90,5 +90,7 @@ object TopicMetadataV2Request {
     def createValidated(value: String): Option[Subject] = {
       refineV[SubjectRegex](value).toOption
     }
+
+    val invalidFormat = "Invalid Subject. Subject may contain only alphanumeric characters, hyphens(-), underscores(_), and periods(.)"
   }
 }
