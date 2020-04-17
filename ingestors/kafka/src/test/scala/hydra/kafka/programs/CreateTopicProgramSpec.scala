@@ -355,7 +355,9 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       }
 
     override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (GenericRecord, GenericRecord)] = fs2.Stream.empty
-}
+
+    override def publishStringKeyMessage(record: (String, GenericRecord), topicName: TopicName): IO[Either[PublishError, Unit]] = ???
+  }
 
   private def getSchema(name: String): Schema =
     SchemaBuilder
