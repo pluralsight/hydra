@@ -8,7 +8,7 @@ object Dependencies {
   val akkaKryoVersion = "0.5.2"
   val akkaVersion = "2.6.4"
   val avroVersion = "1.9.2"
-  val catsEffectVersion = "2.1.2"
+  val catsEffectVersion = "2.1.3"
   val catsLoggerVersion = "1.0.1"
   val catsRetryVersion = "1.1.0"
   val catsVersion = "2.1.1"
