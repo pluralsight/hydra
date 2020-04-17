@@ -120,6 +120,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           override def getAllSubjects: IO[List[String]] = IO.pure(List())
 
           override def getSchemaRegistryClient: IO[SchemaRegistryClient] = IO.raiseError(new Exception("Something horrible went wrong!"))
+
+          override def getSchemaBySubject(subject: String): IO[Option[Schema]] = ???
         }
       (for {
         kafka <- KafkaAdminAlgebra.test[IO]
@@ -166,6 +168,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           override def getAllVersions(subject: String): IO[List[Int]] = IO.pure(Nil)
           override def getAllSubjects: IO[List[String]] = IO.pure(Nil)
           override def getSchemaRegistryClient: IO[SchemaRegistryClient] = IO.raiseError(new Exception("Something horrible went wrong!"))
+
+          override def getSchemaBySubject(subject: String): IO[Option[Schema]] = ???
         }
 
       (for {
@@ -217,6 +221,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           override def getAllVersions(subject: String): IO[List[Int]] = IO.pure(Nil)
           override def getAllSubjects: IO[List[String]] = IO.pure(Nil)
           override def getSchemaRegistryClient: IO[SchemaRegistryClient] = IO.raiseError(new Exception)
+
+          override def getSchemaBySubject(subject: String): IO[Option[Schema]] = ???
         }
 
       val schemaRegistryState = Map("subject-key" -> 1)
@@ -355,7 +361,9 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       }
 
     override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (GenericRecord, GenericRecord)] = fs2.Stream.empty
-}
+
+    override def publishStringKeyMessage(record: (String, GenericRecord), topicName: TopicName): IO[Either[PublishError, Unit]] = ???
+  }
 
   private def getSchema(name: String): Schema =
     SchemaBuilder

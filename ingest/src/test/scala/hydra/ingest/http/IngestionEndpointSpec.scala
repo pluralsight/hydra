@@ -6,16 +6,20 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.{MethodRejection, MissingHeaderRejection, RequestEntityExpectedRejection}
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.{TestActorRef, TestKit}
+import cats.effect.{Concurrent, ContextShift, IO}
+import hydra.avro.registry.SchemaRegistry
 import hydra.common.util.ActorUtils
 import hydra.core.ingest.RequestParams
 import hydra.core.marshallers.GenericError
 import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.TestIngestor
+import hydra.kafka.algebras.KafkaClientAlgebra
 import org.joda.time.DateTime
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 /**
@@ -48,7 +52,15 @@ class IngestionEndpointSpec
     "ingestor_registry"
   ).underlyingActor
 
-  val ingestRoute = new IngestionEndpoint().route
+  private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+  private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
+
+  import scalacache.Mode
+  implicit val mode: Mode[IO] = scalacache.CatsEffect.modes.async
+  val ingestRoute = new IngestionEndpoint(
+    false,
+    new IngestionFlow[IO](SchemaRegistry.test[IO].unsafeRunSync, KafkaClientAlgebra.test[IO].unsafeRunSync)
+  ).route
 
   override def afterAll = {
     super.afterAll()

@@ -78,15 +78,26 @@ object AppConfig {
       env("HYDRA_V2_METADATA_CONSUMER_GROUP")
     ).parMapN(V2MetadataTopicConfig)
 
+  final case class IngestConfig(
+                                 alternateIngestEnabled: Boolean
+                               )
+
+  private val ingestConfig: ConfigValue[IngestConfig] =
+    (
+      env("HYDRA_INGEST_ALTERNATE_ENABLED").as[Boolean].default(false)
+    ).map(IngestConfig)
+
   final case class AppConfig(
       createTopicConfig: CreateTopicConfig,
-      v2MetadataTopicConfig: V2MetadataTopicConfig
+      v2MetadataTopicConfig: V2MetadataTopicConfig,
+      ingestConfig: IngestConfig
   )
 
   val appConfig: ConfigValue[AppConfig] =
     (
       createTopicConfig,
-      v2MetadataTopicConfig
+      v2MetadataTopicConfig,
+      ingestConfig
     ).parMapN(AppConfig)
 
 }

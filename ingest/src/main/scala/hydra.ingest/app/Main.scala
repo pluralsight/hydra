@@ -73,6 +73,9 @@ object Main extends IOApp with ConfigSupport with LoggingAdapter {
     } yield server
 
   private def buildProgram()(implicit system: ActorSystem): IO[Unit] = {
+    import scalacache.Mode
+    implicit val mode: Mode[IO] = scalacache.CatsEffect.modes.async
+
     AppConfig.appConfig.load[IO].flatMap { config =>
       for {
         algebras <- Algebras

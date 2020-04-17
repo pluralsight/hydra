@@ -86,7 +86,10 @@ class KafkaClientAlgebraSpec
       val (topic2, key4, value4) = topicAndKeyAndValue("topic2","key4","value4")
       val (_, key5, value5) = topicAndKeyAndValue("topic2","key5","value5")
       "consume from two different topics" in {
-        (kafkaClient.publishMessage((key4, value4), topic2) *> kafkaClient.publishMessage((key5, value5), topic2)).unsafeRunSync()
+        (schemaRegistry.registerSchema(subject = s"$topic2-key", key4.getSchema) *>
+          schemaRegistry.registerSchema(subject = s"$topic2-value", value4.getSchema) *>
+          kafkaClient.publishMessage((key4, value4), topic2) *>
+          kafkaClient.publishMessage((key5, value5), topic2)).unsafeRunSync()
         val topicOneStream = kafkaClient.consumeMessages(topic, "doesNotReallyMatter")
         val topicTwoStream = kafkaClient.consumeMessages(topic2, "doesNotReallyMatter")
 

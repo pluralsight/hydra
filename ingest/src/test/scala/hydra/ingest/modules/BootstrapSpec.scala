@@ -106,6 +106,8 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
       publishTo.update(_ + (topicName -> record)).attemptNarrow[PublishError]
 
     override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (GenericRecord, GenericRecord)] = fs2.Stream.empty
+
+    override def publishStringKeyMessage(record: (String, GenericRecord), topicName: TopicName): IO[Either[PublishError, Unit]] = ???
   }
 
 }
