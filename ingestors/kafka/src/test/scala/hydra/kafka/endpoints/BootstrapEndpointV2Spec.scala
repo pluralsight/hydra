@@ -62,7 +62,7 @@ final class BootstrapEndpointV2Spec
       s <- SchemaRegistry.test[IO]
       k <- KafkaAdminAlgebra.test[IO]
       kc <- KafkaClientAlgebra.test[IO]
-      m <- MetadataAlgebra.make("_metadata.topic.name", "bootstrap.consumer.group", kc)
+      m <- MetadataAlgebra.make("_metadata.topic.name", "bootstrap.consumer.group", kc, true)
     } yield getTestCreateTopicProgram(s, k, kc, m)
 
   "BootstrapEndpointV2" must {
@@ -134,7 +134,7 @@ final class BootstrapEndpointV2Spec
         override def getSchemaRegistryClient: IO[SchemaRegistryClient] = err
       }
       KafkaClientAlgebra.test[IO].flatMap { client =>
-        MetadataAlgebra.make("123", "456", client).flatMap { m =>
+        MetadataAlgebra.make("123", "456", client, true).flatMap { m =>
           KafkaAdminAlgebra
             .test[IO]
             .map { kafka =>
