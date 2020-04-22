@@ -7,6 +7,7 @@ import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, TopicName}
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataV2Container
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Value}
+import org.apache.avro.generic.GenericRecord
 
 trait MetadataAlgebra[F[_]] {
 
@@ -25,13 +26,18 @@ object MetadataAlgebra {
   def make[F[_]: Sync: Concurrent](
                         metadataTopicName: TopicName,
                         consumerGroup: ConsumerGroup,
-                        kafkaClientAlgebra: KafkaClientAlgebra[F]
+                        kafkaClientAlgebra: KafkaClientAlgebra[F],
+                        consumeMetadataEnabled: Boolean
                       ): F[MetadataAlgebra[F]] = {
-    val metadataStream = kafkaClientAlgebra.consumeMessages(metadataTopicName, consumerGroup)
+    val metadataStream: fs2.Stream[F, (GenericRecord, GenericRecord)] = if (consumeMetadataEnabled) {
+      kafkaClientAlgebra.consumeMessages(metadataTopicName, consumerGroup)
+    } else {
+      fs2.Stream.empty
+    }
     for {
       ref <- Ref[F].of(MetadataStorageFacade.empty)
       _ <- Concurrent[F].start(metadataStream.flatMap { case (key, value) =>
-        fs2.Stream.eval{
+        fs2.Stream.eval {
           TopicMetadataV2.decode[F](key, value).flatMap { case (topicMetadataKey, topicMetadataValue) =>
             ref.update(_.addMetadata(TopicMetadataV2Container(topicMetadataKey, topicMetadataValue)))
           }
