@@ -28,7 +28,6 @@ import scalacache.guava.GuavaCache
 import scalacache.modes.scalaFuture._
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
-import cats.implicits._
 
 /**
   * Created by alexsilva on 1/20/17.
