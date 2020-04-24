@@ -75,7 +75,6 @@ class SchemaRegistryActor(
     e.getCause.asInstanceOf[RestClientException].getErrorCode < 500
 
   private def fetchSchema(location: String) = {
-    log.error(s"***FOUNDATION*** location -> $location")
     for {
       valueSchema <- loader
         .retrieveValueSchema(location)
@@ -104,7 +103,6 @@ class SchemaRegistryActor(
       loader.loadValueSchemaIntoCache(schemaResource) pipeTo sender
 
     case FetchAllSchemaVersionsRequest(subject: String) =>
-      log.error(s"***PHYSICS*** - subject -> $subject")
       val allVersionsRequest = for {
         resource <- loader.retrieveValueSchema(addSchemaSuffix(subject))
         allVersions <- Future.sequence((1 to resource.version).map {
@@ -123,14 +121,12 @@ class SchemaRegistryActor(
       breaker.withCircuitBreaker(allSubjectsRequest, registryFailure) pipeTo sender
 
     case FetchSchemaMetadataRequest(subject) =>
-      log.error(s"***SPRUCE*** subject -> $subject")
       val metadataRequest = loader
         .retrieveValueSchema(subject)
         .map(FetchSchemaMetadataResponse(_))
       breaker.withCircuitBreaker(metadataRequest, registryFailure) pipeTo sender
 
     case FetchSchemaVersionRequest(subject, version) =>
-      log.error(s"***HYDRANT*** subject -> $subject, version -> $version")
       val metadataRequest = loader
         .retrieveValueSchema(subject, version)
         .map(FetchSchemaVersionResponse(_))

@@ -44,7 +44,6 @@ class AvroRecordFactory(schemaResourceLoader: ActorRef)
   override def build(
       request: HydraRequest
   )(implicit ec: ExecutionContext): Future[AvroRecord] = {
-    log.error(s"***ROCKIES*** AvroRecordFactory request -> ${request.toString}")
     for {
       (topic, subject) <- Future.fromTry(getTopicAndSchemaSubject(request))
       schemaResource <- (schemaResourceLoader ? FetchSchemaRequest(subject))

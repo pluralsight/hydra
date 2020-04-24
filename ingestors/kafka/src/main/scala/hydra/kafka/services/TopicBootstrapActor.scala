@@ -193,7 +193,6 @@ class TopicBootstrapActor(
   private[kafka] def registerSchema(
       schemaJson: String
   ): Future[RegisterSchemaResponse] = {
-    log.error(s"***SANDSTONE*** TopicBootstrapActor schemaJson -> $schemaJson")
     (schemaRegistryActor ? RegisterSchemaRequest(schemaJson))
       .mapTo[RegisterSchemaResponse]
   }
