@@ -23,6 +23,7 @@ import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.avro.resource.SchemaResource
 import hydra.avro.util.AvroUtils
 import hydra.common.config.ConfigSupport
+import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor.{FetchSchemaRequest, FetchSchemaResponse}
 import hydra.core.ingest.HydraRequest
 import hydra.core.transport.ValidationStrategy.Strict
@@ -36,13 +37,14 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 class AvroRecordFactory(schemaResourceLoader: ActorRef)
     extends KafkaRecordFactory[String, GenericRecord]
-    with ConfigSupport {
+    with ConfigSupport with LoggingAdapter {
 
   private implicit val timeout = util.Timeout(3.seconds)
 
   override def build(
       request: HydraRequest
   )(implicit ec: ExecutionContext): Future[AvroRecord] = {
+    log.error(s"***ROCKIES*** AvroRecordFactory request -> ${request.toString}")
     for {
       (topic, subject) <- Future.fromTry(getTopicAndSchemaSubject(request))
       schemaResource <- (schemaResourceLoader ? FetchSchemaRequest(subject))
