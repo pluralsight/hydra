@@ -28,6 +28,7 @@ import scalacache.guava.GuavaCache
 import scalacache.modes.scalaFuture._
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
+import cats.implicits._
 
 /**
   * Created by alexsilva on 1/20/17.
@@ -54,7 +55,7 @@ class SchemaResourceLoader(
     log.error(s"***RAILCAR*** - subject -> $subject, version -> $version")
     if (version == 0) getLatestSchema(subject.withValueSuffix)
     else loadFromCache(subject.withValueSuffix, version.toString)
-  }
+  }.map(_.getOrElse(throw SchemaRegistryException(SchemaNotFoundException(subject), subject)))
 
   def retrieveKeySchema(subject: String, version: Int = 0)(
       implicit ec: ExecutionContext
@@ -62,7 +63,7 @@ class SchemaResourceLoader(
     log.error(s"***CLIMATE*** - subject -> $subject, version -> $version")
     if (version == 0) getLatestSchema(subject.withKeySuffix)
     else loadFromCache(subject.withKeySuffix, version.toString)
-  }
+  }.map(_.getOrElse(throw SchemaRegistryException(SchemaNotFoundException(subject), subject)))
 
   def loadValueSchemaIntoCache(
       schemaResource: SchemaResource
@@ -92,17 +93,17 @@ class SchemaResourceLoader(
       .sequence {
         Seq(
           schemaCache.put(schemaResource.id)(schemaResource.schema, ttl = None),
-          put(srSubject)(schemaResource, ttl = Some(metadataCheckInterval)),
-          put(srSubject, schemaResource.version)(schemaResource, ttl = None)
+          put(srSubject)(Option(schemaResource), ttl = Some(metadataCheckInterval)),
+          put(srSubject, schemaResource.version)(Option(schemaResource), ttl = None)
         )
       }
       .map(_ => schemaResource)
 
   private def getLatestSchema(
       subject: String
-  )(implicit ec: ExecutionContext): Future[SchemaResource] = {
+  )(implicit ec: ExecutionContext): Future[Option[SchemaResource]] = {
     cachingF(subject)(ttl = Some(metadataCheckInterval)) {
-      log.error(s"***MIDNIGHT*** Fetching latest metadata for $subject")
+      log.error(s"***DAWN*** Fetching latest metadata for $subject")
       Future(registry.getLatestSchemaMetadata(subject))
         .flatMap { md =>
           schemaCache
@@ -112,18 +113,18 @@ class SchemaResourceLoader(
               )
               new Schema.Parser().parse(md.getSchema)
             }
-            .map(SchemaResource(md.getId, md.getVersion, _))
+            .map(sch => Option(SchemaResource(md.getId, md.getVersion, sch)))
         }
-        .recoverWith {
-          case e: ConnectException => throw e
-          case e: Exception        => throw new SchemaRegistryException(e, subject)
+        .recover {
+          case e: ConnectException => None
+          case e: Exception        => None
         }
     }
   }
 
   private def loadFromCache(subject: String, version: String)(
       implicit ec: ExecutionContext
-  ): Future[SchemaResource] = {
+  ): Future[Option[SchemaResource]] = {
     cachingF(subject, version)(ttl = None) {
       log.debug(s"Fetching version $version for $subject schema")
       loadFromRegistry(subject, version)
@@ -132,7 +133,7 @@ class SchemaResourceLoader(
 
   private def loadFromRegistry(subject: String, version: String)(
       implicit ec: ExecutionContext
-  ): Future[SchemaResource] = {
+  ): Future[Option[SchemaResource]] = {
     log.debug(
       s"Loading schema $subject, version $version from schema registry $registryUrl."
     )
@@ -144,9 +145,10 @@ class SchemaResourceLoader(
           .getById(m.id) //this is what will throw if the schema does not exist
         m
       })
-      .recoverWith {
-        case e: ConnectException => throw e
-        case e: Exception        => throw new SchemaRegistryException(e, subject)
+      .map(Option(_))
+      .recover {
+        case e: ConnectException => None
+        case e: Exception        => None
       }
   }
 
@@ -176,10 +178,12 @@ class SchemaResourceLoader(
 object SchemaResourceLoader {
   val log = LoggerFactory.getLogger(getClass)
 
-  val cache = GuavaCache[SchemaResource]
+  val cache = GuavaCache[Option[SchemaResource]]
 
   //we need to cache the schemas once and only once, otherwise CachedSchemaRegistryClient used
   // by Confluent inside the KafkaProducer will eventually break once we return more schemas
   // than max.schemas.per.subject.
   val schemaCache = GuavaCache[Schema]
+
+  final case class SchemaNotFoundException(subject: String) extends Exception(s"Schema not found for $subject")
 }
