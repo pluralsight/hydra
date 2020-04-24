@@ -51,7 +51,6 @@ class SchemaResourceLoader(
   def retrieveValueSchema(subject: String, version: Int = 0)(
       implicit ec: ExecutionContext
   ): Future[SchemaResource] = {
-    log.error(s"***RAILCAR*** - subject -> $subject, version -> $version")
     if (version == 0) getLatestSchema(subject.withValueSuffix)
     else loadFromCache(subject.withValueSuffix, version.toString)
   }.map(_.getOrElse(throw SchemaRegistryException(SchemaNotFoundException(subject), subject)))
@@ -59,7 +58,6 @@ class SchemaResourceLoader(
   def retrieveKeySchema(subject: String, version: Int = 0)(
       implicit ec: ExecutionContext
   ): Future[SchemaResource] = {
-    log.error(s"***CLIMATE*** - subject -> $subject, version -> $version")
     if (version == 0) getLatestSchema(subject.withKeySuffix)
     else loadFromCache(subject.withKeySuffix, version.toString)
   }.map(_.getOrElse(throw SchemaRegistryException(SchemaNotFoundException(subject), subject)))
@@ -102,13 +100,13 @@ class SchemaResourceLoader(
       subject: String
   )(implicit ec: ExecutionContext): Future[Option[SchemaResource]] = {
     cachingF(subject)(ttl = Some(metadataCheckInterval)) {
-      log.error(s"***DAWN*** Fetching latest metadata for $subject")
+      log.debug(s"Fetching latest metadata for $subject")
       Future(registry.getLatestSchemaMetadata(subject))
         .flatMap { md =>
           schemaCache
             .caching(md.getId)(ttl = None) { //the schema itself is immutable and never expires
-              log.error(
-                s"***GROCERY*** - Caching new schema $subject [version=${md.getVersion} id=${md.getId}]"
+              log.debug(
+                s"Caching new schema $subject [version=${md.getVersion} id=${md.getId}]"
               )
               new Schema.Parser().parse(md.getSchema)
             }

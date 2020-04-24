@@ -32,7 +32,6 @@ class JdbcRecordFactory(schemaResourceLoader: ActorRef)
   override def build(
       request: HydraRequest
   )(implicit ec: ExecutionContext): Future[JdbcRecord] = {
-    log.error(s"***BOOMBOX*** JDBCRecordFactory request -> ${request.toString}")
     for {
       subject <- Future.fromTry(JdbcRecordFactory.getSchemaName(request))
       schema <- (schemaResourceLoader ? FetchSchemaRequest(subject))
