@@ -115,8 +115,8 @@ class SchemaResourceLoader(
             .map(sch => Option(SchemaResource(md.getId, md.getVersion, sch)))
         }
         .recover {
-          case e: ConnectException => None
-          case e: Exception        => None
+          case _: ConnectException => None
+          case e: Exception        => throw e
         }
     }
   }
@@ -146,8 +146,8 @@ class SchemaResourceLoader(
       })
       .map(Option(_))
       .recover {
-        case e: ConnectException => None
-        case e: Exception        => None
+        case _: ConnectException => None
+        case e: Exception        => throw e
       }
   }
 
