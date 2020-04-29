@@ -2,13 +2,13 @@ import sbt.{ExclusionRule, _}
 
 object Dependencies {
 
-  val akkaHTTPCorsVersion = "0.4.2"
+  val akkaHTTPCorsVersion = "0.4.3"
   val akkaHTTPVersion = "10.1.11"
   val akkaKafkaStreamVersion = "2.0.2"
   val akkaKryoVersion = "0.5.2"
   val akkaVersion = "2.6.4"
   val avroVersion = "1.9.2"
-  val catsEffectVersion = "2.1.2"
+  val catsEffectVersion = "2.1.3"
   val catsLoggerVersion = "1.0.1"
   val catsRetryVersion = "1.1.0"
   val catsVersion = "2.1.1"
@@ -16,24 +16,24 @@ object Dependencies {
   val confluentVersion = "5.4.1"
   val easyMockVersion = "4.2" //needed for mocking static java methods
   val fs2KafkaVersion = "1.0.0"
-  val hikariCPVersion = "3.4.2"
+  val hikariCPVersion = "3.4.3"
   val h2DbVersion = "1.4.200"
   val jacksonCoreVersion = "2.10.3"
   val jacksonDatabindVersion = "2.10.3"
   val jodaConvertVersion = "2.2.1"
-  val jodaTimeVersion = "2.10.5"
-  val kafkaVersion = "2.5.0"
+  val jodaTimeVersion = "2.10.6"
+  val kafkaVersion = "2.4.1"
   val kamonPVersion = "2.1.0"
   val kamonVersion = "2.1.0"
-  val log4jVersion = "2.13.1"
+  val log4jVersion = "2.13.2"
   val opRabbitVersion = "2.1.0"
   val powerMockVersion = "2.0.7" //needed for mocking static java methods
-  val refinedVersion = "0.9.13"
+  val refinedVersion = "0.9.14"
   val reflectionsVersion = "0.9.12"
   val scalaCacheVersion = "0.28.0"
   val scalaMockVersion = "4.4.0"
   val scalaTestVersion = "3.1.1"
-  val scalazVersion = "7.2.30"
+  val scalazVersion = "7.3.0"
   val sprayJsonVersion = "1.3.5"
   val typesafeConfigVersion = "1.3.2"
   val vulcanVersion = "1.0.1"
@@ -137,7 +137,10 @@ object Dependencies {
     )
 
     val guavacache =
-      "com.github.cb372" %% "scalacache-guava" % scalaCacheVersion
+      Seq(
+        "com.github.cb372" %% "scalacache-guava",
+        "com.github.cb372" %% "scalacache-cats-effect"
+      ).map(_ % scalaCacheVersion)
 
     val reflections = "org.reflections" % "reflections" % reflectionsVersion
 
@@ -196,17 +199,16 @@ object Dependencies {
     logging ++ Seq(avro, hikariCP, h2db) ++ joda ++ testDeps
 
   val avroDeps: Seq[ModuleID] =
-    baseDeps ++ confluent ++ jackson ++ Seq(guavacache) ++ catsEffect
+    baseDeps ++ confluent ++ jackson ++ guavacache ++ catsEffect
 
   val coreDeps: Seq[ModuleID] = akka ++ baseDeps ++
     Seq(
-      guavacache,
       reflections,
       akkaKryo,
       postgres,
       h2db,
       retry
-    ) ++
+    ) ++ guavacache ++
     confluent ++ kamon
 
   val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(ciris)

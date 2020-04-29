@@ -42,7 +42,7 @@ final class BootstrapEndpointV2Spec
       ka: KafkaAdminAlgebra[IO],
       kc: KafkaClientAlgebra[IO],
       m: MetadataAlgebra[IO]
-  ): BootstrapEndpointV2 = {
+  ): BootstrapEndpointV2[IO] = {
     val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
     new BootstrapEndpointV2(
       new CreateTopicProgram[IO](
@@ -57,12 +57,12 @@ final class BootstrapEndpointV2Spec
     )
   }
 
-  private val testCreateTopicProgram: IO[BootstrapEndpointV2] =
+  private val testCreateTopicProgram: IO[BootstrapEndpointV2[IO]] =
     for {
       s <- SchemaRegistry.test[IO]
       k <- KafkaAdminAlgebra.test[IO]
       kc <- KafkaClientAlgebra.test[IO]
-      m <- MetadataAlgebra.make("_metadata.topic.name", "bootstrap.consumer.group", kc)
+      m <- MetadataAlgebra.make("_metadata.topic.name", "bootstrap.consumer.group", kc, true)
     } yield getTestCreateTopicProgram(s, k, kc, m)
 
   "BootstrapEndpointV2" must {
@@ -132,9 +132,11 @@ final class BootstrapEndpointV2Spec
         override def getAllSubjects: IO[List[String]] = err
 
         override def getSchemaRegistryClient: IO[SchemaRegistryClient] = err
+
+        override def getSchemaBySubject(subject: String): IO[Option[Schema]] = err
       }
       KafkaClientAlgebra.test[IO].flatMap { client =>
-        MetadataAlgebra.make("123", "456", client).flatMap { m =>
+        MetadataAlgebra.make("123", "456", client, true).flatMap { m =>
           KafkaAdminAlgebra
             .test[IO]
             .map { kafka =>
@@ -155,6 +157,34 @@ final class BootstrapEndpointV2Spec
             bootstrapEndpoint.route
           ) ~> check {
             response.status shouldBe StatusCodes.OK
+          }
+        }
+        .unsafeRunSync()
+    }
+
+    "receive 404 with Subject not found body" in {
+      val subject = "nonexistanttopic"
+      testCreateTopicProgram
+        .map { bootstrapEndpoint =>
+          Get(s"/v2/streams/$subject") ~> Route.seal(
+            bootstrapEndpoint.route
+          ) ~> check {
+            response.status shouldBe StatusCodes.NotFound
+            responseAs[String] shouldBe s"Subject $subject could not be found."
+          }
+        }
+        .unsafeRunSync()
+    }
+
+    "receive 400 with Subject not properly formatted" in {
+      val subject = "invalid!topic&&"
+      testCreateTopicProgram
+        .map { bootstrapEndpoint =>
+          Get(s"/v2/streams/$subject") ~> Route.seal(
+            bootstrapEndpoint.route
+          ) ~> check {
+            response.status shouldBe StatusCodes.BadRequest
+            responseAs[String] shouldBe Subject.invalidFormat
           }
         }
         .unsafeRunSync()

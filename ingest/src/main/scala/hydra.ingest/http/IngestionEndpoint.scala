@@ -20,10 +20,11 @@ import akka.actor._
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
 import hydra.common.config.ConfigSupport._
+import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
-import hydra.core.ingest.{CorrelationIdBuilder, RequestParams}
+import hydra.core.ingest.{CorrelationIdBuilder, IngestionReport, RequestParams}
 import hydra.core.marshallers.GenericError
-import hydra.core.protocol.InitiateHttpRequest
+import hydra.core.protocol.{IngestorCompleted, InitiateHttpRequest, RequestPublished}
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestionHandlerGateway
 
@@ -32,7 +33,10 @@ import scala.concurrent.duration.{FiniteDuration, _}
 /**
   * Created by alexsilva on 12/22/15.
   */
-class IngestionEndpoint(implicit system: ActorSystem) extends RouteSupport {
+class IngestionEndpoint[F[_]: Futurable](
+                                          alternateIngestFlowEnabled: Boolean,
+                                          ingestionFlow: IngestionFlow[F]
+                                        )(implicit system: ActorSystem) extends RouteSupport with HydraIngestJsonSupport {
 
   import hydra.ingest.bootstrap.RequestFactories._
 
@@ -68,10 +72,26 @@ class IngestionEndpoint(implicit system: ActorSystem) extends RouteSupport {
 
   private def cId = CorrelationIdBuilder.generate()
 
+  /*
+  {
+    "correlationId": "3g7Nr1EEIzr",
+    "ingestors": {
+        "kafka": {
+            "code": 201,
+            "message": "Created"
+        }
+    }
+}
+   */
+
   private def publishRequest = parameter("correlationId" ?) { cIdOpt =>
     extractRequest { req =>
-      onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) {
-        hydraRequest =>
+      onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>
+        if (alternateIngestFlowEnabled) {
+          onSuccess(Futurable[F].unsafeToFuture(ingestionFlow.ingest(hydraRequest))) {
+            complete(IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorCompleted), 200))
+          }
+        } else {
           imperativelyComplete { ctx =>
             requestHandler ! InitiateHttpRequest(
               hydraRequest,
@@ -79,6 +99,7 @@ class IngestionEndpoint(implicit system: ActorSystem) extends RouteSupport {
               ctx
             )
           }
+        }
       }
     }
   }

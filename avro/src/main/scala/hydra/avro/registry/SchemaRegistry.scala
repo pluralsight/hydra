@@ -1,12 +1,11 @@
 package hydra.avro.registry
 
 import cats.effect.Sync
-import io.confluent.kafka.schemaregistry.client.{
-  CachedSchemaRegistryClient,
-  MockSchemaRegistryClient,
-  SchemaRegistryClient
-}
+import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, MockSchemaRegistryClient, SchemaRegistryClient}
 import org.apache.avro.Schema
+import org.apache.avro.Schema.Parser
+
+import scala.util.Try
 
 /**
   * Internal interface to interact with the SchemaRegistryClient from Confluent.
@@ -64,6 +63,8 @@ trait SchemaRegistry[F[_]] {
     * @return SchemaRegistryClient
     */
   def getSchemaRegistryClient: F[SchemaRegistryClient]
+
+  def getSchemaBySubject(subject: String): F[Option[Schema]]
 
 }
 
@@ -129,6 +130,13 @@ object SchemaRegistry {
         }
 
       override def getSchemaRegistryClient: F[SchemaRegistryClient] = Sync[F].pure(schemaRegistryClient)
+
+      //TODO: Test this
+      override def getSchemaBySubject(subject: String): F[Option[Schema]] = Sync[F].delay {
+        Try {
+          new org.apache.avro.Schema.Parser().parse(schemaRegistryClient.getLatestSchemaMetadata(subject).getSchema)
+        }.toOption
+      }
     }
 
 }

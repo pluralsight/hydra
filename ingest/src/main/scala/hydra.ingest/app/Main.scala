@@ -10,8 +10,8 @@ import hydra.common.Settings
 import hydra.common.config.ConfigSupport
 import ConfigSupport._
 import hydra.common.logging.LoggingAdapter
-import hydra.ingest.bootstrap.{ActorFactory, RouteFactory}
-import hydra.ingest.modules.{Algebras, Bootstrap, Programs}
+import hydra.ingest.bootstrap.ActorFactory
+import hydra.ingest.modules.{Algebras, Bootstrap, Programs, Routes}
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import kamon.Kamon
@@ -60,30 +60,32 @@ object Main extends IOApp with ConfigSupport with LoggingAdapter {
     }
   }
 
-  private def routesIO()(implicit system: ActorSystem): IO[Route] =
-    IO(RouteFactory.getRoutes())
-
-  private def serverIO(routes: Route, settings: Settings)(
+  private def serverIO(routes: Routes[IO], settings: Settings)(
       implicit system: ActorSystem
-  ): IO[ServerBinding] = {
-    IO.fromFuture(
-      IO(
-        Http().bindAndHandle(routes, settings.httpInterface, settings.httpPort)
+  ): IO[ServerBinding] =
+    for {
+      r <- routes.routes
+      server <- IO.fromFuture(
+        IO(
+          Http().bindAndHandle(r, settings.httpInterface, settings.httpPort)
+        )
       )
-    )
-  }
+    } yield server
 
   private def buildProgram()(implicit system: ActorSystem): IO[Unit] = {
+    import scalacache.Mode
+    implicit val mode: Mode[IO] = scalacache.CatsEffect.modes.async
+
     AppConfig.appConfig.load[IO].flatMap { config =>
       for {
         algebras <- Algebras
-          .make[IO](config.createTopicConfig)
+          .make[IO](config)
         programs <- Programs.make[IO](config, algebras)
         bootstrap <- Bootstrap
           .make[IO](programs.createTopic, config.v2MetadataTopicConfig)
         _ <- actorsIO()
         _ <- bootstrap.bootstrapAll
-        routes <- routesIO()
+        routes <- Routes.make[IO](programs, algebras, config)
         _ <- report
         _ <- serverIO(routes, Settings.HydraSettings)
       } yield ()
