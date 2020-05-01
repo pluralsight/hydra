@@ -35,7 +35,7 @@ trait KafkaProducerSupport extends TransportOps {
   override def transportName: String = "kafka"
 
   private val pool = RoundRobinPool(
-    nrOfInstances = 5,
+    nrOfInstances = 20,
     resizer = Some(DefaultOptimalSizeExploringResizer())
   )
 
