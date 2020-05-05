@@ -2,7 +2,7 @@ package hydra.ingest.http
 
 import akka.actor.{Actor, Props}
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.headers.RawHeader
+import akka.http.scaladsl.model.headers.{RawHeader, `User-Agent`}
 import akka.http.scaladsl.server.{MethodRejection, MissingHeaderRejection, RequestEntityExpectedRejection}
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.{TestActorRef, TestKit}
@@ -10,11 +10,13 @@ import cats.effect.{Concurrent, ContextShift, IO}
 import hydra.avro.registry.SchemaRegistry
 import hydra.common.util.ActorUtils
 import hydra.core.ingest.RequestParams
+import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
 import hydra.core.marshallers.GenericError
 import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.TestIngestor
 import hydra.kafka.algebras.KafkaClientAlgebra
+import org.apache.avro.SchemaBuilder
 import org.joda.time.DateTime
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -59,7 +61,8 @@ class IngestionEndpointSpec
   implicit val mode: Mode[IO] = scalacache.CatsEffect.modes.async
   val ingestRoute = new IngestionEndpoint(
     false,
-    new IngestionFlow[IO](SchemaRegistry.test[IO].unsafeRunSync, KafkaClientAlgebra.test[IO].unsafeRunSync)
+    new IngestionFlow[IO](SchemaRegistry.test[IO].unsafeRunSync, KafkaClientAlgebra.test[IO].unsafeRunSync),
+    Set.empty
   ).route
 
   override def afterAll = {
@@ -132,6 +135,42 @@ class IngestionEndpointSpec
     "broadcasts a request" in {
       val request = Post("/ingest", "payload")
       request ~> ingestRoute ~> check {
+        status shouldBe StatusCodes.OK
+      }
+    }
+
+    val ingestRouteAlt = {
+      val schemaRegistry = SchemaRegistry.test[IO].unsafeRunSync
+      schemaRegistry.registerSchema(
+        "my_topic-value",
+        SchemaBuilder.record("my_topic").fields().requiredBoolean("test").endRecord()
+      ).unsafeRunSync
+      new IngestionEndpoint(
+        true,
+        new IngestionFlow[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync),
+        Set("Segment"),
+        Some("alt-test-request-handler")
+      ).route
+    }
+
+    "publishes to a target ingestor for UA in provided Set" in {
+      val ingestor = RawHeader(RequestParams.HYDRA_INGESTOR_PARAM, "tester")
+      val userAgent = `User-Agent`("Segment.com")
+      val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
+
+      val request = Post("/ingest", "payload").withHeaders(ingestor, userAgent, kafkaTopic)
+      request ~> ingestRouteAlt ~> check {
+        status shouldBe StatusCodes.OK
+      }
+    }
+
+    "rejects for UA not in provided Set" in {
+      val ingestor = RawHeader(RequestParams.HYDRA_INGESTOR_PARAM, "tester")
+      val userAgent = `User-Agent`("not_found")
+      val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
+
+      val request = Post("/ingest", """{"test":true}""").withHeaders(ingestor, userAgent, kafkaTopic)
+      request ~> ingestRouteAlt ~> check {
         status shouldBe StatusCodes.OK
       }
     }

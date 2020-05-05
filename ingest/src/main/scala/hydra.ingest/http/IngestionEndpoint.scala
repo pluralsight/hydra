@@ -22,7 +22,7 @@ import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
 import hydra.common.config.ConfigSupport._
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
-import hydra.core.ingest.{CorrelationIdBuilder, IngestionReport, RequestParams}
+import hydra.core.ingest.{CorrelationIdBuilder, HydraRequest, IngestionReport, RequestParams}
 import hydra.core.marshallers.GenericError
 import hydra.core.protocol.{IngestorCompleted, InitiateHttpRequest, RequestPublished}
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
@@ -35,7 +35,9 @@ import scala.concurrent.duration.{FiniteDuration, _}
   */
 class IngestionEndpoint[F[_]: Futurable](
                                           alternateIngestFlowEnabled: Boolean,
-                                          ingestionFlow: IngestionFlow[F]
+                                          ingestionFlow: IngestionFlow[F],
+                                          useOldIngestUAContains: Set[String],
+                                          requestHandlerPathName: Option[String] = None
                                         )(implicit system: ActorSystem) extends RouteSupport with HydraIngestJsonSupport {
 
   import hydra.ingest.bootstrap.RequestFactories._
@@ -46,7 +48,7 @@ class IngestionEndpoint[F[_]: Futurable](
 
   private val requestHandler = system.actorOf(
     IngestionHandlerGateway.props(registryPath),
-    "ingestion_Http_handler_gateway"
+    requestHandlerPathName.getOrElse("ingestion_Http_handler_gateway")
   )
 
   private val ingestTimeout = applicationConfig
@@ -72,22 +74,17 @@ class IngestionEndpoint[F[_]: Futurable](
 
   private def cId = CorrelationIdBuilder.generate()
 
-  /*
-  {
-    "correlationId": "3g7Nr1EEIzr",
-    "ingestors": {
-        "kafka": {
-            "code": 201,
-            "message": "Created"
-        }
+  private def useAlternateIngestFlow(request: HydraRequest): Boolean = {
+    request.metadata.find(e => e._1.equalsIgnoreCase("User-Agent")) match {
+      case Some(ua) if useOldIngestUAContains.exists(ua._2.startsWith) => false
+      case _ => true
     }
-}
-   */
+  }
 
   private def publishRequest = parameter("correlationId" ?) { cIdOpt =>
     extractRequest { req =>
       onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>
-        if (alternateIngestFlowEnabled) {
+        if (alternateIngestFlowEnabled && useAlternateIngestFlow(hydraRequest)) {
           onSuccess(Futurable[F].unsafeToFuture(ingestionFlow.ingest(hydraRequest))) {
             complete(IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorCompleted), 200))
           }
