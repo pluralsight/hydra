@@ -38,13 +38,14 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](schemaRegistr
     request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM) match {
       case Some(topic) => getValueSchemaWrapper(topic).flatMap { schemaWrapper =>
         val ar = AvroRecord(topic, schemaWrapper.schema, None, request.payload, AckStrategy.Replicated)
+        val payloadMaybe = Option(ar.payload)
         // TODO: Support v2
         val key = schemaWrapper.primaryKeys.toList match {
           case Nil => None
-          case l => l.flatMap(pkName => Try(ar.payload.get(pkName)).toOption)
+          case l => l.flatMap(pkName => payloadMaybe.flatMap(p => Try(p.get(pkName)).toOption))
             .mkString("|").some
         }
-        kafkaClient.publishStringKeyMessage((key, ar.payload), topic)
+        kafkaClient.publishStringKeyMessage((key, payloadMaybe), topic)
       }.void
       case None => MonadError[F, Throwable].raiseError(MissingTopicNameException(request))
     }

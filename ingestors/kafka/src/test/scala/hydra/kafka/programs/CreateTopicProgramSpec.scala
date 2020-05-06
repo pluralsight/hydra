@@ -277,11 +277,11 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafkaAdmin <- KafkaAdminAlgebra.test[IO]
-        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, GenericRecord)])
+        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(publishTo)
         )
-        m <- TopicMetadataV2.encode[IO](key, value)
+        m <- TopicMetadataV2.encode[IO](key, Some(value))
         _ <- new CreateTopicProgram[IO](
           schemaRegistry = schemaRegistry,
           kafkaAdmin = kafkaAdmin,
@@ -301,7 +301,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafkaAdmin <- KafkaAdminAlgebra.test[IO]
-        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, GenericRecord)])
+        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(
             publishTo,
@@ -328,7 +328,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafkaAdmin <- KafkaAdminAlgebra.test[IO]
-        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, GenericRecord)])
+        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(
             publishTo,
@@ -350,22 +350,22 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
   }
 
   private final class TestKafkaClientAlgebraWithPublishTo(
-                                                          publishTo: Ref[IO, Map[TopicName, (GenericRecord, GenericRecord)]],
+                                                          publishTo: Ref[IO, Map[TopicName, (GenericRecord, Option[GenericRecord])]],
                                                           failOnPublish: Boolean = false
   ) extends KafkaClientAlgebra[IO] {
 
-    override def publishMessage(record: (GenericRecord, GenericRecord), topicName: TopicName): IO[Either[PublishError, Unit]] =
+    override def publishMessage(record: (GenericRecord, Option[GenericRecord]), topicName: TopicName): IO[Either[PublishError, Unit]] =
       if (failOnPublish) {
         IO.pure(Left(PublishError.Timeout))
       } else {
         publishTo.update(_ + (topicName -> record)).attemptNarrow[PublishError]
       }
 
-    override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (GenericRecord, GenericRecord)] = fs2.Stream.empty
+    override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (GenericRecord, Option[GenericRecord])] = fs2.Stream.empty
 
-    override def publishStringKeyMessage(record: (Option[String], GenericRecord), topicName: TopicName): IO[Either[PublishError, Unit]] = ???
+    override def publishStringKeyMessage(record: (Option[String], Option[GenericRecord]), topicName: TopicName): IO[Either[PublishError, Unit]] = ???
 
-    override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[IO, (Option[String], GenericRecord)] = ???
+    override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[IO, (Option[String], Option[GenericRecord])] = ???
   }
 
   private def getSchema(name: String): Schema =

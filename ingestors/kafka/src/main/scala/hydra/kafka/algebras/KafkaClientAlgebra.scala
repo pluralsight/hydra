@@ -71,8 +71,8 @@ object KafkaClientAlgebra {
   private sealed trait RecordKeyFormat
   private final case class GenericRecordKey(value: GenericRecord) extends RecordKeyFormat
   private final case class StringKey(value: Option[String]) extends RecordKeyFormat
-  type Record = (GenericRecord, GenericRecord)
-  type StringRecord = (Option[String], GenericRecord)
+  type Record = (GenericRecord, Option[GenericRecord])
+  type StringRecord = (Option[String], Option[GenericRecord])
 
   sealed abstract class PublishError(message: String)
     extends Exception(message)
@@ -89,13 +89,13 @@ object KafkaClientAlgebra {
 
 
   private def getProducerQueue[F[_]: ConcurrentEffect: ContextShift]
-  (bootstrapServers: String, schemaRegistryClient: SchemaRegistryClient): F[fs2.concurrent.Queue[F, (RecordKeyFormat, GenericRecord, TopicName, Deferred[F, Unit])]] = {
+  (bootstrapServers: String, schemaRegistryClient: SchemaRegistryClient): F[fs2.concurrent.Queue[F, (RecordKeyFormat, Option[GenericRecord], TopicName, Deferred[F, Unit])]] = {
     import fs2.kafka._
     val producerSettings =
       ProducerSettings(keySerializer = getKeySerializer(schemaRegistryClient), valueSerializer = getGenericRecordSerializer(schemaRegistryClient))
         .withBootstrapServers(bootstrapServers)
     for {
-      queue <- fs2.concurrent.Queue.unbounded[F, (RecordKeyFormat, GenericRecord, TopicName, Deferred[F, Unit])]
+      queue <- fs2.concurrent.Queue.unbounded[F, (RecordKeyFormat, Option[GenericRecord], TopicName, Deferred[F, Unit])]
       _ <- Concurrent[F].start(queue.dequeue.map { payload =>
         val record = ProducerRecord(payload._3, payload._1, payload._2)
         ProducerRecords.one(record, payload._4)
@@ -117,7 +117,7 @@ object KafkaClientAlgebra {
           produceMessage[Option[String]](record, topicName, StringKey.apply)
         }
 
-        override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[F, (GenericRecord, GenericRecord)] = {
+        override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[F, (GenericRecord, Option[GenericRecord])] = {
           consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName)
         }
 
@@ -125,7 +125,7 @@ object KafkaClientAlgebra {
           consumeMessages[Option[String]](getStringKeyDeserializer(schemaRegistryClient), consumerGroup, topicName)
         }
 
-        private def produceMessage[A](record: (A, GenericRecord), topicName: TopicName, convert: A => RecordKeyFormat): F[Either[PublishError, Unit]] = {
+        private def produceMessage[A](record: (A, Option[GenericRecord]), topicName: TopicName, convert: A => RecordKeyFormat): F[Either[PublishError, Unit]] = {
           Deferred[F, Unit].flatMap { d =>
             queue.enqueue1((convert(record._1), record._2, topicName, d)) *>
               Concurrent.timeoutTo[F, Either[PublishError, Unit]](d.get.map(Right(_)), 5.seconds, Sync[F].pure(Left(PublishError.Timeout)))
@@ -135,10 +135,10 @@ object KafkaClientAlgebra {
         private def consumeMessages[A](
                                         keyDeserializer: Deserializer[F, A],
                                         consumerGroup: ConsumerGroup,
-                                        topicName: TopicName): fs2.Stream[F, (A, GenericRecord)] = {
+                                        topicName: TopicName): fs2.Stream[F, (A, Option[GenericRecord])] = {
           val consumerSettings = ConsumerSettings(
             keyDeserializer = keyDeserializer,
-            valueDeserializer = getGenericRecordDeserializer(schemaRegistryClient)()
+            valueDeserializer = getOptionalGenericRecordDeserializer(schemaRegistryClient)()
           )
             .withAutoOffsetReset(AutoOffsetReset.Earliest)
             .withBootstrapServers(bootstrapServers)
@@ -222,8 +222,20 @@ object KafkaClientAlgebra {
         de.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "").asJava, isKey)
         de
       }
+      (topic: TopicName, data: Array[Byte]) => {
+        deserializer.deserialize(topic, data).asInstanceOf[GenericRecord]
+      }
+    }.suspend
+
+  private def getOptionalGenericRecordDeserializer[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient)(isKey: Boolean = false): Deserializer[F, Option[GenericRecord]] =
+    Deserializer.delegate[F, Option[GenericRecord]] {
+      val deserializer = {
+        val de = new KafkaAvroDeserializer(schemaRegistryClient)
+        de.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "").asJava, isKey)
+        de
+      }
     (topic: TopicName, data: Array[Byte]) => {
-      deserializer.deserialize(topic, data).asInstanceOf[GenericRecord]
+      Option(data).map(deserializer.deserialize(topic, _).asInstanceOf[GenericRecord])
     }
   }.suspend
 
@@ -241,15 +253,15 @@ object KafkaClientAlgebra {
       }
     }.suspend
 
-  private def getGenericRecordSerializer[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient): Serializer[F, GenericRecord] =
-    Serializer.delegate[F, GenericRecord] {
+  private def getGenericRecordSerializer[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient): Serializer[F, Option[GenericRecord]] =
+    Serializer.delegate[F, Option[GenericRecord]] {
       val serializer = new KafkaAvroSerializer(schemaRegistryClient)
-      (topic: TopicName, data: GenericRecord) => {
-        serializer.serialize(topic, data)
+      (topic: TopicName, data: Option[GenericRecord]) => {
+        data.map(serializer.serialize(topic, _)).orNull
       }
     }.suspend
 
-  private type CacheRecord = (RecordKeyFormat, GenericRecord)
+  private type CacheRecord = (RecordKeyFormat, Option[GenericRecord])
 
   private final case class MockFS2Kafka[F[_]](
                                                    private val topics: Map[TopicName, List[CacheRecord]],

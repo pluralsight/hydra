@@ -54,7 +54,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
     )
 
     val (encodedKey, encodedValue) =
-      TopicMetadataV2.encode[IO](key, value).unsafeRunSync()
+      TopicMetadataV2.encode[IO](key, Some(value)).unsafeRunSync()
 
     encodedKey shouldBe new GenericRecordBuilder(
       TopicMetadataV2Key.codec.schema.toOption.get
@@ -98,7 +98,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
     )
 
     val (encodedKey, encodedValue) =
-      TopicMetadataV2.encode[IO](key, value).unsafeRunSync()
+      TopicMetadataV2.encode[IO](key, Some(value)).unsafeRunSync()
 
     val (decodedKey,decodedValue) =
       TopicMetadataV2.decode[IO](encodedKey, encodedValue).unsafeRunSync()

@@ -64,7 +64,7 @@ class KafkaClientAlgebraSpec
       val (topic, (_, key), value) = topicAndKeyAndValue("topic1","key1","value1")
       (schemaRegistry.registerSchema(subject = s"$topic-key", key.getSchema) *>
         schemaRegistry.registerSchema(subject = s"$topic-value", value.getSchema) *>
-        kafkaClient.publishMessage((key, value), topic).map{ r =>
+        kafkaClient.publishMessage((key, Some(value)), topic).map{ r =>
           assert(r.isRight)}).unsafeRunSync()
     }
 
@@ -77,17 +77,17 @@ class KafkaClientAlgebraSpec
 
     val (_, (_, key2), value2) = topicAndKeyAndValue("topic1","key2","value2")
     "publish avro record to existing topic and consume only that value in existing consumer group" in {
-      kafkaClient.publishMessage((key2, value2), topic).unsafeRunSync()
+      kafkaClient.publishMessage((key2, Some(value2)), topic).unsafeRunSync()
       val records = kafkaClient.consumeMessages(topic, "newConsumerGroup6").take(2).compile.toList.unsafeRunSync()
-      records should contain allOf((key2, value2), (key, value))
+      records should contain allOf((key2, Some(value2)), (key, Some(value)))
     }
 
     val (_, (_, key3), value3) = topicAndKeyAndValue("topic1","key3","value3")
     "continue consuming avro messages from the same stream" in {
       val stream = kafkaClient.consumeMessages(topic, "doesNotReallyMatter")
-      stream.take(2).compile.toList.unsafeRunSync() should contain allOf((key2, value2), (key, value))
-      kafkaClient.publishMessage((key3, value3), topic).unsafeRunSync()
-      stream.take(3).compile.toList.unsafeRunSync().last shouldBe (key3, value3)
+      stream.take(2).compile.toList.unsafeRunSync() should contain allOf((key2, Some(value2)), (key, Some(value)))
+      kafkaClient.publishMessage((key3, Some(value3)), topic).unsafeRunSync()
+      stream.take(3).compile.toList.unsafeRunSync().last shouldBe (key3, Some(value3))
     }
 
     val (topic2, (_, key4), value4) = topicAndKeyAndValue("topic2","key4","value4")
@@ -95,13 +95,13 @@ class KafkaClientAlgebraSpec
     "consume avro messages from two different topics" in {
       (schemaRegistry.registerSchema(subject = s"$topic2-key", key4.getSchema) *>
         schemaRegistry.registerSchema(subject = s"$topic2-value", value4.getSchema) *>
-        kafkaClient.publishMessage((key4, value4), topic2) *>
-        kafkaClient.publishMessage((key5, value5), topic2)).unsafeRunSync()
+        kafkaClient.publishMessage((key4, Some(value4)), topic2) *>
+        kafkaClient.publishMessage((key5, Some(value5)), topic2)).unsafeRunSync()
       val topicOneStream = kafkaClient.consumeMessages(topic, "doesNotReallyMatter")
       val topicTwoStream = kafkaClient.consumeMessages(topic2, "doesNotReallyMatter")
 
-      topicOneStream.take(3).compile.toList.unsafeRunSync() should contain allOf ((key3, value3), (key2, value2), (key, value))
-      topicTwoStream.take(2).compile.toList.unsafeRunSync() should contain allOf ((key4, value4), (key5, value5))
+      topicOneStream.take(3).compile.toList.unsafeRunSync() should contain allOf ((key3, Some(value3)), (key2, Some(value2)), (key, Some(value)))
+      topicTwoStream.take(2).compile.toList.unsafeRunSync() should contain allOf ((key4, Some(value4)), (key5, Some(value5)))
     }
   }
 
@@ -109,7 +109,7 @@ class KafkaClientAlgebraSpec
     "publish string key message to kafka" in {
       val (topic, (keyString, _), value) = topicAndKeyAndValue("stringTopic1","key1","value1")
       (schemaRegistry.registerSchema(subject = s"$topic-value", value.getSchema) *>
-        kafkaClient.publishStringKeyMessage((keyString, value), topic).map{ r =>
+        kafkaClient.publishStringKeyMessage((keyString, Some(value)), topic).map{ r =>
           assert(r.isRight)}).unsafeRunSync()
     }
 
@@ -117,35 +117,35 @@ class KafkaClientAlgebraSpec
     "consume string key message from kafka" in {
       val records = kafkaClient.consumeStringKeyMessages(topic,"newConsumerGroup").take(1).compile.toList.unsafeRunSync()
       records should have length 1
-      records.head shouldBe (keyString, value)
+      records.head shouldBe (keyString, Some(value))
     }
 
     val (_, (keyString2, _), value2) = topicAndKeyAndValue("stringTopic1","key2","value2")
     "publish string key record to existing topic and consume only that value in existing consumer group" in {
-      kafkaClient.publishStringKeyMessage((keyString2, value2), topic).unsafeRunSync()
+      kafkaClient.publishStringKeyMessage((keyString2, Some(value2)), topic).unsafeRunSync()
       val records = kafkaClient.consumeStringKeyMessages(topic, "newConsumerGroup6").take(2).compile.toList.unsafeRunSync()
-      records should contain allOf((keyString2, value2), (keyString, value))
+      records should contain allOf((keyString2, Some(value2)), (keyString, Some(value)))
     }
 
     val (_, (keyString3, _), value3) = topicAndKeyAndValue("stringTopic1","key3","value3")
     "continue consuming string key messages from the same stream" in {
       val stream = kafkaClient.consumeStringKeyMessages(topic, "doesNotReallyMatter")
-      stream.take(2).compile.toList.unsafeRunSync() should contain allOf((keyString2, value2), (keyString, value))
-      kafkaClient.publishStringKeyMessage((keyString3, value3), topic).unsafeRunSync()
-      stream.take(3).compile.toList.unsafeRunSync().last shouldBe (keyString3, value3)
+      stream.take(2).compile.toList.unsafeRunSync() should contain allOf((keyString2, Some(value2)), (keyString, Some(value)))
+      kafkaClient.publishStringKeyMessage((keyString3, Some(value3)), topic).unsafeRunSync()
+      stream.take(3).compile.toList.unsafeRunSync().last shouldBe (keyString3, Some(value3))
     }
 
     val (topic2, (keyString4, _), value4) = topicAndKeyAndValue("stringTopic2","key4","value4")
     val (_, (keyString5, _), value5) = topicAndKeyAndValue("stringTopic2","key5","value5")
     "consume string key messages from two different topics" in {
       (schemaRegistry.registerSchema(subject = s"$topic2-value", value4.getSchema) *>
-        kafkaClient.publishStringKeyMessage((keyString4, value4), topic2) *>
-        kafkaClient.publishStringKeyMessage((keyString5, value5), topic2)).unsafeRunSync()
+        kafkaClient.publishStringKeyMessage((keyString4, Some(value4)), topic2) *>
+        kafkaClient.publishStringKeyMessage((keyString5, Some(value5)), topic2)).unsafeRunSync()
       val topicOneStream = kafkaClient.consumeStringKeyMessages(topic, "doesNotReallyMatter")
       val topicTwoStream = kafkaClient.consumeStringKeyMessages(topic2, "doesNotReallyMatter")
 
-      topicOneStream.take(3).compile.toList.unsafeRunSync() should contain allOf ((keyString3, value3), (keyString2, value2), (keyString, value))
-      topicTwoStream.take(2).compile.toList.unsafeRunSync() should contain allOf ((keyString4, value4), (keyString5, value5))
+      topicOneStream.take(3).compile.toList.unsafeRunSync() should contain allOf ((keyString3, Some(value3)), (keyString2, Some(value2)), (keyString, Some(value)))
+      topicTwoStream.take(2).compile.toList.unsafeRunSync() should contain allOf ((keyString4, Some(value4)), (keyString5, Some(value5)))
     }
   }
 
@@ -153,7 +153,7 @@ class KafkaClientAlgebraSpec
     "publish null key message to kafka" in {
       val (topic, _, value) = topicAndKeyAndValue("nullTopic1","key1","value1")
       (schemaRegistry.registerSchema(subject = s"$topic-value", value.getSchema) *>
-        kafkaClient.publishStringKeyMessage((None, value), topic).map{ r =>
+        kafkaClient.publishStringKeyMessage((None, Some(value)), topic).map{ r =>
           assert(r.isRight)}).unsafeRunSync()
     }
 
@@ -161,7 +161,7 @@ class KafkaClientAlgebraSpec
     "consume null key message from kafka" in {
       val records = kafkaClient.consumeStringKeyMessages(topic,"newConsumerGroup").take(1).compile.toList.unsafeRunSync()
       records should have length 1
-      records.head shouldBe (None, value)
+      records.head shouldBe (None, Some(value))
     }
   }
 }

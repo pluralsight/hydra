@@ -30,12 +30,12 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
 
   private def createTestCase(
       config: V2MetadataTopicConfig
-  ): IO[(Option[Topic], List[String], Map[String, (GenericRecord, GenericRecord)])] = {
+  ): IO[(Option[Topic], List[String], Map[String, (GenericRecord, Option[GenericRecord])])] = {
     val retry = RetryPolicies.alwaysGiveUp[IO]
     for {
       schemaRegistry <- SchemaRegistry.test[IO]
       kafkaAdmin <- KafkaAdminAlgebra.test[IO]
-      ref <- Ref[IO].of(Map.empty[String, (GenericRecord, GenericRecord)])
+      ref <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord])])
       kafkaClient = new TestKafkaClientAlgebraWithPublishTo(ref)
       c = new CreateTopicProgram[IO](
         schemaRegistry,
@@ -96,18 +96,18 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
     }
   }
 
-  private final class TestKafkaClientAlgebraWithPublishTo(publishTo: Ref[IO, Map[String, (GenericRecord, GenericRecord)]]
+  private final class TestKafkaClientAlgebraWithPublishTo(publishTo: Ref[IO, Map[String, (GenericRecord, Option[GenericRecord])]]
   ) extends KafkaClientAlgebra[IO] {
     override def publishMessage(
-        record: (GenericRecord, GenericRecord),
+        record: (GenericRecord, Option[GenericRecord]),
         topicName: TopicName): IO[Either[PublishError, Unit]] =
       publishTo.update(_ + (topicName -> record)).attemptNarrow[PublishError]
 
-    override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (GenericRecord, GenericRecord)] = fs2.Stream.empty
+    override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (GenericRecord, Option[GenericRecord])] = fs2.Stream.empty
 
-    override def publishStringKeyMessage(record: (Option[String], GenericRecord), topicName: TopicName): IO[Either[PublishError, Unit]] = ???
+    override def publishStringKeyMessage(record: (Option[String], Option[GenericRecord]), topicName: TopicName): IO[Either[PublishError, Unit]] = ???
 
-    override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[IO, (Option[String], GenericRecord)] = ???
+    override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[IO, (Option[String], Option[GenericRecord])] = ???
   }
 
 }
