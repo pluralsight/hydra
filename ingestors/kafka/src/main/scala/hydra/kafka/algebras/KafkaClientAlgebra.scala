@@ -3,6 +3,7 @@ package hydra.kafka.algebras
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.implicits._
+import com.fasterxml.jackson.databind.KeyDeserializer
 import fs2.concurrent.Queue
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
@@ -129,23 +130,21 @@ object KafkaClientAlgebra {
         }
 
         override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[F, (GenericRecord, GenericRecord)] = {
-          val consumerSettings = ConsumerSettings(
-            keyDeserializer = getGenericRecordDeserializer(schemaRegistryClient)(isKey = true),
-            valueDeserializer = getGenericRecordDeserializer(schemaRegistryClient)()
-          )
-          consumeMessages[GenericRecord](consumerSettings, consumerGroup, topicName)
+          consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName)
         }
 
         override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, (String, GenericRecord)] = {
-          val consumerSettings: ConsumerSettings[F, String, GenericRecord] = ConsumerSettings(
-            keyDeserializer = getStringKeyDeserializer(schemaRegistryClient),
-            valueDeserializer = getGenericRecordDeserializer(schemaRegistryClient)()
-          )
-          consumeMessages[String](consumerSettings, consumerGroup, topicName)
+          consumeMessages[String](getStringKeyDeserializer(schemaRegistryClient), consumerGroup, topicName)
         }
 
-        private def consumeMessages[A](consumerSettings: ConsumerSettings[F, A, GenericRecord], consumerGroup: ConsumerGroup, topicName: TopicName): fs2.Stream[F, (A, GenericRecord)] = {
-          consumerSettings
+        private def consumeMessages[A](
+                                        keyDeserializer: Deserializer[F, A],
+                                        consumerGroup: ConsumerGroup,
+                                        topicName: TopicName): fs2.Stream[F, (A, GenericRecord)] = {
+          val consumerSettings = ConsumerSettings(
+            keyDeserializer = keyDeserializer,
+            valueDeserializer = getGenericRecordDeserializer(schemaRegistryClient)()
+          )
             .withAutoOffsetReset(AutoOffsetReset.Earliest)
             .withBootstrapServers(bootstrapServers)
             .withGroupId(consumerGroup)

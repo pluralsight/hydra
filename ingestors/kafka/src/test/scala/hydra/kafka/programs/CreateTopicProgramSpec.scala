@@ -10,7 +10,7 @@ import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.core.marshallers.History
 import hydra.kafka.algebras.KafkaAdminAlgebra.{Topic, TopicName}
-import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
+import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, PublishError}
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
 import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -363,6 +363,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
     override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (GenericRecord, GenericRecord)] = fs2.Stream.empty
 
     override def publishStringKeyMessage(record: (String, GenericRecord), topicName: TopicName): IO[Either[PublishError, Unit]] = ???
+
+    override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[IO, (String, GenericRecord)] = ???
   }
 
   private def getSchema(name: String): Schema =
