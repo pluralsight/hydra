@@ -70,9 +70,9 @@ object KafkaClientAlgebra {
 
   type TopicName = String
   type ConsumerGroup = String
-  sealed trait RecordKeyFormat
-  final case class GenericRecordKey(value: GenericRecord) extends RecordKeyFormat
-  final case class StringKey(value: String) extends RecordKeyFormat
+  private sealed trait RecordKeyFormat
+  private final case class GenericRecordKey(value: GenericRecord) extends RecordKeyFormat
+  private final case class StringKey(value: String) extends RecordKeyFormat
   type Record = (GenericRecord, GenericRecord)
   type StringRecord = (String, GenericRecord)
 
@@ -163,28 +163,49 @@ object KafkaClientAlgebra {
 
   def test[F[_]: Sync: Concurrent]: F[KafkaClientAlgebra[F]] = Ref[F].of(MockFS2Kafka.empty[F]).map { cache =>
     new KafkaClientAlgebra[F] {
-      override def publishMessage(record: Record, topicName: TopicName): F[Either[PublishError, Unit]] =
-        cache.update(_.publishMessage(topicName, record)) *>
-          cache.get.flatMap(_.getConsumerQueuesFor(topicName).traverse(_.enqueue1(record))) *>
-          Sync[F].pure(Right(()))
+      override def publishMessage(record: Record, topicName: TopicName): F[Either[PublishError, Unit]] = {
+        val cacheRecord = (GenericRecordKey(record._1), record._2)
+        publishCacheMessage(cacheRecord, topicName)
+      }
 
-      def consumeMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, Record] = {
+      override def publishStringKeyMessage(record: (String, GenericRecord), topicName: TopicName): F[Either[PublishError, Unit]] = {
+        val cacheRecord = (StringKey(record._1), record._2)
+        publishCacheMessage(cacheRecord, topicName)
+      }
+
+      override def consumeMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, Record] = {
+        consumeCacheMessage(topicName, consumerGroup).map {
+          case (r: GenericRecordKey, v) => (r.value, v)
+          case _ => throw new Exception("Expected GenericRecord, got String")
+        }
+      }
+
+      override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, (String, GenericRecord)] = {
+        consumeCacheMessage(topicName, consumerGroup).map {
+          case (r: StringKey, v) => (r.value, v)
+          case _ => throw new Exception("Expected String, got GenericRecord")
+        }
+      }
+
+      private def consumeCacheMessage(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, CacheRecord] = {
         fs2.Stream.force(for {
           queue <- createNewStreamOfQueue(cache, topicName)
           _ <- cache.update(_.addConsumerQueue(topicName, consumerGroup, queue))
         } yield queue.dequeue)
       }
 
-      override def publishStringKeyMessage(record: (String, GenericRecord), topicName: TopicName): F[Either[PublishError, Unit]] = ???
-
-      override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, (String, GenericRecord)] = ???
+      private def publishCacheMessage(cacheRecord: CacheRecord, topicName: TopicName): F[Either[PublishError, Unit]] = {
+        cache.update(_.publishMessage(topicName, cacheRecord)) *>
+          cache.get.flatMap(_.getConsumerQueuesFor(topicName).traverse(_.enqueue1(cacheRecord))) *>
+          Sync[F].pure(Right(()))
+      }
     }
   }
 
-  private def createNewStreamOfQueue[F[_]: Concurrent](cache: Ref[F, MockFS2Kafka[F]], topicName: TopicName): F[Queue[F, Record]] = {
+  private def createNewStreamOfQueue[F[_]: Concurrent](cache: Ref[F, MockFS2Kafka[F]], topicName: TopicName): F[Queue[F, CacheRecord]] = {
     for {
       streamRecords <- cache.get.map(_.getStreamFor(topicName))
-      newQueue <- fs2.concurrent.Queue.unbounded[F, Record]
+      newQueue <- fs2.concurrent.Queue.unbounded[F, CacheRecord]
       _ <- streamRecords.traverse(newQueue.enqueue1)
     } yield newQueue
   }
@@ -232,24 +253,26 @@ object KafkaClientAlgebra {
       }
     }.suspend
 
+  private type CacheRecord = (RecordKeyFormat, GenericRecord)
+
   private final case class MockFS2Kafka[F[_]](
-                                                   private val topics: Map[TopicName, List[Record]],
-                                                   consumerQueues: Map[(TopicName, ConsumerGroup), fs2.concurrent.Queue[F, Record]]
+                                                   private val topics: Map[TopicName, List[CacheRecord]],
+                                                   consumerQueues: Map[(TopicName, ConsumerGroup), fs2.concurrent.Queue[F, CacheRecord]]
                                                  ) {
-    def publishMessage(topicName: TopicName, record: Record): MockFS2Kafka[F] = {
-      val updatedStream: List[Record] = this.topics.getOrElse(topicName, List.empty) :+ record
+    def publishMessage(topicName: TopicName, record: CacheRecord): MockFS2Kafka[F] = {
+      val updatedStream: List[CacheRecord] = this.topics.getOrElse(topicName, List.empty) :+ record
       this.copy(topics = this.topics + (topicName -> updatedStream))
     }
 
-    def addConsumerQueue(topicName: TopicName, consumerGroup: ConsumerGroup, queue: Queue[F, Record]): MockFS2Kafka[F] = {
+    def addConsumerQueue(topicName: TopicName, consumerGroup: ConsumerGroup, queue: Queue[F, CacheRecord]): MockFS2Kafka[F] = {
       this.copy(consumerQueues = this.consumerQueues + ((topicName, consumerGroup) -> queue))
     }
 
-    def getConsumerQueuesFor(topicName: TopicName): List[Queue[F, Record]] = this.consumerQueues.toList.filter(_._1._1 == topicName).map(_._2)
+    def getConsumerQueuesFor(topicName: TopicName): List[Queue[F, CacheRecord]] = this.consumerQueues.toList.filter(_._1._1 == topicName).map(_._2)
 
-    def getConsumerQueue(topicName: TopicName, consumerGroup: ConsumerGroup): Option[Queue[F, Record]] = this.consumerQueues.get((topicName, consumerGroup))
+    def getConsumerQueue(topicName: TopicName, consumerGroup: ConsumerGroup): Option[Queue[F, CacheRecord]] = this.consumerQueues.get((topicName, consumerGroup))
 
-    def getStreamFor(topicName: TopicName): List[Record] = this.topics.getOrElse(topicName, List())
+    def getStreamFor(topicName: TopicName): List[CacheRecord] = this.topics.getOrElse(topicName, List())
   }
 
   private object MockFS2Kafka {
