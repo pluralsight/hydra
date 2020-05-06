@@ -72,7 +72,7 @@ class KafkaClientAlgebraSpec
     "consume avro message from kafka" in {
       val records = kafkaClient.consumeMessages(topic,"newConsumerGroup").take(1).compile.toList.unsafeRunSync()
       records should have length 1
-      records.head shouldBe (key, value)
+      records.head shouldBe (key, Some(value))
     }
 
     val (_, (_, key2), value2) = topicAndKeyAndValue("topic1","key2","value2")
