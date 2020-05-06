@@ -53,7 +53,7 @@ class KafkaClientAlgebraSpec
 
   private def runTest(schemaRegistry: SchemaRegistry[IO], kafkaClient: KafkaClientAlgebra[IO], isTest: Boolean = false): Unit = {
     (if (isTest) "KafkaClient#test" else "KafkaClient#live") must {
-      "publish message to kafka" in {
+      "publish avro message to kafka" in {
         val (topic, key, value) = topicAndKeyAndValue("topic1","key1","value1")
         (schemaRegistry.registerSchema(subject = s"$topic-key", key.getSchema) *>
           schemaRegistry.registerSchema(subject = s"$topic-value", value.getSchema) *>
@@ -62,21 +62,21 @@ class KafkaClientAlgebraSpec
       }
 
       val (topic, key, value) = topicAndKeyAndValue("topic1","key1","value1")
-      "consume message from kafka" in {
+      "consume avro message from kafka" in {
         val records = kafkaClient.consumeMessages(topic,"newConsumerGroup").take(1).compile.toList.unsafeRunSync()
         records should have length 1
         records.head shouldBe (key, value)
       }
 
       val (_, key2, value2) = topicAndKeyAndValue("topic1","key2","value2")
-      "publish a record to existing topic and consume only that value in existing consumer group" in {
+      "publish avro record to existing topic and consume only that value in existing consumer group" in {
         kafkaClient.publishMessage((key2, value2), topic).unsafeRunSync()
         val records = kafkaClient.consumeMessages(topic, "newConsumerGroup6").take(2).compile.toList.unsafeRunSync()
         records should contain allOf((key2, value2), (key, value))
       }
 
       val (_, key3, value3) = topicAndKeyAndValue("topic1","key3","value3")
-      "continue consuming messages from the same stream" in {
+      "continue consuming avro messages from the same stream" in {
         val stream = kafkaClient.consumeMessages(topic, "doesNotReallyMatter")
         stream.take(2).compile.toList.unsafeRunSync() should contain allOf((key2, value2), (key, value))
         kafkaClient.publishMessage((key3, value3), topic).unsafeRunSync()
@@ -85,7 +85,7 @@ class KafkaClientAlgebraSpec
 
       val (topic2, key4, value4) = topicAndKeyAndValue("topic2","key4","value4")
       val (_, key5, value5) = topicAndKeyAndValue("topic2","key5","value5")
-      "consume from two different topics" in {
+      "consume avro messages from two different topics" in {
         (schemaRegistry.registerSchema(subject = s"$topic2-key", key4.getSchema) *>
           schemaRegistry.registerSchema(subject = s"$topic2-value", value4.getSchema) *>
           kafkaClient.publishMessage((key4, value4), topic2) *>

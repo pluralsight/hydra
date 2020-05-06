@@ -39,7 +39,6 @@ trait KafkaClientAlgebra[F[_]] {
                       topicName: TopicName
                     ): F[Either[PublishError, Unit]]
 
-
   /**
     * Consume the Hydra record from Kafka.
     * Does not commit offsets. Each time function is called will return
@@ -63,8 +62,6 @@ trait KafkaClientAlgebra[F[_]] {
                        topicName: TopicName,
                        consumerGroup: ConsumerGroup
                      ): fs2.Stream[F, StringRecord]
-
-
 }
 
 object KafkaClientAlgebra {
@@ -113,7 +110,7 @@ object KafkaClientAlgebra {
     getProducerQueue[F](bootstrapServers, schemaRegistryClient).map { queue =>
       new KafkaClientAlgebra[F] {
         override def publishMessage(record: Record, topicName: TopicName): F[Either[PublishError, Unit]] = {
-          produceMessage(record, topicName, GenericRecordKey.apply)
+          produceMessage[GenericRecord](record, topicName, GenericRecordKey.apply)
         }
 
         override def publishStringKeyMessage(record: StringRecord, topicName: TopicName): F[Either[PublishError, Unit]] = {
@@ -158,6 +155,8 @@ object KafkaClientAlgebra {
     }
   }
 
+
+  final case class ConsumeErrorException(message: String) extends Exception(message)
   def test[F[_]: Sync: Concurrent]: F[KafkaClientAlgebra[F]] = Ref[F].of(MockFS2Kafka.empty[F]).map { cache =>
     new KafkaClientAlgebra[F] {
       override def publishMessage(record: Record, topicName: TopicName): F[Either[PublishError, Unit]] = {
@@ -171,16 +170,16 @@ object KafkaClientAlgebra {
       }
 
       override def consumeMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, Record] = {
-        consumeCacheMessage(topicName, consumerGroup).map {
-          case (r: GenericRecordKey, v) => (r.value, v)
-          case _ => throw new Exception("Expected GenericRecord, got String")
+        consumeCacheMessage(topicName, consumerGroup).evalMap {
+          case (r: GenericRecordKey, v) => Sync[F].pure((r.value, v))
+          case _ => Sync[F].raiseError[Record](ConsumeErrorException("Expected GenericRecord, got String"))
         }
       }
 
-      override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, (String, GenericRecord)] = {
-        consumeCacheMessage(topicName, consumerGroup).map {
-          case (r: StringKey, v) => (r.value, v)
-          case _ => throw new Exception("Expected String, got GenericRecord")
+      override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, StringRecord] = {
+        consumeCacheMessage(topicName, consumerGroup).evalMap {
+          case (r: StringKey, v) => Sync[F].pure((r.value, v))
+          case _ => Sync[F].raiseError[StringRecord](ConsumeErrorException("Expected String, got GenericRecord"))
         }
       }
 

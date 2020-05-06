@@ -5,14 +5,12 @@ import cats.effect.{IO, Sync, Timer}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.ingest.app.AppConfig.V2MetadataTopicConfig
-import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
 import hydra.kafka.algebras.KafkaAdminAlgebra.Topic
-import hydra.kafka.algebras.KafkaClientAlgebra.{PublishError, TopicName}
+import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, PublishError, TopicName}
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
 import hydra.kafka.model.ContactMethod
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.producer.KafkaRecord
 import hydra.kafka.programs.CreateTopicProgram
-import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import org.apache.avro.generic.GenericRecord
@@ -108,6 +106,8 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
     override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (GenericRecord, GenericRecord)] = fs2.Stream.empty
 
     override def publishStringKeyMessage(record: (String, GenericRecord), topicName: TopicName): IO[Either[PublishError, Unit]] = ???
+
+    override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[IO, (String, GenericRecord)] = ???
   }
 
 }
