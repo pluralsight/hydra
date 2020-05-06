@@ -47,7 +47,7 @@ class IngestionFlowSpec extends AnyFlatSpec with Matchers {
     ingest(testRequest).flatMap { kafkaClient =>
       kafkaClient.consumeStringKeyMessages(testSubject, "test-consumer").take(1).compile.toList.map { publishedMessages =>
         val firstMessage = publishedMessages.head
-        (firstMessage._1, firstMessage._2.toString) shouldBe (testKey, testPayload)
+        (firstMessage._1, firstMessage._2.toString) shouldBe (Some(testKey), testPayload)
       }
     }.unsafeRunSync()
   }
@@ -57,7 +57,7 @@ class IngestionFlowSpec extends AnyFlatSpec with Matchers {
     ingest(testRequest).flatMap { kafkaClient =>
       kafkaClient.consumeStringKeyMessages(testSubjectNoKey, "test-consumer").take(1).compile.toList.map { publishedMessages =>
         val firstMessage = publishedMessages.head
-        (firstMessage._1, firstMessage._2.toString) shouldBe (null, testPayload)
+        (firstMessage._1, firstMessage._2.toString) shouldBe (None, testPayload)
       }
     }.unsafeRunSync()
   }

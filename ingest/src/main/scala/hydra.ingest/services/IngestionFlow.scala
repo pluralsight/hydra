@@ -36,11 +36,12 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](schemaRegistr
     request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM) match {
       case Some(topic) => getValueSchemaWrapper(topic).flatMap { schemaWrapper =>
         val ar = AvroRecord(topic, schemaWrapper.schema, None, request.payload, AckStrategy.Replicated)
-        // TODO: Support null keys, support v2
-        val key = schemaWrapper
-          .primaryKeys
-          .flatMap(pkName => Try(ar.payload.get(pkName)).toOption)
-          .mkString("|")
+        // TODO: Support v2
+        val key = schemaWrapper.primaryKeys.toList match {
+          case Nil => None
+          case l => l.flatMap(pkName => Try(ar.payload.get(pkName)).toOption)
+            .mkString("|").some
+        }
         kafkaClient.publishStringKeyMessage((key, ar.payload), topic)
       }.void
       case None => throw new Exception // TODO: Handle this error - Return a 4xx error

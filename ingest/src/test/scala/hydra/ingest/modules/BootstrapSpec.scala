@@ -105,9 +105,9 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
 
     override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (GenericRecord, GenericRecord)] = fs2.Stream.empty
 
-    override def publishStringKeyMessage(record: (String, GenericRecord), topicName: TopicName): IO[Either[PublishError, Unit]] = ???
+    override def publishStringKeyMessage(record: (Option[String], GenericRecord), topicName: TopicName): IO[Either[PublishError, Unit]] = ???
 
-    override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[IO, (String, GenericRecord)] = ???
+    override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[IO, (Option[String], GenericRecord)] = ???
   }
 
 }
