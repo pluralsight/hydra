@@ -112,21 +112,12 @@ object KafkaClientAlgebra {
   ): F[KafkaClientAlgebra[F]] = schemaRegistryAlgebra.getSchemaRegistryClient.flatMap { schemaRegistryClient =>
     getProducerQueue[F](bootstrapServers, schemaRegistryClient).map { queue =>
       new KafkaClientAlgebra[F] {
-        override def publishMessage(
-                                     record: Record,
-                                     topicName: TopicName
-                                   ): F[Either[PublishError, Unit]] = {
-          Deferred[F, Unit].flatMap { d =>
-            queue.enqueue1((GenericRecordKey(record._1), record._2, topicName, d)) *>
-              Concurrent.timeoutTo[F, Either[PublishError, Unit]](d.get.map(Right(_)), 5.seconds, Sync[F].pure(Left(PublishError.Timeout)))
-          }
+        override def publishMessage(record: Record, topicName: TopicName): F[Either[PublishError, Unit]] = {
+          produceMessage(record, topicName, GenericRecordKey.apply)
         }
 
-        override def publishStringKeyMessage(record: (String, GenericRecord), topicName: TopicName): F[Either[PublishError, Unit]] = {
-          Deferred[F, Unit].flatMap { d =>
-            queue.enqueue1((StringKey(record._1), record._2, topicName, d)) *>
-              Concurrent.timeoutTo[F, Either[PublishError, Unit]](d.get.map(Right(_)), 5.seconds, Sync[F].pure(Left(PublishError.Timeout)))
-          }
+        override def publishStringKeyMessage(record: StringRecord, topicName: TopicName): F[Either[PublishError, Unit]] = {
+          produceMessage[String](record, topicName, StringKey.apply)
         }
 
         override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[F, (GenericRecord, GenericRecord)] = {
@@ -135,6 +126,13 @@ object KafkaClientAlgebra {
 
         override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, (String, GenericRecord)] = {
           consumeMessages[String](getStringKeyDeserializer(schemaRegistryClient), consumerGroup, topicName)
+        }
+
+        private def produceMessage[A](record: (A, GenericRecord), topicName: TopicName, convert: A => RecordKeyFormat): F[Either[PublishError, Unit]] = {
+          Deferred[F, Unit].flatMap { d =>
+            queue.enqueue1((convert(record._1), record._2, topicName, d)) *>
+              Concurrent.timeoutTo[F, Either[PublishError, Unit]](d.get.map(Right(_)), 5.seconds, Sync[F].pure(Left(PublishError.Timeout)))
+          }
         }
 
         private def consumeMessages[A](
