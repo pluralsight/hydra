@@ -79,13 +79,21 @@ object AppConfig {
     ).parMapN(V2MetadataTopicConfig)
 
   final case class IngestConfig(
-                                 alternateIngestEnabled: Boolean
+                                 alternateIngestEnabled: Boolean,
+                                 useOldIngestIfUAContains: Set[String]
                                )
+
+  private implicit def decodeSetStrings
+  : ConfigDecoder[String, Set[String]] =
+    ConfigDecoder
+      .identity[String]
+      .mapOption("Set[String]")(s => Some(s.split(",").toSet))
 
   private val ingestConfig: ConfigValue[IngestConfig] =
     (
-      env("HYDRA_INGEST_ALTERNATE_ENABLED").as[Boolean].default(false)
-    ).map(IngestConfig)
+      env("HYDRA_INGEST_ALTERNATE_ENABLED").as[Boolean].default(false),
+      env("HYDRA_INGEST_ALTERNATE_IGNORE_UA_STRINGS").as[Set[String]].default(Set.empty)
+    ).parMapN(IngestConfig)
 
   final case class AppConfig(
       createTopicConfig: CreateTopicConfig,

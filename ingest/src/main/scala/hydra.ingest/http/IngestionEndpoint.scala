@@ -24,11 +24,11 @@ import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
 import hydra.core.ingest.{CorrelationIdBuilder, HydraRequest, IngestionReport, RequestParams}
 import hydra.core.marshallers.GenericError
-import hydra.core.protocol.{IngestorCompleted, InitiateHttpRequest, RequestPublished}
+import hydra.core.protocol.{IngestorCompleted, InitiateHttpRequest}
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestionHandlerGateway
 
-import scala.concurrent.duration.{FiniteDuration, _}
+import scala.concurrent.duration._
 
 /**
   * Created by alexsilva on 12/22/15.
@@ -36,7 +36,7 @@ import scala.concurrent.duration.{FiniteDuration, _}
 class IngestionEndpoint[F[_]: Futurable](
                                           alternateIngestFlowEnabled: Boolean,
                                           ingestionFlow: IngestionFlow[F],
-                                          useOldIngestUAContains: Set[String],
+                                          useOldIngestIfUAContains: Set[String],
                                           requestHandlerPathName: Option[String] = None
                                         )(implicit system: ActorSystem) extends RouteSupport with HydraIngestJsonSupport {
 
@@ -76,7 +76,7 @@ class IngestionEndpoint[F[_]: Futurable](
 
   private def useAlternateIngestFlow(request: HydraRequest): Boolean = {
     request.metadata.find(e => e._1.equalsIgnoreCase("User-Agent")) match {
-      case Some(ua) if useOldIngestUAContains.exists(ua._2.startsWith) => false
+      case Some(ua) if useOldIngestIfUAContains.exists(ua._2.startsWith) => false
       case _ => true
     }
   }
