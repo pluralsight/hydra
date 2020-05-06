@@ -26,6 +26,7 @@ import hydra.core.ingest.{CorrelationIdBuilder, HydraRequest, IngestionReport, R
 import hydra.core.marshallers.GenericError
 import hydra.core.protocol.{IngestorCompleted, IngestorJoined, InitiateHttpRequest}
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
+import hydra.ingest.services.IngestionFlow.MissingTopicNameException
 import hydra.ingest.services.{IngestionFlow, IngestionHandlerGateway}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
 
@@ -96,6 +97,9 @@ class IngestionEndpoint[F[_]: Futurable](
                   s" Metadata:${hydraRequest.metadata}; Payload: ${hydraRequest.payload} Ingestors: Alt-Ingest-Flow"
               log.error(s"Ingestion timed out for request $errorMsg")
               complete(StatusCodes.RequestTimeout, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorJoined), 408))
+            case Failure(_: MissingTopicNameException) =>
+              // Yeah, a 404 is a bad idea, but that is what the old v1 flow does so we are keeping it the same
+              complete(StatusCodes.NotFound, IngestionReport(hydraRequest.correlationId, Map(), 404))
             case Failure(other) =>
               val errorMsg =
                 s"Exception: $other; ${hydraRequest.correlationId}: Ack:${hydraRequest.ackStrategy}; Validation: ${hydraRequest.validationStrategy};" +

@@ -19,6 +19,8 @@ import scala.util.Try
 
 final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](schemaRegistry: SchemaRegistry[F], kafkaClient: KafkaClientAlgebra[F]) {
 
+  import IngestionFlow._
+
   implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
 
   private def getValueSchema(topicName: String): F[Schema] = {
@@ -44,7 +46,12 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](schemaRegistr
         }
         kafkaClient.publishStringKeyMessage((key, ar.payload), topic)
       }.void
-      case None => throw new Exception // TODO: Handle this error - Return a 4xx error
+      case None => MonadError[F, Throwable].raiseError(MissingTopicNameException(request))
     }
   }
+}
+
+object IngestionFlow {
+  final case class MissingTopicNameException(request: HydraRequest)
+    extends Exception(s"Missing the topic name in request with correlationId ${request.correlationId}")
 }

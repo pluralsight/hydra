@@ -4,6 +4,7 @@ import cats.effect.{Concurrent, ContextShift, IO}
 import hydra.avro.registry.SchemaRegistry
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
+import hydra.ingest.services.IngestionFlow.MissingTopicNameException
 import hydra.kafka.algebras.KafkaClientAlgebra
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.flatspec.AnyFlatSpec
@@ -60,6 +61,11 @@ class IngestionFlowSpec extends AnyFlatSpec with Matchers {
         (firstMessage._1, firstMessage._2.toString) shouldBe (None, testPayload)
       }
     }.unsafeRunSync()
+  }
+
+  it should "return an error when no topic name is provided" in {
+    val testRequest = HydraRequest("correlationId", testPayload)
+    ingest(testRequest).attempt.unsafeRunSync() shouldBe Left(MissingTopicNameException(testRequest))
   }
 
 }
