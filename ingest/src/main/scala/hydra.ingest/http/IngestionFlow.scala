@@ -43,7 +43,7 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](schemaRegistr
           .mkString("|")
         kafkaClient.publishStringKeyMessage((key, ar.payload), topic)
       }.void
-      case None => throw new Exception
+      case None => throw new Exception // TODO: Handle this error - Return a 4xx error
     }
   }
 }

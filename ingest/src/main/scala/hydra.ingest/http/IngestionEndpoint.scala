@@ -17,18 +17,20 @@
 package hydra.ingest.http
 
 import akka.actor._
-import akka.http.scaladsl.model.HttpRequest
+import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
 import hydra.common.config.ConfigSupport._
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
 import hydra.core.ingest.{CorrelationIdBuilder, HydraRequest, IngestionReport, RequestParams}
 import hydra.core.marshallers.GenericError
-import hydra.core.protocol.{IngestorCompleted, InitiateHttpRequest}
+import hydra.core.protocol.{IngestorCompleted, IngestorJoined, InitiateHttpRequest}
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestionHandlerGateway
+import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
 
 import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 /**
   * Created by alexsilva on 12/22/15.
@@ -85,8 +87,21 @@ class IngestionEndpoint[F[_]: Futurable](
     extractRequest { req =>
       onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>
         if (alternateIngestFlowEnabled && useAlternateIngestFlow(hydraRequest)) {
-          onSuccess(Futurable[F].unsafeToFuture(ingestionFlow.ingest(hydraRequest))) {
-            complete(IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorCompleted), 200))
+          onComplete(Futurable[F].unsafeToFuture(ingestionFlow.ingest(hydraRequest))) {
+            case Success(_) =>
+              complete(IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorCompleted), 200))
+            case Failure(PublishError.Timeout) =>
+              val errorMsg =
+                s"${hydraRequest.correlationId}: Ack:${hydraRequest.ackStrategy}; Validation: ${hydraRequest.validationStrategy};" +
+                  s" Metadata:${hydraRequest.metadata}; Payload: ${hydraRequest.payload} Ingestors: Alt-Ingest-Flow"
+              log.error(s"Ingestion timed out for request $errorMsg")
+              complete(StatusCodes.RequestTimeout, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorJoined), 408))
+            case Failure(other) =>
+              val errorMsg =
+                s"Exception: $other; ${hydraRequest.correlationId}: Ack:${hydraRequest.ackStrategy}; Validation: ${hydraRequest.validationStrategy};" +
+                  s" Metadata:${hydraRequest.metadata}; Payload: ${hydraRequest.payload} Ingestors: Alt-Ingest-Flow"
+              log.error(s"Ingestion failed for request $errorMsg")
+              complete(StatusCodes.InternalServerError, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorJoined), 500))
           }
         } else {
           imperativelyComplete { ctx =>
