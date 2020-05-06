@@ -55,6 +55,7 @@ class KafkaClientAlgebraSpec
     (if (isTest) "KafkaClient#test" else "KafkaClient#live") must {
       avroTests(schemaRegistry, kafkaClient)
       stringKeyTests(schemaRegistry, kafkaClient)
+      nullKeyTests(schemaRegistry, kafkaClient)
     }
   }
 
@@ -147,6 +148,22 @@ class KafkaClientAlgebraSpec
       topicTwoStream.take(2).compile.toList.unsafeRunSync() should contain allOf ((keyString4, value4), (keyString5, value5))
     }
   }
+
+  private def nullKeyTests(schemaRegistry: SchemaRegistry[IO], kafkaClient: KafkaClientAlgebra[IO]): Unit = {
+    "publish null key message to kafka" in {
+      val (topic, _, value) = topicAndKeyAndValue("nullTopic1","key1","value1")
+      (schemaRegistry.registerSchema(subject = s"$topic-value", value.getSchema) *>
+        kafkaClient.publishStringKeyMessage((None, value), topic).map{ r =>
+          assert(r.isRight)}).unsafeRunSync()
+    }
+
+    val (topic, _, value) = topicAndKeyAndValue("nullTopic1","key1","value1")
+    "consume null key message from kafka" in {
+      val records = kafkaClient.consumeStringKeyMessages(topic,"newConsumerGroup").take(1).compile.toList.unsafeRunSync()
+      records should have length 1
+      records.head shouldBe (None, value)
+    }
+  }
 }
 
 object KafkaClientAlgebraSpec {
@@ -165,9 +182,9 @@ object KafkaClientAlgebraSpec {
       Codec.derive[SimpleCaseClassValue]
   }
 
-  def topicAndKeyAndValue(topic: String, key: String, value: String): (String, (String, GenericRecord), GenericRecord) = {
+  def topicAndKeyAndValue(topic: String, key: String, value: String): (String, (Option[String], GenericRecord), GenericRecord) = {
     (topic,
-      (key, SimpleCaseClassKey.codec.encode(SimpleCaseClassKey(key)).map(_.asInstanceOf[GenericRecord]).toOption.get),
+      (Some(key), SimpleCaseClassKey.codec.encode(SimpleCaseClassKey(key)).map(_.asInstanceOf[GenericRecord]).toOption.get),
       SimpleCaseClassValue.codec.encode(SimpleCaseClassValue(value)).map(_.asInstanceOf[GenericRecord]).toOption.get)
   }
 }

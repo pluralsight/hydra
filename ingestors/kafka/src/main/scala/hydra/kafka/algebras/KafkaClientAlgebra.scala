@@ -70,9 +70,9 @@ object KafkaClientAlgebra {
   type ConsumerGroup = String
   private sealed trait RecordKeyFormat
   private final case class GenericRecordKey(value: GenericRecord) extends RecordKeyFormat
-  private final case class StringKey(value: String) extends RecordKeyFormat
+  private final case class StringKey(value: Option[String]) extends RecordKeyFormat
   type Record = (GenericRecord, GenericRecord)
-  type StringRecord = (String, GenericRecord)
+  type StringRecord = (Option[String], GenericRecord)
 
   sealed abstract class PublishError(message: String)
     extends Exception(message)
@@ -114,15 +114,15 @@ object KafkaClientAlgebra {
         }
 
         override def publishStringKeyMessage(record: StringRecord, topicName: TopicName): F[Either[PublishError, Unit]] = {
-          produceMessage[String](record, topicName, StringKey.apply)
+          produceMessage[Option[String]](record, topicName, StringKey.apply)
         }
 
         override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[F, (GenericRecord, GenericRecord)] = {
           consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName)
         }
 
-        override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, (String, GenericRecord)] = {
-          consumeMessages[String](getStringKeyDeserializer(schemaRegistryClient), consumerGroup, topicName)
+        override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, StringRecord] = {
+          consumeMessages[Option[String]](getStringKeyDeserializer(schemaRegistryClient), consumerGroup, topicName)
         }
 
         private def produceMessage[A](record: (A, GenericRecord), topicName: TopicName, convert: A => RecordKeyFormat): F[Either[PublishError, Unit]] = {
@@ -164,7 +164,7 @@ object KafkaClientAlgebra {
         publishCacheMessage(cacheRecord, topicName)
       }
 
-      override def publishStringKeyMessage(record: (String, GenericRecord), topicName: TopicName): F[Either[PublishError, Unit]] = {
+      override def publishStringKeyMessage(record: StringRecord, topicName: TopicName): F[Either[PublishError, Unit]] = {
         val cacheRecord = (StringKey(record._1), record._2)
         publishCacheMessage(cacheRecord, topicName)
       }
@@ -206,11 +206,11 @@ object KafkaClientAlgebra {
     } yield newQueue
   }
 
-  private def getStringKeyDeserializer[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient): Deserializer[F, String] = {
-    Deserializer.delegate[F, String] {
+  private def getStringKeyDeserializer[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient): Deserializer[F, Option[String]] = {
+    Deserializer.delegate[F, Option[String]] {
       val stringDeserializer = new StringDeserializer
       (topic: TopicName, data: Array[Byte]) => {
-        stringDeserializer.deserialize(topic, data)
+        Option(stringDeserializer.deserialize(topic, data))
       }
     }.suspend
   }
@@ -237,7 +237,7 @@ object KafkaClientAlgebra {
       val stringSerializer = new StringSerializer
       (topic: TopicName, data: RecordKeyFormat) => data match {
         case GenericRecordKey(g) => serializer.serialize(topic, g)
-        case StringKey(s) => stringSerializer.serialize(topic, s)
+        case StringKey(s) => s.map(stringSerializer.serialize(topic, _)).orNull
       }
     }.suspend
 
