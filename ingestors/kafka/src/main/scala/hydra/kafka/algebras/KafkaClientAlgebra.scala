@@ -9,7 +9,7 @@ import hydra.avro.registry.SchemaRegistry
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import io.confluent.kafka.serializers.{AbstractKafkaAvroSerDeConfig, KafkaAvroDeserializer, KafkaAvroSerializer}
 import org.apache.avro.generic.GenericRecord
-import org.apache.kafka.common.serialization.StringSerializer
+import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -27,6 +27,12 @@ trait KafkaClientAlgebra[F[_]] {
     topicName: TopicName
   ): F[Either[PublishError, Unit]]
 
+  /**
+    * Publishes string keyed messages for compatibility with Hydra V1
+    * @param record - Record with a string key and an avro body
+    * @param topicName - topic name to produce to
+    * @return Either[PublishError, Unit] - Unit is returned upon success, PublishError on failure.
+    */
   def publishStringKeyMessage(
                       record: StringRecord,
                       topicName: TopicName
@@ -44,6 +50,19 @@ trait KafkaClientAlgebra[F[_]] {
      topicName: TopicName,
      consumerGroup: ConsumerGroup
    ): fs2.Stream[F, Record]
+
+  /**
+    * Consume the Hydra record from Kafka.
+    * Does not commit offsets. Each time function is called will return
+    * @param topicName - topic name to consume
+    * @param consumerGroup - group id for consume
+    * @return Stream that results in tupled K and V
+    */
+  def consumeStringKeyMessages(
+                       topicName: TopicName,
+                       consumerGroup: ConsumerGroup
+                     ): fs2.Stream[F, StringRecord]
+
 
 }
 
@@ -102,11 +121,31 @@ object KafkaClientAlgebra {
           }
         }
 
+        override def publishStringKeyMessage(record: (String, GenericRecord), topicName: TopicName): F[Either[PublishError, Unit]] = {
+          Deferred[F, Unit].flatMap { d =>
+            queue.enqueue1((StringKey(record._1), record._2, topicName, d)) *>
+              Concurrent.timeoutTo[F, Either[PublishError, Unit]](d.get.map(Right(_)), 5.seconds, Sync[F].pure(Left(PublishError.Timeout)))
+          }
+        }
+
         override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[F, (GenericRecord, GenericRecord)] = {
           val consumerSettings = ConsumerSettings(
             keyDeserializer = getGenericRecordDeserializer(schemaRegistryClient)(isKey = true),
             valueDeserializer = getGenericRecordDeserializer(schemaRegistryClient)()
           )
+          consumeMessages[GenericRecord](consumerSettings, consumerGroup, topicName)
+        }
+
+        override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, (String, GenericRecord)] = {
+          val consumerSettings: ConsumerSettings[F, String, GenericRecord] = ConsumerSettings(
+            keyDeserializer = getStringKeyDeserializer(schemaRegistryClient),
+            valueDeserializer = getGenericRecordDeserializer(schemaRegistryClient)()
+          )
+          consumeMessages[String](consumerSettings, consumerGroup, topicName)
+        }
+
+        private def consumeMessages[A](consumerSettings: ConsumerSettings[F, A, GenericRecord], consumerGroup: ConsumerGroup, topicName: TopicName): fs2.Stream[F, (A, GenericRecord)] = {
+          consumerSettings
             .withAutoOffsetReset(AutoOffsetReset.Earliest)
             .withBootstrapServers(bootstrapServers)
             .withGroupId(consumerGroup)
@@ -117,13 +156,6 @@ object KafkaClientAlgebra {
               val r = committable.record
               (r.key, r.value)
             }
-        }
-
-        override def publishStringKeyMessage(record: (String, GenericRecord), topicName: TopicName): F[Either[PublishError, Unit]] = {
-          Deferred[F, Unit].flatMap { d =>
-            queue.enqueue1((StringKey(record._1), record._2, topicName, d)) *>
-              Concurrent.timeoutTo[F, Either[PublishError, Unit]](d.get.map(Right(_)), 5.seconds, Sync[F].pure(Left(PublishError.Timeout)))
-          }
         }
       }
     }
@@ -144,6 +176,8 @@ object KafkaClientAlgebra {
       }
 
       override def publishStringKeyMessage(record: (String, GenericRecord), topicName: TopicName): F[Either[PublishError, Unit]] = ???
+
+      override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, (String, GenericRecord)] = ???
     }
   }
 
@@ -153,6 +187,15 @@ object KafkaClientAlgebra {
       newQueue <- fs2.concurrent.Queue.unbounded[F, Record]
       _ <- streamRecords.traverse(newQueue.enqueue1)
     } yield newQueue
+  }
+
+  private def getStringKeyDeserializer[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient): Deserializer[F, String] = {
+    Deserializer.delegate[F, String] {
+      val stringDeserializer = new StringDeserializer
+      (topic: TopicName, data: Array[Byte]) => {
+        stringDeserializer.deserialize(topic, data)
+      }
+    }.suspend
   }
 
   private def getGenericRecordDeserializer[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient)(isKey: Boolean = false): Deserializer[F, GenericRecord] =
