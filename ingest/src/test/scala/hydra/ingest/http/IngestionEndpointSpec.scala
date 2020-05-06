@@ -13,6 +13,7 @@ import hydra.core.ingest.RequestParams
 import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
 import hydra.core.marshallers.GenericError
 import hydra.ingest.IngestorInfo
+import hydra.ingest.services.IngestionFlow
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.TestIngestor
 import hydra.kafka.algebras.KafkaClientAlgebra

@@ -26,7 +26,7 @@ import hydra.core.ingest.{CorrelationIdBuilder, HydraRequest, IngestionReport, R
 import hydra.core.marshallers.GenericError
 import hydra.core.protocol.{IngestorCompleted, IngestorJoined, InitiateHttpRequest}
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
-import hydra.ingest.services.IngestionHandlerGateway
+import hydra.ingest.services.{IngestionFlow, IngestionHandlerGateway}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
 
 import scala.concurrent.duration._

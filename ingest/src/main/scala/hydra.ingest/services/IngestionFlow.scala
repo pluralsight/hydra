@@ -1,4 +1,4 @@
-package hydra.ingest.http
+package hydra.ingest.services
 
 import cats.MonadError
 import cats.implicits._
