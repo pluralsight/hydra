@@ -3,7 +3,7 @@ package hydra.ingest.modules
 import cats.effect._
 import cats.implicits._
 import hydra.ingest.app.AppConfig.AppConfig
-import hydra.ingest.http.IngestionFlow
+import hydra.ingest.services.IngestionFlow
 import hydra.kafka.programs.CreateTopicProgram
 import io.chrisdavenport.log4cats.Logger
 import retry.RetryPolicies._

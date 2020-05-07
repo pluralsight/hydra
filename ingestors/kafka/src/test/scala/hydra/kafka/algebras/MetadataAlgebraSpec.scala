@@ -63,7 +63,7 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
           _ <- kafkaClientAlgebra.publishMessage(record, metadataTopicName)
           _ <- metadataAlgebra.getMetadataFor(subject).retryIfFalse(_.isDefined)
           metadata <- metadataAlgebra.getMetadataFor(subject)
-        } yield metadata shouldBe Some(TopicMetadataV2Container(key, value))).unsafeRunSync()
+        } yield metadata shouldBe Some(TopicMetadataV2Container(key, Some(value)))).unsafeRunSync()
       }
 
       "retrieve all metadata" in {
@@ -79,7 +79,7 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
     }
   }
 
-  private def getMetadataGenericRecords(subject: Subject): (IO[(GenericRecord, GenericRecord)], TopicMetadataV2Key, TopicMetadataV2Value) = {
+  private def getMetadataGenericRecords(subject: Subject): (IO[(GenericRecord, Option[GenericRecord])], TopicMetadataV2Key, TopicMetadataV2Value) = {
     val key = TopicMetadataV2Key(subject)
     val value = TopicMetadataV2Value(
         History,
@@ -89,6 +89,6 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
         Instant.now,
         List(),
         None)
-    (TopicMetadataV2.encode[IO](key, value), key, value)
+    (TopicMetadataV2.encode[IO](key, Some(value)), key, value)
   }
 }

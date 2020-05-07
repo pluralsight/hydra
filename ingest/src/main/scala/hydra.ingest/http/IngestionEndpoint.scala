@@ -17,25 +17,30 @@
 package hydra.ingest.http
 
 import akka.actor._
-import akka.http.scaladsl.model.HttpRequest
+import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
 import hydra.common.config.ConfigSupport._
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
-import hydra.core.ingest.{CorrelationIdBuilder, IngestionReport, RequestParams}
+import hydra.core.ingest.{CorrelationIdBuilder, HydraRequest, IngestionReport, RequestParams}
 import hydra.core.marshallers.GenericError
-import hydra.core.protocol.{IngestorCompleted, InitiateHttpRequest, RequestPublished}
+import hydra.core.protocol.{IngestorCompleted, IngestorJoined, InitiateHttpRequest}
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
-import hydra.ingest.services.IngestionHandlerGateway
+import hydra.ingest.services.IngestionFlow.MissingTopicNameException
+import hydra.ingest.services.{IngestionFlow, IngestionHandlerGateway}
+import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
 
-import scala.concurrent.duration.{FiniteDuration, _}
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 /**
   * Created by alexsilva on 12/22/15.
   */
 class IngestionEndpoint[F[_]: Futurable](
                                           alternateIngestFlowEnabled: Boolean,
-                                          ingestionFlow: IngestionFlow[F]
+                                          ingestionFlow: IngestionFlow[F],
+                                          useOldIngestIfUAContains: Set[String],
+                                          requestHandlerPathName: Option[String] = None
                                         )(implicit system: ActorSystem) extends RouteSupport with HydraIngestJsonSupport {
 
   import hydra.ingest.bootstrap.RequestFactories._
@@ -46,7 +51,7 @@ class IngestionEndpoint[F[_]: Futurable](
 
   private val requestHandler = system.actorOf(
     IngestionHandlerGateway.props(registryPath),
-    "ingestion_Http_handler_gateway"
+    requestHandlerPathName.getOrElse("ingestion_Http_handler_gateway")
   )
 
   private val ingestTimeout = applicationConfig
@@ -72,24 +77,35 @@ class IngestionEndpoint[F[_]: Futurable](
 
   private def cId = CorrelationIdBuilder.generate()
 
-  /*
-  {
-    "correlationId": "3g7Nr1EEIzr",
-    "ingestors": {
-        "kafka": {
-            "code": 201,
-            "message": "Created"
-        }
+  private def useAlternateIngestFlow(request: HydraRequest): Boolean = {
+    request.metadata.find(e => e._1.equalsIgnoreCase("User-Agent")) match {
+      case Some(ua) if useOldIngestIfUAContains.exists(ua._2.startsWith) => false
+      case _ => true
     }
-}
-   */
+  }
 
   private def publishRequest = parameter("correlationId" ?) { cIdOpt =>
     extractRequest { req =>
       onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>
-        if (alternateIngestFlowEnabled) {
-          onSuccess(Futurable[F].unsafeToFuture(ingestionFlow.ingest(hydraRequest))) {
-            complete(IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorCompleted), 200))
+        if (alternateIngestFlowEnabled && useAlternateIngestFlow(hydraRequest)) {
+          onComplete(Futurable[F].unsafeToFuture(ingestionFlow.ingest(hydraRequest))) {
+            case Success(_) =>
+              complete(IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorCompleted), 200))
+            case Failure(PublishError.Timeout) =>
+              val errorMsg =
+                s"${hydraRequest.correlationId}: Ack:${hydraRequest.ackStrategy}; Validation: ${hydraRequest.validationStrategy};" +
+                  s" Metadata:${hydraRequest.metadata}; Payload: ${hydraRequest.payload} Ingestors: Alt-Ingest-Flow"
+              log.error(s"Ingestion timed out for request $errorMsg")
+              complete(StatusCodes.RequestTimeout, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorJoined), 408))
+            case Failure(_: MissingTopicNameException) =>
+              // Yeah, a 404 is a bad idea, but that is what the old v1 flow does so we are keeping it the same
+              complete(StatusCodes.NotFound, IngestionReport(hydraRequest.correlationId, Map(), 404))
+            case Failure(other) =>
+              val errorMsg =
+                s"Exception: $other; ${hydraRequest.correlationId}: Ack:${hydraRequest.ackStrategy}; Validation: ${hydraRequest.validationStrategy};" +
+                  s" Metadata:${hydraRequest.metadata}; Payload: ${hydraRequest.payload} Ingestors: Alt-Ingest-Flow"
+              log.error(s"Ingestion failed for request $errorMsg")
+              complete(StatusCodes.InternalServerError, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorJoined), 500))
           }
         } else {
           imperativelyComplete { ctx =>
