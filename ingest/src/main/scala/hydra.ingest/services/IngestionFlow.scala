@@ -38,8 +38,10 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](schemaRegistr
     request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM) match {
       case Some(topic) => getValueSchemaWrapper(topic).flatMap { schemaWrapper =>
         val useStrictValidation = request.validationStrategy == ValidationStrategy.Strict
-        val ar = AvroRecord(topic, schemaWrapper.schema, None, request.payload, AckStrategy.Replicated, useStrictValidation)
-        val payloadMaybe = Option(ar.payload)
+        val payloadMaybe = Option(request.payload) match {
+          case Some(p) => Some(AvroRecord(topic, schemaWrapper.schema, None, p, AckStrategy.Replicated, useStrictValidation).payload)
+          case None => None
+        }
         // TODO: Support v2
         val key = schemaWrapper.primaryKeys.toList match {
           case Nil => None
