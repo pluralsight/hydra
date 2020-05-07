@@ -83,11 +83,11 @@ object AppConfig {
                                  useOldIngestIfUAContains: Set[String]
                                )
 
-  private implicit def decodeSetStrings
+  private[app] implicit def decodeSetStrings
   : ConfigDecoder[String, Set[String]] =
     ConfigDecoder
       .identity[String]
-      .mapOption("Set[String]")(s => Some(s.split(",").toSet))
+      .mapOption("Set[String]")(s => Some(if (s.isEmpty) Set.empty else s.split(",").toSet))
 
   private val ingestConfig: ConfigValue[IngestConfig] =
     (
