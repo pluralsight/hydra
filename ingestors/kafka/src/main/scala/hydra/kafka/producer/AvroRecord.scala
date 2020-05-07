@@ -30,7 +30,7 @@ object AvroRecord {
 
     val payload: GenericRecord = {
       val converter: JsonConverter[GenericRecord] =
-        new JsonConverter[GenericRecord](schema)
+        new JsonConverter[GenericRecord](schema, useStrictValidation)
       converter.convert(json)
     }
 
