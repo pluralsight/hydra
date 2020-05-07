@@ -73,7 +73,7 @@ object TopicMetadataV2 {
       }
       .rethrow
       .flatMap {
-        case (k: GenericRecord, v: Option[GenericRecord]) => Monad[F].pure((k, v))
+        case (k: GenericRecord, v: GenericRecord) => Monad[F].pure((k, Option(v)))
         case (k, v) =>
           MonadError[F, Throwable].raiseError(
             AvroEncodingFailure(
