@@ -24,7 +24,7 @@ import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
 import hydra.core.ingest.{CorrelationIdBuilder, HydraRequest, IngestionReport, RequestParams}
 import hydra.core.marshallers.GenericError
-import hydra.core.protocol.{IngestorCompleted, IngestorJoined, InitiateHttpRequest}
+import hydra.core.protocol.{IngestorCompleted, IngestorError, IngestorJoined, InitiateHttpRequest}
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestionFlow.MissingTopicNameException
 import hydra.ingest.services.{IngestionFlow, IngestionHandlerGateway}
@@ -105,7 +105,7 @@ class IngestionEndpoint[F[_]: Futurable](
                 s"Exception: $other; ${hydraRequest.correlationId}: Ack:${hydraRequest.ackStrategy}; Validation: ${hydraRequest.validationStrategy};" +
                   s" Metadata:${hydraRequest.metadata}; Payload: ${hydraRequest.payload} Ingestors: Alt-Ingest-Flow"
               log.error(s"Ingestion failed for request $errorMsg")
-              complete(StatusCodes.InternalServerError, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorJoined), 500))
+              complete(StatusCodes.ServiceUnavailable, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorError(other)), 503))
           }
         } else {
           imperativelyComplete { ctx =>
