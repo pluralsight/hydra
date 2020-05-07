@@ -24,7 +24,8 @@ object AvroRecord {
       schema: Schema,
       key: Option[String],
       json: String,
-      ackStrategy: AckStrategy
+      ackStrategy: AckStrategy,
+      useStrictValidation: Boolean = false
   ): AvroRecord = {
 
     val payload: GenericRecord = {

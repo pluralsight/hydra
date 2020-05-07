@@ -6,7 +6,7 @@ import hydra.avro.registry.SchemaRegistry
 import hydra.avro.util.SchemaWrapper
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
-import hydra.core.transport.AckStrategy
+import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.kafka.algebras.KafkaClientAlgebra
 import hydra.kafka.producer.AvroRecord
 import org.apache.avro.Schema
@@ -37,7 +37,8 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](schemaRegistr
   def ingest(request: HydraRequest): F[Unit] = {
     request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM) match {
       case Some(topic) => getValueSchemaWrapper(topic).flatMap { schemaWrapper =>
-        val ar = AvroRecord(topic, schemaWrapper.schema, None, request.payload, AckStrategy.Replicated)
+        val useStrictValidation = request.validationStrategy == ValidationStrategy.Strict
+        val ar = AvroRecord(topic, schemaWrapper.schema, None, request.payload, AckStrategy.Replicated, useStrictValidation)
         val payloadMaybe = Option(ar.payload)
         // TODO: Support v2
         val key = schemaWrapper.primaryKeys.toList match {
