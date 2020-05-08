@@ -24,11 +24,12 @@ import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
 import hydra.core.ingest.{CorrelationIdBuilder, HydraRequest, IngestionReport, RequestParams}
 import hydra.core.marshallers.GenericError
-import hydra.core.protocol.{IngestorCompleted, IngestorError, IngestorJoined, InitiateHttpRequest}
+import hydra.core.protocol.{IngestorCompleted, IngestorError, IngestorJoined, InitiateHttpRequest, InvalidRequest}
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestionFlow.MissingTopicNameException
 import hydra.ingest.services.{IngestionFlow, IngestionHandlerGateway}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
+import com.pluralsight.hydra.avro.RequiredFieldMissingException
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
@@ -100,6 +101,8 @@ class IngestionEndpoint[F[_]: Futurable](
             case Failure(_: MissingTopicNameException) =>
               // Yeah, a 404 is a bad idea, but that is what the old v1 flow does so we are keeping it the same
               complete(StatusCodes.NotFound, IngestionReport(hydraRequest.correlationId, Map(), 404))
+            case Failure(r: RequiredFieldMissingException) =>
+              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(r)), 400))
             case Failure(other) =>
               val errorMsg =
                 s"Exception: $other; ${hydraRequest.correlationId}: Ack:${hydraRequest.ackStrategy}; Validation: ${hydraRequest.validationStrategy};" +

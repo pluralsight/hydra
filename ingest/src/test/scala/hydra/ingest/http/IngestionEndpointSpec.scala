@@ -165,7 +165,7 @@ class IngestionEndpointSpec
       }
     }
 
-    "rejects for UA not in provided Set" in {
+    "accepts for UA not in provided Set" in {
       val ingestor = RawHeader(RequestParams.HYDRA_INGESTOR_PARAM, "tester")
       val userAgent = `User-Agent`("not_found")
       val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
@@ -173,6 +173,15 @@ class IngestionEndpointSpec
       val request = Post("/ingest", """{"test":true}""").withHeaders(ingestor, userAgent, kafkaTopic)
       request ~> ingestRouteAlt ~> check {
         status shouldBe StatusCodes.OK
+      }
+    }
+
+    "rejects for a bad payload" in {
+      val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
+
+      val request = Post("/ingest", """{}""").withHeaders(kafkaTopic)
+      request ~> ingestRouteAlt ~> check {
+        status shouldBe StatusCodes.BadRequest
       }
     }
   }
