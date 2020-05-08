@@ -164,7 +164,7 @@ class SchemasEndpoint()(implicit system: ActorSystem)
 
     case e: Exception =>
       extractUri { uri =>
-        log.warn(s"Request to $uri could not be handled normally")
+        log.warn("Request to {} failed with exception: {}", uri, e)
         complete(
           BadRequest,
           GenericServiceResponse(
