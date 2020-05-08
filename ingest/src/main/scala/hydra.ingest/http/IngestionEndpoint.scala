@@ -103,6 +103,8 @@ class IngestionEndpoint[F[_]: Futurable](
               complete(StatusCodes.NotFound, IngestionReport(hydraRequest.correlationId, Map(), 404))
             case Failure(r: RequiredFieldMissingException) =>
               complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(r)), 400))
+            case Failure(e: java.io.IOException) =>
+              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), 400))
             case Failure(other) =>
               val errorMsg =
                 s"Exception: $other; ${hydraRequest.correlationId}: Ack:${hydraRequest.ackStrategy}; Validation: ${hydraRequest.validationStrategy};" +

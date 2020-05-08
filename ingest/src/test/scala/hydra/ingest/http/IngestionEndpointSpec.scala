@@ -184,5 +184,14 @@ class IngestionEndpointSpec
         status shouldBe StatusCodes.BadRequest
       }
     }
+
+    "rejects for a bad json payload" in {
+      val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
+
+      val request = Post("/ingest", """{"test":00.0123}""").withHeaders(kafkaTopic)
+      request ~> ingestRouteAlt ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
   }
 }
