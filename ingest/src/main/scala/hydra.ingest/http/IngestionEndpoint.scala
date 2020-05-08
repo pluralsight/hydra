@@ -29,7 +29,7 @@ import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestionFlow.MissingTopicNameException
 import hydra.ingest.services.{IngestionFlow, IngestionHandlerGateway}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
-import com.pluralsight.hydra.avro.RequiredFieldMissingException
+import com.pluralsight.hydra.avro.{UndefinedFieldsException, JsonToAvroConversionException, RequiredFieldMissingException}
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
@@ -104,6 +104,10 @@ class IngestionEndpoint[F[_]: Futurable](
             case Failure(r: RequiredFieldMissingException) =>
               complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(r)), 400))
             case Failure(e: java.io.IOException) =>
+              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), 400))
+            case Failure(e: JsonToAvroConversionException) =>
+              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), 400))
+            case Failure(e: UndefinedFieldsException) =>
               complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), 400))
             case Failure(other) =>
               val errorMsg =

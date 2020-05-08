@@ -10,7 +10,7 @@ import cats.effect.{Concurrent, ContextShift, IO}
 import hydra.avro.registry.SchemaRegistry
 import hydra.common.util.ActorUtils
 import hydra.core.ingest.RequestParams
-import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
+import RequestParams._
 import hydra.core.marshallers.GenericError
 import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestionFlow
@@ -144,7 +144,7 @@ class IngestionEndpointSpec
       val schemaRegistry = SchemaRegistry.test[IO].unsafeRunSync
       schemaRegistry.registerSchema(
         "my_topic-value",
-        SchemaBuilder.record("my_topic").fields().requiredBoolean("test").endRecord()
+        SchemaBuilder.record("my_topic").fields().requiredBoolean("test").optionalInt("intField").endRecord()
       ).unsafeRunSync
       new IngestionEndpoint(
         true,
@@ -191,6 +191,34 @@ class IngestionEndpointSpec
       val request = Post("/ingest", """{"test":00.0123}""").withHeaders(kafkaTopic)
       request ~> ingestRouteAlt ~> check {
         status shouldBe StatusCodes.BadRequest
+      }
+    }
+
+    "rejects for an incorrect int type in the payload" in {
+      val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
+
+      val request = Post("/ingest", """{"test":true, "intField":false}""").withHeaders(kafkaTopic)
+      request ~> ingestRouteAlt ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
+
+    "rejects for an extra field when using strict validation" in {
+      val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
+
+      val request = Post("/ingest", """{"test":true, "extraField":true}""").withHeaders(kafkaTopic)
+      request ~> ingestRouteAlt ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
+
+    "accepts for an extra field when using relaxed validation" in {
+      val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
+      val validation = RawHeader(HYDRA_VALIDATION_STRATEGY, "relaxed")
+
+      val request = Post("/ingest", """{"test":true, "extraField":true}""").withHeaders(kafkaTopic, validation)
+      request ~> ingestRouteAlt ~> check {
+        status shouldBe StatusCodes.OK
       }
     }
   }
