@@ -29,10 +29,10 @@ import hydra.core.ingest.{CorrelationIdBuilder, HydraRequest, IngestionReport, R
 import hydra.core.marshallers.GenericError
 import hydra.core.protocol.{IngestorCompleted, IngestorError, IngestorJoined, InitiateHttpRequest, InvalidRequest}
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
-import hydra.ingest.services.IngestionFlow.MissingTopicNameException
+import hydra.ingest.services.IngestionFlow.{AvroConversionAugmentedException, MissingTopicNameException}
 import hydra.ingest.services.{IngestionFlow, IngestionHandlerGateway}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
-import com.pluralsight.hydra.avro.{UndefinedFieldsException, JsonToAvroConversionException, RequiredFieldMissingException}
+import com.pluralsight.hydra.avro.{JsonToAvroConversionException, RequiredFieldMissingException, UndefinedFieldsException}
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
@@ -106,14 +106,8 @@ class IngestionEndpoint[F[_]: Futurable](
               // Yeah, a 404 is a bad idea, but that is what the old v1 flow does so we are keeping it the same
               val responseCode = StatusCodes.NotFound
               complete(responseCode, IngestionReport(hydraRequest.correlationId, Map(), responseCode.intValue))
-            case Failure(r: RequiredFieldMissingException) =>
+            case Failure(r: AvroConversionAugmentedException) =>
               complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(r)), 400))
-            case Failure(e: java.io.IOException) =>
-              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), 400))
-            case Failure(e: JsonToAvroConversionException) =>
-              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), 400))
-            case Failure(e: UndefinedFieldsException) =>
-              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), 400))
             case Failure(other) =>
               val responseCode = StatusCodes.ServiceUnavailable
               val errorMsg =
