@@ -39,7 +39,7 @@ class IngestionFlowSpec extends AnyFlatSpec with Matchers {
     _ <- schemaRegistry.registerSchema(testSubject + "-value", testSchema)
     _ <- schemaRegistry.registerSchema(testSubjectNoKey + "-value", testSchemaNoKey)
     kafkaClient <- KafkaClientAlgebra.test[IO]
-    ingestFlow <- IO(new IngestionFlow[IO](schemaRegistry, kafkaClient))
+    ingestFlow <- IO(new IngestionFlow[IO](schemaRegistry, kafkaClient, "https://schemaRegistry.notreal"))
     _ <- ingestFlow.ingest(request)
   } yield kafkaClient
 

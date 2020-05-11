@@ -12,6 +12,7 @@ import hydra.common.util.ActorUtils
 import hydra.core.ingest.RequestParams
 import RequestParams._
 import hydra.core.marshallers.GenericError
+import hydra.core.protocol.IngestorError
 import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestionFlow
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
@@ -62,7 +63,7 @@ class IngestionEndpointSpec
   implicit val mode: Mode[IO] = scalacache.CatsEffect.modes.async
   val ingestRoute = new IngestionEndpoint(
     false,
-    new IngestionFlow[IO](SchemaRegistry.test[IO].unsafeRunSync, KafkaClientAlgebra.test[IO].unsafeRunSync),
+    new IngestionFlow[IO](SchemaRegistry.test[IO].unsafeRunSync, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistryUrl.notreal"),
     Set.empty
   ).route
 
@@ -148,7 +149,7 @@ class IngestionEndpointSpec
       ).unsafeRunSync
       new IngestionEndpoint(
         true,
-        new IngestionFlow[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync),
+        new IngestionFlow[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistry.notreal"),
         Set("Segment"),
         Some("alt-test-request-handler")
       ).route

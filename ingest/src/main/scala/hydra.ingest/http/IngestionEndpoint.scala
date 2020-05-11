@@ -19,6 +19,9 @@ package hydra.ingest.http
 import akka.actor._
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
+import com.pluralsight.hydra.avro.{JsonToAvroConversionException, RequiredFieldMissingException, UndefinedFieldsException}
+import hydra.avro.registry.ConfluentSchemaRegistry
+import hydra.avro.util.AvroUtils
 import hydra.common.config.ConfigSupport._
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
@@ -91,16 +94,18 @@ class IngestionEndpoint[F[_]: Futurable](
         if (alternateIngestFlowEnabled && useAlternateIngestFlow(hydraRequest)) {
           onComplete(Futurable[F].unsafeToFuture(ingestionFlow.ingest(hydraRequest))) {
             case Success(_) =>
-              complete(IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorCompleted), 200))
+              complete(IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorCompleted), StatusCodes.OK.intValue))
             case Failure(PublishError.Timeout) =>
               val errorMsg =
                 s"${hydraRequest.correlationId}: Ack:${hydraRequest.ackStrategy}; Validation: ${hydraRequest.validationStrategy};" +
                   s" Metadata:${hydraRequest.metadata}; Payload: ${hydraRequest.payload} Ingestors: Alt-Ingest-Flow"
               log.error(s"Ingestion timed out for request $errorMsg")
-              complete(StatusCodes.RequestTimeout, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorJoined), 408))
+              val responseCode = StatusCodes.RequestTimeout
+              complete(responseCode, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorJoined), responseCode.intValue))
             case Failure(_: MissingTopicNameException) =>
               // Yeah, a 404 is a bad idea, but that is what the old v1 flow does so we are keeping it the same
-              complete(StatusCodes.NotFound, IngestionReport(hydraRequest.correlationId, Map(), 404))
+              val responseCode = StatusCodes.NotFound
+              complete(responseCode, IngestionReport(hydraRequest.correlationId, Map(), responseCode.intValue))
             case Failure(r: RequiredFieldMissingException) =>
               complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(r)), 400))
             case Failure(e: java.io.IOException) =>
@@ -110,11 +115,12 @@ class IngestionEndpoint[F[_]: Futurable](
             case Failure(e: UndefinedFieldsException) =>
               complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), 400))
             case Failure(other) =>
+              val responseCode = StatusCodes.ServiceUnavailable
               val errorMsg =
                 s"Exception: $other; ${hydraRequest.correlationId}: Ack:${hydraRequest.ackStrategy}; Validation: ${hydraRequest.validationStrategy};" +
                   s" Metadata:${hydraRequest.metadata}; Payload: ${hydraRequest.payload} Ingestors: Alt-Ingest-Flow"
               log.error(s"Ingestion failed for request $errorMsg")
-              complete(StatusCodes.ServiceUnavailable, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorError(other)), 503))
+              complete(responseCode, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorError(other)), responseCode.intValue))
           }
         } else {
           imperativelyComplete { ctx =>
