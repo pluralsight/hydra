@@ -20,7 +20,10 @@ import scalacache.memoization._
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](schemaRegistry: SchemaRegistry[F], kafkaClient: KafkaClientAlgebra[F], schemaRegistryBaseUrl: String) {
+final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](
+                                                                    schemaRegistry: SchemaRegistry[F],
+                                                                    kafkaClient: KafkaClientAlgebra[F],
+                                                                    schemaRegistryBaseUrl: String) {
 
   import IngestionFlow._
 

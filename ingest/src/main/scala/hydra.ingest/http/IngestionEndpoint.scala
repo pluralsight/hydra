@@ -107,13 +107,13 @@ class IngestionEndpoint[F[_]: Futurable](
               val responseCode = StatusCodes.NotFound
               complete(responseCode, IngestionReport(hydraRequest.correlationId, Map(), responseCode.intValue))
             case Failure(r: RequiredFieldMissingException) =>
-              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(r)), 400))
+              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(r)), StatusCodes.BadRequest.intValue))
             case Failure(e: java.io.IOException) =>
-              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), 400))
+              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), StatusCodes.BadRequest.intValue))
             case Failure(e: JsonToAvroConversionException) =>
-              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), 400))
+              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), StatusCodes.BadRequest.intValue))
             case Failure(e: UndefinedFieldsException) =>
-              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), 400))
+              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), StatusCodes.BadRequest.intValue))
             case Failure(other) =>
               val responseCode = StatusCodes.ServiceUnavailable
               val errorMsg =
