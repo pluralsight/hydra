@@ -106,8 +106,19 @@ class IngestionEndpoint[F[_]: Futurable](
               // Yeah, a 404 is a bad idea, but that is what the old v1 flow does so we are keeping it the same
               val responseCode = StatusCodes.NotFound
               complete(responseCode, IngestionReport(hydraRequest.correlationId, Map(), responseCode.intValue))
-            case Failure(r: AvroConversionAugmentedException) =>
+<<<<<<< HEAD
+            case Failure(r: RequiredFieldMissingException) =>
               complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(r)), StatusCodes.BadRequest.intValue))
+            case Failure(e: java.io.IOException) =>
+              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), StatusCodes.BadRequest.intValue))
+            case Failure(e: JsonToAvroConversionException) =>
+              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), StatusCodes.BadRequest.intValue))
+            case Failure(e: UndefinedFieldsException) =>
+              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), StatusCodes.BadRequest.intValue))
+=======
+            case Failure(r: AvroConversionAugmentedException) =>
+              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(r)), 400))
+>>>>>>> 0675567bb12711e8a2be97d4997188ec5acec745
             case Failure(other) =>
               val responseCode = StatusCodes.ServiceUnavailable
               val errorMsg =

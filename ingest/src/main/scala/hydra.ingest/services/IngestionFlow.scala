@@ -1,5 +1,7 @@
 package hydra.ingest.services
 
+import java.io.IOException
+
 import cats.MonadError
 import cats.implicits._
 import com.pluralsight.hydra.avro.JsonToAvroConversionException
@@ -57,11 +59,8 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](
               case Failure(_) => None
             }).mkString("|").some
         }
-        payloadTryMaybe match {
-          case Success(payloadMaybe) =>
-            kafkaClient.publishStringKeyMessage((key, payloadMaybe), topic).void
-          case Failure(ex) =>
-            MonadError[F, Throwable].raiseError(ex)
+        MonadError[F, Throwable].fromTry(payloadTryMaybe).flatMap { payloadMaybe =>
+          kafkaClient.publishStringKeyMessage((key, payloadMaybe), topic).void
         }
       }
       case None => MonadError[F, Throwable].raiseError(MissingTopicNameException(request))
@@ -72,7 +71,10 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](
     Try(AvroRecord(topic, schemaWrapper.schema, None, payloadString, AckStrategy.Replicated, useStrictValidation)).recoverWith {
       case e: JsonToAvroConversionException =>
         val location = s"$schemaRegistryBaseUrl/subjects/$topic-value/versions/latest/schema"
-        Failure(new RuntimeException(s"${e.getMessage} [$location]"))
+        Failure(new AvroConversionAugmentedException(s"${e.getMessage} [$location]"))
+      case e: IOException =>
+        val location = s"$schemaRegistryBaseUrl/subjects/$topic-value/versions/latest/schema"
+        Failure(new AvroConversionAugmentedException(s"${e.getMessage} [$location]"))
       case e => Failure(e)
     }
   }
@@ -81,4 +83,5 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](
 object IngestionFlow {
   final case class MissingTopicNameException(request: HydraRequest)
     extends Exception(s"Missing the topic name in request with correlationId ${request.correlationId}")
+  final case class AvroConversionAugmentedException(message: String) extends RuntimeException(message)
 }
