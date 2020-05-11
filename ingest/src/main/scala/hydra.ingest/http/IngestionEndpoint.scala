@@ -108,6 +108,7 @@ class IngestionEndpoint[F[_]: Futurable](
               complete(StatusCodes.ServiceUnavailable, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorError(other)), 503))
           }
         } else {
+          log.info("Typewriter - Using Old Ingestion Flow")
           imperativelyComplete { ctx =>
             requestHandler ! InitiateHttpRequest(
               hydraRequest,
