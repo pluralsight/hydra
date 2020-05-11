@@ -41,20 +41,26 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](schemaRegistr
     request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM) match {
       case Some(topic) => getValueSchemaWrapper(topic).flatMap { schemaWrapper =>
         val useStrictValidation = request.validationStrategy == ValidationStrategy.Strict
-        val payloadMaybe: Try[Option[GenericRecord]] = Option(request.payload) match {
+        val payloadTryMaybe: Try[Option[GenericRecord]] = Option(request.payload) match {
           case Some(p) => convertToAvro(topic, schemaWrapper, useStrictValidation, p).map(avroRecord => Some(avroRecord.payload))
           case None => Success(None)
         }
         // TODO: Support v2
         val key = schemaWrapper.primaryKeys.toList match {
           case Nil => None
-          case l =>
-            val a = l.map(pkName => payloadMaybe.map(_.map(p => Try(p.get(pkName)))))
-            a
-//            .mkString("|").some
+          case l => l.flatMap(pkName => payloadTryMaybe match {
+              case Success(payloadMaybe) =>
+                payloadMaybe.flatMap(p => Try(p.get(pkName)).toOption)
+              case Failure(_) => None
+            }).mkString("|").some
         }
-        kafkaClient.publishStringKeyMessage((key, payloadMaybe), topic)
-      }.void
+        payloadTryMaybe match {
+          case Success(payloadMaybe) =>
+            kafkaClient.publishStringKeyMessage((key, payloadMaybe), topic).void
+          case Failure(ex) =>
+            MonadError[F, Throwable].raiseError(ex)
+        }
+      }
       case None => MonadError[F, Throwable].raiseError(MissingTopicNameException(request))
     }
   }
