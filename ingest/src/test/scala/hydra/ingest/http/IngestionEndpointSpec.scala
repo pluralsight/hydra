@@ -15,6 +15,7 @@ import hydra.core.marshallers.GenericError
 import hydra.core.protocol.IngestorError
 import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestionFlow
+import hydra.ingest.services.IngestionFlow.AvroConversionAugmentedException
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.TestIngestor
 import hydra.kafka.algebras.KafkaClientAlgebra
@@ -210,6 +211,7 @@ class IngestionEndpointSpec
       val request = Post("/ingest", """{"test":true, "extraField":true}""").withHeaders(kafkaTopic)
       request ~> ingestRouteAlt ~> check {
         status shouldBe StatusCodes.BadRequest
+        responseAs[String] should include("""com.pluralsight.hydra.avro.UndefinedFieldsException: Field(s) 'extraField' are not defined in the schema and validation is set to strict. Declared fields are: test,intField. [https://schemaregistry.notreal/subjects/my_topic-value/versions/latest/schema]""")
       }
     }
 

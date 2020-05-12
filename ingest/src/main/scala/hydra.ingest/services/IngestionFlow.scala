@@ -71,7 +71,7 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](
     Try(AvroRecord(topic, schemaWrapper.schema, None, payloadString, AckStrategy.Replicated, useStrictValidation)).recoverWith {
       case e: JsonToAvroConversionException =>
         val location = s"$schemaRegistryBaseUrl/subjects/$topic-value/versions/latest/schema"
-        Failure(new AvroConversionAugmentedException(s"${e.getMessage} [$location]"))
+        Failure(new AvroConversionAugmentedException(s"${e.getClass.getName}: ${e.getMessage} [$location]"))
       case e: IOException =>
         val location = s"$schemaRegistryBaseUrl/subjects/$topic-value/versions/latest/schema"
         Failure(new AvroConversionAugmentedException(s"${e.getMessage} [$location]"))
