@@ -3,7 +3,7 @@ package hydra.ingest.services
 import cats.effect.{Concurrent, ContextShift, IO}
 import hydra.avro.registry.SchemaRegistry
 import hydra.core.ingest.HydraRequest
-import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
+import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM,HYDRA_RECORD_KEY_PARAM}
 import hydra.ingest.services.IngestionFlow.MissingTopicNameException
 import hydra.kafka.algebras.KafkaClientAlgebra
 import org.apache.avro.{Schema, SchemaBuilder}
@@ -66,6 +66,18 @@ class IngestionFlowSpec extends AnyFlatSpec with Matchers {
   it should "return an error when no topic name is provided" in {
     val testRequest = HydraRequest("correlationId", testPayload)
     ingest(testRequest).attempt.unsafeRunSync() shouldBe Left(MissingTopicNameException(testRequest))
+  }
+
+  it should "take the key from the header if present" in {
+    val headerKey = "someDifferentKey"
+    val testRequest = HydraRequest("correlationId", testPayload, metadata = Map(HYDRA_RECORD_KEY_PARAM -> headerKey, HYDRA_KAFKA_TOPIC_PARAM -> testSubject))
+    ingest(testRequest).flatMap { kafkaClient =>
+      kafkaClient.consumeStringKeyMessages(testSubject, "test-consumer").take(1).compile.toList.map { publishedMessages =>
+        val firstMessage = publishedMessages.head
+        (firstMessage._1, firstMessage._2.get.toString) shouldBe (Some(headerKey), testPayload)
+      }
+    }.unsafeRunSync()
+
   }
 
 }

@@ -224,5 +224,18 @@ class IngestionEndpointSpec
         status shouldBe StatusCodes.OK
       }
     }
+
+    "receive BadRequest for publishing to topic that does not exist" in {
+      val topic = "my_topic_DNE"
+      val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, topic)
+      val validation = RawHeader(HYDRA_VALIDATION_STRATEGY, "relaxed")
+
+      val request = Post("/ingest", """{"test":true, "extraField":true}""").withHeaders(kafkaTopic, validation)
+      request ~> ingestRouteAlt ~> check {
+        status shouldBe StatusCodes.BadRequest
+        responseAs[String] should include(s"Schema '$topic' cannot be loaded. Cause: hydra.avro.resource.SchemaResourceLoader$$SchemaNotFoundException: Schema not found for $topic")
+      }
+    }
+
   }
 }

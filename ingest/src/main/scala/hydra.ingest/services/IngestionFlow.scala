@@ -7,9 +7,10 @@ import cats.implicits._
 import com.pluralsight.hydra.avro.JsonToAvroConversionException
 import hydra.avro.registry.{ConfluentSchemaRegistry, JsonToAvroConversionExceptionWithMetadata, SchemaRegistry}
 import hydra.avro.resource.SchemaResource
+import hydra.avro.resource.SchemaResourceLoader.SchemaNotFoundException
 import hydra.avro.util.{AvroUtils, SchemaWrapper}
 import hydra.core.ingest.HydraRequest
-import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
+import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM,HYDRA_RECORD_KEY_PARAM}
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.kafka.algebras.KafkaClientAlgebra
 import hydra.kafka.producer.AvroRecord
@@ -33,7 +34,10 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](
 
   private def getValueSchema(topicName: String): F[Schema] = {
     schemaRegistry.getSchemaBySubject(topicName + "-value")
-      .flatMap(maybeSchema => MonadError[F, Throwable].fromOption(maybeSchema, new Exception))
+      .flatMap { maybeSchema =>
+        val schemaNotFound = SchemaNotFoundException(topicName)
+        MonadError[F, Throwable].fromOption(maybeSchema, SchemaNotFoundAugmentedException(schemaNotFound, topicName))
+      }
   }
 
   private def getValueSchemaWrapper(topicName: String): F[SchemaWrapper] = memoizeF[F, SchemaWrapper](Some(2.minutes)) {
@@ -51,20 +55,26 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](
           case None => Success(None)
         }
         // TODO: Support v2
-        val key = schemaWrapper.primaryKeys.toList match {
-          case Nil => None
-          case l => l.flatMap(pkName => payloadTryMaybe match {
-              case Success(payloadMaybe) =>
-                payloadMaybe.flatMap(p => Try(p.get(pkName)).toOption)
-              case Failure(_) => None
-            }).mkString("|").some
-        }
+        val v1Key = getV1RecordKey(schemaWrapper, payloadTryMaybe, request)
         MonadError[F, Throwable].fromTry(payloadTryMaybe).flatMap { payloadMaybe =>
-          kafkaClient.publishStringKeyMessage((key, payloadMaybe), topic).void
+          kafkaClient.publishStringKeyMessage((v1Key, payloadMaybe), topic).void
         }
       }
       case None => MonadError[F, Throwable].raiseError(MissingTopicNameException(request))
     }
+  }
+
+  private def getV1RecordKey(schemaWrapper: SchemaWrapper, payloadTryMaybe: Try[Option[GenericRecord]], request: HydraRequest): Option[String] = {
+    val headerV1Key = request.metadata.get(HYDRA_RECORD_KEY_PARAM)
+    val optionString = schemaWrapper.primaryKeys.toList match {
+      case Nil => None
+      case l => l.flatMap(pkName => payloadTryMaybe match {
+        case Success(payloadMaybe) =>
+          payloadMaybe.flatMap(p => Try(p.get(pkName)).toOption)
+        case Failure(_) => None
+      }).mkString("|").some
+    }
+    headerV1Key.orElse(optionString)
   }
 
   private def convertToAvro(topic: String, schemaWrapper: SchemaWrapper, useStrictValidation: Boolean, payloadString: String): Try[AvroRecord] = {
@@ -84,4 +94,6 @@ object IngestionFlow {
   final case class MissingTopicNameException(request: HydraRequest)
     extends Exception(s"Missing the topic name in request with correlationId ${request.correlationId}")
   final case class AvroConversionAugmentedException(message: String) extends RuntimeException(message)
+  final case class SchemaNotFoundAugmentedException(schemaNotFoundException: SchemaNotFoundException, topic: String)
+    extends RuntimeException(s"Schema '$topic' cannot be loaded. Cause: ${schemaNotFoundException.getClass.getName}: Schema not found for $topic")
 }
