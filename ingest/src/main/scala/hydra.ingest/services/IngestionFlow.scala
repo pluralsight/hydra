@@ -7,6 +7,7 @@ import cats.implicits._
 import com.pluralsight.hydra.avro.JsonToAvroConversionException
 import hydra.avro.registry.{ConfluentSchemaRegistry, JsonToAvroConversionExceptionWithMetadata, SchemaRegistry}
 import hydra.avro.resource.SchemaResource
+import hydra.avro.resource.SchemaResourceLoader.SchemaNotFoundException
 import hydra.avro.util.{AvroUtils, SchemaWrapper}
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
@@ -33,7 +34,10 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](
 
   private def getValueSchema(topicName: String): F[Schema] = {
     schemaRegistry.getSchemaBySubject(topicName + "-value")
-      .flatMap(maybeSchema => MonadError[F, Throwable].fromOption(maybeSchema, new Exception))
+      .flatMap { maybeSchema =>
+        val schemaNotFound = SchemaNotFoundException(topicName)
+        MonadError[F, Throwable].fromOption(maybeSchema, SchemaNotFoundAugmentedException(schemaNotFound, topicName))
+      }
   }
 
   private def getValueSchemaWrapper(topicName: String): F[SchemaWrapper] = memoizeF[F, SchemaWrapper](Some(2.minutes)) {
@@ -84,4 +88,6 @@ object IngestionFlow {
   final case class MissingTopicNameException(request: HydraRequest)
     extends Exception(s"Missing the topic name in request with correlationId ${request.correlationId}")
   final case class AvroConversionAugmentedException(message: String) extends RuntimeException(message)
+  final case class SchemaNotFoundAugmentedException(schemaNotFoundException: SchemaNotFoundException, topic: String)
+    extends RuntimeException(s"Schema '$topic' cannot be loaded. Cause: ${schemaNotFoundException.getClass.getName}: Schema not found for $topic")
 }

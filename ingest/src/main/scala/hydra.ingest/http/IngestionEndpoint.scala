@@ -22,6 +22,7 @@ import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
 import com.pluralsight.hydra.avro.{JsonToAvroConversionException, RequiredFieldMissingException, UndefinedFieldsException}
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.avro.util.AvroUtils
+import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
 import hydra.common.config.ConfigSupport._
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
@@ -29,10 +30,11 @@ import hydra.core.ingest.{CorrelationIdBuilder, HydraRequest, IngestionReport, R
 import hydra.core.marshallers.GenericError
 import hydra.core.protocol.{IngestorCompleted, IngestorError, IngestorJoined, InitiateHttpRequest, InvalidRequest}
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
-import hydra.ingest.services.IngestionFlow.{AvroConversionAugmentedException, MissingTopicNameException}
+import hydra.ingest.services.IngestionFlow.{AvroConversionAugmentedException, MissingTopicNameException, SchemaNotFoundAugmentedException}
 import hydra.ingest.services.{IngestionFlow, IngestionHandlerGateway}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
 import com.pluralsight.hydra.avro.{JsonToAvroConversionException, RequiredFieldMissingException, UndefinedFieldsException}
+import hydra.avro.resource.SchemaResourceLoader.SchemaNotFoundException
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
@@ -108,6 +110,8 @@ class IngestionEndpoint[F[_]: Futurable](
               complete(responseCode, IngestionReport(hydraRequest.correlationId, Map(), responseCode.intValue))
             case Failure(r: AvroConversionAugmentedException) =>
               complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(r)), StatusCodes.BadRequest.intValue))
+            case Failure(e: SchemaNotFoundAugmentedException) =>
+              complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), StatusCodes.BadRequest.intValue))
             case Failure(other) =>
               val responseCode = StatusCodes.ServiceUnavailable
               val errorMsg =
