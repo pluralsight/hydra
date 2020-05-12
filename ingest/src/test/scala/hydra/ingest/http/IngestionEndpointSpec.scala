@@ -236,5 +236,6 @@ class IngestionEndpointSpec
         responseAs[String] should include(s"Schema '$topic' cannot be loaded. Cause: hydra.avro.resource.SchemaResourceLoader$$SchemaNotFoundException: Schema not found for $topic")
       }
     }
+
   }
 }
