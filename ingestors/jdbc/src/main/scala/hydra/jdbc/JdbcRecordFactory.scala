@@ -8,6 +8,7 @@ import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.avro.resource.SchemaResource
 import hydra.avro.util.{AvroUtils, SchemaWrapper}
 import hydra.common.config.ConfigSupport
+import hydra.common.logging.LoggingAdapter
 import hydra.core.akka.SchemaRegistryActor.{FetchSchemaRequest, FetchSchemaResponse}
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams.HYDRA_SCHEMA_PARAM
@@ -24,7 +25,7 @@ import scala.util.{Failure, Success, Try}
 
 class JdbcRecordFactory(schemaResourceLoader: ActorRef)
     extends RecordFactory[Seq[String], GenericRecord]
-    with ConfigSupport {
+    with ConfigSupport with LoggingAdapter {
 
   private implicit val timeout = util.Timeout(3.seconds)
 

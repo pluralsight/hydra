@@ -102,7 +102,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   ): F[Unit] = {
     val message = createTopicRequest.toKeyAndValue
     for {
-      records <- TopicMetadataV2.encode[F](message._1, message._2)
+      records <- TopicMetadataV2.encode[F](message._1, Some(message._2))
       _ <- kafkaClient
         .publishMessage(records, v2MetadataTopicName.value)
         .rethrow

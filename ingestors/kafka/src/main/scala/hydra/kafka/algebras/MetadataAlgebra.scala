@@ -21,7 +21,7 @@ trait MetadataAlgebra[F[_]] {
 
 object MetadataAlgebra {
 
-  final case class TopicMetadataV2Container(key: TopicMetadataV2Key, value: TopicMetadataV2Value)
+  final case class TopicMetadataV2Container(key: TopicMetadataV2Key, value: Option[TopicMetadataV2Value])
 
   def make[F[_]: Sync: Concurrent](
                         metadataTopicName: TopicName,
@@ -29,7 +29,7 @@ object MetadataAlgebra {
                         kafkaClientAlgebra: KafkaClientAlgebra[F],
                         consumeMetadataEnabled: Boolean
                       ): F[MetadataAlgebra[F]] = {
-    val metadataStream: fs2.Stream[F, (GenericRecord, GenericRecord)] = if (consumeMetadataEnabled) {
+    val metadataStream: fs2.Stream[F, (GenericRecord, Option[GenericRecord])] = if (consumeMetadataEnabled) {
       kafkaClientAlgebra.consumeMessages(metadataTopicName, consumerGroup)
     } else {
       fs2.Stream.empty
