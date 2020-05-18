@@ -3,13 +3,13 @@ import sbt.{ExclusionRule, _}
 object Dependencies {
 
   val akkaHTTPCorsVersion = "0.4.3"
-  val akkaHTTPVersion = "10.1.12"
-  val akkaKafkaStreamVersion = "2.0.2"
+  val akkaHTTPVersion = "10.1.11"
+  val akkaKafkaStreamVersion = "2.0.3"
   val akkaKryoVersion = "0.5.2"
   val akkaVersion = "2.6.5"
   val avroVersion = "1.9.2"
   val catsEffectVersion = "2.1.3"
-  val catsLoggerVersion = "1.0.1"
+  val catsLoggerVersion = "1.1.1"
   val catsRetryVersion = "1.1.0"
   val catsVersion = "2.1.1"
   val cirisVersion = "1.0.4"
@@ -25,7 +25,7 @@ object Dependencies {
   val kafkaVersion = "2.4.1"
   val kamonPVersion = "2.1.0"
   val kamonVersion = "2.1.0"
-  val log4jVersion = "2.13.2"
+  val log4jVersion = "2.13.3"
   val opRabbitVersion = "2.1.0"
   val powerMockVersion = "2.0.7" //needed for mocking static java methods
   val refinedVersion = "0.9.14"
@@ -36,7 +36,7 @@ object Dependencies {
   val scalazVersion = "7.3.0"
   val sprayJsonVersion = "1.3.5"
   val typesafeConfigVersion = "1.3.2"
-  val vulcanVersion = "1.0.1"
+  val vulcanVersion = "1.1.0"
 
   object Compile {
 
