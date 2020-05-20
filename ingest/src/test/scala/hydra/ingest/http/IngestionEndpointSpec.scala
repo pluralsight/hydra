@@ -10,10 +10,12 @@ import cats.effect.{Concurrent, ContextShift, IO}
 import hydra.avro.registry.SchemaRegistry
 import hydra.common.util.ActorUtils
 import hydra.core.ingest.RequestParams
-import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
+import RequestParams._
 import hydra.core.marshallers.GenericError
+import hydra.core.protocol.IngestorError
 import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestionFlow
+import hydra.ingest.services.IngestionFlow.AvroConversionAugmentedException
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.TestIngestor
 import hydra.kafka.algebras.KafkaClientAlgebra
@@ -62,7 +64,7 @@ class IngestionEndpointSpec
   implicit val mode: Mode[IO] = scalacache.CatsEffect.modes.async
   val ingestRoute = new IngestionEndpoint(
     false,
-    new IngestionFlow[IO](SchemaRegistry.test[IO].unsafeRunSync, KafkaClientAlgebra.test[IO].unsafeRunSync),
+    new IngestionFlow[IO](SchemaRegistry.test[IO].unsafeRunSync, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistryUrl.notreal"),
     Set.empty
   ).route
 
@@ -144,11 +146,11 @@ class IngestionEndpointSpec
       val schemaRegistry = SchemaRegistry.test[IO].unsafeRunSync
       schemaRegistry.registerSchema(
         "my_topic-value",
-        SchemaBuilder.record("my_topic").fields().requiredBoolean("test").endRecord()
+        SchemaBuilder.record("my_topic").fields().requiredBoolean("test").optionalInt("intField").endRecord()
       ).unsafeRunSync
       new IngestionEndpoint(
         true,
-        new IngestionFlow[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync),
+        new IngestionFlow[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistry.notreal"),
         Set("Segment"),
         Some("alt-test-request-handler")
       ).route
@@ -165,7 +167,7 @@ class IngestionEndpointSpec
       }
     }
 
-    "rejects for UA not in provided Set" in {
+    "accepts for UA not in provided Set" in {
       val ingestor = RawHeader(RequestParams.HYDRA_INGESTOR_PARAM, "tester")
       val userAgent = `User-Agent`("not_found")
       val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
@@ -175,5 +177,65 @@ class IngestionEndpointSpec
         status shouldBe StatusCodes.OK
       }
     }
+
+    "rejects for a bad payload" in {
+      val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
+
+      val request = Post("/ingest", """{}""").withHeaders(kafkaTopic)
+      request ~> ingestRouteAlt ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
+
+    "rejects for a bad json payload" in {
+      val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
+
+      val request = Post("/ingest", """{"test":00.0123}""").withHeaders(kafkaTopic)
+      request ~> ingestRouteAlt ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
+
+    "rejects for an incorrect int type in the payload" in {
+      val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
+
+      val request = Post("/ingest", """{"test":true, "intField":false}""").withHeaders(kafkaTopic)
+      request ~> ingestRouteAlt ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
+
+    "rejects for an extra field when using strict validation" in {
+      val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
+
+      val request = Post("/ingest", """{"test":true, "extraField":true}""").withHeaders(kafkaTopic)
+      request ~> ingestRouteAlt ~> check {
+        status shouldBe StatusCodes.BadRequest
+        responseAs[String] should include("""com.pluralsight.hydra.avro.UndefinedFieldsException: Field(s) 'extraField' are not defined in the schema and validation is set to strict. Declared fields are: test,intField. [https://schemaregistry.notreal/subjects/my_topic-value/versions/latest/schema]""")
+      }
+    }
+
+    "accepts for an extra field when using relaxed validation" in {
+      val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
+      val validation = RawHeader(HYDRA_VALIDATION_STRATEGY, "relaxed")
+
+      val request = Post("/ingest", """{"test":true, "extraField":true}""").withHeaders(kafkaTopic, validation)
+      request ~> ingestRouteAlt ~> check {
+        status shouldBe StatusCodes.OK
+      }
+    }
+
+    "receive BadRequest for publishing to topic that does not exist" in {
+      val topic = "my_topic_DNE"
+      val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, topic)
+      val validation = RawHeader(HYDRA_VALIDATION_STRATEGY, "relaxed")
+
+      val request = Post("/ingest", """{"test":true, "extraField":true}""").withHeaders(kafkaTopic, validation)
+      request ~> ingestRouteAlt ~> check {
+        status shouldBe StatusCodes.BadRequest
+        responseAs[String] should include(s"Schema '$topic' cannot be loaded. Cause: hydra.avro.resource.SchemaResourceLoader$$SchemaNotFoundException: Schema not found for $topic")
+      }
+    }
+
   }
 }

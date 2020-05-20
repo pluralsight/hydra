@@ -31,7 +31,7 @@ case class HydraRequest(
     * @return
     */
   def metadataValueEquals(name: String, value: String): Boolean = {
-    metadataValue(name).map(_.equals(value)).getOrElse(false)
+    metadataValue(name).exists(_.equals(value))
   }
 
   def withCorrelationId(correlationId: String) =
@@ -41,7 +41,7 @@ case class HydraRequest(
     copy(metadata = this.metadata ++ meta)
 
   def hasMetadata(key: String): Boolean =
-    metadata.find(_._1.equalsIgnoreCase(key)).isDefined
+    metadata.exists(_._1.equalsIgnoreCase(key))
 
   def withAckStrategy(strategy: AckStrategy) = copy(ackStrategy = strategy)
 
