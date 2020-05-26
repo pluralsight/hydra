@@ -19,10 +19,6 @@ package hydra.ingest.http
 import akka.actor._
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
-import cats.effect.IO
-import com.pluralsight.hydra.avro.{JsonToAvroConversionException, RequiredFieldMissingException, UndefinedFieldsException}
-import hydra.avro.registry.ConfluentSchemaRegistry
-import hydra.avro.util.AvroUtils
 import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
 import hydra.common.config.ConfigSupport._
 import hydra.common.util.Futurable
@@ -34,9 +30,6 @@ import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestionFlow.{AvroConversionAugmentedException, MissingTopicNameException, SchemaNotFoundAugmentedException}
 import hydra.ingest.services.{IngestionFlow, IngestionHandlerGateway}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
-import com.pluralsight.hydra.avro.{JsonToAvroConversionException, RequiredFieldMissingException, UndefinedFieldsException}
-import hydra.avro.resource.SchemaResourceLoader.SchemaNotFoundException
-import hydra.core.ingest.Ingestor.{IngestCounterMetricName, ReconciliationMetricName}
 import hydra.core.monitor.HydraMetrics
 
 import scala.concurrent.ExecutionContext
@@ -94,10 +87,11 @@ class IngestionEndpoint[F[_]: Futurable](
     }
   }
 
+  //TODO: Need to figure out how to reset this gauge. Currently will only add to gauge
   private def addPromMetric(topic: String, responseCode: String)(implicit ec: ExecutionContext): Unit = {
-    HydraMetrics.incrementCounter(
+    HydraMetrics.incrementGauge(
       lookupKey =
-        "Ingest" + s"_${topic}",
+        "Ingest_topic_" + s"_${topic}",
       metricName = "ingest_topic_response",
       tags = Seq(
         "topic" -> topic,
