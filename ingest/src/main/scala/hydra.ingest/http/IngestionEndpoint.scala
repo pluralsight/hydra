@@ -87,7 +87,6 @@ class IngestionEndpoint[F[_]: Futurable](
     }
   }
 
-  //TODO: Need to figure out how to reset this gauge. Currently will only add to gauge
   private def addPromMetric(topic: String, responseCode: String)(implicit ec: ExecutionContext): Unit = {
     HydraMetrics.incrementGauge(
       lookupKey =
@@ -139,7 +138,6 @@ class IngestionEndpoint[F[_]: Futurable](
                 complete(responseCode, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorError(other)), responseCode.intValue))
             }
           } else {
-            log.info("Typewriter - Using Old Ingestion Flow") //TODO: Remove log
             imperativelyComplete { ctx =>
               requestHandler ! InitiateHttpRequest(
                 hydraRequest,
