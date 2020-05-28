@@ -2,7 +2,7 @@ import sbt.{ExclusionRule, _}
 
 object Dependencies {
 
-  val akkaHTTPCorsVersion = "0.4.3"
+  val akkaHTTPCorsVersion = "1.0.0"
   val akkaHTTPVersion = "10.1.12"
   val akkaKafkaStreamVersion = "2.0.3"
   val akkaKryoVersion = "0.5.2"
