@@ -1,9 +1,11 @@
 package hydra.avro.registry
 
 import cats.effect.Sync
+import io.confluent.kafka.schemaregistry.avro.AvroCompatibilityChecker
 import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, MockSchemaRegistryClient, SchemaRegistryClient}
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Parser
+import io.confluent.kafka.schemaregistry.avro._
 
 import scala.util.Try
 
@@ -64,6 +66,11 @@ trait SchemaRegistry[F[_]] {
     */
   def getSchemaRegistryClient: F[SchemaRegistryClient]
 
+  /**
+    *
+    * @param subject - subject name for the schema found in SchemaRegistry including the suffix (-key | -value)
+    * @return - Optional Schema for the given subject name
+    */
   def getSchemaBySubject(subject: String): F[Option[Schema]]
 
 }
@@ -83,11 +90,15 @@ object SchemaRegistry {
   }
 
   def test[F[_]: Sync]: F[SchemaRegistry[F]] = Sync[F].delay {
-    getFromSchemaRegistryClient(new MockSchemaRegistryClient)
+    getFromSchemaRegistryClient(
+      new MockSchemaRegistryClient,
+      AvroCompatibilityChecker.FULL_TRANSITIVE_CHECKER
+    )
   }
 
   private[this] def getFromSchemaRegistryClient[F[_]: Sync](
-      schemaRegistryClient: SchemaRegistryClient
+      schemaRegistryClient: SchemaRegistryClient,
+      compatabilityChecker: AvroCompatibilityChecker
   ): SchemaRegistry[F] =
     new SchemaRegistry[F] {
 
