@@ -63,16 +63,20 @@ class IngestionEndpoint[F[_]: Futurable](
 
   override val route: Route =
     pathPrefix("ingest") {
-      pathEndOrSingleSlash {
-        handleExceptions(exceptionHandler) {
-          post {
-            requestEntityPresent {
-              publishRequest
-            }
-          } ~ deleteRequest
-        }
-      }
+      publishRoute
+    } ~ pathPrefix("publish"){
+      publishRoute
     }
+
+  private def publishRoute = pathEndOrSingleSlash {
+    handleExceptions(exceptionHandler) {
+      post {
+        requestEntityPresent {
+          publishRequest
+        }
+      } ~ deleteRequest
+    }
+  }
 
   private def deleteRequest = delete {
     headerValueByName(RequestParams.HYDRA_RECORD_KEY_PARAM)(_ => publishRequest)
