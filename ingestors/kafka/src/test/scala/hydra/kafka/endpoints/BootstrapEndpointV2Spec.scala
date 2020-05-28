@@ -133,7 +133,7 @@ final class BootstrapEndpointV2Spec
 
         override def getSchemaRegistryClient: IO[SchemaRegistryClient] = err
 
-        override def getSchemaBySubject(subject: String): IO[Option[Schema]] = err
+        override def getLatestSchemaBySubject(subject: String): IO[Option[Schema]] = err
       }
       KafkaClientAlgebra.test[IO].flatMap { client =>
         MetadataAlgebra.make("123", "456", client, true).flatMap { m =>

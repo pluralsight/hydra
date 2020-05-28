@@ -3,11 +3,13 @@ package hydra.avro.registry
 import cats.effect.Sync
 import io.confluent.kafka.schemaregistry.avro.AvroCompatibilityChecker
 import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, MockSchemaRegistryClient, SchemaRegistryClient}
-import org.apache.avro.Schema
-import org.apache.avro.Schema.Parser
-import io.confluent.kafka.schemaregistry.avro._
+import org.apache.avro.{Schema, SchemaValidatorBuilder}
+import cats.implicits._
 
-import scala.util.Try
+import scala.collection.JavaConverters._
+import org.apache.avro.Schema.Parser
+
+import scala.util.{Failure, Success, Try}
 
 /**
   * Internal interface to interact with the SchemaRegistryClient from Confluent.
@@ -67,46 +69,61 @@ trait SchemaRegistry[F[_]] {
   def getSchemaRegistryClient: F[SchemaRegistryClient]
 
   /**
-    *
+    * Retrieves the latest schema for the given subject name, if exists
     * @param subject - subject name for the schema found in SchemaRegistry including the suffix (-key | -value)
     * @return - Optional Schema for the given subject name
     */
-  def getSchemaBySubject(subject: String): F[Option[Schema]]
+  def getLatestSchemaBySubject(subject: String): F[Option[Schema]]
+
+  /**
+    * Retrieves schema for the version and subject specified, if exists
+    * @param subject - subject name for the schema found in SchemaRegistry including the suffix (-key | -value)
+    * @param schemaVersion - version number for the schema
+    * @return Optional Schema for the given subject and version combination
+    */
+  def getSchemaFor(subject: String, schemaVersion: SchemaVersion): F[Option[Schema]]
 
 }
 
 object SchemaRegistry {
 
+  final case class IncompatibleSchemaException(message: String) extends RuntimeException(message)
+
   type SchemaId = Int
   type SchemaVersion = Int
+
+  private val validator = new SchemaValidatorBuilder().mutualReadStrategy().validateAll()
 
   def live[F[_]: Sync](
       schemaRegistryBaseUrl: String,
       maxCacheSize: Int
   ): F[SchemaRegistry[F]] = Sync[F].delay {
-    getFromSchemaRegistryClient(
-      new CachedSchemaRegistryClient(schemaRegistryBaseUrl, maxCacheSize)
-    )
+    getFromSchemaRegistryClient(new CachedSchemaRegistryClient(schemaRegistryBaseUrl, maxCacheSize))
   }
 
   def test[F[_]: Sync]: F[SchemaRegistry[F]] = Sync[F].delay {
-    getFromSchemaRegistryClient(
-      new MockSchemaRegistryClient,
-      AvroCompatibilityChecker.FULL_TRANSITIVE_CHECKER
-    )
+    getFromSchemaRegistryClient(new MockSchemaRegistryClient)
   }
 
-  private[this] def getFromSchemaRegistryClient[F[_]: Sync](
-      schemaRegistryClient: SchemaRegistryClient,
-      compatabilityChecker: AvroCompatibilityChecker
-  ): SchemaRegistry[F] =
+  private def getFromSchemaRegistryClient[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient): SchemaRegistry[F] =
     new SchemaRegistry[F] {
 
       override def registerSchema(
           subject: String,
           schema: Schema
-      ): F[SchemaId] =
-        Sync[F].delay(schemaRegistryClient.register(subject, schema))
+      ): F[SchemaId] = {
+        for {
+          versions <- getAllVersions(subject)
+          schemas <- versions.traverse(getSchemaFor(subject, _)).map(_.flatten)
+          validated <- Sync[F].delay(Try(validator.validate(schema, schemas.reverse.asJava)))
+          schemaVersion <- validated match {
+            case Success(_) =>
+              Sync[F].delay(schemaRegistryClient.register(subject, schema))
+            case Failure(exception) =>
+              Sync[F].raiseError[SchemaVersion](IncompatibleSchemaException(exception.getMessage))
+          }
+        } yield schemaVersion
+      }
 
       override def deleteSchemaOfVersion(
           subject: String,
@@ -143,11 +160,18 @@ object SchemaRegistry {
       override def getSchemaRegistryClient: F[SchemaRegistryClient] = Sync[F].pure(schemaRegistryClient)
 
       //TODO: Test this
-      override def getSchemaBySubject(subject: String): F[Option[Schema]] = Sync[F].delay {
+      override def getLatestSchemaBySubject(subject: String): F[Option[Schema]] = Sync[F].delay {
         Try {
           new org.apache.avro.Schema.Parser().parse(schemaRegistryClient.getLatestSchemaMetadata(subject).getSchema)
         }.toOption
       }
+
+      override def getSchemaFor(subject: String, schemaVersion: SchemaVersion): F[Option[Schema]] = Sync[F].delay {
+        Try {
+          new org.apache.avro.Schema.Parser().parse(schemaRegistryClient.getSchemaMetadata(subject, schemaVersion).getSchema)
+        }.toOption
+      }
+
     }
 
 }
