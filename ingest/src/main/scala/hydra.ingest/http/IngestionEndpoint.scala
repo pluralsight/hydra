@@ -64,7 +64,7 @@ class IngestionEndpoint[F[_]: Futurable](
   override val route: Route =
     pathPrefix("ingest") {
       publishRoute
-    } ~ pathPrefix("publish"){
+    } ~ pathPrefix("v2" / "publish"){
       publishRoute
     }
 

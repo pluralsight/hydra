@@ -244,7 +244,7 @@ class IngestionEndpointSpec
   "The publish endpoint" should {
 
     "rejects a GET request" in {
-      Get("/publish") ~> ingestRoute ~> check {
+      Get("/v2/publish") ~> ingestRoute ~> check {
         rejections should contain allElementsOf (Seq(
           MethodRejection(HttpMethods.POST),
           MethodRejection(HttpMethods.DELETE)
@@ -253,27 +253,27 @@ class IngestionEndpointSpec
     }
 
     "rejects empty requests" in {
-      Post("/publish") ~> ingestRoute ~> check {
+      Post("/v2/publish") ~> ingestRoute ~> check {
         rejection shouldEqual RequestEntityExpectedRejection
       }
     }
 
     "initiates a delete request" in {
       val key = RawHeader(RequestParams.HYDRA_RECORD_KEY_PARAM, "test")
-      Delete("/publish").withHeaders(key) ~> ingestRoute ~> check {
+      Delete("/v2/publish").withHeaders(key) ~> ingestRoute ~> check {
         response.status.intValue() shouldBe 200 //todo: should we support a 204?
       }
     }
 
     "rejects a delete request without a key" in {
-      Delete("/publish") ~> ingestRoute ~> check {
+      Delete("/v2/publish") ~> ingestRoute ~> check {
         rejection shouldEqual MissingHeaderRejection("hydra-record-key")
       }
     }
 
     "publishes to a target ingestor" in {
       val ingestor = RawHeader(RequestParams.HYDRA_INGESTOR_PARAM, "tester")
-      val request = Post("/publish", "payload").withHeaders(ingestor)
+      val request = Post("/v2/publish", "payload").withHeaders(ingestor)
       request ~> ingestRoute ~> check {
         status shouldBe StatusCodes.OK
       }
@@ -281,7 +281,7 @@ class IngestionEndpointSpec
 
     "rejects a request with an invalid ack strategy" in {
       val ingestor = RawHeader(RequestParams.HYDRA_INGESTOR_PARAM, "tester")
-      val request = Post("/publish", "payload").withHeaders(
+      val request = Post("/v2/publish", "payload").withHeaders(
         ingestor,
         RawHeader(RequestParams.HYDRA_ACK_STRATEGY, "invalid")
       )
@@ -293,14 +293,14 @@ class IngestionEndpointSpec
 
     "returns 404 if unknown ingestor" in {
       val ingestor = RawHeader(RequestParams.HYDRA_INGESTOR_PARAM, "unknown")
-      val request = Post("/publish", "payload").withHeaders(ingestor)
+      val request = Post("/v2/publish", "payload").withHeaders(ingestor)
       request ~> ingestRoute ~> check {
         status shouldBe StatusCodes.NotFound
       }
     }
 
     "broadcasts a request" in {
-      val request = Post("/publish", "payload")
+      val request = Post("/v2/publish", "payload")
       request ~> ingestRoute ~> check {
         status shouldBe StatusCodes.OK
       }
@@ -311,7 +311,7 @@ class IngestionEndpointSpec
       val userAgent = `User-Agent`("Segment.com")
       val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
 
-      val request = Post("/publish", "payload").withHeaders(ingestor, userAgent, kafkaTopic)
+      val request = Post("/v2/publish", "payload").withHeaders(ingestor, userAgent, kafkaTopic)
       request ~> ingestRouteAlt ~> check {
         status shouldBe StatusCodes.OK
       }
@@ -322,7 +322,7 @@ class IngestionEndpointSpec
       val userAgent = `User-Agent`("not_found")
       val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
 
-      val request = Post("/publish", """{"test":true}""").withHeaders(ingestor, userAgent, kafkaTopic)
+      val request = Post("/v2/publish", """{"test":true}""").withHeaders(ingestor, userAgent, kafkaTopic)
       request ~> ingestRouteAlt ~> check {
         status shouldBe StatusCodes.OK
       }
@@ -331,7 +331,7 @@ class IngestionEndpointSpec
     "rejects for a bad payload" in {
       val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
 
-      val request = Post("/publish", """{}""").withHeaders(kafkaTopic)
+      val request = Post("/v2/publish", """{}""").withHeaders(kafkaTopic)
       request ~> ingestRouteAlt ~> check {
         status shouldBe StatusCodes.BadRequest
       }
@@ -340,7 +340,7 @@ class IngestionEndpointSpec
     "rejects for a bad json payload" in {
       val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
 
-      val request = Post("/publish", """{"test":00.0123}""").withHeaders(kafkaTopic)
+      val request = Post("/v2/publish", """{"test":00.0123}""").withHeaders(kafkaTopic)
       request ~> ingestRouteAlt ~> check {
         status shouldBe StatusCodes.BadRequest
       }
@@ -349,7 +349,7 @@ class IngestionEndpointSpec
     "rejects for an incorrect int type in the payload" in {
       val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
 
-      val request = Post("/publish", """{"test":true, "intField":false}""").withHeaders(kafkaTopic)
+      val request = Post("/v2/publish", """{"test":true, "intField":false}""").withHeaders(kafkaTopic)
       request ~> ingestRouteAlt ~> check {
         status shouldBe StatusCodes.BadRequest
       }
@@ -358,7 +358,7 @@ class IngestionEndpointSpec
     "rejects for an extra field when using strict validation" in {
       val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
 
-      val request = Post("/publish", """{"test":true, "extraField":true}""").withHeaders(kafkaTopic)
+      val request = Post("/v2/publish", """{"test":true, "extraField":true}""").withHeaders(kafkaTopic)
       request ~> ingestRouteAlt ~> check {
         status shouldBe StatusCodes.BadRequest
         responseAs[String] should include("""com.pluralsight.hydra.avro.UndefinedFieldsException: Field(s) 'extraField' are not defined in the schema and validation is set to strict. Declared fields are: test,intField. [https://schemaregistry.notreal/subjects/my_topic-value/versions/latest/schema]""")
@@ -369,7 +369,7 @@ class IngestionEndpointSpec
       val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
       val validation = RawHeader(HYDRA_VALIDATION_STRATEGY, "relaxed")
 
-      val request = Post("/publish", """{"test":true, "extraField":true}""").withHeaders(kafkaTopic, validation)
+      val request = Post("/v2/publish", """{"test":true, "extraField":true}""").withHeaders(kafkaTopic, validation)
       request ~> ingestRouteAlt ~> check {
         status shouldBe StatusCodes.OK
       }
@@ -380,7 +380,7 @@ class IngestionEndpointSpec
       val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, topic)
       val validation = RawHeader(HYDRA_VALIDATION_STRATEGY, "relaxed")
 
-      val request = Post("/publish", """{"test":true, "extraField":true}""").withHeaders(kafkaTopic, validation)
+      val request = Post("/v2/publish", """{"test":true, "extraField":true}""").withHeaders(kafkaTopic, validation)
       request ~> ingestRouteAlt ~> check {
         status shouldBe StatusCodes.BadRequest
         responseAs[String] should include(s"Schema '$topic' cannot be loaded. Cause: hydra.avro.resource.SchemaResourceLoader$$SchemaNotFoundException: Schema not found for $topic")

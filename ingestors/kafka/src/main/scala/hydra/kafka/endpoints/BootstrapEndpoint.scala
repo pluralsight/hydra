@@ -40,40 +40,45 @@ class BootstrapEndpoint(override val system:ActorSystem) extends RouteSupport
 
   private implicit val timeout = Timeout(10.seconds)
 
-  override val route: Route = cors(settings) {
-    pathPrefix("streams") {
-      pathEndOrSingleSlash {
-        post {
-          requestEntityPresent {
-            entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
-              onComplete(
-                bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)
-              ) {
-                case Success(message) =>
-                  message match {
+  private def topicRoute =
+    pathEndOrSingleSlash {
+    post {
+      requestEntityPresent {
+        entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
+          onComplete(
+            bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)
+          ) {
+            case Success(message) =>
+              message match {
 
-                    case BootstrapSuccess(metadata) =>
-                      complete(StatusCodes.OK, toResource(metadata))
+                case BootstrapSuccess(metadata) =>
+                  complete(StatusCodes.OK, toResource(metadata))
 
-                    case BootstrapFailure(reasons) =>
-                      complete(StatusCodes.BadRequest, reasons)
+                case BootstrapFailure(reasons) =>
+                  complete(StatusCodes.BadRequest, reasons)
 
-                    case e: Exception =>
-                      log.error("Unexpected error in TopicBootstrapActor", e)
-                      complete(StatusCodes.InternalServerError, e.getMessage)
-                  }
-
-                case Failure(ex) =>
-                  log.error("Unexpected error in BootstrapEndpoint", ex)
-                  complete(StatusCodes.InternalServerError, ex.getMessage)
+                case e: Exception =>
+                  log.error("Unexpected error in TopicBootstrapActor", e)
+                  complete(StatusCodes.InternalServerError, e.getMessage)
               }
-            }
+
+            case Failure(ex) =>
+              log.error("Unexpected error in BootstrapEndpoint", ex)
+              complete(StatusCodes.InternalServerError, ex.getMessage)
           }
         }
-      } ~ get {
-        pathEndOrSingleSlash(getAllStreams(None)) ~
-          path(Segment)(subject => getAllStreams(Some(subject)))
       }
+    }
+  } ~ get {
+    pathEndOrSingleSlash(getAllStreams(None)) ~
+      path(Segment)(subject => getAllStreams(Some(subject)))
+  }
+
+  override val route: Route = cors(settings) {
+    pathPrefix("streams") {
+      topicRoute
+    } ~ pathPrefix("v2" / "topic") {
+      topicRoute
     }
   }
 
