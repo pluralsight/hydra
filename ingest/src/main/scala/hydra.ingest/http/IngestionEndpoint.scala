@@ -88,7 +88,7 @@ class IngestionEndpoint[F[_]: Futurable](
   }
 
   private def addPromMetric(topic: String, responseCode: String)(implicit ec: ExecutionContext): Unit = {
-    HydraMetrics.incrementCounter(
+    HydraMetrics.incrementGauge(
       lookupKey =
         "Ingest_topic_" + s"_${topic}",
       metricName = "ingest_topic_response",
