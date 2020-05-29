@@ -5,7 +5,7 @@ import kamon.metric.{Counter, Gauge, Histogram}
 import kamon.tag.TagSet
 import scalacache.guava.GuavaCache
 
-import scala.concurrent.{ExecutionContext, Future}q;q
+import scala.concurrent.{ExecutionContext, Future}
 
 object HydraMetrics {
 
