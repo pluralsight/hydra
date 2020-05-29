@@ -3,6 +3,7 @@ package hydra.avro.registry
 import cats.effect.IO
 import cats.implicits._
 import cats.{Applicative, Monad}
+import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
@@ -32,6 +33,28 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
     } yield {
       it must "add a schema" in {
         allVersions shouldBe List(1)
+      }
+    }
+  }
+
+  private def testAddEvolution[F[_]: Monad](
+                                           schemaRegistry: SchemaRegistry[F]
+                                         ): F[Unit] = {
+    def recordBuilder(name: String): SchemaBuilder.FieldAssembler[Schema] = {
+      SchemaBuilder.record(name).fields().requiredString("id")
+    }
+    val subject = "testSubjectAdd"
+
+    val schema = recordBuilder(subject).endRecord()
+    val evolvedSchema = recordBuilder(subject).nullableBoolean("nullBool", false).endRecord()
+
+    for {
+      _ <- schemaRegistry.registerSchema(subject, schema)
+      _ <- schemaRegistry.registerSchema(subject, evolvedSchema)
+      allVersions <- schemaRegistry.getAllVersions(subject)
+    } yield {
+      it must "add a schema with an evolved schema" in {
+        allVersions shouldBe List(1, 2)
       }
     }
   }
@@ -108,11 +131,30 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
     }
   }
 
+  private def testAddFailingEvolution[F[_]: Monad](
+                                             schemaRegistryIO: F[SchemaRegistry[F]]
+                                           ): F[Unit] = {
+    def recordBuilder(name: String): SchemaBuilder.FieldAssembler[Schema] = {
+      SchemaBuilder.record(name).fields().requiredString("id")
+    }
+    val subject = "testSubjectAdd"
+
+    val schema = recordBuilder(subject).endRecord()
+    val invalidSchemaEvolution = recordBuilder(subject).requiredBoolean("nullBool").endRecord()
+
+    for {
+      schemaRegistry <- schemaRegistryIO
+      _ <- schemaRegistry.registerSchema(subject, schema)
+      _ <- schemaRegistry.registerSchema(subject, invalidSchemaEvolution)
+    } yield ()
+  }
+
   private def runTests[F[_]: Monad](
       schemaRegistry: F[SchemaRegistry[F]]
   ): F[Unit] = {
     for {
       _ <- schemaRegistry.flatMap(testAddSubject[F])
+      _ <- schemaRegistry.flatMap(testAddEvolution[F])
       _ <- schemaRegistry.flatMap(testDeleteSchemaVersion[F])
       _ <- schemaRegistry.flatMap(testGetAllSubjects[F])
       _ <- testSchemaEvolutionValidation[F]
@@ -121,4 +163,7 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
 
   runTests(SchemaRegistry.test[IO]).unsafeRunSync()
 
+  it must "catch incompatibleSchemaException" in {
+    a[IncompatibleSchemaException] should be thrownBy testAddFailingEvolution(SchemaRegistry.test[IO]).unsafeRunSync()
+  }
 }
