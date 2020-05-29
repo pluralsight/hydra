@@ -33,7 +33,7 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](
   implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
 
   private def getValueSchema(topicName: String): F[Schema] = {
-    schemaRegistry.getSchemaBySubject(topicName + "-value")
+    schemaRegistry.getLatestSchemaBySubject(topicName + "-value")
       .flatMap { maybeSchema =>
         val schemaNotFound = SchemaNotFoundException(topicName)
         MonadError[F, Throwable].fromOption(maybeSchema, SchemaNotFoundAugmentedException(schemaNotFound, topicName))
