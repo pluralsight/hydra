@@ -4,7 +4,6 @@ import kamon.Kamon
 import kamon.metric.{Counter, Gauge, Histogram}
 import kamon.tag.TagSet
 import scalacache.guava.GuavaCache
-import scala.concurrent.duration._
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -21,7 +20,7 @@ object HydraMetrics {
   def getOrCreateCounter(lookupKey: String, metricName: String, tags: => Tags)(
       implicit ec: ExecutionContext
   ): Future[Counter] = {
-    countersCache.caching(lookupKey)(ttl = Some(15.seconds)) {
+    countersCache.caching(lookupKey)(ttl = None) {
       Kamon.counter(metricName).withTags(TagSet.from(tags.toMap))
     }
   }
