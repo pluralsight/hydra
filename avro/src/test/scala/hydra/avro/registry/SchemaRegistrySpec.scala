@@ -4,8 +4,8 @@ import cats.effect.IO
 import cats.implicits._
 import cats.{Applicative, Monad}
 import org.apache.avro.{Schema, SchemaBuilder}
-import org.scalatest.matchers.should.Matchers
 import org.scalatest.flatspec.AnyFlatSpecLike
+import org.scalatest.matchers.should.Matchers
 
 class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
 
@@ -78,6 +78,36 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
     }
   }
 
+  private def testSchemaEvolutionValidation[F[_]: Monad]: F[Unit] = {
+    def recordBuilder(name: String): SchemaBuilder.FieldAssembler[Schema] = {
+      SchemaBuilder.record(name).fields().requiredString("id")
+    }
+    val baseRecord1 = recordBuilder("BaseRecord1").endRecord()
+    val addDefaultedField = recordBuilder("BaseRecord1").nullableInt("newInt", 0).endRecord()
+    val shouldBeSuccess = SchemaRegistry.validate(addDefaultedField, baseRecord1 :: Nil)
+
+    val baseRecord2 = recordBuilder("BaseRecord2").endRecord()
+    val incompatibleRequiredAddEvolution = recordBuilder("BaseRecord2").requiredBoolean("reqBool").endRecord()
+    val incompatibleNullableNoDefaultEvolution = recordBuilder("BaseRecord2")
+      .name("nullBool").`type`().booleanType().noDefault().endRecord()
+    val requiredFieldFailure = SchemaRegistry.validate(incompatibleRequiredAddEvolution, baseRecord2 :: Nil)
+    val noDefaultFailure = SchemaRegistry.validate(incompatibleNullableNoDefaultEvolution, baseRecord2 :: Nil)
+
+    val baseRecord3 = recordBuilder("BaseRecord3").nullableInt("nullableInt", 10).endRecord()
+    val validFieldRemoval = recordBuilder("BaseRecord3").endRecord()
+    val defaultRemovalValid = SchemaRegistry.validate(validFieldRemoval, baseRecord3 :: Nil)
+
+
+    Applicative[F].pure {
+      it must "validate the schema evolutions" in {
+        assert(shouldBeSuccess)
+        assert(!requiredFieldFailure)
+        assert(!noDefaultFailure)
+        assert(defaultRemovalValid)
+      }
+    }
+  }
+
   private def runTests[F[_]: Monad](
       schemaRegistry: F[SchemaRegistry[F]]
   ): F[Unit] = {
@@ -85,6 +115,7 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
       _ <- schemaRegistry.flatMap(testAddSubject[F])
       _ <- schemaRegistry.flatMap(testDeleteSchemaVersion[F])
       _ <- schemaRegistry.flatMap(testGetAllSubjects[F])
+      _ <- testSchemaEvolutionValidation[F]
     } yield ()
   }
 

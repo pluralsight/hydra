@@ -1,14 +1,12 @@
 package hydra.avro.registry
 
 import cats.effect.Sync
-import io.confluent.kafka.schemaregistry.avro.AvroCompatibilityChecker
 import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, MockSchemaRegistryClient, SchemaRegistryClient}
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
 import cats.implicits._
+import io.confluent.kafka.schemaregistry.avro.AvroCompatibilityChecker
 
 import scala.collection.JavaConverters._
-import org.apache.avro.Schema.Parser
-
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -87,12 +85,16 @@ trait SchemaRegistry[F[_]] {
 
 object SchemaRegistry {
 
-  final case class IncompatibleSchemaException(message: String) extends RuntimeException(message)
+  final case class IncompatibleSchemaException(message: String) extends
+    RuntimeException(message)
 
   type SchemaId = Int
   type SchemaVersion = Int
 
-  private val validator = new SchemaValidatorBuilder().mutualReadStrategy().validateAll()
+
+  private[registry] def validate(newSchema: Schema, oldSchemas: List[Schema]): Boolean = {
+    AvroCompatibilityChecker.FULL_TRANSITIVE_CHECKER.isCompatible(newSchema, oldSchemas.asJava)
+  }
 
   def live[F[_]: Sync](
       schemaRegistryBaseUrl: String,
@@ -115,12 +117,11 @@ object SchemaRegistry {
         for {
           versions <- getAllVersions(subject)
           schemas <- versions.traverse(getSchemaFor(subject, _)).map(_.flatten)
-          validated <- Sync[F].delay(Try(validator.validate(schema, schemas.reverse.asJava)))
-          schemaVersion <- validated match {
-            case Success(_) =>
-              Sync[F].delay(schemaRegistryClient.register(subject, schema))
-            case Failure(exception) =>
-              Sync[F].raiseError[SchemaVersion](IncompatibleSchemaException(exception.getMessage))
+          validated <- Sync[F].delay(validate(schema, schemas.reverse))
+          schemaVersion <- if (validated) {
+            Sync[F].delay(schemaRegistryClient.register(subject, schema))
+          } else {
+            Sync[F].raiseError[SchemaVersion](IncompatibleSchemaException("Incompatible Schema Evolution. You may add fields with default fields, or remove fields with default fields."))
           }
         } yield schemaVersion
       }
