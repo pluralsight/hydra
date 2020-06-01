@@ -19,22 +19,32 @@ package hydra.ingest.http
 import akka.actor._
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
-import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
+import akka.pattern
+import akka.util.Timeout
+import cats.effect.IO
 import hydra.common.config.ConfigSupport._
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
+import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
 import hydra.core.ingest.{CorrelationIdBuilder, HydraRequest, IngestionReport, RequestParams}
 import hydra.core.marshallers.GenericError
-import hydra.core.protocol.{IngestorCompleted, IngestorError, IngestorJoined, InitiateHttpRequest, InvalidRequest}
+import hydra.core.monitor.HydraMetrics
+import hydra.core.protocol._
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestionFlow.{AvroConversionAugmentedException, MissingTopicNameException, SchemaNotFoundAugmentedException}
 import hydra.ingest.services.{IngestionFlow, IngestionHandlerGateway}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
-import hydra.core.monitor.HydraMetrics
+import hydra.kafka.consumer.KafkaConsumerProxy.{ListTopics, ListTopicsResponse}
+import org.apache.kafka.common.PartitionInfo
+import scalacache.cachingF
+import scalacache.guava.GuavaCache
 
-import scala.concurrent.ExecutionContext
+import scala.collection.immutable.Map
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
+import scalacache.modes.scalaFuture._
+
 
 /**
   * Created by alexsilva on 12/22/15.
@@ -57,6 +67,7 @@ class IngestionEndpoint[F[_]: Futurable](
     requestHandlerPathName.getOrElse("ingestion_Http_handler_gateway")
   )
 
+
   private val ingestTimeout = applicationConfig
     .getDurationOpt("ingest.timeout")
     .getOrElse(500.millis)
@@ -64,9 +75,45 @@ class IngestionEndpoint[F[_]: Futurable](
   override val route: Route =
     pathPrefix("ingest") {
       publishRoute
-    } ~ pathPrefix("v2" / "publish"){
-      publishRoute
+    } ~ pathPrefix("v2" / "topics") {
+      handleExceptions(exceptionHandler) {
+        pathSuffix("records") {
+          extractUnmatchedPath { remaining =>
+            println(remaining)
+            publishRoute
+          }
+        } ~ extractExecutionContext { implicit ec => getTopics}
+      }
     }
+
+  private val showSystemTopics = applicationConfig
+    .getBooleanOpt("transports.kafka.show-system-topics")
+    .getOrElse(false)
+
+  private val filterSystemTopics = (t: String) =>
+    (t.startsWith("_") && showSystemTopics) || !t.startsWith("_")
+
+
+  private def topics(implicit ec: ExecutionContext) : Future[Map[String, Seq[PartitionInfo]]] = {
+    implicit val timeout = Timeout(5 seconds)
+    implicit val cache = GuavaCache[Map[String, Seq[PartitionInfo]]]
+    cachingF("topics")(ttl = Some(1.minute)) {
+      import akka.pattern.ask
+      (requestHandler ? ListTopics).mapTo[ListTopicsResponse].map { response =>
+        response.topics.filter(t => filterSystemTopics(t._1)).map {
+          case (k, v) => k -> v.toList
+        }
+      }
+    }
+  }
+
+  private def getTopics(implicit ec: ExecutionContext) = get {
+    handleExceptions(exceptionHandler) {
+      get {
+        complete(topics.map(_.keys))
+        }
+      }
+  }
 
   private def publishRoute = pathEndOrSingleSlash {
     handleExceptions(exceptionHandler) {

@@ -447,7 +447,7 @@ class BootstrapEndpointSpec
       EmbeddedKafka.publishToKafka("_hydra.metadata.topic", record)
 
       eventually {
-        Get("/v2/topic") ~> bootstrapRoute ~> check {
+        Get("/v2/topics") ~> bootstrapRoute ~> check {
           val r = responseAs[Seq[TopicMetadata]]
           r.length should be >= 1
           r.head.id.toString shouldBe "79a1627e-04a6-11e9-8eb2-f2801f1b9fd1"
@@ -487,7 +487,7 @@ class BootstrapEndpointSpec
       EmbeddedKafka.publishToKafka("_hydra.metadata.topic", record)
 
       eventually {
-        Get("/v2/topic/exp.assessment.SkillAssessmentTopicsScored1") ~> bootstrapRoute ~> check {
+        Get("/v2/topics/exp.assessment.SkillAssessmentTopicsScored1") ~> bootstrapRoute ~> check {
           val r = responseAs[Seq[TopicMetadata]]
           r.length should be >= 1
           r(0).id.toString shouldBe "79a1627e-04a6-11e9-8eb2-f2801f1b9fd1"
@@ -496,7 +496,7 @@ class BootstrapEndpointSpec
     }
 
     "reject empty requests" in {
-      Post("/v2/topic") ~> bootstrapRoute ~> check {
+      Post("/v2/topics") ~> bootstrapRoute ~> check {
         rejection shouldEqual RequestEntityExpectedRejection
       }
     }
@@ -528,7 +528,7 @@ class BootstrapEndpointSpec
           |}""".stripMargin
       )
 
-      Post("/v2/topic", testEntity) ~> bootstrapRoute ~> check {
+      Post("/v2/topics", testEntity) ~> bootstrapRoute ~> check {
         status shouldBe StatusCodes.OK
         val r = responseAs[TopicMetadata]
         r.streamType shouldBe "Notification"
@@ -562,7 +562,7 @@ class BootstrapEndpointSpec
           |}""".stripMargin
       )
 
-      Post("/v2/topic", testEntity) ~> bootstrapRoute ~> check {
+      Post("/v2/topics", testEntity) ~> bootstrapRoute ~> check {
         status shouldBe StatusCodes.BadRequest
       }
     }
@@ -594,7 +594,7 @@ class BootstrapEndpointSpec
           |}""".stripMargin
       )
 
-      Post("/v2/topic", testEntity) ~> bootstrapRoute ~> check {
+      Post("/v2/topics", testEntity) ~> bootstrapRoute ~> check {
         status shouldBe StatusCodes.BadRequest
       }
     }
@@ -625,7 +625,7 @@ class BootstrapEndpointSpec
           |}""".stripMargin
       )
 
-      Post("/v2/topic", testEntity) ~> bootstrapRoute ~> check {
+      Post("/v2/topics", testEntity) ~> bootstrapRoute ~> check {
         status shouldBe StatusCodes.BadRequest
       }
     }
@@ -656,7 +656,7 @@ class BootstrapEndpointSpec
           |}""".stripMargin
       )
 
-      Post("/v2/topic", testEntity) ~> bootstrapRoute ~> check {
+      Post("/v2/topics", testEntity) ~> bootstrapRoute ~> check {
         rejection shouldBe a[MalformedRequestContentRejection]
       }
     }
@@ -690,7 +690,7 @@ class BootstrapEndpointSpec
 
       val bootstrapRouteWithOverridenStreamManager =
         (new BootstrapEndpoint(system) with BootstrapEndpointTestActors).route
-      Post("/v2/topic", testEntity) ~> bootstrapRouteWithOverridenStreamManager ~> check {
+      Post("/v2/topics", testEntity) ~> bootstrapRouteWithOverridenStreamManager ~> check {
         status shouldBe StatusCodes.OK
       }
     }
@@ -724,10 +724,10 @@ class BootstrapEndpointSpec
 
       val bootstrapRouteWithOverridenStreamManager =
         (new BootstrapEndpoint(system) with BootstrapEndpointTestActors).route
-      Get("/v2/topic/exp.test-existing.v1.SubjectPreexisted") ~> bootstrapRouteWithOverridenStreamManager ~> check {
+      Get("/v2/topics/exp.test-existing.v1.SubjectPreexisted") ~> bootstrapRouteWithOverridenStreamManager ~> check {
         val originalTopicData = responseAs[Seq[TopicMetadata]]
         val originalTopicCreationDate = originalTopicData.head.createdDate
-        Post("/v2/topic", testEntity) ~> bootstrapRouteWithOverridenStreamManager ~> check {
+        Post("/v2/topics", testEntity) ~> bootstrapRouteWithOverridenStreamManager ~> check {
           status shouldBe StatusCodes.OK
           val response2 = responseAs[TopicMetadata]
           response2.createdDate shouldBe originalTopicCreationDate
