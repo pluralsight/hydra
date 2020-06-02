@@ -5,6 +5,7 @@ import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, Moc
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
 import cats.implicits._
 import io.confluent.kafka.schemaregistry.avro.AvroCompatibilityChecker
+import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
@@ -50,7 +51,7 @@ trait SchemaRegistry[F[_]] {
   /**
     * Retrieves all SchemaVersion(s) for a given subject.
     * @param subject - subject name for the schema found in SchemaRegistry including the suffix (-key | -value)
-    * @return List[SchemaVersion] or List.empty if Not Found
+    * @return List[SchemaVersion] or List.empty if Subject Not Found
     */
   def getAllVersions(subject: String): F[List[SchemaVersion]]
 
@@ -143,10 +144,9 @@ object SchemaRegistry {
         }
 
       override def getAllVersions(subject: String): F[List[SchemaId]] =
-        Sync[F].delay {
-          import collection.JavaConverters._
-          Try(schemaRegistryClient.getAllVersions(subject))
-            .map(_.asScala.toList.map(_.toInt)).getOrElse(List.empty)
+        Sync[F].fromTry(Try(schemaRegistryClient.getAllVersions(subject)))
+          .map(_.asScala.toList.map(_.toInt)).recover {
+          case r: RestClientException if r.getErrorCode == 40401 => List.empty
         }
 
       override def getAllSubjects: F[List[String]] =
