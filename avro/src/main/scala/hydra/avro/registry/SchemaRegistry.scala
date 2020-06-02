@@ -50,7 +50,7 @@ trait SchemaRegistry[F[_]] {
   /**
     * Retrieves all SchemaVersion(s) for a given subject.
     * @param subject - subject name for the schema found in SchemaRegistry including the suffix (-key | -value)
-    * @return List[SchemaVersion]
+    * @return List[SchemaVersion] or List.empty if Not Found
     */
   def getAllVersions(subject: String): F[List[SchemaVersion]]
 
@@ -145,11 +145,8 @@ object SchemaRegistry {
       override def getAllVersions(subject: String): F[List[SchemaId]] =
         Sync[F].delay {
           import collection.JavaConverters._
-          schemaRegistryClient
-            .getAllVersions(subject)
-            .asScala
-            .toList
-            .map(_.toInt)
+          Try(schemaRegistryClient.getAllVersions(subject))
+            .map(_.asScala.toList.map(_.toInt)).getOrElse(List.empty)
         }
 
       override def getAllSubjects: F[List[String]] =
