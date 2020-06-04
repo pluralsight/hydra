@@ -70,7 +70,7 @@ final class BootstrapEndpointV2Spec
     "reject an empty request" in {
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
-          Post("/v2/streams") ~> Route.seal(bootstrapEndpoint.route) ~> check {
+          Post("/v2/topics") ~> Route.seal(bootstrapEndpoint.route) ~> check {
             response.status shouldBe StatusCodes.BadRequest
           }
         }
@@ -104,7 +104,7 @@ final class BootstrapEndpointV2Spec
     "accept a valid request" in {
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
-          Post("/v2/streams", validRequest) ~> Route.seal(
+          Post("/v2/topics", validRequest) ~> Route.seal(
             bootstrapEndpoint.route
           ) ~> check {
             response.status shouldBe StatusCodes.OK
@@ -142,7 +142,7 @@ final class BootstrapEndpointV2Spec
           KafkaAdminAlgebra
             .test[IO]
             .map { kafka =>
-              Post("/v2/streams", validRequest) ~> Route.seal(
+              Post("/v2/topics", validRequest) ~> Route.seal(
                 getTestCreateTopicProgram(failingSchemaRegistry, kafka, client, m).route
               ) ~> check {
                 response.status shouldBe StatusCodes.InternalServerError
@@ -155,7 +155,7 @@ final class BootstrapEndpointV2Spec
     "retrieve empty array of metadata" in {
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
-          Get("/v2/streams") ~> Route.seal(
+          Get("/v2/metadata") ~> Route.seal(
             bootstrapEndpoint.route
           ) ~> check {
             response.status shouldBe StatusCodes.OK
@@ -168,7 +168,7 @@ final class BootstrapEndpointV2Spec
       val subject = "nonexistanttopic"
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
-          Get(s"/v2/streams/$subject") ~> Route.seal(
+          Get(s"/v2/topics/$subject") ~> Route.seal(
             bootstrapEndpoint.route
           ) ~> check {
             response.status shouldBe StatusCodes.NotFound
@@ -182,7 +182,7 @@ final class BootstrapEndpointV2Spec
       val subject = "invalid!topic&&"
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
-          Get(s"/v2/streams/$subject") ~> Route.seal(
+          Get(s"/v2/topics/$subject") ~> Route.seal(
             bootstrapEndpoint.route
           ) ~> check {
             response.status shouldBe StatusCodes.BadRequest

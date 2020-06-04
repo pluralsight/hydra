@@ -77,8 +77,6 @@ class BootstrapEndpoint(override val system:ActorSystem) extends RouteSupport
   override val route: Route = cors(settings) {
     pathPrefix("streams") {
       topicRoute
-    } ~ pathPrefix("v2" / "topics") {
-      topicRoute
     }
   }
 

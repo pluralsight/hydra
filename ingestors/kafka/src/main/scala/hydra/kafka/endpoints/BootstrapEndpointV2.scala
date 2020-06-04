@@ -40,7 +40,7 @@ final class BootstrapEndpointV2[F[_]: Futurable](
   import TopicMetadataV2Parser._
 
   val route: Route = cors(settings) {
-    pathPrefix("v2" / "streams") {
+    pathPrefix("v2" / "topics") {
       post {
         pathEndOrSingleSlash {
           entity(as[TopicMetadataV2Request]) { t =>
@@ -53,32 +53,32 @@ final class BootstrapEndpointV2[F[_]: Futurable](
             }
           }
         }
-      } ~
+      }
+    } ~
       get {
-        pathEndOrSingleSlash {
-          onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getAllMetadata)) {
-            case Success(metadata) => complete(StatusCodes.OK, metadata.map(toResource))
-            case Failure(e) => complete(StatusCodes.InternalServerError, e)
-          }
-        } ~
-        path(Segment) { subjectInput =>
+        pathPrefix("v2" / "metadata") {
           pathEndOrSingleSlash {
-            Subject.createValidated(subjectInput) match {
-              case None => complete(StatusCodes.BadRequest, Subject.invalidFormat)
-              case Some(subject) =>
-                onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getMetadataFor(subject))) {
-                  case Success(maybeContainer) =>
-                    maybeContainer match {
-                      case Some(container) =>complete(StatusCodes.OK, toResource(container))
-                      case None => complete(StatusCodes.NotFound, s"Subject ${subject.value} could not be found.")
-                    }
-                  case Failure(e) =>complete(StatusCodes.InternalServerError, e)
-                }
+            onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getAllMetadata)) {
+              case Success(metadata) => complete(StatusCodes.OK, metadata.map(toResource))
+              case Failure(e) => complete(StatusCodes.InternalServerError, e)
             }
-          }
+          } ~
+            extractUnmatchedPath { subjectInput =>
+              Subject.createValidated(subjectInput.toString().replace("/","")) match {
+                case None => complete(StatusCodes.BadRequest, Subject.invalidFormat)
+                case Some(subject) =>
+                  onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getMetadataFor(subject))) {
+                    case Success(maybeContainer) =>
+                      maybeContainer match {
+                        case Some(container) =>complete(StatusCodes.OK, toResource(container))
+                        case None => complete(StatusCodes.NotFound, s"Subject ${subject.value} could not be found.")
+                      }
+                    case Failure(e) =>complete(StatusCodes.InternalServerError, e)
+                  }
+              }
+            }
         }
       }
-    }
   }
 
 }

@@ -91,9 +91,9 @@ class SchemasEndpoint()(implicit system: ActorSystem)
   }
 
   private val v2Route =
-    pathPrefix("v2") {
+    pathPrefix("v2" / "schemas") {
       get {
-        path("schemas" / Segment) { subject =>
+        path(Segment) { subject =>
           getSchema(includeKeySchema = true, subject, None)
         }
       }

@@ -242,13 +242,10 @@ class IngestionEndpointSpec
 
   "The V2 Ingestion path" should {
     "blah" in {
-      val kafkaTopic = RawHeader(HYDRA_KAFKA_TOPIC_PARAM, "my_topic")
       val validation = RawHeader(HYDRA_VALIDATION_STRATEGY, "relaxed")
 
-      val request = Post("/v2/topics/exp.blah.blah/records", """{"test":true, "extraField":true}""").withHeaders(kafkaTopic, validation)
+      val request = Put("/v2/topics/exp.blah.blah/records", """{"test":true, "extraField":true}""").withHeaders(validation)
       request ~> ingestRouteAlt ~> check {
-        println(responseAs[String])
-        println(request)
         status shouldBe StatusCodes.OK
       }
     }
