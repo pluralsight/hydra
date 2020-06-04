@@ -2,8 +2,8 @@ import sbt.{ExclusionRule, _}
 
 object Dependencies {
 
-  val akkaHTTPCorsVersion = "0.4.3"
-  val akkaHTTPVersion = "10.1.11"
+  val akkaHTTPCorsVersion = "1.0.0"
+  val akkaHTTPVersion = "10.1.12"
   val akkaKafkaStreamVersion = "2.0.3"
   val akkaKryoVersion = "0.5.2"
   val akkaVersion = "2.6.5"
@@ -12,14 +12,14 @@ object Dependencies {
   val catsLoggerVersion = "1.1.1"
   val catsRetryVersion = "1.1.0"
   val catsVersion = "2.1.1"
-  val cirisVersion = "1.0.4"
-  val confluentVersion = "5.5.0"
+  val cirisVersion = "1.1.0"
+  val confluentVersion = "5.4.2"
   val easyMockVersion = "4.2" //needed for mocking static java methods
   val fs2KafkaVersion = "1.0.0"
   val hikariCPVersion = "3.4.5"
   val h2DbVersion = "1.4.200"
-  val jacksonCoreVersion = "2.10.3"
-  val jacksonDatabindVersion = "2.10.3"
+  val jacksonCoreVersion = "2.10.4"
+  val jacksonDatabindVersion = "2.10.4"
   val jodaConvertVersion = "2.2.1"
   val jodaTimeVersion = "2.10.6"
   val kafkaVersion = "2.4.1"
@@ -32,8 +32,8 @@ object Dependencies {
   val reflectionsVersion = "0.9.12"
   val scalaCacheVersion = "0.28.0"
   val scalaMockVersion = "4.4.0"
-  val scalaTestVersion = "3.1.1"
-  val scalazVersion = "7.3.0"
+  val scalaTestVersion = "3.1.2"
+  val scalazVersion = "7.3.1"
   val sprayJsonVersion = "1.3.5"
   val typesafeConfigVersion = "1.3.2"
   val vulcanVersion = "1.1.0"
@@ -157,7 +157,7 @@ object Dependencies {
       "com.fasterxml.jackson.core" % "jackson-databind" % jacksonDatabindVersion
     )
 
-    val postgres = "org.postgresql" % "postgresql" % "42.2.12"
+    val postgres = "org.postgresql" % "postgresql" % "42.2.13"
   }
 
   object Test {
