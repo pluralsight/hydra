@@ -83,11 +83,13 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
         } ~ createTopic
       }
     } ~ pathPrefix("v2" / "topics") {
-      handleExceptions(exceptionHandler) {
+      pathEndOrSingleSlash {
+        handleExceptions(exceptionHandler) {
           getTopicNames
         }
-      } ~ get {
-        pathPrefix("v2" / "metadata") {
+      }
+    } ~ get {
+        pathPrefix("v2" / "topics" / "metadata") {
           pathEndOrSingleSlash {
             onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getAllMetadata)) {
               case Success(metadata) => complete(StatusCodes.OK, metadata.map(toResource))
@@ -106,9 +108,9 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                     case Failure(e) =>complete(StatusCodes.InternalServerError, e)
                   }
               }
-            }
+          }
         }
-      }
+    }
   }
 
   private def getTopicNames(implicit ec: ExecutionContext) =
