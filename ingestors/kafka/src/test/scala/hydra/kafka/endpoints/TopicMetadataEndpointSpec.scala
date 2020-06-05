@@ -1,15 +1,17 @@
 package hydra.kafka.endpoints
 
 import akka.actor.{Actor, ActorRef, ActorSelection, Props}
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
-import cats.effect.{Concurrent, ContextShift, IO, Timer}
+import cats.effect.{Concurrent, ContextShift, IO}
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
-import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
+import hydra.kafka.algebras.{KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
+import hydra.kafka.model.TopicMetadataV2Request.Subject
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.common.{Node, PartitionInfo}
 import org.scalatest.BeforeAndAfterAll
@@ -171,5 +173,38 @@ class TopicMetadataEndpointSpec
         responseAs[CreateTopicResponseError]
       }
     }
+  }
+
+  "The /v2/metadata GET endpoint" should {
+    "retrieve empty array of metadata" in {
+      Get("/v2/metadata") ~> route ~> check {
+        response.status shouldBe StatusCodes.OK
+      }
+    }
+
+    "recieve 404 with Subject not found body" in {
+      Get("/v2/metadata/exp.subject") ~> route ~> check {
+        response.status shouldBe StatusCodes.NotFound
+        responseAs[String] shouldBe "Subject exp.subject could not be found."
+      }
+    }
+
+    "receive 400 with Subject not properly formatted" in {
+      Get("/v2/metadata/invalid!topic&&") ~> route ~> check {
+        response.status shouldBe StatusCodes.BadRequest
+        responseAs[String] shouldBe Subject.invalidFormat
+      }
+    }
+  }
+
+  "The /v2/topics GET endpoint" should {
+
+    "return topic names" in {
+      Get("/v2/topics") ~> route ~> check {
+        response.status shouldBe StatusCodes.OK
+        responseAs[Seq[String]] shouldBe Seq("test1")
+      }
+    }
+
   }
 }

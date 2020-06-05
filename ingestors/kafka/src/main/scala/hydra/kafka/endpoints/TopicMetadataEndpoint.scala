@@ -84,9 +84,9 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
       }
     } ~ pathPrefix("v2" / "topics") {
       handleExceptions(exceptionHandler) {
-          getTopics
+          getTopicNames
         }
-      }  ~ get {
+      } ~ get {
         pathPrefix("v2" / "metadata") {
           pathEndOrSingleSlash {
             onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getAllMetadata)) {
@@ -111,7 +111,7 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
       }
   }
 
-  private def getTopics(implicit ec: ExecutionContext) =
+  private def getTopicNames(implicit ec: ExecutionContext) =
     get {
       handleExceptions(exceptionHandler) {
         complete(topics.map(_.keys))
