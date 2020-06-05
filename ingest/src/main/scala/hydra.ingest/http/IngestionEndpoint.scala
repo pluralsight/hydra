@@ -95,40 +95,13 @@ class IngestionEndpoint[F[_]: Futurable](
       handleExceptions(exceptionHandler) {
         pathSuffix("records") {
             put {
-              pubV2
+              extractUnmatchedPath { topic =>
+                pubV2(topic.toString.replace("/", ""))
+              }
             }
-        } ~ extractExecutionContext { implicit ec => getTopics }
-      }
-    }
-
-  private val showSystemTopics = applicationConfig
-    .getBooleanOpt("transports.kafka.show-system-topics")
-    .getOrElse(false)
-
-  private val filterSystemTopics = (t: String) =>
-    (t.startsWith("_") && showSystemTopics) || !t.startsWith("_")
-
-
-  private def topics(implicit ec: ExecutionContext) : Future[Map[String, Seq[PartitionInfo]]] = {
-    implicit val timeout = Timeout(5 seconds)
-    implicit val cache = GuavaCache[Map[String, Seq[PartitionInfo]]]
-    cachingF("topics")(ttl = Some(1.minute)) {
-      import akka.pattern.ask
-      (consumerProxy ? ListTopics).mapTo[ListTopicsResponse].map { response =>
-        response.topics.filter(t => filterSystemTopics(t._1)).map {
-          case (k, v) => k -> v.toList
         }
       }
     }
-  }
-
-  private def getTopics(implicit ec: ExecutionContext) = get {
-    handleExceptions(exceptionHandler) {
-      get {
-        complete(topics.map(_.keys))
-        }
-      }
-  }
 
   private def deleteRequest = delete {
     headerValueByName(RequestParams.HYDRA_RECORD_KEY_PARAM)(_ => publishRequest)
@@ -156,13 +129,11 @@ class IngestionEndpoint[F[_]: Futurable](
   }
 
 
-  private def pubV2 = parameter("correlationId" ?)  { cIdOpt =>
+  private def pubV2(topic: String) = parameter("correlationId" ?)  { cIdOpt =>
     extractRequest { req =>
       extractExecutionContext { implicit ec =>
         onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>
-          extractUnmatchedPath { topic =>
-            complete(topic.toString.replace("/",""))
-          }
+          complete(topic)
         }
       }
     }

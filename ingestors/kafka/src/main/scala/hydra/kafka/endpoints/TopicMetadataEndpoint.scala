@@ -9,9 +9,13 @@ import akka.http.scaladsl.server.ExceptionHandler
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import hydra.common.config.ConfigSupport._
+import hydra.common.util.Futurable
 import hydra.core.http.{CorsSupport, NotFoundException, RouteSupport}
+import hydra.kafka.algebras.MetadataAlgebra
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
+import hydra.kafka.model.TopicMetadataV2Adapter
+import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.util.KafkaUtils
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.kafka.common.PartitionInfo
@@ -22,16 +26,20 @@ import scalacache.modes.scalaFuture._
 import scala.collection.immutable.Map
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 /**
   * A cluster metadata endpoint implemented exclusively with akka streams.
   *
   * Created by alexsilva on 3/18/17.
   */
-class TopicMetadataEndpoint(consumerProxy:ActorSelection)(implicit ec:ExecutionContext) extends RouteSupport
-  with HydraKafkaJsonSupport
-    with CorsSupport {
+class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
+                                             metadataAlgebra: MetadataAlgebra[F])
+                                            (implicit ec:ExecutionContext)
+  extends RouteSupport
+    with HydraKafkaJsonSupport
+    with CorsSupport
+    with TopicMetadataV2Adapter {
 
   private implicit val cache = GuavaCache[Map[String, Seq[PartitionInfo]]]
 
@@ -74,8 +82,41 @@ class TopicMetadataEndpoint(consumerProxy:ActorSelection)(implicit ec:ExecutionC
           }
         } ~ createTopic
       }
-    }
+    } ~ pathPrefix("v2" / "topics") {
+      handleExceptions(exceptionHandler) {
+          getTopics
+        }
+      }  ~ get {
+        pathPrefix("v2" / "metadata") {
+          pathEndOrSingleSlash {
+            onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getAllMetadata)) {
+              case Success(metadata) => complete(StatusCodes.OK, metadata.map(toResource))
+              case Failure(e) => complete(StatusCodes.InternalServerError, e)
+            }
+          } ~ extractUnmatchedPath { subjectInput =>
+              Subject.createValidated(subjectInput.toString().replace("/","")) match {
+                case None => complete(StatusCodes.BadRequest, Subject.invalidFormat)
+                case Some(subject) =>
+                  onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getMetadataFor(subject))) {
+                    case Success(maybeContainer) =>
+                      maybeContainer match {
+                        case Some(container) =>complete(StatusCodes.OK, toResource(container))
+                        case None => complete(StatusCodes.NotFound, s"Subject ${subject.value} could not be found.")
+                      }
+                    case Failure(e) =>complete(StatusCodes.InternalServerError, e)
+                  }
+              }
+            }
+        }
+      }
   }
+
+  private def getTopics(implicit ec: ExecutionContext) =
+    get {
+      handleExceptions(exceptionHandler) {
+        complete(topics.map(_.keys))
+      }
+    }
 
   private def filterByPattern(
       pattern: String

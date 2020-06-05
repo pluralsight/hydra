@@ -52,8 +52,7 @@ final class BootstrapEndpointV2Spec
         retryPolicy,
         Subject.createValidated("test").get
       ),
-      TopicDetails(1, 1),
-      m
+      TopicDetails(1, 1)
     )
   }
 
@@ -150,46 +149,6 @@ final class BootstrapEndpointV2Spec
             }
         }
       }.unsafeRunSync()
-    }
-
-    "retrieve empty array of metadata" in {
-      testCreateTopicProgram
-        .map { bootstrapEndpoint =>
-          Get("/v2/metadata") ~> Route.seal(
-            bootstrapEndpoint.route
-          ) ~> check {
-            response.status shouldBe StatusCodes.OK
-          }
-        }
-        .unsafeRunSync()
-    }
-
-    "receive 404 with Subject not found body" in {
-      val subject = "nonexistanttopic"
-      testCreateTopicProgram
-        .map { bootstrapEndpoint =>
-          Get(s"/v2/metadata/$subject") ~> Route.seal(
-            bootstrapEndpoint.route
-          ) ~> check {
-            response.status shouldBe StatusCodes.NotFound
-            responseAs[String] shouldBe s"Subject $subject could not be found."
-          }
-        }
-        .unsafeRunSync()
-    }
-
-    "receive 400 with Subject not properly formatted" in {
-      val subject = "invalid!topic&&"
-      testCreateTopicProgram
-        .map { bootstrapEndpoint =>
-          Get(s"/v2/metadata/$subject") ~> Route.seal(
-            bootstrapEndpoint.route
-          ) ~> check {
-            response.status shouldBe StatusCodes.BadRequest
-            responseAs[String] shouldBe Subject.invalidFormat
-          }
-        }
-        .unsafeRunSync()
     }
   }
 

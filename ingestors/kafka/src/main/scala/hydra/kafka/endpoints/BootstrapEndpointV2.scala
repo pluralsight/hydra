@@ -15,15 +15,12 @@
  */
 package hydra.kafka.endpoints
 
-import akka.actor.ActorSystem
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
 import hydra.common.util.Futurable
 import hydra.core.http.CorsSupport
-import hydra.kafka.algebras.MetadataAlgebra
-import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{TopicMetadataV2Adapter, TopicMetadataV2Request}
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.serializers.TopicMetadataV2Parser
@@ -34,8 +31,7 @@ import scala.util.{Failure, Success}
 final class BootstrapEndpointV2[F[_]: Futurable](
     createTopicProgram: CreateTopicProgram[F],
     defaultTopicDetails: TopicDetails,
-    metadataAlgebra: MetadataAlgebra[F]
-) extends CorsSupport with TopicMetadataV2Adapter {
+) extends CorsSupport {
 
   import TopicMetadataV2Parser._
 
@@ -54,31 +50,7 @@ final class BootstrapEndpointV2[F[_]: Futurable](
           }
         }
       }
-    } ~
-      get {
-        pathPrefix("v2" / "metadata") {
-          pathEndOrSingleSlash {
-            onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getAllMetadata)) {
-              case Success(metadata) => complete(StatusCodes.OK, metadata.map(toResource))
-              case Failure(e) => complete(StatusCodes.InternalServerError, e)
-            }
-          } ~
-            extractUnmatchedPath { subjectInput =>
-              Subject.createValidated(subjectInput.toString().replace("/","")) match {
-                case None => complete(StatusCodes.BadRequest, Subject.invalidFormat)
-                case Some(subject) =>
-                  onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getMetadataFor(subject))) {
-                    case Success(maybeContainer) =>
-                      maybeContainer match {
-                        case Some(container) =>complete(StatusCodes.OK, toResource(container))
-                        case None => complete(StatusCodes.NotFound, s"Subject ${subject.value} could not be found.")
-                      }
-                    case Failure(e) =>complete(StatusCodes.InternalServerError, e)
-                  }
-              }
-            }
-        }
-      }
+    }
   }
 
 }

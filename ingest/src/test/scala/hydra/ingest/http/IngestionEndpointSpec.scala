@@ -242,9 +242,7 @@ class IngestionEndpointSpec
 
   "The V2 Ingestion path" should {
     "Return 200" in {
-      val validation = RawHeader(HYDRA_VALIDATION_STRATEGY, "relaxed")
-
-      val request = Put("/v2/topics/exp.blah.blah/records", """{"test":true, "extraField":true}""").withHeaders(validation)
+      val request = Put("/v2/topics/exp.blah.blah/records", """{"test":true, "extraField":true}""")
       request ~> ingestRouteAlt ~> check {
         responseAs[String] shouldBe "exp.blah.blah"
         status shouldBe StatusCodes.OK

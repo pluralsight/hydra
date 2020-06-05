@@ -1,9 +1,12 @@
 package hydra.kafka.endpoints
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorRef, ActorSelection, Props}
+import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
+import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
@@ -12,6 +15,7 @@ import org.apache.kafka.common.{Node, PartitionInfo}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
+import scala.concurrent.ExecutionContext
 
 
 class TopicMetadataEndpointSpec
@@ -29,8 +33,11 @@ class TopicMetadataEndpointSpec
 
   import ConfigSupport._
 
-  implicit val kafkaConfig =
+  implicit val kafkaConfig: EmbeddedKafkaConfig =
     EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
+
+  implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+  implicit val concurrent: Concurrent[IO] = IO.ioConcurrentEffect
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -42,15 +49,18 @@ class TopicMetadataEndpointSpec
     EmbeddedKafka.stop()
   }
 
-  val consumerPath = applicationConfig
+  val consumerPath: String = applicationConfig
     .getStringOpt("actors.kafka.consumer_proxy.path")
     .getOrElse(
       s"/user/service/${ActorUtils.actorName(classOf[KafkaConsumerProxy])}"
     )
 
-  val consumerProxy = system.actorSelection(consumerPath)
+  val consumerProxy: ActorSelection = system.actorSelection(consumerPath)
 
-  val route = new TopicMetadataEndpoint(consumerProxy).route
+  val route: Route = (for {
+    kafkaClient <- KafkaClientAlgebra.test[IO]
+    metadataAlgebra <- MetadataAlgebra.make[IO]("topicName-Bill", "I'm_A_Jerk", kafkaClient, consumeMetadataEnabled = false)
+  } yield new TopicMetadataEndpoint(consumerProxy, metadataAlgebra).route).unsafeRunSync()
 
   val node = new Node(0, "host", 1)
 
@@ -59,11 +69,11 @@ class TopicMetadataEndpointSpec
 
   val topics = Map("test1" -> Seq(partitionInfo("test1")))
 
-  private implicit val createTopicFormat = jsonFormat4(CreateTopicReq)
+  private implicit val createTopicFormat: RootJsonFormat[CreateTopicReq] = jsonFormat4(CreateTopicReq)
 
-  private implicit val errorFormat = jsonFormat1(CreateTopicResponseError)
+  private implicit val errorFormat: RootJsonFormat[CreateTopicResponseError] = jsonFormat1(CreateTopicResponseError)
 
-  val proxy = system.actorOf(
+  val proxy: ActorRef = system.actorOf(
     Props(new Actor {
 
       override def receive: Receive = {
