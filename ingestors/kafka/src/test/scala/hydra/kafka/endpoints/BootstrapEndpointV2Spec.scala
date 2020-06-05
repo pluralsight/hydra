@@ -168,7 +168,7 @@ final class BootstrapEndpointV2Spec
       val subject = "nonexistanttopic"
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
-          Get(s"/v2/topics/$subject") ~> Route.seal(
+          Get(s"/v2/metadata/$subject") ~> Route.seal(
             bootstrapEndpoint.route
           ) ~> check {
             response.status shouldBe StatusCodes.NotFound
@@ -182,7 +182,7 @@ final class BootstrapEndpointV2Spec
       val subject = "invalid!topic&&"
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
-          Get(s"/v2/topics/$subject") ~> Route.seal(
+          Get(s"/v2/metadata/$subject") ~> Route.seal(
             bootstrapEndpoint.route
           ) ~> check {
             response.status shouldBe StatusCodes.BadRequest

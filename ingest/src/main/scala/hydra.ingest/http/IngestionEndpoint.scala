@@ -161,7 +161,7 @@ class IngestionEndpoint[F[_]: Futurable](
       extractExecutionContext { implicit ec =>
         onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>
           extractUnmatchedPath { topic =>
-            complete(topic.toString)
+            complete(topic.toString.replace("/",""))
           }
         }
       }
