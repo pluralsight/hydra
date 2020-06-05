@@ -32,51 +32,48 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 class BootstrapEndpoint(override val system:ActorSystem) extends RouteSupport
-    with LoggingAdapter
-    with TopicMetadataAdapter
-    with HydraDirectives
-    with CorsSupport
-    with BootstrapEndpointActors {
+  with LoggingAdapter
+  with TopicMetadataAdapter
+  with HydraDirectives
+  with CorsSupport
+  with BootstrapEndpointActors {
 
   private implicit val timeout = Timeout(10.seconds)
 
-  private def topicRoute =
-    pathEndOrSingleSlash {
-    post {
-      requestEntityPresent {
-        entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
-          onComplete(
-            bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)
-          ) {
-            case Success(message) =>
-              message match {
-
-                case BootstrapSuccess(metadata) =>
-                  complete(StatusCodes.OK, toResource(metadata))
-
-                case BootstrapFailure(reasons) =>
-                  complete(StatusCodes.BadRequest, reasons)
-
-                case e: Exception =>
-                  log.error("Unexpected error in TopicBootstrapActor", e)
-                  complete(StatusCodes.InternalServerError, e.getMessage)
-              }
-
-            case Failure(ex) =>
-              log.error("Unexpected error in BootstrapEndpoint", ex)
-              complete(StatusCodes.InternalServerError, ex.getMessage)
-          }
-        }
-      }
-    }
-  } ~ get {
-    pathEndOrSingleSlash(getAllStreams(None)) ~
-      path(Segment)(subject => getAllStreams(Some(subject)))
-  }
-
   override val route: Route = cors(settings) {
     pathPrefix("streams") {
-      topicRoute
+      pathEndOrSingleSlash {
+        post {
+          requestEntityPresent {
+            entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
+              onComplete(
+                bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)
+              ) {
+                case Success(message) =>
+                  message match {
+
+                    case BootstrapSuccess(metadata) =>
+                      complete(StatusCodes.OK, toResource(metadata))
+
+                    case BootstrapFailure(reasons) =>
+                      complete(StatusCodes.BadRequest, reasons)
+
+                    case e: Exception =>
+                      log.error("Unexpected error in TopicBootstrapActor", e)
+                      complete(StatusCodes.InternalServerError, e.getMessage)
+                  }
+
+                case Failure(ex) =>
+                  log.error("Unexpected error in BootstrapEndpoint", ex)
+                  complete(StatusCodes.InternalServerError, ex.getMessage)
+              }
+            }
+          }
+        }
+      } ~ get {
+        pathEndOrSingleSlash(getAllStreams(None)) ~
+          path(Segment)(subject => getAllStreams(Some(subject)))
+      }
     }
   }
 
