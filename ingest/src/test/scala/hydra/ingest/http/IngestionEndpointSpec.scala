@@ -12,10 +12,8 @@ import hydra.common.util.ActorUtils
 import hydra.core.ingest.RequestParams
 import RequestParams._
 import hydra.core.marshallers.GenericError
-import hydra.core.protocol.IngestorError
 import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestionFlow
-import hydra.ingest.services.IngestionFlow.AvroConversionAugmentedException
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.TestIngestor
 import hydra.kafka.algebras.KafkaClientAlgebra

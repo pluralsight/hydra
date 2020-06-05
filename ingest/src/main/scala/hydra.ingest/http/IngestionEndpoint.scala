@@ -19,9 +19,8 @@ package hydra.ingest.http
 import akka.actor._
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.{ExceptionHandler, PathMatcher, PathMatcher0, PathMatcher1, Rejection, Route}
-import akka.util.Timeout
 import hydra.common.config.ConfigSupport._
-import hydra.common.util.{ActorUtils, Futurable}
+import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
 import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
 import hydra.core.ingest.{CorrelationIdBuilder, HydraRequest, IngestionReport, RequestParams}
@@ -32,17 +31,11 @@ import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestionFlow.{AvroConversionAugmentedException, MissingTopicNameException, SchemaNotFoundAugmentedException}
 import hydra.ingest.services.{IngestionFlow, IngestionHandlerGateway}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
-import hydra.kafka.consumer.KafkaConsumerProxy
-import hydra.kafka.consumer.KafkaConsumerProxy.{ListTopics, ListTopicsResponse}
-import org.apache.kafka.common.PartitionInfo
-import scalacache.cachingF
-import scalacache.guava.GuavaCache
 
 import scala.collection.immutable.Map
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
-import scalacache.modes.scalaFuture._
 
 
 /**
@@ -66,16 +59,6 @@ class IngestionEndpoint[F[_]: Futurable](
     requestHandlerPathName.getOrElse("ingestion_Http_handler_gateway")
   )
 
-
-  //TODO: remove this lookup
-  val consumerPath = applicationConfig
-    .getStringOpt("actors.kafka.consumer_proxy.path")
-    .getOrElse(
-      s"/user/service/${ActorUtils.actorName(classOf[KafkaConsumerProxy])}"
-    )
-
-  val consumerProxy = system.actorSelection(consumerPath)
-
   private val ingestTimeout = applicationConfig
     .getDurationOpt("ingest.timeout")
     .getOrElse(500.millis)
@@ -96,7 +79,7 @@ class IngestionEndpoint[F[_]: Futurable](
         pathSuffix("records") {
             put {
               extractUnmatchedPath { topic =>
-                pubV2(topic.toString.replace("/", ""))
+                publishRequestV2(topic.toString.replace("/", ""))
               }
             }
         }
@@ -129,7 +112,7 @@ class IngestionEndpoint[F[_]: Futurable](
   }
 
 
-  private def pubV2(topic: String) = parameter("correlationId" ?)  { cIdOpt =>
+  private def publishRequestV2(topic: String): Route = parameter("correlationId" ?)  { cIdOpt =>
     extractRequest { req =>
       extractExecutionContext { implicit ec =>
         onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>
@@ -139,7 +122,7 @@ class IngestionEndpoint[F[_]: Futurable](
     }
   }
 
-  private def publishRequest = parameter("correlationId" ?) { cIdOpt =>
+  private def publishRequest: Route = parameter("correlationId" ?) { cIdOpt =>
     extractRequest { req =>
       extractExecutionContext { implicit executionContext =>
         onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>

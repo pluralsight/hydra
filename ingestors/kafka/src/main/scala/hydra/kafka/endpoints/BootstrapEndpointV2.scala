@@ -21,7 +21,7 @@ import akka.http.scaladsl.server.Route
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
 import hydra.common.util.Futurable
 import hydra.core.http.CorsSupport
-import hydra.kafka.model.{TopicMetadataV2Adapter, TopicMetadataV2Request}
+import hydra.kafka.model.TopicMetadataV2Request
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.serializers.TopicMetadataV2Parser
 import hydra.kafka.util.KafkaUtils.TopicDetails
