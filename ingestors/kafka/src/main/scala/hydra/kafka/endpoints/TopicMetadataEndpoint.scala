@@ -83,20 +83,12 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
         } ~ createTopic
       }
     } ~ pathPrefix("v2" / "topics") {
-      pathEndOrSingleSlash {
-        getAllV2Metadata
-      } ~ {
-        ignoreTrailingSlash {
-        extractUnmatchedPath { topic =>
-          getV2Metadata(topic.toString().replace("/", ""))
-        }
-      }
+      getAllV2Metadata ~
+      pathPrefix(Segment) { topicName =>
+        getV2Metadata(topicName)
       }
     } ~ pathPrefix("v2" / "streams") {
-      getAllV2Metadata ~ {
-        extractUnmatchedPath(topic =>
-          getV2Metadata(topic.toString().replace("/", "")))
-      }
+      getAllV2Metadata
     }
   }
 
@@ -110,17 +102,19 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
   }
 
   private def getV2Metadata(topic: String) = get {
-    Subject.createValidated(topic) match {
-      case None => complete(StatusCodes.BadRequest, Subject.invalidFormat)
-      case Some(subject) =>
-        onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getMetadataFor(subject))) {
-          case Success(maybeContainer) =>
-            maybeContainer match {
-              case Some(container) => complete(StatusCodes.OK, toResource(container))
-              case None => complete(StatusCodes.NotFound, s"Subject ${subject.value} could not be found.")
-            }
-          case Failure(e) => complete(StatusCodes.InternalServerError, e)
-        }
+    pathEndOrSingleSlash {
+      Subject.createValidated(topic) match {
+        case None => complete(StatusCodes.BadRequest, Subject.invalidFormat)
+        case Some(subject) =>
+          onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getMetadataFor(subject))) {
+            case Success(maybeContainer) =>
+              maybeContainer match {
+                case Some(container) => complete(StatusCodes.OK, toResource(container))
+                case None => complete(StatusCodes.NotFound, s"Subject ${subject.value} could not be found.")
+              }
+            case Failure(e) => complete(StatusCodes.InternalServerError, e)
+          }
+      }
     }
   }
 

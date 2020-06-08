@@ -74,12 +74,10 @@ class IngestionEndpoint[F[_]: Futurable](
           } ~ deleteRequest
         }
       } ~
-      pathPrefix("v2" / "topics" / Segment) { topicName =>
-        path("records") {
-          pathEndOrSingleSlash {
-            post {
-              publishRequestV2(topicName)
-            }
+      pathPrefix("v2" / "topics" / Segment / "records") { topicName =>
+        pathEndOrSingleSlash {
+          post {
+            publishRequestV2(topicName)
           }
         }
       }

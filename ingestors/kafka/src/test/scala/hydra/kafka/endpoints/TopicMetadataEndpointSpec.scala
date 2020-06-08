@@ -175,22 +175,22 @@ class TopicMetadataEndpointSpec
     }
   }
 
-  "The /v2/metadata GET endpoint" should {
+  "The /v2/topics GET endpoint" should {
     "retrieve empty array of metadata" in {
-      Get("/v2/topics") ~> route ~> check {
+      Get("/v2/topics/") ~> route ~> check {
         response.status shouldBe StatusCodes.OK
       }
     }
 
     "recieve 404 with Subject not found body" in {
-      Get("/v2/topics/exp.subject") ~> route ~> check {
+      Get("/v2/topics/exp.subject/") ~> route ~> check {
         response.status shouldBe StatusCodes.NotFound
         responseAs[String] shouldBe "Subject exp.subject could not be found."
       }
     }
 
     "receive 400 with Subject not properly formatted" in {
-      Get("/v2/topics/invalid!topic&&/metadata") ~> route ~> check {
+      Get("/v2/topics/invalid!topicasf/") ~> route ~> check {
         response.status shouldBe StatusCodes.BadRequest
         responseAs[String] shouldBe Subject.invalidFormat
       }
