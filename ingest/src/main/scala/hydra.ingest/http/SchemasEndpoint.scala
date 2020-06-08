@@ -91,9 +91,6 @@ class SchemasEndpoint()(implicit system: ActorSystem)
     }
   }
 
-  val matcher : PathMatcher0 =
-  "v2" / "topics" / Segment.toString() / "schema"
-
   private val v2Route =
     pathPrefix("v2" / "topics") {
       ignoreTrailingSlash {
