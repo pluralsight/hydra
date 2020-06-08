@@ -12,10 +12,8 @@ import hydra.common.util.ActorUtils
 import hydra.core.ingest.RequestParams
 import RequestParams._
 import hydra.core.marshallers.GenericError
-import hydra.core.protocol.IngestorError
 import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestionFlow
-import hydra.ingest.services.IngestionFlow.AvroConversionAugmentedException
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.TestIngestor
 import hydra.kafka.algebras.KafkaClientAlgebra
@@ -76,6 +74,21 @@ class IngestionEndpointSpec
       duration = 10 seconds
     )
   }
+
+  private val ingestRouteAlt = {
+    val schemaRegistry = SchemaRegistry.test[IO].unsafeRunSync
+    schemaRegistry.registerSchema(
+      "my_topic-value",
+      SchemaBuilder.record("my_topic").fields().requiredBoolean("test").optionalInt("intField").endRecord()
+    ).unsafeRunSync
+    new IngestionEndpoint(
+      true,
+      new IngestionFlow[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistry.notreal"),
+      Set("Segment"),
+      Some("alt-test-request-handler")
+    ).route
+  }
+
 
   "The ingestor endpoint" should {
 
@@ -142,19 +155,6 @@ class IngestionEndpointSpec
       }
     }
 
-    val ingestRouteAlt = {
-      val schemaRegistry = SchemaRegistry.test[IO].unsafeRunSync
-      schemaRegistry.registerSchema(
-        "my_topic-value",
-        SchemaBuilder.record("my_topic").fields().requiredBoolean("test").optionalInt("intField").endRecord()
-      ).unsafeRunSync
-      new IngestionEndpoint(
-        true,
-        new IngestionFlow[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistry.notreal"),
-        Set("Segment"),
-        Some("alt-test-request-handler")
-      ).route
-    }
 
     "publishes to a target ingestor for UA in provided Set" in {
       val ingestor = RawHeader(RequestParams.HYDRA_INGESTOR_PARAM, "tester")
@@ -236,6 +236,15 @@ class IngestionEndpointSpec
         responseAs[String] should include(s"Schema '$topic' cannot be loaded. Cause: hydra.avro.resource.SchemaResourceLoader$$SchemaNotFoundException: Schema not found for $topic")
       }
     }
+  }
 
+  "The V2 Ingestion path" should {
+    "Return 200" in {
+      val request = Post("/v2/topics/exp.blah.blah/records", """{"test":true, "extraField":true}""")
+      request ~> ingestRouteAlt ~> check {
+        responseAs[String] shouldBe "exp.blah.blah"
+        status shouldBe StatusCodes.OK
+      }
+    }
   }
 }

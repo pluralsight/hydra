@@ -17,9 +17,10 @@
 package hydra.ingest.http
 
 import akka.actor.ActorSystem
+import akka.http.javadsl.server.PathMatcher1
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.Location
-import akka.http.scaladsl.server.{ExceptionHandler, Route}
+import akka.http.scaladsl.server.{ExceptionHandler, PathMatcher, PathMatcher0, Route}
 import akka.pattern.ask
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
@@ -93,8 +94,10 @@ class SchemasEndpoint()(implicit system: ActorSystem)
   private val v2Route =
     pathPrefix("v2") {
       get {
-        path("schemas" / Segment) { subject =>
-          getSchema(includeKeySchema = true, subject, None)
+        pathPrefix("schemas" / Segment) { subject =>
+          pathEndOrSingleSlash {
+            getSchema(includeKeySchema = true, subject, None)
+          }
         }
       }
     }

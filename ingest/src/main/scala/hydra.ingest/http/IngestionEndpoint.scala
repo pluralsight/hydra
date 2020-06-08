@@ -18,23 +18,25 @@ package hydra.ingest.http
 
 import akka.actor._
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
-import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
-import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
+import akka.http.scaladsl.server.{ExceptionHandler, PathMatcher, PathMatcher0, PathMatcher1, Rejection, Route}
 import hydra.common.config.ConfigSupport._
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
+import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
 import hydra.core.ingest.{CorrelationIdBuilder, HydraRequest, IngestionReport, RequestParams}
 import hydra.core.marshallers.GenericError
-import hydra.core.protocol.{IngestorCompleted, IngestorError, IngestorJoined, InitiateHttpRequest, InvalidRequest}
+import hydra.core.monitor.HydraMetrics
+import hydra.core.protocol._
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestionFlow.{AvroConversionAugmentedException, MissingTopicNameException, SchemaNotFoundAugmentedException}
 import hydra.ingest.services.{IngestionFlow, IngestionHandlerGateway}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
-import hydra.core.monitor.HydraMetrics
 
+import scala.collection.immutable.Map
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
+
 
 /**
   * Created by alexsilva on 12/22/15.
@@ -62,14 +64,21 @@ class IngestionEndpoint[F[_]: Futurable](
     .getOrElse(500.millis)
 
   override val route: Route =
-    pathPrefix("ingest") {
-      pathEndOrSingleSlash {
-        handleExceptions(exceptionHandler) {
+    handleExceptions(exceptionHandler) {
+      pathPrefix("ingest") {
+        pathEndOrSingleSlash {
           post {
             requestEntityPresent {
               publishRequest
             }
           } ~ deleteRequest
+        }
+      } ~
+      pathPrefix("v2" / "topics" / Segment / "records") { topicName =>
+        pathEndOrSingleSlash {
+          post {
+            publishRequestV2(topicName)
+          }
         }
       }
     }
@@ -99,7 +108,18 @@ class IngestionEndpoint[F[_]: Futurable](
     )
   }
 
-  private def publishRequest = parameter("correlationId" ?) { cIdOpt =>
+
+  private def publishRequestV2(topic: String): Route = parameter("correlationId" ?)  { cIdOpt =>
+    extractRequest { req =>
+      extractExecutionContext { implicit ec =>
+        onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>
+          complete(topic)
+        }
+      }
+    }
+  }
+
+  private def publishRequest: Route = parameter("correlationId" ?) { cIdOpt =>
     extractRequest { req =>
       extractExecutionContext { implicit executionContext =>
         onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>
