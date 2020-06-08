@@ -84,48 +84,45 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
       }
     } ~ pathPrefix("v2" / "topics") {
       pathEndOrSingleSlash {
-        handleExceptions(exceptionHandler) {
-          getTopicNames
+        getAllV2Metadata
+      } ~ {
+        ignoreTrailingSlash {
+        extractUnmatchedPath { topic =>
+          getV2Metadata(topic.toString().replace("/", ""))
         }
       }
-    } ~ pathPrefix("v2" / "topics" / "metadata") {
-        get {
-          getV2Metadata
-        }
+      }
     } ~ pathPrefix("v2" / "streams") {
-      get {
-        getV2Metadata
+      getAllV2Metadata ~ {
+        extractUnmatchedPath(topic =>
+          getV2Metadata(topic.toString().replace("/", "")))
       }
     }
   }
 
-  private def getV2Metadata =
+  private def getAllV2Metadata = get {
     pathEndOrSingleSlash {
-    onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getAllMetadata)) {
+      onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getAllMetadata)) {
       case Success(metadata) => complete(StatusCodes.OK, metadata.map(toResource))
       case Failure(e) => complete(StatusCodes.InternalServerError, e)
+      }
     }
-  } ~ extractUnmatchedPath { subjectInput =>
-    Subject.createValidated(subjectInput.toString().replace("/","")) match {
+  }
+
+  private def getV2Metadata(topic: String) = get {
+    Subject.createValidated(topic) match {
       case None => complete(StatusCodes.BadRequest, Subject.invalidFormat)
       case Some(subject) =>
         onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getMetadataFor(subject))) {
           case Success(maybeContainer) =>
             maybeContainer match {
-              case Some(container) =>complete(StatusCodes.OK, toResource(container))
+              case Some(container) => complete(StatusCodes.OK, toResource(container))
               case None => complete(StatusCodes.NotFound, s"Subject ${subject.value} could not be found.")
             }
-          case Failure(e) =>complete(StatusCodes.InternalServerError, e)
+          case Failure(e) => complete(StatusCodes.InternalServerError, e)
         }
     }
   }
-
-  private def getTopicNames(implicit ec: ExecutionContext) =
-    get {
-      handleExceptions(exceptionHandler) {
-        complete(topics.map(_.keys))
-      }
-    }
 
   private def filterByPattern(
       pattern: String

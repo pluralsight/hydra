@@ -157,7 +157,7 @@ class SchemasEndpointSpec
 
   "The V2 Schemas Endpoint" must {
     "returns a single schema by name with no key schema" in {
-      Get("/v2/schemas/hydra.test.Tester") ~> schemasRoute ~> check {
+      Get("/v2/topics/hydra.test.Tester/schema") ~> schemasRoute ~> check {
         val rep = responseAs[SchemasWithKeyEndpointResponse]
         val valueSchema = rep.valueSchemaResponse
         val id = schemaRegistry.registryClient

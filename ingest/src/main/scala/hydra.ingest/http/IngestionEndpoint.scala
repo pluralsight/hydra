@@ -76,12 +76,14 @@ class IngestionEndpoint[F[_]: Futurable](
       }
     } ~ pathPrefix("v2" / "topics") {
       handleExceptions(exceptionHandler) {
-        pathSuffix("records") {
+        ignoreTrailingSlash {
+          pathSuffix("records") {
             put {
               extractUnmatchedPath { topic =>
                 publishRequestV2(topic.toString.replace("/", ""))
               }
             }
+          }
         }
       }
     }
