@@ -153,26 +153,13 @@ class SchemasEndpointSpec
         resMessage.contains(errorMessage) shouldBe true
       }
     }
-  }
 
-  "The V2 Schemas Endpoint" must {
-    "returns a single schema by name with no key schema" in {
-      Get("/v2/topics/hydra.test.Tester/schema") ~> schemasRoute ~> check {
-        val rep = responseAs[SchemasWithKeyEndpointResponse]
-        val valueSchema = rep.valueSchemaResponse
-        val id = schemaRegistry.registryClient
-          .getId(
-            "hydra.test.Tester-value",
-            new Schema.Parser().parse(valueSchema.schema)
-          )
-        valueSchema.id shouldBe id
-        valueSchema.version shouldBe 2
-        new Schema.Parser().parse(valueSchema.schema) shouldBe schemaEvolved
+    "return 404 if v2 schema doesn't exist" in {
+      Get("/v2/schemas/tester/") ~> schemasRoute ~> check {
+        response.status
+          .intValue() should be >= 400 //have to do this bc the mock registry returns an IOException
       }
     }
 
   }
-
-
-
 }
