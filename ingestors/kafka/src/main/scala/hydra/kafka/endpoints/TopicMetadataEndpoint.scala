@@ -15,7 +15,7 @@ import hydra.kafka.algebras.MetadataAlgebra
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadataV2Adapter
-import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.model.TopicMetadataV2Transport.Subject
 import hydra.kafka.util.KafkaUtils
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.kafka.common.PartitionInfo

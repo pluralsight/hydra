@@ -4,7 +4,7 @@ import cats.implicits._
 import ciris.{ConfigValue, env, _}
 import hydra.kafka.algebras.KafkaClientAlgebra.ConsumerGroup
 import hydra.kafka.model.ContactMethod
-import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.model.TopicMetadataV2Transport.Subject
 
 import scala.concurrent.duration._
 

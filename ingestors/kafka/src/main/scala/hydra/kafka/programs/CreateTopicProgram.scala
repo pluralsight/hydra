@@ -6,8 +6,8 @@ import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
 import hydra.core.transport.AckStrategy
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
-import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request, TopicMetadataV2Value}
+import hydra.kafka.model.TopicMetadataV2Transport.Subject
+import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Transport, TopicMetadataV2Value}
 import hydra.kafka.producer.AvroKeyRecord
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
@@ -98,7 +98,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   }
 
   private def publishMetadata(
-      createTopicRequest: TopicMetadataV2Request
+      createTopicRequest: TopicMetadataV2Transport
   ): F[Unit] = {
     val message = createTopicRequest.toKeyAndValue
     for {
@@ -110,8 +110,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   }
 
   def createTopic(
-      createTopicRequest: TopicMetadataV2Request,
-      topicDetails: TopicDetails
+                   createTopicRequest: TopicMetadataV2Transport,
+                   topicDetails: TopicDetails
   ): F[Unit] = {
     (for {
       _ <- registerSchemas(

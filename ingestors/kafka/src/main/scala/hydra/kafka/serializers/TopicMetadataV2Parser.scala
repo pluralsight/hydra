@@ -10,7 +10,7 @@ import eu.timepit.refined._
 import eu.timepit.refined.auto._
 import hydra.core.marshallers._
 import hydra.kafka.model.ContactMethod.{Email, Slack}
-import hydra.kafka.model.TopicMetadataV2Request.{Subject, SubjectRegex}
+import hydra.kafka.model.TopicMetadataV2Transport.{Subject, SubjectRegex}
 import hydra.kafka.model._
 import hydra.kafka.serializers.Errors._
 import org.apache.avro.Schema
@@ -242,12 +242,12 @@ sealed trait TopicMetadataV2Parser
   }
 
   implicit object TopicMetadataV2Format
-      extends RootJsonFormat[TopicMetadataV2Request] {
+      extends RootJsonFormat[TopicMetadataV2Transport] {
 
-    override def write(obj: TopicMetadataV2Request): JsValue =
-      jsonFormat9(TopicMetadataV2Request.apply).write(obj)
+    override def write(obj: TopicMetadataV2Transport): JsValue =
+      jsonFormat9(TopicMetadataV2Transport.apply).write(obj)
 
-    override def read(json: JsValue): TopicMetadataV2Request = json match {
+    override def read(json: JsValue): TopicMetadataV2Transport = json match {
       case j: JsObject =>
         val subject = toResult(
           SubjectFormat
@@ -309,7 +309,7 @@ sealed trait TopicMetadataV2Parser
           createdDate,
           parentSubjects,
           notes
-        ).mapN(TopicMetadataV2Request.apply) match {
+        ).mapN(TopicMetadataV2Transport.apply) match {
           case Valid(topicMetadataRequest) => topicMetadataRequest
           case Invalid(e) =>
             throw DeserializationException(e.map(_.errorMessage).mkString_(" "))

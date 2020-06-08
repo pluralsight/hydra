@@ -9,7 +9,7 @@ import cats.implicits._
 import cats.{Applicative, ApplicativeError, Monad, MonadError}
 import hydra.avro.convert.{ISODateConverter, IsoDate}
 import hydra.core.marshallers._
-import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.model.TopicMetadataV2Transport.Subject
 import org.apache.avro.generic.GenericRecord
 import spray.json.DefaultJsonProtocol
 import vulcan.generic._
@@ -21,6 +21,7 @@ import scala.util.control.NoStackTrace
 /**
   * Created by alexsilva on 3/30/17.
   */
+
 case class TopicMetadata(
     subject: String,
     schemaId: Int,

@@ -8,7 +8,7 @@ import cats.implicits._
 import hydra.core.marshallers.History
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataV2Container
 import hydra.kafka.model.ContactMethod.Slack
-import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.model.TopicMetadataV2Transport.Subject
 import hydra.kafka.model.{Public, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Value}
 import org.apache.avro.generic.GenericRecord
 import org.scalatest.Assertion

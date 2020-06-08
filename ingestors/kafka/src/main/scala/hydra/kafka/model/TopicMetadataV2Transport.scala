@@ -7,7 +7,7 @@ import eu.timepit.refined._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string._
 import hydra.core.marshallers.StreamType
-import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.model.TopicMetadataV2Transport.Subject
 import org.apache.avro.Schema
 
 sealed trait DataClassification
@@ -54,7 +54,7 @@ object ContactMethod {
 
 final case class Schemas(key: Schema, value: Schema)
 
-final case class TopicMetadataV2Request(
+final case class TopicMetadataV2Transport(
     subject: Subject,
     schemas: Schemas,
     streamType: StreamType,
@@ -79,9 +79,22 @@ final case class TopicMetadataV2Request(
     )
     (key, value)
   }
+  def fromKeyAndValue(k: TopicMetadataV2Key, v: TopicMetadataV2Value, keySchema: Schema, valueSchema: Schema): TopicMetadataV2Transport = {
+    TopicMetadataV2Transport(
+      k.subject,
+      Schemas(keySchema, valueSchema),
+      v.streamType,
+      v.deprecated,
+      v.dataClassification,
+      v.contact,
+      v.createdDate,
+      v.parentSubjects,
+      v.notes
+    )
+  }
 }
 
-object TopicMetadataV2Request {
+object TopicMetadataV2Transport {
   type SubjectRegex = MatchesRegex[W.`"""^[a-zA-Z0-9_\\-\\.]+$"""`.T]
   type Subject = String Refined SubjectRegex
 

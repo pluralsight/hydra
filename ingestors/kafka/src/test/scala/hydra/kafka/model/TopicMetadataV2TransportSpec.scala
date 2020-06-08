@@ -1,11 +1,11 @@
 package hydra.kafka.model
 
-import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.model.TopicMetadataV2Transport.Subject
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
 
-class TopicMetadataV2RequestSpec extends AnyWordSpecLike with Matchers {
+class TopicMetadataV2TransportSpec extends AnyWordSpecLike with Matchers {
 
   "TopicMetadataV2Request" must {
 

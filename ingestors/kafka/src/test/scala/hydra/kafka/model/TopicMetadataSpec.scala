@@ -5,7 +5,7 @@ import java.time.Instant
 import cats.data.NonEmptyList
 import cats.effect.IO
 import hydra.core.marshallers._
-import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.model.TopicMetadataV2Transport.Subject
 import org.apache.avro.generic.{GenericDatumReader, GenericRecordBuilder}
 import org.apache.avro.io.DecoderFactory
 import org.scalatest.matchers.should.Matchers

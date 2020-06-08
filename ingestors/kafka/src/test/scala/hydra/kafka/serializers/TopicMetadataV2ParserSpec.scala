@@ -5,7 +5,7 @@ import java.time.Instant
 import cats.data.NonEmptyList
 import hydra.core.marshallers._
 import hydra.kafka.model.ContactMethod.{Email, Slack}
-import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.model.TopicMetadataV2Transport.Subject
 import hydra.kafka.model._
 import hydra.kafka.serializers.Errors._
 import org.scalatest.matchers.should.Matchers
@@ -202,7 +202,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val tmv2 = TopicMetadataV2Format.read(jsonData)
 
       tmv2 shouldBe
-        TopicMetadataV2Request(
+        TopicMetadataV2Transport(
           subject,
           Schemas(
             new SchemaFormat(isKey = true).read(validAvroSchema),
@@ -239,7 +239,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val tmv2 = TopicMetadataV2Format.read(jsonData)
 
       tmv2 shouldBe
-        TopicMetadataV2Request(
+        TopicMetadataV2Transport(
           subject,
           Schemas(
             new SchemaFormat(isKey = true).read(validAvroSchema),
@@ -414,7 +414,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       )
       val notes = Some("Notes go here.")
 
-      val topicMetadataV2 = TopicMetadataV2Request(
+      val topicMetadataV2 = TopicMetadataV2Transport(
         subject = subject,
         schemas = Schemas(
           keySchema,
@@ -428,8 +428,8 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         parentSubjects = parentSubjects,
         notes = notes
       )
-
-      TopicMetadataV2Format.write(topicMetadataV2) shouldBe
+      val a = TopicMetadataV2Format.write(topicMetadataV2)
+      a shouldBe
         createJsValueOfTopicMetadataV2Request(
           subject,
           slack.channel.value,

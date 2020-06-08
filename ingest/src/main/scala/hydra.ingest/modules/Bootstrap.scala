@@ -26,7 +26,7 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
     if (cfg.createOnStartup) {
       TopicMetadataV2.getSchemas[F].flatMap { schemas =>
         createTopicProgram.createTopic(
-          TopicMetadataV2Request(
+          TopicMetadataV2Transport(
             cfg.topicName,
             schemas,
             History,
