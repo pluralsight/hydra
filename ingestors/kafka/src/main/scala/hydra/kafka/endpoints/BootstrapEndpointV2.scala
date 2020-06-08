@@ -37,8 +37,10 @@ final class BootstrapEndpointV2[F[_]: Futurable](
 
   val route: Route = cors(settings) {
     pathPrefix("v2" / "topics") {
-      post {
-        pathEndOrSingleSlash {
+      put {
+        extractUnmatchedPath { topic =>
+          topic.toString().replace("/","")
+          //TODO: Change the way creating a topic works
           entity(as[TopicMetadataV2Request]) { t =>
             onComplete(
               Futurable[F].unsafeToFuture(createTopicProgram

@@ -78,7 +78,7 @@ class IngestionEndpoint[F[_]: Futurable](
       handleExceptions(exceptionHandler) {
         ignoreTrailingSlash {
           pathSuffix("records") {
-            put {
+            post {
               extractUnmatchedPath { topic =>
                 publishRequestV2(topic.toString.replace("/", ""))
               }

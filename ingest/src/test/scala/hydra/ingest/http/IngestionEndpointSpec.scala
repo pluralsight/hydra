@@ -240,7 +240,7 @@ class IngestionEndpointSpec
 
   "The V2 Ingestion path" should {
     "Return 200" in {
-      val request = Put("/v2/topics/exp.blah.blah/records", """{"test":true, "extraField":true}""")
+      val request = Post("/v2/topics/exp.blah.blah/records", """{"test":true, "extraField":true}""")
       request ~> ingestRouteAlt ~> check {
         responseAs[String] shouldBe "exp.blah.blah"
         status shouldBe StatusCodes.OK

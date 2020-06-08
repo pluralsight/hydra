@@ -69,7 +69,7 @@ final class BootstrapEndpointV2Spec
     "reject an empty request" in {
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
-          Post("/v2/topics") ~> Route.seal(bootstrapEndpoint.route) ~> check {
+          Put("/v2/topics") ~> Route.seal(bootstrapEndpoint.route) ~> check {
             response.status shouldBe StatusCodes.BadRequest
           }
         }
@@ -103,7 +103,7 @@ final class BootstrapEndpointV2Spec
     "accept a valid request" in {
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
-          Post("/v2/topics", validRequest) ~> Route.seal(
+          Put("/v2/topics", validRequest) ~> Route.seal(
             bootstrapEndpoint.route
           ) ~> check {
             response.status shouldBe StatusCodes.OK
@@ -141,7 +141,7 @@ final class BootstrapEndpointV2Spec
           KafkaAdminAlgebra
             .test[IO]
             .map { kafka =>
-              Post("/v2/topics", validRequest) ~> Route.seal(
+              Put("/v2/topics", validRequest) ~> Route.seal(
                 getTestCreateTopicProgram(failingSchemaRegistry, kafka, client, m).route
               ) ~> check {
                 response.status shouldBe StatusCodes.InternalServerError
