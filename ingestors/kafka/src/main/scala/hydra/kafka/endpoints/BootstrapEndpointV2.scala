@@ -22,6 +22,7 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
 import hydra.common.util.Futurable
 import hydra.core.http.CorsSupport
 import hydra.kafka.model.TopicMetadataV2Request
+import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.serializers.TopicMetadataV2Parser
 import hydra.kafka.util.KafkaUtils.TopicDetails
@@ -36,15 +37,13 @@ final class BootstrapEndpointV2[F[_]: Futurable](
   import TopicMetadataV2Parser._
 
   val route: Route = cors(settings) {
-    pathPrefix("v2" / "topics") {
-      put {
-        extractUnmatchedPath { topic =>
-          topic.toString().replace("/","")
-          //TODO: Change the way creating a topic works
+    pathPrefix("v2" / "topics" / Segment) { topicName =>
+      pathEndOrSingleSlash {
+        put {
           entity(as[TopicMetadataV2Request]) { t =>
             onComplete(
               Futurable[F].unsafeToFuture(createTopicProgram
-                .createTopic(t, defaultTopicDetails))
+                .createTopic(t.copy(subject = Subject.createValidated(topicName).getOrElse(t.subject)), defaultTopicDetails))
             ) {
               case Success(_) => complete(StatusCodes.OK)
               case Failure(e) => complete(StatusCodes.InternalServerError, e)
