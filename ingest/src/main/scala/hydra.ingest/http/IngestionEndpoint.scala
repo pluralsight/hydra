@@ -64,24 +64,21 @@ class IngestionEndpoint[F[_]: Futurable](
     .getOrElse(500.millis)
 
   override val route: Route =
-    pathPrefix("ingest") {
-      pathEndOrSingleSlash {
-        handleExceptions(exceptionHandler) {
+    handleExceptions(exceptionHandler) {
+      pathPrefix("ingest") {
+        pathEndOrSingleSlash {
           post {
             requestEntityPresent {
               publishRequest
             }
           } ~ deleteRequest
         }
-      }
-    } ~ pathPrefix("v2" / "topics") {
-      handleExceptions(exceptionHandler) {
-        ignoreTrailingSlash {
-          pathSuffix("records") {
+      } ~
+      pathPrefix("v2" / "topics" / Segment) { topicName =>
+        path("records") {
+          pathEndOrSingleSlash {
             post {
-              extractUnmatchedPath { topic =>
-                publishRequestV2(topic.toString.replace("/", ""))
-              }
+              publishRequestV2(topicName)
             }
           }
         }
