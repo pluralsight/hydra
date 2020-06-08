@@ -92,13 +92,11 @@ class SchemasEndpoint()(implicit system: ActorSystem)
   }
 
   private val v2Route =
-    pathPrefix("v2" / "topics") {
-      ignoreTrailingSlash {
-        pathSuffix("schema") {
-          get {
-            extractUnmatchedPath { subject =>
-              getSchema(includeKeySchema = true, subject.toString().replace("/", ""), None)
-            }
+    pathPrefix("v2") {
+      get {
+        path("schemas" / Segment) { subject =>
+          pathEndOrSingleSlash {
+            getSchema(includeKeySchema = true, subject, None)
           }
         }
       }
