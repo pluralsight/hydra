@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorRef, ActorSelection, Props}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
-import cats.effect.{Concurrent, ContextShift, IO}
+import cats.effect.{Concurrent, ContextShift, IO, Sync}
 import hydra.avro.registry.SchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
@@ -13,6 +13,8 @@ import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadataV2Transport.Subject
+import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
+import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.common.{Node, PartitionInfo}
 import org.scalatest.BeforeAndAfterAll
@@ -36,6 +38,10 @@ class TopicMetadataEndpointSpec
   import scala.concurrent.duration._
 
   import ConfigSupport._
+
+  implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
+    Slf4jLogger.getLogger[F]
+
 
   implicit val kafkaConfig: EmbeddedKafkaConfig =
     EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)

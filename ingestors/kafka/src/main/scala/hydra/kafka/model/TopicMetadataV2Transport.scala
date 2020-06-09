@@ -6,9 +6,10 @@ import cats.data.NonEmptyList
 import eu.timepit.refined._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string._
-import hydra.core.marshallers.StreamType
+import hydra.common.logging.LoggingAdapter
+import hydra.core.marshallers.{History, StreamType}
 import hydra.kafka.model.TopicMetadataV2Transport.Subject
-import org.apache.avro.Schema
+import org.apache.avro.{Schema, SchemaBuilder}
 
 sealed trait DataClassification
 case object Public extends DataClassification
@@ -52,6 +53,13 @@ object ContactMethod {
   }
 }
 
+object Schemas {
+  def emptySchema: Schema = SchemaBuilder
+    .record("SchemaNotFound")
+    .fields()
+    .endRecord()
+}
+
 final case class Schemas(key: Schema, value: Schema)
 
 final case class TopicMetadataV2Transport(
@@ -79,22 +87,9 @@ final case class TopicMetadataV2Transport(
     )
     (key, value)
   }
-  def fromKeyAndValue(k: TopicMetadataV2Key, v: TopicMetadataV2Value, keySchema: Schema, valueSchema: Schema): TopicMetadataV2Transport = {
-    TopicMetadataV2Transport(
-      k.subject,
-      Schemas(keySchema, valueSchema),
-      v.streamType,
-      v.deprecated,
-      v.dataClassification,
-      v.contact,
-      v.createdDate,
-      v.parentSubjects,
-      v.notes
-    )
-  }
 }
 
-object TopicMetadataV2Transport {
+object TopicMetadataV2Transport extends LoggingAdapter {
   type SubjectRegex = MatchesRegex[W.`"""^[a-zA-Z0-9_\\-\\.]+$"""`.T]
   type Subject = String Refined SubjectRegex
 
@@ -105,5 +100,19 @@ object TopicMetadataV2Transport {
     }
 
     val invalidFormat = "Invalid Subject. Subject may contain only alphanumeric characters, hyphens(-), underscores(_), and periods(.)"
+  }
+
+  def fromKeyAndValue(k: TopicMetadataV2Key, v: TopicMetadataV2Value, keySchema: Option[Schema], valueSchema: Option[Schema]): TopicMetadataV2Transport = {
+    TopicMetadataV2Transport(
+      k.subject,
+      Schemas(keySchema.getOrElse(Schemas.emptySchema), valueSchema.getOrElse(Schemas.emptySchema)),
+      v.streamType,
+      v.deprecated,
+      v.dataClassification,
+      v.contact,
+      v.createdDate,
+      v.parentSubjects,
+      v.notes
+    )
   }
 }

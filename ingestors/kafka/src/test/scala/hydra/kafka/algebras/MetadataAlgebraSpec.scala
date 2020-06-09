@@ -3,14 +3,15 @@ package hydra.kafka.algebras
 import java.time.Instant
 
 import cats.data.NonEmptyList
-import cats.effect.{Concurrent, ContextShift, IO, Timer}
+import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.core.marshallers.History
-import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataV2Container
 import hydra.kafka.model.ContactMethod.Slack
 import hydra.kafka.model.TopicMetadataV2Transport.Subject
-import hydra.kafka.model.{Public, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Value}
+import hydra.kafka.model.{Public, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Transport, TopicMetadataV2Value}
+import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
+import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import org.apache.avro.generic.GenericRecord
 import org.scalatest.Assertion
 import org.scalatest.matchers.should.Matchers
@@ -30,6 +31,9 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
   private implicit val policy: RetryPolicy[IO] = limitRetries[IO](5) |+| exponentialBackoff[IO](500.milliseconds)
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
   private implicit def noop[A]: (A, RetryDetails) => IO[Unit] = retry.noop[IO, A]
+
+  implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
+    Slf4jLogger.getLogger[F]
 
   private implicit class RetryAndAssert[A](boolIO: IO[A]) {
     def retryIfFalse(check: A => Boolean): IO[Assertion] =
@@ -65,7 +69,7 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
           _ <- kafkaClientAlgebra.publishMessage(record, metadataTopicName)
           _ <- metadataAlgebra.getMetadataFor(subject).retryIfFalse(_.isDefined)
           metadata <- metadataAlgebra.getMetadataFor(subject)
-        } yield metadata shouldBe Some(TopicMetadataV2Container(key, Some(value)))).unsafeRunSync()
+        } yield metadata shouldBe Some(TopicMetadataV2Transport.fromKeyAndValue(key, value, None, None))).unsafeRunSync()
       }
 
       "retrieve all metadata" in {

@@ -5,6 +5,7 @@ import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.ingest.app.AppConfig.AppConfig
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
+import io.chrisdavenport.log4cats.Logger
 
 final class Algebras[F[_]] private (
     val schemaRegistry: SchemaRegistry[F],
@@ -15,7 +16,7 @@ final class Algebras[F[_]] private (
 
 object Algebras {
 
-  def make[F[_]: Async: ConcurrentEffect: ContextShift: Timer](config: AppConfig): F[Algebras[F]] =
+  def make[F[_]: Async: ConcurrentEffect: ContextShift: Timer: Logger](config: AppConfig): F[Algebras[F]] =
     for {
       schemaRegistry <- SchemaRegistry.live[F](
         config.createTopicConfig.schemaRegistryConfig.fullUrl,
