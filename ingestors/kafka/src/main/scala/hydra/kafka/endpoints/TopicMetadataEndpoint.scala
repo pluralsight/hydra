@@ -96,7 +96,7 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
   private def getAllV2Metadata = get {
     pathEndOrSingleSlash {
       onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getAllMetadata)) {
-      case Success(metadata) => complete(StatusCodes.OK, metadata)
+      case Success(metadata) => complete(StatusCodes.OK, metadata.filterNot(_.subject.value.startsWith("_")))
       case Failure(e) => complete(StatusCodes.InternalServerError, e)
       }
     }
