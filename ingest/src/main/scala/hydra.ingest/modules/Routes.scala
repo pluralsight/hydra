@@ -12,16 +12,19 @@ import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.endpoints.{BootstrapEndpoint, BootstrapEndpointV2, TopicMetadataEndpoint, TopicsEndpoint}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 
+import scala.concurrent.ExecutionContext
+
 final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebras: Algebras[F], cfg: AppConfig)
                                                  (implicit system: ActorSystem) extends RouteConcatenation with ConfigSupport {
 
+  private implicit val ec: ExecutionContext = system.dispatcher
   private val bootstrapEndpointV2 = if (cfg.v2MetadataTopicConfig.createV2TopicsEnabled) {
     val topicDetails =
       TopicDetails(
         cfg.createTopicConfig.defaultNumPartions,
         cfg.createTopicConfig.defaultReplicationFactor
       )
-    new BootstrapEndpointV2(programs.createTopic, topicDetails, algebras.metadata).route
+    new BootstrapEndpointV2(programs.createTopic, topicDetails).route
   } else {
     RouteDirectives.reject
   }
@@ -40,10 +43,10 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
 
     new SchemasEndpoint().route ~
       new BootstrapEndpoint(system).route ~
-      new TopicMetadataEndpoint(consumerProxy)(system.dispatcher).route ~
+      new TopicMetadataEndpoint(consumerProxy, algebras.metadata).route ~
       new IngestorRegistryEndpoint().route ~
       new IngestionWebSocketEndpoint().route ~
-      new IngestionEndpoint(cfg.ingestConfig.alternateIngestEnabled, programs.ingestionFlow).route ~
+      new IngestionEndpoint(cfg.ingestConfig.alternateIngestEnabled, programs.ingestionFlow, cfg.ingestConfig.useOldIngestIfUAContains).route ~
       new TopicsEndpoint(consumerProxy)(system.dispatcher).route ~
       HealthEndpoint.route ~
       bootstrapEndpointV2

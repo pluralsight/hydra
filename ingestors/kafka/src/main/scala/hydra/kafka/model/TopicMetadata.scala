@@ -51,24 +51,29 @@ object TopicMetadataV2 {
 
   def encode[F[_]: MonadError[*[_], Throwable]](
       key: TopicMetadataV2Key,
-      value: TopicMetadataV2Value
-  ): F[(GenericRecord, GenericRecord)] = {
+      value: Option[TopicMetadataV2Value]
+  ): F[(GenericRecord, Option[GenericRecord])] = {
     Monad[F]
-      .pure(
+      .pure {
+        val valueResult: Option[Either[AvroError, Any]] = value.map(TopicMetadataV2Value.codec.encode)
         (
           Validated
             .fromEither(TopicMetadataV2Key.codec.encode(key))
             .toValidatedNel,
-          Validated
-            .fromEither(TopicMetadataV2Value.codec.encode(value))
-            .toValidatedNel
-        ).tupled.toEither.leftMap{ a =>
+          valueResult match {
+            case Some(e: Either[AvroError, Any]) =>
+              Validated
+                .fromEither(e)
+                .toValidatedNel
+            case None => None.validNel
+          }
+          ).tupled.toEither.leftMap { a =>
           MetadataAvroSchemaFailure(a)
         }
-      )
+      }
       .rethrow
       .flatMap {
-        case (k: GenericRecord, v: GenericRecord) => Monad[F].pure((k, v))
+        case (k: GenericRecord, v: GenericRecord) => Monad[F].pure((k, Option(v)))
         case (k, v) =>
           MonadError[F, Throwable].raiseError(
             AvroEncodingFailure(
@@ -80,23 +85,28 @@ object TopicMetadataV2 {
 
   def decode[F[_]: MonadError[*[_], Throwable]](
                                                key: GenericRecord,
-                                               value: GenericRecord
-                                               ): F[(TopicMetadataV2Key, TopicMetadataV2Value)] = {
+                                               value: Option[GenericRecord]
+                                               ): F[(TopicMetadataV2Key, Option[TopicMetadataV2Value])] = {
     getSchemas[F].flatMap { schemas =>
       Monad[F]
-        .pure(
+        .pure {
+          val valueResult: Option[Either[AvroError, TopicMetadataV2Value]] = value.map(TopicMetadataV2Value.codec.decode(_, schemas.value))
           (
             Validated
               .fromEither(TopicMetadataV2Key.codec.decode(key, schemas.key))
               .toValidatedNel,
-            Validated
-              .fromEither(TopicMetadataV2Value.codec.decode(value, schemas.value))
-              .toValidatedNel
+            valueResult match {
+              case Some(Left(avroError)) =>
+               avroError.invalidNel
+              case Some(Right(topicMetadataV2Value)) =>
+                Some(topicMetadataV2Value).validNel
+              case None => None.validNel
+            }
             ).tupled.toEither
-            .leftMap{ a =>
-            MetadataAvroSchemaFailure(a)
-          }
-        )
+            .leftMap { a =>
+              MetadataAvroSchemaFailure(a)
+            }
+        }
         .rethrow
     }
   }

@@ -54,7 +54,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
     )
 
     val (encodedKey, encodedValue) =
-      TopicMetadataV2.encode[IO](key, value).unsafeRunSync()
+      TopicMetadataV2.encode[IO](key, Some(value)).unsafeRunSync()
 
     encodedKey shouldBe new GenericRecordBuilder(
       TopicMetadataV2Key.codec.schema.toOption.get
@@ -82,7 +82,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
     val valueRecord =
       new GenericDatumReader[Any](valueSchema).read(null, decoder)
 
-    encodedValue shouldBe valueRecord
+    encodedValue shouldBe Some(valueRecord)
   }
 
   it must "encode and decode metadataV2" in {
@@ -98,12 +98,12 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
     )
 
     val (encodedKey, encodedValue) =
-      TopicMetadataV2.encode[IO](key, value).unsafeRunSync()
+      TopicMetadataV2.encode[IO](key, Some(value)).unsafeRunSync()
 
     val (decodedKey,decodedValue) =
       TopicMetadataV2.decode[IO](encodedKey, encodedValue).unsafeRunSync()
 
     decodedKey shouldBe key
-    decodedValue shouldBe value
+    decodedValue shouldBe Some(value)
   }
 }
