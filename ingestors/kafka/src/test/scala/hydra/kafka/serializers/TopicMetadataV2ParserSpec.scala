@@ -428,8 +428,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         parentSubjects = parentSubjects,
         notes = notes
       )
-      val a = TopicMetadataV2Format.write(topicMetadataV2)
-      a shouldBe
+      TopicMetadataV2Format.write(topicMetadataV2) shouldBe
         createJsValueOfTopicMetadataV2Request(
           subject,
           slack.channel.value,

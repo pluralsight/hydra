@@ -42,7 +42,6 @@ class TopicMetadataEndpointSpec
   implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
     Slf4jLogger.getLogger[F]
 
-
   implicit val kafkaConfig: EmbeddedKafkaConfig =
     EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
 
