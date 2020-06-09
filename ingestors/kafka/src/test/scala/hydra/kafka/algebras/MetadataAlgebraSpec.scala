@@ -5,6 +5,7 @@ import java.time.Instant
 import cats.data.NonEmptyList
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.implicits._
+import hydra.avro.registry.SchemaRegistry
 import hydra.core.marshallers.History
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataV2Container
 import hydra.kafka.model.ContactMethod.Slack
@@ -41,7 +42,8 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
 
   (for {
     kafkaClient <- KafkaClientAlgebra.test[IO]
-    metadata <- MetadataAlgebra.make(metadataTopicName, consumerGroup, kafkaClient, consumeMetadataEnabled = true)
+    schemaRegistry <- SchemaRegistry.test[IO]
+    metadata <- MetadataAlgebra.make(metadataTopicName, consumerGroup, kafkaClient, schemaRegistry, consumeMetadataEnabled = true)
   } yield {
     runTests(metadata, kafkaClient)
   }).unsafeRunSync()

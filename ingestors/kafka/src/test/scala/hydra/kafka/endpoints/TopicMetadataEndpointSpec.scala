@@ -5,6 +5,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import cats.effect.{Concurrent, ContextShift, IO}
+import hydra.avro.registry.SchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
 import hydra.kafka.algebras.{KafkaClientAlgebra, MetadataAlgebra}
@@ -17,6 +18,7 @@ import org.apache.kafka.common.{Node, PartitionInfo}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
+
 import scala.concurrent.ExecutionContext
 
 
@@ -61,7 +63,8 @@ class TopicMetadataEndpointSpec
 
   val route: Route = (for {
     kafkaClient <- KafkaClientAlgebra.test[IO]
-    metadataAlgebra <- MetadataAlgebra.make[IO]("topicName-Bill", "I'm_A_Jerk", kafkaClient, consumeMetadataEnabled = false)
+    schemaRegistry <- SchemaRegistry.test[IO]
+    metadataAlgebra <- MetadataAlgebra.make[IO]("topicName-Bill", "I'm_A_Jerk", kafkaClient, schemaRegistry, consumeMetadataEnabled = false)
   } yield new TopicMetadataEndpoint(consumerProxy, metadataAlgebra).route).unsafeRunSync()
 
   val node = new Node(0, "host", 1)

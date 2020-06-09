@@ -24,6 +24,6 @@ object Algebras {
       kafkaAdmin <- KafkaAdminAlgebra.live[F](config.createTopicConfig.bootstrapServers)
       kafkaClient <- KafkaClientAlgebra.live[F](config.createTopicConfig.bootstrapServers, schemaRegistry)
       metadata <- MetadataAlgebra.make[F](config.v2MetadataTopicConfig.topicName.value,
-        config.v2MetadataTopicConfig.consumerGroup, kafkaClient, config.v2MetadataTopicConfig.createOnStartup)
+        config.v2MetadataTopicConfig.consumerGroup, kafkaClient, schemaRegistry, config.v2MetadataTopicConfig.createOnStartup)
     } yield new Algebras[F](schemaRegistry, kafkaAdmin, kafkaClient, metadata)
 }
