@@ -27,7 +27,6 @@ object StringToGenericRecord {
 
     private def checkLogicalTypes(record: GenericRecord): Try[Unit] = {
       import collection.JavaConverters._
-      val fields = record.getSchema.getFields.asScala.toList
       def checkAll(avroField: AnyRef, fieldSchema: Option[Schema]): Try[Unit] = avroField match {
         case g: GenericRecord => g.getSchema.getFields.asScala.toList
           .traverse(f => checkAll(g.get(f.name), f.schema.some)).void
@@ -35,6 +34,7 @@ object StringToGenericRecord {
           if (isUuidValid(u.toString)) Success(()) else Failure(InvalidLogicalTypeError("UUID", u.toString))
         case _ => Success(())
       }
+      val fields = record.getSchema.getFields.asScala.toList
       fields.traverse(f => checkAll(record.get(f.name), f.schema.some)).void
     }
 
@@ -51,7 +51,6 @@ object StringToGenericRecord {
 
     private def getAllSchemaFieldNames(schema: Schema): Set[String] = {
       import Schema.Type._
-
       import collection.JavaConverters._
       def loop(sch: Schema, extraName: Option[String]): Set[String] = sch.getType match {
         case RECORD => sch.getFields.asScala.toSet.flatMap { f: Schema.Field =>
