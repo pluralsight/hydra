@@ -5,25 +5,28 @@ import cats.effect.{Concurrent, Sync}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, TopicName}
-import hydra.kafka.model.TopicMetadataV2Transport.Subject
-import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Transport, TopicMetadataV2Value}
+import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
+import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request, TopicMetadataV2Value}
 import org.apache.avro.generic.GenericRecord
 import io.chrisdavenport.log4cats.Logger
+import org.apache.avro.Schema
 
 
 trait MetadataAlgebra[F[_]] {
 
   import MetadataAlgebra._
 
-  def getMetadataFor(subject: Subject): F[Option[TopicMetadataV2Transport]]
+  def getMetadataFor(subject: Subject): F[Option[TopicMetadataContainer]]
 
-  def getAllMetadata: F[List[TopicMetadataV2Transport]]
+  def getAllMetadata: F[List[TopicMetadataContainer]]
 
 }
 
 object MetadataAlgebra {
 
   final case class MetadataValueNotFoundException(message: String) extends Exception(message)
+  final case class TopicMetadataContainer(key: TopicMetadataV2Key, value: TopicMetadataV2Value, keySchema: Option[Schema], valueSchema: Option[Schema])
 
   def make[F[_]: Sync: Concurrent: Logger](
                         metadataTopicName: TopicName,
@@ -46,7 +49,7 @@ object MetadataAlgebra {
               schemaRegistryAlgebra.getLatestSchemaBySubject(subject = topicMetadataKey.subject.value + "-value").flatMap { valueSchema =>
                 topicMetadataValueOpt match {
                   case Some(topicMetadataValue) =>
-                    val topicMetadataV2Transport = TopicMetadataV2Transport.fromKeyAndValue(topicMetadataKey, topicMetadataValue, keySchema, valueSchema)
+                    val topicMetadataV2Transport = TopicMetadataContainer(topicMetadataKey, topicMetadataValue, keySchema, valueSchema)
                     ref.update(_.addMetadata(topicMetadataV2Transport))
                   case None =>
                     Logger[F].error("Metadata value not found")
@@ -63,21 +66,23 @@ object MetadataAlgebra {
   private def getMetadataAlgebra[F[_]: Sync](cache: Ref[F, MetadataStorageFacade]): F[MetadataAlgebra[F]] = {
     Sync[F].delay {
       new MetadataAlgebra[F] {
-        override def getMetadataFor(subject: Subject): F[Option[TopicMetadataV2Transport]] =
+        override def getMetadataFor(subject: Subject): F[Option[TopicMetadataContainer]] =
           cache.get.map(_.getMetadataByTopicName(subject))
+        // call schemaRegistry if schema DNE and update the value in the cache.
 
-        override def getAllMetadata: F[List[TopicMetadataV2Transport]] =
+        override def getAllMetadata: F[List[TopicMetadataContainer]] =
           cache.get.map(_.getAllMetadata)
+        // Update broken metadata (those without schemas attached)
       }
     }
   }
 }
 
-private case class MetadataStorageFacade(metadataMap: Map[Subject, TopicMetadataV2Transport]) {
-  def getMetadataByTopicName(subject: Subject): Option[TopicMetadataV2Transport] = metadataMap.get(subject)
-  def getAllMetadata: List[TopicMetadataV2Transport] = metadataMap.values.toList
-  def addMetadata(metadata: TopicMetadataV2Transport): MetadataStorageFacade =
-    this.copy(this.metadataMap + (metadata.subject -> metadata))
+private case class MetadataStorageFacade(metadataMap: Map[Subject, TopicMetadataContainer]) {
+  def getMetadataByTopicName(subject: Subject): Option[TopicMetadataContainer] = metadataMap.get(subject)
+  def getAllMetadata: List[TopicMetadataContainer] = metadataMap.values.toList
+  def addMetadata(metadata: TopicMetadataContainer): MetadataStorageFacade =
+    this.copy(this.metadataMap + (metadata.key.subject -> metadata))
 }
 
 private object MetadataStorageFacade {

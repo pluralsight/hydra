@@ -12,7 +12,7 @@ import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.core.marshallers.History
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.ContactMethod.Email
-import hydra.kafka.model.TopicMetadataV2Transport.Subject
+import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.serializers.TopicMetadataV2Parser
@@ -86,7 +86,7 @@ final class BootstrapEndpointV2Spec
         .noDefault()
         .endRecord()
 
-    val validRequest = TopicMetadataV2Transport(
+    val validRequest = TopicMetadataV2Request(
       Subject.createValidated("testing").get,
       Schemas(getTestSchema("key"), getTestSchema("value")),
       History,

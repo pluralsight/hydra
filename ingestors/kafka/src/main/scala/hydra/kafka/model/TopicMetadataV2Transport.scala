@@ -7,9 +7,10 @@ import eu.timepit.refined._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string._
 import hydra.common.logging.LoggingAdapter
-import hydra.core.marshallers.{History, StreamType}
-import hydra.kafka.model.TopicMetadataV2Transport.Subject
-import org.apache.avro.{Schema, SchemaBuilder}
+import hydra.core.marshallers.StreamType
+import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
+import hydra.kafka.model.TopicMetadataV2Request.Subject
+import org.apache.avro.Schema
 
 sealed trait DataClassification
 case object Public extends DataClassification
@@ -53,16 +54,9 @@ object ContactMethod {
   }
 }
 
-object Schemas {
-  def emptySchema: Schema = SchemaBuilder
-    .record("SchemaNotFound")
-    .fields()
-    .endRecord()
-}
-
 final case class Schemas(key: Schema, value: Schema)
 
-final case class TopicMetadataV2Transport(
+final case class TopicMetadataV2Request(
     subject: Subject,
     schemas: Schemas,
     streamType: StreamType,
@@ -89,7 +83,7 @@ final case class TopicMetadataV2Transport(
   }
 }
 
-object TopicMetadataV2Transport extends LoggingAdapter {
+object TopicMetadataV2Request extends LoggingAdapter {
   type SubjectRegex = MatchesRegex[W.`"""^[a-zA-Z0-9_\\-\\.]+$"""`.T]
   type Subject = String Refined SubjectRegex
 
@@ -101,11 +95,26 @@ object TopicMetadataV2Transport extends LoggingAdapter {
 
     val invalidFormat = "Invalid Subject. Subject may contain only alphanumeric characters, hyphens(-), underscores(_), and periods(.)"
   }
+}
 
-  def fromKeyAndValue(k: TopicMetadataV2Key, v: TopicMetadataV2Value, keySchema: Option[Schema], valueSchema: Option[Schema]): TopicMetadataV2Transport = {
-    TopicMetadataV2Transport(
+final case class MaybeSchemas(key: Option[Schema], value: Option[Schema])
+final case class TopicMetadataV2Response(
+                                          subject: Subject,
+                                          schemas: MaybeSchemas,
+                                          streamType: StreamType,
+                                          deprecated: Boolean,
+                                          dataClassification: DataClassification,
+                                          contact: NonEmptyList[ContactMethod],
+                                          createdDate: Instant,
+                                          parentSubjects: List[Subject],
+                                          notes: Option[String]
+                                        )
+object TopicMetadataV2Response {
+  def fromTopicMetadataContainer(m: TopicMetadataContainer): TopicMetadataV2Response = {
+    val (k, v, keySchema, valueSchema) = (m.key, m.value, m.keySchema, m.valueSchema)
+    TopicMetadataV2Response(
       k.subject,
-      Schemas(keySchema.getOrElse(Schemas.emptySchema), valueSchema.getOrElse(Schemas.emptySchema)),
+      MaybeSchemas(keySchema, valueSchema),
       v.streamType,
       v.deprecated,
       v.dataClassification,
@@ -116,3 +125,5 @@ object TopicMetadataV2Transport extends LoggingAdapter {
     )
   }
 }
+
+

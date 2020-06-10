@@ -13,7 +13,7 @@ import hydra.kafka.algebras.KafkaAdminAlgebra.{Topic, TopicName}
 import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, PublishError}
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
 import hydra.kafka.model.ContactMethod.Email
-import hydra.kafka.model.TopicMetadataV2Transport.Subject
+import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import hydra.kafka.producer.StringRecord
 import hydra.kafka.util.KafkaUtils.TopicDetails
@@ -44,8 +44,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       subject: String,
       keySchema: Schema,
       valueSchema: Schema
-  ): TopicMetadataV2Transport =
-    TopicMetadataV2Transport(
+  ): TopicMetadataV2Request =
+    TopicMetadataV2Request(
       Subject.createValidated(subject).get,
       Schemas(keySchema, valueSchema),
       History,

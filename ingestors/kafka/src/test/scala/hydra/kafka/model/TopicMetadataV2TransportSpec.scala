@@ -1,6 +1,6 @@
 package hydra.kafka.model
 
-import hydra.kafka.model.TopicMetadataV2Transport.Subject
+import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 

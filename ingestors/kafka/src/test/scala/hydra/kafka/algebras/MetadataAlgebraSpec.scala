@@ -7,9 +7,10 @@ import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.core.marshallers.History
+import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.model.ContactMethod.Slack
-import hydra.kafka.model.TopicMetadataV2Transport.Subject
-import hydra.kafka.model.{Public, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Transport, TopicMetadataV2Value}
+import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.model.{Public, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request, TopicMetadataV2Value}
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import org.apache.avro.generic.GenericRecord
@@ -69,7 +70,7 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
           _ <- kafkaClientAlgebra.publishMessage(record, metadataTopicName)
           _ <- metadataAlgebra.getMetadataFor(subject).retryIfFalse(_.isDefined)
           metadata <- metadataAlgebra.getMetadataFor(subject)
-        } yield metadata shouldBe Some(TopicMetadataV2Transport.fromKeyAndValue(key, value, None, None))).unsafeRunSync()
+        } yield metadata shouldBe Some(TopicMetadataContainer(key, value, None, None))).unsafeRunSync()
       }
 
       "retrieve all metadata" in {

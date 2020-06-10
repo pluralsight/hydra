@@ -21,8 +21,8 @@ import akka.http.scaladsl.server.Route
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
 import hydra.common.util.Futurable
 import hydra.core.http.CorsSupport
-import hydra.kafka.model.TopicMetadataV2Transport
-import hydra.kafka.model.TopicMetadataV2Transport.Subject
+import hydra.kafka.model.TopicMetadataV2Request
+import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.serializers.TopicMetadataV2Parser
 import hydra.kafka.util.KafkaUtils.TopicDetails
@@ -40,7 +40,7 @@ final class BootstrapEndpointV2[F[_]: Futurable](
     pathPrefix("v2" / "topics" / Segment) { topicName =>
       pathEndOrSingleSlash {
         put {
-          entity(as[TopicMetadataV2Transport]) { t =>
+          entity(as[TopicMetadataV2Request]) { t =>
             onComplete(
               Futurable[F].unsafeToFuture(createTopicProgram
                 .createTopic(t.copy(subject = Subject.createValidated(topicName).getOrElse(t.subject)), defaultTopicDetails))
