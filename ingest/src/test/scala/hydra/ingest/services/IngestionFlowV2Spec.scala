@@ -62,4 +62,33 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
     }.unsafeRunSync()
   }
 
+  it should "ingest a record with extra fields and Relaxed validation" in {
+    val testKeyPayloadAlt: String = """{"id": "testing", "random": "blah"}"""
+    val testValPayloadAlt: String =s"""{"testField": true, "other": 1000}"""
+
+    val testRequest = V2IngestRequest(testSubject, testKeyPayloadAlt, testValPayloadAlt.some, ValidationStrategy.Relaxed)
+    ingest(testRequest).flatMap { kafkaClient =>
+      kafkaClient.consumeMessages(testSubject.value, "test-consumer").take(1).compile.toList.map { publishedMessages =>
+        val firstMessage = publishedMessages.head
+        (firstMessage._1.toString, firstMessage._2.get.toString) shouldBe (testKeyPayload, testValPayload)
+      }
+    }.unsafeRunSync()
+  }
+
+  it should "reject a record with extra fields and Strict validation" in {
+    val testKeyPayloadAlt: String = """{"id": "testing", "random": "blah"}"""
+    val testValPayloadAlt: String =s"""{"testField": true, "other": 1000}"""
+
+    val testRequest = V2IngestRequest(testSubject, testKeyPayloadAlt, testValPayloadAlt.some, ValidationStrategy.Strict)
+    ingest(testRequest).attempt.unsafeRunSync() shouldBe a[Left[_, _]]
+  }
+
+  it should "reject a record that doesn't match schema" in {
+    val testKeyPayloadAlt: String = """{"id": "testing"}"""
+    val testValPayloadAlt: String =s"""{"testFieldOther": 1000}"""
+
+    val testRequest = V2IngestRequest(testSubject, testKeyPayloadAlt, testValPayloadAlt.some, ValidationStrategy.Strict)
+    ingest(testRequest).attempt.unsafeRunSync() shouldBe a[Left[_, _]]
+  }
+
 }
