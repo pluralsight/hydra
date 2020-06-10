@@ -12,7 +12,8 @@ import hydra.core.transport.ValidationStrategy
 import hydra.kafka.algebras.KafkaClientAlgebra
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.Schema
-import org.apache.avro.generic.GenericRecord
+import org.apache.avro.generic.{GenericDatumReader, GenericRecord}
+import org.apache.avro.io.DecoderFactory
 import scalacache._
 import scalacache.guava._
 import scalacache.memoization._
@@ -81,10 +82,37 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
 object IngestionFlowV2 {
 
   private implicit class ConvertToGenericRecord(s: String) {
-    def toGenericRecord(schema: Schema, useStrictValidation: Boolean): Try[GenericRecord] = {
-      val converter: JsonConverter[GenericRecord] =
-        new JsonConverter[GenericRecord](schema, useStrictValidation)
-      Try(converter.convert(s))
+
+    private def getAllPayloadFieldNames: Set[String] = {
+      import spray.json._
+      def loop(cur: JsValue): Set[String] = cur match {
+        case JsObject(f) => f.keySet ++ f.values.toSet.flatMap(loop)
+        case _ => Set.empty
+      }
+      loop(s.parseJson)
+    }
+
+    private def getAllSchemaFieldNames(schema: Schema): Set[String] = {
+      import Schema.Type._
+      import collection.JavaConverters._
+      def loop(sch: Schema): Set[String] = sch.getType match {
+        case RECORD => schema.getFields.asScala.toSet.flatMap { f: Schema.Field =>
+          loop(f.schema) ++ Set(f.name)
+        }
+        case _ => Set.empty
+      }
+      loop(schema)
+    }
+
+    def toGenericRecord(schema: Schema, useStrictValidation: Boolean): Try[GenericRecord] = Try {
+      if (useStrictValidation) {
+        val diff = getAllPayloadFieldNames diff getAllSchemaFieldNames(schema)
+        if (diff.nonEmpty) throw new Exception
+      }
+      val decoderFactory = new DecoderFactory
+      val decoder = decoderFactory.jsonDecoder(schema, s)
+      val reader = new GenericDatumReader[GenericRecord](schema)
+      reader.read(null, decoder)
     }
   }
 
