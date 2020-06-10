@@ -49,9 +49,9 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
     val suffix = if (isKey) "-key" else "-value"
     val location = s"$schemaRegistryBaseUrl/subjects/${subject.value}$suffix/versions/latest/schema"
     val pf: PartialFunction[Throwable, Try[A]] = {
-      case e: JsonToAvroConversionException =>
-        Failure(AvroConversionAugmentedException(s"${e.getClass.getName}: ${e.getMessage} [$location]"))
       case e: ValidationExtraFieldsError =>
+        Failure(AvroConversionAugmentedException(s"${e.getClass.getName}: ${e.getMessage} [$location]"))
+      case e: InvalidLogicalTypeError =>
         Failure(AvroConversionAugmentedException(s"${e.getClass.getName}: ${e.getMessage} [$location]"))
       case e: IOException =>
         Failure(AvroConversionAugmentedException(s"${e.getClass.getName}: ${e.getMessage} [$location]"))
