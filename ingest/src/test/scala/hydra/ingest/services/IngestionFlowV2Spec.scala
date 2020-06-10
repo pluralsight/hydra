@@ -33,10 +33,10 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
   private val testValSchema: Schema = SchemaBuilder.record("TestRecord")
     .fields().requiredBoolean("testField").endRecord()
 
-  private def ingest(request: V2IngestRequest): IO[KafkaClientAlgebra[IO]] = for {
+  private def ingest(request: V2IngestRequest, altValueSchema: Option[Schema] = None): IO[KafkaClientAlgebra[IO]] = for {
     schemaRegistry <- SchemaRegistry.test[IO]
     _ <- schemaRegistry.registerSchema(testSubject.value + "-key", testKeySchema)
-    _ <- schemaRegistry.registerSchema(testSubject.value + "-value", testValSchema)
+    _ <- schemaRegistry.registerSchema(testSubject.value + "-value", altValueSchema.getOrElse(testValSchema))
     kafkaClient <- KafkaClientAlgebra.test[IO]
     ingestFlow <- IO(new IngestionFlowV2[IO](schemaRegistry, kafkaClient, "https://schemaRegistry.notreal"))
     _ <- ingestFlow.ingest(request)
