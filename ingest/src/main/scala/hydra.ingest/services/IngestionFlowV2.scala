@@ -51,6 +51,8 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
     val pf: PartialFunction[Throwable, Try[A]] = {
       case e: JsonToAvroConversionException =>
         Failure(AvroConversionAugmentedException(s"${e.getClass.getName}: ${e.getMessage} [$location]"))
+      case e: ValidationExtraFieldsError =>
+        Failure(AvroConversionAugmentedException(s"${e.getClass.getName}: ${e.getMessage} [$location]"))
       case e: IOException =>
         Failure(AvroConversionAugmentedException(s"${e.getClass.getName}: ${e.getMessage} [$location]"))
       case e => Failure(e)
@@ -107,7 +109,7 @@ object IngestionFlowV2 {
     def toGenericRecord(schema: Schema, useStrictValidation: Boolean): Try[GenericRecord] = Try {
       if (useStrictValidation) {
         val diff = getAllPayloadFieldNames diff getAllSchemaFieldNames(schema)
-        if (diff.nonEmpty) throw new Exception
+        if (diff.nonEmpty) throw ValidationExtraFieldsError(diff)
       }
       val decoderFactory = new DecoderFactory
       val decoder = decoderFactory.jsonDecoder(schema, s)
@@ -118,6 +120,9 @@ object IngestionFlowV2 {
 
   final case class V2IngestRequest(topic: Subject, keyPayload: String, valPayload: Option[String], validationStrategy: ValidationStrategy)
 
+  final case class ValidationExtraFieldsError(fields: Set[String]) extends RuntimeException(
+    s"Extra fields ${fields.mkString(",")} found with Strict Validation Strategy"
+  )
   final case class AvroConversionAugmentedException(message: String) extends RuntimeException(message)
   final case class SchemaNotFoundAugmentedException(schemaNotFoundException: SchemaNotFoundException, topic: String)
     extends RuntimeException(s"Schema '$topic' cannot be loaded. Cause: ${schemaNotFoundException.getClass.getName}: Schema not found for $topic")
