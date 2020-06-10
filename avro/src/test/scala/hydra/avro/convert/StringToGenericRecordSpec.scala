@@ -98,4 +98,41 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     record shouldBe a[Success[_]]
   }
 
+  it should "reject a bad nested UUID logical type" in {
+    val inner = SchemaBuilder.record("testVal")
+      .fields()
+      .name("testUuid")
+      .`type`(LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.STRING)))
+      .noDefault
+      .endRecord
+    val schema = SchemaBuilder.record("testOuterVal")
+      .fields()
+      .requiredBoolean("extra")
+      .name("inner")
+      .`type`(inner)
+      .noDefault
+      .endRecord
+    val record = """{"extra": true, "inner": {"testUuid": "test"}}""".toGenericRecord(schema, useStrictValidation = true)
+    record shouldBe a[Failure[_]]
+  }
+
+  it should "accept a good nested UUID logical type" in {
+    val uuid = UUID.randomUUID
+    val inner = SchemaBuilder.record("testVal")
+      .fields()
+      .name("testUuid")
+      .`type`(LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.STRING)))
+      .noDefault
+      .endRecord
+    val schema = SchemaBuilder.record("testOuterVal")
+      .fields()
+      .requiredBoolean("extra")
+      .name("inner")
+      .`type`(inner)
+      .noDefault
+      .endRecord
+    val record = s"""{"extra": true, "inner": {"testUuid": "${uuid.toString}"}}""".toGenericRecord(schema, useStrictValidation = true)
+    record shouldBe a[Success[_]]
+  }
+
 }
