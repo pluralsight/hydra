@@ -4,7 +4,7 @@ import java.io.IOException
 
 import cats.MonadError
 import cats.implicits._
-import com.pluralsight.hydra.avro.{JsonConverter, JsonToAvroConversionException}
+import com.pluralsight.hydra.avro.JsonToAvroConversionException
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.resource.SchemaResourceLoader.SchemaNotFoundException
 import hydra.avro.util.SchemaWrapper
@@ -96,6 +96,7 @@ object IngestionFlowV2 {
 
     private def getAllSchemaFieldNames(schema: Schema): Set[String] = {
       import Schema.Type._
+
       import collection.JavaConverters._
       def loop(sch: Schema): Set[String] = sch.getType match {
         case RECORD => schema.getFields.asScala.toSet.flatMap { f: Schema.Field =>
