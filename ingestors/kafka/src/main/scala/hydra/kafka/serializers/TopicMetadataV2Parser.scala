@@ -313,15 +313,15 @@ sealed trait TopicMetadataV2Parser
     }
   }
 
-  implicit object MaybeSchemas extends RootJsonFormat[MaybeSchemas] {
+  implicit object MaybeSchemasFormat extends RootJsonFormat[MaybeSchemas] {
     override def read(json: JsValue): MaybeSchemas = throw IntentionallyUnimplemented
 
     override def write(obj: MaybeSchemas): JsValue =  {
-      val keyJson = obj.key.map(k => "key" -> new SchemaFormat(isKey = true).write(k))
-      val valueJson = obj.value.map(v => "value" -> new SchemaFormat(isKey = false).write(v))
+      val keyJson = ("key" -> obj.key.map(k => new SchemaFormat(isKey = true).write(k)).getOrElse(JsString("Unable to retrieve Key Schema")))
+      val valueJson = ("value" -> obj.value.map(v => new SchemaFormat(isKey = false).write(v)).getOrElse(JsString("Unable to retrieve Value Schema")))
 
       JsObject(
-        List(keyJson, valueJson).flatten.toMap
+        List(keyJson, valueJson).toMap
       )
     }
   }
