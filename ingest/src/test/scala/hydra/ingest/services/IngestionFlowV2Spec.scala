@@ -21,8 +21,6 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
 
   private val testSubject: Subject = Subject.createValidated("exp.test.v0.Testing").get
 
-  private val testKey: String = "test"
-
   private val testKeyPayload: String =
     """{"id": "testing"}"""
 
@@ -44,12 +42,22 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
     _ <- ingestFlow.ingest(request)
   } yield kafkaClient
 
-  it should "ingest a message" in {
+  it should "ingest a record" in {
     val testRequest = V2IngestRequest(testSubject, testKeyPayload, testValPayload.some, ValidationStrategy.Strict)
     ingest(testRequest).flatMap { kafkaClient =>
       kafkaClient.consumeMessages(testSubject.value, "test-consumer").take(1).compile.toList.map { publishedMessages =>
         val firstMessage = publishedMessages.head
         (firstMessage._1.toString, firstMessage._2.get.toString) shouldBe (testKeyPayload, testValPayload)
+      }
+    }.unsafeRunSync()
+  }
+
+  it should "ingest a tombstone record" in {
+    val testRequest = V2IngestRequest(testSubject, testKeyPayload, None, ValidationStrategy.Strict)
+    ingest(testRequest).flatMap { kafkaClient =>
+      kafkaClient.consumeMessages(testSubject.value, "test-consumer").take(1).compile.toList.map { publishedMessages =>
+        val firstMessage = publishedMessages.head
+        (firstMessage._1.toString, firstMessage._2) shouldBe (testKeyPayload, None)
       }
     }.unsafeRunSync()
   }
