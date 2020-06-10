@@ -45,34 +45,62 @@ object MetadataAlgebra {
       _ <- Concurrent[F].start(metadataStream.flatMap { case (key, value) =>
         fs2.Stream.eval {
           TopicMetadataV2.decode[F](key, value).flatMap { case (topicMetadataKey, topicMetadataValueOpt) =>
-            schemaRegistryAlgebra.getLatestSchemaBySubject(subject = topicMetadataKey.subject.value + "-key").flatMap { keySchema =>
-              schemaRegistryAlgebra.getLatestSchemaBySubject(subject = topicMetadataKey.subject.value + "-value").flatMap { valueSchema =>
-                topicMetadataValueOpt match {
-                  case Some(topicMetadataValue) =>
+            topicMetadataValueOpt match {
+              case Some(topicMetadataValue) =>
+                schemaRegistryAlgebra.getLatestSchemaBySubject(subject = topicMetadataKey.subject.value + "-key").flatMap { keySchema =>
+                  schemaRegistryAlgebra.getLatestSchemaBySubject(subject = topicMetadataKey.subject.value + "-value").flatMap { valueSchema =>
                     val topicMetadataV2Transport = TopicMetadataContainer(topicMetadataKey, topicMetadataValue, keySchema, valueSchema)
                     ref.update(_.addMetadata(topicMetadataV2Transport))
-                  case None =>
-                    Logger[F].error("Metadata value not found")
+                  }
+                }.recover {
+                  case e =>
+                    Logger[F].error(s"Error retrieving Schema from SchemaRegistry on Kafka Read: ${e.getMessage}")
+                    val topicMetadataV2Transport = TopicMetadataContainer(topicMetadataKey, topicMetadataValue, None, None)
+                    ref.update(_.addMetadata(topicMetadataV2Transport))
                 }
-              }
+              case None =>
+                Logger[F].error("Metadata value not found")
             }
           }
         }
       }.compile.drain)
-      algebra <- getMetadataAlgebra[F](ref)
+      algebra <- getMetadataAlgebra[F](ref, schemaRegistryAlgebra)
     } yield algebra
   }
 
-  private def getMetadataAlgebra[F[_]: Sync](cache: Ref[F, MetadataStorageFacade]): F[MetadataAlgebra[F]] = {
+  private def getMetadataAlgebra[F[_]: Sync: Logger](cache: Ref[F, MetadataStorageFacade], schemaRegistryAlgebra: SchemaRegistry[F]): F[MetadataAlgebra[F]] = {
     Sync[F].delay {
       new MetadataAlgebra[F] {
         override def getMetadataFor(subject: Subject): F[Option[TopicMetadataContainer]] =
-          cache.get.map(_.getMetadataByTopicName(subject))
-        // call schemaRegistry if schema DNE and update the value in the cache.
+          cache.get.map(_.getMetadataByTopicName(subject)).flatMap {
+            case Some(t) if t.keySchema.isEmpty | t.valueSchema.isEmpty =>
+              updateCacheWithNewSchemaRegistryValues(t).map(Some(_))
+            case a => Sync[F].pure(a)
+          }
 
         override def getAllMetadata: F[List[TopicMetadataContainer]] =
-          cache.get.map(_.getAllMetadata)
-        // Update broken metadata (those without schemas attached)
+          cache.get.map(_.getAllMetadata).flatMap { metadata =>
+            val (good2go, needs2beUpdated) = metadata.partition(m => m.keySchema.isDefined && m.valueSchema.isDefined)
+            needs2beUpdated.traverse(updateCacheWithNewSchemaRegistryValues).map(_ ++ good2go)
+          }
+
+        /**
+          * Updates TopicMetadataContainer with new values from SchemaRegistry
+          * @param t - TopicMetadataContainer with either keySchema=None or valueSchema=None
+          * @return TopicMetadataContainer with new Schemas from SchemaRegistry if they were undefined
+          */
+        private def updateCacheWithNewSchemaRegistryValues(t: TopicMetadataContainer): F[TopicMetadataContainer] = {
+          schemaRegistryAlgebra.getLatestSchemaBySubject(subject = t.key.subject.value + "-key").flatMap { keySchema =>
+            schemaRegistryAlgebra.getLatestSchemaBySubject(subject = t.key.subject.value + "-value").flatMap { valueSchema =>
+              val updatedTopic = t.copy(keySchema = t.keySchema.orElse(keySchema), valueSchema = t.valueSchema.orElse(valueSchema))
+              cache.update(_.addMetadata(updatedTopic)) *> Sync[F].pure(updatedTopic)
+            }
+          }.recover {
+            case e =>
+              Logger[F].error(s"Error retrieving Schema from SchemaRegistry: ${e.getMessage}")
+              t
+          }
+        }
       }
     }
   }
