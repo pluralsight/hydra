@@ -55,7 +55,6 @@ object ContactMethod {
 final case class Schemas(key: Schema, value: Schema)
 
 final case class TopicMetadataV2Request(
-    subject: Subject,
     schemas: Schemas,
     streamType: StreamType,
     deprecated: Boolean,
@@ -66,9 +65,8 @@ final case class TopicMetadataV2Request(
     notes: Option[String]
 ) {
 
-  def toKeyAndValue: (TopicMetadataV2Key, TopicMetadataV2Value) = {
-    val key = TopicMetadataV2Key(subject)
-    val value = TopicMetadataV2Value(
+  def toValue: TopicMetadataV2Value = {
+    TopicMetadataV2Value(
       streamType,
       deprecated,
       dataClassification,
@@ -77,7 +75,6 @@ final case class TopicMetadataV2Request(
       parentSubjects,
       notes
     )
-    (key, value)
   }
 }
 

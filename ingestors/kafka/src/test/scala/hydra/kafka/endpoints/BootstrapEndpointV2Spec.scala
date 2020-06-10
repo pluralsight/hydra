@@ -2,16 +2,17 @@ package hydra.kafka.endpoints
 
 import java.time.Instant
 
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.javadsl.model.headers.RawHeader
+import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, HttpHeader, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import cats.data.NonEmptyList
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
-import hydra.core.marshallers.History
+import hydra.core.marshallers.{History, StreamType}
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
-import hydra.kafka.model.ContactMethod.Email
+import hydra.kafka.model.ContactMethod.{Email, Slack}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import hydra.kafka.programs.CreateTopicProgram
@@ -24,7 +25,8 @@ import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import retry.{RetryPolicies, RetryPolicy}
-
+import spray.json._
+import TopicMetadataV2Parser._
 import scala.concurrent.ExecutionContext
 
 final class BootstrapEndpointV2Spec
@@ -87,7 +89,6 @@ final class BootstrapEndpointV2Spec
         .endRecord()
 
     val validRequest = TopicMetadataV2Request(
-      Subject.createValidated("testing").get,
       Schemas(getTestSchema("key"), getTestSchema("value")),
       History,
       deprecated = false,
@@ -96,17 +97,29 @@ final class BootstrapEndpointV2Spec
       Instant.now,
       List.empty,
       None
-    )
-
-    import TopicMetadataV2Parser._
+    ).toJson.compactPrint
 
     "accept a valid request" in {
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
-          Put("/v2/topics/testing", validRequest) ~> Route.seal(
+          Put("/v2/topics/testing", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> Route.seal(
             bootstrapEndpoint.route
           ) ~> check {
             response.status shouldBe StatusCodes.OK
+          }
+        }
+        .unsafeRunSync()
+    }
+
+    "reject a request with invalid name" in {
+      testCreateTopicProgram
+        .map { bootstrapEndpoint =>
+          Put("/v2/topics/invalid%20name", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> Route.seal(
+            bootstrapEndpoint.route
+          ) ~> check {
+            val r = responseAs[String]
+            r shouldBe Subject.invalidFormat
+            response.status shouldBe StatusCodes.BadRequest
           }
         }
         .unsafeRunSync()

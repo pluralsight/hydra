@@ -203,7 +203,6 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
 
       tmv2 shouldBe
         TopicMetadataV2Request(
-          subject,
           Schemas(
             new SchemaFormat(isKey = true).read(validAvroSchema),
             new SchemaFormat(isKey = false).read(validAvroSchema)
@@ -240,7 +239,6 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
 
       tmv2 shouldBe
         TopicMetadataV2Request(
-          subject,
           Schemas(
             new SchemaFormat(isKey = true).read(validAvroSchema),
             new SchemaFormat(isKey = false).read(validAvroSchema)
@@ -307,7 +305,6 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
   ) = {
     val jsValue = s"""
          |{
-         |  "subject": "${subject.value}",
          |  "schemas": {
          |   "key": ${validAvroSchema.compactPrint},
          |   "value": ${validAvroSchema.compactPrint}
@@ -415,7 +412,6 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val notes = Some("Notes go here.")
 
       val topicMetadataV2 = TopicMetadataV2Request(
-        subject = subject,
         schemas = Schemas(
           keySchema,
           valueSchema
