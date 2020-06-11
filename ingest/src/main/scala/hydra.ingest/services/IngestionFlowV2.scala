@@ -4,7 +4,6 @@ import java.io.IOException
 
 import cats.MonadError
 import cats.implicits._
-import com.pluralsight.hydra.avro.JsonToAvroConversionException
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.resource.SchemaResourceLoader.SchemaNotFoundException
 import hydra.avro.util.SchemaWrapper
