@@ -59,30 +59,29 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
     pf
   }
 
-  private def getSchemas(request: V2IngestRequest): F[(GenericRecord, Option[GenericRecord])] = {
-    val useStrictValidation = request.validationStrategy == ValidationStrategy.Strict
+  private def getSchemas(request: V2IngestRequest, topic: Subject): F[(GenericRecord, Option[GenericRecord])] = {
+    val useStrictValidation = request.validationStrategy.getOrElse(ValidationStrategy.Strict) == ValidationStrategy.Strict
     def getRecord(payload: String, schema: Schema): Try[GenericRecord] =
       payload.toGenericRecord(schema, useStrictValidation)
     for {
-      kSchema <- getSchemaWrapper(request.topic, isKey = true)
-      vSchema <- getSchemaWrapper(request.topic, isKey = false)
+      kSchema <- getSchemaWrapper(topic, isKey = true)
+      vSchema <- getSchemaWrapper(topic, isKey = false)
       k <- MonadError[F, Throwable].fromTry(
-        getRecord(request.keyPayload, kSchema.schema).recoverWith(recover(request.topic, isKey = true)))
+        getRecord(request.keyPayload, kSchema.schema).recoverWith(recover(topic, isKey = true)))
       v <- MonadError[F, Throwable].fromTry(
-        request.valPayload.traverse(getRecord(_, vSchema.schema)).recoverWith(recover(request.topic, isKey = false)))
+        request.valPayload.traverse(getRecord(_, vSchema.schema)).recoverWith(recover(topic, isKey = false)))
     } yield (k, v)
   }
 
-  def ingest(request: V2IngestRequest): F[Unit] = {
-    getSchemas(request).flatMap { case (key, value) =>
-      kafkaClient.publishMessage((key, value), request.topic.value).void
+  def ingest(request: V2IngestRequest, topic: Subject): F[Unit] = {
+    getSchemas(request, topic).flatMap { case (key, value) =>
+      kafkaClient.publishMessage((key, value), topic.value).void
     }
   }
 }
 
 object IngestionFlowV2 {
-
-  final case class V2IngestRequest(topic: Subject, keyPayload: String, valPayload: Option[String], validationStrategy: ValidationStrategy)
+  final case class V2IngestRequest(keyPayload: String, valPayload: Option[String], validationStrategy: Option[ValidationStrategy])
 
   final case class AvroConversionAugmentedException(message: String) extends RuntimeException(message)
   final case class SchemaNotFoundAugmentedException(schemaNotFoundException: SchemaNotFoundException, topic: String)

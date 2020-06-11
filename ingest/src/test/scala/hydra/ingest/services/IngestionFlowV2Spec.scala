@@ -39,11 +39,11 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
     _ <- schemaRegistry.registerSchema(testSubject.value + "-value", altValueSchema.getOrElse(testValSchema))
     kafkaClient <- KafkaClientAlgebra.test[IO]
     ingestFlow <- IO(new IngestionFlowV2[IO](schemaRegistry, kafkaClient, "https://schemaRegistry.notreal"))
-    _ <- ingestFlow.ingest(request)
+    _ <- ingestFlow.ingest(request, testSubject)
   } yield kafkaClient
 
   it should "ingest a record" in {
-    val testRequest = V2IngestRequest(testSubject, testKeyPayload, testValPayload.some, ValidationStrategy.Strict)
+    val testRequest = V2IngestRequest(testKeyPayload, testValPayload.some, ValidationStrategy.Strict.some)
     ingest(testRequest).flatMap { kafkaClient =>
       kafkaClient.consumeMessages(testSubject.value, "test-consumer").take(1).compile.toList.map { publishedMessages =>
         val firstMessage = publishedMessages.head
@@ -53,7 +53,7 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
   }
 
   it should "ingest a tombstone record" in {
-    val testRequest = V2IngestRequest(testSubject, testKeyPayload, None, ValidationStrategy.Strict)
+    val testRequest = V2IngestRequest(testKeyPayload, None, ValidationStrategy.Strict.some)
     ingest(testRequest).flatMap { kafkaClient =>
       kafkaClient.consumeMessages(testSubject.value, "test-consumer").take(1).compile.toList.map { publishedMessages =>
         val firstMessage = publishedMessages.head
@@ -66,7 +66,7 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
     val testKeyPayloadAlt: String = """{"id": "testing", "random": "blah"}"""
     val testValPayloadAlt: String =s"""{"testField": true, "other": 1000}"""
 
-    val testRequest = V2IngestRequest(testSubject, testKeyPayloadAlt, testValPayloadAlt.some, ValidationStrategy.Relaxed)
+    val testRequest = V2IngestRequest(testKeyPayloadAlt, testValPayloadAlt.some, ValidationStrategy.Relaxed.some)
     ingest(testRequest).flatMap { kafkaClient =>
       kafkaClient.consumeMessages(testSubject.value, "test-consumer").take(1).compile.toList.map { publishedMessages =>
         val firstMessage = publishedMessages.head
@@ -79,7 +79,15 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
     val testKeyPayloadAlt: String = """{"id": "testing", "random": "blah"}"""
     val testValPayloadAlt: String =s"""{"testField": true, "other": 1000}"""
 
-    val testRequest = V2IngestRequest(testSubject, testKeyPayloadAlt, testValPayloadAlt.some, ValidationStrategy.Strict)
+    val testRequest = V2IngestRequest(testKeyPayloadAlt, testValPayloadAlt.some, ValidationStrategy.Strict.some)
+    ingest(testRequest).attempt.unsafeRunSync() shouldBe a[Left[_, _]]
+  }
+
+  it should "reject a record with extra fields and no validation specified" in {
+    val testKeyPayloadAlt: String = """{"id": "testing", "random": "blah"}"""
+    val testValPayloadAlt: String =s"""{"testField": true, "other": 1000}"""
+
+    val testRequest = V2IngestRequest(testKeyPayloadAlt, testValPayloadAlt.some, None)
     ingest(testRequest).attempt.unsafeRunSync() shouldBe a[Left[_, _]]
   }
 
@@ -87,7 +95,7 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
     val testKeyPayloadAlt: String = """{"id": "testing"}"""
     val testValPayloadAlt: String =s"""{"testFieldOther": 1000}"""
 
-    val testRequest = V2IngestRequest(testSubject, testKeyPayloadAlt, testValPayloadAlt.some, ValidationStrategy.Strict)
+    val testRequest = V2IngestRequest(testKeyPayloadAlt, testValPayloadAlt.some, ValidationStrategy.Strict.some)
     ingest(testRequest).attempt.unsafeRunSync() shouldBe a[Left[_, _]]
   }
 
