@@ -4,7 +4,8 @@ import akka.actor.{Actor, ActorRef, ActorSelection, Props}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
-import cats.effect.{Concurrent, ContextShift, IO}
+import cats.effect.{Concurrent, ContextShift, IO, Sync}
+import hydra.avro.registry.SchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
 import hydra.kafka.algebras.{KafkaClientAlgebra, MetadataAlgebra}
@@ -12,11 +13,14 @@ import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadataV2Request.Subject
+import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
+import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.kafka.common.{Node, PartitionInfo}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
+
 import scala.concurrent.ExecutionContext
 
 
@@ -34,6 +38,9 @@ class TopicMetadataEndpointSpec
   import scala.concurrent.duration._
 
   import ConfigSupport._
+
+  implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
+    Slf4jLogger.getLogger[F]
 
   implicit val kafkaConfig: EmbeddedKafkaConfig =
     EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
@@ -61,7 +68,8 @@ class TopicMetadataEndpointSpec
 
   val route: Route = (for {
     kafkaClient <- KafkaClientAlgebra.test[IO]
-    metadataAlgebra <- MetadataAlgebra.make[IO]("topicName-Bill", "I'm_A_Jerk", kafkaClient, consumeMetadataEnabled = false)
+    schemaRegistry <- SchemaRegistry.test[IO]
+    metadataAlgebra <- MetadataAlgebra.make[IO]("topicName-Bill", "I'm_A_Jerk", kafkaClient, schemaRegistry, consumeMetadataEnabled = false)
   } yield new TopicMetadataEndpoint(consumerProxy, metadataAlgebra).route).unsafeRunSync()
 
   val node = new Node(0, "host", 1)

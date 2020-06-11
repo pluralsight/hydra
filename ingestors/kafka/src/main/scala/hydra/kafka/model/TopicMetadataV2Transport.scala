@@ -6,7 +6,9 @@ import cats.data.NonEmptyList
 import eu.timepit.refined._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string._
+import hydra.common.logging.LoggingAdapter
 import hydra.core.marshallers.StreamType
+import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.Schema
 
@@ -81,7 +83,7 @@ final case class TopicMetadataV2Request(
   }
 }
 
-object TopicMetadataV2Request {
+object TopicMetadataV2Request extends LoggingAdapter {
   type SubjectRegex = MatchesRegex[W.`"""^[a-zA-Z0-9_\\-\\.]+$"""`.T]
   type Subject = String Refined SubjectRegex
 
@@ -94,3 +96,34 @@ object TopicMetadataV2Request {
     val invalidFormat = "Invalid Subject. Subject may contain only alphanumeric characters, hyphens(-), underscores(_), and periods(.)"
   }
 }
+
+final case class MaybeSchemas(key: Option[Schema], value: Option[Schema])
+final case class TopicMetadataV2Response(
+                                          subject: Subject,
+                                          schemas: MaybeSchemas,
+                                          streamType: StreamType,
+                                          deprecated: Boolean,
+                                          dataClassification: DataClassification,
+                                          contact: NonEmptyList[ContactMethod],
+                                          createdDate: Instant,
+                                          parentSubjects: List[Subject],
+                                          notes: Option[String]
+                                        )
+object TopicMetadataV2Response {
+  def fromTopicMetadataContainer(m: TopicMetadataContainer): TopicMetadataV2Response = {
+    val (k, v, keySchema, valueSchema) = (m.key, m.value, m.keySchema, m.valueSchema)
+    TopicMetadataV2Response(
+      k.subject,
+      MaybeSchemas(keySchema, valueSchema),
+      v.streamType,
+      v.deprecated,
+      v.dataClassification,
+      v.contact,
+      v.createdDate,
+      v.parentSubjects,
+      v.notes
+    )
+  }
+}
+
+
