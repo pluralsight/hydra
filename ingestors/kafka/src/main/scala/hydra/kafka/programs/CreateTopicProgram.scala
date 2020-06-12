@@ -110,8 +110,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   }
 
   def createTopic(
-      createTopicRequest: TopicMetadataV2Request,
-      topicDetails: TopicDetails
+                   createTopicRequest: TopicMetadataV2Request,
+                   topicDetails: TopicDetails
   ): F[Unit] = {
     (for {
       _ <- registerSchemas(

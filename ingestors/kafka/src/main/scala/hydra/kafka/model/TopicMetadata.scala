@@ -21,6 +21,7 @@ import scala.util.control.NoStackTrace
 /**
   * Created by alexsilva on 3/30/17.
   */
+
 case class TopicMetadata(
     subject: String,
     schemaId: Int,
@@ -41,7 +42,7 @@ object TopicMetadataV2 {
     (
       Validated.fromEither(TopicMetadataV2Key.codec.schema).toValidatedNel,
       Validated.fromEither(TopicMetadataV2Value.codec.schema).toValidatedNel
-    ).mapN(Schemas) match {
+    ).mapN(Schemas.apply) match {
       case Valid(s) =>
         Applicative[F].pure(s)
       case Invalid(e) =>

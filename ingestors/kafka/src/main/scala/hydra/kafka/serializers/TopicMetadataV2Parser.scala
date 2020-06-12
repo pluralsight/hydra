@@ -6,27 +6,21 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import cats.data.Validated.{Invalid, Valid}
 import cats.data._
 import cats.implicits._
-import eu.timepit.refined._
 import eu.timepit.refined.auto._
 import hydra.core.marshallers._
 import hydra.kafka.model.ContactMethod.{Email, Slack}
-import hydra.kafka.model.TopicMetadataV2Request.{Subject, SubjectRegex}
+import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import hydra.kafka.serializers.Errors._
+import hydra.kafka.serializers.TopicMetadataV2Parser.IntentionallyUnimplemented
 import org.apache.avro.Schema
-import spray.json.{
-  DefaultJsonProtocol,
-  DeserializationException,
-  JsNull,
-  JsObject,
-  JsString,
-  JsValue,
-  RootJsonFormat
-}
+import spray.json.{DefaultJsonProtocol, DeserializationException, JsObject, JsString, JsValue, RootJsonFormat}
 
 import scala.util.{Failure, Success, Try}
 
-object TopicMetadataV2Parser extends TopicMetadataV2Parser
+object TopicMetadataV2Parser extends TopicMetadataV2Parser {
+  case object IntentionallyUnimplemented extends RuntimeException
+}
 
 sealed trait TopicMetadataV2Parser
     extends SprayJsonSupport
@@ -317,6 +311,25 @@ sealed trait TopicMetadataV2Parser
       case j =>
         throw DeserializationException(invalidPayloadProvided(j))
     }
+  }
+
+  implicit object MaybeSchemasFormat extends RootJsonFormat[MaybeSchemas] {
+    override def read(json: JsValue): MaybeSchemas = throw IntentionallyUnimplemented
+
+    override def write(obj: MaybeSchemas): JsValue =  {
+      val keyJson = ("key" -> obj.key.map(k => new SchemaFormat(isKey = true).write(k)).getOrElse(JsString("Unable to retrieve Key Schema")))
+      val valueJson = ("value" -> obj.value.map(v => new SchemaFormat(isKey = false).write(v)).getOrElse(JsString("Unable to retrieve Value Schema")))
+
+      JsObject(
+        List(keyJson, valueJson).toMap
+      )
+    }
+  }
+
+  implicit object TopicMetadataResponseV2Format extends RootJsonFormat[TopicMetadataV2Response] {
+    override def read(json: JsValue): TopicMetadataV2Response = throw IntentionallyUnimplemented
+
+    override def write(obj: TopicMetadataV2Response): JsValue = jsonFormat9(TopicMetadataV2Response.apply).write(obj)
   }
 
   private def throwDeserializationError(key: String, `type`: String) =
