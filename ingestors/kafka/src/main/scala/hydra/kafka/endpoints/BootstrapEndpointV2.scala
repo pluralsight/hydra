@@ -43,17 +43,17 @@ final class BootstrapEndpointV2[F[_]: Futurable](
       pathEndOrSingleSlash {
         put {
           entity(as[TopicMetadataV2Request]) { t =>
-            val validatedTopic = Subject.createValidated(topicName)
-            if (validatedTopic.isEmpty) {
-              complete(StatusCodes.BadRequest, Subject.invalidFormat)
-            } else {
-              onComplete(
-                Futurable[F].unsafeToFuture(createTopicProgram
-                  .createTopic(validatedTopic.get, t, defaultTopicDetails))
-              ) {
-                case Success(_) => complete(StatusCodes.OK)
-                case Failure(e) => complete(StatusCodes.InternalServerError, e)
-              }
+            Subject.createValidated(topicName) match {
+              case Some(validatedTopic) =>
+                onComplete(
+                  Futurable[F].unsafeToFuture(createTopicProgram
+                    .createTopic(validatedTopic, t, defaultTopicDetails))
+                ) {
+                  case Success(_) => complete(StatusCodes.OK)
+                  case Failure(e) => complete(StatusCodes.InternalServerError, e)
+                }
+              case None =>
+                complete(StatusCodes.BadRequest, Subject.invalidFormat)
             }
           }
         }
