@@ -6,7 +6,6 @@ import cats.data.NonEmptyList
 import eu.timepit.refined._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string._
-import hydra.common.logging.LoggingAdapter
 import hydra.core.marshallers.StreamType
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -57,7 +56,6 @@ object ContactMethod {
 final case class Schemas(key: Schema, value: Schema)
 
 final case class TopicMetadataV2Request(
-    subject: Subject,
     schemas: Schemas,
     streamType: StreamType,
     deprecated: Boolean,
@@ -68,9 +66,8 @@ final case class TopicMetadataV2Request(
     notes: Option[String]
 ) {
 
-  def toKeyAndValue: (TopicMetadataV2Key, TopicMetadataV2Value) = {
-    val key = TopicMetadataV2Key(subject)
-    val value = TopicMetadataV2Value(
+  def toValue: TopicMetadataV2Value = {
+    TopicMetadataV2Value(
       streamType,
       deprecated,
       dataClassification,
@@ -79,11 +76,10 @@ final case class TopicMetadataV2Request(
       parentSubjects,
       notes
     )
-    (key, value)
   }
 }
 
-object TopicMetadataV2Request extends LoggingAdapter {
+object TopicMetadataV2Request {
   type SubjectRegex = MatchesRegex[W.`"""^[a-zA-Z0-9_\\-\\.]+$"""`.T]
   type Subject = String Refined SubjectRegex
 

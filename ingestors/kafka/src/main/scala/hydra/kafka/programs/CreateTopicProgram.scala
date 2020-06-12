@@ -11,7 +11,7 @@ import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Re
 import hydra.kafka.producer.AvroKeyRecord
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
-import org.apache.avro.Schema
+import org.apache.avro.{Schema, SchemaParseException}
 import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy, _}
 
@@ -98,9 +98,10 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   }
 
   private def publishMetadata(
+      topicName: Subject,
       createTopicRequest: TopicMetadataV2Request
   ): F[Unit] = {
-    val message = createTopicRequest.toKeyAndValue
+    val message = (TopicMetadataV2Key(topicName), createTopicRequest.toValue)
     for {
       records <- TopicMetadataV2.encode[F](message._1, Some(message._2))
       _ <- kafkaClient
@@ -110,17 +111,18 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   }
 
   def createTopic(
-                   createTopicRequest: TopicMetadataV2Request,
-                   topicDetails: TopicDetails
+      topicName: Subject,
+      createTopicRequest: TopicMetadataV2Request,
+      topicDetails: TopicDetails
   ): F[Unit] = {
     (for {
       _ <- registerSchemas(
-        createTopicRequest.subject,
+        topicName,
         createTopicRequest.schemas.key,
         createTopicRequest.schemas.value
       )
-      _ <- createTopicResource(createTopicRequest.subject, topicDetails)
-      _ <- Resource.liftF(publishMetadata(createTopicRequest))
+      _ <- createTopicResource(topicName, topicDetails)
+      _ <- Resource.liftF(publishMetadata(topicName, createTopicRequest))
     } yield ()).use(_ => Bracket[F, Throwable].unit)
   }
 }

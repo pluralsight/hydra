@@ -239,7 +239,7 @@ sealed trait TopicMetadataV2Parser
       extends RootJsonFormat[TopicMetadataV2Request] {
 
     override def write(obj: TopicMetadataV2Request): JsValue =
-      jsonFormat9(TopicMetadataV2Request.apply).write(obj)
+      jsonFormat8(TopicMetadataV2Request.apply).write(obj)
 
     override def read(json: JsValue): TopicMetadataV2Request = json match {
       case j: JsObject =>
@@ -294,7 +294,6 @@ sealed trait TopicMetadataV2Parser
           j.getFields("notes").headOption.map(_.convertTo[String])
         )
         (
-          subject,
           schemas,
           streamType,
           deprecated,
