@@ -3,7 +3,7 @@ package hydra.kafka.endpoints
 import java.time.Instant
 
 import akka.http.javadsl.model.headers.RawHeader
-import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, HttpHeader, StatusCodes}
+import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, HttpHeader, MediaTypes, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import cats.data.NonEmptyList
@@ -27,6 +27,7 @@ import org.scalatest.wordspec.AnyWordSpecLike
 import retry.{RetryPolicies, RetryPolicy}
 import spray.json._
 import TopicMetadataV2Parser._
+
 import scala.concurrent.ExecutionContext
 
 final class BootstrapEndpointV2Spec
@@ -154,7 +155,7 @@ final class BootstrapEndpointV2Spec
           KafkaAdminAlgebra
             .test[IO]
             .map { kafka =>
-              Put("/v2/topics/testing/", validRequest) ~> Route.seal(
+              Put("/v2/topics/testing/", HttpEntity(MediaTypes.`application/json`, validRequest)) ~> Route.seal(
                 getTestCreateTopicProgram(failingSchemaRegistry, kafka, client, m).route
               ) ~> check {
                 response.status shouldBe StatusCodes.InternalServerError

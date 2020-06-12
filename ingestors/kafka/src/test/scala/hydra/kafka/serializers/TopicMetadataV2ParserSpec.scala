@@ -452,10 +452,11 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         Some(new SchemaFormat(isKey = true).read(validAvroSchema)),
         Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
       val response = TopicMetadataV2Response.fromTopicMetadataContainer(tmc)
-      val request = TopicMetadataV2Request.apply(tmc.key.subject,Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,
+      val request = TopicMetadataV2Request.apply(Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,
         tmc.value.deprecated,tmc.value.dataClassification,tmc.value.contact,tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes)
 
-      TopicMetadataV2Format.write(request) shouldBe TopicMetadataResponseV2Format.write(response)
+      TopicMetadataV2Format.write(request).compactPrint shouldBe
+        TopicMetadataResponseV2Format.write(response).compactPrint.replace(",\"subject\":\"valid\"", "")
     }
 
     def createSchema: Schema = {
