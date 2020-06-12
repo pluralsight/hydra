@@ -19,14 +19,55 @@ package hydra.ingest.http
 import hydra.core.ingest.IngestionReport
 import hydra.core.marshallers.HydraJsonSupport
 import hydra.core.protocol.IngestorStatus
+import hydra.core.transport.ValidationStrategy
 import hydra.ingest.IngestorInfo
+import hydra.ingest.services.IngestionFlowV2.V2IngestRequest
+import spray.json.JsObject
 
-/**
-  * Created by alexsilva on 2/18/16.
-  */
+private object HydraIngestJsonSupport {
+  private final case class IntermediateV2IngestRequest(
+                                                        key: JsObject,
+                                                        value: Option[JsObject],
+                                                        validationStrategy: Option[ValidationStrategy]
+                                                      )
+}
+
 trait HydraIngestJsonSupport extends HydraJsonSupport {
 
+  import HydraIngestJsonSupport._
   import spray.json._
+
+  implicit object ValidationStrategyFormat extends RootJsonFormat[ValidationStrategy] {
+
+    def read(json: JsValue): ValidationStrategy = json match {
+      case JsString(s) if s.toLowerCase == "strict" => ValidationStrategy.Strict
+      case JsString(s) if s.toLowerCase == "relaxed" => ValidationStrategy.Relaxed
+      case _ =>
+        import scala.reflect.runtime.{universe => ru}
+        val tpe = ru.typeOf[ValidationStrategy]
+        val clazz = tpe.typeSymbol.asClass
+        throw DeserializationException(
+          s"expected a ValidationStrategy of ${clazz.knownDirectSubclasses}, but got $json"
+        )
+    }
+
+    def write(obj: ValidationStrategy): JsValue = {
+      JsString(obj.toString)
+    }
+  }
+
+  private implicit val intermediateV2IngestRequestFormat: JsonFormat[IntermediateV2IngestRequest] =
+    jsonFormat3(IntermediateV2IngestRequest)
+
+  implicit object V2IngestRequestFormat extends RootJsonFormat[V2IngestRequest] {
+    override def read(json: JsValue): V2IngestRequest = {
+      val int = intermediateV2IngestRequestFormat.read(json)
+      V2IngestRequest(int.key.compactPrint, int.value.map(_.compactPrint), int.validationStrategy)
+    }
+
+    // Intentionally unimplemented, `V2IngestRequest` is only a request not a response
+    override def write(obj: V2IngestRequest): JsValue = ???
+  }
 
   implicit val ingestorInfoFormat = jsonFormat4(IngestorInfo)
 

@@ -54,7 +54,6 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](
           case Some(p) => convertToAvro(topic, schemaWrapper, useStrictValidation, p).map(avroRecord => Some(avroRecord.payload))
           case None => Success(None)
         }
-        // TODO: Support v2
         val v1Key = getV1RecordKey(schemaWrapper, payloadTryMaybe, request)
         MonadError[F, Throwable].fromTry(payloadTryMaybe).flatMap { payloadMaybe =>
           kafkaClient.publishStringKeyMessage((v1Key, payloadMaybe), topic).void
