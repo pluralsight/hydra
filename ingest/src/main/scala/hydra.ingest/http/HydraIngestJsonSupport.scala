@@ -65,6 +65,7 @@ trait HydraIngestJsonSupport extends HydraJsonSupport {
       V2IngestRequest(int.key.compactPrint, int.value.map(_.compactPrint), int.validationStrategy)
     }
 
+    // Intentionally unimplemented, `V2IngestRequest` is only a request not a response
     override def write(obj: V2IngestRequest): JsValue = ???
   }
 
