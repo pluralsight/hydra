@@ -113,7 +113,7 @@ object SchemaRegistry {
 
       private implicit class CheckKeySchemaEvolution(schemasF: F[List[Schema]]) {
         def checkKeyEvolution(subject: String, newSchema: Schema): F[List[Schema]] = schemasF.flatTap[Unit] {
-          case _ if !subject.endsWith("-key") => Sync[F].unit
+          case _ if subject.endsWith("-value") => Sync[F].unit
           case Nil => Sync[F].unit
           case oldSchema :: Nil =>
             if (oldSchema.hashCode == newSchema.hashCode) {

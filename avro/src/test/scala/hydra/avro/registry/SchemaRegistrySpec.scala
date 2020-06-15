@@ -25,7 +25,7 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
   private def testAddSubject[F[_]: Monad](
       schemaRegistry: SchemaRegistry[F]
   ): F[Unit] = {
-    val subject = "testSubjectAdd"
+    val subject = "testSubjectAdd-value"
     for {
       schema <- getSchema[F]("testSchemaAdd")
       _ <- schemaRegistry.registerSchema(subject, schema)
@@ -43,10 +43,11 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
     def recordBuilder(name: String): SchemaBuilder.FieldAssembler[Schema] = {
       SchemaBuilder.record(name).fields().requiredString("id")
     }
-    val subject = "testSubjectAdd"
+    val subject = "testSubjectAdd-value"
+    val name = "testSubjectAdd"
 
-    val schema = recordBuilder(subject).endRecord()
-    val evolvedSchema = recordBuilder(subject).nullableBoolean("nullBool", false).endRecord()
+    val schema = recordBuilder(name).endRecord()
+    val evolvedSchema = recordBuilder(name).nullableBoolean("nullBool", false).endRecord()
 
     for {
       _ <- schemaRegistry.registerSchema(subject, schema)
@@ -106,9 +107,9 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
   private def testDeleteSchemaVersion[F[_]: Monad](
       schemaRegistry: SchemaRegistry[F]
   ): F[Unit] = {
-    val subject = "testSubjectDelete"
+    val subject = "testSubjectDelete-value"
     for {
-      schema <- getSchema[F]("testSchemaDelete")
+      schema <- getSchema[F]("testSubjectDelete")
       _ <- schemaRegistry.registerSchema(subject, schema)
       version <- schemaRegistry.getVersion(subject, schema)
       _ <- schemaRegistry.deleteSchemaOfVersion(subject, version)
@@ -123,7 +124,7 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
   private def testGetAllSubjects[F[_]: Monad](
       schemaRegistry: SchemaRegistry[F]
   ): F[Unit] = {
-    val subject = "testGetAllSubjects"
+    val subject = "testGetAllSubjects-value"
     for {
       schema <- getSchema[F]("testGetAllSubjects")
       allSubjectsEmpty <- schemaRegistry.getAllSubjects
@@ -183,8 +184,8 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
     }
     val subject = "testSubjectAdd"
 
-    val schema = recordBuilder(subject).endRecord()
-    val invalidSchemaEvolution = recordBuilder(subject).requiredBoolean("nullBool").endRecord()
+    val schema = recordBuilder("testName").endRecord()
+    val invalidSchemaEvolution = recordBuilder("testName").requiredBoolean("nullBool").endRecord()
 
     for {
       schemaRegistry <- schemaRegistryIO
