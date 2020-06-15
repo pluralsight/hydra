@@ -2,7 +2,7 @@ package hydra.avro.registry
 
 import cats.effect.IO
 import cats.implicits._
-import cats.{Applicative, Monad}
+import cats.{Applicative, Monad, MonadError}
 import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -55,6 +55,50 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
     } yield {
       it must "add a schema with an evolved schema" in {
         allVersions shouldBe List(1, 2)
+      }
+    }
+  }
+
+  private def testNoAddKeyNoEvolution[F[_]: Monad](
+                                             schemaRegistry: SchemaRegistry[F]
+                                           ): F[Unit] = {
+    def recordBuilder(name: String): SchemaBuilder.FieldAssembler[Schema] = {
+      SchemaBuilder.record(name).fields().requiredString("id")
+    }
+    val subject = "testSubjectAdd-key"
+
+    val schema = recordBuilder("schemaNameTest").endRecord()
+
+    for {
+      _ <- schemaRegistry.registerSchema(subject, schema)
+      _ <- schemaRegistry.registerSchema(subject, schema)
+      allVersions <- schemaRegistry.getAllVersions(subject)
+    } yield {
+      it must "not add a schema when no key evolution takes place" in {
+        allVersions shouldBe List(1)
+      }
+    }
+  }
+
+  private def testErrorKeyEvolution[F[_]: MonadError[*[_], Throwable]](
+                                                    schemaRegistry: SchemaRegistry[F]
+                                                  ): F[Unit] = {
+    def recordBuilder(name: String): SchemaBuilder.FieldAssembler[Schema] = {
+      SchemaBuilder.record(name).fields().requiredString("id")
+    }
+    val subject = "testSubjectAdd-key"
+
+    val schema = recordBuilder("schemaName").endRecord()
+    val evolvedSchema = recordBuilder("schemaName").nullableBoolean("nullBool", false).endRecord()
+
+    for {
+      _ <- schemaRegistry.registerSchema(subject, schema)
+      error <- schemaRegistry.registerSchema(subject, evolvedSchema).attempt
+      allVersions <- schemaRegistry.getAllVersions(subject)
+    } yield {
+      it must "return an error when a key schema evolution is attempted" in {
+        error shouldBe IncompatibleSchemaException("Key schema evolutions are not permitted.").asLeft
+        allVersions shouldBe List(1)
       }
     }
   }
@@ -149,12 +193,14 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
     } yield ()
   }
 
-  private def runTests[F[_]: Monad](
+  private def runTests[F[_]: MonadError[*[_], Throwable]](
       schemaRegistry: F[SchemaRegistry[F]]
   ): F[Unit] = {
     for {
       _ <- schemaRegistry.flatMap(testAddSubject[F])
       _ <- schemaRegistry.flatMap(testAddEvolution[F])
+      _ <- schemaRegistry.flatMap(testNoAddKeyNoEvolution[F])
+      _ <- schemaRegistry.flatMap(testErrorKeyEvolution[F])
       _ <- schemaRegistry.flatMap(testDeleteSchemaVersion[F])
       _ <- schemaRegistry.flatMap(testGetAllSubjects[F])
       _ <- testSchemaEvolutionValidation[F]

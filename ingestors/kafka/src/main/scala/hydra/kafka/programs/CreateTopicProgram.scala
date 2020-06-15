@@ -126,3 +126,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     } yield ()).use(_ => Bracket[F, Throwable].unit)
   }
 }
+
+object CreateTopicProgram {
+
+}

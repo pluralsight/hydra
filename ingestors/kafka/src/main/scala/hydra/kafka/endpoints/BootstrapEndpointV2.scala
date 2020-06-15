@@ -19,6 +19,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
+import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
 import hydra.common.util.Futurable
 import hydra.core.http.CorsSupport
 import hydra.core.marshallers.GenericServiceResponse
@@ -50,6 +51,7 @@ final class BootstrapEndpointV2[F[_]: Futurable](
                     .createTopic(validatedTopic, t, defaultTopicDetails))
                 ) {
                   case Success(_) => complete(StatusCodes.OK)
+                  case Failure(IncompatibleSchemaException(m)) => complete(StatusCodes.BadRequest, m)
                   case Failure(e) => complete(StatusCodes.InternalServerError, e)
                 }
               case None =>
