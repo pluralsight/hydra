@@ -25,7 +25,8 @@ final class Programs[F[_]: Logger: Sync: Timer: Mode] private(
     algebras.kafkaAdmin,
     algebras.kafkaClient,
     retryPolicy,
-    cfg.v2MetadataTopicConfig.topicName
+    cfg.v2MetadataTopicConfig.topicName,
+    algebras.metadata
   )
 
   val ingestionFlow: IngestionFlow[F] = new IngestionFlow[F](

@@ -11,7 +11,7 @@ import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.core.marshallers.History
 import hydra.kafka.algebras.KafkaAdminAlgebra.{Topic, TopicName}
 import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, PublishError}
-import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
@@ -36,6 +36,11 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
 
+  private def metadataAlgebraF(
+                                metadataTopic: String,
+                                s: SchemaRegistry[IO],
+                                k: KafkaClientAlgebra[IO]
+                              ) = MetadataAlgebra.make(metadataTopic, "consumerGroup", k, s, consumeMetadataEnabled = true)
 
   private val keySchema = getSchema("key")
   private val valueSchema = getSchema("val")
@@ -64,12 +69,14 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         schemaRegistry <- schemaRegistryIO
         kafka <- KafkaAdminAlgebra.test[IO]
         kafkaClient <- KafkaClientAlgebra.test[IO]
+        metadata <- metadataAlgebraF("v2Topic", schemaRegistry, kafkaClient)
         registerInternalMetadata = new CreateTopicProgram[IO](
           schemaRegistry,
           kafka,
           kafkaClient,
           policy,
-          Subject.createValidated("v2Topic").get
+          Subject.createValidated("v2Topic").get,
+          metadata
         )
         _ = registerInternalMetadata
           .createTopic(
@@ -130,12 +137,15 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         kafkaClient <- KafkaClientAlgebra.test[IO]
         ref <- Ref[IO]
           .of(TestState(deleteSchemaWasCalled = false, 0))
+        schemaRegistry = getSchemaRegistry(ref)
+        metadata <- metadataAlgebraF("test", schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
-          getSchemaRegistry(ref),
+          schemaRegistry,
           kafka,
           kafkaClient,
           policy,
-          Subject.createValidated("test").get
+          Subject.createValidated("test").get,
+          metadata
         ).createTopic(
             Subject.createValidated("subject").get,
             createTopicMetadataRequest(keySchema, valueSchema),
@@ -179,12 +189,15 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         kafka <- KafkaAdminAlgebra.test[IO]
         kafkaClient <- KafkaClientAlgebra.test[IO]
         ref <- Ref[IO].of(0)
+        schemaRegistry = getSchemaRegistry(ref)
+        metadata <- metadataAlgebraF("test", schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
-          getSchemaRegistry(ref),
+          schemaRegistry,
           kafka,
           kafkaClient,
           policy,
-          Subject.createValidated("test").get
+          Subject.createValidated("test").get,
+          metadata
         ).createTopic(
             Subject.createValidated("subject").get,
             createTopicMetadataRequest(keySchema, valueSchema),
@@ -235,12 +248,15 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         kafkaClient <- KafkaClientAlgebra.test[IO]
         ref <- Ref[IO]
           .of(TestState(schemaRegistryState))
+        schemaRegistry = getSchemaRegistry(ref)
+        metadata <- metadataAlgebraF("test", schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
-          getSchemaRegistry(ref),
+          schemaRegistry,
           kafka,
           kafkaClient,
           policy,
-          Subject.createValidated("test").get
+          Subject.createValidated("test").get,
+          metadata
         ).createTopic(
             Subject.createValidated("subject").get,
             createTopicMetadataRequest(keySchema, valueSchema),
@@ -258,12 +274,14 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafka <- KafkaAdminAlgebra.test[IO]
         kafkaClient <- KafkaClientAlgebra.test[IO]
+        metadata <- metadataAlgebraF("test-metadata-topic", schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
           kafka,
           kafkaClient,
           policy,
-          Subject.createValidated("test-metadata-topic").get
+          Subject.createValidated("test-metadata-topic").get,
+          metadata
         ).createTopic(
           Subject.createValidated("subject").get,
           createTopicMetadataRequest(keySchema, valueSchema),
@@ -288,12 +306,14 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           new TestKafkaClientAlgebraWithPublishTo(publishTo)
         )
         m <- TopicMetadataV2.encode[IO](key, Some(value))
+        metadata <- metadataAlgebraF(metadataTopic, schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
           schemaRegistry = schemaRegistry,
           kafkaAdmin = kafkaAdmin,
           kafkaClient = kafkaClient,
           retryPolicy = policy,
-          v2MetadataTopicName = Subject.createValidated(metadataTopic).get
+          v2MetadataTopicName = Subject.createValidated(metadataTopic).get,
+          metadata
         ).createTopic(subject, request, TopicDetails(1, 1))
         published <- publishTo.get
       } yield published shouldBe Map(metadataTopic -> (m._1, m._2))).unsafeRunSync()
@@ -314,12 +334,14 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
             failOnPublish = true
           )
         )
+        metadata <- metadataAlgebraF(metadataTopic, schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
           kafkaAdmin,
           kafkaClient,
           policy,
-          Subject.createValidated(metadataTopic).get
+          Subject.createValidated(metadataTopic).get,
+          metadata
         ).createTopic(Subject.createValidated(subject).get, request, TopicDetails(1, 1)).attempt
         topic <- kafkaAdmin.describeTopic(subject)
       } yield topic should not be defined).unsafeRunSync()
@@ -342,12 +364,14 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           )
         )
         _ <- kafkaAdmin.createTopic(subject, topicDetails)
+        metadata <- metadataAlgebraF(metadataTopic, schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
           kafkaAdmin,
           kafkaClient,
           policy,
-          Subject.createValidated(metadataTopic).get
+          Subject.createValidated(metadataTopic).get,
+          metadata
         ).createTopic(Subject.createValidated(subject).get, request, topicDetails).attempt
         topic <- kafkaAdmin.describeTopic(subject)
       } yield topic shouldBe defined).unsafeRunSync()

@@ -5,7 +5,7 @@ import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
 import hydra.core.transport.AckStrategy
-import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request, TopicMetadataV2Value}
 import hydra.kafka.producer.AvroKeyRecord
@@ -20,7 +20,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
                                                                                kafkaAdmin: KafkaAdminAlgebra[F],
                                                                                kafkaClient: KafkaClientAlgebra[F],
                                                                                retryPolicy: RetryPolicy[F],
-                                                                               v2MetadataTopicName: Subject
+                                                                               v2MetadataTopicName: Subject,
+                                                                               metadataAlgebra: MetadataAlgebra[F]
 ) {
 
   private def onFailure(resourceTried: String): (Throwable, RetryDetails) => F[Unit] = {
@@ -101,8 +102,10 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       topicName: Subject,
       createTopicRequest: TopicMetadataV2Request
   ): F[Unit] = {
-    val message = (TopicMetadataV2Key(topicName), createTopicRequest.toValue)
     for {
+      metadata <- metadataAlgebra.getMetadataFor(topicName)
+      createdDate = metadata.map(_.value.createdDate).getOrElse(createTopicRequest.createdDate)
+      message = (TopicMetadataV2Key(topicName), createTopicRequest.copy(createdDate = createdDate).toValue)
       records <- TopicMetadataV2.encode[F](message._1, Some(message._2))
       _ <- kafkaClient
         .publishMessage(records, v2MetadataTopicName.value)
