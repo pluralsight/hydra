@@ -1,6 +1,9 @@
 package hydra.kafka.programs
 
-import cats.effect.{Bracket, ExitCase, Resource}
+import java.time.Instant
+import java.util.concurrent.TimeUnit
+
+import cats.effect.{Bracket, Clock, ExitCase, Resource}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
@@ -15,7 +18,7 @@ import org.apache.avro.{Schema, SchemaParseException}
 import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy, _}
 
-final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
+final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger: Clock](
                                                                                schemaRegistry: SchemaRegistry[F],
                                                                                kafkaAdmin: KafkaAdminAlgebra[F],
                                                                                kafkaClient: KafkaClientAlgebra[F],
@@ -103,6 +106,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   ): F[Unit] = {
     val message = (TopicMetadataV2Key(topicName), createTopicRequest.toValue)
     for {
+      time <- Clock[F].realTime(TimeUnit.MILLISECONDS).map(Instant.ofEpochMilli)
       records <- TopicMetadataV2.encode[F](message._1, Some(message._2))
       _ <- kafkaClient
         .publishMessage(records, v2MetadataTopicName.value)

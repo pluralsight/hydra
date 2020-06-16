@@ -64,22 +64,21 @@ object StreamTypeV2 {
 final case class TopicMetadataV2Request(
     schemas: Schemas,
     streamType: StreamTypeV2,
-    deprecated: Boolean,
+    deprecated: Option[Boolean],
     dataClassification: DataClassification,
     contact: NonEmptyList[ContactMethod],
-    createdDate: Instant,
-    parentSubjects: List[Subject],
+    parentSubjects: Option[List[Subject]],
     notes: Option[String]
 ) {
 
-  def toValue: TopicMetadataV2Value = {
+  def toValue(createdDate: Instant): TopicMetadataV2Value = {
     TopicMetadataV2Value(
       streamType,
-      deprecated,
+      deprecated.getOrElse(false),
       dataClassification,
       contact,
       createdDate,
-      parentSubjects,
+      parentSubjects.getOrElse(List.empty),
       notes
     )
   }
