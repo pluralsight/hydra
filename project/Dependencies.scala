@@ -10,7 +10,7 @@ object Dependencies {
   val avroVersion = "1.9.2"
   val catsEffectVersion = "2.1.3"
   val catsLoggerVersion = "1.1.1"
-  val catsRetryVersion = "1.1.0"
+  val catsRetryVersion = "1.1.1"
   val catsVersion = "2.1.1"
   val cirisVersion = "1.1.0"
   val confluentVersion = "5.4.2"
