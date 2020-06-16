@@ -91,7 +91,7 @@ final class BootstrapEndpointV2Spec
 
     val validRequest = TopicMetadataV2Request(
       Schemas(getTestSchema("key"), getTestSchema("value")),
-      History,
+      StreamTypeV2.Entity,
       deprecated = false,
       Public,
       NonEmptyList.of(Email.create("test@pluralsight.com").get),

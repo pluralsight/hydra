@@ -136,24 +136,24 @@ sealed trait TopicMetadataV2Parser
     }
   }
 
-  implicit object StreamTypeFormat extends RootJsonFormat[StreamType] {
+  implicit object StreamTypeV2Format
+    extends RootJsonFormat[StreamTypeV2] {
 
-    def read(json: JsValue): StreamType = json match {
-      case JsString("Notification") => Notification
-      case JsString("History")      => History
-      case JsString("CurrentState") => CurrentState
-      case JsString("Telemetry")    => Telemetry
+    def read(json: JsValue): StreamTypeV2 = json match {
+      case JsString("Entity")                 => StreamTypeV2.Entity
+      case JsString("Event")                  => StreamTypeV2.Event
+      case JsString("Telemetry")              => StreamTypeV2.Telemetry
       case _ =>
         import scala.reflect.runtime.{universe => ru}
-        val tpe = ru.typeOf[StreamType]
+        val tpe = ru.typeOf[StreamTypeV2]
         val knownDirectSubclasses: Set[ru.Symbol] =
           tpe.typeSymbol.asClass.knownDirectSubclasses
         throw DeserializationException(
-          StreamTypeInvalid(json, knownDirectSubclasses).errorMessage
+          DataClassificationInvalid(json, knownDirectSubclasses).errorMessage
         )
     }
 
-    def write(obj: StreamType): JsValue = {
+    def write(obj: StreamTypeV2): JsValue = {
       JsString(obj.toString)
     }
   }
@@ -260,7 +260,7 @@ sealed trait TopicMetadataV2Parser
           )
         )
         val streamType = toResult(
-          StreamTypeFormat.read(
+          StreamTypeV2Format.read(
             j.getFields("streamType")
               .headOption
               .getOrElse(throwDeserializationError("streamType", "String"))

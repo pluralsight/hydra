@@ -46,7 +46,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
   ): TopicMetadataV2Request =
     TopicMetadataV2Request(
       Schemas(keySchema, valueSchema),
-      History,
+      StreamTypeV2.Entity,
       deprecated = false,
       Public,
       NonEmptyList.of(Email.create("test@test.com").get),

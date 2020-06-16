@@ -134,7 +134,7 @@ object TopicMetadataV2Key {
 
 @AvroNamespace("_hydra.v2")
 final case class TopicMetadataV2Value(
-    streamType: StreamType,
+    streamType: StreamTypeV2,
     deprecated: Boolean,
     dataClassification: DataClassification,
     contact: NonEmptyList[ContactMethod],
@@ -145,21 +145,19 @@ final case class TopicMetadataV2Value(
 
 object TopicMetadataV2Value {
 
-  implicit val streamTypeCodec: Codec[StreamType] =
-    Codec.deriveEnum[StreamType](
-      symbols = List("Notification", "CurrentState", "History", "Telemetry"),
+  implicit val streamTypeCodec: Codec[StreamTypeV2] =
+    Codec.deriveEnum[StreamTypeV2](
+      symbols = List("Event", "Entity", "Telemetry"),
       encode = {
-        case History      => "History"
-        case Telemetry    => "Telemetry"
-        case CurrentState => "CurrentState"
-        case Notification => "Notification"
+        case StreamTypeV2.Event      => "Event"
+        case StreamTypeV2.Entity     => "Entity"
+        case StreamTypeV2.Telemetry  => "Telemetry"
       },
       decode = {
-        case "History"      => Right(History)
-        case "Telemetry"    => Right(Telemetry)
-        case "CurrentState" => Right(CurrentState)
-        case "Notification" => Right(Notification)
-        case other          => Left(AvroError(s"$other is not a StreamType"))
+        case "Event"     => Right(StreamTypeV2.Event)
+        case "Entity"    => Right(StreamTypeV2.Entity)
+        case "Telemetry" => Right(StreamTypeV2.Telemetry)
+        case other       => Left(AvroError(s"$other is not a StreamTypeV2"))
       }
     )
 

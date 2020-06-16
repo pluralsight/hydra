@@ -6,7 +6,6 @@ import cats.data.NonEmptyList
 import eu.timepit.refined._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string._
-import hydra.core.marshallers.StreamType
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.Schema
@@ -55,9 +54,16 @@ object ContactMethod {
 
 final case class Schemas(key: Schema, value: Schema)
 
+sealed trait StreamTypeV2 extends Product with Serializable
+object StreamTypeV2 {
+  case object Event extends StreamTypeV2
+  case object Entity extends StreamTypeV2
+  case object Telemetry extends StreamTypeV2
+}
+
 final case class TopicMetadataV2Request(
     schemas: Schemas,
-    streamType: StreamType,
+    streamType: StreamTypeV2,
     deprecated: Boolean,
     dataClassification: DataClassification,
     contact: NonEmptyList[ContactMethod],
@@ -97,7 +103,7 @@ final case class MaybeSchemas(key: Option[Schema], value: Option[Schema])
 final case class TopicMetadataV2Response(
                                           subject: Subject,
                                           schemas: MaybeSchemas,
-                                          streamType: StreamType,
+                                          streamType: StreamTypeV2,
                                           deprecated: Boolean,
                                           dataClassification: DataClassification,
                                           contact: NonEmptyList[ContactMethod],
