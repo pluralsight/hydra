@@ -4,7 +4,6 @@ import java.time.Instant
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import hydra.core.marshallers._
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.generic.{GenericDatumReader, GenericRecordBuilder}
 import org.apache.avro.io.DecoderFactory
@@ -28,8 +27,8 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
   }
 
   import TopicMetadataV2Value._
-  List(Notification, CurrentState, History, Telemetry).map(
-    testCodec[StreamType]
+  List(StreamTypeV2.Event, StreamTypeV2.Entity, StreamTypeV2.Telemetry).map(
+    testCodec[StreamTypeV2]
   )
   List(
     Public,
@@ -44,7 +43,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
   it must "encode TopicMetadataV2 key and value" in {
     val key = TopicMetadataV2Key(Subject.createValidated("test_subject").get)
     val value = TopicMetadataV2Value(
-      History,
+      StreamTypeV2.Entity,
       false,
       Public,
       NonEmptyList.of(ContactMethod.create("test@test.com").get),
@@ -65,7 +64,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
 
     val json =
       s"""{
-         |"streamType":"History",
+         |"streamType":"Entity",
          |"deprecated": false,
          |"dataClassification":"Public",
          |"contact":[
@@ -88,7 +87,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
   it must "encode and decode metadataV2" in {
     val key = TopicMetadataV2Key(Subject.createValidated("test_subject").get)
     val value = TopicMetadataV2Value(
-      History,
+      StreamTypeV2.Entity,
       false,
       Public,
       NonEmptyList.of(ContactMethod.create("test@test.com").get),

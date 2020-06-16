@@ -29,7 +29,7 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
           cfg.topicName,
           TopicMetadataV2Request(
             schemas,
-            History,
+            StreamTypeV2.Entity,
             false,
             InternalUseOnly,
             NonEmptyList.of(cfg.contactMethod),

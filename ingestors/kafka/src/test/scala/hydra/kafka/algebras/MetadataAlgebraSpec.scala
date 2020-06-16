@@ -10,7 +10,7 @@ import hydra.core.marshallers.History
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.model.ContactMethod.Slack
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{Public, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request, TopicMetadataV2Value}
+import hydra.kafka.model.{Public, StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request, TopicMetadataV2Value}
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import org.apache.avro.generic.GenericRecord
@@ -89,7 +89,7 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
   private def getMetadataGenericRecords(subject: Subject): (IO[(GenericRecord, Option[GenericRecord])], TopicMetadataV2Key, TopicMetadataV2Value) = {
     val key = TopicMetadataV2Key(subject)
     val value = TopicMetadataV2Value(
-        History,
+        StreamTypeV2.Entity,
         deprecated = false,
         Public,
         NonEmptyList.one(Slack.create("#channel").get),

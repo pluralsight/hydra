@@ -97,21 +97,20 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
     }
 
     "parse one of each type of StreamType" in {
-      StreamTypeFormat.read(JsString("Notification")) shouldBe Notification
-      StreamTypeFormat.read(JsString("History")) shouldBe History
-      StreamTypeFormat.read(JsString("CurrentState")) shouldBe CurrentState
-      StreamTypeFormat.read(JsString("Telemetry")) shouldBe Telemetry
+      StreamTypeV2Format.read(JsString("Entity")) shouldBe StreamTypeV2.Entity
+      StreamTypeV2Format.read(JsString("Event")) shouldBe StreamTypeV2.Event
+      StreamTypeV2Format.read(JsString("Telemetry")) shouldBe StreamTypeV2.Telemetry
     }
 
     "throw error when parsing StreamType" in {
       val jsValue = JsString.empty
       import scala.reflect.runtime.{universe => ru}
-      val tpe = ru.typeOf[StreamType]
+      val tpe = ru.typeOf[StreamTypeV2]
       val knownDirectSubclasses: Set[ru.Symbol] =
         tpe.typeSymbol.asClass.knownDirectSubclasses
 
       the[DeserializationException] thrownBy {
-        StreamTypeFormat.read(jsValue)
+        StreamTypeV2Format.read(jsValue)
       } should have message StreamTypeInvalid(jsValue, knownDirectSubclasses).errorMessage
     }
 
@@ -287,7 +286,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       email: String,
       allOptionalFieldsPresent: Boolean = true
   )(
-      streamType: StreamType = History,
+      streamType: StreamTypeV2 = StreamTypeV2.Entity,
       deprecated: Boolean = false,
       dataClassification: DataClassification = Public,
       validAvroSchema: JsValue = validAvroSchema,
@@ -297,7 +296,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
   ): (
       JsValue,
       Subject,
-      StreamType,
+      StreamTypeV2,
       Boolean,
       DataClassification,
       Email,
@@ -370,8 +369,8 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
     }
 
     "serialize a StreamType" in {
-      val streamType = History
-      StreamTypeFormat.write(streamType) shouldBe JsString("History")
+      val streamType = StreamTypeV2.Entity
+      StreamTypeV2Format.write(streamType) shouldBe JsString("Entity")
     }
 
     "serialize a DataClassificationFormat" in {
@@ -400,7 +399,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val subject = Subject.createValidated("some_valid_subject_name").get
       val keySchema = new SchemaFormat(isKey = true).read(validAvroSchema)
       val valueSchema = new SchemaFormat(isKey = false).read(validAvroSchema)
-      val streamType = History
+      val streamType = StreamTypeV2.Entity
       val deprecated = false
       val dataClassification = Public
       val email = Email.create("some@address.com").get
@@ -448,7 +447,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
 
     "TopicMetadataV2Format write matches TopicMetadataResponseV2Format write" in {
       val tmc = TopicMetadataContainer(TopicMetadataV2Key(Subject.createValidated("valid").get),
-        TopicMetadataV2Value(History, false, Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None),
+        TopicMetadataV2Value(StreamTypeV2.Entity, false, Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None),
         Some(new SchemaFormat(isKey = true).read(validAvroSchema)),
         Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
       val response = TopicMetadataV2Response.fromTopicMetadataContainer(tmc)
