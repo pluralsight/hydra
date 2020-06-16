@@ -149,7 +149,7 @@ sealed trait TopicMetadataV2Parser
         val knownDirectSubclasses: Set[ru.Symbol] =
           tpe.typeSymbol.asClass.knownDirectSubclasses
         throw DeserializationException(
-          DataClassificationInvalid(json, knownDirectSubclasses).errorMessage
+          StreamTypeInvalid(json, knownDirectSubclasses).errorMessage
         )
     }
 

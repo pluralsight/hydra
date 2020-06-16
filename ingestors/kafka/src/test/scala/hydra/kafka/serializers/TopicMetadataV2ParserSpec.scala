@@ -105,7 +105,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
     "throw error when parsing StreamType" in {
       val jsValue = JsString.empty
       import scala.reflect.runtime.{universe => ru}
-      val tpe = ru.typeOf[StreamType]
+      val tpe = ru.typeOf[StreamTypeV2]
       val knownDirectSubclasses: Set[ru.Symbol] =
         tpe.typeSymbol.asClass.knownDirectSubclasses
 
