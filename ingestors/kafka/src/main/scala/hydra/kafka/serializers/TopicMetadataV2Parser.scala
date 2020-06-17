@@ -283,7 +283,7 @@ sealed trait TopicMetadataV2Parser
               .getOrElse(throwDeserializationError("contact", "JsObject"))
           )
         )
-        val createdDate = toResult(InstantFormat.read(j))
+        val createdDate = toResult(Instant.now())
         val parentSubjects = toResult(
           j.getFields("parentSubjects")
             .headOption

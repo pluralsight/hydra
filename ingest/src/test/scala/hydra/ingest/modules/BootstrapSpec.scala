@@ -1,13 +1,13 @@
 package hydra.ingest.modules
 
 import cats.effect.concurrent.Ref
-import cats.effect.{IO, Sync, Timer}
+import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Sync, Timer}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.ingest.app.AppConfig.V2MetadataTopicConfig
 import hydra.kafka.algebras.KafkaAdminAlgebra.Topic
 import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, PublishError, TopicName}
-import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.ContactMethod
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.CreateTopicProgram
@@ -26,6 +26,9 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
   implicit private val timer: Timer[IO] =
     IO.timer(concurrent.ExecutionContext.global)
 
+  implicit private val cs: ContextShift[IO] = IO.contextShift(concurrent.ExecutionContext.global)
+  implicit private val c: ConcurrentEffect[IO] = IO.ioConcurrentEffect
+
   private val metadataSubject = Subject.createValidated("metadata").get
 
   private def createTestCase(
@@ -37,12 +40,14 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
       kafkaAdmin <- KafkaAdminAlgebra.test[IO]
       ref <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord])])
       kafkaClient = new TestKafkaClientAlgebraWithPublishTo(ref)
+      metadata <- MetadataAlgebra.make(metadataSubject.value, "consumer_group",kafkaClient, schemaRegistry, true)
       c = new CreateTopicProgram[IO](
         schemaRegistry,
         kafkaAdmin,
         kafkaClient,
         retry,
-        metadataSubject
+        metadataSubject,
+        metadata
       )
       boot <- Bootstrap.make[IO](c, config)
       _ <- boot.bootstrapAll

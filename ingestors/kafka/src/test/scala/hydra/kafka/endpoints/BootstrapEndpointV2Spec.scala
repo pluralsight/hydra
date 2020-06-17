@@ -53,7 +53,8 @@ final class BootstrapEndpointV2Spec
         ka,
         kc,
         retryPolicy,
-        Subject.createValidated("test").get
+        Subject.createValidated("test").get,
+        m
       ),
       TopicDetails(1, 1)
     )
