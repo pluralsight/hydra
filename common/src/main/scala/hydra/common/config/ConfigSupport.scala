@@ -38,22 +38,14 @@ import scala.language.implicitConversions
   */
 trait ConfigSupport extends ConfigComponent {
 
-  import ConfigSupport._
-
   private val defaultConfig = ConfigFactory.load()
-
-  val externalConfig = loadExternalConfig(defaultConfig)
 
   val applicationName: String = defaultConfig.getString("application.name")
 
-  val rootConfig: Config = externalConfig.withFallback(defaultConfig).resolve()
+  val rootConfig: Config = defaultConfig
 
   val applicationConfig: Config = rootConfig.getConfig(applicationName)
 
-  def loadExternalConfig(c: Config): Config = {
-    val filePath = c.getStringOpt("application.config.location").getOrElse(s"/etc/hydra/$applicationName.conf")
-    ConfigFactory.parseFile(new java.io.File(filePath))
-  }
 }
 
 object ConfigSupport {
