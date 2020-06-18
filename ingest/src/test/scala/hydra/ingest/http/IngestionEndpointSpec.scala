@@ -251,7 +251,7 @@ final class IngestionEndpointSpec
     "accept a complete request" in {
       val request = Post("/v2/topics/exp.blah.blah/records", HttpEntity(ContentTypes.`application/json`, """{"key":{"test": 1}, "value":{"test": 2}}"""))
       request ~> Route.seal(ingestRouteAlt) ~> check {
-        responseAs[String] shouldBe "OK"
+        responseAs[String] shouldBe "{\"offset\":0,\"partition\":0}"
         status shouldBe StatusCodes.OK
       }
     }

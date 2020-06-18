@@ -22,6 +22,7 @@ import hydra.core.protocol.IngestorStatus
 import hydra.core.transport.ValidationStrategy
 import hydra.ingest.IngestorInfo
 import hydra.ingest.services.IngestionFlowV2.V2IngestRequest
+import hydra.kafka.algebras.KafkaClientAlgebra.PublishResponse
 import spray.json.JsObject
 
 private object HydraIngestJsonSupport {
@@ -36,6 +37,9 @@ trait HydraIngestJsonSupport extends HydraJsonSupport {
 
   import HydraIngestJsonSupport._
   import spray.json._
+
+  private val publishResponseApply: (Int, Option[Long]) => PublishResponse = PublishResponse.apply
+  implicit val publishResponseFormat: RootJsonFormat[PublishResponse] = jsonFormat2(publishResponseApply)
 
   implicit object ValidationStrategyFormat extends RootJsonFormat[ValidationStrategy] {
 
