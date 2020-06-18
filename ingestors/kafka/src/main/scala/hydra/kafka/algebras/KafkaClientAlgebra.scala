@@ -202,9 +202,12 @@ object KafkaClientAlgebra {
       }
 
       private def publishCacheMessage(cacheRecord: CacheRecord, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
-        cache.update(_.publishMessage(topicName, cacheRecord)) *>
+        cache.modify { c =>
+          (c.publishMessage(topicName, cacheRecord), c.getStreamFor(topicName).length)
+        }.flatMap { offset =>
           cache.get.flatMap(_.getConsumerQueuesFor(topicName).traverse(_.enqueue1(cacheRecord))) *>
-          Sync[F].pure(Right(PublishResponse(0, 0))) // TODO fix this to generate realistic results
+            Sync[F].pure(Right(PublishResponse(0, offset)))
+        }
       }
     }
   }
