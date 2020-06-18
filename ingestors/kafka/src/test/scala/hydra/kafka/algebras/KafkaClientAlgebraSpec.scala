@@ -10,6 +10,7 @@ import org.scalatest.wordspec.AnyWordSpecLike
 import vulcan.Codec
 import vulcan.generic._
 import cats.implicits._
+import hydra.kafka.algebras.KafkaClientAlgebra.PublishResponse
 
 import scala.concurrent.ExecutionContext
 
@@ -65,7 +66,7 @@ class KafkaClientAlgebraSpec
       (schemaRegistry.registerSchema(subject = s"$topic-key", key.getSchema) *>
         schemaRegistry.registerSchema(subject = s"$topic-value", value.getSchema) *>
         kafkaClient.publishMessage((key, Some(value)), topic).map{ r =>
-          assert(r.isRight)}).unsafeRunSync()
+          r shouldBe PublishResponse(0, 0).asRight}).unsafeRunSync()
     }
 
     val (topic, (_, key), value) = topicAndKeyAndValue("topic1","key1","value1")
@@ -88,6 +89,13 @@ class KafkaClientAlgebraSpec
       stream.take(2).compile.toList.unsafeRunSync() should contain allOf((key2, Some(value2)), (key, Some(value)))
       kafkaClient.publishMessage((key3, Some(value3)), topic).unsafeRunSync()
       stream.take(3).compile.toList.unsafeRunSync().last shouldBe (key3, Some(value3))
+    }
+
+    "return correct offsets from publish" in {
+      kafkaClient.publishMessage((key2, Some(value2)), topic).unsafeRunSync() shouldBe PublishResponse(0, 3).asRight
+      kafkaClient.publishMessage((key2, Some(value2)), topic).unsafeRunSync() shouldBe PublishResponse(0, 4).asRight
+      kafkaClient.publishMessage((key2, Some(value2)), topic).unsafeRunSync() shouldBe PublishResponse(0, 5).asRight
+      kafkaClient.publishMessage((key2, Some(value2)), topic).unsafeRunSync() shouldBe PublishResponse(0, 6).asRight
     }
 
     val (topic2, (_, key4), value4) = topicAndKeyAndValue("topic2","key4","value4")
