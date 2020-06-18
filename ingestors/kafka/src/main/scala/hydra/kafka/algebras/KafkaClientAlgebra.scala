@@ -130,7 +130,7 @@ object KafkaClientAlgebra {
         }
 
         override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, StringRecord] = {
-          consumeMessages[Option[String]](getStringKeyDeserializer(schemaRegistryClient), consumerGroup, topicName)
+          consumeMessages[Option[String]](getStringKeyDeserializer, consumerGroup, topicName)
         }
 
         private def produceMessage[A](
@@ -220,7 +220,7 @@ object KafkaClientAlgebra {
     } yield newQueue
   }
 
-  private def getStringKeyDeserializer[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient): Deserializer[F, Option[String]] = {
+  private def getStringKeyDeserializer[F[_]: Sync]: Deserializer[F, Option[String]] = {
     Deserializer.delegate[F, Option[String]] {
       val stringDeserializer = new StringDeserializer
       (topic: TopicName, data: Array[Byte]) => {
