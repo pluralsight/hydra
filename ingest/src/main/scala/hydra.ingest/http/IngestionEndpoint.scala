@@ -19,6 +19,7 @@ package hydra.ingest.http
 import akka.actor._
 import akka.http.scaladsl.model.{HttpRequest, StatusCode, StatusCodes}
 import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
+import cats.implicits._
 import hydra.common.config.ConfigSupport._
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
@@ -32,13 +33,11 @@ import hydra.ingest.services.IngestionFlow.{AvroConversionAugmentedException, Mi
 import hydra.ingest.services.IngestionFlowV2.V2IngestRequest
 import hydra.ingest.services.{IngestionFlow, IngestionFlowV2, IngestionHandlerGateway}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
+import hydra.kafka.model.TopicMetadataV2Request.Subject
 
 import scala.collection.immutable.Map
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import cats.implicits._
-import hydra.kafka.model.TopicMetadataV2Request.Subject
-
 import scala.util.{Failure, Success, Try}
 
 
@@ -126,9 +125,9 @@ class IngestionEndpoint[F[_]: Futurable](
         Subject.createValidated(topic) match {
           case Some(t) =>
             onComplete(Futurable[F].unsafeToFuture(ingestionV2Flow.ingest(req, t))) {
-              case Success(_) =>
+              case Success(resp) =>
                 addPromMetric(topic, StatusCodes.OK.toString())
-                complete(StatusCodes.OK)
+                complete(resp)
               case Failure(e) =>
                 val status = getV2ReponseCode(e)
                 addPromMetric(topic, status.toString())

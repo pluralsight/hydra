@@ -9,6 +9,7 @@ import hydra.avro.resource.SchemaResourceLoader.SchemaNotFoundException
 import hydra.avro.util.SchemaWrapper
 import hydra.core.transport.ValidationStrategy
 import hydra.kafka.algebras.KafkaClientAlgebra
+import hydra.kafka.algebras.KafkaClientAlgebra.PublishResponse
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
@@ -73,9 +74,9 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
     } yield (k, v)
   }
 
-  def ingest(request: V2IngestRequest, topic: Subject): F[Unit] = {
+  def ingest(request: V2IngestRequest, topic: Subject): F[PublishResponse] = {
     getSchemas(request, topic).flatMap { case (key, value) =>
-      kafkaClient.publishMessage((key, value), topic.value).void
+      kafkaClient.publishMessage((key, value), topic.value).rethrow
     }
   }
 }

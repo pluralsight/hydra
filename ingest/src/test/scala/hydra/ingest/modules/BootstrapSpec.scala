@@ -6,7 +6,7 @@ import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.ingest.app.AppConfig.V2MetadataTopicConfig
 import hydra.kafka.algebras.KafkaAdminAlgebra.Topic
-import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, PublishError, TopicName}
+import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, PublishError, PublishResponse, TopicName}
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.ContactMethod
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -105,12 +105,12 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
   ) extends KafkaClientAlgebra[IO] {
     override def publishMessage(
         record: (GenericRecord, Option[GenericRecord]),
-        topicName: TopicName): IO[Either[PublishError, Unit]] =
-      publishTo.update(_ + (topicName -> record)).attemptNarrow[PublishError]
+        topicName: TopicName): IO[Either[PublishError, PublishResponse]] =
+      publishTo.update(_ + (topicName -> record)).map(_ => PublishResponse(0, 0)).attemptNarrow[PublishError]
 
     override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (GenericRecord, Option[GenericRecord])] = fs2.Stream.empty
 
-    override def publishStringKeyMessage(record: (Option[String], Option[GenericRecord]), topicName: TopicName): IO[Either[PublishError, Unit]] = ???
+    override def publishStringKeyMessage(record: (Option[String], Option[GenericRecord]), topicName: TopicName): IO[Either[PublishError, PublishResponse]] = ???
 
     override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[IO, (Option[String], Option[GenericRecord])] = ???
   }

@@ -10,6 +10,8 @@ import hydra.avro.registry.SchemaRegistry
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import io.confluent.kafka.serializers.{AbstractKafkaAvroSerDeConfig, KafkaAvroDeserializer, KafkaAvroSerializer}
 import org.apache.avro.generic.GenericRecord
+import org.apache.kafka.clients.producer.RecordMetadata
+import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
 
 import scala.collection.JavaConverters._
@@ -26,7 +28,7 @@ trait KafkaClientAlgebra[F[_]] {
   def publishMessage(
     record: Record,
     topicName: TopicName
-  ): F[Either[PublishError, Unit]]
+  ): F[Either[PublishError, PublishResponse]]
 
   /**
     * Publishes string keyed messages for compatibility with Hydra V1
@@ -37,7 +39,7 @@ trait KafkaClientAlgebra[F[_]] {
   def publishStringKeyMessage(
                       record: StringRecord,
                       topicName: TopicName
-                    ): F[Either[PublishError, Unit]]
+                    ): F[Either[PublishError, PublishResponse]]
 
   /**
     * Consume the Hydra record from Kafka.
@@ -74,6 +76,12 @@ object KafkaClientAlgebra {
   type Record = (GenericRecord, Option[GenericRecord])
   type StringRecord = (Option[String], Option[GenericRecord])
 
+  final case class PublishResponse(partition: Int, offset: Option[Long])
+  object PublishResponse {
+    def apply(partition: Int, offset: Long): PublishResponse =
+      new PublishResponse(partition, if (offset < 0) None else offset.some)
+  }
+
   sealed abstract class PublishError(message: String)
     extends Exception(message)
       with Product
@@ -89,17 +97,17 @@ object KafkaClientAlgebra {
 
 
   private def getProducerQueue[F[_]: ConcurrentEffect: ContextShift]
-  (bootstrapServers: String, schemaRegistryClient: SchemaRegistryClient): F[fs2.concurrent.Queue[F, (RecordKeyFormat, Option[GenericRecord], TopicName, Deferred[F, Unit])]] = {
+  (bootstrapServers: String, schemaRegistryClient: SchemaRegistryClient): F[fs2.concurrent.Queue[F, (RecordKeyFormat, Option[GenericRecord], TopicName, Deferred[F, PublishResponse])]] = {
     import fs2.kafka._
     val producerSettings =
       ProducerSettings(keySerializer = getKeySerializer(schemaRegistryClient), valueSerializer = getGenericRecordSerializer(schemaRegistryClient))
         .withBootstrapServers(bootstrapServers)
     for {
-      queue <- fs2.concurrent.Queue.unbounded[F, (RecordKeyFormat, Option[GenericRecord], TopicName, Deferred[F, Unit])]
+      queue <- fs2.concurrent.Queue.unbounded[F, (RecordKeyFormat, Option[GenericRecord], TopicName, Deferred[F, PublishResponse])]
       _ <- Concurrent[F].start(queue.dequeue.map { payload =>
         val record = ProducerRecord(payload._3, payload._1, payload._2)
         ProducerRecords.one(record, payload._4)
-      }.through(produce(producerSettings)).evalMap { i => i.passthrough.complete(()) }.compile.drain)
+      }.through(produce(producerSettings)).flatMap(i => fs2.Stream.chunk(i.records).evalMap(r => i.passthrough.complete(PublishResponse(r._2.partition, r._2.offset)))).compile.drain)
     } yield queue
   }
 
@@ -109,11 +117,11 @@ object KafkaClientAlgebra {
   ): F[KafkaClientAlgebra[F]] = schemaRegistryAlgebra.getSchemaRegistryClient.flatMap { schemaRegistryClient =>
     getProducerQueue[F](bootstrapServers, schemaRegistryClient).map { queue =>
       new KafkaClientAlgebra[F] {
-        override def publishMessage(record: Record, topicName: TopicName): F[Either[PublishError, Unit]] = {
+        override def publishMessage(record: Record, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
           produceMessage[GenericRecord](record, topicName, GenericRecordKey.apply)
         }
 
-        override def publishStringKeyMessage(record: StringRecord, topicName: TopicName): F[Either[PublishError, Unit]] = {
+        override def publishStringKeyMessage(record: StringRecord, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
           produceMessage[Option[String]](record, topicName, StringKey.apply)
         }
 
@@ -122,16 +130,16 @@ object KafkaClientAlgebra {
         }
 
         override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, StringRecord] = {
-          consumeMessages[Option[String]](getStringKeyDeserializer(schemaRegistryClient), consumerGroup, topicName)
+          consumeMessages[Option[String]](getStringKeyDeserializer, consumerGroup, topicName)
         }
 
         private def produceMessage[A](
                                        record: (A, Option[GenericRecord]),
                                        topicName: TopicName,
-                                       convert: A => RecordKeyFormat): F[Either[PublishError, Unit]] = {
-          Deferred[F, Unit].flatMap { d =>
+                                       convert: A => RecordKeyFormat): F[Either[PublishError, PublishResponse]] = {
+          Deferred[F, PublishResponse].flatMap { d =>
             queue.enqueue1((convert(record._1), record._2, topicName, d)) *>
-              Concurrent.timeoutTo[F, Either[PublishError, Unit]](d.get.map(Right(_)), 5.seconds, Sync[F].pure(Left(PublishError.Timeout)))
+              Concurrent.timeoutTo[F, Either[PublishError, PublishResponse]](d.get.map(Right(_)), 5.seconds, Sync[F].pure(Left(PublishError.Timeout)))
           }
         }
 
@@ -162,12 +170,12 @@ object KafkaClientAlgebra {
   final case class ConsumeErrorException(message: String) extends Exception(message)
   def test[F[_]: Sync: Concurrent]: F[KafkaClientAlgebra[F]] = Ref[F].of(MockFS2Kafka.empty[F]).map { cache =>
     new KafkaClientAlgebra[F] {
-      override def publishMessage(record: Record, topicName: TopicName): F[Either[PublishError, Unit]] = {
+      override def publishMessage(record: Record, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
         val cacheRecord = (GenericRecordKey(record._1), record._2)
         publishCacheMessage(cacheRecord, topicName)
       }
 
-      override def publishStringKeyMessage(record: StringRecord, topicName: TopicName): F[Either[PublishError, Unit]] = {
+      override def publishStringKeyMessage(record: StringRecord, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
         val cacheRecord = (StringKey(record._1), record._2)
         publishCacheMessage(cacheRecord, topicName)
       }
@@ -193,10 +201,13 @@ object KafkaClientAlgebra {
         } yield queue.dequeue)
       }
 
-      private def publishCacheMessage(cacheRecord: CacheRecord, topicName: TopicName): F[Either[PublishError, Unit]] = {
-        cache.update(_.publishMessage(topicName, cacheRecord)) *>
+      private def publishCacheMessage(cacheRecord: CacheRecord, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
+        cache.modify { c =>
+          (c.publishMessage(topicName, cacheRecord), c.getStreamFor(topicName).length)
+        }.flatMap { offset =>
           cache.get.flatMap(_.getConsumerQueuesFor(topicName).traverse(_.enqueue1(cacheRecord))) *>
-          Sync[F].pure(Right(()))
+            Sync[F].pure(Right(PublishResponse(0, offset)))
+        }
       }
     }
   }
@@ -209,7 +220,7 @@ object KafkaClientAlgebra {
     } yield newQueue
   }
 
-  private def getStringKeyDeserializer[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient): Deserializer[F, Option[String]] = {
+  private def getStringKeyDeserializer[F[_]: Sync]: Deserializer[F, Option[String]] = {
     Deserializer.delegate[F, Option[String]] {
       val stringDeserializer = new StringDeserializer
       (topic: TopicName, data: Array[Byte]) => {

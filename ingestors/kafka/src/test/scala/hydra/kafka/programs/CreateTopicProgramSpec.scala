@@ -8,15 +8,13 @@ import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
-import hydra.core.marshallers.History
 import hydra.kafka.algebras.KafkaAdminAlgebra.{Topic, TopicName}
-import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, PublishError}
+import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, PublishError, PublishResponse}
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
-import hydra.kafka.producer.StringRecord
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
@@ -427,16 +425,16 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
                                                           failOnPublish: Boolean = false
   ) extends KafkaClientAlgebra[IO] {
 
-    override def publishMessage(record: (GenericRecord, Option[GenericRecord]), topicName: TopicName): IO[Either[PublishError, Unit]] =
+    override def publishMessage(record: (GenericRecord, Option[GenericRecord]), topicName: TopicName): IO[Either[PublishError, PublishResponse]] =
       if (failOnPublish) {
         IO.pure(Left(PublishError.Timeout))
       } else {
-        publishTo.update(_ + (topicName -> record)).attemptNarrow[PublishError]
+        publishTo.update(_ + (topicName -> record)).map(_ => PublishResponse(0, 0)).attemptNarrow[PublishError]
       }
 
     override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (GenericRecord, Option[GenericRecord])] = fs2.Stream.empty
 
-    override def publishStringKeyMessage(record: (Option[String], Option[GenericRecord]), topicName: TopicName): IO[Either[PublishError, Unit]] = ???
+    override def publishStringKeyMessage(record: (Option[String], Option[GenericRecord]), topicName: TopicName): IO[Either[PublishError, PublishResponse]] = ???
 
     override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[IO, (Option[String], Option[GenericRecord])] = ???
   }
