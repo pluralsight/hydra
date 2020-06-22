@@ -2,7 +2,7 @@ package hydra.ingest.services
 
 import java.io.IOException
 
-import cats.MonadError
+import cats.{Monad, MonadError}
 import cats.implicits._
 import com.pluralsight.hydra.avro.JsonToAvroConversionException
 import hydra.avro.registry.{ConfluentSchemaRegistry, JsonToAvroConversionExceptionWithMetadata, SchemaRegistry}
@@ -10,10 +10,11 @@ import hydra.avro.resource.SchemaResource
 import hydra.avro.resource.SchemaResourceLoader.SchemaNotFoundException
 import hydra.avro.util.{AvroUtils, SchemaWrapper}
 import hydra.core.ingest.HydraRequest
-import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM,HYDRA_RECORD_KEY_PARAM}
+import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_KEY_PARAM}
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.kafka.algebras.KafkaClientAlgebra
 import hydra.kafka.producer.AvroRecord
+import io.confluent.kafka.serializers.KafkaAvroSerializer
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
 import scalacache._
@@ -26,7 +27,9 @@ import scala.util.{Failure, Success, Try}
 final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](
                                                                     schemaRegistry: SchemaRegistry[F],
                                                                     kafkaClient: KafkaClientAlgebra[F],
-                                                                    schemaRegistryBaseUrl: String) {
+                                                                    schemaRegistryBaseUrl: String,
+                                                                    kafkaAvroSerializer: KafkaAvroSerializer
+                                                                  ) {
 
   import IngestionFlow._
 
@@ -90,6 +93,11 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](
 }
 
 object IngestionFlow {
+
+  private val maxRecordSizeBytes = 1000000
+
+  final case class RecordTooLargeError(foundSize: Int) extends
+    Exception(s"Record too large. Max record size is 1000000 (1 million) Bytes. Found $foundSize bytes.")
   final case class MissingTopicNameException(request: HydraRequest)
     extends Exception(s"Missing the topic name in request with correlationId ${request.correlationId}")
   final case class AvroConversionAugmentedException(message: String) extends RuntimeException(message)
