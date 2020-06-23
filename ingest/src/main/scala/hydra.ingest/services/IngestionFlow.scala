@@ -90,11 +90,6 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](
 }
 
 object IngestionFlow {
-
-  private val maxRecordSizeBytes = 1000000
-
-  final case class RecordTooLargeError(foundSize: Int) extends
-    Exception(s"Record too large. Max record size is 1000000 (1 million) Bytes. Found $foundSize bytes.")
   final case class MissingTopicNameException(request: HydraRequest)
     extends Exception(s"Missing the topic name in request with correlationId ${request.correlationId}")
   final case class AvroConversionAugmentedException(message: String) extends RuntimeException(message)
