@@ -1,12 +1,13 @@
 package hydra.kafka.algebras
 
+import cats.{Monad, MonadError}
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.implicits._
 import fs2.concurrent.Queue
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
-import hydra.kafka.algebras.KafkaClientAlgebra.TopicName
+import hydra.kafka.algebras.KafkaClientAlgebra.PublishError.RecordTooLarge
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import io.confluent.kafka.serializers.{AbstractKafkaAvroSerDeConfig, KafkaAvroDeserializer, KafkaAvroSerializer}
 import org.apache.avro.generic.GenericRecord
@@ -62,6 +63,13 @@ trait KafkaClientAlgebra[F[_]] {
                        topicName: TopicName,
                        consumerGroup: ConsumerGroup
                      ): fs2.Stream[F, StringRecord]
+
+  /**
+    * Sets a size limit for the Producer
+    * @param sizeLimitBytes The largest number of allowable bytes in a record (inclusive)
+    * @return The new algebra that rejects records above `sizeLimitBytes`
+    */
+  def withProducerRecordSizeLimit(sizeLimitBytes: Long): F[KafkaClientAlgebra[F]]
 }
 
 object KafkaClientAlgebra {
@@ -87,10 +95,26 @@ object KafkaClientAlgebra {
 
   object PublishError {
 
-    final case object Timeout
+    case object Timeout
       extends PublishError("Timeout while ingesting message.")
         with NoStackTrace
+    final case class RecordTooLarge(actualSize: Long, sizeLimit: Long)
+      extends PublishError(s"Record was $actualSize but the limit is $sizeLimit.")
+        with NoStackTrace
 
+  }
+
+  private def checkSizeLimit[F[_]: MonadError[*[_], Throwable]](k: Array[Byte], v: Option[Array[Byte]], sizeLimitBytes: Option[Long]): F[Unit] = {
+    val recordLength = k.length + v.getOrElse(Array.empty).length
+    sizeLimitBytes match {
+      case Some(limit) =>
+        if (recordLength > limit) {
+          MonadError[F, Throwable].raiseError(RecordTooLarge(recordLength, limit))
+        } else {
+          Monad[F].unit
+        }
+      case None => Monad[F].unit
+    }
   }
 
   private[this] final case class ProduceRecordInfo[F[_]](
@@ -118,7 +142,8 @@ object KafkaClientAlgebra {
   private def getLiveInstance[F[_]: ContextShift: ConcurrentEffect: Timer](bootstrapServers: String)
                                                                           (queue: fs2.concurrent.Queue[F, ProduceRecordInfo[F]],
                                                                            schemaRegistryClient: SchemaRegistryClient,
-                                                                           serializer: Serializer[F, RecordFormat]): F[KafkaClientAlgebra[F]] = Sync[F].delay {
+                                                                           serializer: Serializer[F, RecordFormat],
+                                                                           sizeLimitBytes: Option[Long] = None): F[KafkaClientAlgebra[F]] = Sync[F].delay {
     new KafkaClientAlgebra[F] {
       override def publishMessage(record: Record, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
         produceMessage[GenericRecord](record, topicName, GenericRecordFormat.apply)
@@ -136,6 +161,10 @@ object KafkaClientAlgebra {
         consumeMessages[Option[String]](getStringKeyDeserializer, consumerGroup, topicName)
       }
 
+      override def withProducerRecordSizeLimit(sizeLimitBytes: Long): F[KafkaClientAlgebra[F]] = Sync[F].delay {
+        getLiveInstance(bootstrapServers)(queue, schemaRegistryClient, serializer, sizeLimitBytes.some)
+      }
+
       private def produceMessage[A](
                                      record: (A, Option[GenericRecord]),
                                      topicName: TopicName,
@@ -144,6 +173,7 @@ object KafkaClientAlgebra {
           d <- Deferred[F, PublishResponse]
           k <- serializer.serialize(topicName, Headers.empty, convert(record._1))
           v <- record._2.traverse(r => serializer.serialize(topicName, Headers.empty, GenericRecordFormat(r)))
+          _ <- checkSizeLimit(k, v, sizeLimitBytes)
           _ <- queue.enqueue1(ProduceRecordInfo(k.some, v, topicName, d))
           resolve <- Concurrent.timeoutTo[F, Either[PublishError, PublishResponse]](d.get.map(Right(_)), 5.seconds, Sync[F].pure(Left(PublishError.Timeout)))
         } yield resolve
@@ -180,50 +210,66 @@ object KafkaClientAlgebra {
       k <- getLiveInstance(bootstrapServers)(queue, schemaRegistryClient, getKeySerializer(schemaRegistryClient))
     } yield k
 
-
   final case class ConsumeErrorException(message: String) extends Exception(message)
-  def test[F[_]: Sync: Concurrent]: F[KafkaClientAlgebra[F]] = Ref[F].of(MockFS2Kafka.empty[F]).map { cache =>
-    new KafkaClientAlgebra[F] {
-      override def publishMessage(record: Record, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
-        val cacheRecord = (GenericRecordFormat(record._1), record._2)
-        publishCacheMessage(cacheRecord, topicName)
-      }
+  private def getTestInstance[F[_]: Sync: Concurrent](cache: Ref[F, MockFS2Kafka[F]],
+                                                      schemaRegistry: SchemaRegistry[F],
+                                                      sizeLimitBytes: Option[Long] = None): KafkaClientAlgebra[F] = new KafkaClientAlgebra[F] {
+    override def publishMessage(record: Record, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
+      val cacheRecord = (GenericRecordFormat(record._1), record._2)
+      publishCacheMessage(cacheRecord, topicName)
+    }
 
-      override def publishStringKeyMessage(record: StringRecord, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
-        val cacheRecord = (StringFormat(record._1), record._2)
-        publishCacheMessage(cacheRecord, topicName)
-      }
+    override def publishStringKeyMessage(record: StringRecord, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
+      val cacheRecord = (StringFormat(record._1), record._2)
+      publishCacheMessage(cacheRecord, topicName)
+    }
 
-      override def consumeMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, Record] = {
-        consumeCacheMessage(topicName, consumerGroup).evalMap {
-          case (r: GenericRecordFormat, v) => Sync[F].pure((r.value, v))
-          case _ => Sync[F].raiseError[Record](ConsumeErrorException("Expected GenericRecord, got String"))
-        }
-      }
-
-      override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, StringRecord] = {
-        consumeCacheMessage(topicName, consumerGroup).evalMap {
-          case (r: StringFormat, v) => Sync[F].pure((r.value, v))
-          case _ => Sync[F].raiseError[StringRecord](ConsumeErrorException("Expected String, got GenericRecord"))
-        }
-      }
-
-      private def consumeCacheMessage(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, CacheRecord] = {
-        fs2.Stream.force(for {
-          queue <- createNewStreamOfQueue(cache, topicName)
-          _ <- cache.update(_.addConsumerQueue(topicName, consumerGroup, queue))
-        } yield queue.dequeue)
-      }
-
-      private def publishCacheMessage(cacheRecord: CacheRecord, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
-        cache.modify { c =>
-          (c.publishMessage(topicName, cacheRecord), c.getStreamFor(topicName).length)
-        }.flatMap { offset =>
-          cache.get.flatMap(_.getConsumerQueuesFor(topicName).traverse(_.enqueue1(cacheRecord))) *>
-            Sync[F].pure(Right(PublishResponse(0, offset)))
-        }
+    override def consumeMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, Record] = {
+      consumeCacheMessage(topicName, consumerGroup).evalMap {
+        case (r: GenericRecordFormat, v) => Sync[F].pure((r.value, v))
+        case _ => Sync[F].raiseError[Record](ConsumeErrorException("Expected GenericRecord, got String"))
       }
     }
+
+    override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, StringRecord] = {
+      consumeCacheMessage(topicName, consumerGroup).evalMap {
+        case (r: StringFormat, v) => Sync[F].pure((r.value, v))
+        case _ => Sync[F].raiseError[StringRecord](ConsumeErrorException("Expected String, got GenericRecord"))
+      }
+    }
+
+    override def withProducerRecordSizeLimit(sizeLimitBytes: Long): F[KafkaClientAlgebra[F]] = Sync[F].delay {
+      getTestInstance(cache, schemaRegistry, sizeLimitBytes.some)
+    }
+
+    private def consumeCacheMessage(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, CacheRecord] = {
+      fs2.Stream.force(for {
+        queue <- createNewStreamOfQueue(cache, topicName)
+        _ <- cache.update(_.addConsumerQueue(topicName, consumerGroup, queue))
+      } yield queue.dequeue)
+    }
+
+    private def checkSize(cacheRecord: CacheRecord, topicName: TopicName): F[Unit] = {
+      for {
+        serializer <- schemaRegistry.getSchemaRegistryClient.map(getKeySerializer(_))
+        key <- serializer.serialize(topicName, Headers.empty, cacheRecord._1)
+        value <- cacheRecord._2.traverse(gr => serializer.serialize(topicName, Headers.empty, GenericRecordFormat(gr)))
+        _ <- checkSizeLimit(key, value, sizeLimitBytes)
+      } yield ()
+    }
+
+    private def publishCacheMessage(cacheRecord: CacheRecord, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
+      checkSize(cacheRecord, topicName) *> cache.modify { c =>
+        (c.publishMessage(topicName, cacheRecord), c.getStreamFor(topicName).length)
+      }.flatMap { offset =>
+        cache.get.flatMap(_.getConsumerQueuesFor(topicName).traverse(_.enqueue1(cacheRecord))) *>
+          Sync[F].pure(Right(PublishResponse(0, offset)))
+      }
+    }
+  }
+
+  def test[F[_]: Sync: Concurrent](schemaRegistry: SchemaRegistry[F]): F[KafkaClientAlgebra[F]] = Ref[F].of(MockFS2Kafka.empty[F]).map { cache =>
+    getTestInstance(cache, schemaRegistry)
   }
 
   private def createNewStreamOfQueue[F[_]: Concurrent](cache: Ref[F, MockFS2Kafka[F]], topicName: TopicName): F[Queue[F, CacheRecord]] = {
