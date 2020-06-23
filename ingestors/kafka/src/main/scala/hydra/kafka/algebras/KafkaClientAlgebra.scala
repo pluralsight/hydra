@@ -161,9 +161,8 @@ object KafkaClientAlgebra {
         consumeMessages[Option[String]](getStringKeyDeserializer, consumerGroup, topicName)
       }
 
-      override def withProducerRecordSizeLimit(sizeLimitBytes: Long): F[KafkaClientAlgebra[F]] = Sync[F].delay {
-        getLiveInstance(bootstrapServers)(queue, schemaRegistryClient, serializer, sizeLimitBytes.some)
-      }
+      override def withProducerRecordSizeLimit(sizeLimitBytes: Long): F[KafkaClientAlgebra[F]] =
+        getLiveInstance[F](bootstrapServers)(queue, schemaRegistryClient, serializer, sizeLimitBytes.some)
 
       private def produceMessage[A](
                                      record: (A, Option[GenericRecord]),
@@ -173,7 +172,7 @@ object KafkaClientAlgebra {
           d <- Deferred[F, PublishResponse]
           k <- serializer.serialize(topicName, Headers.empty, convert(record._1))
           v <- record._2.traverse(r => serializer.serialize(topicName, Headers.empty, GenericRecordFormat(r)))
-          _ <- checkSizeLimit(k, v, sizeLimitBytes)
+          _ <- checkSizeLimit[F](k, v, sizeLimitBytes)
           _ <- queue.enqueue1(ProduceRecordInfo(k.some, v, topicName, d))
           resolve <- Concurrent.timeoutTo[F, Either[PublishError, PublishResponse]](d.get.map(Right(_)), 5.seconds, Sync[F].pure(Left(PublishError.Timeout)))
         } yield resolve
@@ -254,7 +253,7 @@ object KafkaClientAlgebra {
         serializer <- schemaRegistry.getSchemaRegistryClient.map(getKeySerializer(_))
         key <- serializer.serialize(topicName, Headers.empty, cacheRecord._1)
         value <- cacheRecord._2.traverse(gr => serializer.serialize(topicName, Headers.empty, GenericRecordFormat(gr)))
-        _ <- checkSizeLimit(key, value, sizeLimitBytes)
+        _ <- checkSizeLimit[F](key, value, sizeLimitBytes)
       } yield ()
     }
 
@@ -266,6 +265,10 @@ object KafkaClientAlgebra {
           Sync[F].pure(Right(PublishResponse(0, offset)))
       }
     }
+  }
+
+  def test[F[_]: Sync: Concurrent]: F[KafkaClientAlgebra[F]] = SchemaRegistry.test[F].flatMap { sr =>
+    test(sr)
   }
 
   def test[F[_]: Sync: Concurrent](schemaRegistry: SchemaRegistry[F]): F[KafkaClientAlgebra[F]] = Ref[F].of(MockFS2Kafka.empty[F]).map { cache =>
