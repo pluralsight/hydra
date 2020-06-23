@@ -80,7 +80,8 @@ object AppConfig {
 
   final case class IngestConfig(
                                  alternateIngestEnabled: Boolean,
-                                 useOldIngestIfUAContains: Set[String]
+                                 useOldIngestIfUAContains: Set[String],
+                                 recordSizeLimitBytes: Option[Long]
                                )
 
   private[app] implicit def decodeSetStrings
@@ -92,7 +93,8 @@ object AppConfig {
   private val ingestConfig: ConfigValue[IngestConfig] =
     (
       env("HYDRA_INGEST_ALTERNATE_ENABLED").as[Boolean].default(false),
-      env("HYDRA_INGEST_ALTERNATE_IGNORE_UA_STRINGS").as[Set[String]].default(Set.empty)
+      env("HYDRA_INGEST_ALTERNATE_IGNORE_UA_STRINGS").as[Set[String]].default(Set.empty),
+      env("HYDRA_INGEST_RECORD_SIZE_LIMIT_BYTES").as[Long].option
     ).parMapN(IngestConfig)
 
   final case class AppConfig(

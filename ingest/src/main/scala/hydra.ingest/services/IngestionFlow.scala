@@ -5,12 +5,11 @@ import java.io.IOException
 import cats.MonadError
 import cats.implicits._
 import com.pluralsight.hydra.avro.JsonToAvroConversionException
-import hydra.avro.registry.{ConfluentSchemaRegistry, JsonToAvroConversionExceptionWithMetadata, SchemaRegistry}
-import hydra.avro.resource.SchemaResource
+import hydra.avro.registry.SchemaRegistry
 import hydra.avro.resource.SchemaResourceLoader.SchemaNotFoundException
-import hydra.avro.util.{AvroUtils, SchemaWrapper}
+import hydra.avro.util.SchemaWrapper
 import hydra.core.ingest.HydraRequest
-import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM,HYDRA_RECORD_KEY_PARAM}
+import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_KEY_PARAM}
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.kafka.algebras.KafkaClientAlgebra
 import hydra.kafka.producer.AvroRecord
@@ -26,7 +25,8 @@ import scala.util.{Failure, Success, Try}
 final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](
                                                                     schemaRegistry: SchemaRegistry[F],
                                                                     kafkaClient: KafkaClientAlgebra[F],
-                                                                    schemaRegistryBaseUrl: String) {
+                                                                    schemaRegistryBaseUrl: String
+                                                                  ) {
 
   import IngestionFlow._
 
