@@ -142,7 +142,8 @@ object KafkaClientAlgebra {
   private def getLiveInstance[F[_]: ContextShift: ConcurrentEffect: Timer](bootstrapServers: String)
                                                                           (queue: fs2.concurrent.Queue[F, ProduceRecordInfo[F]],
                                                                            schemaRegistryClient: SchemaRegistryClient,
-                                                                           serializer: Serializer[F, RecordFormat],
+                                                                           keySerializer: Serializer[F, RecordFormat],
+                                                                           valSerializer: Serializer[F, RecordFormat],
                                                                            sizeLimitBytes: Option[Long] = None): F[KafkaClientAlgebra[F]] = Sync[F].delay {
     new KafkaClientAlgebra[F] {
       override def publishMessage(record: Record, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
@@ -162,7 +163,7 @@ object KafkaClientAlgebra {
       }
 
       override def withProducerRecordSizeLimit(sizeLimitBytes: Long): F[KafkaClientAlgebra[F]] =
-        getLiveInstance[F](bootstrapServers)(queue, schemaRegistryClient, serializer, sizeLimitBytes.some)
+        getLiveInstance[F](bootstrapServers)(queue, schemaRegistryClient, keySerializer, valSerializer, sizeLimitBytes.some)
 
       private def produceMessage[A](
                                      record: (A, Option[GenericRecord]),
@@ -170,8 +171,8 @@ object KafkaClientAlgebra {
                                      convert: A => RecordFormat): F[Either[PublishError, PublishResponse]] =
         for {
           d <- Deferred[F, PublishResponse]
-          k <- serializer.serialize(topicName, Headers.empty, convert(record._1))
-          v <- record._2.traverse(r => serializer.serialize(topicName, Headers.empty, GenericRecordFormat(r)))
+          k <- keySerializer.serialize(topicName, Headers.empty, convert(record._1))
+          v <- record._2.traverse(r => valSerializer.serialize(topicName, Headers.empty, GenericRecordFormat(r)))
           _ <- checkSizeLimit[F](k, v, sizeLimitBytes)
           _ <- queue.enqueue1(ProduceRecordInfo(k.some, v, topicName, d))
           resolve <- Concurrent.timeoutTo[F, Either[PublishError, PublishResponse]](d.get.map(Right(_)), 5.seconds, Sync[F].pure(Left(PublishError.Timeout)))
@@ -207,7 +208,10 @@ object KafkaClientAlgebra {
     for {
       schemaRegistryClient <- schemaRegistryAlgebra.getSchemaRegistryClient
       queue <- getProducerQueue[F](bootstrapServers)
-      k <- getLiveInstance(bootstrapServers)(queue, schemaRegistryClient, getKeySerializer(schemaRegistryClient))
+      k <- getLiveInstance(bootstrapServers)(
+        queue, schemaRegistryClient,
+        getSerializer(schemaRegistryClient)(isKey = true),
+        getSerializer(schemaRegistryClient)(isKey = false))
       kWithSizeLimit <- recordSizeLimit.traverse(k.withProducerRecordSizeLimit)
     } yield kWithSizeLimit.getOrElse(k)
 
@@ -252,9 +256,10 @@ object KafkaClientAlgebra {
 
     private def checkSize(cacheRecord: CacheRecord, topicName: TopicName): F[Unit] = {
       for {
-        serializer <- schemaRegistry.getSchemaRegistryClient.map(getKeySerializer(_))
-        key <- serializer.serialize(topicName, Headers.empty, cacheRecord._1)
-        value <- cacheRecord._2.traverse(gr => serializer.serialize(topicName, Headers.empty, GenericRecordFormat(gr)))
+        keySerializer <- schemaRegistry.getSchemaRegistryClient.map(getSerializer(_)(isKey = true))
+        valSerializer <- schemaRegistry.getSchemaRegistryClient.map(getSerializer(_)(isKey = false))
+        key <- keySerializer.serialize(topicName, Headers.empty, cacheRecord._1)
+        value <- cacheRecord._2.traverse(gr => valSerializer.serialize(topicName, Headers.empty, GenericRecordFormat(gr)))
         _ <- checkSizeLimit[F](key, value, sizeLimitBytes)
       } yield ()
     }
@@ -318,11 +323,11 @@ object KafkaClientAlgebra {
     }
   }.suspend
 
-  private def getKeySerializer[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient): Serializer[F, RecordFormat] =
+  private def getSerializer[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient)(isKey: Boolean): Serializer[F, RecordFormat] =
     Serializer.delegate[F, RecordFormat] {
       val serializer = {
         val se = new KafkaAvroSerializer(schemaRegistryClient)
-        se.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "").asJava, true)
+        se.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "").asJava, isKey)
         se
       }
       val stringSerializer = new StringSerializer
