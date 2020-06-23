@@ -201,13 +201,15 @@ object KafkaClientAlgebra {
 
   def live[F[_]: ContextShift: ConcurrentEffect: Timer](
       bootstrapServers: String,
-      schemaRegistryAlgebra: SchemaRegistry[F]
+      schemaRegistryAlgebra: SchemaRegistry[F],
+      recordSizeLimit: Option[Long]
   ): F[KafkaClientAlgebra[F]] =
     for {
       schemaRegistryClient <- schemaRegistryAlgebra.getSchemaRegistryClient
       queue <- getProducerQueue[F](bootstrapServers)
       k <- getLiveInstance(bootstrapServers)(queue, schemaRegistryClient, getKeySerializer(schemaRegistryClient))
-    } yield k
+      kWithSizeLimit <- recordSizeLimit.traverse(k.withProducerRecordSizeLimit)
+    } yield kWithSizeLimit.getOrElse(k)
 
   final case class ConsumeErrorException(message: String) extends Exception(message)
   private def getTestInstance[F[_]: Sync: Concurrent](cache: Ref[F, MockFS2Kafka[F]],
