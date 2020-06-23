@@ -105,7 +105,7 @@ object KafkaClientAlgebra {
   }
 
   private def checkSizeLimit[F[_]: MonadError[*[_], Throwable]](k: Array[Byte], v: Option[Array[Byte]], sizeLimitBytes: Option[Long]): F[Unit] = {
-    val recordLength = k.length + v.getOrElse(Array.empty).length
+    val recordLength = Option(k).getOrElse(Array.empty).length + v.getOrElse(Array.empty).length
     sizeLimitBytes match {
       case Some(limit) =>
         if (recordLength > limit) {

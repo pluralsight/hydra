@@ -47,7 +47,7 @@ class KafkaClientAlgebraSpec
     schemaRegistryAlgebra1 <- SchemaRegistry.test[IO]
     schemaRegistryAlgebra2 <- SchemaRegistry.test[IO]
     live <- KafkaClientAlgebra.live[IO](s"localhost:$port", schemaRegistryAlgebra1)
-    test <- KafkaClientAlgebra.test[IO]
+    test <- KafkaClientAlgebra.test[IO](schemaRegistryAlgebra2)
   } yield {
     runTest(schemaRegistryAlgebra1, live)
     runTest(schemaRegistryAlgebra2, test, isTest = true)
