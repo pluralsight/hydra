@@ -281,14 +281,6 @@ object KafkaClientAlgebra {
       }
     }.suspend
 
-  private def getGenericRecordSerializer[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient): Serializer[F, Option[GenericRecord]] =
-    Serializer.delegate[F, Option[GenericRecord]] {
-      val serializer = new KafkaAvroSerializer(schemaRegistryClient)
-      (topic: TopicName, data: Option[GenericRecord]) => {
-        data.map(serializer.serialize(topic, _)).orNull
-      }
-    }.suspend
-
   private type CacheRecord = (RecordFormat, Option[GenericRecord])
 
   private final case class MockFS2Kafka[F[_]](

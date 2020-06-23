@@ -44,12 +44,13 @@ class KafkaClientAlgebraSpec
 
 
   (for {
-    schemaRegistryAlgebra <- SchemaRegistry.test[IO]
-    live <- KafkaClientAlgebra.live[IO](s"localhost:$port", schemaRegistryAlgebra)
+    schemaRegistryAlgebra1 <- SchemaRegistry.test[IO]
+    schemaRegistryAlgebra2 <- SchemaRegistry.test[IO]
+    live <- KafkaClientAlgebra.live[IO](s"localhost:$port", schemaRegistryAlgebra1)
     test <- KafkaClientAlgebra.test[IO]
   } yield {
-    runTest(schemaRegistryAlgebra, live)
-    runTest(schemaRegistryAlgebra, test, isTest = true)
+    runTest(schemaRegistryAlgebra1, live)
+    runTest(schemaRegistryAlgebra2, test, isTest = true)
   }).unsafeRunSync()
 
   private def runTest(schemaRegistry: SchemaRegistry[IO], kafkaClient: KafkaClientAlgebra[IO], isTest: Boolean = false): Unit = {
