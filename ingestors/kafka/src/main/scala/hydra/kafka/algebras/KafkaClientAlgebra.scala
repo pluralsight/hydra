@@ -99,7 +99,7 @@ object KafkaClientAlgebra {
       extends PublishError("Timeout while ingesting message.")
         with NoStackTrace
     final case class RecordTooLarge(actualSize: Long, sizeLimit: Long)
-      extends PublishError(s"Record was $actualSize but the limit is $sizeLimit.")
+      extends PublishError(s"Record was $actualSize bytes but the limit is $sizeLimit bytes.")
         with NoStackTrace
 
   }
