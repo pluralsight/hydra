@@ -156,15 +156,15 @@ class IngestionEndpoint[F[_]: Futurable](
                 log.error(s"Ingestion timed out for request $errorMsg")
                 addPromMetric(topic, StatusCodes.RequestTimeout.toString())
                 val responseCode = StatusCodes.RequestTimeout
-                complete(responseCode, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorJoined), responseCode.intValue))
-              case Failure(PublishError.RecordTooLarge(actual, limit)) =>
+                complete(responseCode, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorTimeout), responseCode.intValue))
+              case Failure(e@PublishError.RecordTooLarge(actual, limit)) =>
                 val errorMsg =
                   s"${hydraRequest.correlationId}: Ack:${hydraRequest.ackStrategy}; Validation: ${hydraRequest.validationStrategy};" +
                     s" Metadata:${hydraRequest.metadata}; Payload: ${hydraRequest.payload} Ingestors: Alt-Ingest-Flow"
                 log.error(s"Record too large. Found $actual bytes when limit is $limit bytes $errorMsg")
                 val responseCode = StatusCodes.PayloadTooLarge
                 addPromMetric(topic, responseCode.toString())
-                complete(responseCode, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorJoined), responseCode.intValue))
+                complete(responseCode, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorError(e)), responseCode.intValue))
               case Failure(_: MissingTopicNameException) =>
                 // Yeah, a 404 is a bad idea, but that is what the old v1 flow does so we are keeping it the same
                 addPromMetric(topic, StatusCodes.NotFound.toString())
