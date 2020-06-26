@@ -160,7 +160,7 @@ class IngestionEndpoint[F[_]: Futurable](
               case Failure(e@PublishError.RecordTooLarge(actual, limit)) =>
                 val errorMsg =
                   s"${hydraRequest.correlationId}: Ack:${hydraRequest.ackStrategy}; Validation: ${hydraRequest.validationStrategy};" +
-                    s" Metadata:${hydraRequest.metadata}; Payload: ${hydraRequest.payload} Ingestors: Alt-Ingest-Flow"
+                    s" Metadata:${hydraRequest.metadata}; Ingestors: Alt-Ingest-Flow"
                 log.error(s"Record too large. Found $actual bytes when limit is $limit bytes $errorMsg")
                 val responseCode = StatusCodes.PayloadTooLarge
                 addPromMetric(topic, responseCode.toString())
