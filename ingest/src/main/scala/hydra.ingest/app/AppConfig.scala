@@ -73,7 +73,7 @@ object AppConfig {
       env(
         "HYDRA_V2_METADATA_CONTACT"
       ).as[ContactMethod],
-      env("HYDRA_DEFAULT_PARTIONS").as[Int].default(10),
+      env("HYDRA_DEFAULT_PARTITIONS").as[Int].default(10),
       env("HYDRA_REPLICATION_FACTOR").as[Short].default(3),
       env("HYDRA_V2_METADATA_CONSUMER_GROUP")
     ).parMapN(V2MetadataTopicConfig)
