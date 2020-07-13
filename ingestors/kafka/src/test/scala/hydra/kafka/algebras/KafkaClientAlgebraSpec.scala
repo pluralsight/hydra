@@ -10,6 +10,8 @@ import org.scalatest.wordspec.AnyWordSpecLike
 import vulcan.Codec
 import vulcan.generic._
 import cats.implicits._
+import hydra.kafka.algebras.KafkaClientAlgebra.PublishError.RecordTooLarge
+import hydra.kafka.algebras.KafkaClientAlgebra.PublishResponse
 
 import scala.concurrent.ExecutionContext
 
@@ -43,12 +45,13 @@ class KafkaClientAlgebraSpec
 
 
   (for {
-    schemaRegistryAlgebra <- SchemaRegistry.test[IO]
-    live <- KafkaClientAlgebra.live[IO](s"localhost:$port", schemaRegistryAlgebra)
-    test <- KafkaClientAlgebra.test[IO]
+    schemaRegistryAlgebra1 <- SchemaRegistry.test[IO]
+    schemaRegistryAlgebra2 <- SchemaRegistry.test[IO]
+    live <- KafkaClientAlgebra.live[IO](s"localhost:$port", schemaRegistryAlgebra1, recordSizeLimit = None)
+    test <- KafkaClientAlgebra.test[IO](schemaRegistryAlgebra2)
   } yield {
-    runTest(schemaRegistryAlgebra, live)
-    runTest(schemaRegistryAlgebra, test, isTest = true)
+    runTest(schemaRegistryAlgebra1, live)
+    runTest(schemaRegistryAlgebra2, test, isTest = true)
   }).unsafeRunSync()
 
   private def runTest(schemaRegistry: SchemaRegistry[IO], kafkaClient: KafkaClientAlgebra[IO], isTest: Boolean = false): Unit = {
@@ -65,7 +68,7 @@ class KafkaClientAlgebraSpec
       (schemaRegistry.registerSchema(subject = s"$topic-key", key.getSchema) *>
         schemaRegistry.registerSchema(subject = s"$topic-value", value.getSchema) *>
         kafkaClient.publishMessage((key, Some(value)), topic).map{ r =>
-          assert(r.isRight)}).unsafeRunSync()
+          r shouldBe PublishResponse(0, 0).asRight}).unsafeRunSync()
     }
 
     val (topic, (_, key), value) = topicAndKeyAndValue("topic1","key1","value1")
@@ -90,6 +93,13 @@ class KafkaClientAlgebraSpec
       stream.take(3).compile.toList.unsafeRunSync().last shouldBe (key3, Some(value3))
     }
 
+    "return correct offsets from publish" in {
+      kafkaClient.publishMessage((key2, Some(value2)), topic).unsafeRunSync() shouldBe PublishResponse(0, 3).asRight
+      kafkaClient.publishMessage((key2, Some(value2)), topic).unsafeRunSync() shouldBe PublishResponse(0, 4).asRight
+      kafkaClient.publishMessage((key2, Some(value2)), topic).unsafeRunSync() shouldBe PublishResponse(0, 5).asRight
+      kafkaClient.publishMessage((key2, Some(value2)), topic).unsafeRunSync() shouldBe PublishResponse(0, 6).asRight
+    }
+
     val (topic2, (_, key4), value4) = topicAndKeyAndValue("topic2","key4","value4")
     val (_, (_, key5), value5) = topicAndKeyAndValue("topic2","key5","value5")
     "consume avro messages from two different topics" in {
@@ -102,6 +112,24 @@ class KafkaClientAlgebraSpec
 
       topicOneStream.take(3).compile.toList.unsafeRunSync() should contain allOf ((key3, Some(value3)), (key2, Some(value2)), (key, Some(value)))
       topicTwoStream.take(2).compile.toList.unsafeRunSync() should contain allOf ((key4, Some(value4)), (key5, Some(value5)))
+    }
+
+    "publish avro record to existing topic and be rejected by size limit" in {
+      val result = kafkaClient.withProducerRecordSizeLimit(21)
+        .flatMap(_.publishMessage((key2, Some(value2)), topic)).attempt.unsafeRunSync()
+      result shouldBe RecordTooLarge(22, 21).asLeft
+    }
+
+    "publish avro record to existing topic and not be rejected by size limit equal to size" in {
+      val result = kafkaClient.withProducerRecordSizeLimit(22)
+        .flatMap(_.publishMessage((key2, Some(value2)), topic)).attempt.unsafeRunSync()
+      result shouldBe a[Right[_, _]]
+    }
+
+    "publish avro record to existing topic and not be rejected by size limit larger than size" in {
+      val result = kafkaClient.withProducerRecordSizeLimit(23)
+        .flatMap(_.publishMessage((key2, Some(value2)), topic)).attempt.unsafeRunSync()
+      result shouldBe a[Right[_, _]]
     }
   }
 

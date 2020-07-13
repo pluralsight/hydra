@@ -19,13 +19,16 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
+import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
 import hydra.common.util.Futurable
 import hydra.core.http.CorsSupport
+import hydra.core.marshallers.GenericServiceResponse
 import hydra.kafka.model.TopicMetadataV2Request
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.serializers.TopicMetadataV2Parser
 import hydra.kafka.util.KafkaUtils.TopicDetails
+import org.apache.avro.SchemaParseException
 
 import scala.util.{Failure, Success}
 
@@ -41,12 +44,18 @@ final class BootstrapEndpointV2[F[_]: Futurable](
       pathEndOrSingleSlash {
         put {
           entity(as[TopicMetadataV2Request]) { t =>
-            onComplete(
-              Futurable[F].unsafeToFuture(createTopicProgram
-                .createTopic(t.copy(subject = Subject.createValidated(topicName).getOrElse(t.subject)), defaultTopicDetails))
-            ) {
-              case Success(_) => complete(StatusCodes.OK)
-              case Failure(e) => complete(StatusCodes.InternalServerError, e)
+            Subject.createValidated(topicName) match {
+              case Some(validatedTopic) =>
+                onComplete(
+                  Futurable[F].unsafeToFuture(createTopicProgram
+                    .createTopic(validatedTopic, t, defaultTopicDetails))
+                ) {
+                  case Success(_) => complete(StatusCodes.OK)
+                  case Failure(IncompatibleSchemaException(m)) => complete(StatusCodes.BadRequest, m)
+                  case Failure(e) => complete(StatusCodes.InternalServerError, e)
+                }
+              case None =>
+                complete(StatusCodes.BadRequest, Subject.invalidFormat)
             }
           }
         }

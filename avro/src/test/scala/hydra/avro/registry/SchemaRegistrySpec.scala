@@ -2,7 +2,7 @@ package hydra.avro.registry
 
 import cats.effect.IO
 import cats.implicits._
-import cats.{Applicative, Monad}
+import cats.{Applicative, Monad, MonadError}
 import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -25,7 +25,7 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
   private def testAddSubject[F[_]: Monad](
       schemaRegistry: SchemaRegistry[F]
   ): F[Unit] = {
-    val subject = "testSubjectAdd"
+    val subject = "testSubjectAdd-value"
     for {
       schema <- getSchema[F]("testSchemaAdd")
       _ <- schemaRegistry.registerSchema(subject, schema)
@@ -43,10 +43,11 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
     def recordBuilder(name: String): SchemaBuilder.FieldAssembler[Schema] = {
       SchemaBuilder.record(name).fields().requiredString("id")
     }
-    val subject = "testSubjectAdd"
+    val subject = "testSubjectAdd-value"
+    val name = "testSubjectAdd"
 
-    val schema = recordBuilder(subject).endRecord()
-    val evolvedSchema = recordBuilder(subject).nullableBoolean("nullBool", false).endRecord()
+    val schema = recordBuilder(name).endRecord()
+    val evolvedSchema = recordBuilder(name).nullableBoolean("nullBool", false).endRecord()
 
     for {
       _ <- schemaRegistry.registerSchema(subject, schema)
@@ -59,12 +60,56 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
     }
   }
 
+  private def testNoAddKeyNoEvolution[F[_]: Monad](
+                                             schemaRegistry: SchemaRegistry[F]
+                                           ): F[Unit] = {
+    def recordBuilder(name: String): SchemaBuilder.FieldAssembler[Schema] = {
+      SchemaBuilder.record(name).fields().requiredString("id")
+    }
+    val subject = "testSubjectAdd-key"
+
+    val schema = recordBuilder("schemaNameTest").endRecord()
+
+    for {
+      _ <- schemaRegistry.registerSchema(subject, schema)
+      _ <- schemaRegistry.registerSchema(subject, schema)
+      allVersions <- schemaRegistry.getAllVersions(subject)
+    } yield {
+      it must "not add a schema when no key evolution takes place" in {
+        allVersions shouldBe List(1)
+      }
+    }
+  }
+
+  private def testErrorKeyEvolution[F[_]: MonadError[*[_], Throwable]](
+                                                    schemaRegistry: SchemaRegistry[F]
+                                                  ): F[Unit] = {
+    def recordBuilder(name: String): SchemaBuilder.FieldAssembler[Schema] = {
+      SchemaBuilder.record(name).fields().requiredString("id")
+    }
+    val subject = "testSubjectAdd-key"
+
+    val schema = recordBuilder("schemaName").endRecord()
+    val evolvedSchema = recordBuilder("schemaName").nullableBoolean("nullBool", false).endRecord()
+
+    for {
+      _ <- schemaRegistry.registerSchema(subject, schema)
+      error <- schemaRegistry.registerSchema(subject, evolvedSchema).attempt
+      allVersions <- schemaRegistry.getAllVersions(subject)
+    } yield {
+      it must "return an error when a key schema evolution is attempted" in {
+        error shouldBe IncompatibleSchemaException("Key schema evolutions are not permitted.").asLeft
+        allVersions shouldBe List(1)
+      }
+    }
+  }
+
   private def testDeleteSchemaVersion[F[_]: Monad](
       schemaRegistry: SchemaRegistry[F]
   ): F[Unit] = {
-    val subject = "testSubjectDelete"
+    val subject = "testSubjectDelete-value"
     for {
-      schema <- getSchema[F]("testSchemaDelete")
+      schema <- getSchema[F]("testSubjectDelete")
       _ <- schemaRegistry.registerSchema(subject, schema)
       version <- schemaRegistry.getVersion(subject, schema)
       _ <- schemaRegistry.deleteSchemaOfVersion(subject, version)
@@ -79,7 +124,7 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
   private def testGetAllSubjects[F[_]: Monad](
       schemaRegistry: SchemaRegistry[F]
   ): F[Unit] = {
-    val subject = "testGetAllSubjects"
+    val subject = "testGetAllSubjects-value"
     for {
       schema <- getSchema[F]("testGetAllSubjects")
       allSubjectsEmpty <- schemaRegistry.getAllSubjects
@@ -139,8 +184,8 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
     }
     val subject = "testSubjectAdd"
 
-    val schema = recordBuilder(subject).endRecord()
-    val invalidSchemaEvolution = recordBuilder(subject).requiredBoolean("nullBool").endRecord()
+    val schema = recordBuilder("testName").endRecord()
+    val invalidSchemaEvolution = recordBuilder("testName").requiredBoolean("nullBool").endRecord()
 
     for {
       schemaRegistry <- schemaRegistryIO
@@ -149,12 +194,14 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
     } yield ()
   }
 
-  private def runTests[F[_]: Monad](
+  private def runTests[F[_]: MonadError[*[_], Throwable]](
       schemaRegistry: F[SchemaRegistry[F]]
   ): F[Unit] = {
     for {
       _ <- schemaRegistry.flatMap(testAddSubject[F])
       _ <- schemaRegistry.flatMap(testAddEvolution[F])
+      _ <- schemaRegistry.flatMap(testNoAddKeyNoEvolution[F])
+      _ <- schemaRegistry.flatMap(testErrorKeyEvolution[F])
       _ <- schemaRegistry.flatMap(testDeleteSchemaVersion[F])
       _ <- schemaRegistry.flatMap(testGetAllSubjects[F])
       _ <- testSchemaEvolutionValidation[F]

@@ -19,44 +19,6 @@ class ConfigSupportSpec extends Matchers with AnyFunSpecLike with ConfigSupport 
       applicationName shouldBe "hydraTest"
     }
 
-    it("loads external files properly") {
-      val path = Thread
-        .currentThread()
-        .getContextClassLoader
-        .getResource("test.conf")
-        .getFile
-      loadExternalConfig(
-        ConfigFactory
-          .parseMap(Map("application.config.location" -> path).asJava)
-      ).getString("external-key") shouldBe "external-value"
-      loadExternalConfig(ConfigFactory.empty()) shouldBe ConfigFactory.empty()
-    }
-
-    it("errors if external config file has a syntax error") {
-      val path = Thread
-        .currentThread()
-        .getContextClassLoader
-        .getResource("test-error.conf")
-        .getFile
-      intercept[ConfigException] {
-        loadExternalConfig(
-          ConfigFactory
-            .parseMap(Map("application.config.location" -> path).asJava)
-        )
-      }
-    }
-
-    it("errors if empty config if path doesn't exists") {
-      loadExternalConfig(
-        ConfigFactory.parseMap(
-          Map(
-            "application.config.location"
-              -> "this-doesnt-exist"
-          ).asJava
-        )
-      ) shouldBe ConfigFactory.empty()
-    }
-
     it("converts a config to map") {
       val map = Map(
         "test-key" -> "test-value",

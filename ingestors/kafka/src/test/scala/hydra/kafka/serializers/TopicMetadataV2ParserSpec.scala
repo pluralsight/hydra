@@ -4,10 +4,12 @@ import java.time.Instant
 
 import cats.data.NonEmptyList
 import hydra.core.marshallers._
+import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.model.ContactMethod.{Email, Slack}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import hydra.kafka.serializers.Errors._
+import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
@@ -95,21 +97,20 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
     }
 
     "parse one of each type of StreamType" in {
-      StreamTypeFormat.read(JsString("Notification")) shouldBe Notification
-      StreamTypeFormat.read(JsString("History")) shouldBe History
-      StreamTypeFormat.read(JsString("CurrentState")) shouldBe CurrentState
-      StreamTypeFormat.read(JsString("Telemetry")) shouldBe Telemetry
+      StreamTypeV2Format.read(JsString("Entity")) shouldBe StreamTypeV2.Entity
+      StreamTypeV2Format.read(JsString("Event")) shouldBe StreamTypeV2.Event
+      StreamTypeV2Format.read(JsString("Telemetry")) shouldBe StreamTypeV2.Telemetry
     }
 
     "throw error when parsing StreamType" in {
       val jsValue = JsString.empty
       import scala.reflect.runtime.{universe => ru}
-      val tpe = ru.typeOf[StreamType]
+      val tpe = ru.typeOf[StreamTypeV2]
       val knownDirectSubclasses: Set[ru.Symbol] =
         tpe.typeSymbol.asClass.knownDirectSubclasses
 
       the[DeserializationException] thrownBy {
-        StreamTypeFormat.read(jsValue)
+        StreamTypeV2Format.read(jsValue)
       } should have message StreamTypeInvalid(jsValue, knownDirectSubclasses).errorMessage
     }
 
@@ -203,7 +204,6 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
 
       tmv2 shouldBe
         TopicMetadataV2Request(
-          subject,
           Schemas(
             new SchemaFormat(isKey = true).read(validAvroSchema),
             new SchemaFormat(isKey = false).read(validAvroSchema)
@@ -240,7 +240,6 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
 
       tmv2 shouldBe
         TopicMetadataV2Request(
-          subject,
           Schemas(
             new SchemaFormat(isKey = true).read(validAvroSchema),
             new SchemaFormat(isKey = false).read(validAvroSchema)
@@ -287,7 +286,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       email: String,
       allOptionalFieldsPresent: Boolean = true
   )(
-      streamType: StreamType = History,
+      streamType: StreamTypeV2 = StreamTypeV2.Entity,
       deprecated: Boolean = false,
       dataClassification: DataClassification = Public,
       validAvroSchema: JsValue = validAvroSchema,
@@ -297,7 +296,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
   ): (
       JsValue,
       Subject,
-      StreamType,
+      StreamTypeV2,
       Boolean,
       DataClassification,
       Email,
@@ -307,7 +306,6 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
   ) = {
     val jsValue = s"""
          |{
-         |  "subject": "${subject.value}",
          |  "schemas": {
          |   "key": ${validAvroSchema.compactPrint},
          |   "value": ${validAvroSchema.compactPrint}
@@ -371,8 +369,8 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
     }
 
     "serialize a StreamType" in {
-      val streamType = History
-      StreamTypeFormat.write(streamType) shouldBe JsString("History")
+      val streamType = StreamTypeV2.Entity
+      StreamTypeV2Format.write(streamType) shouldBe JsString("Entity")
     }
 
     "serialize a DataClassificationFormat" in {
@@ -401,7 +399,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val subject = Subject.createValidated("some_valid_subject_name").get
       val keySchema = new SchemaFormat(isKey = true).read(validAvroSchema)
       val valueSchema = new SchemaFormat(isKey = false).read(validAvroSchema)
-      val streamType = History
+      val streamType = StreamTypeV2.Entity
       val deprecated = false
       val dataClassification = Public
       val email = Email.create("some@address.com").get
@@ -415,7 +413,6 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val notes = Some("Notes go here.")
 
       val topicMetadataV2 = TopicMetadataV2Request(
-        subject = subject,
         schemas = Schemas(
           keySchema,
           valueSchema
@@ -428,7 +425,6 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         parentSubjects = parentSubjects,
         notes = notes
       )
-
       TopicMetadataV2Format.write(topicMetadataV2) shouldBe
         createJsValueOfTopicMetadataV2Request(
           subject,
@@ -443,6 +439,52 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
           notes,
           createdDate
         )._1
+    }
+
+  }
+
+  "TopicMetadataV2Parser" must {
+
+    "TopicMetadataV2Format write matches TopicMetadataResponseV2Format write" in {
+      val tmc = TopicMetadataContainer(TopicMetadataV2Key(Subject.createValidated("valid").get),
+        TopicMetadataV2Value(StreamTypeV2.Entity, false, Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None),
+        Some(new SchemaFormat(isKey = true).read(validAvroSchema)),
+        Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
+      val response = TopicMetadataV2Response.fromTopicMetadataContainer(tmc)
+      val request = TopicMetadataV2Request.apply(Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,
+        tmc.value.deprecated,tmc.value.dataClassification,tmc.value.contact,tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes)
+
+      TopicMetadataV2Format.write(request).compactPrint shouldBe
+        TopicMetadataResponseV2Format.write(response).compactPrint.replace(",\"subject\":\"valid\"", "")
+    }
+
+    def createSchema: Schema = {
+      SchemaBuilder
+        .record("mySchema")
+        .fields()
+        .name("isTrue")
+        .`type`()
+        .stringType()
+        .noDefault()
+        .endRecord()
+    }
+
+    "write maybeSchemas" in {
+      val maybeSchemas = MaybeSchemas(None, Some(createSchema))
+      MaybeSchemasFormat.write(maybeSchemas) shouldBe JsObject(
+        Map(
+          "key" -> JsString("Unable to retrieve Key Schema"),
+          "value" -> new SchemaFormat(isKey = false).write(createSchema)
+        )
+      )
+
+      val missingVal = MaybeSchemas(Some(createSchema), None)
+      MaybeSchemasFormat.write(missingVal) shouldBe JsObject(
+        Map(
+          "value" -> JsString("Unable to retrieve Value Schema"),
+          "key" -> new SchemaFormat(isKey = true).write(createSchema)
+        )
+      )
     }
 
   }

@@ -4,11 +4,9 @@ import cats.effect.{Bracket, ExitCase, Resource}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
-import hydra.core.transport.AckStrategy
-import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request, TopicMetadataV2Value}
-import hydra.kafka.producer.AvroKeyRecord
+import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
 import org.apache.avro.Schema
@@ -20,7 +18,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
                                                                                kafkaAdmin: KafkaAdminAlgebra[F],
                                                                                kafkaClient: KafkaClientAlgebra[F],
                                                                                retryPolicy: RetryPolicy[F],
-                                                                               v2MetadataTopicName: Subject
+                                                                               v2MetadataTopicName: Subject,
+                                                                               metadataAlgebra: MetadataAlgebra[F]
 ) {
 
   private def onFailure(resourceTried: String): (Throwable, RetryDetails) => F[Unit] = {
@@ -98,10 +97,13 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   }
 
   private def publishMetadata(
+      topicName: Subject,
       createTopicRequest: TopicMetadataV2Request
   ): F[Unit] = {
-    val message = createTopicRequest.toKeyAndValue
     for {
+      metadata <- metadataAlgebra.getMetadataFor(topicName)
+      createdDate = metadata.map(_.value.createdDate).getOrElse(createTopicRequest.createdDate)
+      message = (TopicMetadataV2Key(topicName), createTopicRequest.copy(createdDate = createdDate).toValue)
       records <- TopicMetadataV2.encode[F](message._1, Some(message._2))
       _ <- kafkaClient
         .publishMessage(records, v2MetadataTopicName.value)
@@ -110,17 +112,18 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   }
 
   def createTopic(
+      topicName: Subject,
       createTopicRequest: TopicMetadataV2Request,
       topicDetails: TopicDetails
   ): F[Unit] = {
     (for {
       _ <- registerSchemas(
-        createTopicRequest.subject,
+        topicName,
         createTopicRequest.schemas.key,
         createTopicRequest.schemas.value
       )
-      _ <- createTopicResource(createTopicRequest.subject, topicDetails)
-      _ <- Resource.liftF(publishMetadata(createTopicRequest))
+      _ <- createTopicResource(topicName, topicDetails)
+      _ <- Resource.liftF(publishMetadata(topicName, createTopicRequest))
     } yield ()).use(_ => Bracket[F, Throwable].unit)
   }
 }

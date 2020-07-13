@@ -14,8 +14,9 @@ import hydra.core.http.{CorsSupport, NotFoundException, RouteSupport}
 import hydra.kafka.algebras.MetadataAlgebra
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
-import hydra.kafka.model.TopicMetadataV2Adapter
 import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.model.TopicMetadataV2Response
+import hydra.kafka.serializers.TopicMetadataV2Parser
 import hydra.kafka.util.KafkaUtils
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.kafka.common.PartitionInfo
@@ -38,8 +39,9 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                                             (implicit ec:ExecutionContext)
   extends RouteSupport
     with HydraKafkaJsonSupport
-    with CorsSupport
-    with TopicMetadataV2Adapter {
+    with CorsSupport {
+
+  import TopicMetadataV2Parser._
 
   private implicit val cache = GuavaCache[Map[String, Seq[PartitionInfo]]]
 
@@ -95,7 +97,7 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
   private def getAllV2Metadata = get {
     pathEndOrSingleSlash {
       onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getAllMetadata)) {
-      case Success(metadata) => complete(StatusCodes.OK, metadata.map(toResource))
+      case Success(metadata) => complete(StatusCodes.OK, metadata.map(TopicMetadataV2Response.fromTopicMetadataContainer).filterNot(_.subject.value.startsWith("_")))
       case Failure(e) => complete(StatusCodes.InternalServerError, e)
       }
     }
@@ -109,7 +111,7 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
           onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getMetadataFor(subject))) {
             case Success(maybeContainer) =>
               maybeContainer match {
-                case Some(container) => complete(StatusCodes.OK, toResource(container))
+                case Some(container) => complete(StatusCodes.OK, TopicMetadataV2Response.fromTopicMetadataContainer(container))
                 case None => complete(StatusCodes.NotFound, s"Subject ${subject.value} could not be found.")
               }
             case Failure(e) => complete(StatusCodes.InternalServerError, e)

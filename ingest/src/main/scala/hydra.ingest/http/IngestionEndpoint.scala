@@ -17,8 +17,9 @@
 package hydra.ingest.http
 
 import akka.actor._
-import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
-import akka.http.scaladsl.server.{ExceptionHandler, PathMatcher, PathMatcher0, PathMatcher1, Rejection, Route}
+import akka.http.scaladsl.model.{HttpRequest, StatusCode, StatusCodes}
+import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
+import cats.implicits._
 import hydra.common.config.ConfigSupport._
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
@@ -29,13 +30,15 @@ import hydra.core.monitor.HydraMetrics
 import hydra.core.protocol._
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestionFlow.{AvroConversionAugmentedException, MissingTopicNameException, SchemaNotFoundAugmentedException}
-import hydra.ingest.services.{IngestionFlow, IngestionHandlerGateway}
+import hydra.ingest.services.IngestionFlowV2.V2IngestRequest
+import hydra.ingest.services.{IngestionFlow, IngestionFlowV2, IngestionHandlerGateway}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
+import hydra.kafka.model.TopicMetadataV2Request.Subject
 
 import scala.collection.immutable.Map
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 
 /**
@@ -44,6 +47,7 @@ import scala.util.{Failure, Success}
 class IngestionEndpoint[F[_]: Futurable](
                                           alternateIngestFlowEnabled: Boolean,
                                           ingestionFlow: IngestionFlow[F],
+                                          ingestionV2Flow: IngestionFlowV2[F],
                                           useOldIngestIfUAContains: Set[String],
                                           requestHandlerPathName: Option[String] = None
                                         )(implicit system: ActorSystem) extends RouteSupport with HydraIngestJsonSupport {
@@ -108,16 +112,32 @@ class IngestionEndpoint[F[_]: Futurable](
     )
   }
 
+  private def getV2ReponseCode(e: Throwable): (StatusCode, Option[String]) = e match {
+    case PublishError.Timeout => (StatusCodes.RequestTimeout, None)
+    case e: PublishError.RecordTooLarge => (StatusCodes.PayloadTooLarge, e.getMessage.some)
+    case r: IngestionFlowV2.AvroConversionAugmentedException => (StatusCodes.BadRequest, r.message.some)
+    case r: IngestionFlowV2.SchemaNotFoundAugmentedException => (StatusCodes.BadRequest, Try(r.schemaNotFoundException.getMessage).toOption)
+    case e => (StatusCodes.InternalServerError, Try(e.getMessage).toOption)
+  }
 
-  private def publishRequestV2(topic: String): Route = parameter("correlationId" ?)  { cIdOpt =>
-    extractRequest { req =>
-      extractExecutionContext { implicit ec =>
-        onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>
-          complete(topic)
+  private def publishRequestV2(topic: String): Route =
+    extractExecutionContext { implicit ec =>
+      entity(as[V2IngestRequest]) { req =>
+        Subject.createValidated(topic) match {
+          case Some(t) =>
+            onComplete(Futurable[F].unsafeToFuture(ingestionV2Flow.ingest(req, t))) {
+              case Success(resp) =>
+                addPromMetric(topic, StatusCodes.OK.toString())
+                complete(resp)
+              case Failure(e) =>
+                val status = getV2ReponseCode(e)
+                addPromMetric(topic, status.toString())
+                complete(status)
+            }
+          case None => complete(StatusCodes.BadRequest, Subject.invalidFormat)
         }
       }
     }
-  }
 
   private def publishRequest: Route = parameter("correlationId" ?) { cIdOpt =>
     extractRequest { req =>
@@ -136,7 +156,15 @@ class IngestionEndpoint[F[_]: Futurable](
                 log.error(s"Ingestion timed out for request $errorMsg")
                 addPromMetric(topic, StatusCodes.RequestTimeout.toString())
                 val responseCode = StatusCodes.RequestTimeout
-                complete(responseCode, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorJoined), responseCode.intValue))
+                complete(responseCode, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorTimeout), responseCode.intValue))
+              case Failure(e@PublishError.RecordTooLarge(actual, limit)) =>
+                val errorMsg =
+                  s"${hydraRequest.correlationId}: Ack:${hydraRequest.ackStrategy}; Validation: ${hydraRequest.validationStrategy};" +
+                    s" Metadata:${hydraRequest.metadata}; Ingestors: Alt-Ingest-Flow"
+                log.error(s"Record too large. Found $actual bytes when limit is $limit bytes $errorMsg")
+                val responseCode = StatusCodes.PayloadTooLarge
+                addPromMetric(topic, responseCode.toString())
+                complete(responseCode, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorError(e)), responseCode.intValue))
               case Failure(_: MissingTopicNameException) =>
                 // Yeah, a 404 is a bad idea, but that is what the old v1 flow does so we are keeping it the same
                 addPromMetric(topic, StatusCodes.NotFound.toString())

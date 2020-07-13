@@ -6,7 +6,7 @@ import cats.data.NonEmptyList
 import eu.timepit.refined._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string._
-import hydra.core.marshallers.StreamType
+import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.Schema
 
@@ -54,10 +54,16 @@ object ContactMethod {
 
 final case class Schemas(key: Schema, value: Schema)
 
+sealed trait StreamTypeV2 extends Product with Serializable
+object StreamTypeV2 {
+  case object Event extends StreamTypeV2
+  case object Entity extends StreamTypeV2
+  case object Telemetry extends StreamTypeV2
+}
+
 final case class TopicMetadataV2Request(
-    subject: Subject,
     schemas: Schemas,
-    streamType: StreamType,
+    streamType: StreamTypeV2,
     deprecated: Boolean,
     dataClassification: DataClassification,
     contact: NonEmptyList[ContactMethod],
@@ -66,9 +72,8 @@ final case class TopicMetadataV2Request(
     notes: Option[String]
 ) {
 
-  def toKeyAndValue: (TopicMetadataV2Key, TopicMetadataV2Value) = {
-    val key = TopicMetadataV2Key(subject)
-    val value = TopicMetadataV2Value(
+  def toValue: TopicMetadataV2Value = {
+    TopicMetadataV2Value(
       streamType,
       deprecated,
       dataClassification,
@@ -77,7 +82,6 @@ final case class TopicMetadataV2Request(
       parentSubjects,
       notes
     )
-    (key, value)
   }
 }
 
@@ -94,3 +98,34 @@ object TopicMetadataV2Request {
     val invalidFormat = "Invalid Subject. Subject may contain only alphanumeric characters, hyphens(-), underscores(_), and periods(.)"
   }
 }
+
+final case class MaybeSchemas(key: Option[Schema], value: Option[Schema])
+final case class TopicMetadataV2Response(
+                                          subject: Subject,
+                                          schemas: MaybeSchemas,
+                                          streamType: StreamTypeV2,
+                                          deprecated: Boolean,
+                                          dataClassification: DataClassification,
+                                          contact: NonEmptyList[ContactMethod],
+                                          createdDate: Instant,
+                                          parentSubjects: List[Subject],
+                                          notes: Option[String]
+                                        )
+object TopicMetadataV2Response {
+  def fromTopicMetadataContainer(m: TopicMetadataContainer): TopicMetadataV2Response = {
+    val (k, v, keySchema, valueSchema) = (m.key, m.value, m.keySchema, m.valueSchema)
+    TopicMetadataV2Response(
+      k.subject,
+      MaybeSchemas(keySchema, valueSchema),
+      v.streamType,
+      v.deprecated,
+      v.dataClassification,
+      v.contact,
+      v.createdDate,
+      v.parentSubjects,
+      v.notes
+    )
+  }
+}
+
+

@@ -3,7 +3,7 @@ package hydra.ingest.http
 import akka.actor.{Actor, Props}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.{RawHeader, `User-Agent`}
-import akka.http.scaladsl.server.{MethodRejection, MissingHeaderRejection, RequestEntityExpectedRejection}
+import akka.http.scaladsl.server.{MethodRejection, MissingHeaderRejection, RequestEntityExpectedRejection, Route}
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.{TestActorRef, TestKit}
 import cats.effect.{Concurrent, ContextShift, IO}
@@ -13,7 +13,7 @@ import hydra.core.ingest.RequestParams
 import RequestParams._
 import hydra.core.marshallers.GenericError
 import hydra.ingest.IngestorInfo
-import hydra.ingest.services.IngestionFlow
+import hydra.ingest.services.{IngestionFlow, IngestionFlowV2}
 import hydra.ingest.services.IngestorRegistry.{FindAll, FindByName, LookupResult}
 import hydra.ingest.test.TestIngestor
 import hydra.kafka.algebras.KafkaClientAlgebra
@@ -25,10 +25,7 @@ import org.scalatest.wordspec.AnyWordSpecLike
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
-/**
-  * Created by alexsilva on 5/12/17.
-  */
-class IngestionEndpointSpec
+final class IngestionEndpointSpec
     extends Matchers
     with AnyWordSpecLike
     with ScalatestRouteTest
@@ -42,7 +39,6 @@ class IngestionEndpointSpec
 
   val registry = TestActorRef(
     new Actor {
-
       override def receive = {
         case FindByName(name) if name == "tester" =>
           sender ! LookupResult(Seq(ingestorInfo))
@@ -60,9 +56,10 @@ class IngestionEndpointSpec
 
   import scalacache.Mode
   implicit val mode: Mode[IO] = scalacache.CatsEffect.modes.async
-  val ingestRoute = new IngestionEndpoint(
+  private val ingestRoute = new IngestionEndpoint(
     false,
     new IngestionFlow[IO](SchemaRegistry.test[IO].unsafeRunSync, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistryUrl.notreal"),
+    new IngestionFlowV2[IO](SchemaRegistry.test[IO].unsafeRunSync, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistryUrl.notreal"),
     Set.empty
   ).route
 
@@ -76,17 +73,23 @@ class IngestionEndpointSpec
   }
 
   private val ingestRouteAlt = {
-    val schemaRegistry = SchemaRegistry.test[IO].unsafeRunSync
-    schemaRegistry.registerSchema(
-      "my_topic-value",
-      SchemaBuilder.record("my_topic").fields().requiredBoolean("test").optionalInt("intField").endRecord()
-    ).unsafeRunSync
-    new IngestionEndpoint(
-      true,
-      new IngestionFlow[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistry.notreal"),
-      Set("Segment"),
-      Some("alt-test-request-handler")
-    ).route
+    val simpleSchema = SchemaBuilder.record("test").fields.requiredInt("test").endRecord()
+    val otherSchema = SchemaBuilder.record("my_topic").fields().requiredBoolean("test").optionalInt("intField").endRecord()
+    (for {
+      schemaRegistry <- SchemaRegistry.test[IO]
+      _ <- schemaRegistry.registerSchema("my_topic-value", otherSchema)
+      _ <- schemaRegistry.registerSchema("my_topic-value", otherSchema)
+      _ <- schemaRegistry.registerSchema("exp.blah.blah-value", simpleSchema)
+      _ <- schemaRegistry.registerSchema("exp.blah.blah-key", simpleSchema)
+    } yield {
+      new IngestionEndpoint(
+        true,
+        new IngestionFlow[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistry.notreal"),
+        new IngestionFlowV2[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistry.notreal"),
+        Set("Segment"),
+        Some("alt-test-request-handler")
+      ).route
+    }).unsafeRunSync()
   }
 
 
@@ -239,10 +242,16 @@ class IngestionEndpointSpec
   }
 
   "The V2 Ingestion path" should {
-    "Return 200" in {
-      val request = Post("/v2/topics/exp.blah.blah/records", """{"test":true, "extraField":true}""")
-      request ~> ingestRouteAlt ~> check {
-        responseAs[String] shouldBe "exp.blah.blah"
+    "reject an uncomplete request" in {
+      val request = Post("/v2/topics/exp.blah.blah/records", HttpEntity(ContentTypes.`application/json`, """{"test":true, "extraField":true}"""))
+      request ~> Route.seal(ingestRouteAlt) ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
+    "accept a complete request" in {
+      val request = Post("/v2/topics/exp.blah.blah/records", HttpEntity(ContentTypes.`application/json`, """{"key":{"test": 1}, "value":{"test": 2}}"""))
+      request ~> Route.seal(ingestRouteAlt) ~> check {
+        responseAs[String] shouldBe "{\"offset\":0,\"partition\":0}"
         status shouldBe StatusCodes.OK
       }
     }

@@ -111,13 +111,28 @@ object SchemaRegistry {
   private def getFromSchemaRegistryClient[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient): SchemaRegistry[F] =
     new SchemaRegistry[F] {
 
+      private implicit class CheckKeySchemaEvolution(schemasF: F[List[Schema]]) {
+        def checkKeyEvolution(subject: String, newSchema: Schema): F[List[Schema]] = schemasF.flatTap[Unit] {
+          case _ if subject.endsWith("-value") => Sync[F].unit
+          case Nil => Sync[F].unit
+          case oldSchema :: Nil =>
+            if (oldSchema.hashCode == newSchema.hashCode) {
+              Sync[F].unit
+            } else {
+              Sync[F].raiseError(IncompatibleSchemaException(s"Key schema evolutions are not permitted."))
+            }
+          case _ =>
+            Sync[F].raiseError(IncompatibleSchemaException(s"There are too many versions registered for the subject $subject"))
+        }
+      }
+
       override def registerSchema(
           subject: String,
           schema: Schema
       ): F[SchemaId] = {
         for {
           versions <- getAllVersions(subject)
-          schemas <- versions.traverse(getSchemaFor(subject, _)).map(_.flatten)
+          schemas <- versions.traverse(getSchemaFor(subject, _)).map(_.flatten).checkKeyEvolution(subject, schema)
           validated <- Sync[F].delay(validate(schema, schemas.reverse))
           schemaVersion <- if (validated) {
             Sync[F].delay(schemaRegistryClient.register(subject, schema))

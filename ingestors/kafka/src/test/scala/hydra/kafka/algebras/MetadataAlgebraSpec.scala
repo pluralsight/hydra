@@ -3,13 +3,16 @@ package hydra.kafka.algebras
 import java.time.Instant
 
 import cats.data.NonEmptyList
-import cats.effect.{Concurrent, ContextShift, IO, Timer}
+import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.implicits._
+import hydra.avro.registry.SchemaRegistry
 import hydra.core.marshallers.History
-import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataV2Container
+import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.model.ContactMethod.Slack
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{Public, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Value}
+import hydra.kafka.model.{Public, StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request, TopicMetadataV2Value}
+import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
+import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import org.apache.avro.generic.GenericRecord
 import org.scalatest.Assertion
 import org.scalatest.matchers.should.Matchers
@@ -30,6 +33,9 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
   private implicit def noop[A]: (A, RetryDetails) => IO[Unit] = retry.noop[IO, A]
 
+  implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
+    Slf4jLogger.getLogger[F]
+
   private implicit class RetryAndAssert[A](boolIO: IO[A]) {
     def retryIfFalse(check: A => Boolean): IO[Assertion] =
       boolIO.map(check).retryingM(identity, policy, noop).map(assert(_))
@@ -41,7 +47,8 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
 
   (for {
     kafkaClient <- KafkaClientAlgebra.test[IO]
-    metadata <- MetadataAlgebra.make(metadataTopicName, consumerGroup, kafkaClient, consumeMetadataEnabled = true)
+    schemaRegistry <- SchemaRegistry.test[IO]
+    metadata <- MetadataAlgebra.make(metadataTopicName, consumerGroup, kafkaClient, schemaRegistry, consumeMetadataEnabled = true)
   } yield {
     runTests(metadata, kafkaClient)
   }).unsafeRunSync()
@@ -63,7 +70,7 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
           _ <- kafkaClientAlgebra.publishMessage(record, metadataTopicName)
           _ <- metadataAlgebra.getMetadataFor(subject).retryIfFalse(_.isDefined)
           metadata <- metadataAlgebra.getMetadataFor(subject)
-        } yield metadata shouldBe Some(TopicMetadataV2Container(key, Some(value)))).unsafeRunSync()
+        } yield metadata shouldBe Some(TopicMetadataContainer(key, value, None, None))).unsafeRunSync()
       }
 
       "retrieve all metadata" in {
@@ -82,7 +89,7 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
   private def getMetadataGenericRecords(subject: Subject): (IO[(GenericRecord, Option[GenericRecord])], TopicMetadataV2Key, TopicMetadataV2Value) = {
     val key = TopicMetadataV2Key(subject)
     val value = TopicMetadataV2Value(
-        History,
+        StreamTypeV2.Entity,
         deprecated = false,
         Public,
         NonEmptyList.one(Slack.create("#channel").get),
