@@ -85,7 +85,7 @@ lazy val root = Project(
   id = "hydra",
   base = file(".")
 ).settings(defaultSettings)
-  .aggregate(common, core, avro, ingest, kafka, sql, jdbc, rabbitmq)
+  .aggregate(common, core, avro, ingest, kafka, sql, jdbc)
 
 lazy val common = Project(
   id = "common",
@@ -144,16 +144,6 @@ lazy val jdbc = Project(
     moduleSettings,
     name := "hydra-jdbc",
     libraryDependencies ++= Dependencies.sqlDeps
-  )
-
-lazy val rabbitmq = Project(
-  id = "rabbitmq",
-  base = file("ingestors/rabbitmq")
-).dependsOn(core)
-  .settings(
-    moduleSettings,
-    name := "hydra-rabbitmq",
-    libraryDependencies ++= Dependencies.rabbitDeps
   )
 
 val sbSettings =
