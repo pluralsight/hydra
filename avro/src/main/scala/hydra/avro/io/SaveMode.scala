@@ -4,8 +4,6 @@ package hydra.avro.io
   * /**
   * SaveMode is used to specify the expected behavior of creating a record sink to a data source.
   *
-  * For instance, in JDBC implementations, this specifies whether to create a table if one doesn't
-  * exist.
   *
   */
   * Created by alexsilva on 7/11/17.
