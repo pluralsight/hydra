@@ -26,7 +26,7 @@ import hydra.core.http.RouteSupport
 import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
 import hydra.core.ingest.{CorrelationIdBuilder, HydraRequest, IngestionReport, RequestParams}
 import hydra.core.marshallers.GenericError
-import hydra.core.monitor.HydraMetrics
+import hydra.core.monitor.HydraMetrics.addPromHttpMetric
 import hydra.core.protocol._
 import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestionFlow.{AvroConversionAugmentedException, MissingTopicNameException, SchemaNotFoundAugmentedException}
@@ -100,18 +100,6 @@ class IngestionEndpoint[F[_]: Futurable](
     }
   }
 
-  private def addPromMetric(topic: String, responseCode: String)(implicit ec: ExecutionContext): Unit = {
-    HydraMetrics.incrementGauge(
-      lookupKey =
-        "Ingest_topic_" + s"_${topic}",
-      metricName = "ingest_topic_response",
-      tags = Seq(
-        "topic" -> topic,
-        "responseCode" -> responseCode
-      )
-    )
-  }
-
   private def getV2ReponseCode(e: Throwable): (StatusCode, Option[String]) = e match {
     case PublishError.Timeout => (StatusCodes.RequestTimeout, None)
     case e: PublishError.RecordTooLarge => (StatusCodes.PayloadTooLarge, e.getMessage.some)
@@ -128,14 +116,16 @@ class IngestionEndpoint[F[_]: Futurable](
             case Some(t) =>
               onComplete(Futurable[F].unsafeToFuture(ingestionV2Flow.ingest(req, t))) {
                 case Success(resp) =>
-                  addPromMetric(topic, StatusCodes.OK.toString())
+                  addPromHttpMetric(topic, StatusCodes.OK.toString, "IngestV2")
                   complete(resp)
                 case Failure(e) =>
                   val status = getV2ReponseCode(e)
-                  addPromMetric(topic, status.toString())
+                  addPromHttpMetric(topic, status.toString,"IngestV2")
                   complete(status)
               }
-            case None => complete(StatusCodes.BadRequest, Subject.invalidFormat)
+            case None =>
+              addPromHttpMetric(topic, StatusCodes.BadRequest.toString, "IngestV2")
+              complete(StatusCodes.BadRequest, Subject.invalidFormat)
           }
         }
       }
@@ -145,14 +135,14 @@ class IngestionEndpoint[F[_]: Futurable](
     extractExecutionContext { implicit ec =>
       onComplete(Futurable[F].unsafeToFuture(ingestionFlow.ingest(hydraRequest))) {
         case Success(_) =>
-          addPromMetric(topic, StatusCodes.OK.toString())
+          addPromHttpMetric(topic, StatusCodes.OK.toString(), "Ingest")
           complete(IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorCompleted), StatusCodes.OK.intValue))
         case Failure(PublishError.Timeout) =>
           val errorMsg =
             s"${hydraRequest.correlationId}: Ack:${hydraRequest.ackStrategy}; Validation: ${hydraRequest.validationStrategy};" +
               s" Metadata:${hydraRequest.metadata}; Payload: ${hydraRequest.payload} Ingestors: Alt-Ingest-Flow"
           log.error(s"Ingestion timed out for request $errorMsg")
-          addPromMetric(topic, StatusCodes.RequestTimeout.toString())
+          addPromHttpMetric(topic, StatusCodes.RequestTimeout.toString,"Ingest")
           val responseCode = StatusCodes.RequestTimeout
           complete(responseCode, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorTimeout), responseCode.intValue))
         case Failure(e@PublishError.RecordTooLarge(actual, limit)) =>
@@ -161,18 +151,18 @@ class IngestionEndpoint[F[_]: Futurable](
               s" Metadata:${hydraRequest.metadata}; Ingestors: Alt-Ingest-Flow"
           log.error(s"Record too large. Found $actual bytes when limit is $limit bytes $errorMsg")
           val responseCode = StatusCodes.PayloadTooLarge
-          addPromMetric(topic, responseCode.toString())
+          addPromHttpMetric(topic, responseCode.toString,"Ingest")
           complete(responseCode, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorError(e)), responseCode.intValue))
         case Failure(_: MissingTopicNameException) =>
           // Yeah, a 404 is a bad idea, but that is what the old v1 flow does so we are keeping it the same
-          addPromMetric(topic, StatusCodes.NotFound.toString())
+          addPromHttpMetric(topic, StatusCodes.NotFound.toString,"Ingest")
           val responseCode = StatusCodes.NotFound
           complete(responseCode, IngestionReport(hydraRequest.correlationId, Map(), responseCode.intValue))
         case Failure(r: AvroConversionAugmentedException) =>
-          addPromMetric(topic, StatusCodes.BadRequest.toString())
+          addPromHttpMetric(topic, StatusCodes.BadRequest.toString,"Ingest")
           complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(r)), StatusCodes.BadRequest.intValue))
         case Failure(e: SchemaNotFoundAugmentedException) =>
-          addPromMetric(topic, StatusCodes.BadRequest.toString())
+          addPromHttpMetric(topic, StatusCodes.BadRequest.toString,"Ingest")
           complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), StatusCodes.BadRequest.intValue))
         case Failure(other) =>
           val responseCode = StatusCodes.ServiceUnavailable
@@ -180,7 +170,7 @@ class IngestionEndpoint[F[_]: Futurable](
             s"Exception: $other; ${hydraRequest.correlationId}: Ack:${hydraRequest.ackStrategy}; Validation: ${hydraRequest.validationStrategy};" +
               s" Metadata:${hydraRequest.metadata}; Payload: ${hydraRequest.payload} Ingestors: Alt-Ingest-Flow"
           log.error(s"Ingestion failed for request $errorMsg")
-          addPromMetric(topic, StatusCodes.ServiceUnavailable.toString())
+          addPromHttpMetric(topic, StatusCodes.ServiceUnavailable.toString,"Ingest")
           complete(responseCode, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorError(other)), responseCode.intValue))
       }
     }
@@ -207,10 +197,6 @@ class IngestionEndpoint[F[_]: Futurable](
     }
   }
 
-  private def sendServerError(): Unit = {
-
-  }
-
   private def exceptionHandler(topic: String) = ExceptionHandler {
       case e: IllegalArgumentException =>
         extractExecutionContext { implicit ec =>
@@ -219,25 +205,25 @@ class IngestionEndpoint[F[_]: Futurable](
             .getOrElse(false)) {
             log.error("Ingestion 400 ERROR: " + e.getMessage)
           }
-          addPromMetric(topic, StatusCodes.BadRequest.toString())
+          addPromHttpMetric(topic, StatusCodes.BadRequest.toString,"Ingest")
           complete(400, GenericError(400, e.getMessage))
         }
 
       case e: Throwable =>
         extractExecutionContext { implicit ec =>
-          addPromMetric(topic, StatusCodes.InternalServerError.toString())
+          addPromHttpMetric(topic, StatusCodes.InternalServerError.toString,"Ingest")
           complete(500, GenericError(500, e.getMessage))
         }
 
       case e: Exception =>
         extractExecutionContext { implicit ec =>
-          addPromMetric(topic, StatusCodes.InternalServerError.toString())
+          addPromHttpMetric(topic, StatusCodes.InternalServerError.toString,"Ingest")
           complete(500, GenericError(500, e.getMessage))
         }
 
       case e: Error =>
         extractExecutionContext { implicit ec =>
-          addPromMetric(topic, StatusCodes.InternalServerError.toString())
+          addPromHttpMetric(topic, StatusCodes.InternalServerError.toString,"Ingest")
           complete(500, GenericError(500, e.getMessage))
         }
   }

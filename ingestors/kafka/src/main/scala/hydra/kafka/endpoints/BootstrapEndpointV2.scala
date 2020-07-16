@@ -22,14 +22,14 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
 import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
 import hydra.common.util.Futurable
 import hydra.core.http.CorsSupport
-import hydra.core.marshallers.GenericServiceResponse
+import hydra.core.monitor.HydraMetrics.addPromHttpMetric
 import hydra.kafka.model.TopicMetadataV2Request
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.serializers.TopicMetadataV2Parser
 import hydra.kafka.util.KafkaUtils.TopicDetails
-import org.apache.avro.SchemaParseException
 
+import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
 final class BootstrapEndpointV2[F[_]: Futurable](
@@ -40,22 +40,31 @@ final class BootstrapEndpointV2[F[_]: Futurable](
   import TopicMetadataV2Parser._
 
   val route: Route = cors(settings) {
-    pathPrefix("v2" / "topics" / Segment) { topicName =>
-      pathEndOrSingleSlash {
-        put {
-          entity(as[TopicMetadataV2Request]) { t =>
-            Subject.createValidated(topicName) match {
-              case Some(validatedTopic) =>
-                onComplete(
-                  Futurable[F].unsafeToFuture(createTopicProgram
-                    .createTopic(validatedTopic, t, defaultTopicDetails))
-                ) {
-                  case Success(_) => complete(StatusCodes.OK)
-                  case Failure(IncompatibleSchemaException(m)) => complete(StatusCodes.BadRequest, m)
-                  case Failure(e) => complete(StatusCodes.InternalServerError, e)
-                }
-              case None =>
-                complete(StatusCodes.BadRequest, Subject.invalidFormat)
+    extractExecutionContext { implicit ec =>
+      pathPrefix("v2" / "topics" / Segment) { topicName =>
+        pathEndOrSingleSlash {
+          put {
+            entity(as[TopicMetadataV2Request]) { t =>
+              Subject.createValidated(topicName) match {
+                case Some(validatedTopic) =>
+                  onComplete(
+                    Futurable[F].unsafeToFuture(createTopicProgram
+                      .createTopic(validatedTopic, t, defaultTopicDetails))
+                  ) {
+                    case Success(_) =>
+                      addPromHttpMetric(topicName, StatusCodes.OK.toString, "V2Bootstrap")
+                      complete(StatusCodes.OK)
+                    case Failure(IncompatibleSchemaException(m)) =>
+                      addPromHttpMetric(topicName, StatusCodes.BadRequest.toString, "V2Bootstrap")
+                      complete(StatusCodes.BadRequest, m)
+                    case Failure(e) =>
+                      addPromHttpMetric(topicName, StatusCodes.InternalServerError.toString, "V2Bootstrap")
+                      complete(StatusCodes.InternalServerError, e)
+                  }
+                case None =>
+                  addPromHttpMetric(topicName, StatusCodes.BadRequest.toString, "V2Bootstrap")
+                  complete(StatusCodes.BadRequest, Subject.invalidFormat)
+              }
             }
           }
         }

@@ -33,6 +33,7 @@ import hydra.core.marshallers.GenericServiceResponse
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.SchemaParseException
 import spray.json.RootJsonFormat
+import hydra.core.monitor.HydraMetrics.addPromHttpMetric
 
 import scala.concurrent.duration._
 
@@ -55,39 +56,46 @@ class SchemasEndpoint()(implicit system: ActorSystem)
 
   override def route: Route = cors(settings) {
     handleExceptions(excptHandler) {
-      pathPrefix("schemas") {
-        get {
-          pathEndOrSingleSlash {
-            onSuccess(
-              (schemaRegistryActor ? FetchSubjectsRequest)
-                .mapTo[FetchSubjectsResponse]
-            ) { response => complete(OK, response.subjects) }
-          } ~ path(Segment) { subject =>
-            parameters('schema ?) { schemaOnly: Option[String] =>
-              getSchema(includeKeySchema = false, subject, schemaOnly)
+      extractExecutionContext { implicit ec =>
+        pathPrefix("schemas") {
+          get {
+            pathEndOrSingleSlash {
+              onSuccess(
+                (schemaRegistryActor ? FetchSubjectsRequest)
+                  .mapTo[FetchSubjectsResponse]
+              ) { response =>
+                addPromHttpMetric("", OK.toString, "/schemas")
+                complete(OK, response.subjects)
+              }
+            } ~ path(Segment) { subject =>
+              parameters('schema ?) { schemaOnly: Option[String] =>
+                getSchema(includeKeySchema = false, subject, schemaOnly)
+              }
+            } ~ path(Segment / "versions") { subject =>
+              onSuccess(
+                (schemaRegistryActor ? FetchAllSchemaVersionsRequest(subject))
+                  .mapTo[FetchAllSchemaVersionsResponse]
+              ) { response =>
+                addPromHttpMetric(subject, OK.toString, subject + "/versions")
+                complete(OK, response.versions.map(SchemasEndpointResponse(_)))
+              }
+            } ~ path(Segment / "versions" / IntNumber) { (subject, version) =>
+              onSuccess(
+                (schemaRegistryActor ? FetchSchemaVersionRequest(
+                  subject,
+                  version
+                )).mapTo[FetchSchemaVersionResponse]
+              ) { response =>
+                addPromHttpMetric(subject, OK.toString, subject + "/versions/" + version)
+                complete(OK, SchemasEndpointResponse(response.schemaResource))
+              }
             }
-          } ~ path(Segment / "versions") { subject =>
-            onSuccess(
-              (schemaRegistryActor ? FetchAllSchemaVersionsRequest(subject))
-                .mapTo[FetchAllSchemaVersionsResponse]
-            ) { response =>
-              complete(OK, response.versions.map(SchemasEndpointResponse(_)))
+          } ~
+            post {
+              registerNewSchema
             }
-          } ~ path(Segment / "versions" / IntNumber) { (subject, version) =>
-            onSuccess(
-              (schemaRegistryActor ? FetchSchemaVersionRequest(
-                subject,
-                version
-              )).mapTo[FetchSchemaVersionResponse]
-            ) { response =>
-              complete(OK, SchemasEndpointResponse(response.schemaResource))
-            }
-          }
-        } ~
-          post {
-            registerNewSchema
-          }
-      } ~ v2Route
+        } ~ v2Route
+      }
     }
   }
 
@@ -107,34 +115,41 @@ class SchemasEndpoint()(implicit system: ActorSystem)
       (schemaRegistryActor ? FetchSchemaRequest(subject))
         .mapTo[FetchSchemaResponse]
     ) { response =>
-
-      if (includeKeySchema) {
-        complete(OK, SchemasWithKeyEndpointResponse.apply(response))
-      } else {
-        val schemaResource = response.schemaResource
-        schemaOnly.map(_ => complete(OK, schemaResource.schema.toString))
-          .getOrElse(
-            complete(OK, SchemasEndpointResponse(schemaResource))
-          )
+      extractExecutionContext { implicit ec =>
+        if (includeKeySchema) {
+          addPromHttpMetric(subject, OK.toString, "V2Schema/" + subject)
+          complete(OK, SchemasWithKeyEndpointResponse.apply(response))
+        } else {
+          val schemaResource = response.schemaResource
+          addPromHttpMetric(subject, OK.toString, "schema/" + subject)
+          schemaOnly.map{_ =>
+            complete(OK, schemaResource.schema.toString)}
+            .getOrElse {
+              complete(OK, SchemasEndpointResponse(schemaResource))
+            }
+        }
       }
     }
   }
 
   private def registerNewSchema: Route = {
     entity(as[String]) { json =>
-      extractRequest { request =>
-        onSuccess(
-          (schemaRegistryActor ? RegisterSchemaRequest(json))
-            .mapTo[RegisterSchemaResponse]
-        ) { registeredSchema =>
-          respondWithHeader(
-            Location(
-              request.uri.copy(path =
-                request.uri.path / registeredSchema.schemaResource.schema.getFullName
+      extractExecutionContext { implicit ec =>
+        extractRequest { request =>
+          onSuccess(
+            (schemaRegistryActor ? RegisterSchemaRequest(json))
+              .mapTo[RegisterSchemaResponse]
+          ) { registeredSchema =>
+            respondWithHeader(
+              Location(
+                request.uri.copy(path =
+                  request.uri.path / registeredSchema.schemaResource.schema.getFullName
+                )
               )
-            )
-          ) {
-            complete(Created, SchemasEndpointResponse(registeredSchema))
+            ) {
+              addPromHttpMetric(registeredSchema.schemaResource.schema.getFullName, Created.toString, "/schemas")
+              complete(Created, SchemasEndpointResponse(registeredSchema))
+            }
           }
         }
       }
@@ -143,38 +158,50 @@ class SchemasEndpoint()(implicit system: ActorSystem)
 
   private[http] val excptHandler: ExceptionHandler = ExceptionHandler {
     case e: RestClientException if e.getErrorCode == 40401 =>
-      complete(NotFound, GenericServiceResponse(404, e.getMessage))
+      extractExecutionContext { implicit ec =>
+        addPromHttpMetric("", NotFound.toString, "schemasEndpoint")
+        complete(NotFound, GenericServiceResponse(404, e.getMessage))
+      }
 
     case e: RestClientException =>
       val registryHttpStatus = e.getStatus
       val registryErrorCode = e.getErrorCode
-      complete(
-        registryHttpStatus,
-        GenericServiceResponse(
-          registryErrorCode,
-          s"Registry error: ${e.getMessage}"
+      extractExecutionContext { implicit ec =>
+        addPromHttpMetric("", registryHttpStatus.toString, "schemasEndpoint")
+        complete(
+          registryHttpStatus,
+          GenericServiceResponse(
+            registryErrorCode,
+            s"Registry error: ${e.getMessage}"
+          )
         )
-      )
+      }
 
     case e: SchemaParseException =>
-      complete(
-        BadRequest,
-        GenericServiceResponse(
-          400,
-          s"Unable to parse avro schema: ${e.getMessage}"
-        )
-      )
-
-    case e: Exception =>
-      extractUri { uri =>
-        log.warn(s"Request to $uri failed with exception: {}", e)
+      extractExecutionContext { implicit ec =>
+        addPromHttpMetric("", BadRequest.toString, "schemasEndpoint")
         complete(
           BadRequest,
           GenericServiceResponse(
             400,
-            s"Unable to complete request for ${uri.path.tail} : ${e.getMessage}"
+            s"Unable to parse avro schema: ${e.getMessage}"
           )
         )
+      }
+
+    case e: Exception =>
+      extractExecutionContext { implicit ec =>
+        extractUri { uri =>
+          log.warn(s"Request to $uri failed with exception: {}", e)
+          addPromHttpMetric("", BadRequest.toString, "schemasEndpoint")
+          complete(
+            BadRequest,
+            GenericServiceResponse(
+              400,
+              s"Unable to complete request for ${uri.path.tail} : ${e.getMessage}"
+            )
+          )
+        }
       }
   }
 }

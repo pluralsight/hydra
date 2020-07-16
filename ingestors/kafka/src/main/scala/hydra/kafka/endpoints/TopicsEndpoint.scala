@@ -2,6 +2,7 @@ package hydra.kafka.endpoints
 
 import akka.actor.ActorSelection
 import akka.http.scaladsl.common.EntityStreamingSupport
+import akka.http.scaladsl.model.StatusCodes
 import akka.kafka.Subscriptions
 import akka.kafka.scaladsl.Consumer
 import akka.pattern.ask
@@ -10,6 +11,7 @@ import hydra.core.http.RouteSupport
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetLatestOffsets, LatestOffsetsResponse}
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
+import hydra.core.monitor.HydraMetrics.addPromHttpMetric
 
 import scala.collection.immutable.Map
 import scala.concurrent.duration._
@@ -52,6 +54,7 @@ class TopicsEndpoint(consumerProxy:ActorSelection)(implicit ec:ExecutionContext)
                       case cause => ctx.fail(cause)
                     }
                   )
+                addPromHttpMetric(topicName, StatusCodes.OK.toString, "transports/kafka/consumer/topics/" + topicName)
                 complete(source)
 
             }
