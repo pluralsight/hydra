@@ -16,7 +16,6 @@ object Dependencies {
   val confluentVersion = "5.4.2"
   val easyMockVersion = "4.2" //needed for mocking static java methods
   val fs2KafkaVersion = "1.0.0"
-  val hikariCPVersion = "3.4.5"
   val h2DbVersion = "1.4.200"
   val jacksonCoreVersion = "2.10.4"
   val jacksonDatabindVersion = "2.10.4"
@@ -143,8 +142,6 @@ object Dependencies {
 
     val reflections = "org.reflections" % "reflections" % reflectionsVersion
 
-    val hikariCP = "com.zaxxer" % "HikariCP" % hikariCPVersion
-
     val jackson = Seq(
       "com.fasterxml.jackson.core" % "jackson-core" % jacksonCoreVersion,
       "com.fasterxml.jackson.core" % "jackson-databind" % jacksonDatabindVersion
@@ -187,9 +184,6 @@ object Dependencies {
 
   val baseDeps: Seq[ModuleID] =
     akka ++ Seq(scalaz, avro) ++ cats ++ logging ++ joda ++ testDeps
-
-  val sqlDeps: Seq[ModuleID] =
-    logging ++ Seq(avro, hikariCP, h2db) ++ joda ++ testDeps
 
   val avroDeps: Seq[ModuleID] =
     baseDeps ++ confluent ++ jackson ++ guavacache ++ catsEffect
