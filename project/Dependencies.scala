@@ -26,7 +26,7 @@ object Dependencies {
   val kamonVersion = "2.1.3"
   val log4jVersion = "2.13.3"
   val powerMockVersion = "2.0.7" //needed for mocking static java methods
-  val refinedVersion = "0.9.14"
+  val refinedVersion = "0.9.15"
   val reflectionsVersion = "0.9.12"
   val scalaCacheVersion = "0.28.0"
   val scalaMockVersion = "4.4.0"
