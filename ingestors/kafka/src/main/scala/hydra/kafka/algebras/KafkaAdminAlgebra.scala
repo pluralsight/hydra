@@ -135,9 +135,9 @@ object KafkaAdminAlgebra {
           latest <- getLatestOffsets(topic)
           group <- getConsumerGroupOffsets(consumerGroup)
         } yield {
-          latest.flatMap { case (topicAndPartition, latestOffset) =>
+          latest.map { case (topicAndPartition, latestOffset) =>
             val maybeLag = group.get(topicAndPartition).map(groupOffset => LagOffsets(latestOffset, groupOffset))
-            maybeLag.map(topicAndPartition -> _)
+            topicAndPartition -> maybeLag.getOrElse(LagOffsets(latestOffset, Offset(0)))
           }
         }
       }
@@ -145,7 +145,7 @@ object KafkaAdminAlgebra {
       private def getConsumerResource: Resource[F, KafkaConsumer[F, _, _]] = {
         val des = Deserializer[F, String]
         consumerResource[F, String, String](
-          ConsumerSettings.apply(des, des)
+          ConsumerSettings.apply(des, des).withBootstrapServers(bootstrapServers)
         )
       }
 
