@@ -6,7 +6,9 @@ import cats.implicits._
 import fs2.kafka._
 import hydra.core.protocol._
 import hydra.kafka.util.KafkaUtils.TopicDetails
+import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.clients.admin.NewTopic
+import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
 
 import scala.util.control.NoStackTrace
@@ -46,12 +48,30 @@ trait KafkaAdminAlgebra[F[_]] {
     * @return
     */
   def deleteTopic(name: String): F[Unit]
+
+  /**
+    * Fetch the offsets by topic and partition for a given consumer group
+    * @param consumerGroup The name of the consumer group you are fetching the offsets for
+    * @return Offsets keyed by topic and partition
+    */
+  def getConsumerGroupOffsets(consumerGroup: String): F[Map[TopicAndPartition, Offset]]
 }
 
 object KafkaAdminAlgebra {
 
   type TopicName = String
   final case class Topic(name: TopicName, numberPartitions: Int)
+
+  final case class TopicAndPartition(topic: String, partition: Int)
+  object TopicAndPartition {
+    def apply(t: TopicPartition): TopicAndPartition =
+      new TopicAndPartition(t.topic, t.partition)
+  }
+  final case class Offset(value: Long) extends AnyVal
+  object Offset {
+    def apply(o: OffsetAndMetadata): Offset =
+      new Offset(o.offset)
+  }
 
   def live[F[_]: Sync: Concurrent: ContextShift](
       bootstrapServers: String,
@@ -81,6 +101,10 @@ object KafkaAdminAlgebra {
 
       override def deleteTopic(name: String): F[Unit] =
         getAdminClientResource.use(_.deleteTopic(name))
+
+      override def getConsumerGroupOffsets(consumerGroup: String): F[Map[TopicAndPartition, Offset]] =
+        getAdminClientResource.use(_.listConsumerGroupOffsets(consumerGroup)
+          .partitionsToOffsetAndMetadata.map(_.map(r => TopicAndPartition(r._1) -> Offset(r._2))))
 
       private def getAdminClientResource: Resource[F, KafkaAdminClient[F]] = {
         adminClientResource(
