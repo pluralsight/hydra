@@ -1,7 +1,7 @@
 package hydra.kafka.algebras
 
 import cats.effect.concurrent.Ref
-import cats.effect.{Async, Concurrent, ContextShift, Resource, Sync}
+import cats.effect.{Async, Concurrent, ConcurrentEffect, ContextShift, Resource, Sync, Timer}
 import cats.implicits._
 import fs2.kafka._
 import hydra.core.protocol._
@@ -55,6 +55,22 @@ trait KafkaAdminAlgebra[F[_]] {
     * @return Offsets keyed by topic and partition
     */
   def getConsumerGroupOffsets(consumerGroup: String): F[Map[TopicAndPartition, Offset]]
+
+  /**
+    * Fetch the latest offsets for a given topic
+    * @param topic name of the topic to get the last offsets for
+    * @return offsets by partition and topic
+    */
+  def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]]
+
+  /**
+    * Returns the lag for a given consumer on a given topic
+    * @param topic Name of the topic you want the lag for
+    * @param consumerGroup Name of the consumer group you want the lag for
+    * @return The latest and group offsets by topic and partition
+    */
+  def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]]
+
 }
 
 object KafkaAdminAlgebra {
@@ -72,8 +88,9 @@ object KafkaAdminAlgebra {
     def apply(o: OffsetAndMetadata): Offset =
       new Offset(o.offset)
   }
+  final case class LagOffsets(latest: Offset, group: Offset)
 
-  def live[F[_]: Sync: Concurrent: ContextShift](
+  def live[F[_]: Sync: ConcurrentEffect: ContextShift: Timer](
       bootstrapServers: String,
   ): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
     new KafkaAdminAlgebra[F] {
@@ -105,6 +122,32 @@ object KafkaAdminAlgebra {
       override def getConsumerGroupOffsets(consumerGroup: String): F[Map[TopicAndPartition, Offset]] =
         getAdminClientResource.use(_.listConsumerGroupOffsets(consumerGroup)
           .partitionsToOffsetAndMetadata.map(_.map(r => TopicAndPartition(r._1) -> Offset(r._2))))
+
+      override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] =
+        getConsumerResource.use { consumer =>
+          consumer.partitionsFor(topic).map(_.map(p => new TopicPartition(p.topic, p.partition))).flatMap { topicPartition =>
+            consumer.endOffsets(topicPartition.toSet).map(_.map(in => TopicAndPartition(in._1) -> Offset(in._2)))
+          }
+        }
+
+      override def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]] = {
+        for {
+          latest <- getLatestOffsets(topic)
+          group <- getConsumerGroupOffsets(consumerGroup)
+        } yield {
+          latest.flatMap { case (topicAndPartition, latestOffset) =>
+            val maybeLag = group.get(topicAndPartition).map(groupOffset => LagOffsets(latestOffset, groupOffset))
+            maybeLag.map(topicAndPartition -> _)
+          }
+        }
+      }
+
+      private def getConsumerResource: Resource[F, KafkaConsumer[F, _, _]] = {
+        val des = Deserializer[F, String]
+        consumerResource[F, String, String](
+          ConsumerSettings.apply(des, des)
+        )
+      }
 
       private def getAdminClientResource: Resource[F, KafkaAdminClient[F]] = {
         adminClientResource(
