@@ -209,7 +209,7 @@ class IngestionEndpoint[F[_]: Futurable](
           complete(400, GenericError(400, e.getMessage))
         }
 
-      case _ =>
+      case e =>
         extractExecutionContext { implicit ec =>
           addPromHttpMetric(topic, StatusCodes.InternalServerError.toString,"ingestionEndpoint")
           complete(500, GenericError(500, e.getMessage))
