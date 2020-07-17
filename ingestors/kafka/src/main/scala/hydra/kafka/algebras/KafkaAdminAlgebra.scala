@@ -180,6 +180,13 @@ object KafkaAdminAlgebra {
 
       override def deleteTopic(name: String): F[Unit] =
         ref.update(_ - name)
+
+      // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
+      override def getConsumerGroupOffsets(consumerGroup: String): F[Map[TopicAndPartition, Offset]] = ???
+      // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
+      override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] = ???
+      // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
+      override def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]] = ???
     }
   }
 
