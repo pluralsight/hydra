@@ -73,7 +73,7 @@ object HydraMetrics {
   def addPromHttpMetric(topic: String, responseCode: String, path: String)(implicit ec: ExecutionContext): Unit = {
     incrementGauge(
       lookupKey =
-        "Ingest_topic_" + s"_${topic}",
+        "Ingest_topic_" + s"_${topic}_${path}",
       metricName = "ingest_topic_response",
       tags = Seq(
         "topic" -> topic,
