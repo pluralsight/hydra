@@ -69,4 +69,17 @@ object HydraMetrics {
   )(implicit ec: ExecutionContext): Future[Unit] = {
     getOrCreateHistogram(lookupKey, metricName, tags).map(_.record(value))
   }
+
+  def addPromHttpMetric(topic: String, responseCode: String, path: String)(implicit ec: ExecutionContext): Unit = {
+    incrementGauge(
+      lookupKey =
+        "Ingest_topic_" + s"_${topic}_${path}",
+      metricName = "ingest_topic_response",
+      tags = Seq(
+        "topic" -> topic,
+        "responseCode" -> responseCode,
+        "path" -> path
+      )
+    )
+  }
 }
