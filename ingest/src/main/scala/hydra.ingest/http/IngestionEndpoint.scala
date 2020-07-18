@@ -116,15 +116,15 @@ class IngestionEndpoint[F[_]: Futurable](
             case Some(t) =>
               onComplete(Futurable[F].unsafeToFuture(ingestionV2Flow.ingest(req, t))) {
                 case Success(resp) =>
-                  addPromHttpMetric(topic, StatusCodes.OK.toString, "/v2/topics/" + topic + "/records")
+                  addPromHttpMetric(topic, StatusCodes.OK.toString, "/v2/topics/.../records")
                   complete(resp)
                 case Failure(e) =>
                   val status = getV2ReponseCode(e)
-                  addPromHttpMetric(topic, status.toString,"/v2/topics/" + topic + "/records")
+                  addPromHttpMetric(topic, status.toString,"/v2/topics/.../records")
                   complete(status)
               }
             case None =>
-              addPromHttpMetric(topic, StatusCodes.BadRequest.toString, "/v2/topics/" + topic + "/records")
+              addPromHttpMetric(topic, StatusCodes.BadRequest.toString, "/v2/topics/.../records")
               complete(StatusCodes.BadRequest, Subject.invalidFormat)
           }
         }

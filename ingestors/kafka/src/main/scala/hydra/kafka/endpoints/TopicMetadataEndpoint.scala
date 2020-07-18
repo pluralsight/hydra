@@ -82,12 +82,12 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                 topics
                   .get(name)
                   .map {
-                    addPromHttpMetric(name, StatusCodes.OK.toString, "/transports/kafka/topics/" + name)
+                    addPromHttpMetric(name, StatusCodes.OK.toString, "/transports/kafka/topics/")
                     complete(_)
                   }
                   .getOrElse(
                     failWith{
-                      addPromHttpMetric(name, StatusCodes.NotFound.toString, "/transports/kafka/topics/" + name)
+                      addPromHttpMetric(name, StatusCodes.NotFound.toString, "/transports/kafka/topics/")
                       new NotFoundException(s"Topic $name not found.")}
                   )
               }
@@ -122,21 +122,21 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
     pathEndOrSingleSlash {
       Subject.createValidated(topic) match {
         case None =>
-          addPromHttpMetric(topic, StatusCodes.BadRequest.toString,"/v2/topics/"+topic)
+          addPromHttpMetric(topic, StatusCodes.BadRequest.toString,"/v2/topics/")
           complete(StatusCodes.BadRequest, Subject.invalidFormat)
         case Some(subject) =>
           onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getMetadataFor(subject))) {
             case Success(maybeContainer) =>
               maybeContainer match {
                 case Some(container) =>
-                  addPromHttpMetric(topic, StatusCodes.OK.toString, "/v2/topics/"+topic)
+                  addPromHttpMetric(topic, StatusCodes.OK.toString, "/v2/topics/")
                   complete(StatusCodes.OK, TopicMetadataV2Response.fromTopicMetadataContainer(container))
                 case None =>
-                  addPromHttpMetric(topic, StatusCodes.NotFound.toString, "/v2/topics/"+topic)
+                  addPromHttpMetric(topic, StatusCodes.NotFound.toString, "/v2/topics/")
                   complete(StatusCodes.NotFound, s"Subject ${subject.value} could not be found.")
               }
             case Failure(e) =>
-              addPromHttpMetric(topic, StatusCodes.InternalServerError.toString,"/v2/topics/"+topic)
+              addPromHttpMetric(topic, StatusCodes.InternalServerError.toString,"/v2/topics/")
               complete(StatusCodes.InternalServerError, e)
           }
       }
