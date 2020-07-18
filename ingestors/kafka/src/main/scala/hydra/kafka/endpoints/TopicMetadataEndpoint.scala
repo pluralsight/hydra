@@ -199,6 +199,9 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
     case e: NotFoundException =>
       addPromHttpMetric("",StatusCodes.NotFound.toString, "topicMetadataEndpoint")
       complete(HttpResponse(NotFound, entity = e.msg))
+    case e =>
+      addPromHttpMetric("", InternalServerError.toString, "topicMetadataEndpoint")
+      complete(HttpResponse(InternalServerError, entity = e.getMessage))
   }
 }
 
