@@ -70,10 +70,10 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                 val topicList = pattern.map(filterByPattern) getOrElse topics
                 n match {
                   case Some(_) =>
-                    addPromHttpMetric("transports-kafka-topics",StatusCodes.OK.toString,"/transports/kafka/topics-keys")
+                    addPromHttpMetric("",StatusCodes.OK.toString,"/transports/kafka/topics-keys")
                     complete(topicList.map(_.keys))
                   case None =>
-                    addPromHttpMetric("transports-kafka-topics",StatusCodes.OK.toString,"/transports/kafka/topics")
+                    addPromHttpMetric("",StatusCodes.OK.toString,"/transports/kafka/topics")
                     complete(topicList)
                 }
               }

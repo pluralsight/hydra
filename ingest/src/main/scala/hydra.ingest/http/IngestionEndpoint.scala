@@ -120,7 +120,7 @@ class IngestionEndpoint[F[_]: Futurable](
                   complete(resp)
                 case Failure(e) =>
                   val status = getV2ReponseCode(e)
-                  addPromHttpMetric(topic, status.toString,"/v2/topics/.../records")
+                  addPromHttpMetric(topic, status._1.toString,"/v2/topics/.../records")
                   complete(status)
               }
             case None =>
