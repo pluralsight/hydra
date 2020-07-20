@@ -51,7 +51,7 @@ class BootstrapEndpoint(override val system:ActorSystem) extends RouteSupport
             post {
               requestEntityPresent {
                 entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
-                  val topic = topicMetadataRequest.schema.getFields("namespace", "name").toString
+                  val topic = topicMetadataRequest.schema.getFields("namespace", "name").mkString(".").replaceAll("\"","")
                   onComplete(
                     bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)
                   ) {
