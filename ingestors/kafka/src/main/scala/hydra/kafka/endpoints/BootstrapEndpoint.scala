@@ -18,7 +18,8 @@ package hydra.kafka.endpoints
 
 import akka.actor._
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.Directives.{complete, extractExecutionContext}
+import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.pattern.ask
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
@@ -43,45 +44,47 @@ class BootstrapEndpoint(override val system:ActorSystem) extends RouteSupport
   private implicit val timeout = Timeout(10.seconds)
 
   override val route: Route = cors(settings) {
-    extractExecutionContext { implicit ec =>
-      pathPrefix("streams") {
-        pathEndOrSingleSlash {
-          post {
-            requestEntityPresent {
-              entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
-                val topic = topicMetadataRequest.schema.getFields("namespace", "name").toString
-                onComplete(
-                  bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)
-                ) {
+    handleExceptions(exceptionHandler("Bootstrap")) {
+      extractExecutionContext { implicit ec =>
+        pathPrefix("streams") {
+          pathEndOrSingleSlash {
+            post {
+              requestEntityPresent {
+                entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
+                  val topic = topicMetadataRequest.schema.getFields("namespace", "name").toString
+                  onComplete(
+                    bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)
+                  ) {
 
-                  case Success(message) =>
-                    message match {
+                    case Success(message) =>
+                      message match {
 
-                      case BootstrapSuccess(metadata) =>
-                        addPromHttpMetric(topic, StatusCodes.OK.toString, "Bootstrap")
-                        complete(StatusCodes.OK, toResource(metadata))
+                        case BootstrapSuccess(metadata) =>
+                          addPromHttpMetric(topic, StatusCodes.OK.toString, "Bootstrap")
+                          complete(StatusCodes.OK, toResource(metadata))
 
-                      case BootstrapFailure(reasons) =>
-                        addPromHttpMetric(topic, StatusCodes.BadRequest.toString, "Bootstrap")
-                        complete(StatusCodes.BadRequest, reasons)
+                        case BootstrapFailure(reasons) =>
+                          addPromHttpMetric(topic, StatusCodes.BadRequest.toString, "Bootstrap")
+                          complete(StatusCodes.BadRequest, reasons)
 
-                      case e: Exception =>
-                        log.error("Unexpected error in TopicBootstrapActor", e)
-                        addPromHttpMetric(topic, StatusCodes.InternalServerError.toString, "Bootstrap")
-                        complete(StatusCodes.InternalServerError, e.getMessage)
-                    }
+                        case e: Exception =>
+                          log.error("Unexpected error in TopicBootstrapActor", e)
+                          addPromHttpMetric(topic, StatusCodes.InternalServerError.toString, "Bootstrap")
+                          complete(StatusCodes.InternalServerError, e.getMessage)
+                      }
 
-                  case Failure(ex) =>
-                    log.error("Unexpected error in BootstrapEndpoint", ex)
-                    addPromHttpMetric(topic, StatusCodes.InternalServerError.toString, "Bootstrap")
-                    complete(StatusCodes.InternalServerError, ex.getMessage)
+                    case Failure(ex) =>
+                      log.error("Unexpected error in BootstrapEndpoint", ex)
+                      addPromHttpMetric(topic, StatusCodes.InternalServerError.toString, "Bootstrap")
+                      complete(StatusCodes.InternalServerError, ex.getMessage)
+                  }
                 }
               }
             }
+          } ~ get {
+            pathEndOrSingleSlash(getAllStreams(None)) ~
+              path(Segment)(subject => getAllStreams(Some(subject)))
           }
-        } ~ get {
-          pathEndOrSingleSlash(getAllStreams(None)) ~
-            path(Segment)(subject => getAllStreams(Some(subject)))
         }
       }
     }
@@ -101,5 +104,13 @@ class BootstrapEndpoint(override val system:ActorSystem) extends RouteSupport
           complete(StatusCodes.InternalServerError, "Unknown error")
       }
     }
+  }
+
+  private def exceptionHandler(topic: String) = ExceptionHandler {
+    case e =>
+      extractExecutionContext { implicit ec =>
+        addPromHttpMetric(topic, StatusCodes.InternalServerError.toString,"Bootstrap")
+        complete(500, e.getMessage)
+      }
   }
 }

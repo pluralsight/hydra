@@ -76,7 +76,7 @@ class SchemasEndpoint()(implicit system: ActorSystem)
                 (schemaRegistryActor ? FetchAllSchemaVersionsRequest(subject))
                   .mapTo[FetchAllSchemaVersionsResponse]
               ) { response =>
-                addPromHttpMetric(subject, OK.toString, "/schemas/" + subject + "/versions")
+                addPromHttpMetric(subject, OK.toString, "/schemas/.../versions")
                 complete(OK, response.versions.map(SchemasEndpointResponse(_)))
               }
             } ~ path(Segment / "versions" / IntNumber) { (subject, version) =>
@@ -86,7 +86,7 @@ class SchemasEndpoint()(implicit system: ActorSystem)
                   version
                 )).mapTo[FetchSchemaVersionResponse]
               ) { response =>
-                addPromHttpMetric(subject, OK.toString, "/schemas/" + subject + "/versions/" + version)
+                addPromHttpMetric(subject, OK.toString, "/schemas/.../versions/" + version)
                 complete(OK, SchemasEndpointResponse(response.schemaResource))
               }
             }
@@ -117,11 +117,11 @@ class SchemasEndpoint()(implicit system: ActorSystem)
     ) { response =>
       extractExecutionContext { implicit ec =>
         if (includeKeySchema) {
-          addPromHttpMetric(subject, OK.toString, "/v2/schemas/" + subject)
+          addPromHttpMetric(subject, OK.toString, "/v2/schemas/")
           complete(OK, SchemasWithKeyEndpointResponse.apply(response))
         } else {
           val schemaResource = response.schemaResource
-          addPromHttpMetric(subject, OK.toString, "/schema/" + subject)
+          addPromHttpMetric(subject, OK.toString, "/schema/")
           schemaOnly.map{_ =>
             complete(OK, schemaResource.schema.toString)}
             .getOrElse {

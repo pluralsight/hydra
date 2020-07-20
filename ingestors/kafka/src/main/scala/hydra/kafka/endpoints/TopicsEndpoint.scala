@@ -54,7 +54,7 @@ class TopicsEndpoint(consumerProxy:ActorSelection)(implicit ec:ExecutionContext)
                       case cause => ctx.fail(cause)
                     }
                   )
-                addPromHttpMetric(topicName, StatusCodes.OK.toString, "transports/kafka/consumer/topics/" + topicName)
+                addPromHttpMetric(topicName, StatusCodes.OK.toString, "transports/kafka/consumer/topics/")
                 complete(source)
 
             }
