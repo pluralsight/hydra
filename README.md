@@ -43,9 +43,6 @@ The ingestion implementation, including HTTP endpoints, actors, communication pr
 ### Kafka
 A Transport implementation that replicates messages into Kafka.
 
-### JDBC
-A transport implementation that replicates messages into databases via JDBC.
-
 ## Building Hydra
 Hydra is built using [SBT](http://www.scala-sbt.org/). To build Hydra, run:
 

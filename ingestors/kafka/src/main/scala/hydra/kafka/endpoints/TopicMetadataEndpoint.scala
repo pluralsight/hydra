@@ -11,6 +11,7 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import hydra.common.config.ConfigSupport._
 import hydra.common.util.Futurable
 import hydra.core.http.{CorsSupport, NotFoundException, RouteSupport}
+import hydra.core.monitor.HydraMetrics.addPromHttpMetric
 import hydra.kafka.algebras.MetadataAlgebra
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
@@ -28,6 +29,7 @@ import scala.collection.immutable.Map
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
+import TopicMetadataV2Parser._
 
 /**
   * A cluster metadata endpoint implemented exclusively with akka streams.
@@ -40,8 +42,6 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
   extends RouteSupport
     with HydraKafkaJsonSupport
     with CorsSupport {
-
-  import TopicMetadataV2Parser._
 
   private implicit val cache = GuavaCache[Map[String, Seq[PartitionInfo]]]
 
@@ -61,44 +61,59 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
     (t.startsWith("_") && showSystemTopics) || !t.startsWith("_")
 
   override val route = cors(settings) {
-    pathPrefix("transports" / "kafka") {
-      handleExceptions(exceptionHandler) {
-        get {
-          path("topics") {
-            parameters('pattern ?, 'fields ?) { (pattern, n) =>
-              val topicList = pattern.map(filterByPattern) getOrElse topics
-              n match {
-                case Some(_) => complete(topicList.map(_.keys))
-                case None    => complete(topicList)
+    extractExecutionContext { implicit ec =>
+      pathPrefix("transports" / "kafka") {
+        handleExceptions(exceptionHandler) {
+          get {
+            path("topics") {
+              parameters('pattern ?, 'fields ?) { (pattern, n) =>
+                val topicList = pattern.map(filterByPattern) getOrElse topics
+                n match {
+                  case Some(_) =>
+                    addPromHttpMetric("",StatusCodes.OK.toString,"/transports/kafka/topics-keys")
+                    complete(topicList.map(_.keys))
+                  case None =>
+                    addPromHttpMetric("",StatusCodes.OK.toString,"/transports/kafka/topics")
+                    complete(topicList)
+                }
+              }
+            } ~ path("topics" / Segment) { name =>
+              onSuccess(topics) { topics =>
+                topics
+                  .get(name)
+                  .map {
+                    addPromHttpMetric(name, StatusCodes.OK.toString, "/transports/kafka/topics/")
+                    complete(_)
+                  }
+                  .getOrElse(
+                    failWith{
+                      addPromHttpMetric(name, StatusCodes.NotFound.toString, "/transports/kafka/topics/")
+                      new NotFoundException(s"Topic $name not found.")}
+                  )
               }
             }
-          } ~ path("topics" / Segment) { name =>
-            onSuccess(topics) { topics =>
-              topics
-                .get(name)
-                .map(complete(_))
-                .getOrElse(
-                  failWith(new NotFoundException(s"Topic $name not found."))
-                )
-            }
+          } ~ createTopic
+        }
+      } ~ pathPrefix("v2" / "topics") {
+        getAllV2Metadata ~
+          pathPrefix(Segment) { topicName =>
+            getV2Metadata(topicName)
           }
-        } ~ createTopic
+      } ~ pathPrefix("v2" / "streams") {
+        getAllV2Metadata
       }
-    } ~ pathPrefix("v2" / "topics") {
-      getAllV2Metadata ~
-      pathPrefix(Segment) { topicName =>
-        getV2Metadata(topicName)
-      }
-    } ~ pathPrefix("v2" / "streams") {
-      getAllV2Metadata
     }
   }
 
   private def getAllV2Metadata = get {
     pathEndOrSingleSlash {
       onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getAllMetadata)) {
-      case Success(metadata) => complete(StatusCodes.OK, metadata.map(TopicMetadataV2Response.fromTopicMetadataContainer).filterNot(_.subject.value.startsWith("_")))
-      case Failure(e) => complete(StatusCodes.InternalServerError, e)
+        case Success(metadata) =>
+          addPromHttpMetric("", StatusCodes.OK.toString,"/v2/streams")
+          complete(StatusCodes.OK, metadata.map(TopicMetadataV2Response.fromTopicMetadataContainer).filterNot(_.subject.value.startsWith("_")))
+        case Failure(e) =>
+          addPromHttpMetric("", StatusCodes.InternalServerError.toString, "/v2/streams")
+          complete(StatusCodes.InternalServerError, e)
       }
     }
   }
@@ -106,23 +121,31 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
   private def getV2Metadata(topic: String) = get {
     pathEndOrSingleSlash {
       Subject.createValidated(topic) match {
-        case None => complete(StatusCodes.BadRequest, Subject.invalidFormat)
+        case None =>
+          addPromHttpMetric(topic, StatusCodes.BadRequest.toString,"/v2/topics/")
+          complete(StatusCodes.BadRequest, Subject.invalidFormat)
         case Some(subject) =>
           onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getMetadataFor(subject))) {
             case Success(maybeContainer) =>
               maybeContainer match {
-                case Some(container) => complete(StatusCodes.OK, TopicMetadataV2Response.fromTopicMetadataContainer(container))
-                case None => complete(StatusCodes.NotFound, s"Subject ${subject.value} could not be found.")
+                case Some(container) =>
+                  addPromHttpMetric(topic, StatusCodes.OK.toString, "/v2/topics/")
+                  complete(StatusCodes.OK, TopicMetadataV2Response.fromTopicMetadataContainer(container))
+                case None =>
+                  addPromHttpMetric(topic, StatusCodes.NotFound.toString, "/v2/topics/")
+                  complete(StatusCodes.NotFound, s"Subject ${subject.value} could not be found.")
               }
-            case Failure(e) => complete(StatusCodes.InternalServerError, e)
+            case Failure(e) =>
+              addPromHttpMetric(topic, StatusCodes.InternalServerError.toString,"/v2/topics/")
+              complete(StatusCodes.InternalServerError, e)
           }
       }
     }
   }
 
   private def filterByPattern(
-      pattern: String
-  ): Future[Map[String, Seq[PartitionInfo]]] =
+                               pattern: String
+                             ): Future[Map[String, Seq[PartitionInfo]]] =
     topics.map(_.filter(e => e._1 matches pattern))
 
   private def createTopic = path("topics") {
@@ -133,9 +156,12 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
         val to = timeout.duration.toMillis.toInt
         onSuccess(kafkaUtils.createTopic(req.topic, details, to)) { result =>
           Try(result.all.get(timeout.duration.toSeconds, TimeUnit.SECONDS))
-            .map(_ => complete(StatusCodes.OK, topicInfo(req.topic)))
+            .map { _ =>
+              addPromHttpMetric(req.topic, StatusCodes.OK.toString, "TopicCreation")
+              complete(StatusCodes.OK, topicInfo(req.topic))}
             .recover {
               case e: Exception =>
+                addPromHttpMetric(req.topic,StatusCodes.BadRequest.toString, "TopicCreation")
                 complete(
                   StatusCodes.BadRequest,
                   CreateTopicResponseError(e.getMessage)
@@ -168,17 +194,22 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
 
   val exceptionHandler = ExceptionHandler {
     case e: IllegalArgumentException =>
+      addPromHttpMetric("",StatusCodes.BadRequest.toString, "topicMetadataEndpoint")
       complete(HttpResponse(BadRequest, entity = e.getMessage))
     case e: NotFoundException =>
+      addPromHttpMetric("",StatusCodes.NotFound.toString, "topicMetadataEndpoint")
       complete(HttpResponse(NotFound, entity = e.msg))
+    case e =>
+      addPromHttpMetric("", InternalServerError.toString, "topicMetadataEndpoint")
+      complete(HttpResponse(InternalServerError, entity = e.getMessage))
   }
 }
 
 case class CreateTopicReq(
-    topic: String,
-    partitions: Int,
-    replicationFactor: Short,
-    config: Map[String, String]
-)
+                           topic: String,
+                           partitions: Int,
+                           replicationFactor: Short,
+                           config: Map[String, String]
+                         )
 
 case class CreateTopicResponseError(error: String)
