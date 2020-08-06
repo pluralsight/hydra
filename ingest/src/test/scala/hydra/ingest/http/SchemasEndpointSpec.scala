@@ -59,19 +59,9 @@ class SchemasEndpointSpec
   implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
   implicit val endpointV2Format = jsonFormat2(SchemasWithKeyEndpointResponse.apply)
   implicit val schemasWithTopicFormat: RootJsonFormat[SchemasWithTopicResponse] = jsonFormat2(SchemasWithTopicResponse.apply)
-  implicit object batchSchemasFormat extends RootJsonFormat[BatchSchemasResponse] {
-    override def write(obj: BatchSchemasResponse): JsValue = {
-      val s = obj.schemasResponse.map(sch => schemasWithTopicFormat.write(sch))
-      JsObject(Map[String, JsValue](
-        "schemasResponse" -> JsArray(s.toVector)
-      ))
-    }
-
-    override def read(json: JsValue): BatchSchemasResponse = json match {
-      case j: JsObject =>
-        val schemasResponse = j.getFields("schemasResponse").headOption.map(_.convertTo[Vector[SchemasWithTopicResponse]]).get
-        BatchSchemasResponse(schemasResponse.toList)
-    }
+  implicit val batchSchemasFormat: RootJsonFormat[BatchSchemasResponse] = {
+    val make: List[SchemasWithTopicResponse] => BatchSchemasResponse = BatchSchemasResponse.apply
+    jsonFormat1(make)
   }
 
   private val schemaRegistry =
