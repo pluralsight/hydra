@@ -16,7 +16,7 @@
 
 package hydra.ingest.http
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorSelection, ActorSystem}
 import akka.http.javadsl.server.PathMatcher1
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.Location
@@ -26,15 +26,26 @@ import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import hydra.avro.resource.SchemaResource
 import hydra.common.config.ConfigSupport
+import hydra.common.config.ConfigSupport._
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.akka.SchemaRegistryActor._
 import hydra.core.http.{CorsSupport, RouteSupport}
 import hydra.core.marshallers.GenericServiceResponse
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.SchemaParseException
-import spray.json.RootJsonFormat
+import spray.json.{JsArray, JsObject, JsValue, RootJsonFormat}
 import hydra.core.monitor.HydraMetrics.addPromHttpMetric
+import hydra.kafka.consumer.KafkaConsumerProxy.{ListTopics, ListTopicsResponse}
+import org.apache.kafka.common.PartitionInfo
+import scalacache.cachingF
+import scalacache._
+import scalacache.guava.GuavaCache
+import scalacache.modes.scalaFuture._
+import akka.http.scaladsl.server.ExceptionHandler
 
+import scala.concurrent.{ExecutionContext, Future}
+import scala.collection.immutable.Map
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
@@ -42,17 +53,32 @@ import scala.concurrent.duration._
   *
   * Created by alexsilva on 2/13/16.
   */
-class SchemasEndpoint()(implicit system: ActorSystem)
+class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSystem)
     extends RouteSupport
     with ConfigSupport
     with CorsSupport {
 
+  private implicit val cache = GuavaCache[Map[String, Seq[PartitionInfo]]]
+
+
   implicit val endpointFormat: RootJsonFormat[SchemasEndpointResponse] = jsonFormat3(SchemasEndpointResponse.apply)
   implicit val v2EndpointFormat: RootJsonFormat[SchemasWithKeyEndpointResponse] = jsonFormat2(SchemasWithKeyEndpointResponse.apply)
+  implicit val schemasWithTopicFormat: RootJsonFormat[SchemasWithTopicResponse] = jsonFormat2(SchemasWithTopicResponse.apply)
+  implicit val batchSchemasFormat: RootJsonFormat[BatchSchemasResponse] = {
+    val make: List[SchemasWithTopicResponse] => BatchSchemasResponse = BatchSchemasResponse.apply
+    jsonFormat1(make)
+  }
   implicit val timeout: Timeout = Timeout(3.seconds)
 
   private val schemaRegistryActor =
     system.actorOf(SchemaRegistryActor.props(applicationConfig))
+
+  private val filterSystemTopics = (t: String) =>
+    (t.startsWith("_") && showSystemTopics) || !t.startsWith("_")
+
+  private val showSystemTopics = applicationConfig
+    .getBooleanOpt("transports.kafka.show-system-topics")
+    .getOrElse(false)
 
   override def route: Route = cors(settings) {
     handleExceptions(excptHandler) {
@@ -102,6 +128,15 @@ class SchemasEndpoint()(implicit system: ActorSystem)
   private val v2Route =
     pathPrefix("v2") {
       get {
+        pathPrefix("schemas") {
+          pathEndOrSingleSlash {
+            extractExecutionContext { implicit ec =>
+              onSuccess(topics) { topics =>
+                getSchemas(topics.keys.toList)
+              }
+            }
+          }
+        } ~
         pathPrefix("schemas" / Segment) { subject =>
           pathEndOrSingleSlash {
             getSchema(includeKeySchema = true, subject, None)
@@ -127,6 +162,19 @@ class SchemasEndpoint()(implicit system: ActorSystem)
             .getOrElse {
               complete(OK, SchemasEndpointResponse(schemaResource))
             }
+        }
+      }
+    }
+  }
+
+  def getSchemas(subjects: List[String]): Route = {
+    onSuccess(
+      (schemaRegistryActor ? FetchSchemasRequest(subjects))
+        .mapTo[FetchSchemasResponse]
+    ) {
+      response => {
+        extractExecutionContext { implicit ec =>
+          complete(OK, BatchSchemasResponse.apply(response))
         }
       }
     }
@@ -204,6 +252,18 @@ class SchemasEndpoint()(implicit system: ActorSystem)
         }
       }
   }
+
+  private def topics(implicit ec: ExecutionContext): Future[Map[String, Seq[PartitionInfo]]] = {
+    implicit val timeout = Timeout(5 seconds)
+    cachingF("topics")(ttl = Some(1.minute)) {
+      import akka.pattern.ask
+      (consumerProxy ? ListTopics).mapTo[ListTopicsResponse].map { response =>
+        response.topics.filter(t => filterSystemTopics(t._1)).map {
+          case (k, v) => k -> v.toList
+        }
+      }
+    }
+  }
 }
 
 case class SchemasWithKeyEndpointResponse(keySchemaResponse: Option[SchemasEndpointResponse], valueSchemaResponse: SchemasEndpointResponse)
@@ -214,6 +274,20 @@ object SchemasWithKeyEndpointResponse {
       f.keySchemaResource.map(SchemasEndpointResponse.apply),
       SchemasEndpointResponse.apply(f.schemaResource)
     )
+}
+
+case class SchemasWithTopicResponse(topic: String, valueSchemaResponse: Option[SchemasEndpointResponse])
+
+object SchemasWithTopicResponse {
+  def apply(t: (String, Option[SchemaResource])): SchemasWithTopicResponse =
+    new SchemasWithTopicResponse(t._1, t._2.map(SchemasEndpointResponse.apply))
+}
+
+case class BatchSchemasResponse(schemasResponse: List[SchemasWithTopicResponse])
+
+object BatchSchemasResponse {
+  def apply(f: FetchSchemasResponse) =
+    new BatchSchemasResponse(f.valueSchemas.map(SchemasWithTopicResponse.apply))
 }
 
 case class SchemasEndpointResponse(id: Int, version: Int, schema: String)

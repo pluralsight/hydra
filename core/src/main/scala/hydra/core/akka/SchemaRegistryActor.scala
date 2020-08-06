@@ -2,6 +2,7 @@ package hydra.core.akka
 
 import akka.actor.{Actor, Props}
 import akka.pattern.{CircuitBreaker, pipe}
+import akka.util.Timeout
 import com.typesafe.config.Config
 import hydra.avro.registry.{ConfluentSchemaRegistry, SchemaRegistryException}
 import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
@@ -11,8 +12,11 @@ import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol.HydraApplicationError
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.{Schema, SchemaParseException}
+import org.apache.kafka.common.PartitionInfo
+import scalacache.cachingF
 
 import scala.collection.JavaConverters._
+import scala.collection.immutable.Map
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
@@ -86,9 +90,19 @@ class SchemaRegistryActor(
 
   }
 
+  private def fetchSchemas(locations: List[String]) = {
+    for {
+      valueSchemas <- loader
+        .retrieveValueSchemas(locations)
+    } yield FetchSchemasResponse(valueSchemas)
+  }
+
   override def receive = {
     case FetchSchemaRequest(location) =>
       breaker.withCircuitBreaker(fetchSchema(location), registryFailure) pipeTo sender
+
+    case FetchSchemasRequest(locations) =>
+      breaker.withCircuitBreaker(fetchSchemas(locations), registryFailure) pipeTo sender
 
     case RegisterSchemaRequest(json: String) =>
       val maybeRegister = tryHandleRegisterSchema(json)
@@ -194,6 +208,12 @@ object SchemaRegistryActor {
   sealed trait SchemaRegistryResponse
 
   case class FetchSchemaRequest(location: String) extends SchemaRegistryRequest
+
+  case class FetchSchemasRequest(locations: List[String]) extends SchemaRegistryRequest
+
+  case class FetchSchemasResponse(
+     valueSchemas: List[(String, Option[SchemaResource])]
+  ) extends SchemaRegistryResponse
 
   case class FetchSchemaResponse(
       schemaResource: SchemaResource,

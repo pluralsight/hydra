@@ -74,6 +74,18 @@ class SchemaResourceLoaderSpec
   }
 
   describe("When loading schemas from the registry") {
+
+    it("return a list of schemas") {
+      val loader = fixture()
+      val res = loader.retrieveValueSchemas(List(subject, subject))
+      whenReady(res) { metadatas =>
+        metadatas.map(_ match {
+          case (subj, Some(schemaResource)) => (subj, schemaResource.schema)
+          case _ => None
+        }) shouldBe List((subject,testValueSchema), (subject, testValueSchema))
+      }
+    }
+
     it("returns the latest version of a value schema") {
       val loader = fixture()
       val res = loader.retrieveValueSchema(subject)
