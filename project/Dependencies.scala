@@ -198,7 +198,7 @@ object Dependencies {
     ) ++ guavacache ++
     confluent ++ kamon
 
-  val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(ciris)
+  val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(ciris, embeddedKafka)
 
   val kafkaDeps: Seq[ModuleID] = coreDeps ++ Seq(
     akkaKafkaStream,
