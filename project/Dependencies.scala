@@ -2,8 +2,8 @@ import sbt.{ExclusionRule, _}
 
 object Dependencies {
 
-  val akkaHTTPCorsVersion = "1.1.0"
-  val akkaHTTPVersion = "10.1.12"
+  val akkaHTTPCorsVersion = "1.0.0"
+  val akkaHTTPVersion = "10.2.0"
   val akkaKafkaStreamVersion = "2.0.4"
   val akkaKryoVersion = "0.5.2"
   val akkaVersion = "2.6.7"
@@ -198,7 +198,7 @@ object Dependencies {
     ) ++ guavacache ++
     confluent ++ kamon
 
-  val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(ciris)
+  val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(ciris, embeddedKafka)
 
   val kafkaDeps: Seq[ModuleID] = coreDeps ++ Seq(
     akkaKafkaStream,
