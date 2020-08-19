@@ -130,6 +130,7 @@ object KafkaClientAlgebra {
     val producerSettings =
       ProducerSettings[F, Array[Byte], Array[Byte]]
         .withBootstrapServers(bootstrapServers)
+        .withAcks(Acks.All)
     for {
       queue <- fs2.concurrent.Queue.unbounded[F, ProduceRecordInfo[F]]
       _ <- Concurrent[F].start(queue.dequeue.map { payload =>
