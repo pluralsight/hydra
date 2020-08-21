@@ -41,7 +41,7 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
 
     val consumerProxy = system.actorSelection(consumerPath)
 
-    new SchemasEndpoint().route ~
+    new SchemasEndpoint(consumerProxy).route ~
       new BootstrapEndpoint(system).route ~
       new TopicMetadataEndpoint(consumerProxy, algebras.metadata).route ~
       new IngestorRegistryEndpoint().route ~

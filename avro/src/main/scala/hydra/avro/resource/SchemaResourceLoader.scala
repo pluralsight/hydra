@@ -62,6 +62,12 @@ class SchemaResourceLoader(
     else loadFromCache(subject.withKeySuffix, version.toString)
   }.map(_.getOrElse(throw SchemaRegistryException(SchemaNotFoundException(subject), subject)))
 
+  def retrieveValueSchemas(subjects: List[String])(
+      implicit ec: ExecutionContext
+  ): Future[List[(String, Option[SchemaResource])]] = {
+    Future.sequence(subjects.map(sub => getLatestSchema(sub.withValueSuffix).map(sch => (sub,sch))))
+  }
+
   def loadValueSchemaIntoCache(
       schemaResource: SchemaResource
   )(implicit ec: ExecutionContext): Future[SchemaResource] = {
