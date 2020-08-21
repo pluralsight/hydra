@@ -5,7 +5,6 @@ object Dependencies {
   val akkaHTTPCorsVersion = "1.0.0"
   val akkaHTTPVersion = "10.2.0"
   val akkaKafkaStreamVersion = "2.0.4"
-  val akkaKryoVersion = "0.5.2"
   val akkaVersion = "2.6.7"
   val avroVersion = "1.9.2"
   val catsEffectVersion = "2.1.4"
@@ -116,11 +115,6 @@ object Dependencies {
         .excludeAll(ExclusionRule(organization = "io.spray"))
     )
 
-    val akkaKryo =
-      ("com.github.romix.akka" %% "akka-kryo-serialization" % akkaKryoVersion)
-        .excludeAll {
-          ExclusionRule(organization = "com.typesafe.akka")
-        }
 
     val akkaKafkaStream =
       "com.typesafe.akka" %% "akka-stream-kafka" % akkaKafkaStreamVersion
@@ -191,7 +185,6 @@ object Dependencies {
   val coreDeps: Seq[ModuleID] = akka ++ baseDeps ++
     Seq(
       reflections,
-      akkaKryo,
       postgres,
       h2db,
       retry
