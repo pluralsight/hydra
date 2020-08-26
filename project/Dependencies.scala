@@ -3,37 +3,34 @@ import sbt.{ExclusionRule, _}
 object Dependencies {
 
   val akkaHTTPCorsVersion = "1.0.0"
-  val akkaHTTPVersion = "10.1.12"
-  val akkaKafkaStreamVersion = "2.0.3"
-  val akkaKryoVersion = "0.5.2"
-  val akkaVersion = "2.6.6"
-  val avroVersion = "1.9.2"
-  val catsEffectVersion = "2.1.3"
+  val akkaHTTPVersion = "10.2.0"
+  val akkaKafkaStreamVersion = "2.0.4"
+  val akkaVersion = "2.6.7"
+  val avroVersion = "1.10.0"
+  val catsEffectVersion = "2.1.4"
   val catsLoggerVersion = "1.1.1"
   val catsRetryVersion = "1.1.1"
   val catsVersion = "2.1.1"
-  val cirisVersion = "1.1.1"
-  val confluentVersion = "5.5.1"
+  val cirisVersion = "1.1.2"
+  val confluentVersion = "5.4.2"
   val easyMockVersion = "4.2" //needed for mocking static java methods
   val fs2KafkaVersion = "1.0.0"
-  val hikariCPVersion = "3.4.5"
   val h2DbVersion = "1.4.200"
   val jacksonCoreVersion = "2.10.4"
   val jacksonDatabindVersion = "2.10.4"
   val jodaConvertVersion = "2.2.1"
   val jodaTimeVersion = "2.10.6"
   val kafkaVersion = "2.4.1"
-  val kamonPVersion = "2.1.1"
-  val kamonVersion = "2.1.1"
+  val kamonPVersion = "2.1.4"
+  val kamonVersion = "2.1.4"
   val log4jVersion = "2.13.3"
-  val opRabbitVersion = "2.1.0"
   val powerMockVersion = "2.0.7" //needed for mocking static java methods
-  val refinedVersion = "0.9.14"
+  val refinedVersion = "0.9.15"
   val reflectionsVersion = "0.9.12"
   val scalaCacheVersion = "0.28.0"
-  val scalaMockVersion = "4.4.0"
-  val scalaTestVersion = "3.2.0"
-  val scalazVersion = "7.3.1"
+  val scalaMockVersion = "5.0.0"
+  val scalaTestVersion = "3.2.2"
+  val scalazVersion = "7.3.2"
   val sprayJsonVersion = "1.3.5"
   val typesafeConfigVersion = "1.3.2"
   val vulcanVersion = "1.1.0"
@@ -118,11 +115,6 @@ object Dependencies {
         .excludeAll(ExclusionRule(organization = "io.spray"))
     )
 
-    val akkaKryo =
-      ("com.github.romix.akka" %% "akka-kryo-serialization" % akkaKryoVersion)
-        .excludeAll {
-          ExclusionRule(organization = "com.typesafe.akka")
-        }
 
     val akkaKafkaStream =
       "com.typesafe.akka" %% "akka-stream-kafka" % akkaKafkaStreamVersion
@@ -143,14 +135,6 @@ object Dependencies {
       ).map(_ % scalaCacheVersion)
 
     val reflections = "org.reflections" % "reflections" % reflectionsVersion
-
-    val hikariCP = "com.zaxxer" % "HikariCP" % hikariCPVersion
-
-    val opRabbit = Seq(
-      "com.spingo" %% "op-rabbit-core" % opRabbitVersion,
-      "com.spingo" %% "op-rabbit-json4s" % opRabbitVersion,
-      "com.spingo" %% "op-rabbit-airbrake" % opRabbitVersion
-    )
 
     val jackson = Seq(
       "com.fasterxml.jackson.core" % "jackson-core" % jacksonCoreVersion,
@@ -195,26 +179,19 @@ object Dependencies {
   val baseDeps: Seq[ModuleID] =
     akka ++ Seq(scalaz, avro) ++ cats ++ logging ++ joda ++ testDeps
 
-  val sqlDeps: Seq[ModuleID] =
-    logging ++ Seq(avro, hikariCP, h2db) ++ joda ++ testDeps
-
   val avroDeps: Seq[ModuleID] =
     baseDeps ++ confluent ++ jackson ++ guavacache ++ catsEffect
 
   val coreDeps: Seq[ModuleID] = akka ++ baseDeps ++
     Seq(
       reflections,
-      akkaKryo,
       postgres,
       h2db,
       retry
     ) ++ guavacache ++
     confluent ++ kamon
 
-  val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(ciris)
-
-  val rabbitDeps: Seq[ModuleID] =
-    logging ++ joda ++ opRabbit ++ testDeps
+  val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(ciris, embeddedKafka)
 
   val kafkaDeps: Seq[ModuleID] = coreDeps ++ Seq(
     akkaKafkaStream,
@@ -222,5 +199,4 @@ object Dependencies {
     refined
   ) ++ kafka ++ akkaHttpHal ++ vulcan ++ fs2Kafka
 
-  val overrides = Set(logging, typesafeConfig, joda)
 }
