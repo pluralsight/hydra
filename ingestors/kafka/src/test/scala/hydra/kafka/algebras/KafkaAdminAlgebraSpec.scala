@@ -2,10 +2,7 @@ package hydra.kafka.algebras
 
 import akka.actor.ActorSystem
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
-import hydra.avro.registry.SchemaRegistry
-import hydra.kafka.algebras.KafkaAdminAlgebra.{LagOffsets, Offset, TopicAndPartition}
-import hydra.kafka.algebras.KafkaClientAlgebra.getOptionalGenericRecordDeserializer
+import hydra.kafka.algebras.KafkaAdminAlgebra.{LagOffsets, Offset, Topic, TopicAndPartition}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.scalatest.BeforeAndAfterAll
@@ -75,13 +72,31 @@ final class KafkaAdminAlgebraSpec
         kafkaClient.getTopicNames.unsafeRunSync() shouldBe List(topicName)
       }
 
-      "delete a topic" in {
+      "validate topic exists" in {
+        val topicCreated = "topic_created"
+        (for {
+          _ <- kafkaClient.createTopic(topicCreated, TopicDetails(1,1))
+          maybeExists <- kafkaClient.kafkaContainsTopic(topicCreated)
+          maybeTopic <- kafkaClient.describeTopic(topicCreated)
+        } yield (maybeExists,maybeTopic) shouldBe(true,Some(Topic(topicCreated,1))) ).unsafeRunSync()
+      }
+
+      "delete a topic and describe" in {
         val topicToDelete = "topic_to_delete"
         (for {
           _ <- kafkaClient.createTopic(topicToDelete, TopicDetails(1, 1))
           _ <- kafkaClient.deleteTopic(topicToDelete)
           maybeTopic <- kafkaClient.describeTopic(topicToDelete)
         } yield maybeTopic should not be defined).unsafeRunSync()
+      }
+
+      "delete a topic and list" in {
+        val topicToDelete = "topic_to_delete2"
+        (for {
+          _ <- kafkaClient.createTopic(topicToDelete, TopicDetails(1, 1))
+          _ <- kafkaClient.deleteTopic(topicToDelete)
+          maybeTopic <- kafkaClient.kafkaContainsTopic(topicToDelete)
+        } yield maybeTopic shouldBe(false)).unsafeRunSync()
       }
 
       if (!isTest) {

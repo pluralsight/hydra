@@ -1,5 +1,6 @@
 package hydra.kafka.algebras
 
+import cats.data.NonEmptyList
 import cats.effect.concurrent.Ref
 import cats.effect.{Async, Concurrent, ConcurrentEffect, ContextShift, Resource, Sync, Timer}
 import cats.implicits._
@@ -29,6 +30,13 @@ trait KafkaAdminAlgebra[F[_]] {
   def describeTopic(name: TopicName): F[Option[Topic]]
 
   /**
+    * Checks if topic exists in Kafka
+    * @param name - name of the topic in Kafka
+    * @return True if found in Kafka, False if not found
+    */
+  def kafkaContainsTopic(name: TopicName): F[Boolean]
+
+  /**
     * Retrieves a list of all TopicName(s) found in Kafka
     * @return List[TopicName]
     */
@@ -48,6 +56,13 @@ trait KafkaAdminAlgebra[F[_]] {
     * @return
     */
   def deleteTopic(name: String): F[Unit]
+
+  /**
+    * Deletes the topic(s) in Kafka
+    * @param topicNames - a list of topic names in Kafka
+    * @return
+    */
+  def deleteTopics(topicNames: NonEmptyList[String]): NonEmptyList[F[Unit]]
 
   /**
     * Fetch the offsets by topic and partition for a given consumer group
@@ -106,6 +121,13 @@ object KafkaAdminAlgebra {
           }
       }
 
+      override def kafkaContainsTopic(name: TopicName): F[Boolean] = {
+        if(name.startsWith("_"))
+          getAdminClientResource.use(_.listTopics.includeInternal.names.map(_.toList)).map(topics => topics.contains(name))
+        else
+          getTopicNames.map(topics => topics.contains(name))
+      }
+
       override def getTopicNames: F[List[TopicName]] =
         getAdminClientResource.use(_.listTopics.names.map(_.toList))
 
@@ -118,6 +140,9 @@ object KafkaAdminAlgebra {
 
       override def deleteTopic(name: String): F[Unit] =
         getAdminClientResource.use(_.deleteTopic(name))
+
+      override def deleteTopics(topicNames: NonEmptyList[String]): NonEmptyList[F[Unit]] =
+        topicNames.map(a => deleteTopic(a))
 
       override def getConsumerGroupOffsets(consumerGroup: String): F[Map[TopicAndPartition, Offset]] =
         getAdminClientResource.use(_.listConsumerGroupOffsets(consumerGroup)
@@ -187,7 +212,13 @@ object KafkaAdminAlgebra {
       override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] = ???
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]] = ???
-    }
+
+      override def kafkaContainsTopic(name: TopicName): F[Boolean] =
+        getTopicNames.map(topics => topics.contains(name))
+
+      override def deleteTopics(topicNames: NonEmptyList[String]): NonEmptyList[F[Unit]] =
+        topicNames.map(deleteTopic(_))
+}
   }
 
 }
