@@ -183,13 +183,14 @@ object KafkaClientAlgebra {
                                       keyDeserializer: Deserializer[F, A],
                                       consumerGroup: ConsumerGroup,
                                       topicName: TopicName): fs2.Stream[F, (A, Option[GenericRecord])] = {
-        val consumerSettings = ConsumerSettings(
+        val consumerSettings: ConsumerSettings[F, A, Option[GenericRecord]] = ConsumerSettings(
           keyDeserializer = keyDeserializer,
           valueDeserializer = getOptionalGenericRecordDeserializer(schemaRegistryClient)()
         )
           .withAutoOffsetReset(AutoOffsetReset.Earliest)
           .withBootstrapServers(bootstrapServers)
           .withGroupId(consumerGroup)
+        val b: fs2.Stream[F, KafkaConsumer[F, A, Option[GenericRecord]]] = consumerStream(consumerSettings)
         consumerStream(consumerSettings)
           .evalTap(_.subscribeTo(topicName))
           .flatMap(_.stream)
