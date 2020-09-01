@@ -1,6 +1,7 @@
 package hydra.kafka.algebras
 
-import cats.data.NonEmptyList
+import akka.actor.Status.Success
+import cats.data.{NonEmptyChain, NonEmptyList, Validated, ValidatedNec, ValidatedNel}
 import cats.effect.concurrent.Ref
 import cats.effect.{Async, Concurrent, ConcurrentEffect, ContextShift, Resource, Sync, Timer}
 import cats.implicits._
@@ -62,7 +63,7 @@ trait KafkaAdminAlgebra[F[_]] {
     * @param topicNames - a list of topic names in Kafka
     * @return
     */
-  def deleteTopics(topicNames: NonEmptyList[String]): NonEmptyList[F[Unit]]
+  def deleteTopics(topicNames: List[String]): F[Either[DeleteTopicErrorList, Unit]]
 
   /**
     * Fetch the offsets by topic and partition for a given consumer group
@@ -105,6 +106,14 @@ object KafkaAdminAlgebra {
   }
   final case class LagOffsets(latest: Offset, group: Offset)
 
+  final case class DeleteTopicError(topicName: String, cause: Throwable)
+    extends Exception (s"Unable to delete $topicName", cause){
+    def errorMessage: String = s"$topicName ${cause.getMessage}"
+  }
+
+  final case class DeleteTopicErrorList(errors: NonEmptyList[DeleteTopicError])
+    extends Exception (s"Topic(s) failed to delete:\n${errors.map(_.errorMessage).toList.mkString("\n")}")
+
   def live[F[_]: Sync: ConcurrentEffect: ContextShift: Timer](
       bootstrapServers: String,
   ): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
@@ -141,8 +150,15 @@ object KafkaAdminAlgebra {
       override def deleteTopic(name: String): F[Unit] =
         getAdminClientResource.use(_.deleteTopic(name))
 
-      override def deleteTopics(topicNames: NonEmptyList[String]): NonEmptyList[F[Unit]] =
-        topicNames.map(a => deleteTopic(a))
+      override def deleteTopics(topicNames: List[String]): F[Either[DeleteTopicErrorList, Unit]] =
+        topicNames.traverse{topicName =>
+          deleteTopic(topicName).attempt
+            .map{
+              _.leftMap(
+                DeleteTopicError(topicName, _)
+              ).toValidatedNel
+            }
+        }.map(_.combineAll.toEither.leftMap(errorList => DeleteTopicErrorList(errorList)))
 
       override def getConsumerGroupOffsets(consumerGroup: String): F[Map[TopicAndPartition, Offset]] =
         getAdminClientResource.use(_.listConsumerGroupOffsets(consumerGroup)
@@ -216,8 +232,10 @@ object KafkaAdminAlgebra {
       override def kafkaContainsTopic(name: TopicName): F[Boolean] =
         getTopicNames.map(topics => topics.contains(name))
 
-      override def deleteTopics(topicNames: NonEmptyList[String]): NonEmptyList[F[Unit]] =
-        topicNames.map(deleteTopic(_))
+      override def deleteTopics(topicNames: List[String]): F[List[Either[String, Unit]]] =
+        topicNames.traverse(topicName =>
+          deleteTopic(topicName).attempt
+            .map(_.leftMap(_ => s"Unable to delete $topicName")))
 }
   }
 
