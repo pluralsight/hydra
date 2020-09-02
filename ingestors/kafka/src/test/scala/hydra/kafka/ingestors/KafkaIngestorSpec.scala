@@ -18,7 +18,7 @@ import hydra.kafka.test.TestRecordFactory
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Parser
-import org.apache.avro.generic.GenericRecordBuilder
+import org.apache.avro.generic.{GenericData, GenericRecordBuilder}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.funspec.AnyFunSpecLike
@@ -72,7 +72,7 @@ class KafkaIngestorSpec
 
   val avroSchema = new Schema.Parser().parse(schema)
 
-  val record = new GenericRecordBuilder(avroSchema)
+  val record: GenericData.Record = new GenericRecordBuilder(avroSchema)
     .set("first", "hydra")
     .set("last", "hydra")
     .build()

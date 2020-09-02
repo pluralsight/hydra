@@ -17,7 +17,7 @@ import hydra.kafka.algebras.KafkaClientAlgebra.{GenericRecordFormat, RecordForma
 import io.chrisdavenport.log4cats.Logger
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import io.confluent.kafka.serializers.{AbstractKafkaAvroSerDeConfig, KafkaAvroDeserializer, KafkaAvroSerializer}
-import org.apache.avro.generic.GenericRecord
+import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
 import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
 import vulcan.generic._
 
@@ -51,53 +51,62 @@ object ConsumerGroupsAlgebra {
   final case class Topic(topicName: String, lastCommit: Instant)
 
 
-  def make[F[_]: ContextShift: ConcurrentEffect: Timer](topicName: String, bootstrapServers: String, consumerGroup: String, kafkaClientAlgebra: KafkaClientAlgebra[F], schemaRegistryAlgebra: SchemaRegistry[F]): F[ConsumerGroupsAlgebra[F]] = {
+  def make[F[_]: ContextShift: ConcurrentEffect: Timer](kafkaInternalTopic: String, dvsConsumerTopic: String, bootstrapServers: String, consumerGroup: String, kafkaClientAlgebra: KafkaClientAlgebra[F], schemaRegistryAlgebra: SchemaRegistry[F]): F[ConsumerGroupsAlgebra[F]] = {
     val b = for {
       cf <- Ref[F].of(ConsumerGroupsStorageFacade.empty)
       schemaRegistryClient <- schemaRegistryAlgebra.getSchemaRegistryClient
+      _ <- Concurrent[F].start(consumerOffsetsToInternalOffsets(kafkaInternalTopic, dvsConsumerTopic, bootstrapServers, consumerGroup, schemaRegistryClient))
     } yield ()
 
     Sync[F].delay(new ConsumerGroupsAlgebra[F] {
     })
   }
 
-  private def getOffsetsStream[F[_]: ConcurrentEffect: ContextShift: Timer](topicName: String, bootstrapServers: String, consumerGroup: String, schemaRegistryClient: SchemaRegistryClient): fs2.Stream[F, (Option[TopicConsumerKey], Option[TopicConsumerValue])] = {
+  private def consumerOffsetsToInternalOffsets[F[_]: ConcurrentEffect: ContextShift: Timer](sourceTopic: String, destinationTopic: String, bootstrapServers: String, consumerGroupName: String, s: SchemaRegistryClient) = {
     val settings: ConsumerSettings[F, Option[BaseKey], Option[OffsetAndMetadata]] = ConsumerSettings(
       getConsumerGroupDeserializer[F, BaseKey](GroupMetadataManager.readMessageKey),
       getConsumerGroupDeserializer[F, OffsetAndMetadata](GroupMetadataManager.readOffsetMessageValue)
     )
       .withAutoOffsetReset(AutoOffsetReset.Latest)
       .withBootstrapServers(bootstrapServers)
-      .withGroupId(consumerGroup)
+      .withGroupId(consumerGroupName)
 
-    val producerSettings = ProducerSettings(getSerializer(schemaRegistryClient)(isKey = true), getSerializer(schemaRegistryClient)(isKey = false))
-        .withBootstrapServers(bootstrapServers)
-        .withAcks(Acks.All)
+    val producerSettings = ProducerSettings[F, Array[Byte], Array[Byte]]
+      .withBootstrapServers(bootstrapServers)
+      .withAcks(Acks.All)
+
     consumerStream(settings)
-      .evalTap(_.subscribeTo(topicName))
+      .evalTap(_.subscribeTo(sourceTopic))
       .flatMap(_.stream)
-      .map { cr =>
+      .evalTap(_.offset.commit)
+      .flatMap { cr =>
         (cr.record.key, cr.record.value) match {
           case (Some(OffsetKey(_, k)), offsetMaybe) =>
-            val topicName = k.topicPartition.topic()
+            val topic = k.topicPartition.topic()
             val consumerGroup = k.group
-            val value = offsetMaybe.map(o => Instant.ofEpochMilli(o.commitTimestamp)).map(TopicConsumerValue.apply)
-            (TopicConsumerKey(topicName, consumerGroup).some, value)
-          case _ =>
-            (none, none)
-        }
-      }.through(produce(producerSettings))
+            val key: GenericRecord = new GenericRecordBuilder(TopicConsumerKey.codec.schema.toOption.get).set("topicName",topic).set("consumerGroupName",consumerGroup).build()
+            val value: Option[GenericRecord] = offsetMaybe.map(o => Instant.ofEpochMilli(o.commitTimestamp)).map(commit => new GenericRecordBuilder(TopicConsumerValue.codec.schema.toOption.get).set("lastCommit",commit).build())
 
+            fs2.Stream.eval(for {
+              k <- getSerializer[F, GenericRecord](s)(isKey = true).serialize(destinationTopic, Headers.empty, key)
+              v <- getSerializer[F, Option[GenericRecord]](s)(isKey = false).serialize(destinationTopic, Headers.empty, value)
+            } yield ProducerRecord(destinationTopic, k, v)).map(ProducerRecords.one)
+          case _ =>
+            fs2.Stream.empty
+        }
+      }
+      .through(produce(producerSettings))
+      .compile.drain
   }
 
-  private def getSerializer[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient)(isKey: Boolean): Serializer[F, Option[GenericRecord]] =
-    Serializer.delegate[F, Option[GenericRecord]] {
+  private def getSerializer[F[_]: Sync, A](schemaRegistryClient: SchemaRegistryClient)(isKey: Boolean): Serializer[F, A] =
+    Serializer.delegate[F, A] {
       val serializer = {
         val se = new KafkaAvroSerializer(schemaRegistryClient)
         se.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "").asJava, isKey)
         se
       }
-      (topic: TopicName, data: Option[GenericRecord]) => serializer.serialize(topic, data)
+      (topic: TopicName, data: A) => serializer.serialize(topic, data)
     }.suspend
 
   private def getConsumerGroupDeserializer[F[_]: Sync, A](byteBufferToA: ByteBuffer => A): Deserializer[F, Option[A]] =
