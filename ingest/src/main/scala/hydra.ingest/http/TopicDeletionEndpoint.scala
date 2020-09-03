@@ -3,8 +3,7 @@ package hydra.ingest.http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
-import cats.data.Validated
-import cats.implicits._
+import hydra.ingest.programs.TopicDeletionProgram
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
 import spray.json.DefaultJsonProtocol
@@ -13,7 +12,10 @@ import hydra.kafka.algebras.KafkaAdminAlgebra
 
 import scala.util.{Failure, Success}
 
-final class TopicDeletionEndpoint[F[_]: Futurable] (kafkaClient: KafkaAdminAlgebra[F]) extends RouteSupport with DefaultJsonProtocol with SprayJsonSupport {
+final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeletionProgram[F])
+  extends RouteSupport with
+    DefaultJsonProtocol with
+    SprayJsonSupport {
 
   override val route: Route =
     handleExceptions(exceptionHandler) {
@@ -25,14 +27,15 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (kafkaClient: KafkaAdminAlgeb
               // check if consumers exist for this topic, if they do fail and return consumer groups
               // try deleting topic
 
-              onComplete(
-                Futurable[F].unsafeToFuture(
-                  kafkaClient.deleteTopics(maybeList)
-                )
-              ) {
-                case Success(Right(_)) =>
-                case Success(Left(deletionErrors)) =>
-                case Failure(error) =>
+              val maybeDeletion = deletionProgram.deleteTopic(maybeList)
+              if(maybeDeletion.isLeft) {
+                if (maybeDeletion.left.get.errors.length == maybeList.length) {
+                  complete(StatusCodes.InternalServerError, maybeDeletion.left.get)
+                } else {
+                  complete(StatusCodes.PartialContent, maybeDeletion.left.get)
+                }
+              } else {
+                complete(StatusCodes.OK)
               }
 
               // Confirm that topics are deleted?

@@ -232,10 +232,15 @@ object KafkaAdminAlgebra {
       override def kafkaContainsTopic(name: TopicName): F[Boolean] =
         getTopicNames.map(topics => topics.contains(name))
 
-      override def deleteTopics(topicNames: List[String]): F[List[Either[String, Unit]]] =
-        topicNames.traverse(topicName =>
+      override def deleteTopics(topicNames: List[String]): F[Either[DeleteTopicErrorList, Unit]] =
+        topicNames.traverse{topicName =>
           deleteTopic(topicName).attempt
-            .map(_.leftMap(_ => s"Unable to delete $topicName")))
+            .map{
+              _.leftMap(
+                DeleteTopicError(topicName, _)
+              ).toValidatedNel
+            }
+        }.map(_.combineAll.toEither.leftMap(errorList => DeleteTopicErrorList(errorList)))
 }
   }
 
