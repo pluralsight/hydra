@@ -12,6 +12,7 @@ import cats.data.{NonEmptyChain, NonEmptyList, Validated, ValidatedNec, Validate
 import cats.implicits._
 import cats.effect.concurrent.Ref
 import cats.effect.{Async, Concurrent, ConcurrentEffect, ContextShift, Resource, Sync, Timer}
+import hydra.ingest.programs.TopicDeletionProgram.FailureToDeleteSchemaVersion
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -22,63 +23,30 @@ import scala.util.{Failure, Success}
 final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaClient: KafkaAdminAlgebra[F],
                                               schemaClient: SchemaRegistry[F]) {
 
-  private def deleteVersionFromSchemaRegistry(schemaVersion: SchemaVersion, topic: String): F[Either[DeleteTopicError, Unit]] = {
-    schemaClient.deleteSchemaOfVersion(topic, schemaVersion).attempt.map(_.leftMap(DeleteTopicError(topic,_)))
-  }
-
-  private def getVersionFromSchemaRegistry(topic: String): F[Either[DeleteTopicError, List[SchemaVersion]]] = {
-    schemaClient.getAllVersions(topic).attempt.map(_.leftMap(DeleteTopicError(topic, _)))
-  }
-
-  private def deleteFromSchemaRegistry(topicNames: List[String]): F[Either[DeleteTopicErrorList, Unit]] = {
-    topicNames.traverse { topic =>
-      val maybeVersion = getVersionFromSchemaRegistry(topic)
-      maybeVersion.flatMap(_.traverse(versions => versions.traverse(deleteVersionFromSchemaRegistry(_,topic))))
-    }
+  private def deleteFromSchemaRegistry(topicNames: List[String]): F[ValidatedNel[FailureToDeleteSchemaVersion, Unit]] = {
+    topicNames.flatMap(topic => List(topic + "-key", topic + "-value")).traverse { subject =>
+      schemaClient.getAllVersions(subject)
+        .flatMap(_.traverse(version => schemaClient.deleteSchemaOfVersion(subject, version)
+          .attempt.map(_.leftMap(cause => FailureToDeleteSchemaVersion(version, subject, cause)).toValidatedNel)))
+    }.map(_.flatten.combineAll)
   }
 
   def deleteTopic(topicNames: List[String]): F[Either[DeleteTopicErrorList, Unit]] = {
-    kafkaClient.deleteTopics(topicNames).flatMap{
-      case Right(value) =>{
-        deleteFromSchemaRegistry(topicNames) match {
-          case Left(errorList) => return Left(errorList)
-          case Right(_) => return Right(Unit)
-        }
+    kafkaClient.deleteTopics(topicNames).flatMap { result =>
+      val topicsToDeleteSchemaFor = result match {
+        case Right(_) => topicNames
+        case Left(error) =>
+          val failedTopicNames = error.errors.map(_.topicName).toList.toSet
+          topicNames.toSet.diff(failedTopicNames).toList
       }
-      case Left(value) =>
+      // TODO chain errors together for failures from topic deletions and schema deletions
+      // This will require a common super type for the failures (so they can be combined into a single list)
+      deleteFromSchemaRegistry(topicsToDeleteSchemaFor)
     }
-
-
-//    {
-//      case Success(maybeSuccess) => {
-//        case Success(Right) => {
-//          // delete all from schema registry
-//
-//        }
-//        case Success(Left) => {
-//          // Either partial success or full failure
-//          maybeSuccess.left.map{ topicErrors =>
-//            val erroredTopicNames = topicErrors.errors.map(topicError => topicError.topicName).toList
-//            if (erroredTopicNames.length == topicNames.length) {
-//              // No success
-//              return Left(topicErrors)
-//            } else {
-//              // partial success
-//              val partialSuccess = topicNames.filter(topic => !erroredTopicNames.contains(topic))
-//              deleteFromSchemaRegistry(partialSuccess) match {
-//                case Left(value) => topicErrors += value
-//              }
-//              return Left(topicErrors)
-//            }
-//          }
-//        }
-//        case Failure(e) => {
-//          return Left(DeleteTopicErrorList(topicNames.map(topic => DeleteTopicError(topic, e)).toNonEmptyList))
-//        }
-//      }
-//      case Failure(e) =>  {
-//        return Left(DeleteTopicErrorList(topicNames.map(topic => DeleteTopicError(topic, e)).toNonEmptyList))
-//      }
-//    }
   }
+}
+
+object TopicDeletionProgram {
+  final case class FailureToDeleteSchemaVersion(schemaVersion: SchemaVersion, subject: String, cause: Throwable)
+    extends Exception(s"Failed to delete $schemaVersion for $subject", cause)
 }
