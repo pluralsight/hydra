@@ -27,7 +27,7 @@ class TopicConsumerSpec extends AnyFlatSpecLike with Matchers {
       .build()
 
     val genericValue = new GenericRecordBuilder(TopicConsumerValue.codec.schema.toOption.get)
-      .set("lastCommit", value.lastCommit)
+      .set("lastCommit", value.lastCommit.toEpochMilli)
       .build()
 
     val (decodedKey, decodedValue) =
