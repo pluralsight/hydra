@@ -99,7 +99,7 @@ object TopicMetadataV2 {
             valueResult match {
               case Some(Left(avroError)) =>
                avroError.invalidNel
-              case Some(Right(topicMetadataV2Value)) =>
+              case Some (Right(topicMetadataV2Value)) =>
                 Some(topicMetadataV2Value).validNel
               case None => None.validNel
             }
