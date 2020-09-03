@@ -5,7 +5,7 @@ import java.util.UUID
 import org.apache.avro.{LogicalTypes, Schema}
 import org.apache.avro.generic.{GenericDatumReader, GenericRecord}
 import org.apache.avro.io.DecoderFactory
-import cats.implicits._
+import cats.syntax.all._
 import org.apache.avro.util.Utf8
 
 import scala.util.{Failure, Success, Try}

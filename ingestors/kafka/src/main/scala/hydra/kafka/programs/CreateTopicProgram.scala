@@ -1,7 +1,7 @@
 package hydra.kafka.programs
 
 import cats.effect.{Bracket, ExitCase, Resource}
-import cats.implicits._
+import cats.syntax.all._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}

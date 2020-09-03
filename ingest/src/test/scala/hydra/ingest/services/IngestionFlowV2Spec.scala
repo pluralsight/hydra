@@ -1,7 +1,7 @@
 package hydra.ingest.services
 
 import cats.effect.{Concurrent, ContextShift, IO}
-import cats.implicits._
+import cats.syntax.all._
 import hydra.avro.registry.SchemaRegistry
 import hydra.core.transport.ValidationStrategy
 import hydra.ingest.services.IngestionFlowV2.V2IngestRequest
