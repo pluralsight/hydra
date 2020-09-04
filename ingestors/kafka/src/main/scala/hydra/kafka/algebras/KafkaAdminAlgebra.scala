@@ -220,7 +220,12 @@ object KafkaAdminAlgebra {
       }
 
       override def deleteTopic(name: String): F[Unit] =
-        ref.update(_ - name)
+        ref.modify(topicMap => if(topicMap.contains(name)) (topicMap - name, None)
+        else (topicMap, Some(new UnknownTopicOrPartitionException("Topic does not exist"))))
+          .flatMap{
+          case Some(e) => Sync[F].raiseError(e)
+          case None => Sync[F].unit
+        }
 
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getConsumerGroupOffsets(consumerGroup: String): F[Map[TopicAndPartition, Offset]] = ???
@@ -235,8 +240,8 @@ object KafkaAdminAlgebra {
       override def deleteTopics(topicNames: List[String]): F[Either[KafkaDeleteTopicErrorList, Unit]] =
         topicNames.traverse{topicName =>
           deleteTopic(topicName).attempt
-            .map{
-              _.leftMap(
+            .map{ blah =>
+              blah.leftMap(
                 KafkaDeleteTopicError(topicName, _)
               ).toValidatedNel
             }

@@ -1,5 +1,7 @@
 package hydra.ingest.programs
 
+import cats.data.Validated.{Invalid, Valid}
+import cats.data.{NonEmptyList, ValidatedNel}
 import cats.effect.IO
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.algebras.KafkaAdminAlgebra
@@ -11,11 +13,14 @@ import cats.implicits._
 
 class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
 
+  private type ErrorChecker = ValidatedNel[DeleteTopicError, Unit] => Unit
+
   private def applyTestcase(kafkaAdminAlgebra: IO[KafkaAdminAlgebra[IO]],
                            schemaRegistry: IO[SchemaRegistry[IO]],
                             topicNames: List[String],
                             topicNamesToDelete: List[String],
-                            registerKey: Boolean): Unit = {
+                            registerKey: Boolean,
+                            assertionError: ErrorChecker = _ => ()): Unit = {
     (for {
       kafkaAlgebra <- kafkaAdminAlgebra
       schemaAlgebra <- schemaRegistry
@@ -24,10 +29,11 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
         schemaAlgebra.registerSchema(topic,
           SchemaBuilder.record("name" + topic.replace("-",""))
             .fields().requiredString("id" + topic.replace("-","")).endRecord()))
-      _ <-  new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra).deleteTopic(topicNamesToDelete)
+      errors <-  new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra).deleteTopic(topicNamesToDelete)
       allTopics <- kafkaAlgebra.getTopicNames
       allSchemas <- topicNames.traverse(topic => schemaAlgebra.getAllVersions(topic + "-value").map(versions => if(versions.nonEmpty) Some(topic + "-value") else None)).map(_.flatten)
     } yield {
+      assertionError(errors)
       allTopics shouldBe topicNames.toSet.diff(topicNamesToDelete.toSet).toList
       allSchemas shouldBe allTopics.map(topic => topic + "-value")
     }).unsafeRunSync()
@@ -51,6 +57,11 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
 
   it should "Delete Multiple Topics from Kafka key and value" in {
     applyTestcase(KafkaAdminAlgebra.test[IO], SchemaRegistry.test[IO], List("topic1", "topic2"), List("topic1","topic2"), registerKey = true)
+  }
+
+  it should "Not delete topic if not exist" in {
+    val checkErrors: ErrorChecker = errors => errors shouldBe a [Invalid[KafkaDeletionErrors]]
+    applyTestcase(KafkaAdminAlgebra.test[IO], SchemaRegistry.test[IO], List("topic1", "topic2"), List("topic3"), registerKey = true, checkErrors)
   }
 
 }
