@@ -102,7 +102,7 @@ final class KafkaAdminAlgebraSpec
       "delete multiple topics" in {
         val topicsToDelete = List("topic1","topic2","topic3","topic4","topic5")
         topicsToDelete.map(topic => kafkaClient.createTopic(topic, TopicDetails(1, 1)).unsafeRunSync())
-        kafkaClient.deleteTopics(topicsToDelete).map(_.unsafeRunSync())
+        kafkaClient.deleteTopics(topicsToDelete).unsafeRunSync()
         topicsToDelete.map(topic => kafkaClient.kafkaContainsTopic(topic).unsafeRunSync() shouldBe false)
       }
 
