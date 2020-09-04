@@ -2,17 +2,18 @@ package hydra.ingest.programs
 
 import cats.Monad
 import cats.MonadError
+import cats.data.Validated.Invalid
 import cats.effect.Sync
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
 import hydra.common.util.Futurable
-import hydra.kafka.algebras.KafkaAdminAlgebra.{DeleteTopicError, DeleteTopicErrorList}
+import hydra.kafka.algebras.KafkaAdminAlgebra.{KafkaDeleteTopicError, KafkaDeleteTopicErrorList}
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import cats.data.{NonEmptyChain, NonEmptyList, Validated, ValidatedNec, ValidatedNel}
 import cats.implicits._
 import cats.effect.concurrent.Ref
 import cats.effect.{Async, Concurrent, ConcurrentEffect, ContextShift, Resource, Sync, Timer}
-import hydra.ingest.programs.TopicDeletionProgram.FailureToDeleteSchemaVersion
+import hydra.ingest.programs.TopicDeletionProgram.{FailureToDeleteSchemaVersion, SchemaDeleteTopicErrorList}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -31,7 +32,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaClient:
     }.map(_.flatten.combineAll)
   }
 
-  def deleteTopic(topicNames: List[String]): F[Either[DeleteTopicErrorList, Unit]] = {
+  def deleteTopic(topicNames: List[String]): F[ValidatedNel[DeleteTopicError, Unit]] = {
     kafkaClient.deleteTopics(topicNames).flatMap { result =>
       val topicsToDeleteSchemaFor = result match {
         case Right(_) => topicNames
@@ -39,14 +40,25 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaClient:
           val failedTopicNames = error.errors.map(_.topicName).toList.toSet
           topicNames.toSet.diff(failedTopicNames).toList
       }
-      // TODO chain errors together for failures from topic deletions and schema deletions
-      // This will require a common super type for the failures (so they can be combined into a single list)
-      deleteFromSchemaRegistry(topicsToDeleteSchemaFor)
+
+      deleteFromSchemaRegistry(topicsToDeleteSchemaFor).map(schemaResult =>
+        schemaResult.toEither.leftMap(a => SchemaDeletionErrors(SchemaDeleteTopicErrorList(a)))
+          .toValidatedNel.combine(result.leftMap(KafkaDeletionErrors).toValidatedNel)
+      )
     }
   }
 }
 
 object TopicDeletionProgram {
   final case class FailureToDeleteSchemaVersion(schemaVersion: SchemaVersion, subject: String, cause: Throwable)
-    extends Exception(s"Failed to delete $schemaVersion for $subject", cause)
+    extends Exception(s"Failed to delete $schemaVersion for $subject", cause) {
+    def errorMessage: String = s"$subject ${cause.getMessage}"
+  }
+
+  final case class SchemaDeleteTopicErrorList(errors: NonEmptyList[FailureToDeleteSchemaVersion])
+    extends Exception (s"Topic(s) failed to delete:\n${errors.map(_.errorMessage).toList.mkString("\n")}")
 }
+
+sealed abstract class DeleteTopicError extends RuntimeException
+final case class KafkaDeletionErrors(kafkaDeleteTopicErrorList: KafkaDeleteTopicErrorList) extends DeleteTopicError
+final case class SchemaDeletionErrors(schemaDeleteTopicErrorList: SchemaDeleteTopicErrorList) extends DeleteTopicError
