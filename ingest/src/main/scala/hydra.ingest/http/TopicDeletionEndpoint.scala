@@ -40,7 +40,7 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
                     case Validated.Invalid(e) => {
                       e.asInstanceOf[DeleteTopicError] match {
                         case SchemaDeletionErrors(schemaDeleteTopicErrorList) => {
-                          val badTopics = schemaDeleteTopicErrorList.errors.toList.map(error => error.subject.split("-").head)
+                          val badTopics = schemaDeleteTopicErrorList.errors.toList.map(error => error.errorMessage.split("-").head)
                           val goodTopics = maybeList.toSet.diff(badTopics.toSet).toList
                           badTopics.map(topicName => addPromHttpMetric(topicName, StatusCodes.InternalServerError.toString(), "/deleteTopics/"))
                           goodTopics.map(topicName => addPromHttpMetric(topicName, StatusCodes.OK.toString(), "/deleteTopics/"))

@@ -100,7 +100,10 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       // delete all given topics to delete
       errors <-  new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra).deleteTopic(topicNamesToDelete)
       allTopics <- kafkaAlgebra.getTopicNames
-      allSchemas <- topicNames.traverse(topic => schemaAlgebra.getAllVersions(topic + "-value").attempt.map(versions => if(versions.nonEmpty) Some(topic + "-value") else None)).map(_.flatten)
+      allSchemas <- topicNames.traverse(topic => schemaAlgebra.getAllVersions(topic + "-value").attempt.map {
+        case Right(versions) => if(versions.nonEmpty) Some(topic + "-value") else None
+        case Left(_) => Some(topic + "-value")
+      }).map(_.flatten)
     } yield {
       assertionError(errors)
       allTopics shouldBe topicNames.toSet.diff(topicNamesToDelete.toSet.diff(topicNamesToFail.toSet)).toList
