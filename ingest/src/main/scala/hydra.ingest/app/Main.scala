@@ -5,7 +5,6 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
 import cats.effect.{ExitCode, IO, IOApp, Resource}
-import cats.implicits._
 import hydra.common.Settings
 import hydra.common.config.ConfigSupport
 import ConfigSupport._
