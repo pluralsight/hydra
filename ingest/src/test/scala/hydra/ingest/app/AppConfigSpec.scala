@@ -2,7 +2,7 @@ package hydra.ingest.app
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import cats.implicits._
+import cats.syntax.all._
 
 final class AppConfigSpec extends AnyFlatSpec with Matchers {
 

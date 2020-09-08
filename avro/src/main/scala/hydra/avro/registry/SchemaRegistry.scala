@@ -3,7 +3,7 @@ package hydra.avro.registry
 import cats.effect.Sync
 import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, MockSchemaRegistryClient, SchemaRegistryClient}
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
-import cats.implicits._
+import cats.syntax.all._
 import io.confluent.kafka.schemaregistry.avro.AvroCompatibilityChecker
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 
