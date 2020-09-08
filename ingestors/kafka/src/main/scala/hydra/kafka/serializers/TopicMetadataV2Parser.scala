@@ -5,7 +5,7 @@ import java.time.Instant
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import cats.data.Validated.{Invalid, Valid}
 import cats.data._
-import cats.implicits._
+import cats.syntax.all._
 import eu.timepit.refined.auto._
 import hydra.core.marshallers._
 import hydra.kafka.model.ContactMethod.{Email, Slack}

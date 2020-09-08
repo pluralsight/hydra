@@ -5,7 +5,7 @@ import java.util.UUID
 
 import cats.data.Validated.{Invalid, Valid}
 import cats.data.{NonEmptyList, Validated}
-import cats.implicits._
+import cats.syntax.all._
 import cats.{Applicative, ApplicativeError, Monad, MonadError}
 import hydra.avro.convert.{ISODateConverter, IsoDate}
 import hydra.core.marshallers._

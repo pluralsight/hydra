@@ -1,7 +1,7 @@
 package hydra.ingest.modules
 
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import hydra.ingest.app.AppConfig.AppConfig
 import hydra.ingest.services.{IngestionFlow, IngestionFlowV2}
 import hydra.kafka.programs.CreateTopicProgram
