@@ -56,27 +56,18 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
     }
 
   def kafkabadTest[F[_]: Sync]: F[KafkaAdminAlgebra[F]] =
-    Ref[F].of(Map[TopicName, Topic]()).flatMap(getBadTestKafkaClient[F])
+    KafkaAdminAlgebra.test[F].flatMap(getBadTestKafkaClient[F])
 
-  private[this] def getBadTestKafkaClient[F[_]: Sync](ref: Ref[F, Map[TopicName, Topic]]): F[KafkaAdminAlgebra[F]] = Sync[F].delay  {
+  private[this] def getBadTestKafkaClient[F[_]: Sync](underlying: KafkaAdminAlgebra[F]): F[KafkaAdminAlgebra[F]] = Sync[F].delay  {
     new KafkaAdminAlgebra[F] {
-      override def describeTopic(name: TopicName): F[Option[Topic]] =
-      // return None
-        ref.get.map(_ => None)
+      override def describeTopic(name: TopicName): F[Option[Topic]] = underlying.describeTopic(name)
 
       override def getTopicNames: F[List[TopicName]] =
-      // return empty list
-        ref.get.map(_ => List())
+        underlying.getTopicNames
 
-      override def createTopic(
-                                name: TopicName,
-                                details: TopicDetails
-                              ): F[Unit] = {
-        ref.update(old => old)
-      }
+      override def createTopic(name: TopicName, details: TopicDetails): F[Unit] = underlying.createTopic(name, details)
 
-      override def deleteTopic(name: String): F[Unit] =
-        Sync[F].raiseError(new Exception("An exception has occured in your deleteTopic"))
+      override def deleteTopic(name: String): F[Unit] = ???
 
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getConsumerGroupOffsets(consumerGroup: String): F[Map[TopicAndPartition, Offset]] = ???
@@ -85,8 +76,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]] = ???
 
-      override def kafkaContainsTopic(name: TopicName): F[Boolean] =
-        getTopicNames.map(topics => false)
+      override def kafkaContainsTopic(name: TopicName): F[Boolean] = getTopicNames.map(topics => false)
 
       override def deleteTopics(topicNames: List[String]): F[Either[KafkaDeleteTopicErrorList, Unit]] =
         Sync[F].pure(Left(new KafkaDeleteTopicErrorList( NonEmptyList.fromList(
@@ -119,7 +109,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       allSchemas <- topicNames.traverse(topic => schemaAlgebra.getAllVersions(topic + "-value").map(versions => if(versions.nonEmpty) Some(topic + "-value") else None)).map(_.flatten)
     } yield {
       assertionError(errors)
-      allTopics shouldBe topicNames.toSet.diff(topicNamesToDelete.toSet).toList
+      allTopics shouldBe topicNames.toSet.diff(topicNamesToDelete.toSet.diff(topicNamesToFail.toSet)).toList
       allSchemas shouldBe allTopics.map(topic => topic + "-value")
     }).unsafeRunSync()
   }
