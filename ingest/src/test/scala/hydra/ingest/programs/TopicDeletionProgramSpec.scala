@@ -18,40 +18,34 @@ import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
 
 class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
 
-  def schemaBadTest[F[_]: Sync]: F[SchemaRegistry[F]] = Sync[F].delay {
-    getFromBadSchemaRegistryClient(new MockSchemaRegistryClient)
-  }
+  def schemaBadTest[F[_]: Sync]: F[SchemaRegistry[F]] =
+    SchemaRegistry.test[F].map(getFromBadSchemaRegistryClient[F])
 
-  private def getFromBadSchemaRegistryClient[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient): SchemaRegistry[F] =
+  private def getFromBadSchemaRegistryClient[F[_]: Sync](underlying: SchemaRegistry[F]): SchemaRegistry[F] =
     new SchemaRegistry[F] {
 
-      private implicit class CheckKeySchemaEvolution(schemasF: F[List[Schema]]) {
-        Sync[F].raiseError(IncompatibleSchemaException(s"Key schema evolutions are not permitted."))
-      }
-
       override def registerSchema(subject: String,schema: Schema): F[SchemaId] = {
-        Sync[F].delay(0)
+        underlying.registerSchema(subject, schema)
       }
 
       override def deleteSchemaOfVersion(subject: String,version: SchemaVersion): F[Unit] =
-        Sync[F].raiseError(new SchemaRegistryException(new Exception(s"Unable to delete $version of $subject"), subject))
+        underlying.deleteSchemaOfVersion(subject,version)
 
       override def getVersion(subject: String,schema: Schema): F[SchemaVersion] =
-        Sync[F].raiseError(new Exception(s"Unable to get version for $subject"))
+        underlying.getVersion(subject,schema)
 
       override def getAllVersions(subject: String): F[List[SchemaId]] =
-        Sync[F].raiseError(new SchemaRegistryException(new Exception(s"Unable to get all versions of $subject"), subject))
+        Sync[F].raiseError(new Exception("Unable to get all versions"))
 
       override def getAllSubjects: F[List[String]] =
-        Sync[F].raiseError(new Exception("Unable to get all Subjects"))
+        underlying.getAllSubjects
 
-      override def getSchemaRegistryClient: F[SchemaRegistryClient] = Sync[F].pure(schemaRegistryClient)
+      override def getSchemaRegistryClient: F[SchemaRegistryClient] = underlying.getSchemaRegistryClient
 
       //TODO: Test this
-      override def getLatestSchemaBySubject(subject: String): F[Option[Schema]] = Sync[F].raiseError(new Exception("LatestSchemaBySubject failed"))
+      override def getLatestSchemaBySubject(subject: String): F[Option[Schema]] = underlying.getLatestSchemaBySubject(subject)
 
-      override def getSchemaFor(subject: String, schemaVersion: SchemaVersion): F[Option[Schema]] =
-        Sync[F].raiseError(new Exception(s"getSchemaFor failed for version $schemaVersion of $subject"))
+      override def getSchemaFor(subject: String, schemaVersion: SchemaVersion): F[Option[Schema]] = underlying.getSchemaFor(subject, schemaVersion)
 
     }
 
@@ -106,7 +100,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       // delete all given topics to delete
       errors <-  new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra).deleteTopic(topicNamesToDelete)
       allTopics <- kafkaAlgebra.getTopicNames
-      allSchemas <- topicNames.traverse(topic => schemaAlgebra.getAllVersions(topic + "-value").map(versions => if(versions.nonEmpty) Some(topic + "-value") else None)).map(_.flatten)
+      allSchemas <- topicNames.traverse(topic => schemaAlgebra.getAllVersions(topic + "-value").attempt.map(versions => if(versions.nonEmpty) Some(topic + "-value") else None)).map(_.flatten)
     } yield {
       assertionError(errors)
       allTopics shouldBe topicNames.toSet.diff(topicNamesToDelete.toSet.diff(topicNamesToFail.toSet)).toList
@@ -145,7 +139,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
 
   it should "Return a SchemaDeletionError if getting all versions fail" in {
     val checkErrors: ErrorChecker = errors => errors shouldBe a [Invalid[_]]
-    applyTestcase(kafkabadTest[IO], schemaBadTest[IO], List("topic1", "topic2"), List("topic1"), registerKey = true, List.empty, checkErrors)
+    applyTestcase(KafkaAdminAlgebra.test[IO], schemaBadTest[IO], List("topic1", "topic2"), List("topic1"), registerKey = true, List.empty, checkErrors)
   }
 
   it should "Return a SchemaDeletionError if deleting a specific version fails" in {
