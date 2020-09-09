@@ -35,12 +35,12 @@ object ConsumerGroupsAlgebra {
   final case class Topic(topicName: String, lastCommit: Instant)
 
 
-  def make[F[_]: ContextShift: ConcurrentEffect: Timer](kafkaInternalTopic: String, dvsConsumerTopic: String, bootstrapServers: String, consumerGroup: String, kafkaClientAlgebra: KafkaClientAlgebra[F], schemaRegistryAlgebra: SchemaRegistry[F]): F[ConsumerGroupsAlgebra[F]] = {
-    val dvsConsumerStream = kafkaClientAlgebra.consumeMessages(dvsConsumerTopic, consumerGroup)
+  def make[F[_]: ContextShift: ConcurrentEffect: Timer](kafkaInternalTopic: String, dvsConsumerTopic: String, bootstrapServers: String, uniquePerNodeConsumerGroup: String, commonConsumerGroup: String, kafkaClientAlgebra: KafkaClientAlgebra[F], schemaRegistryAlgebra: SchemaRegistry[F]): F[ConsumerGroupsAlgebra[F]] = {
+    val dvsConsumerStream = kafkaClientAlgebra.consumeMessages(dvsConsumerTopic, uniquePerNodeConsumerGroup)
     for {
       cf <- Ref[F].of(ConsumerGroupsStorageFacade.empty)
       schemaRegistryClient <- schemaRegistryAlgebra.getSchemaRegistryClient
-      _ <- Concurrent[F].start(consumerOffsetsToInternalOffsets(kafkaInternalTopic, dvsConsumerTopic, bootstrapServers, consumerGroup, schemaRegistryClient))
+      _ <- Concurrent[F].start(consumerOffsetsToInternalOffsets(kafkaInternalTopic, dvsConsumerTopic, bootstrapServers, commonConsumerGroup, schemaRegistryClient))
       _ <- Concurrent[F].start(dvsConsumerStream.flatMap { case (key, value) =>
         fs2.Stream.eval(TopicConsumer.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
           topicValue match {
@@ -81,16 +81,20 @@ object ConsumerGroupsAlgebra {
         (cr.record.key, cr.record.value) match {
           case (Some(OffsetKey(_, k)), offsetMaybe) =>
             val topic = k.topicPartition.topic()
-            val consumerGroup = k.group
-            val consumerKey = TopicConsumerKey(topic, consumerGroup)
+            val consumerGroupMaybe = Option(k.group)
+            val consumerKeyMaybe = consumerGroupMaybe.map(TopicConsumerKey(topic, _))
             val consumerValue = offsetMaybe.map(o => Instant.ofEpochMilli(o.commitTimestamp)).map(TopicConsumerValue.apply)
 
-            fs2.Stream.eval(for {
-              topicConsumer <- TopicConsumer.encode[F](consumerKey, consumerValue)
-              (key, value) = topicConsumer
-              k <- getSerializer[F, GenericRecord](s)(isKey = true).serialize(destinationTopic, Headers.empty, key)
-              v <- getSerializer[F, Option[GenericRecord]](s)(isKey = false).serialize(destinationTopic, Headers.empty, value)
-            } yield ProducerRecord(destinationTopic, k, v)).map(p => ProducerRecords.one(p))
+            consumerKeyMaybe match {
+              case Some(consumerKey) =>
+                fs2.Stream.eval(for {
+                  topicConsumer <- TopicConsumer.encode[F](consumerKey, consumerValue)
+                  (key, value) = topicConsumer
+                  k <- getSerializer[F, GenericRecord](s)(isKey = true).serialize(destinationTopic, Headers.empty, key)
+                  v <- getSerializer[F, Option[GenericRecord]](s)(isKey = false).serialize(destinationTopic, Headers.empty, value)
+                } yield ProducerRecord(destinationTopic, k, v)).map(p => ProducerRecords.one(p))
+              case None => fs2.Stream.empty
+            }
           case _ =>
             fs2.Stream.empty
         }
