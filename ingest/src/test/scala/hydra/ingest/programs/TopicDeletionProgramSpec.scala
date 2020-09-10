@@ -78,14 +78,42 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
     }
   }
 
+  private val twoTopics = List("topic1", "topic2")
+  private val invalidErrorChecker: ErrorChecker = errors => errors shouldBe a [Invalid[_]]
+  private val noUpgrade = ("",false)
   private type ErrorChecker = ValidatedNel[DeleteTopicError, Unit] => Unit
 
+  private def buildSchema(topic: String, upgrade: Boolean): Schema = {
+    val schemaStart = SchemaBuilder.record("name" + topic.replace("-", ""))
+      .fields().requiredString("id" + topic.replace("-", ""))
+    if (upgrade && !topic.contains("-key")) {
+      schemaStart.nullableBoolean("upgrade",upgrade).endRecord()
+    } else {
+      schemaStart.endRecord()
+    }
+  }
+
+  private def registerTopics(topicNames: List[String], schemaAlgebra: SchemaRegistry[IO],
+                                    registerKey: Boolean, upgrade: Boolean): IO[List[SchemaId]] = {
+    topicNames.flatMap(topic => if(registerKey) List(topic + "-key", topic + "-value") else List(topic + "-value"))
+      .traverse(topic => schemaAlgebra.registerSchema(topic, buildSchema(topic, upgrade)))
+  }
+
+  private def possibleFailureGetAllSchemaVersions(topicNames: List[String], schemaAlgebra: SchemaRegistry[IO]): IO[List[String]] = {
+    topicNames.traverse(topic => schemaAlgebra.getAllVersions(topic + "-value").attempt.map {
+      case Right(versions) => if(versions.nonEmpty) Some(topic + "-value") else None
+      case Left(_) => Some(topic + "-value")
+    }).map(_.flatten)
+  }
+
   private def applyTestcase(kafkaAdminAlgebra: IO[KafkaAdminAlgebra[IO]],
-                           schemaRegistry: IO[SchemaRegistry[IO]],
+                            schemaRegistry: IO[SchemaRegistry[IO]],
                             topicNames: List[String],
                             topicNamesToDelete: List[String],
+                            schemasToSucceed: List[String] = List.empty,
                             registerKey: Boolean,
                             topicNamesToFail: List[String] = List.empty,
+                            upgradeTopic: Tuple2[String, Boolean] = ("", false),
                             assertionError: ErrorChecker = _ => ()): Unit = {
     (for {
       kafkaAlgebra <- kafkaAdminAlgebra
@@ -93,17 +121,15 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       // create all topics
       _ <- topicNames.traverse(topic => kafkaAlgebra.createTopic(topic,TopicDetails(1,1)))
       // register all topics
-      _ <- topicNames.flatMap(topic => if(registerKey) List(topic + "-key", topic + "-value") else List(topic + "-value")).traverse(topic =>
-        schemaAlgebra.registerSchema(topic,
-          SchemaBuilder.record("name" + topic.replace("-",""))
-            .fields().requiredString("id" + topic.replace("-","")).endRecord()))
-      // delete all given topics to delete
+      _ <- registerTopics(topicNames, schemaAlgebra, registerKey, upgrade=false)
+      // upgrade any topics needed
+      _ <- registerTopics(List(upgradeTopic._1), schemaAlgebra, registerKey, upgradeTopic._2)
+      // delete all given topics
       errors <-  new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra).deleteTopic(topicNamesToDelete)
+      // get all topic names
       allTopics <- kafkaAlgebra.getTopicNames
-      allSchemas <- topicNames.traverse(topic => schemaAlgebra.getAllVersions(topic + "-value").attempt.map {
-        case Right(versions) => if(versions.nonEmpty) Some(topic + "-value") else None
-        case Left(_) => Some(topic + "-value")
-      }).map(_.flatten)
+      // get all versions of any given topic
+      allSchemas <- possibleFailureGetAllSchemaVersions(schemasToSucceed, schemaAlgebra)
     } yield {
       assertionError(errors)
       allTopics shouldBe topicNames.toSet.diff(topicNamesToDelete.toSet.diff(topicNamesToFail.toSet)).toList
@@ -111,47 +137,79 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
     }).unsafeRunSync()
   }
 
+  private def applyGoodTestcase(topicNames: List[String],
+                                topicNamesToDelete: List[String],
+                                registerKey: Boolean = false,
+                                upgradeTopic: Tuple2[String, Boolean] = ("", false),
+                                assertionError: ErrorChecker = _ => ()): Unit = {
+    applyTestcase(KafkaAdminAlgebra.test[IO], SchemaRegistry.test[IO],
+      topicNames, topicNamesToDelete, topicNames, registerKey,
+      List.empty, upgradeTopic, assertionError)
+  }
+
+  private def applyFailureTestcase(kafkaAdminAlgebra: IO[KafkaAdminAlgebra[IO]],
+                            schemaRegistry: IO[SchemaRegistry[IO]],
+                            topicNames: List[String],
+                            topicNamesToDelete: List[String],
+                            registerKey: Boolean,
+                            topicNamesToFail: List[String] = List.empty,
+                            schemasToSucceed: List[String] = List.empty,
+                            assertionError: ErrorChecker = _ => (),
+                            upgradeTopic: Tuple2[String, Boolean] = ("", false)): Unit = {
+    applyTestcase(kafkaAdminAlgebra, schemaRegistry,
+      topicNames, topicNamesToDelete, schemasToSucceed, registerKey,
+      topicNamesToFail, upgradeTopic, assertionError)
+  }
+
+
   it should "Delete a Single Topic from Kafka value only" in {
-    applyTestcase(KafkaAdminAlgebra.test[IO], SchemaRegistry.test[IO], List("topic1"), List("topic1"), registerKey = false)
+    applyGoodTestcase(List("topic1"), List("topic1"))
   }
 
   it should "Delete a Single Topic from Multiple topics in Kafka value only" in {
-    applyTestcase(KafkaAdminAlgebra.test[IO], SchemaRegistry.test[IO], List("topic1","topic2"), List("topic1"), registerKey = false)
+    applyGoodTestcase(twoTopics, List("topic1"))
   }
 
   it should "Delete Multiple Topics from Kafka value only" in {
-    applyTestcase(KafkaAdminAlgebra.test[IO], SchemaRegistry.test[IO], List("topic1", "topic2"), List("topic1","topic2"), registerKey = false)
+    applyGoodTestcase(twoTopics, twoTopics)
   }
 
   it should "Delete a Single Topic from Multiple topics in Kafka key and value" in {
-    applyTestcase(KafkaAdminAlgebra.test[IO], SchemaRegistry.test[IO], List("topic1","topic2"), List("topic1"), registerKey = true)
+    applyGoodTestcase(twoTopics, List("topic1"), registerKey = true)
   }
 
   it should "Delete Multiple Topics from Kafka key and value" in {
-    applyTestcase(KafkaAdminAlgebra.test[IO], SchemaRegistry.test[IO], List("topic1", "topic2"), List("topic1","topic2"), registerKey = true)
+    applyGoodTestcase(twoTopics, twoTopics, registerKey = true)
   }
 
   it should "Return a KafkaDeletionError if the topic does not exist" in {
-    val checkErrors: ErrorChecker = errors => errors shouldBe a [Invalid[_]]
-    applyTestcase(KafkaAdminAlgebra.test[IO], SchemaRegistry.test[IO], List("topic1", "topic2"), List("topic3"), registerKey = true, List.empty, checkErrors)
+    applyGoodTestcase(twoTopics, List("topic3"), registerKey = true, noUpgrade, invalidErrorChecker)
   }
 
   it should "Delete nothing from Kafka or SchemaRegistry with an empty list" in {
-    applyTestcase(KafkaAdminAlgebra.test[IO], SchemaRegistry.test[IO], List("topic1", "topic2"), List(), registerKey = true)
+    applyGoodTestcase(twoTopics, List(), registerKey = true)
+  }
+
+  it should "Delete multiple versions of a schema" in {
+    applyGoodTestcase(twoTopics, List("topic1"), registerKey = true, ("topic1", true))
+  }
+
+  // FAILURE CASES
+  it should "Return a KafkaDeletionError if the topic fails to delete" in {
+    applyFailureTestcase(kafkabadTest[IO], SchemaRegistry.test[IO],
+      twoTopics, twoTopics, registerKey = true, twoTopics, twoTopics, invalidErrorChecker)
   }
 
   it should "Return a SchemaDeletionError if getting all versions fail" in {
-    val checkErrors: ErrorChecker = errors => errors shouldBe a [Invalid[_]]
-    applyTestcase(KafkaAdminAlgebra.test[IO], schemaBadTest[IO], List("topic1", "topic2"), List("topic1"), registerKey = true, List.empty, checkErrors)
+    applyFailureTestcase(KafkaAdminAlgebra.test[IO], schemaBadTest[IO],
+      twoTopics, List("topic1"), registerKey = true, List.empty, twoTopics, invalidErrorChecker)
   }
 
   it should "Return a SchemaDeletionError if deleting a specific version fails" in {
-
-  }
-
-  it should "Return a KafkaDeletionError if the topic fails to delete" in {
-    val checkErrors: ErrorChecker = errors => errors shouldBe a [Invalid[_]]
-    applyTestcase(kafkabadTest[IO], SchemaRegistry.test[IO], List("topic1", "topic2"), List("topic1", "topic2"), registerKey = true, List("topic1", "topic2"), checkErrors)
+    applyFailureTestcase(KafkaAdminAlgebra.test[IO], schemaBadTest[IO],
+      topicNames = twoTopics, topicNamesToDelete = List("topic1"),
+      registerKey = true, topicNamesToFail = List.empty,
+      schemasToSucceed = List("topic2"), invalidErrorChecker, upgradeTopic = ("topic1" ,true))
   }
 
 }

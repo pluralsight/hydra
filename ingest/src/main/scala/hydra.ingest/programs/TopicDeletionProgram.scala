@@ -14,7 +14,6 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaClient:
                                               schemaClient: SchemaRegistry[F]) {
 
   private def deleteFromSchemaRegistry(topicNames: List[String]): F[ValidatedNel[SchemaRegistryError, Unit]] = {
-    // Try deleting both -key and -value
     topicNames.flatMap(topic => List(topic + "-key", topic + "-value")).traverse { subject =>
       // Delete all versions of the schema
       schemaClient.getAllVersions(subject).attempt.flatMap {
