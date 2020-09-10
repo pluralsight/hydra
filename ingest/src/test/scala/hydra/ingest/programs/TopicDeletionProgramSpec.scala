@@ -16,10 +16,10 @@ import io.confluent.kafka.schemaregistry.client.{SchemaRegistryClient}
 
 class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
 
-  def schemaBadTest[F[_]: Sync](allowAllVersions: Boolean = true): F[SchemaRegistry[F]] =
-    SchemaRegistry.test[F].map(sr => getFromBadSchemaRegistryClient[F](sr, allowAllVersions))
+  def schemaBadTest[F[_]: Sync](allowAllVersions: Boolean = true, errorOnUpgrade: Boolean = false): F[SchemaRegistry[F]] =
+    SchemaRegistry.test[F].map(sr => getFromBadSchemaRegistryClient[F](sr, allowAllVersions, errorOnUpgrade))
 
-  private def getFromBadSchemaRegistryClient[F[_]: Sync](underlying: SchemaRegistry[F], allowAllVersions: Boolean): SchemaRegistry[F] =
+  private def getFromBadSchemaRegistryClient[F[_]: Sync](underlying: SchemaRegistry[F], allowAllVersions: Boolean, errorOnUpgrade: Boolean): SchemaRegistry[F] =
     new SchemaRegistry[F] {
 
       override def registerSchema(subject: String,schema: Schema): F[SchemaId] = {
@@ -27,7 +27,11 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       }
 
       override def deleteSchemaOfVersion(subject: String,version: SchemaVersion): F[Unit] =
-        underlying.deleteSchemaOfVersion(subject,version)
+        if(errorOnUpgrade && version > 1) {
+          Sync[F].raiseError(new Exception(s"Error on version $version"))
+        } else {
+          underlying.deleteSchemaOfVersion(subject,version)
+        }
 
       override def getVersion(subject: String,schema: Schema): F[SchemaVersion] =
         underlying.getVersion(subject,schema)
@@ -202,14 +206,14 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "Return a SchemaDeletionError if getting all versions fail" in {
-    applyFailureTestcase(KafkaAdminAlgebra.test[IO], schemaBadTest[IO](false),
+    applyFailureTestcase(KafkaAdminAlgebra.test[IO], schemaBadTest[IO](allowAllVersions = false),
       topicNames = twoTopics, topicNamesToDelete = List("topic1"),
       registerKey = true, kafkaTopicNamesToFail = List.empty,
       schemasToSucceed = List("topic2"), invalidErrorChecker)
   }
 
   it should "Return a SchemaDeletionError if deleting a specific version fails" in {
-    applyFailureTestcase(KafkaAdminAlgebra.test[IO], schemaBadTest[IO](),
+    applyFailureTestcase(KafkaAdminAlgebra.test[IO], schemaBadTest[IO](errorOnUpgrade = true),
       topicNames = twoTopics, topicNamesToDelete = List("topic1"),
       registerKey = true, kafkaTopicNamesToFail = List.empty,
       schemasToSucceed = List("topic2"), invalidErrorChecker, upgradeTopic = ("topic1" ,true))
