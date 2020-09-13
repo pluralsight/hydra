@@ -84,7 +84,8 @@ lazy val moduleSettings =
 lazy val root = Project(
   id = "hydra",
   base = file(".")
-).settings(defaultSettings)
+)
+  .settings(moduleSettings)
   .aggregate(common, core, avro, ingest, kafka)
 
 lazy val common = Project(
@@ -110,8 +111,9 @@ lazy val kafka = Project(
   id = "kafka",
   base = file("ingestors/kafka")
 ).dependsOn(core)
+  .configs(IntegrationTest)
   .settings(
-    moduleSettings,
+    moduleSettings ++ Defaults.itSettings,
     name := "hydra-kafka",
     libraryDependencies ++= Dependencies.kafkaDeps
   )

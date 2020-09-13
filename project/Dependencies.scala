@@ -32,8 +32,10 @@ object Dependencies {
   val scalaTestVersion = "3.2.2"
   val scalazVersion = "7.3.2"
   val sprayJsonVersion = "1.3.5"
+  val testContainersVersion = "0.37.0"
   val typesafeConfigVersion = "1.3.2"
   val vulcanVersion = "1.1.0"
+
 
   object Compile {
 
@@ -169,8 +171,19 @@ object Dependencies {
       "com.opentable.components" % "otj-pg-embedded" % "0.13.3" % "test"
   }
 
+  object Integration {
+    val testContainers = Seq(
+      "com.dimafeng" %% "testcontainers-scala-scalatest" % testContainersVersion % "it",
+      "com.dimafeng" %% "testcontainers-scala-kafka" % testContainersVersion % "it"
+    )
+
+  }
+
   import Compile._
   import Test._
+  import Integration._
+
+  val integrationDeps: Seq[ModuleID] = testContainers
 
   val testDeps: Seq[ModuleID] =
     Seq(scalaTest, junit, scalaMock, easyMock, embeddedPostgres) ++
@@ -197,6 +210,6 @@ object Dependencies {
     akkaKafkaStream,
     jsonLenses,
     refined
-  ) ++ kafka ++ akkaHttpHal ++ vulcan ++ fs2Kafka
+  ) ++ kafka ++ akkaHttpHal ++ vulcan ++ fs2Kafka ++ integrationDeps
 
 }
