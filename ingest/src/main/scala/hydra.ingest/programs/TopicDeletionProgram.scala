@@ -49,15 +49,16 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaClient:
 
 object TopicDeletionProgram {
 
-  sealed abstract class SchemaRegistryError(message: String, cause: Throwable) extends RuntimeException(message, cause) {
+  sealed abstract class SchemaRegistryError(subject: String, message: String, cause: Throwable) extends RuntimeException(message, cause) {
     def errorMessage: String = s"$message $cause"
+    def getSubject: String = subject
   }
 
   final case class FailureToGetSchemaVersions(subject: String, cause: Throwable)
-    extends SchemaRegistryError(s"Unable to get all schema versions for $subject", cause)
+    extends SchemaRegistryError(subject, s"Unable to get all schema versions for $subject", cause)
 
   final case class FailureToDeleteSchemaVersion(schemaVersion: SchemaVersion, subject: String, cause: Throwable)
-    extends SchemaRegistryError(s"Failed to delete $schemaVersion for $subject", cause)
+    extends SchemaRegistryError(subject, s"Failed to delete version: $schemaVersion for $subject", cause)
 
   final case class SchemaDeleteTopicErrorList(errors: NonEmptyList[SchemaRegistryError])
     extends Exception (s"Topic(s) failed to delete:\n${errors.map(_.errorMessage).toList.mkString("\n")}")
