@@ -4,7 +4,7 @@ import akka.actor.Status.Success
 import cats.data.{NonEmptyChain, NonEmptyList, Validated, ValidatedNec, ValidatedNel}
 import cats.effect.concurrent.Ref
 import cats.effect.{Async, Concurrent, ConcurrentEffect, ContextShift, Resource, Sync, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import fs2.kafka._
 import hydra.core.protocol._
 import hydra.kafka.util.KafkaUtils.TopicDetails

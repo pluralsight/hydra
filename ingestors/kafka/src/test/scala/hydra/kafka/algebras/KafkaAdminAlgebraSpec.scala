@@ -3,6 +3,9 @@ package hydra.kafka.algebras
 import akka.actor.ActorSystem
 import cats.effect.{ContextShift, IO, Timer}
 import hydra.kafka.algebras.KafkaAdminAlgebra.{LagOffsets, Offset, Topic, TopicAndPartition}
+import hydra.avro.registry.SchemaRegistry
+import hydra.kafka.algebras.KafkaAdminAlgebra.{LagOffsets, Offset, TopicAndPartition}
+import hydra.kafka.algebras.KafkaClientAlgebra.getOptionalGenericRecordDeserializer
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.scalatest.BeforeAndAfterAll

@@ -19,7 +19,7 @@ package hydra.common.config
 import java.util.Properties
 import java.util.concurrent.TimeUnit
 
-import cats.implicits._
+import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
 
 import scala.concurrent.duration.FiniteDuration

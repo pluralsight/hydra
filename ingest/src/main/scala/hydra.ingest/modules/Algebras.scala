@@ -1,7 +1,7 @@
 package hydra.ingest.modules
 
 import cats.effect.{Async, ConcurrentEffect, ContextShift, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import hydra.avro.registry.SchemaRegistry
 import hydra.ingest.app.AppConfig.AppConfig
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}

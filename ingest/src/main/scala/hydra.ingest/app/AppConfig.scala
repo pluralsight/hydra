@@ -1,6 +1,6 @@
 package hydra.ingest.app
 
-import cats.implicits._
+import cats.syntax.all._
 import ciris.{ConfigValue, env, _}
 import hydra.kafka.algebras.KafkaClientAlgebra.ConsumerGroup
 import hydra.kafka.model.ContactMethod

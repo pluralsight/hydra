@@ -1,5 +1,6 @@
 package hydra.avro.convert
 
+import java.time.Instant
 import java.util.UUID
 
 import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
@@ -132,6 +133,29 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
       .noDefault
       .endRecord
     val record = s"""{"extra": true, "inner": {"testUuid": "${uuid.toString}"}}""".toGenericRecord(schema, useStrictValidation = true)
+    record shouldBe a[Success[_]]
+  }
+
+  it should "validate TimestampMillis logical type" in {
+    val schema = SchemaBuilder.record("testVal")
+      .fields()
+      .name("testTs")
+      .`type`(LogicalTypes.timestampMillis.addToSchema(Schema.create(Schema.Type.LONG)))
+      .noDefault
+      .endRecord
+    val record = """{"testTs": 819283928392839283928398293829382938298329839283928392839283928398}""".toGenericRecord(schema, useStrictValidation = true)
+    record shouldBe a[Failure[_]]
+  }
+
+  it should "accept a valid TimestampMillis logical type" in {
+    val ts = Instant.now
+    val schema = SchemaBuilder.record("testVal")
+      .fields()
+      .name("testTs")
+      .`type`(LogicalTypes.timestampMillis.addToSchema(Schema.create(Schema.Type.LONG)))
+      .noDefault
+      .endRecord
+    val record = s"""{"testTs": ${ts.toEpochMilli}}""".toGenericRecord(schema, useStrictValidation = true)
     record shouldBe a[Success[_]]
   }
 
