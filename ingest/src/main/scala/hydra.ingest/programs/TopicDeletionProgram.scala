@@ -15,7 +15,6 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaClient:
 
   private def deleteFromSchemaRegistry(topicNames: List[String]): F[ValidatedNel[SchemaRegistryError, Unit]] = {
     topicNames.flatMap(topic => List(topic + "-key", topic + "-value")).traverse { subject =>
-      // Delete all versions of the schema
       schemaClient.getAllVersions(subject).attempt.flatMap {
         case Right(versions) =>
           versions.traverse(version => schemaClient.deleteSchemaOfVersion(subject, version)
@@ -28,19 +27,15 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaClient:
   }
 
   def deleteTopic(topicNames: List[String]): F[ValidatedNel[DeleteTopicError, Unit]] = {
-    // delete the topic from Kafka
     kafkaClient.deleteTopics(topicNames).flatMap { result =>
-      // get the names of the topics that succeeded
       val topicsToDeleteSchemaFor = result match {
         case Right(_) => topicNames
         case Left(error) =>
           val failedTopicNames = error.errors.map(_.topicName).toList.toSet
           topicNames.toSet.diff(failedTopicNames).toList
       }
-      // delete topics that succeeded being deleted in Kafka in SchemaRegistry
       deleteFromSchemaRegistry(topicsToDeleteSchemaFor).map(schemaResult =>
         schemaResult.toEither.leftMap(a => SchemaDeletionErrors(SchemaDeleteTopicErrorList(a)))
-          // combine SchemaRegistry errors and Kafka Errors for return
           .toValidatedNel.combine(result.leftMap(KafkaDeletionErrors).toValidatedNel)
       )
     }

@@ -1,6 +1,5 @@
 package hydra.ingest.http
 
-import akka.actor.ActorSystem
 import cats.data.NonEmptyList
 import cats.effect.{IO, Sync}
 import hydra.avro.registry.SchemaRegistry
@@ -10,18 +9,14 @@ import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.matchers.should.Matchers
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
-import akka.http.scaladsl.client.RequestBuilding._
 import hydra.ingest.programs.TopicDeletionProgram
 import hydra.kafka.algebras.KafkaAdminAlgebra.{KafkaDeleteTopicError, KafkaDeleteTopicErrorList, LagOffsets, Offset, Topic, TopicAndPartition, TopicName}
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.scalatest.wordspec.{AnyWordSpec, AnyWordSpecLike}
-import akka.actor.{Actor, ActorRef, ActorSelection, ActorSystem, Props}
 import akka.http.scaladsl.model.headers.BasicHttpCredentials
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCode, StatusCodes}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit._
-import akka.testkit.TestKit._
-import hydra.common.config.ConfigSupport
 
 
 

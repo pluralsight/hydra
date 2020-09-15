@@ -8,7 +8,7 @@ import cats.data.Validated
 import hydra.ingest.programs.{KafkaDeletionErrors, SchemaDeletionErrors, TopicDeletionProgram}
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
-import spray.json.{DefaultJsonProtocol, JsArray, JsObject, JsValue, JsonFormat, RootJsonFormat}
+import spray.json.{DefaultJsonProtocol, RootJsonFormat}
 import hydra.core.monitor.HydraMetrics.addPromHttpMetric
 
 import scala.concurrent.ExecutionContext
@@ -95,8 +95,6 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
               pathEndOrSingleSlash {
                 entity(as[DeletionRequest]) { req =>
                   val maybeList = req.topics
-                  // check if consumers exist for this topic, if they do fail and return consumer groups
-                  // try deleting topic
                   deleteTopics(maybeList, userName)
                 }
               }
