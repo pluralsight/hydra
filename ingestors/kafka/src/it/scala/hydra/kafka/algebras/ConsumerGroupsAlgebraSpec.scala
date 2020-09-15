@@ -1,9 +1,14 @@
 package hydra.kafka.algebras
 
+import java.time.Instant
+
 import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.implicits._
 import com.dimafeng.testcontainers.{ForAllTestContainer, KafkaContainer}
 import hydra.avro.registry.SchemaRegistry
+import hydra.kafka.algebras.KafkaClientAlgebraSpec.SimpleCaseClassValue
+import hydra.kafka.model.TopicConsumer
+import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import org.apache.avro.generic.GenericRecord
@@ -25,7 +30,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
   implicit private val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
 
-  private implicit val policy: RetryPolicy[IO] = limitRetries[IO](5) |+| exponentialBackoff[IO](5000.milliseconds)
+  private implicit val policy: RetryPolicy[IO] = limitRetries[IO](5) |+| exponentialBackoff[IO](500.milliseconds)
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
   private implicit def noop[A]: (A, RetryDetails) => IO[Unit] = retry.noop[IO, A]
 
@@ -43,23 +48,29 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
   }
 
   private val internalKafkaConsumerTopic = "__consumer_offsets"
-  private val summarizedConsumerGroups = "dvs_internal_consumers"
+  private val dvsConsumerTopic = "dvs_internal_consumers"
   private val consumerGroup = "consumerGroupName"
 
   (for {
     kafkaClient <- KafkaClientAlgebra.test[IO]
     schemaRegistry <- SchemaRegistry.test[IO]
-    consumerGroupAlgebra <- ConsumerGroupsAlgebra.make(internalKafkaConsumerTopic, summarizedConsumerGroups, container.bootstrapServers, consumerGroup, consumerGroup, kafkaClient, schemaRegistry)
+    consumerGroupAlgebra <- ConsumerGroupsAlgebra.make(internalKafkaConsumerTopic, dvsConsumerTopic, container.bootstrapServers, consumerGroup, consumerGroup, kafkaClient, schemaRegistry)
   } yield {
     runTests(consumerGroupAlgebra, schemaRegistry, kafkaClient)
   }).unsafeRunSync()
 
   def runTests(cga: ConsumerGroupsAlgebra[IO], schemaRegistry: SchemaRegistry[IO], kafkaClient: KafkaClientAlgebra[IO]): Unit = {
+    createDVSConsumerTopic(schemaRegistry)
+
     val topicName = "dvs_internal_test123"
     val (keyGR, valueGR) = getGenericRecords(topicName, "key123", "value123")
     createTopic(topicName, keyGR, valueGR, schemaRegistry)
     kafkaClient.publishMessage((keyGR, Some(valueGR)), topicName).unsafeRunSync()
-    kafkaClient.consumeMessages(topicName, "randomConsumerGroup").take(1).compile.drain.unsafeRunSync()
+    kafkaClient.consumeMessages(topicName, "randomConsumerGroup").take(0).compile.drain.unsafeRunSync()
+
+    kafkaClient.consumeMessages(dvsConsumerTopic, "doesNotMatter").take(1).map { case (g, _) =>
+      println(g)
+    }.compile.drain.unsafeRunSync()
 
     "ConsumerGroupAlgebraSpec" should {
 
@@ -74,6 +85,12 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
     schemaRegistry.registerSchema(s"$subject-value", valueGR.getSchema).unsafeRunSync()
   }
 
+  private def createDVSConsumerTopic(schemaRegistry: SchemaRegistry[IO]): Unit = {
+    val topic = dvsConsumerTopic
+    TopicConsumer.encode[IO](TopicConsumerKey("t", "c"), TopicConsumerValue(Instant.now).some).flatMap { case (k, Some(v)) =>
+      schemaRegistry.registerSchema(topic, k.getSchema) *> schemaRegistry.registerSchema(topic, v.getSchema)
+    }.unsafeRunSync()
+  }
 
   private def getGenericRecords(subject: String, keyValue: String, value: String): (GenericRecord, GenericRecord) = {
     val (_, (_, keyRecord), valueRecord) = KafkaClientAlgebraSpec.topicAndKeyAndValue(subject, keyValue, value)

@@ -60,12 +60,14 @@ object ConsumerGroupsAlgebra {
     }
   }
 
+  // TODO Use the MetadataAlgebra Consumer group for summarizedConsumerGroup Topic
   private def consumerOffsetsToInternalOffsets[F[_]: ConcurrentEffect: ContextShift: Timer](sourceTopic: String, destinationTopic: String, bootstrapServers: String, consumerGroupName: String, s: SchemaRegistryClient) = {
     val settings: ConsumerSettings[F, Option[BaseKey], Option[OffsetAndMetadata]] = ConsumerSettings(
       getConsumerGroupDeserializer[F, BaseKey](GroupMetadataManager.readMessageKey),
       getConsumerGroupDeserializer[F, OffsetAndMetadata](GroupMetadataManager.readOffsetMessageValue)
     )
-      .withAutoOffsetReset(AutoOffsetReset.Latest)
+      // TODO Potentially not the behavior desired (Earliest and commit offsets)
+      .withAutoOffsetReset(AutoOffsetReset.Earliest)
       .withBootstrapServers(bootstrapServers)
       .withGroupId(consumerGroupName)
 
@@ -76,7 +78,8 @@ object ConsumerGroupsAlgebra {
     consumerStream(settings)
       .evalTap(_.subscribeTo(sourceTopic))
       .flatMap(_.stream)
-      .evalTap(_.offset.commit)
+      // TODO Infinite Loop created when committing to the __consumer_offsets about the __consumer_offsets
+//      .evalTap(_.offset.commit)
       .flatMap { cr =>
         (cr.record.key, cr.record.value) match {
           case (Some(OffsetKey(_, k)), offsetMaybe) =>
@@ -91,7 +94,7 @@ object ConsumerGroupsAlgebra {
                   topicConsumer <- TopicConsumer.encode[F](consumerKey, consumerValue)
                   (key, value) = topicConsumer
                   k <- getSerializer[F, GenericRecord](s)(isKey = true).serialize(destinationTopic, Headers.empty, key)
-                  v <- getSerializer[F, Option[GenericRecord]](s)(isKey = false).serialize(destinationTopic, Headers.empty, value)
+                  v <- getSerializer[F, GenericRecord](s)(isKey = false).serialize(destinationTopic, Headers.empty, value.orNull)
                 } yield ProducerRecord(destinationTopic, k, v)).map(p => ProducerRecords.one(p))
               case None => fs2.Stream.empty
             }
@@ -99,6 +102,7 @@ object ConsumerGroupsAlgebra {
             fs2.Stream.empty
         }
       }
+      // TODO Use passthrough to commit offset
       .through(produce(producerSettings))
       .compile.drain
   }
