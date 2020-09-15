@@ -3,6 +3,7 @@ package hydra.ingest.modules
 import cats.effect._
 import cats.implicits._
 import hydra.ingest.app.AppConfig.AppConfig
+import hydra.ingest.programs.TopicDeletionProgram
 import hydra.ingest.services.{IngestionFlow, IngestionFlowV2}
 import hydra.kafka.programs.CreateTopicProgram
 import io.chrisdavenport.log4cats.Logger
@@ -39,6 +40,11 @@ final class Programs[F[_]: Logger: Sync: Timer: Mode] private(
     algebras.schemaRegistry,
     algebras.kafkaClient,
     cfg.createTopicConfig.schemaRegistryConfig.fullUrl
+  )
+
+  val topicDeletion: TopicDeletionProgram[F] = new TopicDeletionProgram[F](
+    algebras.kafkaAdmin,
+    algebras.schemaRegistry
   )
 
 }
