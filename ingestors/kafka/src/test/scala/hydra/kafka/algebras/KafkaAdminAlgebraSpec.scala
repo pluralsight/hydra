@@ -79,9 +79,8 @@ final class KafkaAdminAlgebraSpec
         val topicCreated = "topic_created"
         (for {
           _ <- kafkaClient.createTopic(topicCreated, TopicDetails(1,1))
-          maybeExists <- kafkaClient.kafkaContainsTopic(topicCreated)
           maybeTopic <- kafkaClient.describeTopic(topicCreated)
-        } yield (maybeExists,maybeTopic) shouldBe(true,Some(Topic(topicCreated,1))) ).unsafeRunSync()
+        } yield maybeTopic shouldBe Some(Topic(topicCreated,1)) ).unsafeRunSync()
       }
 
       "delete a topic and describe" in {
@@ -93,20 +92,11 @@ final class KafkaAdminAlgebraSpec
         } yield maybeTopic should not be defined).unsafeRunSync()
       }
 
-      "delete a topic and list" in {
-        val topicToDelete = "topic_to_delete2"
-        (for {
-          _ <- kafkaClient.createTopic(topicToDelete, TopicDetails(1, 1))
-          _ <- kafkaClient.deleteTopic(topicToDelete)
-          maybeTopic <- kafkaClient.kafkaContainsTopic(topicToDelete)
-        } yield maybeTopic shouldBe(false)).unsafeRunSync()
-      }
-
       "delete multiple topics" in {
         val topicsToDelete = List("topic1","topic2","topic3","topic4","topic5")
         topicsToDelete.map(topic => kafkaClient.createTopic(topic, TopicDetails(1, 1)).unsafeRunSync())
         kafkaClient.deleteTopics(topicsToDelete).unsafeRunSync()
-        topicsToDelete.map(topic => kafkaClient.kafkaContainsTopic(topic).unsafeRunSync() shouldBe false)
+        topicsToDelete.map(topic => kafkaClient.describeTopic(topic).unsafeRunSync() shouldBe None)
       }
 
       if (!isTest) {

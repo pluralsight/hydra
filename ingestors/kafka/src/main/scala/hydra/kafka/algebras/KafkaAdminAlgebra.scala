@@ -31,13 +31,6 @@ trait KafkaAdminAlgebra[F[_]] {
   def describeTopic(name: TopicName): F[Option[Topic]]
 
   /**
-    * Checks if topic exists in Kafka
-    * @param name - name of the topic in Kafka
-    * @return True if found in Kafka, False if not found
-    */
-  def kafkaContainsTopic(name: TopicName): F[Boolean]
-
-  /**
     * Retrieves a list of all TopicName(s) found in Kafka
     * @return List[TopicName]
     */
@@ -128,13 +121,6 @@ object KafkaAdminAlgebra {
           .recover {
             case _: UnknownTopicOrPartitionException => None
           }
-      }
-
-      override def kafkaContainsTopic(name: TopicName): F[Boolean] = {
-        if(name.startsWith("_"))
-          getAdminClientResource.use(_.listTopics.includeInternal.names.map(_.toList)).map(topics => topics.contains(name))
-        else
-          getTopicNames.map(topics => topics.contains(name))
       }
 
       override def getTopicNames: F[List[TopicName]] =
@@ -233,9 +219,6 @@ object KafkaAdminAlgebra {
       override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] = ???
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]] = ???
-
-      override def kafkaContainsTopic(name: TopicName): F[Boolean] =
-        getTopicNames.map(topics => topics.contains(name))
 
       override def deleteTopics(topicNames: List[String]): F[Either[KafkaDeleteTopicErrorList, Unit]] =
         topicNames.traverse{topicName =>

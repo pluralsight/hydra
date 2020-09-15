@@ -16,13 +16,23 @@ import hydra.ingest.programs.TopicDeletionProgram.SchemaDeleteTopicErrorList
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
+object TopicDeletionEndpoint extends
+  DefaultJsonProtocol with
+  SprayJsonSupport
+{
+  private implicit val endpointFormat = jsonFormat2(DeletionEndpointResponse.apply)
+  final case class DeletionEndpointResponse(topicOrSubject: String, message: String)
+
+  final case class DeletionRequest(topics: List[String])
+  implicit val deleteRequestFormat: RootJsonFormat[DeletionRequest] = jsonFormat1(DeletionRequest)
+}
+
 final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeletionProgram[F], deletionPassword: String)
   extends RouteSupport with
     DefaultJsonProtocol with
     SprayJsonSupport {
 
-  implicit val endpointFormat = jsonFormat2(DeletionEndpointResponse.apply)
-  case class DeletionEndpointResponse(topicOrSubject: String, message: String)
+  import TopicDeletionEndpoint._
 
   private def tupleErrorsToResponse(errorTuple: (List[SchemaDeletionErrors], List[KafkaDeletionErrors])): List[DeletionEndpointResponse] = {
     schemaErrorsToResponse(errorTuple._1) ::: kafkaErrorsToResponse(errorTuple._2)
@@ -36,12 +46,11 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
     kafkaResults.flatMap(_.kafkaDeleteTopicErrorList.errors.map(e => DeletionEndpointResponse(e.topicName, e.errorMessage)).toList)
   }
 
-  final case class DeletionRequest(topics: List[String])
-  implicit val deleteRequestFormat: RootJsonFormat[DeletionRequest] = jsonFormat1(DeletionRequest)
-
   private def validResponse(topics: List[String], userDeleting: String)(implicit ec: ExecutionContext) = {
-    topics.map(topicName => addPromHttpMetric(topicName, StatusCodes.OK.toString(), "/deleteTopics/"))
-    topics.map(topicName => log.info(s"User $userDeleting deleted topic: $topicName"))
+    topics.foreach { topicName =>
+      addPromHttpMetric(topicName, StatusCodes.OK.toString(), "/deleteTopics/")
+      log.info(s"User $userDeleting deleted topic: $topicName")
+    }
     complete(StatusCodes.OK, topics)
   }
 
@@ -53,8 +62,10 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
       val failedTopicNames = response.map(der => der.topicOrSubject)
       val successfulTopics = topics.toSet.diff(failedTopicNames.toSet).toList
       failedTopicNames.map(topicName => addPromHttpMetric(topicName, StatusCodes.Accepted.toString(), "/deleteTopics/"))
-      successfulTopics.map(topicName => addPromHttpMetric(topicName, StatusCodes.OK.toString(), "/deleteTopics/"))
-      successfulTopics.map(topicName => log.info(s"User $userDeleting deleted topic $topicName"))
+      successfulTopics.foreach{ topicName =>
+        addPromHttpMetric(topicName, StatusCodes.OK.toString(), "/deleteTopics/")
+        log.info(s"User $userDeleting deleted topic $topicName")
+      }
       complete(StatusCodes.Accepted, response)
     }
   }
@@ -102,7 +113,7 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
       extractExecutionContext { implicit ec =>
         pathPrefix("v2" / "topics") {
           delete {
-            authenticateBasic(realm = "secure site", myUserPassAuthenticator) { userName =>
+            authenticateBasic(realm = "", myUserPassAuthenticator) { userName =>
               pathPrefix("schemas" / Segment) { topic =>
                 onComplete(
                   Futurable[F].unsafeToFuture(deletionProgram.deleteFromSchemaRegistry(List(topic)))
@@ -125,8 +136,7 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
               } ~
               pathEndOrSingleSlash {
                 entity(as[DeletionRequest]) { req =>
-                  val maybeList = req.topics
-                  deleteTopics(maybeList, userName)
+                  deleteTopics(req.topics, userName)
                 }
               }
             }

@@ -54,7 +54,6 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
 
       override def getSchemaRegistryClient: F[SchemaRegistryClient] = underlying.getSchemaRegistryClient
 
-      //TODO: Test this
       override def getLatestSchemaBySubject(subject: String): F[Option[Schema]] = underlying.getLatestSchemaBySubject(subject)
 
       override def getSchemaFor(subject: String, schemaVersion: SchemaVersion): F[Option[Schema]] = underlying.getSchemaFor(subject, schemaVersion)
