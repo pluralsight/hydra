@@ -13,7 +13,7 @@ import hydra.ingest.programs.TopicDeletionProgram.{FailureToDeleteSchemaVersion,
 final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaClient: KafkaAdminAlgebra[F],
                                               schemaClient: SchemaRegistry[F]) {
 
-  private def deleteFromSchemaRegistry(topicNames: List[String]): F[ValidatedNel[SchemaRegistryError, Unit]] = {
+  def deleteFromSchemaRegistry(topicNames: List[String]): F[ValidatedNel[SchemaRegistryError, Unit]] = {
     topicNames.flatMap(topic => List(topic + "-key", topic + "-value")).traverse { subject =>
       schemaClient.getAllVersions(subject).attempt.flatMap {
         case Right(versions) =>

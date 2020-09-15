@@ -132,6 +132,25 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
       }).unsafeRunSync()
     }
 
+    "return 200 with single schema deletion" in {
+      val topic = List("exp.blah.blah")
+      (for {
+        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
+        schemaAlgebra <- SchemaRegistry.test[IO]
+        _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1)))
+        _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
+        allTopics <- kafkaAlgebra.getTopicNames
+      } yield {
+        allTopics shouldBe topic
+        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra), "myPass").route
+        Delete("/v2/topics/schemas/exp.blah.blah") ~>
+          addCredentials(validCredentials) ~> Route.seal(route) ~> check {
+          responseAs[String] shouldBe """["exp.blah.blah"]"""
+          status shouldBe StatusCodes.OK
+        }
+      }).unsafeRunSync()
+    }
+
     "return 200 with multiple deletions" in {
       val topic = List("exp.blah.blah","exp.hello.world","exp.hi.there")
       (for {

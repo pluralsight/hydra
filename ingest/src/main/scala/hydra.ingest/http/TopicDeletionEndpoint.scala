@@ -4,12 +4,14 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.Credentials
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
-import cats.data.Validated
-import hydra.ingest.programs.{KafkaDeletionErrors, SchemaDeletionErrors, TopicDeletionProgram}
+import cats.data.{NonEmptyList, Validated, ValidatedNel}
+import hydra.ingest.programs.{DeleteTopicError, KafkaDeletionErrors, SchemaDeletionErrors, TopicDeletionProgram}
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
 import spray.json.{DefaultJsonProtocol, RootJsonFormat}
 import hydra.core.monitor.HydraMetrics.addPromHttpMetric
+import hydra.ingest.programs.TopicDeletionProgram.SchemaDeleteTopicErrorList
+
 
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
@@ -37,6 +39,37 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
   final case class DeletionRequest(topics: List[String])
   implicit val deleteRequestFormat: RootJsonFormat[DeletionRequest] = jsonFormat1(DeletionRequest)
 
+  private def validResponse(topics: List[String], userDeleting: String)(implicit ec: ExecutionContext) = {
+    topics.map(topicName => addPromHttpMetric(topicName, StatusCodes.OK.toString(), "/deleteTopics/"))
+    topics.map(topicName => log.info(s"User $userDeleting deleted topic: $topicName"))
+    complete(StatusCodes.OK, topics)
+  }
+
+  private def returnResponse(topics: List[String], userDeleting: String, response: List[DeletionEndpointResponse])(implicit ec: ExecutionContext) = {
+    if (response.length == topics.length) {
+      topics.map(topicName => addPromHttpMetric(topicName, StatusCodes.InternalServerError.toString(), "/deleteTopics"))
+      complete(StatusCodes.InternalServerError, response)
+    } else {
+      val failedTopicNames = response.map(der => der.topicOrSubject)
+      val successfulTopics = topics.toSet.diff(failedTopicNames.toSet).toList
+      failedTopicNames.map(topicName => addPromHttpMetric(topicName, StatusCodes.Accepted.toString(), "/deleteTopics/"))
+      successfulTopics.map(topicName => addPromHttpMetric(topicName, StatusCodes.OK.toString(), "/deleteTopics/"))
+      successfulTopics.map(topicName => log.info(s"User $userDeleting deleted topic $topicName"))
+      complete(StatusCodes.Accepted, response)
+    }
+  }
+
+  private def invalidResponse(topics: List[String], userDeleting: String, e: NonEmptyList[DeleteTopicError])(implicit ec: ExecutionContext) = {
+    val allErrors = e.foldLeft((List.empty[SchemaDeletionErrors], List.empty[KafkaDeletionErrors])) { (agg, i) =>
+      i match {
+        case sde: SchemaDeletionErrors => (agg._1 :+ sde, agg._2)
+        case kde: KafkaDeletionErrors => (agg._1, agg._2 :+ kde)
+      }
+    }
+    val response = tupleErrorsToResponse(allErrors)
+    returnResponse(topics, userDeleting, response)
+  }
+
   private def deleteTopics(topics: List[String], userDeleting: String)(implicit ec: ExecutionContext) = {
     onComplete(
       Futurable[F].unsafeToFuture(deletionProgram.deleteTopic(topics))
@@ -44,29 +77,10 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
       case Success(maybeSuccess) => {
         maybeSuccess match {
           case Validated.Valid(a) => {
-            topics.map(topicName => addPromHttpMetric(topicName, StatusCodes.OK.toString(), "/deleteTopics/"))
-            topics.map(topicName => log.info(s"User $userDeleting deleted topic: $topicName"))
-            complete(StatusCodes.OK, topics)
+            validResponse(topics, userDeleting)
           }
           case Validated.Invalid(e) => {
-            val allErrors = e.foldLeft((List.empty[SchemaDeletionErrors], List.empty[KafkaDeletionErrors])) { (agg, i) =>
-              i match {
-                case sde: SchemaDeletionErrors => (agg._1 :+ sde, agg._2)
-                case kde: KafkaDeletionErrors => (agg._1, agg._2 :+ kde)
-              }
-            }
-            val response = tupleErrorsToResponse(allErrors)
-            if (response.length == topics.length) {
-              topics.map(topicName => addPromHttpMetric(topicName, StatusCodes.InternalServerError.toString(), "/deleteTopics/"))
-              complete(StatusCodes.InternalServerError, response)
-            } else {
-              val failedTopicNames = response.map(der => der.topicOrSubject)
-              val successfulTopics = topics.toSet.diff(failedTopicNames.toSet).toList
-              failedTopicNames.map(topicName => addPromHttpMetric(topicName, StatusCodes.Accepted.toString(), "/deleteTopics/"))
-              successfulTopics.map(topicName => addPromHttpMetric(topicName, StatusCodes.OK.toString(), "/deleteTopics/"))
-              successfulTopics.map(topicName => log.info(s"User $userDeleting deleted topic $topicName"))
-              complete(StatusCodes.Accepted, response)
-            }
+            invalidResponse(topics, userDeleting, e)
           }
         }
       }
@@ -89,6 +103,23 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
         pathPrefix("v2" / "topics") {
           delete {
             authenticateBasic(realm = "secure site", myUserPassAuthenticator) { userName =>
+              pathPrefix("schemas" / Segment) { topic =>
+                onComplete(
+                  Futurable[F].unsafeToFuture(deletionProgram.deleteFromSchemaRegistry(List(topic)))
+                ) {
+                  case Success(maybeSuccess) => {
+                    maybeSuccess match {
+                      case Validated.Valid(a) => {
+                        validResponse(List(topic), userName)
+                      }
+                      case Validated.Invalid(e) => {
+                        val response = schemaErrorsToResponse(List(SchemaDeletionErrors(SchemaDeleteTopicErrorList(e))))
+                        returnResponse(List(topic), userName, response)
+                      }
+                    }
+                  }
+                }
+              } ~
               pathPrefix(Segment) { topic =>
                 deleteTopics(List(topic), userName)
               } ~
