@@ -83,8 +83,6 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]] = ???
 
-      override def kafkaContainsTopic(name: TopicName): F[Boolean] = getTopicNames.map(topics => false)
-
       override def deleteTopics(topicNames: List[String]): F[Either[KafkaDeleteTopicErrorList, Unit]] =
         Sync[F].pure(Left(new KafkaDeleteTopicErrorList(NonEmptyList.fromList(
           topicNames.map(topic => KafkaDeleteTopicError(topic, new Exception("Unable to delete topic")))).get)))
