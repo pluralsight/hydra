@@ -2,6 +2,7 @@ package hydra.ingest.http
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.server.directives.Credentials
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import cats.data.Validated
 import hydra.ingest.programs.{KafkaDeletionErrors, SchemaDeletionErrors, TopicDeletionProgram}
@@ -13,7 +14,7 @@ import hydra.core.monitor.HydraMetrics.addPromHttpMetric
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
-final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeletionProgram[F])
+final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeletionProgram[F], deletionPassword: String)
   extends RouteSupport with
     DefaultJsonProtocol with
     SprayJsonSupport {
@@ -33,22 +34,10 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
     kafkaResults.flatMap(_.kafkaDeleteTopicErrorList.errors.map(e => DeletionEndpointResponse(e.topicName, e.errorMessage)).toList)
   }
 
-  final case class DeletionRequest(valPayload: String)
-  private final case class IntermediateDeletionRequest(topics: JsArray)
-  private implicit val intermediateDeletionRequestFormat: JsonFormat[IntermediateDeletionRequest] =
-    jsonFormat1(IntermediateDeletionRequest)
+  final case class DeletionRequest(topics: List[String])
+  implicit val deleteRequestFormat: RootJsonFormat[DeletionRequest] = jsonFormat1(DeletionRequest)
 
-  implicit object DeletionRequestFormat extends RootJsonFormat[DeletionRequest] {
-    override def read(json: JsValue): DeletionRequest = {
-      val inter = intermediateDeletionRequestFormat.read(json)
-      DeletionRequest(inter.topics.compactPrint)
-    }
-
-    //Not implemented on purpose. Never used
-    override def write(obj: DeletionRequest): JsValue = ???
-  }
-
-  private def deleteTopics(topics: List[String])(implicit ec: ExecutionContext) = {
+  private def deleteTopics(topics: List[String], userDeleting: String)(implicit ec: ExecutionContext) = {
     onComplete(
       Futurable[F].unsafeToFuture(deletionProgram.deleteTopic(topics))
     ) {
@@ -56,6 +45,7 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
         maybeSuccess match {
           case Validated.Valid(a) => {
             topics.map(topicName => addPromHttpMetric(topicName, StatusCodes.OK.toString(), "/deleteTopics/"))
+            topics.map(topicName => log.info(s"User $userDeleting deleted topic: $topicName"))
             complete(StatusCodes.OK, topics)
           }
           case Validated.Invalid(e) => {
@@ -70,7 +60,11 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
               topics.map(topicName => addPromHttpMetric(topicName, StatusCodes.InternalServerError.toString(), "/deleteTopics/"))
               complete(StatusCodes.InternalServerError, response)
             } else {
-              response.map(der => addPromHttpMetric(der.topicOrSubject, StatusCodes.Accepted.toString(), "/deleteTopics/"))
+              val failedTopicNames = response.map(der => der.topicOrSubject)
+              val successfulTopics = topics.toSet.diff(failedTopicNames.toSet).toList
+              failedTopicNames.map(topicName => addPromHttpMetric(topicName, StatusCodes.Accepted.toString(), "/deleteTopics/"))
+              successfulTopics.map(topicName => addPromHttpMetric(topicName, StatusCodes.OK.toString(), "/deleteTopics/"))
+              successfulTopics.map(topicName => log.info(s"User $userDeleting deleted topic $topicName"))
               complete(StatusCodes.Accepted, response)
             }
           }
@@ -83,27 +77,29 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
     }
   }
 
+  def myUserPassAuthenticator(credentials: Credentials): Option[String] =
+    credentials match {
+      case p@Credentials.Provided(id) if p.verify(deletionPassword) => Some(id)
+      case _ => None
+    }
+
   override val route: Route =
     handleExceptions(exceptionHandler) {
       extractExecutionContext { implicit ec =>
         pathPrefix("v2" / "topics") {
-          pathEndOrSingleSlash {
-            delete {
-              entity(as[DeletionRequest]) { req =>
-                val maybeList = req.valPayload
-                  .replace("[","")
-                  .replace("\"","")
-                  .replace(" ","")
-                  .replace("]","").split(",").toList
-                // check if consumers exist for this topic, if they do fail and return consumer groups
-                // try deleting topic
-                deleteTopics(maybeList)
+          delete {
+            authenticateBasic(realm = "secure site", myUserPassAuthenticator) { userName =>
+              pathPrefix(Segment) { topic =>
+                deleteTopics(List(topic), userName)
+              } ~
+              pathEndOrSingleSlash {
+                entity(as[DeletionRequest]) { req =>
+                  val maybeList = req.topics
+                  // check if consumers exist for this topic, if they do fail and return consumer groups
+                  // try deleting topic
+                  deleteTopics(maybeList, userName)
+                }
               }
-            }
-          }
-          pathPrefix(Segment) { topic =>
-            pathEndOrSingleSlash {
-              deleteTopics(List(topic))
             }
           }
         }

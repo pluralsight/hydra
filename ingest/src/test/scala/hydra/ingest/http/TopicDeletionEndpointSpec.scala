@@ -16,6 +16,7 @@ import hydra.kafka.algebras.KafkaAdminAlgebra.{KafkaDeleteTopicError, KafkaDelet
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.scalatest.wordspec.{AnyWordSpec, AnyWordSpecLike}
 import akka.actor.{Actor, ActorRef, ActorSelection, ActorSystem, Props}
+import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCode, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit._
@@ -114,6 +115,9 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
 
 
   "The deletionEndpoint path" should {
+
+    val validCredentials = BasicHttpCredentials("John", "myPass")
+
     "return 200 with single deletion in body" in {
       val topic = List("exp.blah.blah")
       (for {
@@ -124,8 +128,9 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         allTopics <- kafkaAlgebra.getTopicNames
       } yield {
         allTopics shouldBe topic
-        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra)).route
-        Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~> Route.seal(route) ~> check {
+        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra), "myPass").route
+        Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
+          addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe """["exp.blah.blah"]"""
           status shouldBe StatusCodes.OK
         }
@@ -140,8 +145,9 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
       } yield {
-        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra)).route
-        Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah,exp.hello.world,exp.hi.there"]}""")) ~> Route.seal(route) ~> check {
+        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra), "myPass").route
+        Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah","exp.hello.world","exp.hi.there"]}""")) ~>
+          addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe "[\"exp.blah.blah\",\"exp.hello.world\",\"exp.hi.there\"]"
           status shouldBe StatusCodes.OK
         }
@@ -156,8 +162,9 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
       } yield {
-        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra)).route
-        Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~> Route.seal(route) ~> check {
+        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra), "myPass").route
+        Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
+          addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe "[{\"message\":\"exp.blah.blah Unable to delete topic\",\"topicOrSubject\":\"exp.blah.blah\"}]"
           status shouldBe StatusCodes.InternalServerError
         }
@@ -172,8 +179,9 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
       } yield {
-        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra)).route
-        Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~> Route.seal(route) ~> check {
+        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra), "myPass").route
+        Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
+          addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe
             """[{"message":"Unable to get all schema versions for exp.blah.blah-value java.lang.Exception: Unable to get all versions","topicOrSubject":"exp.blah.blah-value"}]""".stripMargin
           status shouldBe StatusCodes.InternalServerError
@@ -190,8 +198,9 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
         _ <- registerTopics(topic, schemaAlgebra, registerKey= false, upgrade = true)
       } yield {
-        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra)).route
-        Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~> Route.seal(route) ~> check {
+        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra), "myPass").route
+        Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
+          addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe """[{"message":"Failed to delete version: 2 for exp.blah.blah-value java.lang.Exception: Error on version 2","topicOrSubject":"exp.blah.blah-value"}]"""
           status shouldBe StatusCodes.InternalServerError
         }
@@ -207,8 +216,9 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         _ <- registerTopics(topics, schemaAlgebra, registerKey = false, upgrade = false)
         _ <- registerTopics(List("exp.blah.ha"), schemaAlgebra, registerKey= false, upgrade = true)
       } yield {
-        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra)).route
-        Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah, exp.blah.ha, exp.test.this, exp.hi.There"]}""")) ~> Route.seal(route) ~> check {
+        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra), "myPass").route
+        Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah", "exp.blah.ha", "exp.test.this", "exp.hi.There"]}""")) ~>
+          addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe """[{"message":"Failed to delete version: 2 for exp.blah.ha-value java.lang.Exception: Error on version 2","topicOrSubject":"exp.blah.ha-value"}]"""
           status shouldBe StatusCodes.Accepted
         }
@@ -225,10 +235,49 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         allTopics <- kafkaAlgebra.getTopicNames
       } yield {
         allTopics shouldBe topic
-        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra)).route
-        Delete("/v2/topics/exp.blah.blah") ~> Route.seal(route) ~> check {
+        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra), "myPass").route
+        Delete("/v2/topics/exp.blah.blah") ~>
+          addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe """["exp.blah.blah"]"""
           status shouldBe StatusCodes.OK
+        }
+      }).unsafeRunSync()
+    }
+
+    "return 401 with bad credentials" in {
+      val topic = List("exp.blah.blah")
+      (for {
+        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
+        schemaAlgebra <- SchemaRegistry.test[IO]
+        _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1)))
+        _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
+        allTopics <- kafkaAlgebra.getTopicNames
+      } yield {
+        allTopics shouldBe topic
+        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra), "myPass").route
+        Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
+          addCredentials(BasicHttpCredentials("John", "badPass")) ~> Route.seal(route) ~> check {
+          responseAs[String] shouldBe "The supplied authentication is invalid"
+          status shouldBe StatusCodes.Unauthorized
+        }
+      }).unsafeRunSync()
+    }
+
+    "return 401 with no credentials" in {
+      val topic = List("exp.blah.blah")
+      (for {
+        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
+        schemaAlgebra <- SchemaRegistry.test[IO]
+        _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1)))
+        _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
+        allTopics <- kafkaAlgebra.getTopicNames
+      } yield {
+        allTopics shouldBe topic
+        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra), "myPass").route
+        Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
+          Route.seal(route) ~> check {
+          responseAs[String] shouldBe "The resource requires authentication, which was not supplied with the request"
+          status shouldBe StatusCodes.Unauthorized
         }
       }).unsafeRunSync()
     }
