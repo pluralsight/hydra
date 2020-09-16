@@ -7,7 +7,7 @@ import hydra.kafka.algebras.KafkaAdminAlgebra.KafkaDeleteTopicErrorList
 import hydra.kafka.algebras.KafkaAdminAlgebra
 import cats.data.{NonEmptyList, ValidatedNel}
 import cats.implicits._
-import hydra.ingest.programs.TopicDeletionProgram.{FailureToDeleteSchemaVersion, FailureToGetSchemaVersions, SchemaDeleteTopicErrorList, SchemaRegistryError}
+import hydra.ingest.programs.TopicDeletionProgram.{SchemaDeleteTopicErrorList, SchemaFailToDelete, SchemaRegistryError}
 
 
 final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaClient: KafkaAdminAlgebra[F],
@@ -15,15 +15,10 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaClient:
 
   def deleteFromSchemaRegistry(topicNames: List[String]): F[ValidatedNel[SchemaRegistryError, Unit]] = {
     topicNames.flatMap(topic => List(topic + "-key", topic + "-value")).traverse { subject =>
-      schemaClient.getAllVersions(subject).attempt.flatMap {
-        case Right(versions) =>
-          versions.traverse(version => schemaClient.deleteSchemaOfVersion(subject, version)
-          .attempt.map(_.leftMap(cause => FailureToDeleteSchemaVersion(version, subject, cause): SchemaRegistryError).toValidatedNel))
-        case Left(error) =>
-          val e: SchemaRegistryError = FailureToGetSchemaVersions(subject, error)
-          List(e.invalidNel[Unit]).pure[F]
+      schemaClient.deleteSchemaSubject(subject).attempt.map {
+        _.leftMap(error => SchemaFailToDelete(subject, error)).toValidatedNel
       }
-    }.map(_.flatten.combineAll)
+    }.map(_.combineAll)
   }
 
   def deleteTopic(topicNames: List[String]): F[ValidatedNel[DeleteTopicError, Unit]] = {
@@ -49,11 +44,8 @@ object TopicDeletionProgram {
     def getSubject: String = subject
   }
 
-  final case class FailureToGetSchemaVersions(subject: String, cause: Throwable)
-    extends SchemaRegistryError(subject, s"Unable to get all schema versions for $subject", cause)
-
-  final case class FailureToDeleteSchemaVersion(schemaVersion: SchemaVersion, subject: String, cause: Throwable)
-    extends SchemaRegistryError(subject, s"Failed to delete version: $schemaVersion for $subject", cause)
+  final case class SchemaFailToDelete(subject: String, cause: Throwable)
+    extends SchemaRegistryError(subject, s"Unable to delete schemas for $subject", cause)
 
   final case class SchemaDeleteTopicErrorList(errors: NonEmptyList[SchemaRegistryError])
     extends Exception (s"Topic(s) failed to delete:\n${errors.map(_.errorMessage).toList.mkString("\n")}")

@@ -16,10 +16,10 @@ import io.confluent.kafka.schemaregistry.client.{SchemaRegistryClient}
 
 class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
 
-  def schemaBadTest[F[_]: Sync](allowAllVersions: Boolean = true, errorOnUpgrade: Boolean = false): F[SchemaRegistry[F]] =
-    SchemaRegistry.test[F].map(sr => getFromBadSchemaRegistryClient[F](sr, allowAllVersions, errorOnUpgrade))
+  def schemaBadTest[F[_]: Sync](simulateBadDeletion: Boolean): F[SchemaRegistry[F]] =
+    SchemaRegistry.test[F].map(sr => getFromBadSchemaRegistryClient[F](sr, simulateBadDeletion))
 
-  private def getFromBadSchemaRegistryClient[F[_]: Sync](underlying: SchemaRegistry[F], allowAllVersions: Boolean, errorOnUpgrade: Boolean): SchemaRegistry[F] =
+  private def getFromBadSchemaRegistryClient[F[_]: Sync](underlying: SchemaRegistry[F], simulateBadDeletion: Boolean): SchemaRegistry[F] =
     new SchemaRegistry[F] {
 
       override def registerSchema(subject: String,schema: Schema): F[SchemaId] = {
@@ -27,18 +27,13 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       }
 
       override def deleteSchemaOfVersion(subject: String,version: SchemaVersion): F[Unit] =
-        if(errorOnUpgrade && version > 1) {
-          Sync[F].raiseError(new Exception(s"Error on version $version"))
-        } else {
           underlying.deleteSchemaOfVersion(subject,version)
-        }
 
       override def getVersion(subject: String,schema: Schema): F[SchemaVersion] =
         underlying.getVersion(subject,schema)
 
       override def getAllVersions(subject: String): F[List[SchemaId]] =
-        if(allowAllVersions) underlying.getAllVersions(subject)
-        else Sync[F].raiseError(new Exception("Unable to get all versions"))
+        underlying.getAllVersions(subject)
 
       override def getAllSubjects: F[List[String]] =
         underlying.getAllSubjects
@@ -50,6 +45,13 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
 
       override def getSchemaFor(subject: String, schemaVersion: SchemaVersion): F[Option[Schema]] = underlying.getSchemaFor(subject, schemaVersion)
 
+      override def deleteSchemaSubject(subject: String): F[Unit] =
+        if(simulateBadDeletion) {
+          Sync[F].raiseError(new Exception("Unable to delete schema"))
+        }
+        else {
+          underlying.deleteSchemaSubject(subject)
+        }
     }
 
   def kafkabadTest[F[_]: Sync]: F[KafkaAdminAlgebra[F]] =
@@ -72,8 +74,6 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] = ???
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]] = ???
-
-      override def kafkaContainsTopic(name: TopicName): F[Boolean] = getTopicNames.map(topics => false)
 
       override def deleteTopics(topicNames: List[String]): F[Either[KafkaDeleteTopicErrorList, Unit]] =
         Sync[F].pure(Left(new KafkaDeleteTopicErrorList( NonEmptyList.fromList(
@@ -191,18 +191,11 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       schemasToSucceed = twoTopics, assertionError = invalidErrorChecker)
   }
 
-  it should "Return a SchemaDeletionError if getting all versions fail" in {
-    applyTestcase(KafkaAdminAlgebra.test[IO], schemaBadTest[IO](allowAllVersions = false),
+  it should "Return a SchemaDeletionError if deleting schemas fails" in {
+    applyTestcase(KafkaAdminAlgebra.test[IO], schemaBadTest[IO](true),
       topicNames = twoTopics, topicNamesToDelete = List("topic1"),
       registerKey = true, kafkaTopicNamesToFail = List.empty,
       schemasToSucceed = List("topic2"), assertionError = invalidErrorChecker)
-  }
-
-  it should "Return a SchemaDeletionError if deleting a specific version fails" in {
-    applyTestcase(KafkaAdminAlgebra.test[IO], schemaBadTest[IO](errorOnUpgrade = true),
-      topicNames = twoTopics, topicNamesToDelete = List("topic1"),
-      registerKey = true, kafkaTopicNamesToFail = List.empty,
-      schemasToSucceed = List("topic2"), assertionError = invalidErrorChecker, upgradeTopic = ("topic1" ,true))
   }
 
 }

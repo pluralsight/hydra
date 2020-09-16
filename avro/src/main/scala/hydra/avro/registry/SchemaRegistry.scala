@@ -6,6 +6,7 @@ import org.apache.avro.{Schema, SchemaValidatorBuilder}
 import cats.syntax.all._
 import io.confluent.kafka.schemaregistry.avro.AvroCompatibilityChecker
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
+import javax.security.auth.Subject
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
@@ -37,6 +38,11 @@ trait SchemaRegistry[F[_]] {
     * @return Unit
     */
   def deleteSchemaOfVersion(subject: String, version: SchemaVersion): F[Unit]
+
+  /**
+    * blah fill in
+    */
+  def deleteSchemaSubject(subject: String): F[Unit]
 
   /**
     * Retrieves the SchemaVersion if the given subject and schema match an item in SchemaRegistry.
@@ -150,6 +156,8 @@ object SchemaRegistry {
           schemaRegistryClient.deleteSchemaVersion(subject, version.toString)
         )
 
+
+
       override def getVersion(
           subject: String,
           schema: Schema
@@ -185,6 +193,13 @@ object SchemaRegistry {
         }.toOption
       }
 
+      /**
+        * blah fill in
+        */
+      override def deleteSchemaSubject(subject: String): F[Unit] =
+        Sync[F].delay {
+          schemaRegistryClient.deleteSubject(subject)
+        }
     }
 
 }
