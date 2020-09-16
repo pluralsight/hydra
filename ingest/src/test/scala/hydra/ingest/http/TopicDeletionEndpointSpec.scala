@@ -24,40 +24,42 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
 
   import concurrent.ExecutionContext.Implicits.global
 
-  def schemaBadTest[F[_] : Sync](allowAllVersions: Boolean = true, errorOnUpgrade: Boolean = false): F[SchemaRegistry[F]] =
-    SchemaRegistry.test[F].map(sr => getFromBadSchemaRegistryClient[F](sr, allowAllVersions, errorOnUpgrade))
+  def schemaBadTest[F[_]: Sync](simulateBadDeletion: Boolean): F[SchemaRegistry[F]] =
+    SchemaRegistry.test[F].map(sr => getFromBadSchemaRegistryClient[F](sr, simulateBadDeletion))
 
-  private def getFromBadSchemaRegistryClient[F[_] : Sync](underlying: SchemaRegistry[F], allowAllVersions: Boolean, errorOnUpgrade: Boolean): SchemaRegistry[F] =
+  private def getFromBadSchemaRegistryClient[F[_]: Sync](underlying: SchemaRegistry[F], simulateBadDeletion: Boolean): SchemaRegistry[F] =
     new SchemaRegistry[F] {
 
-      override def registerSchema(subject: String, schema: Schema): F[SchemaId] = {
+      override def registerSchema(subject: String,schema: Schema): F[SchemaId] = {
         underlying.registerSchema(subject, schema)
       }
 
-      override def deleteSchemaOfVersion(subject: String, version: SchemaVersion): F[Unit] =
-        if (errorOnUpgrade && version > 1) {
-          Sync[F].raiseError(new Exception(s"Error on version $version"))
-        } else {
-          underlying.deleteSchemaOfVersion(subject, version)
-        }
+      override def deleteSchemaOfVersion(subject: String,version: SchemaVersion): F[Unit] =
+        underlying.deleteSchemaOfVersion(subject,version)
 
-      override def getVersion(subject: String, schema: Schema): F[SchemaVersion] =
-        underlying.getVersion(subject, schema)
+      override def getVersion(subject: String,schema: Schema): F[SchemaVersion] =
+        underlying.getVersion(subject,schema)
 
       override def getAllVersions(subject: String): F[List[SchemaId]] =
-        if (allowAllVersions) underlying.getAllVersions(subject)
-        else if(!allowAllVersions && subject.contains("-key")) underlying.getAllVersions(subject)
-        else Sync[F].raiseError(new Exception("Unable to get all versions"))
+        underlying.getAllVersions(subject)
 
       override def getAllSubjects: F[List[String]] =
         underlying.getAllSubjects
 
       override def getSchemaRegistryClient: F[SchemaRegistryClient] = underlying.getSchemaRegistryClient
 
+      //TODO: Test this
       override def getLatestSchemaBySubject(subject: String): F[Option[Schema]] = underlying.getLatestSchemaBySubject(subject)
 
       override def getSchemaFor(subject: String, schemaVersion: SchemaVersion): F[Option[Schema]] = underlying.getSchemaFor(subject, schemaVersion)
 
+      override def deleteSchemaSubject(subject: String): F[Unit] =
+        if(simulateBadDeletion) {
+          Sync[F].raiseError(new Exception("Unable to delete schema"))
+        }
+        else {
+          underlying.deleteSchemaSubject(subject)
+        }
     }
 
   def kafkaBadTest[F[_] : Sync]: F[KafkaAdminAlgebra[F]] =
@@ -178,60 +180,6 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe "[{\"message\":\"exp.blah.blah Unable to delete topic\",\"topicOrSubject\":\"exp.blah.blah\"}]"
           status shouldBe StatusCodes.InternalServerError
-        }
-      }).unsafeRunSync()
-    }
-
-    "return 500 if unable to get all schema versions for -value" in {
-      val topic = List("exp.blah.blah")
-      (for {
-        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
-        schemaAlgebra <- schemaBadTest[IO](allowAllVersions = false)
-        _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1)))
-        _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
-      } yield {
-        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra), "myPass").route
-        Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
-          addCredentials(validCredentials) ~> Route.seal(route) ~> check {
-          responseAs[String] shouldBe
-            """[{"message":"Unable to get all schema versions for exp.blah.blah-value java.lang.Exception: Unable to get all versions","topicOrSubject":"exp.blah.blah-value"}]""".stripMargin
-          status shouldBe StatusCodes.InternalServerError
-        }
-      }).unsafeRunSync()
-    }
-
-    "return 202 if unable to delete specific version" in {
-      val topic = List("exp.blah.blah")
-      (for {
-        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
-        schemaAlgebra <- schemaBadTest[IO](errorOnUpgrade = true)
-        _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1)))
-        _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
-        _ <- registerTopics(topic, schemaAlgebra, registerKey= false, upgrade = true)
-      } yield {
-        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra), "myPass").route
-        Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
-          addCredentials(validCredentials) ~> Route.seal(route) ~> check {
-          responseAs[String] shouldBe """[{"message":"Failed to delete version: 2 for exp.blah.blah-value java.lang.Exception: Error on version 2","topicOrSubject":"exp.blah.blah-value"}]"""
-          status shouldBe StatusCodes.InternalServerError
-        }
-      }).unsafeRunSync()
-    }
-
-    "return 202 if unable to delete specific version -value, but all others pass" in {
-      val topics = List("exp.blah.blah","exp.blah.ha","exp.test.this","exp.hi.There")
-      (for {
-        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
-        schemaAlgebra <- schemaBadTest[IO](errorOnUpgrade = true)
-        _ <- topics.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1)))
-        _ <- registerTopics(topics, schemaAlgebra, registerKey = false, upgrade = false)
-        _ <- registerTopics(List("exp.blah.ha"), schemaAlgebra, registerKey= false, upgrade = true)
-      } yield {
-        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra), "myPass").route
-        Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah", "exp.blah.ha", "exp.test.this", "exp.hi.There"]}""")) ~>
-          addCredentials(validCredentials) ~> Route.seal(route) ~> check {
-          responseAs[String] shouldBe """[{"message":"Failed to delete version: 2 for exp.blah.ha-value java.lang.Exception: Error on version 2","topicOrSubject":"exp.blah.ha-value"}]"""
-          status shouldBe StatusCodes.Accepted
         }
       }).unsafeRunSync()
     }
