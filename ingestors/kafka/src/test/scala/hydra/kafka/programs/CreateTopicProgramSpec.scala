@@ -132,6 +132,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           override def getLatestSchemaBySubject(subject: String): IO[Option[Schema]] = IO.pure(None)
 
           override def getSchemaFor(subject: String, schemaVersion: SchemaVersion): IO[Option[Schema]] = IO.pure(None)
+          override def deleteSchemaSubject(subject: String): IO[Unit] = IO.pure(())
         }
       (for {
         kafka <- KafkaAdminAlgebra.test[IO]
@@ -184,6 +185,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           override def getSchemaRegistryClient: IO[SchemaRegistryClient] = IO.raiseError(new Exception("Something horrible went wrong!"))
           override def getLatestSchemaBySubject(subject: String): IO[Option[Schema]] = IO.pure(None)
           override def getSchemaFor(subject: String, schemaVersion: SchemaVersion): IO[Option[Schema]] = IO.pure(None)
+          override def deleteSchemaSubject(subject: String): IO[Unit] = IO.pure(())
         }
 
       (for {
@@ -241,6 +243,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           override def getSchemaRegistryClient: IO[SchemaRegistryClient] = IO.raiseError(new Exception)
           override def getLatestSchemaBySubject(subject: String): IO[Option[Schema]] = IO.pure(None)
           override def getSchemaFor(subject: String, schemaVersion: SchemaVersion): IO[Option[Schema]] = IO.pure(None)
+          override def deleteSchemaSubject(subject: String): IO[Unit] = IO.pure(())
         }
 
       val schemaRegistryState = Map("subject-key" -> 1)
