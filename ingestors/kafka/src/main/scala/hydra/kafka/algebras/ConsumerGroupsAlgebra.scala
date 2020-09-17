@@ -17,6 +17,7 @@ import io.confluent.kafka.serializers.{AbstractKafkaAvroSerDeConfig, KafkaAvroSe
 import kafka.common.OffsetAndMetadata
 import kafka.coordinator.group.{BaseKey, GroupMetadataManager, OffsetKey}
 import org.apache.avro.generic.GenericRecord
+import org.apache.kafka.common.TopicPartition
 
 import scala.collection.JavaConverters._
 import scala.util.Try
@@ -24,6 +25,7 @@ import scala.util.Try
 trait ConsumerGroupsAlgebra[F[_]] {
   def getConsumersForTopic(topicName: String): F[TopicConsumers]
   def getTopicsForConsumer(consumerGroupName: String): F[ConsumerTopics]
+  def internalStream(bootstrapServers: String, consumerGroupName: String): fs2.Stream[F, String]
 }
 
 object ConsumerGroupsAlgebra {
@@ -35,7 +37,14 @@ object ConsumerGroupsAlgebra {
   final case class Topic(topicName: String, lastCommit: Instant)
 
 
-  def make[F[_]: ContextShift: ConcurrentEffect: Timer](kafkaInternalTopic: String, dvsConsumerTopic: String, bootstrapServers: String, uniquePerNodeConsumerGroup: String, commonConsumerGroup: String, kafkaClientAlgebra: KafkaClientAlgebra[F], schemaRegistryAlgebra: SchemaRegistry[F]): F[ConsumerGroupsAlgebra[F]] = {
+  def make[F[_]: ContextShift: ConcurrentEffect: Timer](
+                                                         kafkaInternalTopic: String,
+                                                         dvsConsumerTopic: String,
+                                                         bootstrapServers: String,
+                                                         uniquePerNodeConsumerGroup: String,
+                                                         commonConsumerGroup: String,
+                                                         kafkaClientAlgebra: KafkaClientAlgebra[F],
+                                                         schemaRegistryAlgebra: SchemaRegistry[F]): F[ConsumerGroupsAlgebra[F]] = {
     val dvsConsumerStream = kafkaClientAlgebra.consumeMessages(dvsConsumerTopic, uniquePerNodeConsumerGroup)
     for {
       cf <- Ref[F].of(ConsumerGroupsStorageFacade.empty)
@@ -57,16 +66,41 @@ object ConsumerGroupsAlgebra {
 
       override def getTopicsForConsumer(consumerGroupName: String): F[ConsumerTopics] =
         cf.get.map(_.getTopicsForConsumerGroupName(consumerGroupName))
+
+      override def internalStream(bootstrapServers: String, consumerGroupName: String): fs2.Stream[F, String] =
+        consumerOffsetsStream(bootstrapServers, consumerGroupName)
     }
   }
 
-  // TODO Use the MetadataAlgebra Consumer group for summarizedConsumerGroup Topic
-  private def consumerOffsetsToInternalOffsets[F[_]: ConcurrentEffect: ContextShift: Timer](sourceTopic: String, destinationTopic: String, bootstrapServers: String, consumerGroupName: String, s: SchemaRegistryClient) = {
+  def consumerOffsetsStream[F[_]: ConcurrentEffect: ContextShift: Timer](bootstrapServers: String, consumerGroupName: String): fs2.Stream[F, String] = {
     val settings: ConsumerSettings[F, Option[BaseKey], Option[OffsetAndMetadata]] = ConsumerSettings(
       getConsumerGroupDeserializer[F, BaseKey](GroupMetadataManager.readMessageKey),
       getConsumerGroupDeserializer[F, OffsetAndMetadata](GroupMetadataManager.readOffsetMessageValue)
     )
-      // TODO Potentially not the behavior desired (Earliest and commit offsets)
+      .withAutoOffsetReset(AutoOffsetReset.Earliest)
+      .withBootstrapServers(bootstrapServers)
+      .withGroupId(consumerGroupName)
+
+    consumerStream(settings)
+      .evalTap(_.subscribeTo("__consumer_offsets"))
+      .flatMap(_.stream)
+      .flatMap { cr =>
+        (cr.record.key, cr.record.value) match {
+          case (Some(OffsetKey(_, k)), offsetMaybe) =>
+            val topic = k.topicPartition.topic()
+            fs2.Stream(topic)
+          case e => fs2.Stream(e._1.map(d => s"${d.key.toString} HASLFK").getOrElse("No UsableKey Found"))
+        }
+      }
+  }
+
+  // TODO Use the MetadataAlgebra Consumer group for summarizedConsumerGroup Topic
+  private def consumerOffsetsToInternalOffsets[F[_]: ConcurrentEffect: ContextShift: Timer]
+  (sourceTopic: String, destinationTopic: String, bootstrapServers: String, consumerGroupName: String, s: SchemaRegistryClient) = {
+    val settings: ConsumerSettings[F, Option[BaseKey], Option[OffsetAndMetadata]] = ConsumerSettings(
+      getConsumerGroupDeserializer[F, BaseKey](GroupMetadataManager.readMessageKey),
+      getConsumerGroupDeserializer[F, OffsetAndMetadata](GroupMetadataManager.readOffsetMessageValue)
+    )
       .withAutoOffsetReset(AutoOffsetReset.Earliest)
       .withBootstrapServers(bootstrapServers)
       .withGroupId(consumerGroupName)
@@ -78,8 +112,6 @@ object ConsumerGroupsAlgebra {
     consumerStream(settings)
       .evalTap(_.subscribeTo(sourceTopic))
       .flatMap(_.stream)
-      // TODO Infinite Loop created when committing to the __consumer_offsets about the __consumer_offsets
-//      .evalTap(_.offset.commit)
       .flatMap { cr =>
         (cr.record.key, cr.record.value) match {
           case (Some(OffsetKey(_, k)), offsetMaybe) =>
@@ -95,6 +127,11 @@ object ConsumerGroupsAlgebra {
                   (key, value) = topicConsumer
                   k <- getSerializer[F, GenericRecord](s)(isKey = true).serialize(destinationTopic, Headers.empty, key)
                   v <- getSerializer[F, GenericRecord](s)(isKey = false).serialize(destinationTopic, Headers.empty, value.orNull)
+                  // TODO Turn Commit offset into Producer Record which can be streamed in next step
+                  // This is going to be a compacted topic that the algebra will read off of on start to know which offset to start processing
+//                  a = cr.offset.offsets(cr.offset.topicPartition)
+//                  b = a.offset()
+//                  c = ConsumerOffsetCommit(partition: Long, offset: Long) => ProducerRecord
                 } yield ProducerRecord(destinationTopic, k, v)).map(p => ProducerRecords.one(p))
               case None => fs2.Stream.empty
             }
@@ -102,7 +139,6 @@ object ConsumerGroupsAlgebra {
             fs2.Stream.empty
         }
       }
-      // TODO Use passthrough to commit offset
       .through(produce(producerSettings))
       .compile.drain
   }

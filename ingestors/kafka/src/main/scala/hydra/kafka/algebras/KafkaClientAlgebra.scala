@@ -190,10 +190,10 @@ object KafkaClientAlgebra {
           .withAutoOffsetReset(AutoOffsetReset.Earliest)
           .withBootstrapServers(bootstrapServers)
           .withGroupId(consumerGroup)
-        val b: fs2.Stream[F, KafkaConsumer[F, A, Option[GenericRecord]]] = consumerStream(consumerSettings)
         consumerStream(consumerSettings)
           .evalTap(_.subscribeTo(topicName))
           .flatMap(_.stream)
+          .evalTap(_.offset.commit)
           .map { committable =>
             val r = committable.record
             (r.key, r.value)
@@ -205,7 +205,7 @@ object KafkaClientAlgebra {
   def live[F[_]: ContextShift: ConcurrentEffect: Timer](
       bootstrapServers: String,
       schemaRegistryAlgebra: SchemaRegistry[F],
-      recordSizeLimit: Option[Long]
+      recordSizeLimit: Option[Long] = None
   ): F[KafkaClientAlgebra[F]] =
     for {
       schemaRegistryClient <- schemaRegistryAlgebra.getSchemaRegistryClient
