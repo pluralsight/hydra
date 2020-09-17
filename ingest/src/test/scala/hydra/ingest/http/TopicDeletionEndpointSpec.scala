@@ -260,6 +260,25 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
       }).unsafeRunSync()
     }
 
+    "return 202 with a schema failure schema endpoint" in {
+      val topic = List("exp.blah.blah")
+      (for {
+        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
+        schemaAlgebra <- schemaBadTest[IO](true)
+        _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1)))
+        _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
+        allTopics <- kafkaAlgebra.getTopicNames
+      } yield {
+        allTopics shouldBe topic
+        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra), "myPass").route
+        Delete("/v2/topics/schemas/exp.blah.blah") ~>
+          addCredentials(validCredentials) ~> Route.seal(route) ~> check {
+          responseAs[String] shouldBe """[{"message":"Unable to delete schemas for exp.blah.blah-key java.lang.Exception: Unable to delete schema","topicOrSubject":"exp.blah.blah-key"},{"message":"Unable to delete schemas for exp.blah.blah-value java.lang.Exception: Unable to delete schema","topicOrSubject":"exp.blah.blah-value"}]"""
+          status shouldBe StatusCodes.Accepted
+        }
+      }).unsafeRunSync()
+    }
+
   }
 
 }
