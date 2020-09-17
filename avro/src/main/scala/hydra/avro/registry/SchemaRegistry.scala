@@ -40,7 +40,10 @@ trait SchemaRegistry[F[_]] {
   def deleteSchemaOfVersion(subject: String, version: SchemaVersion): F[Unit]
 
   /**
-    * blah fill in
+    * Deletes the subject from the versionCache, idCache, and schemaCache
+    * of the CachedSchemaRegistryClient
+    * @param subject The subject using -key or -value to delete
+    * @return Unit
     */
   def deleteSchemaSubject(subject: String): F[Unit]
 
@@ -193,9 +196,6 @@ object SchemaRegistry {
         }.toOption
       }
 
-      /**
-        * blah fill in
-        */
       override def deleteSchemaSubject(subject: String): F[Unit] =
         Sync[F].delay {
           schemaRegistryClient.deleteSubject(subject)

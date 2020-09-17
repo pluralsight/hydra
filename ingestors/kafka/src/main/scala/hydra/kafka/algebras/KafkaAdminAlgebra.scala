@@ -223,8 +223,8 @@ object KafkaAdminAlgebra {
       override def deleteTopics(topicNames: List[String]): F[Either[KafkaDeleteTopicErrorList, Unit]] =
         topicNames.traverse{topicName =>
           deleteTopic(topicName).attempt
-            .map{ blah =>
-              blah.leftMap(
+            .map{ deleteAttempt =>
+              deleteAttempt.leftMap(
                 KafkaDeleteTopicError(topicName, _)
               ).toValidatedNel
             }
