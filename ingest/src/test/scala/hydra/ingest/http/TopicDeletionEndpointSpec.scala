@@ -48,7 +48,6 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
 
       override def getSchemaRegistryClient: F[SchemaRegistryClient] = underlying.getSchemaRegistryClient
 
-      //TODO: Test this
       override def getLatestSchemaBySubject(subject: String): F[Option[Schema]] = underlying.getLatestSchemaBySubject(subject)
 
       override def getSchemaFor(subject: String, schemaVersion: SchemaVersion): F[Option[Schema]] = underlying.getSchemaFor(subject, schemaVersion)
@@ -63,7 +62,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
     }
 
   def kafkaBadTest[F[_] : Sync]: F[KafkaAdminAlgebra[F]] =
-    KafkaAdminAlgebra.test[F].flatMap(getBadTestKafkaClient[F])
+    KafkaAdminAlgebra.test[F].flatMap( kaa => getBadTestKafkaClient[F](kaa))
 
   private[this] def getBadTestKafkaClient[F[_] : Sync](underlying: KafkaAdminAlgebra[F]): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
     new KafkaAdminAlgebra[F] {
@@ -85,9 +84,10 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]] = ???
 
-      override def deleteTopics(topicNames: List[String]): F[Either[KafkaDeleteTopicErrorList, Unit]] =
-        Sync[F].pure(Left(new KafkaDeleteTopicErrorList(NonEmptyList.fromList(
-          topicNames.map(topic => KafkaDeleteTopicError(topic, new Exception("Unable to delete topic")))).get)))
+      override def deleteTopics(topicNames: List[String]): F[Either[KafkaDeleteTopicErrorList, Unit]] = {
+          Sync[F].pure(Left(new KafkaDeleteTopicErrorList(NonEmptyList.fromList(
+            topicNames.map(topic => KafkaDeleteTopicError(topic, new Exception("Unable to delete topic")))).get)))
+      }
     }
   }
 
@@ -237,6 +237,25 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           Route.seal(route) ~> check {
           responseAs[String] shouldBe "The resource requires authentication, which was not supplied with the request"
           status shouldBe StatusCodes.Unauthorized
+        }
+      }).unsafeRunSync()
+    }
+
+    "return 202 with a schema failure" in {
+      val topic = List("exp.blah.blah")
+      (for {
+        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
+        schemaAlgebra <- schemaBadTest[IO](true)
+        _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1)))
+        _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
+        allTopics <- kafkaAlgebra.getTopicNames
+      } yield {
+        allTopics shouldBe topic
+        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra), "myPass").route
+        Delete("/v2/topics/exp.blah.blah") ~>
+          addCredentials(validCredentials) ~> Route.seal(route) ~> check {
+          responseAs[String] shouldBe """[{"message":"Unable to delete schemas for exp.blah.blah-key java.lang.Exception: Unable to delete schema","topicOrSubject":"exp.blah.blah-key"},{"message":"Unable to delete schemas for exp.blah.blah-value java.lang.Exception: Unable to delete schema","topicOrSubject":"exp.blah.blah-value"}]"""
+          status shouldBe StatusCodes.Accepted
         }
       }).unsafeRunSync()
     }
