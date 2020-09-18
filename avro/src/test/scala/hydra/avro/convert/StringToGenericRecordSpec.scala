@@ -57,6 +57,15 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     record shouldBe a[Success[_]]
   }
 
+  it should "return valid for union with sub-record with namespace and Strict validation" in {
+    val schema = SchemaBuilder.record("outerRecordName").namespace("ns").fields()
+      .name("unionFieldName").`type`.unionOf().nullType()
+      .and.record("innerRecordName").fields.requiredInt("intFieldName")
+      .endRecord().endUnion.nullDefault().endRecord()
+    val record = """{"unionFieldName": {"ns.innerRecordName": {"intFieldName": 2020}}}""".toGenericRecord(schema, useStrictValidation = true)
+    record shouldBe a[Success[_]]
+  }
+
   it should "return error in nested record with extra field and Strict validation" in {
     val inner = SchemaBuilder.record("Test").fields()
       .requiredInt("testInner").endRecord()
