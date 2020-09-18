@@ -6,7 +6,9 @@ import org.apache.avro.{LogicalTypes, Schema}
 import org.apache.avro.generic.{GenericDatumReader, GenericRecord}
 import org.apache.avro.io.DecoderFactory
 import cats.syntax.all._
+import org.apache.avro.Schema.Type.RECORD
 import org.apache.avro.util.Utf8
+import spray.json.{JsObject, JsValue}
 
 import scala.util.{Failure, Success, Try}
 
@@ -38,34 +40,28 @@ object StringToGenericRecord {
       fields.traverse(f => checkAll(record.get(f.name), f.schema.some)).void
     }
 
-    private def getAllPayloadFieldNames: Set[String] = {
-      import spray.json._
-      def loop(cur: JsValue, extraName: Option[String]): Set[String] = cur match {
-        case JsObject(f) => f.flatMap { case (k: String, v: JsValue) =>
-          loop(v, k.some) ++ Set(extraName.getOrElse("") + k)
-        }.toSet
-        case _ => Set.empty
-      }
-      loop(s.parseJson, None)
-    }
-
-    private def getAllSchemaFieldNames(schema: Schema): Set[String] = {
-      import Schema.Type._
-      import collection.JavaConverters._
-      def loop(sch: Schema, extraName: Option[String]): Set[String] = sch.getType match {
-        case RECORD => sch.getFields.asScala.toSet.flatMap { f: Schema.Field =>
-          loop(f.schema, f.name.some) ++ Set(extraName.getOrElse("") + f.name)
+    private def isStrictCompat(inputSchema: Schema): List[String] = {
+      def loop(sch: Schema, payload: JsValue): List[String] = {
+        import Schema.Type._
+        (sch.getType, payload) match {
+          case (RECORD, JsObject(fields)) => fields.toList.flatMap { case (k, v) =>
+            Try(sch.getField(k).schema).toOption match {
+              case Some(subfield) => loop(subfield, v)
+              case None => List(k)
+            }
+          }
+          case _ => List.empty
         }
-        case UNION => sch.getTypes.asScala.toSet.flatMap(loop(_, extraName))
-        case other => Set(extraName.getOrElse("") + other.name.toLowerCase)
       }
-      loop(schema, None)
+
+      import spray.json._
+      loop(inputSchema, s.parseJson)
     }
 
     def toGenericRecord(schema: Schema, useStrictValidation: Boolean): Try[GenericRecord] = Try {
       if (useStrictValidation) {
-        val diff = getAllPayloadFieldNames diff getAllSchemaFieldNames(schema)
-        if (diff.nonEmpty) throw ValidationExtraFieldsError(diff)
+        val diff = isStrictCompat(schema)
+        if (diff.nonEmpty) throw ValidationExtraFieldsError(diff.toSet)
       }
       val decoderFactory = new DecoderFactory
       val decoder = decoderFactory.jsonDecoder(schema, s)
