@@ -56,7 +56,8 @@ object StringToGenericRecord {
         case RECORD => sch.getFields.asScala.toSet.flatMap { f: Schema.Field =>
           loop(f.schema, f.name.some) ++ Set(extraName.getOrElse("") + f.name)
         }
-        case _ => Set.empty
+        case UNION => sch.getTypes.asScala.toSet.flatMap(loop(_, extraName))
+        case other => Set(extraName.getOrElse("") + other.name.toLowerCase)
       }
       loop(schema, None)
     }

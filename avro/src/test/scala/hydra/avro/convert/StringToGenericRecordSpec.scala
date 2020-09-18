@@ -42,6 +42,12 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     record shouldBe a[Success[_]]
   }
 
+  it should "return valid for union and Strict validation" in {
+    val schema = SchemaBuilder.record("Test").fields().optionalString("myString").endRecord()
+    val record = """{"myString": {"string": "testtesttest"}}""".toGenericRecord(schema, useStrictValidation = true)
+    record shouldBe a[Success[_]]
+  }
+
   it should "return error in nested record with extra field and Strict validation" in {
     val inner = SchemaBuilder.record("Test").fields()
       .requiredInt("testInner").endRecord()
