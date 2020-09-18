@@ -129,6 +129,10 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
                       }
                     }
                   }
+                  case Failure(e) => {
+                    addPromHttpMetric(topic, StatusCodes.InternalServerError.toString(), "/deleteTopics/")
+                    complete(StatusCodes.InternalServerError, e.getMessage)
+                  }
                 }
               } ~
               pathPrefix(Segment) { topic =>
