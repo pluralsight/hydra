@@ -40,7 +40,7 @@ object StringToGenericRecord {
       fields.traverse(f => checkAll(record.get(f.name), f.schema.some)).void
     }
 
-    private def isStrictCompat(inputSchema: Schema): List[String] = {
+    private def getStrictCompatDiff(inputSchema: Schema): List[String] = {
       def loop(sch: Schema, payload: JsValue): List[String] = {
         import Schema.Type._
         (sch.getType, payload) match {
@@ -60,7 +60,7 @@ object StringToGenericRecord {
 
     def toGenericRecord(schema: Schema, useStrictValidation: Boolean): Try[GenericRecord] = Try {
       if (useStrictValidation) {
-        val diff = isStrictCompat(schema)
+        val diff = getStrictCompatDiff(schema)
         if (diff.nonEmpty) throw ValidationExtraFieldsError(diff.toSet)
       }
       val decoderFactory = new DecoderFactory
