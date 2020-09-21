@@ -25,7 +25,7 @@ import scala.util.Try
 trait ConsumerGroupsAlgebra[F[_]] {
   def getConsumersForTopic(topicName: String): F[TopicConsumers]
   def getTopicsForConsumer(consumerGroupName: String): F[ConsumerTopics]
-  def internalStream(bootstrapServers: String, consumerGroupName: String): fs2.Stream[F, String]
+  def getAllConsumers: F[Map[TopicConsumerKey, TopicConsumerValue]]
 }
 
 object ConsumerGroupsAlgebra {
@@ -67,8 +67,8 @@ object ConsumerGroupsAlgebra {
       override def getTopicsForConsumer(consumerGroupName: String): F[ConsumerTopics] =
         cf.get.map(_.getTopicsForConsumerGroupName(consumerGroupName))
 
-      override def internalStream(bootstrapServers: String, consumerGroupName: String): fs2.Stream[F, String] =
-        consumerOffsetsStream(bootstrapServers, consumerGroupName)
+      override def getAllConsumers: F[Map[TopicConsumerKey, TopicConsumerValue]] =
+        cf.get.map(_.consumerMap)
     }
   }
 

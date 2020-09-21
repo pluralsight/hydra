@@ -6,7 +6,6 @@ import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.implicits._
 import com.dimafeng.testcontainers.{ForAllTestContainer, KafkaContainer}
 import hydra.avro.registry.SchemaRegistry
-import hydra.kafka.algebras.KafkaClientAlgebraSpec.SimpleCaseClassValue
 import hydra.kafka.model.TopicConsumer
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
 import hydra.kafka.util.KafkaUtils.TopicDetails
@@ -61,11 +60,13 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
     runTests(consumerGroupAlgebra, schemaRegistry, kafkaClient, kafkaAdmin)
   }).unsafeRunSync()
 
-  def runTests(cga: ConsumerGroupsAlgebra[IO], schemaRegistry: SchemaRegistry[IO], kafkaClient: KafkaClientAlgebra[IO], kafkaAdmin: KafkaAdminAlgebra[IO]): Unit = {
-    val (dvsTopicKey, dvsTopicValue) = createDVSConsumerTopic(schemaRegistry, kafkaAdmin)
-    kafkaClient.publishMessage((dvsTopicKey, dvsTopicValue.some), dvsConsumerTopic).unsafeRunSync()
-    kafkaClient.consumeMessages(dvsConsumerTopic, "tempConsumerGroup").take(1).compile.last.unsafeRunSync() shouldBe (dvsTopicKey, dvsTopicValue.some).some
+  def runTests(
+                cga: ConsumerGroupsAlgebra[IO],
+                schemaRegistry: SchemaRegistry[IO],
+                kafkaClient: KafkaClientAlgebra[IO],
+                kafkaAdmin: KafkaAdminAlgebra[IO]): Unit = {
 
+    createDVSConsumerTopic(schemaRegistry, kafkaAdmin)
 
     val topicName = "dvs_internal_test123"
     val (keyGR, valueGR) = getGenericRecords(topicName, "key123", "value123")
@@ -73,19 +74,48 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
     kafkaClient.publishMessage((keyGR, Some(valueGR)), topicName).unsafeRunSync()
     kafkaClient.consumeMessages(topicName, "randomConsumerGroup").take(1).compile.last.unsafeRunSync() shouldBe (keyGR, valueGR.some).some
 
-
-    cga.internalStream(container.bootstrapServers, "DNM").take(7).map(println).compile.drain.unsafeRunSync()
-
-    println("WE\'VE PASSED THE INTERNAL STREAM!!!")
-
-    kafkaClient.consumeMessages(dvsConsumerTopic, "doesNotMatter").take(2).map { case (g, _) =>
-      println(g)
-    }.compile.drain.unsafeRunSync()
-
     "ConsumerGroupAlgebraSpec" should {
 
-      "consume offsets into the internal topic" in {
-        cga.getConsumersForTopic(topicName).retryIfFalse(_.consumers.nonEmpty).unsafeRunSync()
+      "consume randomConsumerGroup offsets into the cache" in {
+        cga.getConsumersForTopic(topicName).retryIfFalse(_.consumers.exists(_.consumerGroupName == "randomConsumerGroup")).unsafeRunSync()
+      }
+
+      "consume two consumerGroups on dvs_internal_test123 topic into the cache" in {
+        kafkaClient.consumeMessages(topicName, "randomConsumerGroup2").take(1).compile.last.unsafeRunSync() shouldBe (keyGR, valueGR.some).some
+        cga.getConsumersForTopic(topicName).retryIfFalse(_.consumers.length == 2).unsafeRunSync()
+        cga.getConsumersForTopic(topicName).unsafeRunSync()
+      }
+
+      "consume two topics of the same consumer group randomConsumerGroup" in {
+        val topicName2 = "myNewTopix"
+        val (keyGR2, valueGR2) = getGenericRecords(topicName2, "abc", "123")
+        createTopic(topicName2, keyGR2, valueGR2, schemaRegistry, kafkaAdmin)
+        kafkaClient.publishMessage((keyGR2, Some(valueGR2)), topicName2).unsafeRunSync()
+        kafkaClient.consumeMessages(topicName2, "randomConsumerGroup").take(1).compile.last.unsafeRunSync() shouldBe (keyGR2, valueGR2.some).some
+
+        cga.getTopicsForConsumer("randomConsumerGroup").retryIfFalse(_.topics.map(_.topicName).forall(List(topicName, topicName2).contains)).unsafeRunSync()
+      }
+
+      "confirm that the timestamps for the consumed topics vary from one to the other" in {
+        cga.getAllConsumers.map(_.values.toSet.size).unsafeRunSync() shouldBe cga.getAllConsumers.map(_.values.size).unsafeRunSync()
+      }
+
+      "update the consumer offset, verify that the latest timestamp is updated" in {
+        val topicName2 = "myNewTopix2.0"
+        val (keyGR2, valueGR2) = getGenericRecords(topicName2, "abcdef", "123456")
+        createTopic(topicName2, keyGR2, valueGR2, schemaRegistry, kafkaAdmin)
+        kafkaClient.publishMessage((keyGR2, Some(valueGR2)), topicName2).unsafeRunSync()
+
+        val (keyGR3, valueGR3) = getGenericRecords(topicName2, "abcdef", "123456")
+        kafkaClient.publishMessage((keyGR3, Some(valueGR3)), topicName2).unsafeRunSync()
+
+        kafkaClient.consumeMessages(topicName2, "randomConsumerGroup").take(1).compile.last.unsafeRunSync() shouldBe (keyGR2, valueGR2.some).some
+        cga.getConsumersForTopic(topicName2).map(_.consumers.headOption.map(_.lastCommit)).retryIfFalse(_.isDefined).unsafeRunSync()
+        val firstTimestamp = cga.getConsumersForTopic(topicName2).map(_.consumers.headOption.map(_.lastCommit)).unsafeRunSync().get
+
+        kafkaClient.consumeMessages(topicName2, "randomConsumerGroup").take(1).compile.last.unsafeRunSync() shouldBe (keyGR3, valueGR3.some).some
+
+        cga.getConsumersForTopic(topicName2).map(_.consumers.head.lastCommit).retryIfFalse(_.isAfter(firstTimestamp)).unsafeRunSync()
       }
     }
   }
@@ -117,7 +147,3 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
   }
 
 }
-
-// 1) __consumer_offsets topic is not actually committing offset info (Maybe the client's offset committing is wrong!)
-// 2) __consumer_offsets is working, but publishing to the dvs_internal_consumers topic is failing
-// 3) dvs_internal_consumers topic is not being consumed into the cache
