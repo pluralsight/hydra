@@ -24,10 +24,10 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
 
   import concurrent.ExecutionContext.Implicits.global
 
-  def schemaBadTest[F[_]: Sync](simulateBadDeletion: Boolean): F[SchemaRegistry[F]] =
-    SchemaRegistry.test[F].map(sr => getFromBadSchemaRegistryClient[F](sr, simulateBadDeletion))
+  def schemaBadTest[F[_]: Sync](simulateV1BadDeletion: Boolean, simulateV2BadDeletion: Boolean): F[SchemaRegistry[F]] =
+    SchemaRegistry.test[F].map(sr => getFromBadSchemaRegistryClient[F](sr, simulateV1BadDeletion, simulateV2BadDeletion))
 
-  private def getFromBadSchemaRegistryClient[F[_]: Sync](underlying: SchemaRegistry[F], simulateBadDeletion: Boolean): SchemaRegistry[F] =
+  private def getFromBadSchemaRegistryClient[F[_]: Sync](underlying: SchemaRegistry[F], simulateV1BadDeletion: Boolean, simulateV2BadDeletion: Boolean): SchemaRegistry[F] =
     new SchemaRegistry[F] {
 
       override def registerSchema(subject: String,schema: Schema): F[SchemaId] = {
@@ -53,7 +53,10 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
       override def getSchemaFor(subject: String, schemaVersion: SchemaVersion): F[Option[Schema]] = underlying.getSchemaFor(subject, schemaVersion)
 
       override def deleteSchemaSubject(subject: String): F[Unit] =
-        if(simulateBadDeletion) {
+        if(simulateV1BadDeletion && subject.contains("-value")) {
+          Sync[F].raiseError(new Exception("Unable to delete schema"))
+        }
+        else if(simulateV2BadDeletion) {
           Sync[F].raiseError(new Exception("Unable to delete schema"))
         }
         else {
@@ -241,11 +244,30 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
       }).unsafeRunSync()
     }
 
-    "return 202 with a schema failure" in {
+    "return 202 with a schema failure -value only" in {
       val topic = List("exp.blah.blah")
       (for {
         kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
-        schemaAlgebra <- schemaBadTest[IO](true)
+        schemaAlgebra <- schemaBadTest[IO](true, false)
+        _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1)))
+        _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
+        allTopics <- kafkaAlgebra.getTopicNames
+      } yield {
+        allTopics shouldBe topic
+        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra), "myPass").route
+        Delete("/v2/topics/exp.blah.blah") ~>
+          addCredentials(validCredentials) ~> Route.seal(route) ~> check {
+          responseAs[String] shouldBe """[{"message":"Unable to delete schemas for exp.blah.blah-value java.lang.Exception: Unable to delete schema","topicOrSubject":"exp.blah.blah-value"}]"""
+          status shouldBe StatusCodes.Accepted
+        }
+      }).unsafeRunSync()
+    }
+
+    "return 202 with a schema failure V2" in {
+      val topic = List("exp.blah.blah")
+      (for {
+        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
+        schemaAlgebra <- schemaBadTest[IO](false, true)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
         allTopics <- kafkaAlgebra.getTopicNames
@@ -260,11 +282,30 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
       }).unsafeRunSync()
     }
 
-    "return 202 with a schema failure schema endpoint" in {
+    "return 202 with a schema failure schema endpoint -value only" in {
       val topic = List("exp.blah.blah")
       (for {
         kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
-        schemaAlgebra <- schemaBadTest[IO](true)
+        schemaAlgebra <- schemaBadTest[IO](true, false)
+        _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1)))
+        _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
+        allTopics <- kafkaAlgebra.getTopicNames
+      } yield {
+        allTopics shouldBe topic
+        val route = new TopicDeletionEndpoint[IO](new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra), "myPass").route
+        Delete("/v2/topics/schemas/exp.blah.blah") ~>
+          addCredentials(validCredentials) ~> Route.seal(route) ~> check {
+          responseAs[String] shouldBe """[{"message":"Unable to delete schemas for exp.blah.blah-value java.lang.Exception: Unable to delete schema","topicOrSubject":"exp.blah.blah-value"}]"""
+          status shouldBe StatusCodes.Accepted
+        }
+      }).unsafeRunSync()
+    }
+
+    "return 500 with a schema failure schema endpoint V2" in {
+      val topic = List("exp.blah.blah")
+      (for {
+        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
+        schemaAlgebra <- schemaBadTest[IO](false, true)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
         allTopics <- kafkaAlgebra.getTopicNames
@@ -274,7 +315,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         Delete("/v2/topics/schemas/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe """[{"message":"Unable to delete schemas for exp.blah.blah-key java.lang.Exception: Unable to delete schema","topicOrSubject":"exp.blah.blah-key"},{"message":"Unable to delete schemas for exp.blah.blah-value java.lang.Exception: Unable to delete schema","topicOrSubject":"exp.blah.blah-value"}]"""
-          status shouldBe StatusCodes.Accepted
+          status shouldBe StatusCodes.InternalServerError
         }
       }).unsafeRunSync()
     }

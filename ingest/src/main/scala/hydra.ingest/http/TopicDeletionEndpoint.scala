@@ -46,31 +46,33 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
     kafkaResults.flatMap(_.kafkaDeleteTopicErrorList.errors.map(e => DeletionEndpointResponse(e.topicName, e.errorMessage)).toList)
   }
 
-  private def validResponse(topics: List[String], userDeleting: String)(implicit ec: ExecutionContext) = {
+  private def validResponse(topics: List[String], userDeleting: String, path: String)(implicit ec: ExecutionContext) = {
     topics.foreach { topicName =>
-      addPromHttpMetric(topicName, StatusCodes.OK.toString(), "/deleteTopics/")
+      addPromHttpMetric(topicName, StatusCodes.OK.toString(), path)
       log.info(s"User $userDeleting deleted topic: $topicName")
     }
     complete(StatusCodes.OK, topics)
   }
 
-  private def returnResponse(topics: List[String], userDeleting: String, response: List[DeletionEndpointResponse])(implicit ec: ExecutionContext) = {
-    if (response.length == topics.length) {
-      topics.map(topicName => addPromHttpMetric(topicName, StatusCodes.InternalServerError.toString(), "/deleteTopics"))
-      complete(StatusCodes.InternalServerError, response)
-    } else {
+  private def returnResponse(topics: List[String], userDeleting: String, response: List[DeletionEndpointResponse], path: String)(implicit ec: ExecutionContext) = {
+    if(response.map(_.topicOrSubject.contains("-key")).contains(true) ||
+      response.map(_.topicOrSubject.contains("-value")).contains(true)) {
       val failedTopicNames = response.map(der => der.topicOrSubject)
       val successfulTopics = topics.toSet.diff(failedTopicNames.toSet).toList
-      failedTopicNames.map(topicName => addPromHttpMetric(topicName, StatusCodes.Accepted.toString(), "/deleteTopics/"))
+      failedTopicNames.map(topicName => addPromHttpMetric(topicName, StatusCodes.Accepted.toString(), path))
       successfulTopics.foreach{ topicName =>
-        addPromHttpMetric(topicName, StatusCodes.OK.toString(), "/deleteTopics/")
+        addPromHttpMetric(topicName, StatusCodes.OK.toString(), path)
         log.info(s"User $userDeleting deleted topic $topicName")
       }
       complete(StatusCodes.Accepted, response)
     }
+    else {
+      topics.map(topicName => addPromHttpMetric(topicName, StatusCodes.InternalServerError.toString(), path))
+      complete(StatusCodes.InternalServerError, response)
+    }
   }
 
-  private def invalidResponse(topics: List[String], userDeleting: String, e: NonEmptyList[DeleteTopicError])(implicit ec: ExecutionContext) = {
+  private def invalidResponse(topics: List[String], userDeleting: String, e: NonEmptyList[DeleteTopicError], path: String)(implicit ec: ExecutionContext) = {
     val allErrors = e.foldLeft((List.empty[SchemaDeletionErrors], List.empty[KafkaDeletionErrors])) { (agg, i) =>
       i match {
         case sde: SchemaDeletionErrors => (agg._1 :+ sde, agg._2)
@@ -78,25 +80,25 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
       }
     }
     val response = tupleErrorsToResponse(allErrors)
-    returnResponse(topics, userDeleting, response)
+    returnResponse(topics, userDeleting, response, path)
   }
 
-  private def deleteTopics(topics: List[String], userDeleting: String)(implicit ec: ExecutionContext) = {
+  private def deleteTopics(topics: List[String], userDeleting: String, path: String)(implicit ec: ExecutionContext) = {
     onComplete(
       Futurable[F].unsafeToFuture(deletionProgram.deleteTopic(topics))
     ) {
       case Success(maybeSuccess) => {
         maybeSuccess match {
           case Validated.Valid(a) => {
-            validResponse(topics, userDeleting)
+            validResponse(topics, userDeleting, path)
           }
           case Validated.Invalid(e) => {
-            invalidResponse(topics, userDeleting, e)
+            invalidResponse(topics, userDeleting, e, path)
           }
         }
       }
       case Failure(e) => {
-        topics.map(topicName => addPromHttpMetric(topicName, StatusCodes.InternalServerError.toString(), "/deleteTopics/"))
+        topics.map(topicName => addPromHttpMetric(topicName, StatusCodes.InternalServerError.toString(), path))
         complete(StatusCodes.InternalServerError, e.getMessage)
       }
     }
@@ -121,26 +123,32 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
                   case Success(maybeSuccess) => {
                     maybeSuccess match {
                       case Validated.Valid(a) => {
-                        validResponse(List(topic), userName)
+                        validResponse(List(topic), userName, "/v2/topics/schemas")
                       }
                       case Validated.Invalid(e) => {
                         val response = schemaErrorsToResponse(List(SchemaDeletionErrors(SchemaDeleteTopicErrorList(e))))
-                        returnResponse(List(topic), userName, response)
+                        if(response.length >= 2) {
+                          // With one topic coming in if we get anything >= to 2 there was at least a -key and a -value error
+                          addPromHttpMetric(topic, StatusCodes.InternalServerError.toString(), "/v2/topics/schemas")
+                          complete(StatusCodes.InternalServerError, response)
+                        } else {
+                          returnResponse(List(topic), userName, response, "/v2/topics/schemas")
+                        }
                       }
                     }
                   }
                   case Failure(e) => {
-                    addPromHttpMetric(topic, StatusCodes.InternalServerError.toString(), "/deleteTopics/")
+                    addPromHttpMetric(topic, StatusCodes.InternalServerError.toString(), "/v2/topics/schemas")
                     complete(StatusCodes.InternalServerError, e.getMessage)
                   }
                 }
               } ~
               pathPrefix(Segment) { topic =>
-                deleteTopics(List(topic), userName)
+                deleteTopics(List(topic), userName, "/v2/topics")
               } ~
               pathEndOrSingleSlash {
                 entity(as[DeletionRequest]) { req =>
-                  deleteTopics(req.topics, userName)
+                  deleteTopics(req.topics, userName, "/v2/topics")
                 }
               }
             }
@@ -152,7 +160,7 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
   private def exceptionHandler = ExceptionHandler {
     case e =>
       extractExecutionContext{ implicit ec =>
-        addPromHttpMetric("", StatusCodes.InternalServerError.toString,"/deleteTopic")
+        addPromHttpMetric("", StatusCodes.InternalServerError.toString,"/v2/topics")
         complete(500, e.getMessage)
       }
   }
