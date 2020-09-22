@@ -32,6 +32,7 @@ trait BootstrapEndpointTestActors extends BootstrapEndpointActors {
           "",
           derived = false,
           None,
+          None,
           "",
           "",
           None,

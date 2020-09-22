@@ -86,13 +86,19 @@ final case class TopicMetadataV2Request(
 }
 
 object TopicMetadataV2Request {
-  type SubjectRegex = MatchesRegex[W.`"""^[a-zA-Z0-9_\\-\\.]+$"""`.T]
+  type SubjectRegex = MatchesRegex[W.`"""^(?:skills|flow|tech|fin|dvs)\\.[a-zA-Z0-9\\-\\.]+"""`.T]
   type Subject = String Refined SubjectRegex
 
   object Subject {
 
     def createValidated(value: String): Option[Subject] = {
-      refineV[SubjectRegex](value).toOption
+      if(value.length > 255 ||
+        value.contains(".-") ||
+        value.contains("-.")) {
+        None
+      } else {
+        refineV[SubjectRegex](value).toOption
+      }
     }
 
     val invalidFormat = "Invalid Subject. Subject may contain only alphanumeric characters, hyphens(-), underscores(_), and periods(.)"

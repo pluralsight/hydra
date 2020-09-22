@@ -23,6 +23,7 @@ class TopicMetadataAdapterSpec
       subject = "hydra-test",
       derived = false,
       deprecated = None,
+      deprecatedDate = None,
       dataClassification = "public",
       contact = "alex",
       additionalDocumentation = None,

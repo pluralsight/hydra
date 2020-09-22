@@ -784,6 +784,7 @@ class MockStreamsManagerActor extends Actor {
     "entity",
     false,
     None,
+    None,
     "private",
     "alex",
     None,

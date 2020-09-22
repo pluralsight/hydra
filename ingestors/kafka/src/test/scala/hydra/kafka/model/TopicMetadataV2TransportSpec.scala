@@ -32,7 +32,7 @@ class TopicMetadataV2TransportSpec extends AnyWordSpecLike with Matchers {
     }
 
     "Parse correct Subjects" in {
-      val correctSubjectString = "Foo"
+      val correctSubjectString = "skills.exp-blah-blah"
       val correctSubject = Subject.createValidated(correctSubjectString)
       correctSubject.get shouldBe a[Subject]
       correctSubject.get.value shouldEqual (correctSubjectString)
@@ -40,6 +40,37 @@ class TopicMetadataV2TransportSpec extends AnyWordSpecLike with Matchers {
 
     "Return None for incorrect Subjects" in {
       Subject.createValidated("*NoT A \\ good subject") shouldBe None
+    }
+
+    "Ensure correct topic prefixes are allowed" in {
+      val correctPrefixList = List("skills.","flow.","tech.","fin.","dvs.")
+      val listOfValidatedSubjects = correctPrefixList.map(pre => Subject.createValidated(pre + "blah.blah-blah-blah"))
+      listOfValidatedSubjects.map(sub => sub.get shouldBe a[Subject])
+    }
+
+    "Ensure incorrect topic prefixes are not allowed" in {
+      val correctPrefixList = List("ha.","bla.","exp.","hello.","world.")
+      val listOfInvalidatedSubjects = correctPrefixList.map(pre => Subject.createValidated(pre + "blah.blah-blah-blah"))
+      listOfInvalidatedSubjects.map(sub => sub.getOrElse(None) shouldBe None)
+    }
+
+    "Ensure underscores are not allowed" in {
+      val correctPrefixList = List("skills.","flow.","tech.","fin.","dvs.")
+      val listOfInvalidatedSubjects = correctPrefixList.map(pre => Subject.createValidated(pre + "blah.blah-blah_blah"))
+      listOfInvalidatedSubjects.map(sub => sub.getOrElse(None) shouldBe None)
+    }
+
+    "return invalid subject if longer than 255 characters" in {
+      val bigTopic = "dvs." + "a" * 252
+      Subject.createValidated(bigTopic).getOrElse(None) shouldBe None
+    }
+
+    "return invalid subject containing .-" in {
+      Subject.createValidated("dvs.-hello").getOrElse(None) shouldBe None
+    }
+
+    "return invalid subject containing -." in {
+      Subject.createValidated("dvs.hello-.goodbye").getOrElse(None) shouldBe None
     }
 
   }

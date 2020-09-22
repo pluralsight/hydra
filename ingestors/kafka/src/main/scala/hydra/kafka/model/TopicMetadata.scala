@@ -28,6 +28,7 @@ case class TopicMetadata(
     streamType: String,
     derived: Boolean,
     deprecated: Option[Boolean],
+    deprecatedDate: Option[Long],
     dataClassification: String,
     contact: String,
     additionalDocumentation: Option[String],

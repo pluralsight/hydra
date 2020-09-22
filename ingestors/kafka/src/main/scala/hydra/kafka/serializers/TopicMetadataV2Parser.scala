@@ -267,6 +267,11 @@ sealed trait TopicMetadataV2Parser
           )
         )
         val deprecated = toResult(getBoolWithKey(j, "deprecated"))
+        val deprecatedDate = if(deprecated.toOption.getOrElse(false)) {
+          Option(Instant.now().toEpochMilli)
+        } else {
+          None
+        }
         val dataClassification = toResult(
           DataClassificationFormat.read(
             j.getFields("dataClassification")
