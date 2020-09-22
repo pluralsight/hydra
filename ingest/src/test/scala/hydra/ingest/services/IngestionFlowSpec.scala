@@ -46,7 +46,7 @@ class IngestionFlowSpec extends AnyFlatSpec with Matchers {
   it should "ingest a message" in {
     val testRequest = HydraRequest("correlationId", testPayload, metadata = Map(HYDRA_KAFKA_TOPIC_PARAM -> testSubject))
     ingest(testRequest).flatMap { kafkaClient =>
-      kafkaClient.consumeStringKeyMessages(testSubject, "test-consumer").take(1).compile.toList.map { publishedMessages =>
+      kafkaClient.consumeStringKeyMessages(testSubject, "test-consumer", commitOffsets = false).take(1).compile.toList.map { publishedMessages =>
         val firstMessage = publishedMessages.head
         (firstMessage._1, firstMessage._2.get.toString) shouldBe (Some(testKey), testPayload)
       }
@@ -56,7 +56,7 @@ class IngestionFlowSpec extends AnyFlatSpec with Matchers {
   it should "ingest a message with a null key" in {
     val testRequest = HydraRequest("correlationId", testPayload, metadata = Map(HYDRA_KAFKA_TOPIC_PARAM -> testSubjectNoKey))
     ingest(testRequest).flatMap { kafkaClient =>
-      kafkaClient.consumeStringKeyMessages(testSubjectNoKey, "test-consumer").take(1).compile.toList.map { publishedMessages =>
+      kafkaClient.consumeStringKeyMessages(testSubjectNoKey, "test-consumer", commitOffsets = false).take(1).compile.toList.map { publishedMessages =>
         val firstMessage = publishedMessages.head
         (firstMessage._1, firstMessage._2.get.toString) shouldBe (None, testPayload)
       }
@@ -72,7 +72,7 @@ class IngestionFlowSpec extends AnyFlatSpec with Matchers {
     val headerKey = "someDifferentKey"
     val testRequest = HydraRequest("correlationId", testPayload, metadata = Map(HYDRA_RECORD_KEY_PARAM -> headerKey, HYDRA_KAFKA_TOPIC_PARAM -> testSubject))
     ingest(testRequest).flatMap { kafkaClient =>
-      kafkaClient.consumeStringKeyMessages(testSubject, "test-consumer").take(1).compile.toList.map { publishedMessages =>
+      kafkaClient.consumeStringKeyMessages(testSubject, "test-consumer", commitOffsets = false).take(1).compile.toList.map { publishedMessages =>
         val firstMessage = publishedMessages.head
         (firstMessage._1, firstMessage._2.get.toString) shouldBe (Some(headerKey), testPayload)
       }

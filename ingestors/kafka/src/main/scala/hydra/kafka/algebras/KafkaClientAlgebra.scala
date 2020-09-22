@@ -1,6 +1,6 @@
 package hydra.kafka.algebras
 
-import cats.{Monad, MonadError}
+import cats.{Applicative, Monad, MonadError}
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.implicits._
@@ -49,7 +49,8 @@ trait KafkaClientAlgebra[F[_]] {
     */
   def consumeMessages(
      topicName: TopicName,
-     consumerGroup: ConsumerGroup
+     consumerGroup: ConsumerGroup,
+     commitOffsets: Boolean
    ): fs2.Stream[F, Record]
 
   /**
@@ -61,7 +62,8 @@ trait KafkaClientAlgebra[F[_]] {
     */
   def consumeStringKeyMessages(
                        topicName: TopicName,
-                       consumerGroup: ConsumerGroup
+                       consumerGroup: ConsumerGroup,
+                       commitOffsets: Boolean
                      ): fs2.Stream[F, StringRecord]
 
   /**
@@ -81,6 +83,7 @@ object KafkaClientAlgebra {
   private final case class StringFormat(value: Option[String]) extends RecordFormat
   type Record = (GenericRecord, Option[GenericRecord])
   type StringRecord = (Option[String], Option[GenericRecord])
+  final case class OffsetsNotCommittableInTest() extends NoStackTrace
 
   final case class PublishResponse(partition: Int, offset: Option[Long])
   object PublishResponse {
@@ -155,12 +158,12 @@ object KafkaClientAlgebra {
         produceMessage[Option[String]](record, topicName, StringFormat.apply)
       }
 
-      override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[F, (GenericRecord, Option[GenericRecord])] = {
-        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName)
+      override def consumeMessages(topicName: TopicName, consumerGroup: String, commitOffsets: Boolean): fs2.Stream[F, (GenericRecord, Option[GenericRecord])] = {
+        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets)
       }
 
-      override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, StringRecord] = {
-        consumeMessages[Option[String]](getStringKeyDeserializer, consumerGroup, topicName)
+      override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, StringRecord] = {
+        consumeMessages[Option[String]](getStringKeyDeserializer, consumerGroup, topicName, commitOffsets)
       }
 
       override def withProducerRecordSizeLimit(sizeLimitBytes: Long): F[KafkaClientAlgebra[F]] =
@@ -182,7 +185,9 @@ object KafkaClientAlgebra {
       private def consumeMessages[A](
                                       keyDeserializer: Deserializer[F, A],
                                       consumerGroup: ConsumerGroup,
-                                      topicName: TopicName): fs2.Stream[F, (A, Option[GenericRecord])] = {
+                                      topicName: TopicName,
+                                      commitOffsets: Boolean
+                                    ): fs2.Stream[F, (A, Option[GenericRecord])] = {
         val consumerSettings: ConsumerSettings[F, A, Option[GenericRecord]] = ConsumerSettings(
           keyDeserializer = keyDeserializer,
           valueDeserializer = getOptionalGenericRecordDeserializer(schemaRegistryClient)()
@@ -193,7 +198,9 @@ object KafkaClientAlgebra {
         consumerStream(consumerSettings)
           .evalTap(_.subscribeTo(topicName))
           .flatMap(_.stream)
-          .evalTap(_.offset.commit)
+          .evalTap{ committable =>
+            if (commitOffsets) committable.offset.commit else Applicative[F].pure(())
+          }
           .map { committable =>
             val r = committable.record
             (r.key, r.value)
@@ -231,17 +238,23 @@ object KafkaClientAlgebra {
       publishCacheMessage(cacheRecord, topicName)
     }
 
-    override def consumeMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, Record] = {
-      consumeCacheMessage(topicName, consumerGroup).evalMap {
-        case (r: GenericRecordFormat, v) => Sync[F].pure((r.value, v))
-        case _ => Sync[F].raiseError[Record](ConsumeErrorException("Expected GenericRecord, got String"))
+    override def consumeMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, Record] = {
+      if (commitOffsets) fs2.Stream.raiseError[F](new OffsetsNotCommittableInTest)
+      else {
+        consumeCacheMessage(topicName, consumerGroup).evalMap {
+          case (r: GenericRecordFormat, v) => Sync[F].pure((r.value, v))
+          case _ => Sync[F].raiseError[Record](ConsumeErrorException("Expected GenericRecord, got String"))
+        }
       }
     }
 
-    override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, StringRecord] = {
-      consumeCacheMessage(topicName, consumerGroup).evalMap {
-        case (r: StringFormat, v) => Sync[F].pure((r.value, v))
-        case _ => Sync[F].raiseError[StringRecord](ConsumeErrorException("Expected String, got GenericRecord"))
+    override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, StringRecord] = {
+      if (commitOffsets) fs2.Stream.raiseError[F](new OffsetsNotCommittableInTest)
+      else {
+        consumeCacheMessage(topicName, consumerGroup).evalMap {
+          case (r: StringFormat, v) => Sync[F].pure((r.value, v))
+          case _ => Sync[F].raiseError[StringRecord](ConsumeErrorException("Expected String, got GenericRecord"))
+        }
       }
     }
 

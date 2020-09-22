@@ -45,7 +45,7 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
   it should "ingest a record" in {
     val testRequest = V2IngestRequest(testKeyPayload, testValPayload.some, ValidationStrategy.Strict.some)
     ingest(testRequest).flatMap { kafkaClient =>
-      kafkaClient.consumeMessages(testSubject.value, "test-consumer").take(1).compile.toList.map { publishedMessages =>
+      kafkaClient.consumeMessages(testSubject.value, "test-consumer", commitOffsets = false).take(1).compile.toList.map { publishedMessages =>
         val firstMessage = publishedMessages.head
         (firstMessage._1.toString, firstMessage._2.get.toString) shouldBe (testKeyPayload, testValPayload)
       }
@@ -55,7 +55,7 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
   it should "ingest a tombstone record" in {
     val testRequest = V2IngestRequest(testKeyPayload, None, ValidationStrategy.Strict.some)
     ingest(testRequest).flatMap { kafkaClient =>
-      kafkaClient.consumeMessages(testSubject.value, "test-consumer").take(1).compile.toList.map { publishedMessages =>
+      kafkaClient.consumeMessages(testSubject.value, "test-consumer", commitOffsets = false).take(1).compile.toList.map { publishedMessages =>
         val firstMessage = publishedMessages.head
         (firstMessage._1.toString, firstMessage._2) shouldBe (testKeyPayload, None)
       }
@@ -68,7 +68,7 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
 
     val testRequest = V2IngestRequest(testKeyPayloadAlt, testValPayloadAlt.some, ValidationStrategy.Relaxed.some)
     ingest(testRequest).flatMap { kafkaClient =>
-      kafkaClient.consumeMessages(testSubject.value, "test-consumer").take(1).compile.toList.map { publishedMessages =>
+      kafkaClient.consumeMessages(testSubject.value, "test-consumer", commitOffsets = false).take(1).compile.toList.map { publishedMessages =>
         val firstMessage = publishedMessages.head
         (firstMessage._1.toString, firstMessage._2.get.toString) shouldBe (testKeyPayload, testValPayload)
       }

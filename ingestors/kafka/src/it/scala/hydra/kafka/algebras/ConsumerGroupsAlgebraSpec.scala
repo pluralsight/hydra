@@ -72,7 +72,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
     val (keyGR, valueGR) = getGenericRecords(topicName, "key123", "value123")
     createTopic(topicName, keyGR, valueGR, schemaRegistry, kafkaAdmin)
     kafkaClient.publishMessage((keyGR, Some(valueGR)), topicName).unsafeRunSync()
-    kafkaClient.consumeMessages(topicName, "randomConsumerGroup").take(1).compile.last.unsafeRunSync() shouldBe (keyGR, valueGR.some).some
+    kafkaClient.consumeMessages(topicName, "randomConsumerGroup", commitOffsets = true).take(1).compile.last.unsafeRunSync() shouldBe (keyGR, valueGR.some).some
 
     "ConsumerGroupAlgebraSpec" should {
 
@@ -81,7 +81,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
       }
 
       "consume two consumerGroups on dvs_internal_test123 topic into the cache" in {
-        kafkaClient.consumeMessages(topicName, "randomConsumerGroup2").take(1).compile.last.unsafeRunSync() shouldBe (keyGR, valueGR.some).some
+        kafkaClient.consumeMessages(topicName, "randomConsumerGroup2", commitOffsets = true).take(1).compile.last.unsafeRunSync() shouldBe (keyGR, valueGR.some).some
         cga.getConsumersForTopic(topicName).retryIfFalse(_.consumers.length == 2).unsafeRunSync()
         cga.getConsumersForTopic(topicName).unsafeRunSync()
       }
@@ -91,7 +91,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
         val (keyGR2, valueGR2) = getGenericRecords(topicName2, "abc", "123")
         createTopic(topicName2, keyGR2, valueGR2, schemaRegistry, kafkaAdmin)
         kafkaClient.publishMessage((keyGR2, Some(valueGR2)), topicName2).unsafeRunSync()
-        kafkaClient.consumeMessages(topicName2, "randomConsumerGroup").take(1).compile.last.unsafeRunSync() shouldBe (keyGR2, valueGR2.some).some
+        kafkaClient.consumeMessages(topicName2, "randomConsumerGroup", commitOffsets = true).take(1).compile.last.unsafeRunSync() shouldBe (keyGR2, valueGR2.some).some
 
         cga.getTopicsForConsumer("randomConsumerGroup").retryIfFalse(_.topics.map(_.topicName).forall(List(topicName, topicName2).contains)).unsafeRunSync()
       }
@@ -109,11 +109,11 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
         val (keyGR3, valueGR3) = getGenericRecords(topicName2, "abcdef", "123456")
         kafkaClient.publishMessage((keyGR3, Some(valueGR3)), topicName2).unsafeRunSync()
 
-        kafkaClient.consumeMessages(topicName2, "randomConsumerGroup").take(1).compile.last.unsafeRunSync() shouldBe (keyGR2, valueGR2.some).some
+        kafkaClient.consumeMessages(topicName2, "randomConsumerGroup", commitOffsets = true).take(1).compile.last.unsafeRunSync() shouldBe (keyGR2, valueGR2.some).some
         cga.getConsumersForTopic(topicName2).map(_.consumers.headOption.map(_.lastCommit)).retryIfFalse(_.isDefined).unsafeRunSync()
         val firstTimestamp = cga.getConsumersForTopic(topicName2).map(_.consumers.headOption.map(_.lastCommit)).unsafeRunSync().get
 
-        kafkaClient.consumeMessages(topicName2, "randomConsumerGroup").take(1).compile.last.unsafeRunSync() shouldBe (keyGR3, valueGR3.some).some
+        kafkaClient.consumeMessages(topicName2, "randomConsumerGroup", commitOffsets = true).take(1).compile.last.unsafeRunSync() shouldBe (keyGR3, valueGR3.some).some
 
         cga.getConsumersForTopic(topicName2).map(_.consumers.head.lastCommit).retryIfFalse(_.isAfter(firstTimestamp)).unsafeRunSync()
       }
