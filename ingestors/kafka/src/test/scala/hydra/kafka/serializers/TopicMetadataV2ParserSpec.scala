@@ -492,5 +492,16 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       )
     }
 
+    "make sure deprecatedDate works with deprecated true" in {
+      val subject = Subject.createValidated("dvs.valid").get
+      val tmc = TopicMetadataContainer(TopicMetadataV2Key(subject),
+        TopicMetadataV2Value(StreamTypeV2.Entity, true, None, Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None),
+        Some(new SchemaFormat(isKey = true).read(validAvroSchema)),
+        Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
+      val request = TopicMetadataV2Request.apply(Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,
+        tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.dataClassification,tmc.value.contact,tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes)
+      Instant.now().isBefore(TopicMetadataV2Format.read(request.toJson).deprecatedDate.get) shouldBe true
+    }
+
   }
 }

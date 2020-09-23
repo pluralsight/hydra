@@ -269,9 +269,9 @@ sealed trait TopicMetadataV2Parser
         val deprecated = toResult(getBoolWithKey(j, "deprecated"))
         val deprecatedDate = if(deprecated.toOption.getOrElse(false) &&
           j.getFields("deprecatedDate").headOption.getOrElse(None).equals(None)) {
-          toResult(Option(Instant.now().getEpochSecond))
+          toResult(Option(Instant.now()))
         } else if (!j.getFields("deprecatedDate").headOption.getOrElse(None).equals(None)) {
-          toResult(Option(j.getFields("deprecatedDate").headOption.getOrElse(throwDeserializationError("deprecatedDate","long")).toString.toLong))
+          toResult(Option(Instant.ofEpochMilli(j.getFields("deprecatedDate").headOption.getOrElse(throwDeserializationError("deprecatedDate","long")).toString.toLong)))
         } else {
           toResult(None)
         }
@@ -337,7 +337,7 @@ sealed trait TopicMetadataV2Parser
   implicit object TopicMetadataResponseV2Format extends RootJsonFormat[TopicMetadataV2Response] {
     override def read(json: JsValue): TopicMetadataV2Response = throw IntentionallyUnimplemented
 
-    override def write(obj: TopicMetadataV2Response): JsValue = jsonFormat9(TopicMetadataV2Response.apply).write(obj)
+    override def write(obj: TopicMetadataV2Response): JsValue = jsonFormat10(TopicMetadataV2Response.apply).write(obj)
   }
 
   private def throwDeserializationError(key: String, `type`: String) =
