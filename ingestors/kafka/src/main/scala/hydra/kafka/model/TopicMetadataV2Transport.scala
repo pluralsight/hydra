@@ -62,6 +62,7 @@ object StreamTypeV2 {
 }
 
 final case class TopicMetadataV2Request(
+    //subject: Subject,
     schemas: Schemas,
     streamType: StreamTypeV2,
     deprecated: Boolean,
@@ -101,7 +102,7 @@ object TopicMetadataV2Request {
       }
     }
 
-    val invalidFormat = "Invalid Subject. Subject may contain only alphanumeric characters, hyphens(-), underscores(_), and periods(.)"
+    val invalidFormat = "Invalid Subject. Subject may contain only alphanumeric characters, hyphens(-) and periods(.)"
   }
 }
 

@@ -446,7 +446,8 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
   "TopicMetadataV2Parser" must {
 
     "TopicMetadataV2Format write matches TopicMetadataResponseV2Format write" in {
-      val tmc = TopicMetadataContainer(TopicMetadataV2Key(Subject.createValidated("dvs.valid").get),
+      val subject = Subject.createValidated("dvs.valid").get
+      val tmc = TopicMetadataContainer(TopicMetadataV2Key(subject),
         TopicMetadataV2Value(StreamTypeV2.Entity, false, Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None),
         Some(new SchemaFormat(isKey = true).read(validAvroSchema)),
         Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
@@ -455,7 +456,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         tmc.value.deprecated,tmc.value.dataClassification,tmc.value.contact,tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes)
 
       TopicMetadataV2Format.write(request).compactPrint shouldBe
-        TopicMetadataResponseV2Format.write(response).compactPrint.replace(",\"subject\":\"valid\"", "")
+        TopicMetadataResponseV2Format.write(response).compactPrint.replace(",\"subject\":\"dvs.valid\"", "")
     }
 
     def createSchema: Schema = {

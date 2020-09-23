@@ -294,6 +294,7 @@ sealed trait TopicMetadataV2Parser
           j.getFields("notes").headOption.map(_.convertTo[String])
         )
         (
+//          subject,
           schemas,
           streamType,
           deprecated,
@@ -373,7 +374,7 @@ object Errors {
     val expected =
       """
         |{
-        |   "subject": "String a-zA-Z0-9_.-\\",
+        |   "subject": "String a-zA-Z0-9.-\\",
         |   "schemas": {
         |     "key": {},
         |     "value": {}
