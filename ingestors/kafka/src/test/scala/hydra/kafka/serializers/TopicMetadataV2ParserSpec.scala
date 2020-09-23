@@ -455,7 +455,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         tmc.value.deprecated,tmc.value.dataClassification,tmc.value.contact,tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes)
 
       TopicMetadataV2Format.write(request).compactPrint shouldBe
-        TopicMetadataResponseV2Format.write(response).compactPrint//.replace(",\"subject\":\"valid\"", "")
+        TopicMetadataResponseV2Format.write(response).compactPrint.replace(",\"subject\":\"valid\"", "")
     }
 
     def createSchema: Schema = {
