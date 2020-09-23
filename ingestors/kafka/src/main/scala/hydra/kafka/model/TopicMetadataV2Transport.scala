@@ -88,7 +88,7 @@ final case class TopicMetadataV2Request(
 }
 
 object TopicMetadataV2Request {
-  type SubjectRegex = MatchesRegex[W.`"""^(?:skills|flow|tech|fin|dvs)\\.[a-zA-Z0-9\\-\\.]+"""`.T]
+  type SubjectRegex = MatchesRegex[W.`"""^(?:skills|flow|tech|fin|dvs|_[a-zA-Z0-9]+)\\.[a-zA-Z0-9\\-\\.]+"""`.T]
   type Subject = String Refined SubjectRegex
 
   object Subject {

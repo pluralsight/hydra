@@ -73,6 +73,10 @@ class TopicMetadataV2TransportSpec extends AnyWordSpecLike with Matchers {
       Subject.createValidated("dvs.hello-.goodbye").getOrElse(None) shouldBe None
     }
 
+    "Allow internal topics" in {
+      Subject.createValidated("_hydra.v2.metadata").getOrElse(None) shouldBe a[Subject]
+    }
+
   }
 
 }
