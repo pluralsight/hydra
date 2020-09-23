@@ -70,18 +70,18 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         schemaRegistry <- schemaRegistryIO
         kafka <- KafkaAdminAlgebra.test[IO]
         kafkaClient <- KafkaClientAlgebra.test[IO]
-        metadata <- metadataAlgebraF("v2Topic", schemaRegistry, kafkaClient)
+        metadata <- metadataAlgebraF("dvs.v2Topic", schemaRegistry, kafkaClient)
         registerInternalMetadata = new CreateTopicProgram[IO](
           schemaRegistry,
           kafka,
           kafkaClient,
           policy,
-          Subject.createValidated("v2Topic").get,
+          Subject.createValidated("dvs.v2Topic").get,
           metadata
         )
         _ = registerInternalMetadata
           .createTopic(
-            Subject.createValidated("subject").get,
+            Subject.createValidated("dvs.subject").get,
             createTopicMetadataRequest(keySchema, valueSchema),
             TopicDetails(1, 1)
           )
@@ -146,10 +146,10 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           kafka,
           kafkaClient,
           policy,
-          Subject.createValidated("test").get,
+          Subject.createValidated("dvs.test").get,
           metadata
         ).createTopic(
-            Subject.createValidated("subject").get,
+            Subject.createValidated("dvs.subject").get,
             createTopicMetadataRequest(keySchema, valueSchema),
             TopicDetails(1, 1)
           )
@@ -199,10 +199,10 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           kafka,
           kafkaClient,
           policy,
-          Subject.createValidated("test").get,
+          Subject.createValidated("dvs.test").get,
           metadata
         ).createTopic(
-            Subject.createValidated("subject").get,
+            Subject.createValidated("dvs.subject").get,
             createTopicMetadataRequest(keySchema, valueSchema),
             TopicDetails(1, 1)
           )
@@ -259,10 +259,10 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           kafka,
           kafkaClient,
           policy,
-          Subject.createValidated("test").get,
+          Subject.createValidated("dvs.test").get,
           metadata
         ).createTopic(
-            Subject.createValidated("subject").get,
+            Subject.createValidated("dvs.subject").get,
             createTopicMetadataRequest(keySchema, valueSchema),
             TopicDetails(1, 1)
           )
@@ -273,21 +273,21 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
     "create the topic in Kafka" in {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      val subject = "subject"
+      val subject = "dvs.subject"
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafka <- KafkaAdminAlgebra.test[IO]
         kafkaClient <- KafkaClientAlgebra.test[IO]
-        metadata <- metadataAlgebraF("test-metadata-topic", schemaRegistry, kafkaClient)
+        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
           kafka,
           kafkaClient,
           policy,
-          Subject.createValidated("test-metadata-topic").get,
+          Subject.createValidated("dvs.test-metadata-topic").get,
           metadata
         ).createTopic(
-          Subject.createValidated("subject").get,
+          Subject.createValidated("dvs.subject").get,
           createTopicMetadataRequest(keySchema, valueSchema),
           TopicDetails(1, 1)
         )
@@ -297,8 +297,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
     "ingest metadata into the metadata topic" in {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      val subject = Subject.createValidated("subject").get
-      val metadataTopic = "test-metadata-topic"
+      val subject = Subject.createValidated("dvs.subject").get
+      val metadataTopic = "dvs.test-metadata-topic"
       val request = createTopicMetadataRequest(keySchema, valueSchema)
       val key = TopicMetadataV2Key(subject)
       val value = request.toValue
@@ -325,8 +325,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
     "ingest updated metadata into the metadata topic - verify created date did not change" in {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      val subject = Subject.createValidated("subject").get
-      val metadataTopic = "test-metadata-topic"
+      val subject = Subject.createValidated("dvs.subject").get
+      val metadataTopic = "dvs.test-metadata-topic"
       val request = createTopicMetadataRequest(keySchema, valueSchema)
       val key = TopicMetadataV2Key(subject)
       val value = request.toValue
@@ -365,8 +365,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
     "rollback kafka topic creation when error encountered in publishing metadata" in {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      val subject = "subject"
-      val metadataTopic = "test-metadata-topic"
+      val subject = "dvs.subject"
+      val metadataTopic = "dvs.test-metadata-topic"
       val request = createTopicMetadataRequest(keySchema, valueSchema)
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
@@ -393,8 +393,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
     "not delete an existing topic when rolling back" in {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      val subject = "subject"
-      val metadataTopic = "test-metadata-topic"
+      val subject = "dvs.subject"
+      val metadataTopic = "dvs.test-metadata-topic"
       val topicDetails = TopicDetails(1, 1)
       val request = createTopicMetadataRequest(keySchema, valueSchema)
       (for {

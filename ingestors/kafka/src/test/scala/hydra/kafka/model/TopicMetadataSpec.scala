@@ -41,7 +41,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
   val createdDate = Instant.now
 
   it must "encode TopicMetadataV2 key and value" in {
-    val key = TopicMetadataV2Key(Subject.createValidated("test_subject").get)
+    val key = TopicMetadataV2Key(Subject.createValidated("dvs.test-subject").get)
     val value = TopicMetadataV2Value(
       StreamTypeV2.Entity,
       false,
@@ -85,7 +85,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
   }
 
   it must "encode and decode metadataV2" in {
-    val key = TopicMetadataV2Key(Subject.createValidated("test_subject").get)
+    val key = TopicMetadataV2Key(Subject.createValidated("dvs.test-subject").get)
     val value = TopicMetadataV2Value(
       StreamTypeV2.Entity,
       false,

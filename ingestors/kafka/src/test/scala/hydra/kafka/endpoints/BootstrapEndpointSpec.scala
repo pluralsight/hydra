@@ -75,7 +75,7 @@ class BootstrapEndpointSpec
 
   private val bootstrapRoute = new BootstrapEndpoint(system).route
 
-  implicit val f = jsonFormat12(TopicMetadata)
+  implicit val f = jsonFormat11(TopicMetadata)
 
   override def beforeAll: Unit = {
     EmbeddedKafka.start()

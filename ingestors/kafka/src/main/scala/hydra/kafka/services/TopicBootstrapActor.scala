@@ -63,7 +63,7 @@ class TopicBootstrapActor(
   import TopicBootstrapActor._
   import spray.json._
 
-  implicit val metadataFormat = jsonFormat12(TopicMetadata)
+  implicit val metadataFormat = jsonFormat11(TopicMetadata)
 
   implicit val ec = context.dispatcher
 
@@ -212,7 +212,6 @@ class TopicBootstrapActor(
       topicMetadataRequest.streamType.toString,
       topicMetadataRequest.derived,
       topicMetadataRequest.deprecated,
-      topicMetadataRequest.deprecatedDate,
       topicMetadataRequest.dataClassification,
       topicMetadataRequest.contact,
       topicMetadataRequest.additionalDocumentation,
