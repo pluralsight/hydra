@@ -136,6 +136,7 @@ object TopicMetadataV2Key {
 final case class TopicMetadataV2Value(
     streamType: StreamTypeV2,
     deprecated: Boolean,
+    deprecatedDate: Option[Long],
     dataClassification: DataClassification,
     contact: NonEmptyList[ContactMethod],
     createdDate: Instant,

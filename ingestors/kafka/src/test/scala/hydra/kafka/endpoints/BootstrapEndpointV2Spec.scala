@@ -94,6 +94,7 @@ final class BootstrapEndpointV2Spec
       Schemas(getTestSchema("key"), getTestSchema("value")),
       StreamTypeV2.Entity,
       deprecated = false,
+      None,
       Public,
       NonEmptyList.of(Email.create("test@pluralsight.com").get),
       Instant.now,

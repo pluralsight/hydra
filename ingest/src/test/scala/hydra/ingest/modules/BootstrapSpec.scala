@@ -29,7 +29,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
   implicit private val cs: ContextShift[IO] = IO.contextShift(concurrent.ExecutionContext.global)
   implicit private val c: ConcurrentEffect[IO] = IO.ioConcurrentEffect
 
-  private val metadataSubject = Subject.createValidated("metadata").get
+  private val metadataSubject = Subject.createValidated("dvs.metadata").get
 
   private def createTestCase(
       config: V2MetadataTopicConfig

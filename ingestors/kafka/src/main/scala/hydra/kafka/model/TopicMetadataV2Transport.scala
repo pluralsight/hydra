@@ -62,10 +62,10 @@ object StreamTypeV2 {
 }
 
 final case class TopicMetadataV2Request(
-    //subject: Subject,
     schemas: Schemas,
     streamType: StreamTypeV2,
     deprecated: Boolean,
+    deprecatedDate: Option[Long],
     dataClassification: DataClassification,
     contact: NonEmptyList[ContactMethod],
     createdDate: Instant,
@@ -77,6 +77,7 @@ final case class TopicMetadataV2Request(
     TopicMetadataV2Value(
       streamType,
       deprecated,
+      deprecatedDate,
       dataClassification,
       contact,
       createdDate,

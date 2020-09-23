@@ -54,6 +54,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       Schemas(keySchema, valueSchema),
       StreamTypeV2.Entity,
       deprecated = false,
+      None,
       Public,
       NonEmptyList.of(Email.create(email).get),
       createdDate,

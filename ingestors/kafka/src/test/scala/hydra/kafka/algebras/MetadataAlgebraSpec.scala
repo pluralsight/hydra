@@ -91,6 +91,7 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
     val value = TopicMetadataV2Value(
         StreamTypeV2.Entity,
         deprecated = false,
+        None,
         Public,
         NonEmptyList.one(Slack.create("#channel").get),
         Instant.now,

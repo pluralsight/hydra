@@ -210,6 +210,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
           ),
           streamType,
           deprecated,
+          None,
           dataClassification,
           NonEmptyList(email, slackChannel :: Nil),
           tmv2.createdDate,
@@ -246,6 +247,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
           ),
           streamType,
           deprecated = false,
+          None,
           dataClassification,
           NonEmptyList(email, slackChannel :: Nil),
           tmv2.createdDate,
@@ -401,6 +403,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val valueSchema = new SchemaFormat(isKey = false).read(validAvroSchema)
       val streamType = StreamTypeV2.Entity
       val deprecated = false
+      val deprecatedDate = None
       val dataClassification = Public
       val email = Email.create("some@address.com").get
       val slack = Slack.create("#valid_slack_channel").get
@@ -419,6 +422,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         ),
         streamType = streamType,
         deprecated = deprecated,
+        deprecatedDate,
         dataClassification = dataClassification,
         contact = contact,
         createdDate = createdDate,
@@ -448,12 +452,12 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
     "TopicMetadataV2Format write matches TopicMetadataResponseV2Format write" in {
       val subject = Subject.createValidated("dvs.valid").get
       val tmc = TopicMetadataContainer(TopicMetadataV2Key(subject),
-        TopicMetadataV2Value(StreamTypeV2.Entity, false, Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None),
+        TopicMetadataV2Value(StreamTypeV2.Entity, false, None, Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None),
         Some(new SchemaFormat(isKey = true).read(validAvroSchema)),
         Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
       val response = TopicMetadataV2Response.fromTopicMetadataContainer(tmc)
       val request = TopicMetadataV2Request.apply(Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,
-        tmc.value.deprecated,tmc.value.dataClassification,tmc.value.contact,tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes)
+        tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.dataClassification,tmc.value.contact,tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes)
 
       TopicMetadataV2Format.write(request).compactPrint shouldBe
         TopicMetadataResponseV2Format.write(response).compactPrint.replace(",\"subject\":\"dvs.valid\"", "")
