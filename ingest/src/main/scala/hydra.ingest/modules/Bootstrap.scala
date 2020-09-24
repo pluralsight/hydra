@@ -22,6 +22,9 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
       _ <- bootstrapMetadataTopic
     } yield ()
 
+  //TODO create the summarizedConsumerGroups Topic
+  //TODO create consumerGroupOffsetTopic (look into storing this value in Zookeeper)
+
   private def bootstrapMetadataTopic: F[Unit] =
     if (cfg.createOnStartup) {
       TopicMetadataV2.getSchemas[F].flatMap { schemas =>

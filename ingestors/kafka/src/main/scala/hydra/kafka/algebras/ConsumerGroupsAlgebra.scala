@@ -94,7 +94,50 @@ object ConsumerGroupsAlgebra {
       }
   }
 
-  // TODO Use the MetadataAlgebra Consumer group for summarizedConsumerGroup Topic
+  private def seekToLatestOffsets[F[_]: ConcurrentEffect](sourceTopic: String)
+                                                         (stream: fs2.Stream[F, KafkaConsumer[F, Option[BaseKey], Option[OffsetAndMetadata]]]) = {
+    val partitionMap = fs2.Stream(Map(1 -> 10, 2 -> 12, 3 -> 14))
+    stream.flatTap { b =>
+      partitionMap.evalMap { p =>
+        p.iterator.toList.traverse { case (p, o) =>
+          b.seek(new TopicPartition(sourceTopic, p), o)
+        }
+      }
+    }
+  }
+
+  private def processRecord[F[_]: ConcurrentEffect](
+                                                     cr: CommittableConsumerRecord[F, Option[BaseKey], Option[OffsetAndMetadata]],
+                                                     s: SchemaRegistryClient,
+                                                     destinationTopic: String
+                                                   ): fs2.Stream[F, ProducerRecords[Array[Byte], Array[Byte], Unit]] = {
+    (cr.record.key, cr.record.value) match {
+      case (Some(OffsetKey(_, k)), offsetMaybe) =>
+        val topic = k.topicPartition.topic()
+        val consumerGroupMaybe = Option(k.group)
+        val consumerKeyMaybe = consumerGroupMaybe.map(TopicConsumerKey(topic, _))
+        val consumerValue = offsetMaybe.map(o => Instant.ofEpochMilli(o.commitTimestamp)).map(TopicConsumerValue.apply)
+
+        consumerKeyMaybe match {
+          case Some(consumerKey) =>
+            fs2.Stream.eval(for {
+              topicConsumer <- TopicConsumer.encode[F](consumerKey, consumerValue)
+              (key, value) = topicConsumer
+              k <- getSerializer[F, GenericRecord](s)(isKey = true).serialize(destinationTopic, Headers.empty, key)
+              v <- getSerializer[F, GenericRecord](s)(isKey = false).serialize(destinationTopic, Headers.empty, value.orNull)
+              // TODO Turn Commit offset into Producer Record which can be streamed in next step
+              // This is going to be a compacted topic that the algebra will read off of on start to know which offset to start processing
+              //                  a = cr.offset.offsets(cr.offset.topicPartition)
+              //                  b = a.offset()
+              //                  c = ConsumerOffsetCommit(partition: Long, offset: Long) => ProducerRecord
+            } yield ProducerRecord(destinationTopic, k, v)).map(p => ProducerRecords.one(p))
+          case None => fs2.Stream.empty
+        }
+      case _ =>
+        fs2.Stream.empty
+    }
+  }
+
   private def consumerOffsetsToInternalOffsets[F[_]: ConcurrentEffect: ContextShift: Timer]
   (sourceTopic: String, destinationTopic: String, bootstrapServers: String, consumerGroupName: String, s: SchemaRegistryClient) = {
     val settings: ConsumerSettings[F, Option[BaseKey], Option[OffsetAndMetadata]] = ConsumerSettings(
@@ -109,35 +152,10 @@ object ConsumerGroupsAlgebra {
       .withBootstrapServers(bootstrapServers)
       .withAcks(Acks.All)
 
-    consumerStream(settings)
-      .evalTap(_.subscribeTo(sourceTopic))
+    seekToLatestOffsets(sourceTopic)(consumerStream(settings).evalTap(_.subscribeTo(sourceTopic)))
       .flatMap(_.stream)
       .flatMap { cr =>
-        (cr.record.key, cr.record.value) match {
-          case (Some(OffsetKey(_, k)), offsetMaybe) =>
-            val topic = k.topicPartition.topic()
-            val consumerGroupMaybe = Option(k.group)
-            val consumerKeyMaybe = consumerGroupMaybe.map(TopicConsumerKey(topic, _))
-            val consumerValue = offsetMaybe.map(o => Instant.ofEpochMilli(o.commitTimestamp)).map(TopicConsumerValue.apply)
-
-            consumerKeyMaybe match {
-              case Some(consumerKey) =>
-                fs2.Stream.eval(for {
-                  topicConsumer <- TopicConsumer.encode[F](consumerKey, consumerValue)
-                  (key, value) = topicConsumer
-                  k <- getSerializer[F, GenericRecord](s)(isKey = true).serialize(destinationTopic, Headers.empty, key)
-                  v <- getSerializer[F, GenericRecord](s)(isKey = false).serialize(destinationTopic, Headers.empty, value.orNull)
-                  // TODO Turn Commit offset into Producer Record which can be streamed in next step
-                  // This is going to be a compacted topic that the algebra will read off of on start to know which offset to start processing
-//                  a = cr.offset.offsets(cr.offset.topicPartition)
-//                  b = a.offset()
-//                  c = ConsumerOffsetCommit(partition: Long, offset: Long) => ProducerRecord
-                } yield ProducerRecord(destinationTopic, k, v)).map(p => ProducerRecords.one(p))
-              case None => fs2.Stream.empty
-            }
-          case _ =>
-            fs2.Stream.empty
-        }
+        processRecord(cr, s, destinationTopic)
       }
       .through(produce(producerSettings))
       .compile.drain
