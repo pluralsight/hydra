@@ -48,13 +48,15 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       keySchema: Schema,
       valueSchema: Schema,
       email: String = "test@test.com",
-      createdDate: Instant = Instant.now()
+      createdDate: Instant = Instant.now(),
+      deprecated: Boolean = false,
+      deprecatedDate: Option[Instant] = None
   ): TopicMetadataV2Request =
     TopicMetadataV2Request(
       Schemas(keySchema, valueSchema),
       StreamTypeV2.Entity,
-      deprecated = false,
-      None,
+      deprecated = deprecated,
+      deprecatedDate,
       Public,
       NonEmptyList.of(Email.create(email).get),
       createdDate,
@@ -420,6 +422,45 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         ).createTopic(Subject.createValidated(subject).get, request, topicDetails).attempt
         topic <- kafkaAdmin.describeTopic(subject)
       } yield topic shouldBe defined).unsafeRunSync()
+    }
+
+    "ingest updated metadata into the metadata topic - verify deprecated date if supplied is not overwritten" in {
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      val subject = Subject.createValidated("dvs.subject").get
+      val metadataTopic = "_test.metadata-topic"
+      val request = createTopicMetadataRequest(keySchema, valueSchema, deprecated = true, deprecatedDate = Some(Instant.now))
+      val key = TopicMetadataV2Key(subject)
+      val value = request.toValue
+      val updatedRequest = createTopicMetadataRequest(keySchema, valueSchema, "updated@email.com", deprecated = true)
+      val updatedKey = TopicMetadataV2Key(subject)
+      val updatedValue = updatedRequest.toValue
+      (for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord])])
+        kafkaClient <- IO(
+          new TestKafkaClientAlgebraWithPublishTo(publishTo)
+        )
+        consumeFrom <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
+        metadata <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
+        createTopicProgram = new CreateTopicProgram[IO](
+          schemaRegistry = schemaRegistry,
+          kafkaAdmin = kafkaAdmin,
+          kafkaClient = kafkaClient,
+          retryPolicy = policy,
+          v2MetadataTopicName = Subject.createValidated(metadataTopic).get,
+          metadata
+        )
+        _ <- createTopicProgram.createTopic(subject, request, TopicDetails(1, 1))
+        _ <- metadata.addToMetadata(subject, request)
+        metadataMap <- publishTo.get
+        _ <- createTopicProgram.createTopic(subject, updatedRequest, TopicDetails(1, 1))
+        updatedMap <- publishTo.get
+      } yield {
+        val deprecatedDate = metadataMap.get(metadataTopic).toString.split("deprecatedDate")(1).substring(4).split(",")(0)
+        val updatedDate = updatedMap.get(metadataTopic).toString.split("deprecatedDate")(1).substring(4).split(",")(0)
+        deprecatedDate shouldBe updatedDate
+      }).unsafeRunSync()
     }
 
   }
