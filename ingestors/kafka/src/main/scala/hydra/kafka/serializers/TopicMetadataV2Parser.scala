@@ -7,7 +7,6 @@ import cats.data.Validated.{Invalid, Valid}
 import cats.data._
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import hydra.core.marshallers._
 import hydra.kafka.model.ContactMethod.{Email, Slack}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
@@ -267,11 +266,10 @@ sealed trait TopicMetadataV2Parser
           )
         )
         val deprecated = toResult(getBoolWithKey(j, "deprecated"))
-        val deprecatedDate = if(deprecated.toOption.getOrElse(false) &&
-          j.getFields("deprecatedDate").headOption.getOrElse(None).equals(None)) {
-          toResult(Option(Instant.now()))
-        } else if (!j.getFields("deprecatedDate").headOption.getOrElse(None).equals(None)) {
-          toResult(Option(Instant.ofEpochMilli(j.getFields("deprecatedDate").headOption.getOrElse(throwDeserializationError("deprecatedDate","long")).toString.toLong)))
+        val deprecatedDate = if ( deprecated.toOption.getOrElse(false) && !j.getFields("deprecatedDate").headOption.getOrElse(None).equals(None)) {
+          toResult(Option(Instant.parse(j.getFields("deprecatedDate").headOption
+            .getOrElse(throwDeserializationError("deprecatedDate","long"))
+            .toString.replace("\"",""))))
         } else {
           toResult(None)
         }
