@@ -103,7 +103,8 @@ object TopicMetadataV2Request {
       }
     }
 
-    val invalidFormat = "Invalid Subject. Subject may contain only alphanumeric characters, hyphens(-) and periods(.)"
+    val invalidFormat = "Invalid Subject. Subject must start with skills, flow, tech, fin, dvs, or an underscore(_). It may contain only alphanumeric characters, hyphens(-) and periods(.)" +
+      " and must not contain \".-\" or \"-.\" anywhere within the topic."
   }
 }
 
