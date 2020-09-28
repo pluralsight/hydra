@@ -5,6 +5,8 @@ import java.time.Instant
 import cats.data.NonEmptyList
 import cats.effect.IO
 import hydra.kafka.model.TopicMetadataV2Request.Subject
+import io.confluent.kafka.schemaregistry.avro.AvroCompatibilityChecker
+import org.apache.avro.Schema
 import org.apache.avro.generic.{GenericDatumReader, GenericRecordBuilder}
 import org.apache.avro.io.DecoderFactory
 import org.scalatest.matchers.should.Matchers
@@ -107,5 +109,17 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
 
     decodedKey shouldBe key
     decodedValue shouldBe Some(value)
+  }
+
+  "TopicMetadata" should "have compatible schema evolutions" in {
+    import collection.JavaConverters._
+    val schemaVersion1String = "{\"type\":\"record\",\"name\":\"TopicMetadataV2Value\",\"namespace\":\"_hydra.v2\",\"fields\":[{\"name\":\"streamType\",\"type\":{\"type\":\"enum\",\"name\":\"StreamTypeV2\",\"namespace\":\"hydra.kafka.model\",\"symbols\":[\"Event\",\"Entity\",\"Telemetry\"]}},{\"name\":\"deprecated\",\"type\":\"boolean\"},{\"name\":\"dataClassification\",\"type\":{\"type\":\"enum\",\"name\":\"DataClassification\",\"namespace\":\"hydra.kafka.model\",\"symbols\":[\"Public\",\"InternalUseOnly\",\"ConfidentialPII\",\"RestrictedFinancial\",\"RestrictedEmployeeData\"]}},{\"name\":\"contact\",\"type\":{\"type\":\"array\",\"items\":[{\"type\":\"record\",\"name\":\"Email\",\"namespace\":\"hydra.kafka.model.ContactMethod\",\"fields\":[{\"name\":\"address\",\"type\":\"string\"}]},{\"type\":\"record\",\"name\":\"Slack\",\"namespace\":\"hydra.kafka.model.ContactMethod\",\"fields\":[{\"name\":\"channel\",\"type\":\"string\"}]}]}},{\"name\":\"createdDate\",\"type\":\"string\"},{\"name\":\"parentSubjects\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"notes\",\"type\":[\"null\",\"string\"]}]}"
+    val schemaVersion2String = "{\"type\":\"record\",\"name\":\"TopicMetadataV2Value\",\"namespace\":\"_hydra.v2\",\"fields\":[{\"name\":\"streamType\",\"type\":{\"type\":\"enum\",\"name\":\"StreamTypeV2\",\"namespace\":\"hydra.kafka.model\",\"symbols\":[\"Event\",\"Entity\",\"Telemetry\"]}},{\"name\":\"deprecated\",\"type\":\"boolean\"},{\"name\":\"deprecatedDate\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"dataClassification\",\"type\":{\"type\":\"enum\",\"name\":\"DataClassification\",\"namespace\":\"hydra.kafka.model\",\"symbols\":[\"Public\",\"InternalUseOnly\",\"ConfidentialPII\",\"RestrictedFinancial\",\"RestrictedEmployeeData\"]}},{\"name\":\"contact\",\"type\":{\"type\":\"array\",\"items\":[{\"type\":\"record\",\"name\":\"Email\",\"namespace\":\"hydra.kafka.model.ContactMethod\",\"fields\":[{\"name\":\"address\",\"type\":\"string\"}]},{\"type\":\"record\",\"name\":\"Slack\",\"namespace\":\"hydra.kafka.model.ContactMethod\",\"fields\":[{\"name\":\"channel\",\"type\":\"string\"}]}]}},{\"name\":\"createdDate\",\"type\":\"string\"},{\"name\":\"parentSubjects\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"notes\",\"type\":[\"null\",\"string\"]}]}"
+    def parser = new Schema.Parser()
+    val schemaVersion1 = parser.parse(schemaVersion1String)
+    val schemaVersion2 = parser.parse(schemaVersion2String)
+    val schemaCurrent = TopicMetadataV2Value.codec.schema.toOption.get
+    val previousVersions = List(schemaVersion1, schemaVersion2)
+    AvroCompatibilityChecker.FULL_TRANSITIVE_CHECKER.isCompatible(schemaCurrent, previousVersions.asJava) shouldBe true
   }
 }
