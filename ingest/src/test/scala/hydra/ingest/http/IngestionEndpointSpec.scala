@@ -79,8 +79,6 @@ final class IngestionEndpointSpec
       schemaRegistry <- SchemaRegistry.test[IO]
       _ <- schemaRegistry.registerSchema("my_topic-value", otherSchema)
       _ <- schemaRegistry.registerSchema("my_topic-value", otherSchema)
-      _ <- schemaRegistry.registerSchema("exp.blah.blah-value", simpleSchema)
-      _ <- schemaRegistry.registerSchema("exp.blah.blah-key", simpleSchema)
       _ <- schemaRegistry.registerSchema("dvs.blah.blah-key", simpleSchema)
       _ <- schemaRegistry.registerSchema("dvs.blah.blah-value", simpleSchema)
     } yield {
