@@ -53,7 +53,7 @@ final class BootstrapEndpointV2Spec
         ka,
         kc,
         retryPolicy,
-        Subject.createValidated("test").get,
+        Subject.createValidated("dvs.hello-world").get,
         m
       ),
       TopicDetails(1, 1)
@@ -73,7 +73,7 @@ final class BootstrapEndpointV2Spec
     "reject an empty request" in {
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
-          Put("/v2/topics/testing") ~> Route.seal(bootstrapEndpoint.route) ~> check {
+          Put("/v2/topics/dvs.testing") ~> Route.seal(bootstrapEndpoint.route) ~> check {
             response.status shouldBe StatusCodes.BadRequest
           }
         }
@@ -94,6 +94,7 @@ final class BootstrapEndpointV2Spec
       Schemas(getTestSchema("key"), getTestSchema("value")),
       StreamTypeV2.Entity,
       deprecated = false,
+      None,
       Public,
       NonEmptyList.of(Email.create("test@pluralsight.com").get),
       Instant.now,
@@ -104,9 +105,10 @@ final class BootstrapEndpointV2Spec
     "accept a valid request" in {
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
-          Put("/v2/topics/testing", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> Route.seal(
+          Put("/v2/topics/dvs.testing", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> Route.seal(
             bootstrapEndpoint.route
           ) ~> check {
+            val responseReturned = responseAs[String]
             response.status shouldBe StatusCodes.OK
           }
         }
@@ -158,7 +160,7 @@ final class BootstrapEndpointV2Spec
           KafkaAdminAlgebra
             .test[IO]
             .map { kafka =>
-              Put("/v2/topics/testing/", HttpEntity(MediaTypes.`application/json`, validRequest)) ~> Route.seal(
+              Put("/v2/topics/dvs.testing/", HttpEntity(MediaTypes.`application/json`, validRequest)) ~> Route.seal(
                 getTestCreateTopicProgram(failingSchemaRegistry, kafka, client, m).route
               ) ~> check {
                 response.status shouldBe StatusCodes.InternalServerError

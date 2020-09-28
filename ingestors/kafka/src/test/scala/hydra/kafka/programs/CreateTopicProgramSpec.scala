@@ -48,12 +48,15 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       keySchema: Schema,
       valueSchema: Schema,
       email: String = "test@test.com",
-      createdDate: Instant = Instant.now()
+      createdDate: Instant = Instant.now(),
+      deprecated: Boolean = false,
+      deprecatedDate: Option[Instant] = None
   ): TopicMetadataV2Request =
     TopicMetadataV2Request(
       Schemas(keySchema, valueSchema),
       StreamTypeV2.Entity,
-      deprecated = false,
+      deprecated = deprecated,
+      deprecatedDate,
       Public,
       NonEmptyList.of(Email.create(email).get),
       createdDate,
@@ -70,18 +73,18 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         schemaRegistry <- schemaRegistryIO
         kafka <- KafkaAdminAlgebra.test[IO]
         kafkaClient <- KafkaClientAlgebra.test[IO]
-        metadata <- metadataAlgebraF("v2Topic", schemaRegistry, kafkaClient)
+        metadata <- metadataAlgebraF("dvs.v2Topic", schemaRegistry, kafkaClient)
         registerInternalMetadata = new CreateTopicProgram[IO](
           schemaRegistry,
           kafka,
           kafkaClient,
           policy,
-          Subject.createValidated("v2Topic").get,
+          Subject.createValidated("dvs.v2Topic").get,
           metadata
         )
         _ = registerInternalMetadata
           .createTopic(
-            Subject.createValidated("subject").get,
+            Subject.createValidated("dvs.subject").get,
             createTopicMetadataRequest(keySchema, valueSchema),
             TopicDetails(1, 1)
           )
@@ -146,10 +149,10 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           kafka,
           kafkaClient,
           policy,
-          Subject.createValidated("test").get,
+          Subject.createValidated("dvs.test").get,
           metadata
         ).createTopic(
-            Subject.createValidated("subject").get,
+            Subject.createValidated("dvs.subject").get,
             createTopicMetadataRequest(keySchema, valueSchema),
             TopicDetails(1, 1)
           )
@@ -199,10 +202,10 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           kafka,
           kafkaClient,
           policy,
-          Subject.createValidated("test").get,
+          Subject.createValidated("dvs.test").get,
           metadata
         ).createTopic(
-            Subject.createValidated("subject").get,
+            Subject.createValidated("dvs.subject").get,
             createTopicMetadataRequest(keySchema, valueSchema),
             TopicDetails(1, 1)
           )
@@ -259,10 +262,10 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           kafka,
           kafkaClient,
           policy,
-          Subject.createValidated("test").get,
+          Subject.createValidated("dvs.test").get,
           metadata
         ).createTopic(
-            Subject.createValidated("subject").get,
+            Subject.createValidated("dvs.subject").get,
             createTopicMetadataRequest(keySchema, valueSchema),
             TopicDetails(1, 1)
           )
@@ -273,21 +276,21 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
     "create the topic in Kafka" in {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      val subject = "subject"
+      val subject = "dvs.subject"
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafka <- KafkaAdminAlgebra.test[IO]
         kafkaClient <- KafkaClientAlgebra.test[IO]
-        metadata <- metadataAlgebraF("test-metadata-topic", schemaRegistry, kafkaClient)
+        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
           kafka,
           kafkaClient,
           policy,
-          Subject.createValidated("test-metadata-topic").get,
+          Subject.createValidated("dvs.test-metadata-topic").get,
           metadata
         ).createTopic(
-          Subject.createValidated("subject").get,
+          Subject.createValidated("dvs.subject").get,
           createTopicMetadataRequest(keySchema, valueSchema),
           TopicDetails(1, 1)
         )
@@ -297,8 +300,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
     "ingest metadata into the metadata topic" in {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      val subject = Subject.createValidated("subject").get
-      val metadataTopic = "test-metadata-topic"
+      val subject = Subject.createValidated("dvs.subject").get
+      val metadataTopic = "dvs.test-metadata-topic"
       val request = createTopicMetadataRequest(keySchema, valueSchema)
       val key = TopicMetadataV2Key(subject)
       val value = request.toValue
@@ -325,8 +328,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
     "ingest updated metadata into the metadata topic - verify created date did not change" in {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      val subject = Subject.createValidated("subject").get
-      val metadataTopic = "test-metadata-topic"
+      val subject = Subject.createValidated("dvs.subject").get
+      val metadataTopic = "dvs.test-metadata-topic"
       val request = createTopicMetadataRequest(keySchema, valueSchema)
       val key = TopicMetadataV2Key(subject)
       val value = request.toValue
@@ -365,8 +368,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
     "rollback kafka topic creation when error encountered in publishing metadata" in {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      val subject = "subject"
-      val metadataTopic = "test-metadata-topic"
+      val subject = "dvs.subject"
+      val metadataTopic = "dvs.test-metadata-topic"
       val request = createTopicMetadataRequest(keySchema, valueSchema)
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
@@ -393,8 +396,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
     "not delete an existing topic when rolling back" in {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      val subject = "subject"
-      val metadataTopic = "test-metadata-topic"
+      val subject = "dvs.subject"
+      val metadataTopic = "dvs.test-metadata-topic"
       val topicDetails = TopicDetails(1, 1)
       val request = createTopicMetadataRequest(keySchema, valueSchema)
       (for {
@@ -419,6 +422,77 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         ).createTopic(Subject.createValidated(subject).get, request, topicDetails).attempt
         topic <- kafkaAdmin.describeTopic(subject)
       } yield topic shouldBe defined).unsafeRunSync()
+    }
+
+    "ingest updated metadata into the metadata topic - verify deprecated date if supplied is not overwritten" in {
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      val subject = Subject.createValidated("dvs.subject").get
+      val metadataTopic = "_test.metadata-topic"
+      val request = createTopicMetadataRequest(keySchema, valueSchema, deprecated = true, deprecatedDate = Some(Instant.now))
+      val updatedRequest = createTopicMetadataRequest(keySchema, valueSchema, "updated@email.com", deprecated = true)
+      (for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord])])
+        kafkaClient <- IO(
+          new TestKafkaClientAlgebraWithPublishTo(publishTo)
+        )
+        consumeFrom <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
+        metadata <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
+        createTopicProgram = new CreateTopicProgram[IO](
+          schemaRegistry = schemaRegistry,
+          kafkaAdmin = kafkaAdmin,
+          kafkaClient = kafkaClient,
+          retryPolicy = policy,
+          v2MetadataTopicName = Subject.createValidated(metadataTopic).get,
+          metadata
+        )
+        _ <- createTopicProgram.createTopic(subject, request, TopicDetails(1, 1))
+        _ <- metadata.addToMetadata(subject, request)
+        metadataMap <- publishTo.get
+        _ <- createTopicProgram.createTopic(subject, updatedRequest, TopicDetails(1, 1))
+        updatedMap <- publishTo.get
+      } yield {
+        val dd = metadataMap.get(metadataTopic).get._2.get.get("deprecatedDate")
+        val ud = updatedMap.get(metadataTopic).get._2.get.get("deprecatedDate")
+        ud shouldBe dd
+      }).unsafeRunSync()
+    }
+
+    "ingest updated metadata into the metadata topic - verify deprecated date is updated when starting with None" in {
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      val subject = Subject.createValidated("dvs.subject").get
+      val metadataTopic = "_test.metadata-topic"
+      val request = createTopicMetadataRequest(keySchema, valueSchema)
+      val updatedRequest = createTopicMetadataRequest(keySchema, valueSchema, "updated@email.com", deprecated = true)
+      (for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord])])
+        kafkaClient <- IO(
+          new TestKafkaClientAlgebraWithPublishTo(publishTo)
+        )
+        consumeFrom <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
+        metadata <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
+        createTopicProgram = new CreateTopicProgram[IO](
+          schemaRegistry = schemaRegistry,
+          kafkaAdmin = kafkaAdmin,
+          kafkaClient = kafkaClient,
+          retryPolicy = policy,
+          v2MetadataTopicName = Subject.createValidated(metadataTopic).get,
+          metadata
+        )
+        _ <- createTopicProgram.createTopic(subject, request, TopicDetails(1, 1))
+        _ <- metadata.addToMetadata(subject, request)
+        metadataMap <- publishTo.get
+        _ <- createTopicProgram.createTopic(subject, updatedRequest, TopicDetails(1, 1))
+        updatedMap <- publishTo.get
+      } yield {
+        val ud = metadataMap.get(metadataTopic).get._2.get.get("deprecatedDate")
+        val dd = updatedMap.get(metadataTopic).get._2.get.get("deprecatedDate")
+        ud shouldBe null
+        Instant.parse(dd.toString) shouldBe a[Instant]
+      }).unsafeRunSync()
     }
 
   }

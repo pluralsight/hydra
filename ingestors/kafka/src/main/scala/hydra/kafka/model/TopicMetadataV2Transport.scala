@@ -65,6 +65,7 @@ final case class TopicMetadataV2Request(
     schemas: Schemas,
     streamType: StreamTypeV2,
     deprecated: Boolean,
+    deprecatedDate: Option[Instant],
     dataClassification: DataClassification,
     contact: NonEmptyList[ContactMethod],
     createdDate: Instant,
@@ -76,6 +77,7 @@ final case class TopicMetadataV2Request(
     TopicMetadataV2Value(
       streamType,
       deprecated,
+      deprecatedDate,
       dataClassification,
       contact,
       createdDate,
@@ -86,16 +88,26 @@ final case class TopicMetadataV2Request(
 }
 
 object TopicMetadataV2Request {
-  type SubjectRegex = MatchesRegex[W.`"""^[a-zA-Z0-9_\\-\\.]+$"""`.T]
+  type SubjectRegex = MatchesRegex[W.`"""^(?:skills|flow|tech|fin|dvs|_[a-zA-Z0-9]+)\\.[a-zA-Z0-9\\-\\.]+"""`.T]
   type Subject = String Refined SubjectRegex
 
   object Subject {
 
     def createValidated(value: String): Option[Subject] = {
-      refineV[SubjectRegex](value).toOption
+      if(value.length > 255 ||
+        value.contains(".-") ||
+        value.contains("-.") ||
+        value.contains("..") ||
+        value.contains("--")) {
+        None
+      } else {
+        refineV[SubjectRegex](value).toOption
+      }
     }
 
-    val invalidFormat = "Invalid Subject. Subject may contain only alphanumeric characters, hyphens(-), underscores(_), and periods(.)"
+    val invalidFormat = "Invalid Subject. Subject must start with skills, flow, tech, fin, dvs, or an underscore(_). " +
+      " It may contain only alphanumeric characters, hyphens(-) and periods(.)" +
+      " and must not contain \".-\", \"-.\", \"..\", or \"--\" anywhere within the topic."
   }
 }
 
@@ -105,6 +117,7 @@ final case class TopicMetadataV2Response(
                                           schemas: MaybeSchemas,
                                           streamType: StreamTypeV2,
                                           deprecated: Boolean,
+                                          deprecatedDate: Option[Instant],
                                           dataClassification: DataClassification,
                                           contact: NonEmptyList[ContactMethod],
                                           createdDate: Instant,
@@ -119,6 +132,7 @@ object TopicMetadataV2Response {
       MaybeSchemas(keySchema, valueSchema),
       v.streamType,
       v.deprecated,
+      v.deprecatedDate,
       v.dataClassification,
       v.contact,
       v.createdDate,

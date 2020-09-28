@@ -57,12 +57,12 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
     "MetadataAlgebraSpec" should {
 
       "retrieve none for non-existant topic" in {
-        val subject = Subject.createValidated("Non-existantTopic").get
+        val subject = Subject.createValidated("dvs.Non-existantTopic").get
         metadataAlgebra.getMetadataFor(subject).unsafeRunSync() shouldBe None
       }
 
       "retrieve metadata" in {
-        val subject = Subject.createValidated("subject1").get
+        val subject = Subject.createValidated("dvs.subject1").get
         val (genericRecordsIO, key, value) = getMetadataGenericRecords(subject)
 
         (for {
@@ -74,7 +74,7 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
       }
 
       "retrieve all metadata" in {
-        val subject = Subject.createValidated("subject2").get
+        val subject = Subject.createValidated("dvs.subject2").get
         val (genericRecordsIO, key, value) = getMetadataGenericRecords(subject)
         (for {
           record <- genericRecordsIO
@@ -91,6 +91,7 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
     val value = TopicMetadataV2Value(
         StreamTypeV2.Entity,
         deprecated = false,
+        None,
         Public,
         NonEmptyList.one(Slack.create("#channel").get),
         Instant.now,
