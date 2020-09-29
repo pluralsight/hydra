@@ -231,9 +231,9 @@ sealed trait TopicMetadataV2Parser
       val t = schema.getType
       t match {
         case Schema.Type.RECORD =>
-          val currentNamespace = Option(schema.getNamespace).map(f => f.contains("-"))
+          val currentNamespace = Option(schema.getNamespace).exists(f => f.contains("-"))
           val allRecords = schema.getFields.asScala.toList.exists(f => isNamespaceValid(f.schema()))
-          currentNamespace.getOrElse(false) || allRecords
+          currentNamespace || allRecords
         case _ => false
       }
     }
