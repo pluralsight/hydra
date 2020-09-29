@@ -228,9 +228,14 @@ sealed trait TopicMetadataV2Parser
 
     override def read(json: JsValue): Schema = {
       val jsonString = json.compactPrint
-      Try(new Schema.Parser().parse(jsonString)).getOrElse(
+      val schema = Try(new Schema.Parser().parse(jsonString)).getOrElse(
         throw DeserializationException(InvalidSchema(json, isKey).errorMessage)
       )
+      if(schema.getNamespace.contains("-")) {
+        throw DeserializationException(InvalidSchema(json, isKey).errorMessage)
+      } else {
+        schema
+      }
     }
   }
 
