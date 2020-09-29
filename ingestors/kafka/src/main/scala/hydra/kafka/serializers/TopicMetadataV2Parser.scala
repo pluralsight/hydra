@@ -14,6 +14,7 @@ import hydra.kafka.serializers.Errors._
 import hydra.kafka.serializers.TopicMetadataV2Parser.IntentionallyUnimplemented
 import org.apache.avro.Schema
 import spray.json.{DefaultJsonProtocol, DeserializationException, JsObject, JsString, JsValue, RootJsonFormat}
+import collection.JavaConverters._
 
 import scala.util.{Failure, Success, Try}
 
@@ -226,11 +227,28 @@ sealed trait TopicMetadataV2Parser
       obj.toString().parseJson
     }
 
+    def isNamespaceInvalid(schema: Schema): Boolean = {
+      val t = schema.getType
+      t match {
+        case Schema.Type.RECORD =>
+          val currentNamespace = Option(schema.getNamespace).exists(f => f.contains("-"))
+          val allRecords = schema.getFields.asScala.toList.exists(f => isNamespaceInvalid(f.schema()))
+          currentNamespace || allRecords
+        case _ => false
+      }
+    }
+
     override def read(json: JsValue): Schema = {
       val jsonString = json.compactPrint
-      Try(new Schema.Parser().parse(jsonString)).getOrElse(
+      val schema = Try(new Schema.Parser().parse(jsonString)).getOrElse(
         throw DeserializationException(InvalidSchema(json, isKey).errorMessage)
       )
+
+      if(isNamespaceInvalid(schema)) {
+        throw DeserializationException(InvalidSchema(json, isKey).errorMessage)
+      } else {
+        schema
+      }
     }
   }
 
