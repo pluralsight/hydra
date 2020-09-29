@@ -67,6 +67,58 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       |}
       |""".stripMargin.parseJson
 
+  val invalidAvroSchemaNestedNamespace =
+    """
+      |{
+      |  "namespace": "_hydra.metadata",
+      |  "name": "SomeName",
+      |  "type": "record",
+      |  "version": 1,
+      |  "fields": [
+      |    {
+      |      "name": "int_rec",
+      |      "type": {
+      |         "type" : "record",
+      |         "name" : "int_record",
+      |         "namespace": "nested-namespace",
+      |         "fields" : [
+      |           {
+      |             "name": "rec_int",
+      |             "type": "int"
+      |           }
+      |         ]
+      |       }
+      |    }
+      |  ]
+      |}
+      |""".stripMargin.parseJson
+
+  val invalidAvroSchemaNestedName =
+    """
+      |{
+      |  "namespace": "_hydra.metadata",
+      |  "name": "SomeName",
+      |  "type": "record",
+      |  "version": 1,
+      |  "fields": [
+      |    {
+      |      "name": "int_rec",
+      |      "type": {
+      |         "type" : "record",
+      |         "name" : "int-record",
+      |         "namespace": "nested",
+      |         "fields" : [
+      |           {
+      |             "name": "rec_int",
+      |             "type": "int"
+      |           }
+      |         ]
+      |       }
+      |    }
+      |  ]
+      |}
+      |""".stripMargin.parseJson
+
   "TopicMetadataV2Deserializer" must {
 
     "return instant.now" in {
@@ -191,6 +243,18 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       the[DeserializationException] thrownBy {
         new SchemaFormat(isKey = false).read(invalidAvroSchemaName).getName
       } should have message InvalidSchema(invalidAvroSchemaName, isKey = false).errorMessage
+    }
+
+    "throw an error with '-' in the namespace of a nested schema" in {
+      the[DeserializationException] thrownBy {
+        new SchemaFormat(isKey = false).read(invalidAvroSchemaNestedNamespace).getName
+      } should have message InvalidSchema(invalidAvroSchemaNestedNamespace, isKey = false).errorMessage
+    }
+
+    "throw an error with '-' in the name of a nested schema" in {
+      the[DeserializationException] thrownBy {
+        new SchemaFormat(isKey = false).read(invalidAvroSchemaNestedName).getName
+      } should have message InvalidSchema(invalidAvroSchemaNestedName, isKey = false).errorMessage
     }
 
     "parse a valid Schemas object" in {
