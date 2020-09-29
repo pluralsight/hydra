@@ -227,12 +227,12 @@ sealed trait TopicMetadataV2Parser
       obj.toString().parseJson
     }
 
-    def isNamespaceValid(schema: Schema): Boolean = {
+    def isNamespaceInvalid(schema: Schema): Boolean = {
       val t = schema.getType
       t match {
         case Schema.Type.RECORD =>
           val currentNamespace = Option(schema.getNamespace).exists(f => f.contains("-"))
-          val allRecords = schema.getFields.asScala.toList.exists(f => isNamespaceValid(f.schema()))
+          val allRecords = schema.getFields.asScala.toList.exists(f => isNamespaceInvalid(f.schema()))
           currentNamespace || allRecords
         case _ => false
       }
@@ -244,7 +244,7 @@ sealed trait TopicMetadataV2Parser
         throw DeserializationException(InvalidSchema(json, isKey).errorMessage)
       )
 
-      if(isNamespaceValid(schema)) {
+      if(isNamespaceInvalid(schema)) {
         throw DeserializationException(InvalidSchema(json, isKey).errorMessage)
       } else {
         schema
