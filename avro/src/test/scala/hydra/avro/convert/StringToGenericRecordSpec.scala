@@ -47,6 +47,14 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     record.get.get("testing") shouldBe null
   }
 
+  it should "convert union record with inner record with implicit null branch" in {
+    val schema = SchemaBuilder.record("Test").namespace("my.namespace").fields().name("testing").`type`()
+      .unionOf().nullType().and().record("TestingInner").fields()
+      .requiredInt("testInner").endRecord().endUnion().nullDefault().endRecord()
+    val record = """{"testing": {"my.namespace.TestingInner": {"testInner": 2020}}}""".toGenericRecord(schema, useStrictValidation = true)
+    record.get.get("testing").toString shouldBe "{\"testInner\": 2020}"
+  }
+
   it should "reject union record with explicit null branch containing extra fields" in {
     val schema = SchemaBuilder.record("Test").fields()
       .optionalString("testing").endRecord()
