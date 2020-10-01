@@ -14,7 +14,7 @@ object Dependencies {
   val cirisVersion = "1.2.1"
   val confluentVersion = "5.4.2"
   val easyMockVersion = "4.2" //needed for mocking static java methods
-  val fs2KafkaVersion = "1.0.0"
+  val fs2KafkaVersion = "1.1.0"
   val h2DbVersion = "1.4.200"
   val jacksonCoreVersion = "2.10.4"
   val jacksonDatabindVersion = "2.10.4"
