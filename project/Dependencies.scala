@@ -21,8 +21,8 @@ object Dependencies {
   val jodaConvertVersion = "2.2.1"
   val jodaTimeVersion = "2.10.6"
   val kafkaVersion = "2.4.1"
-  val kamonPVersion = "2.1.4"
-  val kamonVersion = "2.1.4"
+  val kamonPVersion = "2.1.7"
+  val kamonVersion = "2.1.7"
   val log4jVersion = "2.13.3"
   val powerMockVersion = "2.0.7" //needed for mocking static java methods
   val refinedVersion = "0.9.17"
