@@ -6,8 +6,9 @@ import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.implicits._
 import com.dimafeng.testcontainers.{ForAllTestContainer, KafkaContainer}
 import hydra.avro.registry.SchemaRegistry
-import hydra.kafka.model.TopicConsumer
+import hydra.kafka.model.{TopicConsumer, TopicConsumerOffset}
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
+import hydra.kafka.model.TopicConsumerOffset.{TopicConsumerOffsetKey, TopicConsumerOffsetValue}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
@@ -49,14 +50,15 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
 
   private val internalKafkaConsumerTopic = "__consumer_offsets"
   private val dvsConsumerTopic = "dvs_internal_consumers1"
-  private val dvsConsumerOffsetsTopic = "dvs_internal_consumers_offsets1"
+  private val dvsInternalKafkaTopic = "dvs_internal_consumers_offsets1"
   private val consumerGroup = "consumerGroupName"
 
   (for {
     kafkaAdmin <- KafkaAdminAlgebra.test[IO]//(container.bootstrapServers)
     schemaRegistry <- SchemaRegistry.test[IO]
     kafkaClient <- KafkaClientAlgebra.live[IO](container.bootstrapServers, schemaRegistry)
-    consumerGroupAlgebra <- ConsumerGroupsAlgebra.make(internalKafkaConsumerTopic, dvsConsumerTopic, dvsConsumerOffsetsTopic, container.bootstrapServers, consumerGroup, consumerGroup, kafkaClient, schemaRegistry)
+    kafkaAdmin <- KafkaAdminAlgebra.live(container.bootstrapServers)
+    consumerGroupAlgebra <- ConsumerGroupsAlgebra.make(internalKafkaConsumerTopic, dvsConsumerTopic, dvsInternalKafkaTopic, container.bootstrapServers, consumerGroup, consumerGroup, kafkaClient, kafkaAdmin, schemaRegistry)
   } yield {
     runTests(consumerGroupAlgebra, schemaRegistry, kafkaClient, kafkaAdmin)
   }).unsafeRunSync()
@@ -68,6 +70,8 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
                 kafkaAdmin: KafkaAdminAlgebra[IO]): Unit = {
 
     createDVSConsumerTopic(schemaRegistry, kafkaAdmin)
+
+    createDVSInternalKafkaOffsetsTopic(schemaRegistry, kafkaAdmin)
 
     val topicName = "dvs_internal_test123"
     val (keyGR, valueGR) = getGenericRecords(topicName, "key123", "value123")
@@ -139,6 +143,18 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
           schemaRegistry.registerSchema(topic, v.getSchema)
       } *>
       IO.pure((k, v))
+    case _ => IO.pure(null, null)
+    }.unsafeRunSync()
+  }
+
+  private def createDVSInternalKafkaOffsetsTopic(schemaRegistry: SchemaRegistry[IO], kafkaAdminAlgebra: KafkaAdminAlgebra[IO]): (GenericRecord, GenericRecord) = {
+    val topic = dvsInternalKafkaTopic
+    TopicConsumerOffset.encode[IO](TopicConsumerOffsetKey("t", 0), TopicConsumerOffsetValue(0)).flatMap { case (k, v) =>
+      kafkaAdminAlgebra.createTopic(topic, TopicDetails(1, 1)).flatMap { _ =>
+        schemaRegistry.registerSchema(topic, k.getSchema) *>
+          schemaRegistry.registerSchema(topic, v.getSchema)
+      } *>
+        IO.pure((k, v))
     }.unsafeRunSync()
   }
 

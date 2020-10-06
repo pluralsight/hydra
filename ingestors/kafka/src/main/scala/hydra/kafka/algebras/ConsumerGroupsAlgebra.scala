@@ -3,17 +3,17 @@ package hydra.kafka.algebras
 import java.nio.ByteBuffer
 import java.time.Instant
 
-import cats.{Applicative, Order, data}
-import cats.effect.concurrent.Ref
+import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.implicits._
+import cats.{Applicative, Order, data}
 import fs2.Chunk.Bytes
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.algebras.ConsumerGroupsAlgebra.{Consumer, ConsumerTopics, Topic, TopicConsumers}
-import hydra.kafka.model.{TopicConsumer, TopicConsumerOffset}
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
 import hydra.kafka.model.TopicConsumerOffset.{TopicConsumerOffsetKey, TopicConsumerOffsetValue}
+import hydra.kafka.model.{TopicConsumer, TopicConsumerOffset}
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import io.confluent.kafka.serializers.{AbstractKafkaAvroSerDeConfig, KafkaAvroSerializer}
 import kafka.common.OffsetAndMetadata
@@ -22,7 +22,6 @@ import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.common.TopicPartition
 
 import scala.collection.JavaConverters._
-import scala.collection.SortedSet
 import scala.util.Try
 
 trait ConsumerGroupsAlgebra[F[_]] {
@@ -48,6 +47,7 @@ object ConsumerGroupsAlgebra {
                                                          uniquePerNodeConsumerGroup: String,
                                                          commonConsumerGroup: String,
                                                          kafkaClientAlgebra: KafkaClientAlgebra[F],
+                                                         kafkaAdminAlgebra: KafkaAdminAlgebra[F],
                                                          schemaRegistryAlgebra: SchemaRegistry[F]): F[ConsumerGroupsAlgebra[F]] = {
     val dvsConsumerStream = kafkaClientAlgebra.consumeMessages(dvsConsumerTopic, uniquePerNodeConsumerGroup, commitOffsets = false)
     val dvsConsumerOffsetStream = kafkaClientAlgebra.consumeMessages(dvsInternalKafkaOffsetTopic, uniquePerNodeConsumerGroup, commitOffsets = false)
@@ -55,11 +55,14 @@ object ConsumerGroupsAlgebra {
     for {
       cf <- Ref[F].of(ConsumerGroupsStorageFacade.empty)
       schemaRegistryClient <- schemaRegistryAlgebra.getSchemaRegistryClient
-      partitionMap <- dvsConsumerOffsetStream.flatMap { case (key, value) =>
+      latestOffsets <- kafkaAdminAlgebra.getLatestOffsets(dvsInternalKafkaOffsetTopic)
+      deferred <- Deferred[F, Map[Int, Long]]
+      _ <- Concurrent[F].start(dvsConsumerOffsetStream.flatMap { case (key, value) =>
         fs2.Stream.eval(TopicConsumerOffset.decode[F](key, value).map { case (topicKey, topicValue) =>
           topicValue.map(tV => topicKey.partition -> tV.offset)
         })
-      }.compile.toList.map(_.flatten.toMap)
+      }.compile.drain)
+      partitionMap <- deferred.get
       _ <- Concurrent[F].start(consumerOffsetsToInternalOffsets(kafkaInternalTopic, dvsConsumerTopic, bootstrapServers, commonConsumerGroup, schemaRegistryClient, partitionMap, dvsInternalKafkaOffsetTopic))
       _ <- Concurrent[F].start(dvsConsumerStream.flatMap { case (key, value) =>
         fs2.Stream.eval(TopicConsumer.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
