@@ -49,13 +49,14 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
 
   private val internalKafkaConsumerTopic = "__consumer_offsets"
   private val dvsConsumerTopic = "dvs_internal_consumers1"
+  private val dvsConsumerOffsetsTopic = "dvs_internal_consumers_offsets1"
   private val consumerGroup = "consumerGroupName"
 
   (for {
     kafkaAdmin <- KafkaAdminAlgebra.test[IO]//(container.bootstrapServers)
     schemaRegistry <- SchemaRegistry.test[IO]
     kafkaClient <- KafkaClientAlgebra.live[IO](container.bootstrapServers, schemaRegistry)
-    consumerGroupAlgebra <- ConsumerGroupsAlgebra.make(internalKafkaConsumerTopic, dvsConsumerTopic, container.bootstrapServers, consumerGroup, consumerGroup, kafkaClient, schemaRegistry)
+    consumerGroupAlgebra <- ConsumerGroupsAlgebra.make(internalKafkaConsumerTopic, dvsConsumerTopic, dvsConsumerOffsetsTopic, container.bootstrapServers, consumerGroup, consumerGroup, kafkaClient, schemaRegistry)
   } yield {
     runTests(consumerGroupAlgebra, schemaRegistry, kafkaClient, kafkaAdmin)
   }).unsafeRunSync()

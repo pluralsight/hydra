@@ -52,7 +52,7 @@ object TopicConsumerOffset {
       }
       .rethrow
       .flatMap {
-        case (k: GenericRecord, v: GenericRecord) => Monad[F].pure((k, Option(v)))
+        case (k: GenericRecord, v: GenericRecord) => Monad[F].pure((k, v))
         case (k, v) =>
           MonadError[F, Throwable].raiseError(
             AvroEncodingFailure(

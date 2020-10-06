@@ -13,6 +13,7 @@ import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.algebras.ConsumerGroupsAlgebra.{Consumer, ConsumerTopics, Topic, TopicConsumers}
 import hydra.kafka.model.{TopicConsumer, TopicConsumerOffset}
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
+import hydra.kafka.model.TopicConsumerOffset.{TopicConsumerOffsetKey, TopicConsumerOffsetValue}
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import io.confluent.kafka.serializers.{AbstractKafkaAvroSerDeConfig, KafkaAvroSerializer}
 import kafka.common.OffsetAndMetadata
@@ -42,14 +43,14 @@ object ConsumerGroupsAlgebra {
   def make[F[_]: ContextShift: ConcurrentEffect: Timer](
                                                          kafkaInternalTopic: String,
                                                          dvsConsumerTopic: String,
-                                                         dvsConsumerOffsetTopic: String,
+                                                         dvsInternalKafkaOffsetTopic: String,
                                                          bootstrapServers: String,
                                                          uniquePerNodeConsumerGroup: String,
                                                          commonConsumerGroup: String,
                                                          kafkaClientAlgebra: KafkaClientAlgebra[F],
                                                          schemaRegistryAlgebra: SchemaRegistry[F]): F[ConsumerGroupsAlgebra[F]] = {
     val dvsConsumerStream = kafkaClientAlgebra.consumeMessages(dvsConsumerTopic, uniquePerNodeConsumerGroup, commitOffsets = false)
-    val dvsConsumerOffsetStream = kafkaClientAlgebra.consumeMessages(dvsConsumerOffsetTopic, uniquePerNodeConsumerGroup, commitOffsets = false)
+    val dvsConsumerOffsetStream = kafkaClientAlgebra.consumeMessages(dvsInternalKafkaOffsetTopic, uniquePerNodeConsumerGroup, commitOffsets = false)
 
     for {
       cf <- Ref[F].of(ConsumerGroupsStorageFacade.empty)
@@ -59,7 +60,7 @@ object ConsumerGroupsAlgebra {
           topicValue.map(tV => topicKey.partition -> tV.offset)
         })
       }.compile.toList.map(_.flatten.toMap)
-      _ <- Concurrent[F].start(consumerOffsetsToInternalOffsets(kafkaInternalTopic, dvsConsumerTopic, bootstrapServers, commonConsumerGroup, schemaRegistryClient, partitionMap))
+      _ <- Concurrent[F].start(consumerOffsetsToInternalOffsets(kafkaInternalTopic, dvsConsumerTopic, bootstrapServers, commonConsumerGroup, schemaRegistryClient, partitionMap, dvsInternalKafkaOffsetTopic))
       _ <- Concurrent[F].start(dvsConsumerStream.flatMap { case (key, value) =>
         fs2.Stream.eval(TopicConsumer.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
           topicValue match {
@@ -86,7 +87,7 @@ object ConsumerGroupsAlgebra {
                                                          (
                                                            stream: fs2.Stream[F, KafkaConsumer[F, Option[BaseKey], Option[OffsetAndMetadata]]],
                                                            p: Map[Int, Long]
-                                                         ) = {
+                                                         ): fs2.Stream[F, KafkaConsumer[F, Option[BaseKey], Option[OffsetAndMetadata]]] = {
     implicit val order: Order[TopicPartition] =
       (x: TopicPartition, y: TopicPartition) => if (x.partition() > y.partition()) 1 else if (x.partition() < y.partition()) -1 else 0
     stream.flatTap { b =>
@@ -112,7 +113,8 @@ object ConsumerGroupsAlgebra {
   private def processRecord[F[_]: ConcurrentEffect](
                                                      cr: CommittableConsumerRecord[F, Option[BaseKey], Option[OffsetAndMetadata]],
                                                      s: SchemaRegistryClient,
-                                                     destinationTopic: String
+                                                     destinationTopic: String,
+                                                     dvsInternalKafkaOffsetTopic: String
                                                    ): fs2.Stream[F, ProducerRecords[Array[Byte], Array[Byte], Unit]] = {
     (cr.record.key, cr.record.value) match {
       case (Some(OffsetKey(_, k)), offsetMaybe) =>
@@ -126,15 +128,17 @@ object ConsumerGroupsAlgebra {
           case Some(consumerKey) =>
             fs2.Stream.eval(for {
               topicConsumer <- TopicConsumer.encode[F](consumerKey, consumerValue)
+              topicConsumerOffset <- TopicConsumerOffset.encode[F](TopicConsumerOffsetKey(consumerKey.topicName, k.topicPartition.partition()), TopicConsumerOffsetValue(cr.offset.offsetAndMetadata.offset()))
               (key, value) = topicConsumer
               k <- getSerializer[F, GenericRecord](s)(isKey = true).serialize(destinationTopic, Headers.empty, key)
               v <- getSerializer[F, GenericRecord](s)(isKey = false).serialize(destinationTopic, Headers.empty, value.orNull)
-              // TODO Turn Commit offset into Producer Record which can be streamed in next step
-              // This is going to be a compacted topic that the algebra will read off of on start to know which offset to start processing
-              //                  a = cr.offset.offsets(cr.offset.topicPartition)
-              //                  b = a.offset()
-              //                  c = ConsumerOffsetCommit(partition: Long, offset: Long) => ProducerRecord
-            } yield ProducerRecord(destinationTopic, k, v)).map(p => ProducerRecords.one(p))
+              offsetK <- getSerializer[F, GenericRecord](s)(isKey = true).serialize(dvsInternalKafkaOffsetTopic, Headers.empty, topicConsumerOffset._1)
+              offsetV <- getSerializer[F, GenericRecord](s)(isKey = false).serialize(dvsInternalKafkaOffsetTopic, Headers.empty, topicConsumerOffset._2)
+            } yield  {
+              val p = ProducerRecord(destinationTopic, k, v)
+              val p2 = ProducerRecord(dvsInternalKafkaOffsetTopic, offsetK, offsetV)
+              ProducerRecords(List(p, p2))
+            })
           case None => fs2.Stream.empty
         }
       case c =>
@@ -143,8 +147,6 @@ object ConsumerGroupsAlgebra {
     }
   }
 
-
-
   private def consumerOffsetsToInternalOffsets[F[_]: ConcurrentEffect: ContextShift: Timer]
   (
     sourceTopic: String,
@@ -152,7 +154,8 @@ object ConsumerGroupsAlgebra {
     bootstrapServers: String,
     consumerGroupName: String,
     s: SchemaRegistryClient,
-    partitionMap: Map[Int, Long]
+    partitionMap: Map[Int, Long],
+    dvsInternalKafkaOffsetTopic: String
   ) = {
     val settings: ConsumerSettings[F, Option[BaseKey], Option[OffsetAndMetadata]] = ConsumerSettings(
       getConsumerGroupDeserializer[F, BaseKey](GroupMetadataManager.readMessageKey),
@@ -169,7 +172,7 @@ object ConsumerGroupsAlgebra {
     seekToLatestOffsets(sourceTopic)(consumer, partitionMap)
       .flatMap(_.stream)
       .flatMap { cr =>
-        processRecord(cr, s, destinationTopic)
+        processRecord(cr, s, destinationTopic, dvsInternalKafkaOffsetTopic)
       }
       .through(produce(producerSettings))
       .compile.drain
