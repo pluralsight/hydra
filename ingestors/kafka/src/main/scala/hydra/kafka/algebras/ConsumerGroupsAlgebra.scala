@@ -3,7 +3,7 @@ package hydra.kafka.algebras
 import java.nio.ByteBuffer
 import java.time.Instant
 
-import cats.effect.concurrent.{Deferred, Ref}
+import cats.effect.concurrent.{Deferred, Ref, Semaphore}
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.implicits._
 import cats.{Applicative, Order, data}
@@ -50,19 +50,34 @@ object ConsumerGroupsAlgebra {
                                                          kafkaAdminAlgebra: KafkaAdminAlgebra[F],
                                                          schemaRegistryAlgebra: SchemaRegistry[F]): F[ConsumerGroupsAlgebra[F]] = {
     val dvsConsumerStream = kafkaClientAlgebra.consumeMessages(dvsConsumerTopic, uniquePerNodeConsumerGroup, commitOffsets = false)
-    val dvsConsumerOffsetStream = kafkaClientAlgebra.consumeMessages(dvsInternalKafkaOffsetTopic, uniquePerNodeConsumerGroup, commitOffsets = false)
+    val dvsConsumerOffsetStream = kafkaClientAlgebra.consumeMessagesWithOffsetInfo(dvsInternalKafkaOffsetTopic, uniquePerNodeConsumerGroup, commitOffsets = false)
 
     for {
       cf <- Ref[F].of(ConsumerGroupsStorageFacade.empty)
       schemaRegistryClient <- schemaRegistryAlgebra.getSchemaRegistryClient
-      latestOffsets <- kafkaAdminAlgebra.getLatestOffsets(dvsInternalKafkaOffsetTopic)
+      latestOffsets <- kafkaAdminAlgebra.getLatestOffsets(dvsInternalKafkaOffsetTopic) // Returns the latest offsets in the dvs offset topic to know when we're done reading from the topic
+      latestPartitionOffset = latestOffsets.map(l => l._1.partition -> l._2.value)
       deferred <- Deferred[F, Map[Int, Long]]
-      _ <- Concurrent[F].start(dvsConsumerOffsetStream.flatMap { case (key, value) =>
-        fs2.Stream.eval(TopicConsumerOffset.decode[F](key, value).map { case (topicKey, topicValue) =>
-          topicValue.map(tV => topicKey.partition -> tV.offset)
-        })
-      }.compile.drain)
+      cache <- Ref[F].of(latestPartitionOffset.mapValues(_ => 0L))
+      fiber <- Concurrent[F].start {
+        def isComplete: F[Unit] = for {
+          map <- cache.get
+          isFulfilled = map == latestPartitionOffset
+          _ <- if (isFulfilled) deferred.complete(map) else ConcurrentEffect[F].unit
+        } yield ()
+
+        isComplete *> dvsConsumerOffsetStream.flatMap { case ((key, value), (partition, offset)) =>
+          fs2.Stream.eval(TopicConsumerOffset.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
+            if (latestPartitionOffset.get(partition).contains(offset) && topicValue.isDefined) {
+              cache.update(_ + (topicKey.partition -> topicValue.get.offset))
+            } else ConcurrentEffect[F].unit
+          }).flatTap { _ =>
+            fs2.Stream.eval(isComplete)
+          }
+        }.compile.drain
+      }
       partitionMap <- deferred.get
+      _ <- fiber.cancel
       _ <- Concurrent[F].start(consumerOffsetsToInternalOffsets(kafkaInternalTopic, dvsConsumerTopic, bootstrapServers, commonConsumerGroup, schemaRegistryClient, partitionMap, dvsInternalKafkaOffsetTopic))
       _ <- Concurrent[F].start(dvsConsumerStream.flatMap { case (key, value) =>
         fs2.Stream.eval(TopicConsumer.decode[F](key, value).flatMap { case (topicKey, topicValue) =>

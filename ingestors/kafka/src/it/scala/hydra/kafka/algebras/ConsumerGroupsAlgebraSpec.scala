@@ -22,6 +22,7 @@ import retry.{RetryDetails, RetryPolicy}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import scala.util.Try
 
 class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAllTestContainer with BeforeAndAfterAll {
 
@@ -54,10 +55,9 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
   private val consumerGroup = "consumerGroupName"
 
   (for {
-    kafkaAdmin <- KafkaAdminAlgebra.test[IO]//(container.bootstrapServers)
+    kafkaAdmin <- KafkaAdminAlgebra.live[IO](container.bootstrapServers)
     schemaRegistry <- SchemaRegistry.test[IO]
     kafkaClient <- KafkaClientAlgebra.live[IO](container.bootstrapServers, schemaRegistry)
-    kafkaAdmin <- KafkaAdminAlgebra.live(container.bootstrapServers)
     consumerGroupAlgebra <- ConsumerGroupsAlgebra.make(internalKafkaConsumerTopic, dvsConsumerTopic, dvsInternalKafkaTopic, container.bootstrapServers, consumerGroup, consumerGroup, kafkaClient, kafkaAdmin, schemaRegistry)
   } yield {
     runTests(consumerGroupAlgebra, schemaRegistry, kafkaClient, kafkaAdmin)
@@ -69,9 +69,8 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
                 kafkaClient: KafkaClientAlgebra[IO],
                 kafkaAdmin: KafkaAdminAlgebra[IO]): Unit = {
 
-    createDVSConsumerTopic(schemaRegistry, kafkaAdmin)
-
-    createDVSInternalKafkaOffsetsTopic(schemaRegistry, kafkaAdmin)
+    Try(createDVSConsumerTopic(schemaRegistry, kafkaAdmin))
+    Try(createDVSInternalKafkaOffsetsTopic(schemaRegistry, kafkaAdmin))
 
     val topicName = "dvs_internal_test123"
     val (keyGR, valueGR) = getGenericRecords(topicName, "key123", "value123")
