@@ -109,6 +109,7 @@ object KafkaAdminAlgebra {
 
   def live[F[_]: Sync: ConcurrentEffect: ContextShift: Timer](
       bootstrapServers: String,
+      useSsl: Boolean = false
   ): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
     new KafkaAdminAlgebra[F] {
 
@@ -177,9 +178,10 @@ object KafkaAdminAlgebra {
       }
 
       private def getAdminClientResource: Resource[F, KafkaAdminClient[F]] = {
-        adminClientResource(
-          AdminClientSettings.apply.withBootstrapServers(bootstrapServers)
-        )
+        adminClientResource {
+          val s = AdminClientSettings.apply.withBootstrapServers(bootstrapServers)
+          if (useSsl) s.withProperty("security.protocol", "SSL") else s
+        }
       }
     }
   }
