@@ -6,14 +6,16 @@ import java.time.Instant
 import cats.effect.concurrent.{Deferred, Ref, Semaphore}
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.implicits._
-import cats.{Applicative, Order, data}
+import cats.{Applicative, MonadError, Order, data}
 import fs2.Chunk.Bytes
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.algebras.ConsumerGroupsAlgebra.{Consumer, ConsumerTopics, Topic, TopicConsumers}
+import hydra.kafka.algebras.KafkaClientAlgebra.{Offset, OffsetInfo, Partition, Record}
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
 import hydra.kafka.model.TopicConsumerOffset.{TopicConsumerOffsetKey, TopicConsumerOffsetValue}
 import hydra.kafka.model.{TopicConsumer, TopicConsumerOffset}
+import io.chrisdavenport.log4cats.Logger
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import io.confluent.kafka.serializers.{AbstractKafkaAvroSerDeConfig, KafkaAvroSerializer}
 import kafka.common.OffsetAndMetadata
@@ -32,6 +34,8 @@ trait ConsumerGroupsAlgebra[F[_]] {
 
 object ConsumerGroupsAlgebra {
 
+  type PartitionOffsetMap = Map[Int, Long]
+
   final case class TopicConsumers(topicName: String, consumers: List[Consumer])
   final case class Consumer(consumerGroupName: String, lastCommit: Instant)
 
@@ -39,9 +43,9 @@ object ConsumerGroupsAlgebra {
   final case class Topic(topicName: String, lastCommit: Instant)
 
 
-  def make[F[_]: ContextShift: ConcurrentEffect: Timer](
+  def make[F[_]: ContextShift: ConcurrentEffect: Timer: Logger](
                                                          kafkaInternalTopic: String,
-                                                         dvsConsumerTopic: String,
+                                                         dvsConsumersTopic: String,
                                                          dvsInternalKafkaOffsetTopic: String,
                                                          bootstrapServers: String,
                                                          uniquePerNodeConsumerGroup: String,
@@ -49,62 +53,61 @@ object ConsumerGroupsAlgebra {
                                                          kafkaClientAlgebra: KafkaClientAlgebra[F],
                                                          kafkaAdminAlgebra: KafkaAdminAlgebra[F],
                                                          schemaRegistryAlgebra: SchemaRegistry[F]): F[ConsumerGroupsAlgebra[F]] = {
-    val dvsConsumerStream = kafkaClientAlgebra.consumeMessages(dvsConsumerTopic, uniquePerNodeConsumerGroup, commitOffsets = false)
+    val dvsConsumersStream: fs2.Stream[F, (GenericRecord, Option[GenericRecord])] = kafkaClientAlgebra.consumeMessages(dvsConsumersTopic, uniquePerNodeConsumerGroup, commitOffsets = false)
     val dvsConsumerOffsetStream = kafkaClientAlgebra.consumeMessagesWithOffsetInfo(dvsInternalKafkaOffsetTopic, uniquePerNodeConsumerGroup, commitOffsets = false)
 
     for {
-      cf <- Ref[F].of(ConsumerGroupsStorageFacade.empty)
+      consumerGroupsStorageFacade <- Ref[F].of(ConsumerGroupsStorageFacade.empty)
       schemaRegistryClient <- schemaRegistryAlgebra.getSchemaRegistryClient
-      latestOffsets <- kafkaAdminAlgebra.getLatestOffsets(dvsInternalKafkaOffsetTopic) // Returns the latest offsets in the dvs offset topic to know when we're done reading from the topic
-      latestPartitionOffset = latestOffsets.map(l => l._1.partition -> l._2.value)
-      deferred <- Deferred[F, Map[Int, Long]]
-      cache <- Ref[F].of(latestPartitionOffset.mapValues(_ => 0L))
-      fiber <- Concurrent[F].start {
-        def isComplete: F[Unit] = for {
-          map <- cache.get
-          isFulfilled = map == latestPartitionOffset
-          _ <- if (isFulfilled) deferred.complete(map) else ConcurrentEffect[F].unit
-        } yield ()
-
-        isComplete *> dvsConsumerOffsetStream.flatMap { case ((key, value), (partition, offset)) =>
-          fs2.Stream.eval(TopicConsumerOffset.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
-            if (latestPartitionOffset.get(partition).contains(offset) && topicValue.isDefined) {
-              cache.update(_ + (topicKey.partition -> topicValue.get.offset))
-            } else ConcurrentEffect[F].unit
-          }).flatTap { _ =>
-            fs2.Stream.eval(isComplete)
-          }
-        }.compile.drain
-      }
+      latestOffsets <- kafkaAdminAlgebra.getLatestOffsets(dvsInternalKafkaOffsetTopic)
+      simplifiedLatestOffsets = latestOffsets.map(l => l._1.partition -> l._2.value)
+      deferred <- Deferred[F, PartitionOffsetMap]
+      cache <- Ref[F].of(simplifiedLatestOffsets.mapValues(_ => 0L))
+      backgroundProcess <- Concurrent[F].start(getOffsetsToSeekTo(cache, simplifiedLatestOffsets, deferred, dvsConsumerOffsetStream))
       partitionMap <- deferred.get
-      _ <- fiber.cancel
-      _ <- Concurrent[F].start(consumerOffsetsToInternalOffsets(kafkaInternalTopic, dvsConsumerTopic, bootstrapServers, commonConsumerGroup, schemaRegistryClient, partitionMap, dvsInternalKafkaOffsetTopic))
-      _ <- Concurrent[F].start(dvsConsumerStream.flatMap { case (key, value) =>
-        fs2.Stream.eval(TopicConsumer.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
-          topicValue match {
-            case Some(tV) =>
-              cf.update(_.addConsumerGroup(topicKey, tV))
-            case None =>
-              cf.update(_.removeConsumerGroup(topicKey))
-          }
-        })
-      }.compile.drain)
+      _ <- backgroundProcess.cancel
+      _ <- Concurrent[F].start(consumerOffsetsToInternalOffsets(kafkaInternalTopic, dvsConsumersTopic, bootstrapServers, commonConsumerGroup, schemaRegistryClient, partitionMap, dvsInternalKafkaOffsetTopic))
+      _ <- Concurrent[F].start(consumeDVSConsumersTopicIntoCache(dvsConsumersStream, consumerGroupsStorageFacade))
     } yield new ConsumerGroupsAlgebra[F] {
       override def getConsumersForTopic(topicName: String): F[TopicConsumers] =
-        cf.get.map(_.getConsumersForTopicName(topicName))
+        consumerGroupsStorageFacade.get.map(_.getConsumersForTopicName(topicName))
 
       override def getTopicsForConsumer(consumerGroupName: String): F[ConsumerTopics] =
-        cf.get.map(_.getTopicsForConsumerGroupName(consumerGroupName))
+        consumerGroupsStorageFacade.get.map(_.getTopicsForConsumerGroupName(consumerGroupName))
 
       override def getAllConsumers: F[Map[TopicConsumerKey, TopicConsumerValue]] =
-        cf.get.map(_.consumerMap)
+        consumerGroupsStorageFacade.get.map(_.consumerMap)
     }
   }
 
-  private def seekToLatestOffsets[F[_]: ConcurrentEffect](sourceTopic: String)
-                                                         (
+  private[algebras] def getOffsetsToSeekTo[F[_]: ConcurrentEffect](
+                                                          cache: Ref[F, PartitionOffsetMap],
+                                                          latestPartitionOffset: PartitionOffsetMap,
+                                                          deferred: Deferred[F, PartitionOffsetMap],
+                                                          dvsConsumerOffsetStream: fs2.Stream[F, (Record, OffsetInfo)]
+                                                        ): F[Unit] = {
+    def onStart = if (latestPartitionOffset.values.forall(_ == 0L)) deferred.complete(Map()) else ConcurrentEffect[F].unit
+    def isComplete: F[Unit] = for {
+      map <- cache.get
+      isFulfilled = map.keys.size == latestPartitionOffset.keys.size
+      _ <- if (isFulfilled) deferred.complete(map) else ConcurrentEffect[F].unit
+    } yield ()
+
+    onStart *> dvsConsumerOffsetStream.flatMap { case ((key, value), (partition, offset)) =>
+      fs2.Stream.eval(TopicConsumerOffset.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
+        if (latestPartitionOffset.get(partition).contains(offset) && topicValue.isDefined) {
+          cache.update(_ + (topicKey.partition -> topicValue.get.offset))
+        } else ConcurrentEffect[F].unit
+      }).flatTap { _ =>
+        fs2.Stream.eval(isComplete)
+      }
+    }.compile.drain
+  }
+
+  private def seekToLatestOffsets[F[_]: ConcurrentEffect : Logger](sourceTopic: String)
+                                                                  (
                                                            stream: fs2.Stream[F, KafkaConsumer[F, Option[BaseKey], Option[OffsetAndMetadata]]],
-                                                           p: Map[Int, Long]
+                                                           p: PartitionOffsetMap
                                                          ): fs2.Stream[F, KafkaConsumer[F, Option[BaseKey], Option[OffsetAndMetadata]]] = {
     implicit val order: Order[TopicPartition] =
       (x: TopicPartition, y: TopicPartition) => if (x.partition() > y.partition()) 1 else if (x.partition() < y.partition()) -1 else 0
@@ -113,12 +116,10 @@ object ConsumerGroupsAlgebra {
         if (p.nonEmpty) {
           p.iterator.toList.traverse { case (p, o) =>
             b.assign(data.NonEmptySet.one(new TopicPartition(sourceTopic, p))).recoverWith { case e =>
-              println(s"Error: ${e.getMessage}")
-              ConcurrentEffect[F].unit
+              Logger[F].error(s"AssignToTopic for __consumer_offsets Error: ${e.getMessage}") *> ConcurrentEffect[F].unit
             } *>
               b.seek(new TopicPartition(sourceTopic, p), o).recoverWith { case e =>
-                println(s"Error: ${e.getMessage}")
-                ConcurrentEffect[F].unit
+                Logger[F].error(s"SeekToOffset for __consumer_offsets Error: ${e.getMessage}") *> ConcurrentEffect[F].unit
               }
           }.flatMap(_ => Applicative[F].unit)
         } else {
@@ -136,7 +137,6 @@ object ConsumerGroupsAlgebra {
                                                    ): fs2.Stream[F, ProducerRecords[Array[Byte], Array[Byte], Unit]] = {
     (cr.record.key, cr.record.value) match {
       case (Some(OffsetKey(_, k)), offsetMaybe) =>
-        println(s"Offset: ${cr.offset.offsetAndMetadata.offset()}")
         val topic = k.topicPartition.topic()
         val consumerGroupMaybe = Option(k.group)
         val consumerKeyMaybe = consumerGroupMaybe.map(TopicConsumerKey(topic, _))
@@ -146,7 +146,7 @@ object ConsumerGroupsAlgebra {
           case Some(consumerKey) =>
             fs2.Stream.eval(for {
               topicConsumer <- TopicConsumer.encode[F](consumerKey, consumerValue)
-              topicConsumerOffset <- TopicConsumerOffset.encode[F](TopicConsumerOffsetKey(consumerKey.topicName, k.topicPartition.partition()), TopicConsumerOffsetValue(cr.offset.offsetAndMetadata.offset()))
+              topicConsumerOffset <- TopicConsumerOffset.encode[F](TopicConsumerOffsetKey(cr.offset.topicPartition.topic(), cr.offset.topicPartition.partition()), TopicConsumerOffsetValue(cr.offset.offsetAndMetadata.offset()))
               (key, value) = topicConsumer
               k <- getSerializer[F, GenericRecord](s)(isKey = true).serialize(destinationTopic, Headers.empty, key)
               v <- getSerializer[F, GenericRecord](s)(isKey = false).serialize(destinationTopic, Headers.empty, value.orNull)
@@ -160,19 +160,18 @@ object ConsumerGroupsAlgebra {
           case None => fs2.Stream.empty
         }
       case c =>
-        println(s"Offset: ${c}")
         fs2.Stream.empty
     }
   }
 
-  private def consumerOffsetsToInternalOffsets[F[_]: ConcurrentEffect: ContextShift: Timer]
+  private def consumerOffsetsToInternalOffsets[F[_]: ConcurrentEffect: ContextShift: Timer: Logger]
   (
     sourceTopic: String,
     destinationTopic: String,
     bootstrapServers: String,
     consumerGroupName: String,
     s: SchemaRegistryClient,
-    partitionMap: Map[Int, Long],
+    partitionMap: PartitionOffsetMap,
     dvsInternalKafkaOffsetTopic: String
   ) = {
     val settings: ConsumerSettings[F, Option[BaseKey], Option[OffsetAndMetadata]] = ConsumerSettings(
@@ -212,6 +211,22 @@ object ConsumerGroupsAlgebra {
         Try(byteBufferToA(Bytes(data).toByteBuffer)).toOption
       }
     }.suspend
+
+  private def consumeDVSConsumersTopicIntoCache[F[_]: ContextShift: ConcurrentEffect: Timer: Logger](
+                                                                                                      dvsConsumersStream: fs2.Stream[F, Record],
+                                                                                                      consumerGroupsStorageFacade: Ref[F, ConsumerGroupsStorageFacade]
+                                                                                                    ): F[Unit] = {
+    dvsConsumersStream.flatMap { case (key, value) =>
+      fs2.Stream.eval(TopicConsumer.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
+        topicValue match {
+          case Some(tV) =>
+            consumerGroupsStorageFacade.update(_.addConsumerGroup(topicKey, tV))
+          case None =>
+            consumerGroupsStorageFacade.update(_.removeConsumerGroup(topicKey))
+        }
+      })
+    }.compile.drain
+  }
 }
 
 private case class ConsumerGroupsStorageFacade(consumerMap: Map[TopicConsumerKey, TopicConsumerValue]) {

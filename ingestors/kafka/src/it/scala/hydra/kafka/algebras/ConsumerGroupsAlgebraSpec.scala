@@ -51,14 +51,14 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
 
   private val internalKafkaConsumerTopic = "__consumer_offsets"
   private val dvsConsumerTopic = "dvs_internal_consumers1"
-  private val dvsInternalKafkaTopic = "dvs_internal_consumers_offsets1"
+  private val dvsInternalKafkaOffsetsTopic = "dvs_internal_consumers_offsets1"
   private val consumerGroup = "consumerGroupName"
 
   (for {
     kafkaAdmin <- KafkaAdminAlgebra.live[IO](container.bootstrapServers)
     schemaRegistry <- SchemaRegistry.test[IO]
     kafkaClient <- KafkaClientAlgebra.live[IO](container.bootstrapServers, schemaRegistry)
-    consumerGroupAlgebra <- ConsumerGroupsAlgebra.make(internalKafkaConsumerTopic, dvsConsumerTopic, dvsInternalKafkaTopic, container.bootstrapServers, consumerGroup, consumerGroup, kafkaClient, kafkaAdmin, schemaRegistry)
+    consumerGroupAlgebra <- ConsumerGroupsAlgebra.make(internalKafkaConsumerTopic, dvsConsumerTopic, dvsInternalKafkaOffsetsTopic, container.bootstrapServers, consumerGroup, consumerGroup, kafkaClient, kafkaAdmin, schemaRegistry)
   } yield {
     runTests(consumerGroupAlgebra, schemaRegistry, kafkaClient, kafkaAdmin)
   }).unsafeRunSync()
@@ -72,11 +72,12 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
     Try(createDVSConsumerTopic(schemaRegistry, kafkaAdmin))
     Try(createDVSInternalKafkaOffsetsTopic(schemaRegistry, kafkaAdmin))
 
-    val topicName = "dvs_internal_test123"
+    val topicName = "useless_topic_123"
     val (keyGR, valueGR) = getGenericRecords(topicName, "key123", "value123")
     createTopic(topicName, keyGR, valueGR, schemaRegistry, kafkaAdmin)
     kafkaClient.publishMessage((keyGR, Some(valueGR)), topicName).unsafeRunSync()
-    kafkaClient.consumeMessages(topicName, "randomConsumerGroup", commitOffsets = true).take(1).compile.last.unsafeRunSync() shouldBe (keyGR, valueGR.some).some
+    val consumer1 = "randomConsumerGroup"
+    kafkaClient.consumeMessages(topicName, consumer1, commitOffsets = true).take(1).compile.last.unsafeRunSync() shouldBe (keyGR, valueGR.some).some
 
     "ConsumerGroupAlgebraSpec" should {
 
@@ -84,10 +85,13 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
         cga.getConsumersForTopic(topicName).retryIfFalse(_.consumers.exists(_.consumerGroupName == "randomConsumerGroup")).unsafeRunSync()
       }
 
-      "consume two consumerGroups on dvs_internal_test123 topic into the cache" in {
-        kafkaClient.consumeMessages(topicName, "randomConsumerGroup2", commitOffsets = true).take(1).compile.last.unsafeRunSync() shouldBe (keyGR, valueGR.some).some
-        cga.getConsumersForTopic(topicName).retryIfFalse(_.consumers.length == 2).unsafeRunSync()
-        cga.getConsumersForTopic(topicName).unsafeRunSync()
+      "consume two consumerGroups on useless_topic_123 topic into the cache" in {
+        val consumer2 = "randomConsumerGroup2"
+        kafkaClient.consumeMessages(topicName, consumer2, commitOffsets = true).take(1).compile.last.unsafeRunSync() shouldBe (keyGR, valueGR.some).some
+        cga.getConsumersForTopic(topicName).retryIfFalse { c =>
+          val consumers = List(consumer1, consumer2)
+          c.consumers.length == 2 && c.consumers.map(_.consumerGroupName).forall(consumers.contains)
+        }.unsafeRunSync()
       }
 
       "consume two topics of the same consumer group randomConsumerGroup" in {
@@ -95,9 +99,9 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
         val (keyGR2, valueGR2) = getGenericRecords(topicName2, "abc", "123")
         createTopic(topicName2, keyGR2, valueGR2, schemaRegistry, kafkaAdmin)
         kafkaClient.publishMessage((keyGR2, Some(valueGR2)), topicName2).unsafeRunSync()
-        kafkaClient.consumeMessages(topicName2, "randomConsumerGroup", commitOffsets = true).take(1).compile.last.unsafeRunSync() shouldBe (keyGR2, valueGR2.some).some
-
-        cga.getTopicsForConsumer("randomConsumerGroup").retryIfFalse(_.topics.map(_.topicName).forall(List(topicName, topicName2).contains)).unsafeRunSync()
+        kafkaClient.consumeMessages(topicName2, consumer1, commitOffsets = true).take(1).compile.last.unsafeRunSync() shouldBe (keyGR2, valueGR2.some).some
+        val topics = List(topicName, topicName2)
+        cga.getTopicsForConsumer(consumer1).retryIfFalse(_.topics.map(_.topicName).forall(topics.contains)).unsafeRunSync()
       }
 
       "confirm that the timestamps for the consumed topics vary from one to the other" in {
@@ -118,8 +122,20 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
         val firstTimestamp = cga.getConsumersForTopic(topicName2).map(_.consumers.headOption.map(_.lastCommit)).unsafeRunSync().get
 
         kafkaClient.consumeMessages(topicName2, "randomConsumerGroup", commitOffsets = true).take(1).compile.last.unsafeRunSync() shouldBe (keyGR3, valueGR3.some).some
-
         cga.getConsumersForTopic(topicName2).map(_.consumers.head.lastCommit).retryIfFalse(_.isAfter(firstTimestamp)).unsafeRunSync()
+      }
+
+      "consume from the offsets topic" in {
+        def asIndex: Int => Int = {input => input - 1}
+        val totalNumRecords = 12
+        val records = kafkaClient.consumeMessagesWithOffsetInfo(dvsInternalKafkaOffsetsTopic, "newGroup", commitOffsets = true).take(totalNumRecords).compile.toList.unsafeRunSync()
+        val ((gKey, gValue), (partition, offset)) = records.last
+        val (key, Some(value)) = TopicConsumerOffset.decode[IO](gKey, gValue).unsafeRunSync()
+        key.topicName shouldBe internalKafkaConsumerTopic
+        key.partition shouldBe 0
+        partition shouldBe 0
+        offset shouldBe asIndex(totalNumRecords)
+        value.offset shouldBe 24
       }
     }
   }
@@ -147,7 +163,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
   }
 
   private def createDVSInternalKafkaOffsetsTopic(schemaRegistry: SchemaRegistry[IO], kafkaAdminAlgebra: KafkaAdminAlgebra[IO]): (GenericRecord, GenericRecord) = {
-    val topic = dvsInternalKafkaTopic
+    val topic = dvsInternalKafkaOffsetsTopic
     TopicConsumerOffset.encode[IO](TopicConsumerOffsetKey("t", 0), TopicConsumerOffsetValue(0)).flatMap { case (k, v) =>
       kafkaAdminAlgebra.createTopic(topic, TopicDetails(1, 1)).flatMap { _ =>
         schemaRegistry.registerSchema(topic, k.getSchema) *>
@@ -161,5 +177,13 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
     val (_, (_, keyRecord), valueRecord) = KafkaClientAlgebraSpec.topicAndKeyAndValue(subject, keyValue, value)
     (keyRecord, valueRecord)
   }
+
+  /*
+  We need to know:
+    - Are we seeking to the correct offsets
+    - Are we able to retrieve offsets reliably from our offsets topic which is populated by the __consumer_groups topic
+    - Is our cache (holding partition -> offset info) the same as the getLatestOffsets call
+    - If there is something in the topic prior to startup, are we seeking correctly?
+   */
 
 }
