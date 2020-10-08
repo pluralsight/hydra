@@ -30,7 +30,7 @@ trait KafkaClientAlgebra[F[_]] {
   def publishMessage(
     record: Record,
     topicName: TopicName,
-    header: Option[Map[String,String]] = None
+    headers: Option[Map[String,String]] = None
   ): F[Either[PublishError, PublishResponse]]
 
   /**
@@ -43,7 +43,7 @@ trait KafkaClientAlgebra[F[_]] {
   def publishStringKeyMessage(
                       record: StringRecord,
                       topicName: TopicName,
-                      header: Option[Map[String,String]] = None
+                      headers: Option[Map[String,String]] = None
                     ): F[Either[PublishError, PublishResponse]]
 
   /**
@@ -128,7 +128,7 @@ object KafkaClientAlgebra {
                                                           value: Option[Array[Byte]],
                                                           topicName: TopicName,
                                                           promise: Deferred[F, PublishResponse],
-                                                          headers: Headers
+                                                          headers: Headers = Headers.empty
                                                         )
 
   private def getProducerQueue[F[_]: ConcurrentEffect: ContextShift]
@@ -154,11 +154,11 @@ object KafkaClientAlgebra {
                                                                            valSerializer: Serializer[F, RecordFormat],
                                                                            sizeLimitBytes: Option[Long] = None): F[KafkaClientAlgebra[F]] = Sync[F].delay {
     new KafkaClientAlgebra[F] {
-      override def publishMessage(record: Record, topicName: TopicName, header: Option[Map[String,String]]): F[Either[PublishError, PublishResponse]] = {
+      override def publishMessage(record: Record, topicName: TopicName, header: Option[Map[String,String]] = None): F[Either[PublishError, PublishResponse]] = {
         produceMessage[GenericRecord](record, topicName, header, GenericRecordFormat.apply)
       }
 
-      override def publishStringKeyMessage(record: StringRecord, topicName: TopicName, header: Option[Map[String,String]]): F[Either[PublishError, PublishResponse]] = {
+      override def publishStringKeyMessage(record: StringRecord, topicName: TopicName, header: Option[Map[String,String]] = None): F[Either[PublishError, PublishResponse]] = {
         produceMessage[Option[String]](record, topicName, header, StringFormat.apply)
       }
 
@@ -179,7 +179,7 @@ object KafkaClientAlgebra {
                                      header: Option[Map[String,String]],
                                      convert: A => RecordFormat): F[Either[PublishError, PublishResponse]] = {
         val headers: Headers = header match {
-          case Some(_) => Headers.fromSeq(header.map(mp => mp.toList.map(tpl => Header.apply(tpl._1,tpl._2))).get)
+          case Some(headerMap) => Headers.fromSeq(headerMap.toList.map(tpl => Header.apply(tpl._1, tpl._2)))
           case _ => Headers.empty
         }
         for {
@@ -233,12 +233,12 @@ object KafkaClientAlgebra {
   private def getTestInstance[F[_]: Sync: Concurrent](cache: Ref[F, MockFS2Kafka[F]],
                                                       schemaRegistry: SchemaRegistry[F],
                                                       sizeLimitBytes: Option[Long] = None): KafkaClientAlgebra[F] = new KafkaClientAlgebra[F] {
-    override def publishMessage(record: Record, topicName: TopicName, header: Option[Map[String,String]]): F[Either[PublishError, PublishResponse]] = {
+    override def publishMessage(record: Record, topicName: TopicName, header: Option[Map[String,String]] = None): F[Either[PublishError, PublishResponse]] = {
       val cacheRecord = (GenericRecordFormat(record._1), record._2)
       publishCacheMessage(cacheRecord, topicName)
     }
 
-    override def publishStringKeyMessage(record: StringRecord, topicName: TopicName, header: Option[Map[String,String]]): F[Either[PublishError, PublishResponse]] = {
+    override def publishStringKeyMessage(record: StringRecord, topicName: TopicName, header: Option[Map[String,String]] = None): F[Either[PublishError, PublishResponse]] = {
       val cacheRecord = (StringFormat(record._1), record._2)
       publishCacheMessage(cacheRecord, topicName)
     }

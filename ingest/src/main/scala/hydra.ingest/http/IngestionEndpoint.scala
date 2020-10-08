@@ -108,13 +108,15 @@ class IngestionEndpoint[F[_]: Futurable](
     case e => (StatusCodes.InternalServerError, Try(e.getMessage).toOption)
   }
 
+  private val correlationIdHeader = "ps-correlation-id"
+
   private def publishRequestV2(topic: String): Route =
     handleExceptions(exceptionHandler(topic)) {
       extractExecutionContext { implicit ec =>
-        optionalHeaderValueByName("ps-correlation-id") { cIdOpt =>
+        optionalHeaderValueByName(correlationIdHeader) { cIdOpt =>
           entity(as[V2IngestRequest]) { reqNoHeader =>
             val req = cIdOpt match {
-              case Some(id) => reqNoHeader.copy(reqNoHeader.keyPayload, reqNoHeader.valPayload, reqNoHeader.validationStrategy, Some(Map("ps-correlation-d" -> id)))
+              case Some(id) => reqNoHeader.copy(reqNoHeader.keyPayload, reqNoHeader.valPayload, reqNoHeader.validationStrategy, Some(Map(correlationIdHeader -> id)))
               case _ => reqNoHeader.copy(reqNoHeader.keyPayload, reqNoHeader.valPayload, reqNoHeader.validationStrategy, None)
             }
             Subject.createValidated(topic) match {

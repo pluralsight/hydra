@@ -105,12 +105,13 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
   ) extends KafkaClientAlgebra[IO] {
     override def publishMessage(
         record: (GenericRecord, Option[GenericRecord]),
-        topicName: TopicName): IO[Either[PublishError, PublishResponse]] =
+        topicName: TopicName, headers: Option[Map[String, String]] = None): IO[Either[PublishError, PublishResponse]] =
       publishTo.update(_ + (topicName -> record)).map(_ => PublishResponse(0, 0)).attemptNarrow[PublishError]
 
     override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (GenericRecord, Option[GenericRecord])] = fs2.Stream.empty
 
-    override def publishStringKeyMessage(record: (Option[String], Option[GenericRecord]), topicName: TopicName): IO[Either[PublishError, PublishResponse]] = ???
+    override def publishStringKeyMessage(record: (Option[String], Option[GenericRecord]), topicName: TopicName,
+                                         headers: Option[Map[String, String]] = None): IO[Either[PublishError, PublishResponse]] = ???
 
     override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[IO, (Option[String], Option[GenericRecord])] = ???
 

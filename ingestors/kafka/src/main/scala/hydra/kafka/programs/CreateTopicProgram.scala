@@ -118,7 +118,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       message = (TopicMetadataV2Key(topicName), createTopicRequest.copy(createdDate = createdDate, deprecatedDate = deprecatedDate).toValue)
       records <- TopicMetadataV2.encode[F](message._1, Some(message._2))
       _ <- kafkaClient
-        .publishMessage(records, v2MetadataTopicName.value)
+        .publishMessage(records, v2MetadataTopicName.value, headers = None)
         .rethrow
     } yield ()
   }
