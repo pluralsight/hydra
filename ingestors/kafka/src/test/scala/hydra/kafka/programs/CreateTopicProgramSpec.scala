@@ -21,6 +21,7 @@ import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.apache.avro.generic.GenericRecord
 import org.apache.avro.{Schema, SchemaBuilder}
+import org.apache.kafka.common.header.Headers
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import retry.{RetryPolicies, RetryPolicy}
@@ -502,7 +503,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
                                                           failOnPublish: Boolean = false
   ) extends KafkaClientAlgebra[IO] {
 
-    override def publishMessage(record: (GenericRecord, Option[GenericRecord]), topicName: TopicName): IO[Either[PublishError, PublishResponse]] =
+    override def publishMessage(record: (GenericRecord, Option[GenericRecord]), topicName: TopicName, header: Option[Map[String,String]] = None): IO[Either[PublishError, PublishResponse]] =
       if (failOnPublish) {
         IO.pure(Left(PublishError.Timeout))
       } else {
@@ -511,7 +512,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
     override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (GenericRecord, Option[GenericRecord])] = fs2.Stream.empty
 
-    override def publishStringKeyMessage(record: (Option[String], Option[GenericRecord]), topicName: TopicName): IO[Either[PublishError, PublishResponse]] = ???
+    override def publishStringKeyMessage(record: (Option[String], Option[GenericRecord]), topicName: TopicName, header: Option[Map[String,String]] = None): IO[Either[PublishError, PublishResponse]] = ???
 
     override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[IO, (Option[String], Option[GenericRecord])] = ???
 

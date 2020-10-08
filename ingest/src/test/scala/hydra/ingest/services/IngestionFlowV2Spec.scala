@@ -52,6 +52,16 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
     }.unsafeRunSync()
   }
 
+  it should "ingest a record with a correlationId" in {
+    val testRequest = V2IngestRequest(testKeyPayload, testValPayload.some, ValidationStrategy.Strict.some, Some(Map("ps-correlation-id"->"Thisisacorrelation1d")))
+    ingest(testRequest).flatMap { kafkaClient =>
+      kafkaClient.consumeMessages(testSubject.value, "test-consumer").take(1).compile.toList.map { publishedMessages =>
+        val firstMessage = publishedMessages.head
+        (firstMessage._1.toString, firstMessage._2.get.toString) shouldBe (testKeyPayload, testValPayload)
+      }
+    }.unsafeRunSync()
+  }
+
   it should "ingest a tombstone record" in {
     val testRequest = V2IngestRequest(testKeyPayload, None, ValidationStrategy.Strict.some)
     ingest(testRequest).flatMap { kafkaClient =>

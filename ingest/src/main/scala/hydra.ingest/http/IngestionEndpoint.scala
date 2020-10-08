@@ -111,21 +111,27 @@ class IngestionEndpoint[F[_]: Futurable](
   private def publishRequestV2(topic: String): Route =
     handleExceptions(exceptionHandler(topic)) {
       extractExecutionContext { implicit ec =>
-        entity(as[V2IngestRequest]) { req =>
-          Subject.createValidated(topic) match {
-            case Some(t) =>
-              onComplete(Futurable[F].unsafeToFuture(ingestionV2Flow.ingest(req, t))) {
-                case Success(resp) =>
-                  addPromHttpMetric(topic, StatusCodes.OK.toString, "/v2/topics/.../records")
-                  complete(resp)
-                case Failure(e) =>
-                  val status = getV2ReponseCode(e)
-                  addPromHttpMetric(topic, status._1.toString,"/v2/topics/.../records")
-                  complete(status)
-              }
-            case None =>
-              addPromHttpMetric(topic, StatusCodes.BadRequest.toString, "/v2/topics/.../records")
-              complete(StatusCodes.BadRequest, Subject.invalidFormat)
+        optionalHeaderValueByName("ps-correlation-id") { cIdOpt =>
+          entity(as[V2IngestRequest]) { reqNoHeader =>
+            val req = cIdOpt match {
+              case Some(id) => reqNoHeader.copy(reqNoHeader.keyPayload, reqNoHeader.valPayload, reqNoHeader.validationStrategy, Some(Map("ps-correlation-d" -> id)))
+              case _ => reqNoHeader.copy(reqNoHeader.keyPayload, reqNoHeader.valPayload, reqNoHeader.validationStrategy, None)
+            }
+            Subject.createValidated(topic) match {
+              case Some(t) =>
+                onComplete(Futurable[F].unsafeToFuture(ingestionV2Flow.ingest(req, t))) {
+                  case Success(resp) =>
+                    addPromHttpMetric(topic, StatusCodes.OK.toString, "/v2/topics/.../records")
+                    complete(resp)
+                  case Failure(e) =>
+                    val status = getV2ReponseCode(e)
+                    addPromHttpMetric(topic, status._1.toString, "/v2/topics/.../records")
+                    complete(status)
+                }
+              case None =>
+                addPromHttpMetric(topic, StatusCodes.BadRequest.toString, "/v2/topics/.../records")
+                complete(StatusCodes.BadRequest, Subject.invalidFormat)
+            }
           }
         }
       }
