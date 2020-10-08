@@ -90,14 +90,19 @@ object ConsumerGroupsAlgebra {
     def isComplete: F[Unit] = for {
       map <- cache.get
       isFulfilled = map.keys.size == latestPartitionOffset.keys.size
-      _ <- if (isFulfilled) deferred.complete(map) else ConcurrentEffect[F].unit
+      _ <- if (isFulfilled)
+        deferred.complete(map)
+      else
+        ConcurrentEffect[F].unit
     } yield ()
 
     onStart *> dvsConsumerOffsetStream.flatMap { case ((key, value), (partition, offset)) =>
       fs2.Stream.eval(TopicConsumerOffset.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
         if (latestPartitionOffset.get(partition).contains(offset) && topicValue.isDefined) {
           cache.update(_ + (topicKey.partition -> topicValue.get.offset))
-        } else ConcurrentEffect[F].unit
+        } else {
+          ConcurrentEffect[F].unit
+        }
       }).flatTap { _ =>
         fs2.Stream.eval(isComplete)
       }

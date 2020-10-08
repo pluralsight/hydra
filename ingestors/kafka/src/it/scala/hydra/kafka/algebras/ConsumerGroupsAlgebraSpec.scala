@@ -1,11 +1,15 @@
 package hydra.kafka.algebras
 
 import java.time.Instant
+import java.util.concurrent.ScheduledExecutorService
 
+import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.implicits._
 import com.dimafeng.testcontainers.{ForAllTestContainer, KafkaContainer}
 import hydra.avro.registry.SchemaRegistry
+import hydra.kafka.algebras.ConsumerGroupsAlgebra.PartitionOffsetMap
+import hydra.kafka.algebras.KafkaClientAlgebra.{OffsetInfo, Record}
 import hydra.kafka.model.{TopicConsumer, TopicConsumerOffset}
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
 import hydra.kafka.model.TopicConsumerOffset.{TopicConsumerOffsetKey, TopicConsumerOffsetValue}
@@ -20,7 +24,8 @@ import retry.RetryPolicies._
 import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy}
 
-import scala.concurrent.ExecutionContext
+import concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext}
 import scala.concurrent.duration._
 import scala.util.Try
 
@@ -137,7 +142,52 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
         offset shouldBe asIndex(totalNumRecords)
         value.offset shouldBe 24
       }
+
+      "test the getOffsets function" in {
+        def testConsumerGroupsAlgebraGetOffsetsToSeekTo(
+                                                         latestPartitionOffset: PartitionOffsetMap,
+                                                         dvsConsumerOffsetStream: fs2.Stream[IO, (Record, OffsetInfo)]
+                                                       ) = {
+          (for {
+            cache <- Ref[IO].of(Map.empty[Int, Long])
+            deferred <- Deferred[IO, PartitionOffsetMap]
+            backgroundProcess <- Concurrent[IO].start(ConsumerGroupsAlgebra.getOffsetsToSeekTo(cache, latestPartitionOffset, deferred, dvsConsumerOffsetStream))
+            _ <- deferred.get
+            _ <- backgroundProcess.cancel
+          } yield succeed).unsafeRunSync()
+        }
+
+        val c = createOV(Ref[IO].of((0,-1L)).unsafeRunSync()) _
+
+        val latestPartitionMap = Map[Int, Long](0 -> 3, 1 -> 2, 2 -> 1)
+        val dvsConsumerOffsetStream = fs2.Stream(c(false),c(false),c(false),c(false),c(true),c(false), c(false),c(true), c(false))
+        testConsumerGroupsAlgebraGetOffsetsToSeekTo(latestPartitionMap, dvsConsumerOffsetStream)
+
+        val latestPartitionMap2 = Map[Int, Long](0 -> 0, 1 -> 0, 2 -> 0)
+        val dvsConsumerOffsetStream2 = fs2.Stream()
+        testConsumerGroupsAlgebraGetOffsetsToSeekTo(latestPartitionMap2, dvsConsumerOffsetStream2)
+
+        IO.race(IO.delay(testConsumerGroupsAlgebraGetOffsetsToSeekTo(latestPartitionMap, fs2.Stream.empty)), Timer[IO].sleep(1.seconds)).map {
+          case Left(_) => fail("Should never have completed")
+          case Right(_) => succeed
+        }.unsafeRunSync()
+      }
     }
+  }
+
+  private def createOV(partitionCounter: Ref[IO, OffsetInfo])(incrementPartition: Boolean): (Record, OffsetInfo) = {
+    (partitionCounter.update { case (partition, offset) =>
+      if (incrementPartition) {
+        (partition + 1, 0)
+      } else {
+        (partition, offset + 1)
+      }
+    } *> partitionCounter.get.map { case (partition, offset) =>
+      val key = TopicConsumerOffsetKey("topicName", partition)
+      val value = TopicConsumerOffsetValue(scala.util.Random.nextLong())
+      val (gKey, gValue) = TopicConsumerOffset.encode[IO](key, value).unsafeRunSync()
+      ((gKey, gValue.some),(partition, offset))
+    }).unsafeRunSync()
   }
 
   private def createTopic(subject: String, keyGR: GenericRecord, valueGR: GenericRecord, schemaRegistry: SchemaRegistry[IO], kafkaAdminAlgebra: KafkaAdminAlgebra[IO]): Unit = {
@@ -177,13 +227,5 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
     val (_, (_, keyRecord), valueRecord) = KafkaClientAlgebraSpec.topicAndKeyAndValue(subject, keyValue, value)
     (keyRecord, valueRecord)
   }
-
-  /*
-  We need to know:
-    - Are we seeking to the correct offsets
-    - Are we able to retrieve offsets reliably from our offsets topic which is populated by the __consumer_groups topic
-    - Is our cache (holding partition -> offset info) the same as the getLatestOffsets call
-    - If there is something in the topic prior to startup, are we seeking correctly?
-   */
 
 }
