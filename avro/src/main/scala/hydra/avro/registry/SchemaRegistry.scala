@@ -3,9 +3,10 @@ package hydra.avro.registry
 import cats.effect.Sync
 import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, MockSchemaRegistryClient, SchemaRegistryClient}
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
-import cats.implicits._
+import cats.syntax.all._
 import io.confluent.kafka.schemaregistry.avro.AvroCompatibilityChecker
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
+import javax.security.auth.Subject
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
@@ -37,6 +38,14 @@ trait SchemaRegistry[F[_]] {
     * @return Unit
     */
   def deleteSchemaOfVersion(subject: String, version: SchemaVersion): F[Unit]
+
+  /**
+    * Deletes the subject from the versionCache, idCache, and schemaCache
+    * of the CachedSchemaRegistryClient
+    * @param subject The subject using -key or -value to delete
+    * @return Unit
+    */
+  def deleteSchemaSubject(subject: String): F[Unit]
 
   /**
     * Retrieves the SchemaVersion if the given subject and schema match an item in SchemaRegistry.
@@ -150,6 +159,8 @@ object SchemaRegistry {
           schemaRegistryClient.deleteSchemaVersion(subject, version.toString)
         )
 
+
+
       override def getVersion(
           subject: String,
           schema: Schema
@@ -185,6 +196,10 @@ object SchemaRegistry {
         }.toOption
       }
 
+      override def deleteSchemaSubject(subject: String): F[Unit] =
+        Sync[F].delay {
+          schemaRegistryClient.deleteSubject(subject)
+        }
     }
 
 }

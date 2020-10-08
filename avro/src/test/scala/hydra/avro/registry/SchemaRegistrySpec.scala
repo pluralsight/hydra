@@ -1,7 +1,7 @@
 package hydra.avro.registry
 
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import cats.{Applicative, Monad, MonadError}
 import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
 import org.apache.avro.{Schema, SchemaBuilder}

@@ -3,7 +3,7 @@ package hydra.kafka.algebras
 import cats.{Applicative, Monad, MonadError}
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import fs2.concurrent.Queue
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry

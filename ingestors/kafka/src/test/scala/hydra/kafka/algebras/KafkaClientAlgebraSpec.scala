@@ -9,7 +9,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import vulcan.Codec
 import vulcan.generic._
-import cats.implicits._
+import cats.syntax.all._
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError.RecordTooLarge
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishResponse
 

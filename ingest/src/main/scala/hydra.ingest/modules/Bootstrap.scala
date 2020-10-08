@@ -4,7 +4,7 @@ import java.time.Instant
 
 import cats.data.NonEmptyList
 import cats.effect.Sync
-import cats.implicits._
+import cats.syntax.all._
 import cats.{Monad, MonadError}
 import hydra.core.marshallers.History
 import hydra.ingest.app.AppConfig.V2MetadataTopicConfig
@@ -34,6 +34,7 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
             schemas,
             StreamTypeV2.Entity,
             false,
+            None,
             InternalUseOnly,
             NonEmptyList.of(cfg.contactMethod),
             Instant.now,

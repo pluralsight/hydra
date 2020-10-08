@@ -2,7 +2,7 @@ package hydra.kafka.algebras
 
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, Sync}
-import cats.implicits._
+import cats.syntax.all._
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, TopicName}
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer

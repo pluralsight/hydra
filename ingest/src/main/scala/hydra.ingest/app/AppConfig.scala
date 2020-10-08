@@ -1,6 +1,6 @@
 package hydra.ingest.app
 
-import cats.implicits._
+import cats.syntax.all._
 import ciris.{ConfigValue, env, _}
 import hydra.kafka.algebras.KafkaClientAlgebra.ConsumerGroup
 import hydra.kafka.model.ContactMethod
@@ -97,17 +97,25 @@ object AppConfig {
       env("HYDRA_INGEST_RECORD_SIZE_LIMIT_BYTES").as[Long].option
     ).parMapN(IngestConfig)
 
+  final case class TopicDeletionConfig(deleteTopicPassword: String)
+
+  private val topicDeletionConfig: ConfigValue[TopicDeletionConfig] =
+    (
+      env("HYDRA_INGEST_TOPIC_DELETION_PASSWORD").as[String].default("")
+    ).map(TopicDeletionConfig)
+
   final case class AppConfig(
       createTopicConfig: CreateTopicConfig,
       v2MetadataTopicConfig: V2MetadataTopicConfig,
-      ingestConfig: IngestConfig
+      ingestConfig: IngestConfig,
+      topicDeletionConfig: TopicDeletionConfig
   )
 
   val appConfig: ConfigValue[AppConfig] =
     (
       createTopicConfig,
       v2MetadataTopicConfig,
-      ingestConfig
+      ingestConfig,
+      topicDeletionConfig
     ).parMapN(AppConfig)
-
 }

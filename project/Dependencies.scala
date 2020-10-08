@@ -7,11 +7,11 @@ object Dependencies {
   val akkaKafkaStreamVersion = "2.0.4"
   val akkaVersion = "2.6.7"
   val avroVersion = "1.10.0"
-  val catsEffectVersion = "2.1.4"
+  val catsEffectVersion = "2.2.0"
   val catsLoggerVersion = "1.1.1"
   val catsRetryVersion = "1.1.1"
-  val catsVersion = "2.1.1"
-  val cirisVersion = "1.2.0"
+  val catsVersion = "2.2.0"
+  val cirisVersion = "1.2.1"
   val confluentVersion = "5.4.2"
   val easyMockVersion = "4.2" //needed for mocking static java methods
   val fs2KafkaVersion = "1.0.0"
@@ -25,7 +25,7 @@ object Dependencies {
   val kamonVersion = "2.1.4"
   val log4jVersion = "2.13.3"
   val powerMockVersion = "2.0.7" //needed for mocking static java methods
-  val refinedVersion = "0.9.15"
+  val refinedVersion = "0.9.17"
   val reflectionsVersion = "0.9.12"
   val scalaCacheVersion = "0.28.0"
   val scalaMockVersion = "5.0.0"
@@ -34,7 +34,7 @@ object Dependencies {
   val sprayJsonVersion = "1.3.5"
   val testContainersVersion = "0.37.0"
   val typesafeConfigVersion = "1.3.2"
-  val vulcanVersion = "1.1.0"
+  val vulcanVersion = "1.2.0"
 
 
   object Compile {

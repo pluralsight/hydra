@@ -5,7 +5,7 @@ import java.util.UUID
 import org.apache.avro.{LogicalTypes, Schema}
 import org.apache.avro.generic.{GenericDatumReader, GenericRecord}
 import org.apache.avro.io.DecoderFactory
-import cats.implicits._
+import cats.syntax.all._
 import org.apache.avro.util.Utf8
 
 import scala.util.{Failure, Success, Try}
@@ -56,6 +56,7 @@ object StringToGenericRecord {
         case RECORD => sch.getFields.asScala.toSet.flatMap { f: Schema.Field =>
           loop(f.schema, f.name.some) ++ Set(extraName.getOrElse("") + f.name)
         }
+        case UNION => sch.getTypes.asScala.toList.flatMap(f => loop(f, f.getFullName.some) ++ List(extraName.getOrElse("") + f.getFullName)).toSet
         case _ => Set.empty
       }
       loop(schema, None)
