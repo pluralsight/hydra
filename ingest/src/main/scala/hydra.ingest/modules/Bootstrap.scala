@@ -7,23 +7,24 @@ import cats.effect.Sync
 import cats.syntax.all._
 import cats.{Monad, MonadError}
 import hydra.core.marshallers.History
-import hydra.ingest.app.AppConfig.V2MetadataTopicConfig
+import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, V2MetadataTopicConfig}
 import hydra.kafka.model._
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.util.KafkaUtils.TopicDetails
 
 final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
     createTopicProgram: CreateTopicProgram[F],
-    cfg: V2MetadataTopicConfig
+    cfg: V2MetadataTopicConfig,
+    dvsConsumersTopicConfig: DVSConsumersTopicConfig,
+    cooTopicConfig: ConsumerOffsetsOffsetsTopicConfig
 ) {
 
   def bootstrapAll: F[Unit] =
     for {
       _ <- bootstrapMetadataTopic
+      _ <- bootstrapDVSConsumersTopic
+      _ <- bootstrapConsumerOffsetsOffsetsTopic
     } yield ()
-
-  //TODO create the summarizedConsumerGroups Topic
-  //TODO create consumerGroupOffsetTopic (look into storing this value in Zookeeper)
 
   private def bootstrapMetadataTopic: F[Unit] =
     if (cfg.createOnStartup) {
@@ -33,7 +34,7 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
           TopicMetadataV2Request(
             schemas,
             StreamTypeV2.Entity,
-            false,
+            deprecated = false,
             None,
             InternalUseOnly,
             NonEmptyList.of(cfg.contactMethod),
@@ -50,14 +51,59 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
       Monad[F].unit
     }
 
+  private def bootstrapDVSConsumersTopic: F[Unit] =
+    TopicConsumer.getSchemas[F].flatMap { schemas =>
+      createTopicProgram.createTopic(
+        dvsConsumersTopicConfig.topicName,
+        TopicMetadataV2Request(
+          schemas,
+          StreamTypeV2.Entity,
+          deprecated = false,
+          None,
+          InternalUseOnly,
+          NonEmptyList.of(dvsConsumersTopicConfig.contactMethod),
+          Instant.now,
+          List.empty,
+          Some(
+            "This is the topic that Hydra uses to keep track of a summarized list (no partition/offset info) of consumer groups."
+          )
+        ),
+        TopicDetails(dvsConsumersTopicConfig.numPartitions, dvsConsumersTopicConfig.replicationFactor)
+      )
+    }
+
+  private def bootstrapConsumerOffsetsOffsetsTopic: F[Unit] =
+    TopicConsumerOffset.getSchemas[F].flatMap { schemas =>
+      createTopicProgram.createTopic(
+        cooTopicConfig.topicName,
+        TopicMetadataV2Request(
+          schemas,
+          StreamTypeV2.Entity,
+          deprecated = false,
+          None,
+          InternalUseOnly,
+          NonEmptyList.of(cooTopicConfig.contactMethod),
+          Instant.now,
+          List.empty,
+          Some(
+            "This is the topic that Hydra uses to keep track of the offsets we've consumed in the __consumer_offsets topic that Kakfa manages."
+          )
+        ),
+        TopicDetails(cooTopicConfig.numPartitions, cooTopicConfig.replicationFactor)
+      )
+    }
+
+
 }
 
 object Bootstrap {
 
   def make[F[_]: Sync](
       createTopicProgram: CreateTopicProgram[F],
-      v2MetadataTopicConfig: V2MetadataTopicConfig
+      v2MetadataTopicConfig: V2MetadataTopicConfig,
+      consumersTopicConfig: DVSConsumersTopicConfig,
+      consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig
   ): F[Bootstrap[F]] = Sync[F].delay {
-    new Bootstrap[F](createTopicProgram, v2MetadataTopicConfig)
+    new Bootstrap[F](createTopicProgram, v2MetadataTopicConfig, consumersTopicConfig, consumerOffsetsOffsetsTopicConfig)
   }
 }

@@ -57,6 +57,20 @@ object AppConfig {
       consumerGroup: ConsumerGroup
   )
 
+  final case class DVSConsumersTopicConfig(
+                                          topicName: Subject,
+                                          contactMethod: ContactMethod,
+                                          numPartitions: Int,
+                                          replicationFactor: Short
+                                        )
+
+  final case class ConsumerOffsetsOffsetsTopicConfig(
+                                            topicName: Subject,
+                                            contactMethod: ContactMethod,
+                                            numPartitions: Int,
+                                            replicationFactor: Short
+                                          )
+
   private implicit def contactMethodDecoder
       : ConfigDecoder[String, ContactMethod] =
     ConfigDecoder
@@ -77,6 +91,26 @@ object AppConfig {
       env("HYDRA_REPLICATION_FACTOR").as[Short].default(3),
       env("HYDRA_V2_METADATA_CONSUMER_GROUP")
     ).parMapN(V2MetadataTopicConfig)
+
+  private val dvsConsumersTopicConfig: ConfigValue[DVSConsumersTopicConfig] =
+    (
+      env("HYDRA_DVS_CONSUMERS_TOPIC_NAME")
+        .as[Subject]
+        .default(Subject.createValidated("_hydra.consumer-groups").get),
+      env("HYDRA_V2_METADATA_CONTACT").as[ContactMethod],
+      env("HYDRA_DEFAULT_PARTITIONS").as[Int].default(10),
+      env("HYDRA_REPLICATION_FACTOR").as[Short].default(3)
+      ).parMapN(DVSConsumersTopicConfig)
+
+  private val consumerOffsetsOffsetsTopicConfig: ConfigValue[ConsumerOffsetsOffsetsTopicConfig] =
+    (
+      env("HYDRA_CONSUMER_OFFSETS_OFFSETS_TOPIC_NAME")
+        .as[Subject]
+        .default(Subject.createValidated("_hydra.consumer-offsets-offsets").get),
+      env("HYDRA_V2_METADATA_CONTACT").as[ContactMethod],
+      env("HYDRA_DEFAULT_PARTITIONS").as[Int].default(10),
+      env("HYDRA_REPLICATION_FACTOR").as[Short].default(3)
+      ).parMapN(ConsumerOffsetsOffsetsTopicConfig)
 
   final case class IngestConfig(
                                  alternateIngestEnabled: Boolean,
@@ -108,14 +142,18 @@ object AppConfig {
       createTopicConfig: CreateTopicConfig,
       v2MetadataTopicConfig: V2MetadataTopicConfig,
       ingestConfig: IngestConfig,
-      topicDeletionConfig: TopicDeletionConfig
-  )
+      topicDeletionConfig: TopicDeletionConfig,
+      dvsConsumersTopicConfig: DVSConsumersTopicConfig,
+      consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig
+                            )
 
   val appConfig: ConfigValue[AppConfig] =
     (
       createTopicConfig,
       v2MetadataTopicConfig,
       ingestConfig,
-      topicDeletionConfig
+      topicDeletionConfig,
+      dvsConsumersTopicConfig,
+      consumerOffsetsOffsetsTopicConfig
     ).parMapN(AppConfig)
 }
