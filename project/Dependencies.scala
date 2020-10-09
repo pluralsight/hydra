@@ -141,7 +141,7 @@ object Dependencies {
       "com.fasterxml.jackson.core" % "jackson-databind" % jacksonDatabindVersion
     )
 
-    val postgres = "org.postgresql" % "postgresql" % "42.2.14"
+    val postgres = "org.postgresql" % "postgresql" % "42.2.17"
   }
 
   object Test {
