@@ -14,6 +14,7 @@ import hydra.kafka.algebras.ConsumerGroupsAlgebra.{Consumer, ConsumerTopics, Top
 import hydra.kafka.algebras.KafkaClientAlgebra.{Offset, OffsetInfo, Partition, Record}
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
 import hydra.kafka.model.TopicConsumerOffset.{TopicConsumerOffsetKey, TopicConsumerOffsetValue}
+import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{TopicConsumer, TopicConsumerOffset}
 import io.chrisdavenport.log4cats.Logger
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
@@ -44,29 +45,29 @@ object ConsumerGroupsAlgebra {
 
 
   def make[F[_]: ContextShift: ConcurrentEffect: Timer: Logger](
-                                                         kafkaInternalTopic: String,
-                                                         dvsConsumersTopic: String,
-                                                         dvsInternalKafkaOffsetTopic: String,
-                                                         bootstrapServers: String,
-                                                         uniquePerNodeConsumerGroup: String,
-                                                         commonConsumerGroup: String,
-                                                         kafkaClientAlgebra: KafkaClientAlgebra[F],
-                                                         kafkaAdminAlgebra: KafkaAdminAlgebra[F],
-                                                         schemaRegistryAlgebra: SchemaRegistry[F]): F[ConsumerGroupsAlgebra[F]] = {
-    val dvsConsumersStream: fs2.Stream[F, (GenericRecord, Option[GenericRecord])] = kafkaClientAlgebra.consumeMessages(dvsConsumersTopic, uniquePerNodeConsumerGroup, commitOffsets = false)
-    val dvsConsumerOffsetStream = kafkaClientAlgebra.consumeMessagesWithOffsetInfo(dvsInternalKafkaOffsetTopic, uniquePerNodeConsumerGroup, commitOffsets = false)
+                                                                 kafkaInternalTopic: String,
+                                                                 dvsConsumersTopic: Subject,
+                                                                 consumerOffsetsOffsetsTopicConfig: Subject, // __consumer_offsets is the internal kafka topic we're reading off of
+                                                                 bootstrapServers: String,
+                                                                 uniquePerNodeConsumerGroup: String,
+                                                                 commonConsumerGroup: String,
+                                                                 kafkaClientAlgebra: KafkaClientAlgebra[F],
+                                                                 kafkaAdminAlgebra: KafkaAdminAlgebra[F],
+                                                                 schemaRegistryAlgebra: SchemaRegistry[F]): F[ConsumerGroupsAlgebra[F]] = {
+    val dvsConsumersStream: fs2.Stream[F, (GenericRecord, Option[GenericRecord])] = kafkaClientAlgebra.consumeMessages(dvsConsumersTopic.value, uniquePerNodeConsumerGroup, commitOffsets = false)
+    val dvsConsumerOffsetStream = kafkaClientAlgebra.consumeMessagesWithOffsetInfo(consumerOffsetsOffsetsTopicConfig.value, uniquePerNodeConsumerGroup, commitOffsets = false)
 
     for {
       consumerGroupsStorageFacade <- Ref[F].of(ConsumerGroupsStorageFacade.empty)
       schemaRegistryClient <- schemaRegistryAlgebra.getSchemaRegistryClient
-      latestOffsets <- kafkaAdminAlgebra.getLatestOffsets(dvsInternalKafkaOffsetTopic)
+      latestOffsets <- kafkaAdminAlgebra.getLatestOffsets(consumerOffsetsOffsetsTopicConfig.value)
       simplifiedLatestOffsets = latestOffsets.map(l => l._1.partition -> l._2.value)
       deferred <- Deferred[F, PartitionOffsetMap]
       cache <- Ref[F].of(simplifiedLatestOffsets.mapValues(_ => 0L))
       backgroundProcess <- Concurrent[F].start(getOffsetsToSeekTo(cache, simplifiedLatestOffsets, deferred, dvsConsumerOffsetStream))
       partitionMap <- deferred.get
       _ <- backgroundProcess.cancel
-      _ <- Concurrent[F].start(consumerOffsetsToInternalOffsets(kafkaInternalTopic, dvsConsumersTopic, bootstrapServers, commonConsumerGroup, schemaRegistryClient, partitionMap, dvsInternalKafkaOffsetTopic))
+      _ <- Concurrent[F].start(consumerOffsetsToInternalOffsets(kafkaInternalTopic, dvsConsumersTopic.value, bootstrapServers, commonConsumerGroup, schemaRegistryClient, partitionMap, consumerOffsetsOffsetsTopicConfig.value))
       _ <- Concurrent[F].start(consumeDVSConsumersTopicIntoCache(dvsConsumersStream, consumerGroupsStorageFacade))
     } yield new ConsumerGroupsAlgebra[F] {
       override def getConsumersForTopic(topicName: String): F[TopicConsumers] =

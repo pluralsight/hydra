@@ -9,7 +9,7 @@ import hydra.common.util.{ActorUtils, Futurable}
 import hydra.ingest.app.AppConfig.AppConfig
 import hydra.ingest.http._
 import hydra.kafka.consumer.KafkaConsumerProxy
-import hydra.kafka.endpoints.{BootstrapEndpoint, BootstrapEndpointV2, TopicMetadataEndpoint, TopicsEndpoint}
+import hydra.kafka.endpoints.{BootstrapEndpoint, BootstrapEndpointV2, ConsumerGroupsEndpoint, TopicMetadataEndpoint, TopicsEndpoint}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 
 import scala.concurrent.ExecutionContext
@@ -44,6 +44,7 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
     new SchemasEndpoint(consumerProxy).route ~
       new BootstrapEndpoint(system).route ~
       new TopicMetadataEndpoint(consumerProxy, algebras.metadata).route ~
+      new ConsumerGroupsEndpoint(algebras)
       new IngestorRegistryEndpoint().route ~
       new IngestionWebSocketEndpoint().route ~
       new IngestionEndpoint(cfg.ingestConfig.alternateIngestEnabled,

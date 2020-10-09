@@ -57,20 +57,6 @@ object AppConfig {
       consumerGroup: ConsumerGroup
   )
 
-  final case class DVSConsumersTopicConfig(
-                                          topicName: Subject,
-                                          contactMethod: ContactMethod,
-                                          numPartitions: Int,
-                                          replicationFactor: Short
-                                        )
-
-  final case class ConsumerOffsetsOffsetsTopicConfig(
-                                            topicName: Subject,
-                                            contactMethod: ContactMethod,
-                                            numPartitions: Int,
-                                            replicationFactor: Short
-                                          )
-
   private implicit def contactMethodDecoder
       : ConfigDecoder[String, ContactMethod] =
     ConfigDecoder
@@ -92,6 +78,13 @@ object AppConfig {
       env("HYDRA_V2_METADATA_CONSUMER_GROUP")
     ).parMapN(V2MetadataTopicConfig)
 
+  final case class DVSConsumersTopicConfig(
+                                            topicName: Subject,
+                                            contactMethod: ContactMethod,
+                                            numPartitions: Int,
+                                            replicationFactor: Short
+                                          )
+
   private val dvsConsumersTopicConfig: ConfigValue[DVSConsumersTopicConfig] =
     (
       env("HYDRA_DVS_CONSUMERS_TOPIC_NAME")
@@ -102,6 +95,13 @@ object AppConfig {
       env("HYDRA_REPLICATION_FACTOR").as[Short].default(3)
       ).parMapN(DVSConsumersTopicConfig)
 
+  final case class ConsumerOffsetsOffsetsTopicConfig(
+                                                      topicName: Subject,
+                                                      contactMethod: ContactMethod,
+                                                      numPartitions: Int,
+                                                      replicationFactor: Short
+                                                    )
+
   private val consumerOffsetsOffsetsTopicConfig: ConfigValue[ConsumerOffsetsOffsetsTopicConfig] =
     (
       env("HYDRA_CONSUMER_OFFSETS_OFFSETS_TOPIC_NAME")
@@ -111,6 +111,17 @@ object AppConfig {
       env("HYDRA_DEFAULT_PARTITIONS").as[Int].default(10),
       env("HYDRA_REPLICATION_FACTOR").as[Short].default(3)
       ).parMapN(ConsumerOffsetsOffsetsTopicConfig)
+
+  final case class ConsumerGroupsAlgebraConfig(
+                                                      kafkaInternalConsumerGroupsTopic: String,
+                                                      commonConsumerGroup: ConsumerGroup
+                                                    )
+
+  private val consumerGroupAlgebraConfig: ConfigValue[ConsumerGroupsAlgebraConfig] =
+      (
+        env("KAFKA_CONSUMER_GROUPS_INTERNAL_TOPIC_NAME").as[String].default("__consumer_groups"),
+        env("HYDRA_CONSUMER_GROUPS_COMMON_CONSUMER_GROUP").as[ConsumerGroup].default("kafkaInternalConsumerGroupsTopic-ConsumerGroupName")
+      ).parMapN(ConsumerGroupsAlgebraConfig)
 
   final case class IngestConfig(
                                  alternateIngestEnabled: Boolean,
@@ -144,7 +155,8 @@ object AppConfig {
       ingestConfig: IngestConfig,
       topicDeletionConfig: TopicDeletionConfig,
       dvsConsumersTopicConfig: DVSConsumersTopicConfig,
-      consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig
+      consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
+      consumerGroupsAlgebraConfig: ConsumerGroupsAlgebraConfig
                             )
 
   val appConfig: ConfigValue[AppConfig] =
@@ -154,6 +166,7 @@ object AppConfig {
       ingestConfig,
       topicDeletionConfig,
       dvsConsumersTopicConfig,
-      consumerOffsetsOffsetsTopicConfig
+      consumerOffsetsOffsetsTopicConfig,
+      consumerGroupAlgebraConfig
     ).parMapN(AppConfig)
 }
