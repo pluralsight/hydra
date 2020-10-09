@@ -29,7 +29,7 @@ import scala.util.Try
 trait ConsumerGroupsAlgebra[F[_]] {
   def getConsumersForTopic(topicName: String): F[TopicConsumers]
   def getTopicsForConsumer(consumerGroupName: String): F[ConsumerTopics]
-  def getAllConsumers: F[Map[TopicConsumerKey, TopicConsumerValue]]
+  def getAllConsumers: F[List[ConsumerTopics]]
 }
 
 object ConsumerGroupsAlgebra {
@@ -75,8 +75,8 @@ object ConsumerGroupsAlgebra {
       override def getTopicsForConsumer(consumerGroupName: String): F[ConsumerTopics] =
         consumerGroupsStorageFacade.get.map(_.getTopicsForConsumerGroupName(consumerGroupName))
 
-      override def getAllConsumers: F[Map[TopicConsumerKey, TopicConsumerValue]] =
-        consumerGroupsStorageFacade.get.map(_.consumerMap)
+      override def getAllConsumers: F[List[ConsumerTopics]] =
+        consumerGroupsStorageFacade.get.map(_.getAllConsumers)
     }
   }
 
@@ -246,6 +246,9 @@ private case class ConsumerGroupsStorageFacade(consumerMap: Map[TopicConsumerKey
   def getTopicsForConsumerGroupName(consumerGroupName: String): ConsumerTopics = {
     val topics = consumerMap.filterKeys(_.consumerGroupName == consumerGroupName).map(p => Topic(p._1.topicName, p._2.lastCommit)).toList
     ConsumerTopics(consumerGroupName, topics)
+  }
+  def getAllConsumers: List[ConsumerTopics] = {
+    consumerMap.keys.map(_.consumerGroupName).toSet.map(getTopicsForConsumerGroupName).toList
   }
 }
 
