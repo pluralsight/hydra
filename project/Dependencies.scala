@@ -32,7 +32,7 @@ object Dependencies {
   val scalaTestVersion = "3.2.2"
   val scalazVersion = "7.3.2"
   val sprayJsonVersion = "1.3.5"
-  val testContainersVersion = "0.37.0"
+  val testContainersVersion = "0.38.1"
   val typesafeConfigVersion = "1.3.2"
   val vulcanVersion = "1.2.0"
 
@@ -172,11 +172,15 @@ object Dependencies {
   }
 
   object Integration {
+    private val testcontainersJavaVersion = "1.15.0-rc2"
     val testContainers = Seq(
       "com.dimafeng" %% "testcontainers-scala-scalatest" % testContainersVersion % "it",
-      "com.dimafeng" %% "testcontainers-scala-kafka" % testContainersVersion % "it"
+      "com.dimafeng" %% "testcontainers-scala-kafka" % testContainersVersion % "it",
+      "org.testcontainers" % "testcontainers"                  % testcontainersJavaVersion  % "it",
+      "org.testcontainers" % "database-commons"                % testcontainersJavaVersion  % "it",
+      "org.testcontainers" % "postgresql"                      % testcontainersJavaVersion  % "it",
+      "org.testcontainers" % "jdbc"                            % testcontainersJavaVersion  % "it"
     )
-
   }
 
   import Compile._

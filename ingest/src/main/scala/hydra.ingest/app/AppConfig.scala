@@ -119,7 +119,7 @@ object AppConfig {
 
   private val consumerGroupAlgebraConfig: ConfigValue[ConsumerGroupsAlgebraConfig] =
       (
-        env("KAFKA_CONSUMER_GROUPS_INTERNAL_TOPIC_NAME").as[String].default("__consumer_groups"),
+        env("KAFKA_CONSUMER_GROUPS_INTERNAL_TOPIC_NAME").as[String].default("__consumer_offsets"),
         env("HYDRA_CONSUMER_GROUPS_COMMON_CONSUMER_GROUP").as[ConsumerGroup].default("kafkaInternalConsumerGroupsTopic-ConsumerGroupName")
       ).parMapN(ConsumerGroupsAlgebraConfig)
 

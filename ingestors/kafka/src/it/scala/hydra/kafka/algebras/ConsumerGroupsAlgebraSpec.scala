@@ -1,7 +1,6 @@
 package hydra.kafka.algebras
 
 import java.time.Instant
-import java.util.concurrent.ScheduledExecutorService
 
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
@@ -10,9 +9,10 @@ import com.dimafeng.testcontainers.{ForAllTestContainer, KafkaContainer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.algebras.ConsumerGroupsAlgebra.PartitionOffsetMap
 import hydra.kafka.algebras.KafkaClientAlgebra.{OffsetInfo, Record}
-import hydra.kafka.model.{TopicConsumer, TopicConsumerOffset}
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
 import hydra.kafka.model.TopicConsumerOffset.{TopicConsumerOffsetKey, TopicConsumerOffsetValue}
+import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.model.{TopicConsumer, TopicConsumerOffset}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
@@ -24,8 +24,7 @@ import retry.RetryPolicies._
 import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy}
 
-import concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.Try
 
@@ -55,8 +54,8 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
   }
 
   private val internalKafkaConsumerTopic = "__consumer_offsets"
-  private val dvsConsumerTopic = "dvs_internal_consumers1"
-  private val dvsInternalKafkaOffsetsTopic = "dvs_internal_consumers_offsets1"
+  private val dvsConsumerTopic = Subject.createValidated("dvs.internal-consumers1").get
+  private val dvsInternalKafkaOffsetsTopic = Subject.createValidated("dvs.internal-consumers-offsets1").get
   private val consumerGroup = "consumerGroupName"
 
   (for {
@@ -110,7 +109,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
       }
 
       "confirm that the timestamps for the consumed topics vary from one to the other" in {
-        cga.getAllConsumers.map(_.values.toSet.size).unsafeRunSync() shouldBe cga.getAllConsumers.map(_.values.size).unsafeRunSync()
+        cga.getAllConsumers.map(_.toSet.size).unsafeRunSync() shouldBe cga.getAllConsumers.map(_.size).unsafeRunSync()
       }
 
       "update the consumer offset, verify that the latest timestamp is updated" in {
@@ -133,7 +132,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
       "consume from the offsets topic" in {
         def asIndex: Int => Int = {input => input - 1}
         val totalNumRecords = 12
-        val records = kafkaClient.consumeMessagesWithOffsetInfo(dvsInternalKafkaOffsetsTopic, "newGroup", commitOffsets = true).take(totalNumRecords).compile.toList.unsafeRunSync()
+        val records = kafkaClient.consumeMessagesWithOffsetInfo(dvsInternalKafkaOffsetsTopic.value, "newGroup", commitOffsets = true).take(totalNumRecords).compile.toList.unsafeRunSync()
         val ((gKey, gValue), (partition, offset)) = records.last
         val (key, Some(value)) = TopicConsumerOffset.decode[IO](gKey, gValue).unsafeRunSync()
         key.topicName shouldBe internalKafkaConsumerTopic
@@ -166,6 +165,10 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
         val latestPartitionMap2 = Map[Int, Long](0 -> 0, 1 -> 0, 2 -> 0)
         val dvsConsumerOffsetStream2 = fs2.Stream()
         testConsumerGroupsAlgebraGetOffsetsToSeekTo(latestPartitionMap2, dvsConsumerOffsetStream2)
+
+        val latestPartitionMap3 = Map[Int, Long](0 -> 3, 1 -> 2, 2 -> 1, 3 -> 0)
+        val dvsConsumerOffsetStream3 = fs2.Stream(c(false),c(false),c(false),c(false),c(true),c(false), c(false),c(true), c(false))
+        testConsumerGroupsAlgebraGetOffsetsToSeekTo(latestPartitionMap3, dvsConsumerOffsetStream3)
 
         IO.race(IO.delay(testConsumerGroupsAlgebraGetOffsetsToSeekTo(latestPartitionMap, fs2.Stream.empty)), Timer[IO].sleep(1.seconds)).map {
           case Left(_) => fail("Should never have completed")
@@ -201,7 +204,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
       Returns those instances to be used as proof that the dvsConsumerTopic can publish and consume records
    */
   private def createDVSConsumerTopic(schemaRegistry: SchemaRegistry[IO], kafkaAdminAlgebra: KafkaAdminAlgebra[IO]): (GenericRecord, GenericRecord) = {
-    val topic = dvsConsumerTopic
+    val topic = dvsConsumerTopic.value
     TopicConsumer.encode[IO](TopicConsumerKey("t", "c"), TopicConsumerValue(Instant.now).some).flatMap { case (k, Some(v)) =>
       kafkaAdminAlgebra.createTopic(topic, TopicDetails(1, 1)).flatMap { _ =>
         schemaRegistry.registerSchema(topic, k.getSchema) *>
@@ -213,7 +216,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
   }
 
   private def createDVSInternalKafkaOffsetsTopic(schemaRegistry: SchemaRegistry[IO], kafkaAdminAlgebra: KafkaAdminAlgebra[IO]): (GenericRecord, GenericRecord) = {
-    val topic = dvsInternalKafkaOffsetsTopic
+    val topic = dvsInternalKafkaOffsetsTopic.value
     TopicConsumerOffset.encode[IO](TopicConsumerOffsetKey("t", 0), TopicConsumerOffsetValue(0)).flatMap { case (k, v) =>
       kafkaAdminAlgebra.createTopic(topic, TopicDetails(1, 1)).flatMap { _ =>
         schemaRegistry.registerSchema(topic, k.getSchema) *>

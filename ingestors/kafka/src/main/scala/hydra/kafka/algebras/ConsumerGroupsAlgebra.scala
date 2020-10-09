@@ -90,7 +90,7 @@ object ConsumerGroupsAlgebra {
     def onStart = if (latestPartitionOffset.values.forall(_ == 0L)) deferred.complete(Map()) else ConcurrentEffect[F].unit
     def isComplete: F[Unit] = for {
       map <- cache.get
-      isFulfilled = map.keys.size == latestPartitionOffset.keys.size
+      isFulfilled = map.keys.size == latestPartitionOffset.values.count(_ > 0)
       _ <- if (isFulfilled)
         deferred.complete(map)
       else
