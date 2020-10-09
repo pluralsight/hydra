@@ -44,7 +44,7 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
     new SchemasEndpoint(consumerProxy).route ~
       new BootstrapEndpoint(system).route ~
       new TopicMetadataEndpoint(consumerProxy, algebras.metadata).route ~
-      new ConsumerGroupsEndpoint(algebras)
+      new ConsumerGroupsEndpoint(algebras.consumerGroups).route ~
       new IngestorRegistryEndpoint().route ~
       new IngestionWebSocketEndpoint().route ~
       new IngestionEndpoint(cfg.ingestConfig.alternateIngestEnabled,
