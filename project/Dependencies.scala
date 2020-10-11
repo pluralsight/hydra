@@ -161,7 +161,7 @@ object Dependencies {
     )
 
     val scalaMock = "org.scalamock" %% "scalamock" % scalaMockVersion % "test"
-    val junit = "junit" % "junit" % "4.13" % "test"
+    val junit = "junit" % "junit" % "4.13.1" % "test"
 
     val h2db = "com.h2database" % "h2" % h2DbVersion % "test"
 
