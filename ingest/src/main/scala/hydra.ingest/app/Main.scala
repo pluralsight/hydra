@@ -5,7 +5,6 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
 import cats.effect.{ExitCode, IO, IOApp, Resource}
-import cats.implicits._
 import hydra.common.Settings
 import hydra.common.config.ConfigSupport
 import ConfigSupport._
@@ -67,7 +66,7 @@ object Main extends IOApp with ConfigSupport with LoggingAdapter {
       r <- routes.routes
       server <- IO.fromFuture(
         IO(
-          Http().newServerAt(settings.httpInterface, settings.httpPort).bindFlow(r)
+          Http().bindAndHandle(r, settings.httpInterface, settings.httpPort)
         )
       )
     } yield server

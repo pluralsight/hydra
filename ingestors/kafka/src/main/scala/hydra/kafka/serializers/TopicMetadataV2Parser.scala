@@ -5,9 +5,8 @@ import java.time.Instant
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import cats.data.Validated.{Invalid, Valid}
 import cats.data._
-import cats.implicits._
+import cats.syntax.all._
 import eu.timepit.refined.auto._
-import hydra.core.marshallers._
 import hydra.kafka.model.ContactMethod.{Email, Slack}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
@@ -15,6 +14,7 @@ import hydra.kafka.serializers.Errors._
 import hydra.kafka.serializers.TopicMetadataV2Parser.IntentionallyUnimplemented
 import org.apache.avro.Schema
 import spray.json.{DefaultJsonProtocol, DeserializationException, JsObject, JsString, JsValue, RootJsonFormat}
+import collection.JavaConverters._
 
 import scala.util.{Failure, Success, Try}
 
@@ -227,11 +227,28 @@ sealed trait TopicMetadataV2Parser
       obj.toString().parseJson
     }
 
+    def isNamespaceInvalid(schema: Schema): Boolean = {
+      val t = schema.getType
+      t match {
+        case Schema.Type.RECORD =>
+          val currentNamespace = Option(schema.getNamespace).exists(f => f.contains("-"))
+          val allRecords = schema.getFields.asScala.toList.exists(f => isNamespaceInvalid(f.schema()))
+          currentNamespace || allRecords
+        case _ => false
+      }
+    }
+
     override def read(json: JsValue): Schema = {
       val jsonString = json.compactPrint
-      Try(new Schema.Parser().parse(jsonString)).getOrElse(
+      val schema = Try(new Schema.Parser().parse(jsonString)).getOrElse(
         throw DeserializationException(InvalidSchema(json, isKey).errorMessage)
       )
+
+      if(isNamespaceInvalid(schema)) {
+        throw DeserializationException(InvalidSchema(json, isKey).errorMessage)
+      } else {
+        schema
+      }
     }
   }
 
@@ -239,7 +256,7 @@ sealed trait TopicMetadataV2Parser
       extends RootJsonFormat[TopicMetadataV2Request] {
 
     override def write(obj: TopicMetadataV2Request): JsValue =
-      jsonFormat8(TopicMetadataV2Request.apply).write(obj)
+      jsonFormat9(TopicMetadataV2Request.apply).write(obj)
 
     override def read(json: JsValue): TopicMetadataV2Request = json match {
       case j: JsObject =>
@@ -267,6 +284,13 @@ sealed trait TopicMetadataV2Parser
           )
         )
         val deprecated = toResult(getBoolWithKey(j, "deprecated"))
+        val deprecatedDate = if ( deprecated.toOption.getOrElse(false) && !j.getFields("deprecatedDate").headOption.getOrElse(None).equals(None)) {
+          toResult(Option(Instant.parse(j.getFields("deprecatedDate").headOption
+            .getOrElse(throwDeserializationError("deprecatedDate","long"))
+            .toString.replace("\"",""))))
+        } else {
+          toResult(None)
+        }
         val dataClassification = toResult(
           DataClassificationFormat.read(
             j.getFields("dataClassification")
@@ -297,6 +321,7 @@ sealed trait TopicMetadataV2Parser
           schemas,
           streamType,
           deprecated,
+          deprecatedDate,
           dataClassification,
           contact,
           createdDate,
@@ -328,7 +353,7 @@ sealed trait TopicMetadataV2Parser
   implicit object TopicMetadataResponseV2Format extends RootJsonFormat[TopicMetadataV2Response] {
     override def read(json: JsValue): TopicMetadataV2Response = throw IntentionallyUnimplemented
 
-    override def write(obj: TopicMetadataV2Response): JsValue = jsonFormat9(TopicMetadataV2Response.apply).write(obj)
+    override def write(obj: TopicMetadataV2Response): JsValue = jsonFormat10(TopicMetadataV2Response.apply).write(obj)
   }
 
   private def throwDeserializationError(key: String, `type`: String) =
@@ -373,7 +398,7 @@ object Errors {
     val expected =
       """
         |{
-        |   "subject": "String a-zA-Z0-9_.-\\",
+        |   "subject": "String a-zA-Z0-9.-\\",
         |   "schemas": {
         |     "key": {},
         |     "value": {}

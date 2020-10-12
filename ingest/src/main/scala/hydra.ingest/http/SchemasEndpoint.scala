@@ -174,6 +174,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
     ) {
       response => {
         extractExecutionContext { implicit ec =>
+          addPromHttpMetric("",OK.toString, "/schemas")
           complete(OK, BatchSchemasResponse.apply(response))
         }
       }

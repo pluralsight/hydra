@@ -3,7 +3,7 @@ package hydra.kafka.algebras
 import cats.{Monad, MonadError}
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import fs2.concurrent.Queue
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
@@ -130,6 +130,7 @@ object KafkaClientAlgebra {
     val producerSettings =
       ProducerSettings[F, Array[Byte], Array[Byte]]
         .withBootstrapServers(bootstrapServers)
+        .withAcks(Acks.All)
     for {
       queue <- fs2.concurrent.Queue.unbounded[F, ProduceRecordInfo[F]]
       _ <- Concurrent[F].start(queue.dequeue.map { payload =>

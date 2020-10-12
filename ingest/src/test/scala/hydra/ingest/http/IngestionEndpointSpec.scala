@@ -79,8 +79,8 @@ final class IngestionEndpointSpec
       schemaRegistry <- SchemaRegistry.test[IO]
       _ <- schemaRegistry.registerSchema("my_topic-value", otherSchema)
       _ <- schemaRegistry.registerSchema("my_topic-value", otherSchema)
-      _ <- schemaRegistry.registerSchema("exp.blah.blah-value", simpleSchema)
-      _ <- schemaRegistry.registerSchema("exp.blah.blah-key", simpleSchema)
+      _ <- schemaRegistry.registerSchema("dvs.blah.blah-key", simpleSchema)
+      _ <- schemaRegistry.registerSchema("dvs.blah.blah-value", simpleSchema)
     } yield {
       new IngestionEndpoint(
         true,
@@ -243,13 +243,13 @@ final class IngestionEndpointSpec
 
   "The V2 Ingestion path" should {
     "reject an uncomplete request" in {
-      val request = Post("/v2/topics/exp.blah.blah/records", HttpEntity(ContentTypes.`application/json`, """{"test":true, "extraField":true}"""))
+      val request = Post("/v2/topics/dvs.blah.blah/records", HttpEntity(ContentTypes.`application/json`, """{"test":true, "extraField":true}"""))
       request ~> Route.seal(ingestRouteAlt) ~> check {
         status shouldBe StatusCodes.BadRequest
       }
     }
     "accept a complete request" in {
-      val request = Post("/v2/topics/exp.blah.blah/records", HttpEntity(ContentTypes.`application/json`, """{"key":{"test": 1}, "value":{"test": 2}}"""))
+      val request = Post("/v2/topics/dvs.blah.blah/records", HttpEntity(ContentTypes.`application/json`, """{"key":{"test": 1}, "value":{"test": 2}}"""))
       request ~> Route.seal(ingestRouteAlt) ~> check {
         responseAs[String] shouldBe "{\"offset\":0,\"partition\":0}"
         status shouldBe StatusCodes.OK

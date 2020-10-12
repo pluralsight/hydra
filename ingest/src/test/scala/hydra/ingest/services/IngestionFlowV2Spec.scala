@@ -1,7 +1,7 @@
 package hydra.ingest.services
 
 import cats.effect.{Concurrent, ContextShift, IO}
-import cats.implicits._
+import cats.syntax.all._
 import hydra.avro.registry.SchemaRegistry
 import hydra.core.transport.ValidationStrategy
 import hydra.ingest.services.IngestionFlowV2.V2IngestRequest
@@ -19,7 +19,7 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
   private implicit val mode: scalacache.Mode[IO] = scalacache.CatsEffect.modes.async
 
-  private val testSubject: Subject = Subject.createValidated("exp.test.v0.Testing").get
+  private val testSubject: Subject = Subject.createValidated("dvs.test.v0.Testing").get
 
   private val testKeyPayload: String =
     """{"id": "testing"}"""
