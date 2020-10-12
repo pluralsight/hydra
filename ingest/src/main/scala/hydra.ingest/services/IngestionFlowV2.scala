@@ -4,6 +4,7 @@ import java.io.IOException
 
 import cats.MonadError
 import cats.syntax.all._
+import fs2.kafka.{Header, Headers}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.resource.SchemaResourceLoader.SchemaNotFoundException
 import hydra.avro.util.SchemaWrapper
@@ -84,7 +85,7 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
 object IngestionFlowV2 {
   final case class V2IngestRequest(keyPayload: String, valPayload: Option[String],
                                    validationStrategy: Option[ValidationStrategy],
-                                   correlationId: Option[Map[String,String]] = None)
+                                   correlationId: Option[Headers] = None)
 
   final case class AvroConversionAugmentedException(message: String) extends RuntimeException(message)
   final case class SchemaNotFoundAugmentedException(schemaNotFoundException: SchemaNotFoundException, topic: String)

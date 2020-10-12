@@ -20,6 +20,7 @@ import akka.actor._
 import akka.http.scaladsl.model.{HttpRequest, StatusCode, StatusCodes}
 import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
 import cats.syntax.all._
+import fs2.kafka.{Header, Headers}
 import hydra.common.config.ConfigSupport._
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
@@ -114,10 +115,11 @@ class IngestionEndpoint[F[_]: Futurable](
     handleExceptions(exceptionHandler(topic)) {
       extractExecutionContext { implicit ec =>
         optionalHeaderValueByName(correlationIdHeader) { cIdOpt =>
-          entity(as[V2IngestRequest]) { reqNoHeader =>
+          entity(as[V2IngestRequest]) { reqMaybeHeader =>
             val req = cIdOpt match {
-              case Some(id) => reqNoHeader.copy(reqNoHeader.keyPayload, reqNoHeader.valPayload, reqNoHeader.validationStrategy, Some(Map(correlationIdHeader -> id)))
-              case _ => reqNoHeader.copy(reqNoHeader.keyPayload, reqNoHeader.valPayload, reqNoHeader.validationStrategy, None)
+              case Some(id) => reqMaybeHeader.copy(reqMaybeHeader.keyPayload, reqMaybeHeader.valPayload,
+                reqMaybeHeader.validationStrategy, Some(Headers.fromSeq(List(Header.apply(correlationIdHeader, id)))))
+              case _ => reqMaybeHeader.copy(reqMaybeHeader.keyPayload, reqMaybeHeader.valPayload, reqMaybeHeader.validationStrategy, None)
             }
             Subject.createValidated(topic) match {
               case Some(t) =>
