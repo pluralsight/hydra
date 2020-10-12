@@ -145,14 +145,15 @@ object KafkaClientAlgebra {
                                                                            schemaRegistryClient: SchemaRegistryClient,
                                                                            keySerializer: Serializer[F, RecordFormat],
                                                                            valSerializer: Serializer[F, RecordFormat],
-                                                                           sizeLimitBytes: Option[Long] = None): F[KafkaClientAlgebra[F]] = Sync[F].delay {
+                                                                           sizeLimitBytes: Option[Long] = None,
+                                                                           publishTimeoutDuration: FiniteDuration): F[KafkaClientAlgebra[F]] = Sync[F].delay {
     new KafkaClientAlgebra[F] {
       override def publishMessage(record: Record, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
-        produceMessage[GenericRecord](record, topicName, GenericRecordFormat.apply)
+        produceMessage[GenericRecord](record, topicName, GenericRecordFormat.apply, publishTimeoutDuration)
       }
 
       override def publishStringKeyMessage(record: StringRecord, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
-        produceMessage[Option[String]](record, topicName, StringFormat.apply)
+        produceMessage[Option[String]](record, topicName, StringFormat.apply, publishTimeoutDuration)
       }
 
       override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[F, (GenericRecord, Option[GenericRecord])] = {
@@ -164,19 +165,20 @@ object KafkaClientAlgebra {
       }
 
       override def withProducerRecordSizeLimit(sizeLimitBytes: Long): F[KafkaClientAlgebra[F]] =
-        getLiveInstance[F](bootstrapServers)(queue, schemaRegistryClient, keySerializer, valSerializer, sizeLimitBytes.some)
+        getLiveInstance[F](bootstrapServers)(queue, schemaRegistryClient, keySerializer, valSerializer, sizeLimitBytes.some, publishTimeoutDuration)
 
       private def produceMessage[A](
                                      record: (A, Option[GenericRecord]),
                                      topicName: TopicName,
-                                     convert: A => RecordFormat): F[Either[PublishError, PublishResponse]] =
+                                     convert: A => RecordFormat,
+                                     timeoutDuration: FiniteDuration): F[Either[PublishError, PublishResponse]] =
         for {
           d <- Deferred[F, PublishResponse]
           k <- keySerializer.serialize(topicName, Headers.empty, convert(record._1))
           v <- record._2.traverse(r => valSerializer.serialize(topicName, Headers.empty, GenericRecordFormat(r)))
           _ <- checkSizeLimit[F](k, v, sizeLimitBytes)
           _ <- queue.enqueue1(ProduceRecordInfo(k.some, v, topicName, d))
-          resolve <- Concurrent.timeoutTo[F, Either[PublishError, PublishResponse]](d.get.map(Right(_)), 5.seconds, Sync[F].pure(Left(PublishError.Timeout)))
+          resolve <- Concurrent.timeoutTo[F, Either[PublishError, PublishResponse]](d.get.map(Right(_)), timeoutDuration, Sync[F].pure(Left(PublishError.Timeout)))
         } yield resolve
 
       private def consumeMessages[A](
@@ -204,7 +206,8 @@ object KafkaClientAlgebra {
   def live[F[_]: ContextShift: ConcurrentEffect: Timer](
       bootstrapServers: String,
       schemaRegistryAlgebra: SchemaRegistry[F],
-      recordSizeLimit: Option[Long]
+      recordSizeLimit: Option[Long],
+      publishTimeoutDuration: FiniteDuration = 5.seconds
   ): F[KafkaClientAlgebra[F]] =
     for {
       schemaRegistryClient <- schemaRegistryAlgebra.getSchemaRegistryClient
@@ -212,7 +215,7 @@ object KafkaClientAlgebra {
       k <- getLiveInstance(bootstrapServers)(
         queue, schemaRegistryClient,
         getSerializer(schemaRegistryClient)(isKey = true),
-        getSerializer(schemaRegistryClient)(isKey = false))
+        getSerializer(schemaRegistryClient)(isKey = false), None, publishTimeoutDuration)
       kWithSizeLimit <- recordSizeLimit.traverse(k.withProducerRecordSizeLimit)
     } yield kWithSizeLimit.getOrElse(k)
 
