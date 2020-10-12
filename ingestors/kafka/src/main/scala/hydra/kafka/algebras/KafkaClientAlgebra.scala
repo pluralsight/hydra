@@ -1,9 +1,9 @@
 package hydra.kafka.algebras
 
-import cats.{Monad, MonadError}
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.syntax.all._
+import cats.{Monad, MonadError}
 import fs2.concurrent.Queue
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
@@ -88,20 +88,21 @@ object KafkaClientAlgebra {
       new PublishResponse(partition, if (offset < 0) None else offset.some)
   }
 
-  sealed abstract class PublishError(message: String)
-    extends Exception(message)
+  sealed abstract class PublishError(message: String, cause: Option[Throwable])
+    extends Exception(message, cause.orNull)
       with Product
       with Serializable
 
   object PublishError {
 
     case object Timeout
-      extends PublishError("Timeout while ingesting message.")
+      extends PublishError("Timeout while ingesting message.", None)
         with NoStackTrace
     final case class RecordTooLarge(actualSize: Long, sizeLimit: Long)
-      extends PublishError(s"Record was $actualSize bytes but the limit is $sizeLimit bytes.")
+      extends PublishError(s"Record was $actualSize bytes but the limit is $sizeLimit bytes.", None)
         with NoStackTrace
-
+    final case class OtherPublishError(cause: Throwable)
+      extends PublishError(cause.getMessage, cause.some)
   }
 
   private def checkSizeLimit[F[_]: MonadError[*[_], Throwable]](k: Array[Byte], v: Option[Array[Byte]], sizeLimitBytes: Option[Long]): F[Unit] = {
@@ -121,7 +122,7 @@ object KafkaClientAlgebra {
                                                           key: Option[Array[Byte]],
                                                           value: Option[Array[Byte]],
                                                           topicName: TopicName,
-                                                          promise: Deferred[F, PublishResponse]
+                                                          promise: Deferred[F, Either[PublishError, PublishResponse]]
                                                         )
 
   private def getProducerQueue[F[_]: ConcurrentEffect: ContextShift]
@@ -133,10 +134,15 @@ object KafkaClientAlgebra {
         .withAcks(Acks.All)
     for {
       queue <- fs2.concurrent.Queue.unbounded[F, ProduceRecordInfo[F]]
-      _ <- Concurrent[F].start(queue.dequeue.map { payload =>
+      _ <- Concurrent[F].start(queue.dequeue.flatMap { payload =>
         val record = ProducerRecord(payload.topicName, payload.key.orNull, payload.value.orNull)
-        ProducerRecords.one(record, payload.promise)
-      }.through(produce(producerSettings)).flatMap(i => fs2.Stream.chunk(i.records).evalMap(r => i.passthrough.complete(PublishResponse(r._2.partition, r._2.offset)))).compile.drain)
+        val producerRecords: ProducerRecords[Array[Byte], Array[Byte], Deferred[F, Either[PublishError, PublishResponse]]] =
+          ProducerRecords.one(record, payload.promise)
+        fs2.Stream.emit[F, ProducerRecords[Array[Byte], Array[Byte], Deferred[F, Either[PublishError, PublishResponse]]]](producerRecords)
+          .through(produce(producerSettings))
+          .flatMap(i => fs2.Stream.chunk(i.records).evalMap(r => i.passthrough.complete(PublishResponse(r._2.partition, r._2.offset).asRight)))
+          .handleErrorWith(error => fs2.Stream.emit(payload.promise.complete(PublishError.OtherPublishError(error).asLeft)))
+      }.compile.drain)
     } yield queue
   }
 
@@ -173,12 +179,12 @@ object KafkaClientAlgebra {
                                      convert: A => RecordFormat,
                                      timeoutDuration: FiniteDuration): F[Either[PublishError, PublishResponse]] =
         for {
-          d <- Deferred[F, PublishResponse]
+          d <- Deferred[F, Either[PublishError, PublishResponse]]
           k <- keySerializer.serialize(topicName, Headers.empty, convert(record._1))
           v <- record._2.traverse(r => valSerializer.serialize(topicName, Headers.empty, GenericRecordFormat(r)))
           _ <- checkSizeLimit[F](k, v, sizeLimitBytes)
           _ <- queue.enqueue1(ProduceRecordInfo(k.some, v, topicName, d))
-          resolve <- Concurrent.timeoutTo[F, Either[PublishError, PublishResponse]](d.get.map(Right(_)), timeoutDuration, Sync[F].pure(Left(PublishError.Timeout)))
+          resolve <- Concurrent.timeoutTo[F, Either[PublishError, PublishResponse]](d.get, timeoutDuration, Sync[F].pure(Left(PublishError.Timeout)))
         } yield resolve
 
       private def consumeMessages[A](
