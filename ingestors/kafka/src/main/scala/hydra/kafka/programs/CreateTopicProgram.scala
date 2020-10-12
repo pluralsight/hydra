@@ -1,5 +1,7 @@
 package hydra.kafka.programs
 
+import java.time.Instant
+
 import cats.effect.{Bracket, ExitCase, Resource}
 import cats.syntax.all._
 import hydra.avro.registry.SchemaRegistry
@@ -103,7 +105,17 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     for {
       metadata <- metadataAlgebra.getMetadataFor(topicName)
       createdDate = metadata.map(_.value.createdDate).getOrElse(createTopicRequest.createdDate)
-      message = (TopicMetadataV2Key(topicName), createTopicRequest.copy(createdDate = createdDate).toValue)
+      deprecatedDate = metadata.map(_.value.deprecatedDate).getOrElse(createTopicRequest.deprecatedDate) match {
+        case Some(date) =>
+          Some(date)
+        case None =>
+          if(createTopicRequest.deprecated) {
+            Some(Instant.now)
+          } else {
+            None
+          }
+      }
+      message = (TopicMetadataV2Key(topicName), createTopicRequest.copy(createdDate = createdDate, deprecatedDate = deprecatedDate).toValue)
       records <- TopicMetadataV2.encode[F](message._1, Some(message._2))
       _ <- kafkaClient
         .publishMessage(records, v2MetadataTopicName.value)

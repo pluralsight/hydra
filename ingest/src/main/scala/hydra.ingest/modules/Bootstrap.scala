@@ -31,6 +31,7 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
             schemas,
             StreamTypeV2.Entity,
             false,
+            None,
             InternalUseOnly,
             NonEmptyList.of(cfg.contactMethod),
             Instant.now,

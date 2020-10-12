@@ -145,11 +145,11 @@ object StreamsManagerActor {
           record.get("schemaId").toString.toInt,
           record.get("streamType").toString,
           record.get("derived").toString.toBoolean,
-          Option(record.get("deprecated")).map(_.toString.toBoolean),
+          Try(Option(record.get("deprecated"))).toOption.flatten.map(_.toString.toBoolean),
           record.get("dataClassification").toString,
           record.get("contact").toString,
-          Option(record.get("additionalDocumentation")).map(_.toString),
-          Option(record.get("notes")).map(_.toString),
+          Try(Option(record.get("additionalDocumentation"))).toOption.flatten.map(_.toString),
+          Try(Option(record.get("notes"))).toOption.flatten.map(_.toString),
           UUID.fromString(record.get("id").toString),
           formatter.parseDateTime(record.get("createdDate").toString)
         )

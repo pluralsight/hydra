@@ -191,9 +191,9 @@ class TopicMetadataEndpointSpec
     }
 
     "recieve 404 with Subject not found body" in {
-      Get("/v2/topics/exp.subject/") ~> route ~> check {
+      Get("/v2/topics/skills.subject/") ~> route ~> check {
         response.status shouldBe StatusCodes.NotFound
-        responseAs[String] shouldBe "Subject exp.subject could not be found."
+        responseAs[String] shouldBe "Subject skills.subject could not be found."
       }
     }
 

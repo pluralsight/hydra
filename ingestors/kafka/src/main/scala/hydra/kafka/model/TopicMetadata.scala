@@ -136,6 +136,7 @@ object TopicMetadataV2Key {
 final case class TopicMetadataV2Value(
     streamType: StreamTypeV2,
     deprecated: Boolean,
+    deprecatedDate: Option[Instant],
     dataClassification: DataClassification,
     contact: NonEmptyList[ContactMethod],
     createdDate: Instant,
@@ -201,5 +202,19 @@ object TopicMetadataV2Value {
     Codec.derive[ContactMethod]
 
   implicit val codec: Codec[TopicMetadataV2Value] =
-    Codec.derive[TopicMetadataV2Value]
+  Codec.record[TopicMetadataV2Value](
+    name = "TopicMetadataV2Value",
+    namespace = "_hydra.v2"
+  ) {
+    field =>
+      (field("streamType", _.streamType),
+        field("deprecated", _.deprecated),
+        field("deprecatedDate", _.deprecatedDate, default = Some(None)),
+        field("dataClassification", _.dataClassification),
+        field("contact", _.contact),
+        field("createdDate", _.createdDate),
+        field("parentSubjects", _.parentSubjects),
+        field("notes", _.notes)
+        ).mapN(TopicMetadataV2Value.apply)
+  }
 }
