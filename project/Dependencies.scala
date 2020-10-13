@@ -181,6 +181,7 @@ object Dependencies {
       "org.testcontainers" % "postgresql"                      % testcontainersJavaVersion  % "it",
       "org.testcontainers" % "jdbc"                            % testcontainersJavaVersion  % "it"
     )
+
   }
 
   import Compile._

@@ -159,15 +159,16 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
         val c = createOV(Ref[IO].of((0,-1L)).unsafeRunSync()) _
 
         val latestPartitionMap = Map[Int, Long](0 -> 3, 1 -> 2, 2 -> 1)
-        val dvsConsumerOffsetStream = fs2.Stream(c(false),c(false),c(false),c(false),c(true),c(false), c(false),c(true), c(false))
+        val dvsConsumerOffsetStream = fs2.Stream(c(false),c(false),c(false),c(true),c(false),c(true))
         testConsumerGroupsAlgebraGetOffsetsToSeekTo(latestPartitionMap, dvsConsumerOffsetStream)
 
         val latestPartitionMap2 = Map[Int, Long](0 -> 0, 1 -> 0, 2 -> 0)
         val dvsConsumerOffsetStream2 = fs2.Stream()
         testConsumerGroupsAlgebraGetOffsetsToSeekTo(latestPartitionMap2, dvsConsumerOffsetStream2)
 
+        val d = createOV(Ref[IO].of((0,-1L)).unsafeRunSync()) _
         val latestPartitionMap3 = Map[Int, Long](0 -> 3, 1 -> 2, 2 -> 1, 3 -> 0)
-        val dvsConsumerOffsetStream3 = fs2.Stream(c(false),c(false),c(false),c(false),c(true),c(false), c(false),c(true), c(false))
+        val dvsConsumerOffsetStream3 = fs2.Stream(d(false),d(false),d(false),d(true),d(false),d(true))
         testConsumerGroupsAlgebraGetOffsetsToSeekTo(latestPartitionMap3, dvsConsumerOffsetStream3)
 
         IO.race(IO.delay(testConsumerGroupsAlgebraGetOffsetsToSeekTo(latestPartitionMap, fs2.Stream.empty)), Timer[IO].sleep(1.seconds)).map {

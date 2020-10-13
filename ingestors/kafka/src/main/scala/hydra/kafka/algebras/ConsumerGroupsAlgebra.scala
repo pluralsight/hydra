@@ -63,7 +63,7 @@ object ConsumerGroupsAlgebra {
       latestOffsets <- kafkaAdminAlgebra.getLatestOffsets(consumerOffsetsOffsetsTopicConfig.value)
       simplifiedLatestOffsets = latestOffsets.map(l => l._1.partition -> l._2.value)
       deferred <- Deferred[F, PartitionOffsetMap]
-      cache <- Ref[F].of(simplifiedLatestOffsets.mapValues(_ => 0L))
+      cache <- Ref[F].of(Map[Int, Long]())
       backgroundProcess <- Concurrent[F].start(getOffsetsToSeekTo(cache, simplifiedLatestOffsets, deferred, dvsConsumerOffsetStream))
       partitionMap <- deferred.get
       _ <- backgroundProcess.cancel
@@ -99,7 +99,7 @@ object ConsumerGroupsAlgebra {
 
     onStart *> dvsConsumerOffsetStream.flatMap { case ((key, value), (partition, offset)) =>
       fs2.Stream.eval(TopicConsumerOffset.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
-        if (latestPartitionOffset.get(partition).contains(offset) && topicValue.isDefined) {
+        if (latestPartitionOffset.get(partition).map(_ - 1).contains(offset) && topicValue.isDefined) {
           cache.update(_ + (topicKey.partition -> topicValue.get.offset))
         } else {
           ConcurrentEffect[F].unit
@@ -118,20 +118,28 @@ object ConsumerGroupsAlgebra {
     implicit val order: Order[TopicPartition] =
       (x: TopicPartition, y: TopicPartition) => if (x.partition() > y.partition()) 1 else if (x.partition() < y.partition()) -1 else 0
     stream.flatTap { b =>
-      fs2.Stream.eval(
-        if (p.nonEmpty) {
-          p.iterator.toList.traverse { case (p, o) =>
-            b.assign(data.NonEmptySet.one(new TopicPartition(sourceTopic, p))).recoverWith { case e =>
-              Logger[F].error(s"AssignToTopic for __consumer_offsets Error: ${e.getMessage}") *> ConcurrentEffect[F].unit
-            } *>
-              b.seek(new TopicPartition(sourceTopic, p), o).recoverWith { case e =>
-                Logger[F].error(s"SeekToOffset for __consumer_offsets Error: ${e.getMessage}") *> ConcurrentEffect[F].unit
-              }
-          }.flatMap(_ => Applicative[F].unit)
-        } else {
-          b.subscribeTo(sourceTopic)
-        }
-      )
+      fs2.Stream.eval {
+//        if (p.nonEmpty) {
+//          println("__consumer_offsets Stream Running p.nonEmpty")
+//          p.iterator.toList.traverse { case (p, o) =>
+//            b.assign(data.NonEmptySet.one(new TopicPartition(sourceTopic, p))).recoverWith { case e =>
+//              println(s"AssignToTopic for __consumer_offsets Error: ${e.getMessage}")
+//              Logger[F].error(s"AssignToTopic for __consumer_offsets Error: ${e.getMessage}") *> ConcurrentEffect[F].unit
+//            } *>
+//              b.seek(new TopicPartition(sourceTopic, p), o).recoverWith { case e =>
+//                println(s"SeekToOffset for __consumer_offsets Error: ${e.getMessage}")
+//                Logger[F].error(s"SeekToOffset for __consumer_offsets Error: ${e.getMessage}") *> ConcurrentEffect[F].unit
+//              }
+//          }.recoverWith { case e =>
+//            println(s"Seeking Error: ${e.getMessage}")
+//            ConcurrentEffect[F].pure(List(()))
+//          }.flatMap(_ => Applicative[F].unit)
+//        } else {
+//          println("__consumer_offsets Stream Running p.empty")
+//          b.subscribeTo(sourceTopic)
+//        }
+         b.subscribeTo(sourceTopic)
+      }
     }
   }
 
@@ -154,18 +162,20 @@ object ConsumerGroupsAlgebra {
               topicConsumer <- TopicConsumer.encode[F](consumerKey, consumerValue)
               topicConsumerOffset <- TopicConsumerOffset.encode[F](TopicConsumerOffsetKey(cr.offset.topicPartition.topic(), cr.offset.topicPartition.partition()), TopicConsumerOffsetValue(cr.offset.offsetAndMetadata.offset()))
               (key, value) = topicConsumer
+              (offsetKey, offsetValue) = topicConsumerOffset
               k <- getSerializer[F, GenericRecord](s)(isKey = true).serialize(destinationTopic, Headers.empty, key)
               v <- getSerializer[F, GenericRecord](s)(isKey = false).serialize(destinationTopic, Headers.empty, value.orNull)
-              offsetK <- getSerializer[F, GenericRecord](s)(isKey = true).serialize(dvsInternalKafkaOffsetTopic, Headers.empty, topicConsumerOffset._1)
-              offsetV <- getSerializer[F, GenericRecord](s)(isKey = false).serialize(dvsInternalKafkaOffsetTopic, Headers.empty, topicConsumerOffset._2)
+              offsetK <- getSerializer[F, GenericRecord](s)(isKey = true).serialize(dvsInternalKafkaOffsetTopic, Headers.empty, offsetKey)
+              offsetV <- getSerializer[F, GenericRecord](s)(isKey = false).serialize(dvsInternalKafkaOffsetTopic, Headers.empty, offsetValue)
             } yield  {
               val p = ProducerRecord(destinationTopic, k, v)
               val p2 = ProducerRecord(dvsInternalKafkaOffsetTopic, offsetK, offsetV)
               ProducerRecords(List(p, p2))
             })
-          case None => fs2.Stream.empty
+          case None =>
+            fs2.Stream.empty
         }
-      case c =>
+      case e =>
         fs2.Stream.empty
     }
   }
