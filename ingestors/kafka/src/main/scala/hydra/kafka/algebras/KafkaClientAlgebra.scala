@@ -140,8 +140,13 @@ object KafkaClientAlgebra {
           ProducerRecords.one(record, payload.promise)
         fs2.Stream.emit[F, ProducerRecords[Array[Byte], Array[Byte], Deferred[F, Either[PublishError, PublishResponse]]]](producerRecords)
           .through(produce(producerSettings))
-          .flatMap(i => fs2.Stream.chunk(i.records).evalMap(r => i.passthrough.complete(PublishResponse(r._2.partition, r._2.offset).asRight)))
-          .handleErrorWith(error => fs2.Stream.emit(payload.promise.complete(PublishError.OtherPublishError(error).asLeft)))
+          .attempt
+          .flatMap {
+            case Right(i) =>
+              fs2.Stream.chunk(i.records).evalMap(r => i.passthrough.complete(PublishResponse(r._2.partition, r._2.offset).asRight))
+            case Left(error) =>
+              fs2.Stream.emit(payload.promise.complete(PublishError.OtherPublishError(error).asLeft))
+          }
       }.compile.drain)
     } yield queue
   }
