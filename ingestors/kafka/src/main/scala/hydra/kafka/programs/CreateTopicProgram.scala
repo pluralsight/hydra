@@ -4,6 +4,7 @@ import java.time.Instant
 
 import cats.effect.{Bracket, ExitCase, Resource}
 import cats.syntax.all._
+import fs2.kafka.Headers
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
@@ -100,7 +101,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
 
   private def publishMetadata(
       topicName: Subject,
-      createTopicRequest: TopicMetadataV2Request
+      createTopicRequest: TopicMetadataV2Request,
+      headers: Option[Headers]
   ): F[Unit] = {
     for {
       metadata <- metadataAlgebra.getMetadataFor(topicName)
@@ -116,9 +118,9 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
           }
       }
       message = (TopicMetadataV2Key(topicName), createTopicRequest.copy(createdDate = createdDate, deprecatedDate = deprecatedDate).toValue)
-      records <- TopicMetadataV2.encode[F](message._1, Some(message._2))
+      records <- TopicMetadataV2.encode[F](message._1, Some(message._2), headers)
       _ <- kafkaClient
-        .publishMessage(records, v2MetadataTopicName.value, headers = None)
+        .publishMessage(records, v2MetadataTopicName.value)
         .rethrow
     } yield ()
   }
@@ -135,7 +137,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
         createTopicRequest.schemas.value
       )
       _ <- createTopicResource(topicName, topicDetails)
-      _ <- Resource.liftF(publishMetadata(topicName, createTopicRequest))
+      _ <- Resource.liftF(publishMetadata(topicName, createTopicRequest, None))
     } yield ()).use(_ => Bracket[F, Throwable].unit)
   }
 }

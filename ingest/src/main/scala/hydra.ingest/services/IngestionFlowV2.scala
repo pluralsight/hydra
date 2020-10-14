@@ -77,7 +77,7 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
 
   def ingest(request: V2IngestRequest, topic: Subject): F[PublishResponse] = {
     getSchemas(request, topic).flatMap { case (key, value) =>
-      kafkaClient.publishMessage((key, value), topic.value, request.correlationId).rethrow
+      kafkaClient.publishMessage((key, value, request.headers), topic.value).rethrow
     }
   }
 }
@@ -85,7 +85,7 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
 object IngestionFlowV2 {
   final case class V2IngestRequest(keyPayload: String, valPayload: Option[String],
                                    validationStrategy: Option[ValidationStrategy],
-                                   correlationId: Option[Headers] = None)
+                                   headers: Option[Headers] = None)
 
   final case class AvroConversionAugmentedException(message: String) extends RuntimeException(message)
   final case class SchemaNotFoundAugmentedException(schemaNotFoundException: SchemaNotFoundException, topic: String)
