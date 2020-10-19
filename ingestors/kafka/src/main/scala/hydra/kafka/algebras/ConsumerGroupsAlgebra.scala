@@ -120,25 +120,6 @@ object ConsumerGroupsAlgebra {
       (x: TopicPartition, y: TopicPartition) => if (x.partition() > y.partition()) 1 else if (x.partition() < y.partition()) -1 else 0
     stream.flatTap { b =>
       fs2.Stream.eval {
-//        if (p.nonEmpty) {
-//          println("__consumer_offsets Stream Running p.nonEmpty")
-//          p.iterator.toList.traverse { case (p, o) =>
-//            b.assign(data.NonEmptySet.one(new TopicPartition(sourceTopic, p))).recoverWith { case e =>
-//              println(s"AssignToTopic for __consumer_offsets Error: ${e.getMessage}")
-//              Logger[F].error(s"AssignToTopic for __consumer_offsets Error: ${e.getMessage}") *> ConcurrentEffect[F].unit
-//            } *>
-//              b.seek(new TopicPartition(sourceTopic, p), o).recoverWith { case e =>
-//                println(s"SeekToOffset for __consumer_offsets Error: ${e.getMessage}")
-//                Logger[F].error(s"SeekToOffset for __consumer_offsets Error: ${e.getMessage}") *> ConcurrentEffect[F].unit
-//              }
-//          }.recoverWith { case e =>
-//            println(s"Seeking Error: ${e.getMessage}")
-//            ConcurrentEffect[F].pure(List(()))
-//          }.flatMap(_ => Applicative[F].unit)
-//        } else {
-//          println("__consumer_offsets Stream Running p.empty")
-//          b.subscribeTo(sourceTopic)
-//        }
          b.subscribeTo(sourceTopic)
       }
     }
