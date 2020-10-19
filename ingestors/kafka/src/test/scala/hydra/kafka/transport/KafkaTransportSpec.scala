@@ -39,7 +39,7 @@ class KafkaTransportSpec
   lazy val transport = system.actorOf(KafkaTransport.props(rootConfig), "kafka")
 
   implicit val config = EmbeddedKafkaConfig(
-    kafkaPort = 8061,
+    kafkaPort = 8062,
     zooKeeperPort = 3161,
     customBrokerProperties = Map("auto.create.topics.enable" -> "false")
   )
