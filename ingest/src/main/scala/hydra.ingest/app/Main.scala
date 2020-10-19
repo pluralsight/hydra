@@ -66,7 +66,7 @@ object Main extends IOApp with ConfigSupport with LoggingAdapter {
       r <- routes.routes
       server <- IO.fromFuture(
         IO(
-          Http().newServerAt(settings.httpInterface, settings.httpPort).bindFlow(r)
+          Http().bindAndHandle(r, settings.httpInterface, settings.httpPort)
         )
       )
     } yield server

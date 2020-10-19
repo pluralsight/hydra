@@ -91,10 +91,11 @@ object ConsumerGroupsAlgebra {
     def isComplete: F[Unit] = for {
       map <- cache.get
       isFulfilled = map.keys.size == latestPartitionOffset.values.count(_ > 0)
-      _ <- if (isFulfilled)
+      _ <- if (isFulfilled) {
         deferred.complete(map)
-      else
+      } else {
         ConcurrentEffect[F].unit
+      }
     } yield ()
 
     onStart *> dvsConsumerOffsetStream.flatMap { case ((key, value), (partition, offset)) =>
@@ -160,7 +161,10 @@ object ConsumerGroupsAlgebra {
           case Some(consumerKey) =>
             fs2.Stream.eval(for {
               topicConsumer <- TopicConsumer.encode[F](consumerKey, consumerValue)
-              topicConsumerOffset <- TopicConsumerOffset.encode[F](TopicConsumerOffsetKey(cr.offset.topicPartition.topic(), cr.offset.topicPartition.partition()), TopicConsumerOffsetValue(cr.offset.offsetAndMetadata.offset()))
+              topicConsumerOffset <- TopicConsumerOffset.encode[F](
+                TopicConsumerOffsetKey(cr.offset.topicPartition.topic(),cr.offset.topicPartition.partition()),
+                TopicConsumerOffsetValue(cr.offset.offsetAndMetadata.offset())
+              )
               (key, value) = topicConsumer
               (offsetKey, offsetValue) = topicConsumerOffset
               k <- getSerializer[F, GenericRecord](s)(isKey = true).serialize(destinationTopic, Headers.empty, key)
@@ -175,7 +179,7 @@ object ConsumerGroupsAlgebra {
           case None =>
             fs2.Stream.empty
         }
-      case e =>
+      case _ =>
         fs2.Stream.empty
     }
   }
