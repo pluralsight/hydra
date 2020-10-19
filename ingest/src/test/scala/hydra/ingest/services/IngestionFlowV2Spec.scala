@@ -53,17 +53,17 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
     }.unsafeRunSync()
   }
 
-//  it should "ingest a record with a correlationId" in {
-//    val headers = Headers.fromSeq(List(Header.apply("ps-correlation-id","somethinghere1234")))
-//    val testRequest = V2IngestRequest(testKeyPayload, testValPayload.some, ValidationStrategy.Strict.some,
-//      Some(headers))
-//    ingest(testRequest).flatMap { kafkaClient =>
-//      kafkaClient.consumeMessagesWithHeaders(testSubject.value, "test-consumer").take(1).compile.toList.map { publishedMessages =>
-//        val firstMessage = publishedMessages.head
-//        (firstMessage._1.toString, firstMessage._2.get.toString, firstMessage._3.get.toString) shouldBe (testKeyPayload, testValPayload, headers.toString)
-//      }
-//    }.unsafeRunSync()
-//  }
+  it should "ingest a record with a correlationId" in {
+    val headers = Headers.fromSeq(List(Header.apply("ps-correlation-id","somethinghere1234")))
+    val testRequest = V2IngestRequest(testKeyPayload, testValPayload.some, ValidationStrategy.Strict.some,
+      Some(headers))
+    ingest(testRequest).flatMap { kafkaClient =>
+      kafkaClient.consumeMessages(testSubject.value, "test-consumer").take(1).compile.toList.map { publishedMessages =>
+        val firstMessage = publishedMessages.head
+        (firstMessage._1.toString, firstMessage._2.get.toString, firstMessage._3.get.toString) shouldBe (testKeyPayload, testValPayload, headers.toString)
+      }
+    }.unsafeRunSync()
+  }
 
   it should "ingest a tombstone record" in {
     val testRequest = V2IngestRequest(testKeyPayload, None, ValidationStrategy.Strict.some)

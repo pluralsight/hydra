@@ -217,7 +217,8 @@ object KafkaClientAlgebra {
           .flatMap(_.stream)
           .map { committable =>
             val r = committable.record
-            (r.key, r.value, Option(r.headers))
+            val headers = if (r.headers.isEmpty) None else Option(r.headers)
+            (r.key, r.value, headers)
           }
       }
     }
@@ -250,13 +251,19 @@ object KafkaClientAlgebra {
     }
 
     override def publishStringKeyMessage(record: StringRecord, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
-      val cacheRecord = (StringFormat(record._1), record._2, Some(record._3.getOrElse(Headers.empty)))
+      val cacheRecord = (StringFormat(record._1), record._2, record._3)
       publishCacheMessage(cacheRecord, topicName)
     }
 
     override def consumeMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, Record] = {
       consumeCacheMessage(topicName, consumerGroup).evalMap {
-        case (r: GenericRecordFormat, v, h) => Sync[F].pure((r.value, v, h))
+        case (r: GenericRecordFormat, v, h) => {
+          val headers = h match {
+            case Some(value) => if (value.isEmpty) None else Some(value)
+            case _ => None
+          }
+          Sync[F].pure((r.value, v, headers))
+        }
         case _ => Sync[F].raiseError[Record](ConsumeErrorException("Expected GenericRecord, got String"))
       }
     }
