@@ -7,6 +7,7 @@ import cats.data.Validated.{Invalid, Valid}
 import cats.data.{NonEmptyList, Validated}
 import cats.syntax.all._
 import cats.{Applicative, ApplicativeError, Monad, MonadError}
+import fs2.kafka.Headers
 import hydra.avro.convert.{ISODateConverter, IsoDate}
 import hydra.core.marshallers._
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -52,8 +53,9 @@ object TopicMetadataV2 {
 
   def encode[F[_]: MonadError[*[_], Throwable]](
       key: TopicMetadataV2Key,
-      value: Option[TopicMetadataV2Value]
-  ): F[(GenericRecord, Option[GenericRecord])] = {
+      value: Option[TopicMetadataV2Value],
+      headers: Option[Headers] = None
+  ): F[(GenericRecord, Option[GenericRecord], Option[Headers])] = {
     Monad[F]
       .pure {
         val valueResult: Option[Either[AvroError, Any]] = value.map(TopicMetadataV2Value.codec.encode)
@@ -74,11 +76,11 @@ object TopicMetadataV2 {
       }
       .rethrow
       .flatMap {
-        case (k: GenericRecord, v: GenericRecord) => Monad[F].pure((k, Option(v)))
+        case (k: GenericRecord, v: GenericRecord) => Monad[F].pure((k, Option(v), headers))
         case (k, v) =>
           MonadError[F, Throwable].raiseError(
             AvroEncodingFailure(
-              NonEmptyList.of(k, v).map(_.getClass.getSimpleName)
+              NonEmptyList.of(k, v, headers).map(_.getClass.getSimpleName)
             )
           )
       }

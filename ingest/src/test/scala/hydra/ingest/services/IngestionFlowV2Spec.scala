@@ -2,6 +2,7 @@ package hydra.ingest.services
 
 import cats.effect.{Concurrent, ContextShift, IO}
 import cats.syntax.all._
+import fs2.kafka.{Header, Headers}
 import hydra.avro.registry.SchemaRegistry
 import hydra.core.transport.ValidationStrategy
 import hydra.ingest.services.IngestionFlowV2.V2IngestRequest
@@ -48,6 +49,18 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
       kafkaClient.consumeMessages(testSubject.value, "test-consumer").take(1).compile.toList.map { publishedMessages =>
         val firstMessage = publishedMessages.head
         (firstMessage._1.toString, firstMessage._2.get.toString) shouldBe (testKeyPayload, testValPayload)
+      }
+    }.unsafeRunSync()
+  }
+
+  it should "ingest a record with a correlationId" in {
+    val headers = Headers.fromSeq(List(Header.apply("ps-correlation-id","somethinghere1234")))
+    val testRequest = V2IngestRequest(testKeyPayload, testValPayload.some, ValidationStrategy.Strict.some,
+      Some(headers))
+    ingest(testRequest).flatMap { kafkaClient =>
+      kafkaClient.consumeMessages(testSubject.value, "test-consumer").take(1).compile.toList.map { publishedMessages =>
+        val firstMessage = publishedMessages.head
+        (firstMessage._1.toString, firstMessage._2.get.toString, firstMessage._3.get.toString) shouldBe (testKeyPayload, testValPayload, headers.toString)
       }
     }.unsafeRunSync()
   }
