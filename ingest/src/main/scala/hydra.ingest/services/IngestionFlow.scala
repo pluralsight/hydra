@@ -56,7 +56,7 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](
         }
         val v1Key = getV1RecordKey(schemaWrapper, payloadTryMaybe, request)
         MonadError[F, Throwable].fromTry(payloadTryMaybe).flatMap { payloadMaybe =>
-          kafkaClient.publishStringKeyMessage((v1Key, payloadMaybe), topic).void
+          kafkaClient.publishStringKeyMessage((v1Key, payloadMaybe, None), topic).void
         }
       }
       case None => MonadError[F, Throwable].raiseError(MissingTopicNameException(request))

@@ -22,12 +22,14 @@ trait KafkaClientAlgebra[F[_]] {
   import KafkaClientAlgebra._
   /**
     * Publishes the Hydra record to Kafka
+    *
     * @param record - the hydra record that is to be ingested in Kafka
+    * @param topicName - topic name to produce to
     * @return Either[PublishError, Unit] - Unit is returned upon success, PublishError on failure.
     */
   def publishMessage(
     record: Record,
-    topicName: TopicName
+    topicName: TopicName,
   ): F[Either[PublishError, PublishResponse]]
 
   /**
@@ -38,7 +40,7 @@ trait KafkaClientAlgebra[F[_]] {
     */
   def publishStringKeyMessage(
                       record: StringRecord,
-                      topicName: TopicName
+                      topicName: TopicName,
                     ): F[Either[PublishError, PublishResponse]]
 
   /**
@@ -98,10 +100,10 @@ object KafkaClientAlgebra {
   type Partition = Int
   type Offset = Long
   type OffsetInfo = (Partition, Offset)
-  type Record = (GenericRecord, Option[GenericRecord])
-  type StringRecord = (Option[String], Option[GenericRecord])
   case object OffsetsNotCommittableInTest extends NoStackTrace
   case object OffsetInfoNotRetrievableInTest extends NoStackTrace
+  type Record = (GenericRecord, Option[GenericRecord], Option[Headers])
+  type StringRecord = (Option[String], Option[GenericRecord], Option[Headers])
 
   final case class PublishResponse(partition: Int, offset: Option[Long])
   object PublishResponse {
@@ -143,7 +145,9 @@ object KafkaClientAlgebra {
                                                           key: Option[Array[Byte]],
                                                           value: Option[Array[Byte]],
                                                           topicName: TopicName,
-                                                          promise: Deferred[F, Either[PublishError, PublishResponse]]
+                                                          promise: Deferred[F, Either[PublishError, PublishResponse]],
+                                                          headers: Headers
+
                                                         )
 
   private def getProducerQueue[F[_]: ConcurrentEffect: ContextShift]
@@ -156,7 +160,7 @@ object KafkaClientAlgebra {
     for {
       queue <- fs2.concurrent.Queue.unbounded[F, ProduceRecordInfo[F]]
       _ <- Concurrent[F].start(queue.dequeue.flatMap { payload =>
-        val record = ProducerRecord(payload.topicName, payload.key.orNull, payload.value.orNull)
+        val record = ProducerRecord(payload.topicName, payload.key.orNull, payload.value.orNull).withHeaders(payload.headers)
         val producerRecords: ProducerRecords[Array[Byte], Array[Byte], Deferred[F, Either[PublishError, PublishResponse]]] =
           ProducerRecords.one(record, payload.promise)
         fs2.Stream.emit[F, ProducerRecords[Array[Byte], Array[Byte], Deferred[F, Either[PublishError, PublishResponse]]]](producerRecords)
@@ -188,41 +192,46 @@ object KafkaClientAlgebra {
         produceMessage[Option[String]](record, topicName, StringFormat.apply, publishTimeoutDuration)
       }
 
-      override def consumeMessages(topicName: TopicName, consumerGroup: String, commitOffsets: Boolean): fs2.Stream[F, (GenericRecord, Option[GenericRecord])] = {
-        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets).map(c => (c._1, c._2))
+      override def consumeMessages(topicName: TopicName, consumerGroup: String, commitOffsets: Boolean): fs2.Stream[F, Record] = {
+        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets).map(c => (c._1, c._2, c._3))
       }
 
-      override def consumeMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, ((GenericRecord, Option[GenericRecord]), (Partition, Offset))] = {
-        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets).map(c => ((c._1, c._2),(c._3,c._4)))
+      override def consumeMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, (Record, (Partition, Offset))] = {
+        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets).map(c => ((c._1, c._2, c._3),(c._4,c._5)))
       }
 
       override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, StringRecord] = {
-        consumeMessages[Option[String]](getStringKeyDeserializer, consumerGroup, topicName, commitOffsets).map(c => (c._1, c._2))
+        consumeMessages[Option[String]](getStringKeyDeserializer, consumerGroup, topicName, commitOffsets).map(c => (c._1, c._2, c._3))
       }
 
       override def withProducerRecordSizeLimit(sizeLimitBytes: Long): F[KafkaClientAlgebra[F]] =
         getLiveInstance[F](bootstrapServers)(queue, schemaRegistryClient, keySerializer, valSerializer, sizeLimitBytes.some, publishTimeoutDuration)
 
       private def produceMessage[A](
-                                     record: (A, Option[GenericRecord]),
+                                     record: (A, Option[GenericRecord], Option[Headers]),
                                      topicName: TopicName,
                                      convert: A => RecordFormat,
-                                     timeoutDuration: FiniteDuration): F[Either[PublishError, PublishResponse]] =
+                                     timeoutDuration: FiniteDuration): F[Either[PublishError, PublishResponse]] = {
+        val kafkaHeaders: Headers = record._3 match {
+          case Some(headersExist) => headersExist
+          case _ => Headers.empty
+        }
         for {
           d <- Deferred[F, Either[PublishError, PublishResponse]]
-          k <- keySerializer.serialize(topicName, Headers.empty, convert(record._1))
-          v <- record._2.traverse(r => valSerializer.serialize(topicName, Headers.empty, GenericRecordFormat(r)))
+          k <- keySerializer.serialize(topicName, kafkaHeaders, convert(record._1))
+          v <- record._2.traverse(r => valSerializer.serialize(topicName, kafkaHeaders, GenericRecordFormat(r)))
           _ <- checkSizeLimit[F](k, v, sizeLimitBytes)
-          _ <- queue.enqueue1(ProduceRecordInfo(k.some, v, topicName, d))
+          _ <- queue.enqueue1(ProduceRecordInfo(k.some, v, topicName, d, kafkaHeaders))
           resolve <- Concurrent.timeoutTo[F, Either[PublishError, PublishResponse]](d.get, timeoutDuration, Sync[F].pure(Left(PublishError.Timeout)))
         } yield resolve
+      }
 
       private def consumeMessages[A](
                                       keyDeserializer: Deserializer[F, A],
                                       consumerGroup: ConsumerGroup,
                                       topicName: TopicName,
                                       commitOffsets: Boolean
-                                    ): fs2.Stream[F, (A, Option[GenericRecord], Partition, Offset)] = {
+                                    ): fs2.Stream[F, (A, Option[GenericRecord], Option[Headers], Partition, Offset)] = {
         val consumerSettings: ConsumerSettings[F, A, Option[GenericRecord]] = ConsumerSettings(
           keyDeserializer = keyDeserializer,
           valueDeserializer = getOptionalGenericRecordDeserializer(schemaRegistryClient)()
@@ -238,7 +247,8 @@ object KafkaClientAlgebra {
           }
           .map { committable =>
             val r = committable.record
-            (r.key, r.value, r.partition, r.offset)
+            val headers = if (r.headers.isEmpty) None else Option(r.headers)
+            (r.key, r.value, headers, r.partition, r.offset)
           }
       }
 
@@ -265,13 +275,14 @@ object KafkaClientAlgebra {
   private def getTestInstance[F[_]: Sync: Concurrent](cache: Ref[F, MockFS2Kafka[F]],
                                                       schemaRegistry: SchemaRegistry[F],
                                                       sizeLimitBytes: Option[Long] = None): KafkaClientAlgebra[F] = new KafkaClientAlgebra[F] {
+
     override def publishMessage(record: Record, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
-      val cacheRecord = (GenericRecordFormat(record._1), record._2)
+      val cacheRecord = (GenericRecordFormat(record._1), record._2, Some(record._3.getOrElse(Headers.empty)))
       publishCacheMessage(cacheRecord, topicName)
     }
 
     override def publishStringKeyMessage(record: StringRecord, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
-      val cacheRecord = (StringFormat(record._1), record._2)
+      val cacheRecord = (StringFormat(record._1), record._2, record._3)
       publishCacheMessage(cacheRecord, topicName)
     }
 
@@ -279,17 +290,29 @@ object KafkaClientAlgebra {
       if (commitOffsets) fs2.Stream.raiseError[F](OffsetsNotCommittableInTest)
       else {
         consumeCacheMessage(topicName, consumerGroup).evalMap {
-          case (r: GenericRecordFormat, v) => Sync[F].pure((r.value, v))
-          case _ => Sync[F].raiseError[Record](ConsumeErrorException("Expected GenericRecord, got String"))
+        case (r: GenericRecordFormat, v, h) => {
+          val headers = h match {
+            case Some(value) => if (value.isEmpty) None else Some(value)
+            case _ => None
+          }
+          Sync[F].pure((r.value, v, headers))
         }
+          case _ => Sync[F].raiseError[Record](ConsumeErrorException("Expected GenericRecord, got String"))
       }
     }
+}
 
     override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, StringRecord] = {
       if (commitOffsets) fs2.Stream.raiseError[F](OffsetsNotCommittableInTest)
       else {
         consumeCacheMessage(topicName, consumerGroup).evalMap {
-          case (r: StringFormat, v) => Sync[F].pure((r.value, v))
+          case (r: StringFormat, v, h) => {
+          val headers = h match {
+            case Some(value) => if (value.isEmpty) None else Some(value)
+            case _ => None
+          }
+			Sync[F].pure((r.value, v, headers))
+		  }
           case _ => Sync[F].raiseError[StringRecord](ConsumeErrorException("Expected String, got GenericRecord"))
         }
       }
@@ -393,7 +416,7 @@ object KafkaClientAlgebra {
       }
     }.suspend
 
-  private type CacheRecord = (RecordFormat, Option[GenericRecord])
+  private type CacheRecord = (RecordFormat, Option[GenericRecord], Option[Headers])
 
   private final case class MockFS2Kafka[F[_]](
                                                    private val topics: Map[TopicName, List[CacheRecord]],

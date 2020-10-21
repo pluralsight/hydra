@@ -20,6 +20,7 @@ import akka.actor._
 import akka.http.scaladsl.model.{HttpRequest, StatusCode, StatusCodes}
 import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
 import cats.syntax.all._
+import fs2.kafka.{Header, Headers}
 import hydra.common.config.ConfigSupport._
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
@@ -108,24 +109,33 @@ class IngestionEndpoint[F[_]: Futurable](
     case e => (StatusCodes.InternalServerError, Try(e.getMessage).toOption)
   }
 
+  private val correlationIdHeader = "ps-correlation-id"
+
   private def publishRequestV2(topic: String): Route =
     handleExceptions(exceptionHandler(topic)) {
       extractExecutionContext { implicit ec =>
-        entity(as[V2IngestRequest]) { req =>
-          Subject.createValidated(topic) match {
-            case Some(t) =>
-              onComplete(Futurable[F].unsafeToFuture(ingestionV2Flow.ingest(req, t))) {
-                case Success(resp) =>
-                  addPromHttpMetric(topic, StatusCodes.OK.toString, "/v2/topics/.../records")
-                  complete(resp)
-                case Failure(e) =>
-                  val status = getV2ReponseCode(e)
-                  addPromHttpMetric(topic, status._1.toString,"/v2/topics/.../records")
-                  complete(status)
-              }
-            case None =>
-              addPromHttpMetric(topic, StatusCodes.BadRequest.toString, "/v2/topics/.../records")
-              complete(StatusCodes.BadRequest, Subject.invalidFormat)
+        optionalHeaderValueByName(correlationIdHeader) { cIdOpt =>
+          entity(as[V2IngestRequest]) { reqMaybeHeader =>
+            val req = cIdOpt match {
+              case Some(id) => reqMaybeHeader.copy(reqMaybeHeader.keyPayload, reqMaybeHeader.valPayload,
+                reqMaybeHeader.validationStrategy, Some(Headers.fromSeq(List(Header.apply(correlationIdHeader, id)))))
+              case _ => reqMaybeHeader.copy(reqMaybeHeader.keyPayload, reqMaybeHeader.valPayload, reqMaybeHeader.validationStrategy, None)
+            }
+            Subject.createValidated(topic) match {
+              case Some(t) =>
+                onComplete(Futurable[F].unsafeToFuture(ingestionV2Flow.ingest(req, t))) {
+                  case Success(resp) =>
+                    addPromHttpMetric(topic, StatusCodes.OK.toString, "/v2/topics/.../records")
+                    complete(resp)
+                  case Failure(e) =>
+                    val status = getV2ReponseCode(e)
+                    addPromHttpMetric(topic, status._1.toString, "/v2/topics/.../records")
+                    complete(status)
+                }
+              case None =>
+                addPromHttpMetric(topic, StatusCodes.BadRequest.toString, "/v2/topics/.../records")
+                complete(StatusCodes.BadRequest, Subject.invalidFormat)
+            }
           }
         }
       }

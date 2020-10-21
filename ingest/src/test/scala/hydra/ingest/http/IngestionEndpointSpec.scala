@@ -255,5 +255,13 @@ final class IngestionEndpointSpec
         status shouldBe StatusCodes.OK
       }
     }
+    "accept a request with correlationId header" in {
+      val correlationId = RawHeader("ps-correlation-id", "th1s1ss0m3c0RR3l4t10n")
+      val request = Post("/v2/topics/dvs.blah.blah/records", HttpEntity(ContentTypes.`application/json`, """{"key":{"test": 1}, "value":{"test": 2}}""")).withHeaders(correlationId)
+      request ~> Route.seal(ingestRouteAlt) ~> check {
+        responseAs[String] shouldBe "{\"offset\":1,\"partition\":0}"
+        status shouldBe StatusCodes.OK
+      }
+    }
   }
 }

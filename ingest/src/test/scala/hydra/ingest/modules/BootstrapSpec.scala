@@ -3,6 +3,7 @@ package hydra.ingest.modules
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Sync, Timer}
 import cats.syntax.all._
+import fs2.kafka.Headers
 import hydra.avro.registry.SchemaRegistry
 import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, V2MetadataTopicConfig}
 import hydra.kafka.algebras.KafkaAdminAlgebra.Topic
@@ -38,12 +39,12 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
       consumersTopicConfig: DVSConsumersTopicConfig,
       consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig
 
-  ): IO[(List[Topic], List[String], List[(GenericRecord, Option[GenericRecord])])] = {
+  ): IO[(List[Topic], List[String], List[(GenericRecord, Option[GenericRecord], Option[Headers])])] = {
     val retry = RetryPolicies.alwaysGiveUp[IO]
     for {
       schemaRegistry <- SchemaRegistry.test[IO]
       kafkaAdmin <- KafkaAdminAlgebra.test[IO]
-      ref <- Ref[IO].of(List.empty[(GenericRecord, Option[GenericRecord])])
+      ref <- Ref[IO].of(List.empty[(GenericRecord, Option[GenericRecord], Option[Headers])])
       kafkaClient = new TestKafkaClientAlgebraWithPublishTo(ref)
       metadata <- MetadataAlgebra.make(metadataSubject.value, "consumer_group",kafkaClient, schemaRegistry, consumeMetadataEnabled = true)
       c = new CreateTopicProgram[IO](
@@ -133,20 +134,20 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
     }
   }
 
-  private final class TestKafkaClientAlgebraWithPublishTo(publishTo: Ref[IO, List[(GenericRecord, Option[GenericRecord])]]
+  private final class TestKafkaClientAlgebraWithPublishTo(publishTo: Ref[IO, List[(GenericRecord, Option[GenericRecord], Option[Headers])]]
   ) extends KafkaClientAlgebra[IO] {
     override def publishMessage(
-        record: (GenericRecord, Option[GenericRecord]),
-        topicName: TopicName): IO[Either[PublishError, PublishResponse]] = {
+        record: (GenericRecord, Option[GenericRecord], Option[Headers]),
+		topicName: TopicName): IO[Either[PublishError, PublishResponse]] = {
 
       publishTo.update(_ :+ record).map(_ => PublishResponse(0, 0)).attemptNarrow[PublishError]
     }
 
-    override def consumeMessages(topicName: TopicName, consumerGroup: String, commitOffsets: Boolean): fs2.Stream[IO, (GenericRecord, Option[GenericRecord])] = fs2.Stream.empty
+    override def consumeMessages(topicName: TopicName, consumerGroup: String, commitOffsets: Boolean): fs2.Stream[IO, (GenericRecord, Option[GenericRecord], Option[Headers])] = fs2.Stream.empty
 
-    override def publishStringKeyMessage(record: (Option[String], Option[GenericRecord]), topicName: TopicName): IO[Either[PublishError, PublishResponse]] = ???
+    override def publishStringKeyMessage(record: (Option[String], Option[GenericRecord], Option[Headers]), topicName: TopicName): IO[Either[PublishError, PublishResponse]] = ???
 
-    override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[IO, (Option[String], Option[GenericRecord])] = ???
+    override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[IO, (Option[String], Option[GenericRecord], Option[Headers])] = ???
 
     override def withProducerRecordSizeLimit(sizeLimitBytes: Long): IO[KafkaClientAlgebra[IO]] = ???
 
