@@ -54,7 +54,7 @@ object ConsumerGroupsAlgebra {
                                                                  kafkaClientAlgebra: KafkaClientAlgebra[F],
                                                                  kafkaAdminAlgebra: KafkaAdminAlgebra[F],
                                                                  schemaRegistryAlgebra: SchemaRegistry[F]): F[ConsumerGroupsAlgebra[F]] = {
-    val dvsConsumersStream: fs2.Stream[F, (GenericRecord, Option[GenericRecord])] = kafkaClientAlgebra.consumeMessages(dvsConsumersTopic.value, uniquePerNodeConsumerGroup, commitOffsets = false)
+    val dvsConsumersStream: fs2.Stream[F, (GenericRecord, Option[GenericRecord], Option[Headers])] = kafkaClientAlgebra.consumeMessages(dvsConsumersTopic.value, uniquePerNodeConsumerGroup, commitOffsets = false)
     val dvsConsumerOffsetStream = kafkaClientAlgebra.consumeMessagesWithOffsetInfo(consumerOffsetsOffsetsTopicConfig.value, uniquePerNodeConsumerGroup, commitOffsets = false)
 
     for {
@@ -98,7 +98,7 @@ object ConsumerGroupsAlgebra {
       }
     } yield ()
 
-    onStart *> dvsConsumerOffsetStream.flatMap { case ((key, value), (partition, offset)) =>
+    onStart *> dvsConsumerOffsetStream.flatMap { case ((key, value, _), (partition, offset)) =>
       fs2.Stream.eval(TopicConsumerOffset.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
         if (latestPartitionOffset.get(partition).map(_ - 1).contains(offset) && topicValue.isDefined) {
           cache.update(_ + (topicKey.partition -> topicValue.get.offset))
@@ -217,7 +217,7 @@ object ConsumerGroupsAlgebra {
                                                                                                       dvsConsumersStream: fs2.Stream[F, Record],
                                                                                                       consumerGroupsStorageFacade: Ref[F, ConsumerGroupsStorageFacade]
                                                                                                     ): F[Unit] = {
-    dvsConsumersStream.flatMap { case (key, value) =>
+    dvsConsumersStream.flatMap { case (key, value, _) =>
       fs2.Stream.eval(TopicConsumer.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
         topicValue match {
           case Some(tV) =>

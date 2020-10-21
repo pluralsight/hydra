@@ -348,7 +348,7 @@ object KafkaClientAlgebra {
       }
     }
 
-    override def consumeMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, ((GenericRecord, Option[GenericRecord]), (Partition, Offset))] = {
+    override def consumeMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset))] = {
       fs2.Stream.raiseError[F](OffsetInfoNotRetrievableInTest)
     }
   }

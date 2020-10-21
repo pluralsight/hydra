@@ -79,7 +79,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
     val topicName = "useless_topic_123"
     val (keyGR, valueGR) = getGenericRecords(topicName, "key123", "value123")
     createTopic(topicName, keyGR, valueGR, schemaRegistry, kafkaAdmin)
-    kafkaClient.publishMessage((keyGR, Some(valueGR)), topicName).unsafeRunSync()
+    kafkaClient.publishMessage((keyGR, Some(valueGR), None), topicName).unsafeRunSync()
     val consumer1 = "randomConsumerGroup"
     kafkaClient.consumeMessages(topicName, consumer1, commitOffsets = true).take(1).compile.last.unsafeRunSync() shouldBe (keyGR, valueGR.some).some
 
@@ -102,7 +102,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
         val topicName2 = "myNewTopix"
         val (keyGR2, valueGR2) = getGenericRecords(topicName2, "abc", "123")
         createTopic(topicName2, keyGR2, valueGR2, schemaRegistry, kafkaAdmin)
-        kafkaClient.publishMessage((keyGR2, Some(valueGR2)), topicName2).unsafeRunSync()
+        kafkaClient.publishMessage((keyGR2, Some(valueGR2), None), topicName2).unsafeRunSync()
         kafkaClient.consumeMessages(topicName2, consumer1, commitOffsets = true).take(1).compile.last.unsafeRunSync() shouldBe (keyGR2, valueGR2.some).some
         val topics = List(topicName, topicName2)
         cga.getTopicsForConsumer(consumer1).retryIfFalse(_.topics.map(_.topicName).forall(topics.contains)).unsafeRunSync()
@@ -116,10 +116,10 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
         val topicName2 = "myNewTopix2.0"
         val (keyGR2, valueGR2) = getGenericRecords(topicName2, "abcdef", "123456")
         createTopic(topicName2, keyGR2, valueGR2, schemaRegistry, kafkaAdmin)
-        kafkaClient.publishMessage((keyGR2, Some(valueGR2)), topicName2).unsafeRunSync()
+        kafkaClient.publishMessage((keyGR2, Some(valueGR2), None), topicName2).unsafeRunSync()
 
         val (keyGR3, valueGR3) = getGenericRecords(topicName2, "abcdef", "123456")
-        kafkaClient.publishMessage((keyGR3, Some(valueGR3)), topicName2).unsafeRunSync()
+        kafkaClient.publishMessage((keyGR3, Some(valueGR3), None), topicName2).unsafeRunSync()
 
         kafkaClient.consumeMessages(topicName2, "randomConsumerGroup", commitOffsets = true).take(1).compile.last.unsafeRunSync() shouldBe (keyGR2, valueGR2.some).some
         cga.getConsumersForTopic(topicName2).map(_.consumers.headOption.map(_.lastCommit)).retryIfFalse(_.isDefined).unsafeRunSync()
@@ -133,7 +133,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
         def asIndex: Int => Int = {input => input - 1}
         val totalNumRecords = 12
         val records = kafkaClient.consumeMessagesWithOffsetInfo(dvsInternalKafkaOffsetsTopic.value, "newGroup", commitOffsets = true).take(totalNumRecords).compile.toList.unsafeRunSync()
-        val ((gKey, gValue), (partition, offset)) = records.last
+        val ((gKey, gValue, _), (partition, offset)) = records.last
         val (key, Some(value)) = TopicConsumerOffset.decode[IO](gKey, gValue).unsafeRunSync()
         key.topicName shouldBe internalKafkaConsumerTopic
         key.partition shouldBe 0
@@ -190,7 +190,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
       val key = TopicConsumerOffsetKey("topicName", partition)
       val value = TopicConsumerOffsetValue(scala.util.Random.nextLong())
       val (gKey, gValue) = TopicConsumerOffset.encode[IO](key, value).unsafeRunSync()
-      ((gKey, gValue.some),(partition, offset))
+      ((gKey, gValue.some, None),(partition, offset))
     }).unsafeRunSync()
   }
 
