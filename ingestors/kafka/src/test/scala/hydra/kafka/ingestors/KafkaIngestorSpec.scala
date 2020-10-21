@@ -96,7 +96,7 @@ class KafkaIngestorSpec
   )
 
   override def beforeAll = {
-    implicit val embeddedKafkaConfig = EmbeddedKafkaConfig(kafkaPort = 8092)
+    implicit val embeddedKafkaConfig = EmbeddedKafkaConfig(kafkaPort = 8042)
     EmbeddedKafka.start()
     EmbeddedKafka.createCustomTopic("test-schema")
     EmbeddedKafka.createCustomTopic("just-a-topic")

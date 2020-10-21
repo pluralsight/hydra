@@ -25,16 +25,16 @@ class KafkaUtilsSpec
     with ScalaFutures {
 
   implicit val config =
-    EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
+    EmbeddedKafkaConfig(kafkaPort = 8042, zooKeeperPort = 3141)
 
   val defaultCfg = Map(
     "key.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
     "auto.offset.reset" -> "latest",
     "group.id" -> "hydra",
-    "bootstrap.servers" -> "localhost:8092",
+    "bootstrap.servers" -> "localhost:8042",
     "enable.auto.commit" -> "false",
     "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
-    "zookeeper.connect" -> "localhost:3181",
+    "zookeeper.connect" -> "localhost:3141",
     "client.id" -> "string",
     "metadata.fetch.timeout.ms" -> "100000"
   )
@@ -66,7 +66,7 @@ class KafkaUtilsSpec
       |hydra_kafka {
       |   schema.registry.url = "localhost:808"
       |   kafka.producer {
-      |     bootstrap.servers="localhost:8092"
+      |     bootstrap.servers="localhost:8042"
       |     key.serializer = org.apache.kafka.common.serialization.StringSerializer
       |   }
       |   kafka.clients {
@@ -97,7 +97,7 @@ class KafkaUtilsSpec
     }
 
     "return the correct boostrap servers config" in {
-      KafkaUtils.BootstrapServers shouldBe "localhost:8092"
+      KafkaUtils.BootstrapServers shouldBe "localhost:8012"
     }
 
     "loads default consumer" in {
@@ -106,10 +106,10 @@ class KafkaUtilsSpec
         "key.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
         "auto.offset.reset" -> "latest",
         "group.id" -> "hydra",
-        "bootstrap.servers" -> "localhost:8092",
+        "bootstrap.servers" -> "localhost:8012",
         "enable.auto.commit" -> "false",
         "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
-        "zookeeper.connect" -> "localhost:3181",
+        "zookeeper.connect" -> "localhost:3111",
         "client.id" -> "string",
         "metadata.fetch.timeout.ms" -> "100000"
       )
@@ -123,10 +123,10 @@ class KafkaUtilsSpec
         "key.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
         "auto.offset.reset" -> "latest",
         "group.id" -> "hydrag",
-        "bootstrap.servers" -> "localhost:8092",
+        "bootstrap.servers" -> "localhost:8012",
         "enable.auto.commit" -> "false",
         "value.deserializer" -> "io.confluent.kafka.serializers.KafkaAvroDeserializer",
-        "zookeeper.connect" -> "localhost:3181",
+        "zookeeper.connect" -> "localhost:3111",
         "client.id" -> "avro",
         "metadata.fetch.timeout.ms" -> "100000",
         "schema.registry.url" -> "mock"
@@ -142,7 +142,7 @@ class KafkaUtilsSpec
       settings.properties shouldBe Map(
         "value.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
         "key.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
-        "bootstrap.servers" -> "localhost:8092",
+        "bootstrap.servers" -> "localhost:8042",
         "client.id" -> "test",
         "linger.ms" -> "10"
       )
@@ -154,7 +154,7 @@ class KafkaUtilsSpec
       clients("test1").properties shouldBe Map(
         "value.serializer" -> "org.apache.kafka.common.serialization.Tester",
         "key.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
-        "bootstrap.servers" -> "localhost:8092",
+        "bootstrap.servers" -> "localhost:8042",
         "client.id" -> "test1",
         "linger.ms" -> "10"
       )
