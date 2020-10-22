@@ -43,7 +43,7 @@ class TopicMetadataEndpointSpec
     Slf4jLogger.getLogger[F]
 
   implicit val kafkaConfig: EmbeddedKafkaConfig =
-    EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
+    EmbeddedKafkaConfig(kafkaPort = 8012, zooKeeperPort = 3111)
 
   implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   implicit val concurrent: Concurrent[IO] = IO.ioConcurrentEffect

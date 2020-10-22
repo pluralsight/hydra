@@ -54,8 +54,8 @@ class TopicBootstrapActorSpec
   implicit val ec = system.dispatcher
 
   implicit val embeddedKafkaConfig = EmbeddedKafkaConfig(
-    kafkaPort = 8092,
-    zooKeeperPort = 3181,
+    kafkaPort = 8012,
+    zooKeeperPort = 3111,
     customBrokerProperties = Map("auto.create.topics.enable" -> "false")
   )
 

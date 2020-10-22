@@ -116,7 +116,7 @@ final class KafkaAdminAlgebraSpec
         }
 
         def consumeTest(): Unit = {
-          val consumerSettings = ConsumerSettings(
+          val consumerSettings: ConsumerSettings[IO, String, String] = ConsumerSettings(
             keyDeserializer = Deserializer[IO, String],
             valueDeserializer = Deserializer[IO, String]
           )
