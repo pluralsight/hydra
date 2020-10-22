@@ -11,7 +11,7 @@ import vulcan.Codec
 import vulcan.generic._
 import cats.syntax.all._
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError.RecordTooLarge
-import hydra.kafka.algebras.KafkaClientAlgebra.PublishResponse
+import hydra.kafka.algebras.KafkaClientAlgebra.{OffsetInfoNotRetrievableInTest, PublishResponse}
 
 import scala.concurrent.ExecutionContext
 
@@ -76,6 +76,18 @@ class KafkaClientAlgebraSpec
       val records = kafkaClient.consumeMessages(topic,"newConsumerGroup", shouldCommitOffsets).take(1).compile.toList.unsafeRunSync()
       records should have length 1
       records.head shouldBe (key, Some(value), None)
+    }
+
+    "consume avro message with partition info from kafka" in {
+      if (shouldCommitOffsets) {
+        val records = kafkaClient.consumeMessagesWithOffsetInfo(topic,"partitionInfoConsumer", shouldCommitOffsets).take(1).compile.toList.unsafeRunSync()
+        records should have length 1
+        records.head shouldBe ((key, Some(value), None),(0,0))
+      } else {
+        a [OffsetInfoNotRetrievableInTest] should be thrownBy {
+          kafkaClient.consumeMessagesWithOffsetInfo(topic,"partitionInfoConsumer", shouldCommitOffsets).take(1).compile.toList.unsafeRunSync()
+        }
+      }
     }
 
     val (_, (_, key2), value2) = topicAndKeyAndValue("topic1","key2","value2")

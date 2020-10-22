@@ -101,7 +101,7 @@ object KafkaClientAlgebra {
   type Offset = Long
   type OffsetInfo = (Partition, Offset)
   case object OffsetsNotCommittableInTest extends NoStackTrace
-  case object OffsetInfoNotRetrievableInTest extends NoStackTrace
+  final case class OffsetInfoNotRetrievableInTest() extends NoStackTrace
   type Record = (GenericRecord, Option[GenericRecord], Option[Headers])
   type StringRecord = (Option[String], Option[GenericRecord], Option[Headers])
 
@@ -349,7 +349,7 @@ object KafkaClientAlgebra {
     }
 
     override def consumeMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset))] = {
-      fs2.Stream.raiseError[F](OffsetInfoNotRetrievableInTest)
+      fs2.Stream.raiseError[F](OffsetInfoNotRetrievableInTest())
     }
   }
 
