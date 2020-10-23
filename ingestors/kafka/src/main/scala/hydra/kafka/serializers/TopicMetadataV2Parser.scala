@@ -256,7 +256,7 @@ sealed trait TopicMetadataV2Parser
       extends RootJsonFormat[TopicMetadataV2Request] {
 
     override def write(obj: TopicMetadataV2Request): JsValue =
-      jsonFormat9(TopicMetadataV2Request.apply).write(obj)
+      jsonFormat10(TopicMetadataV2Request.apply).write(obj)
 
     override def read(json: JsValue): TopicMetadataV2Request = json match {
       case j: JsObject =>
@@ -317,6 +317,9 @@ sealed trait TopicMetadataV2Parser
         val notes = toResult(
           j.getFields("notes").headOption.map(_.convertTo[String])
         )
+        val teamName = toResult(
+          j.getFields("teamName").headOption.map(_.convertTo[String]).getOrElse(throwDeserializationError("teamName", "String"))
+        )
         (
           schemas,
           streamType,
@@ -326,7 +329,8 @@ sealed trait TopicMetadataV2Parser
           contact,
           createdDate,
           parentSubjects,
-          notes
+          notes,
+          teamName
         ).mapN(TopicMetadataV2Request.apply) match {
           case Valid(topicMetadataRequest) => topicMetadataRequest
           case Invalid(e) =>

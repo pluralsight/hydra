@@ -70,7 +70,8 @@ final case class TopicMetadataV2Request(
     contact: NonEmptyList[ContactMethod],
     createdDate: Instant,
     parentSubjects: List[Subject],
-    notes: Option[String]
+    notes: Option[String],
+    teamName: String
 ) {
 
   def toValue: TopicMetadataV2Value = {
@@ -82,7 +83,8 @@ final case class TopicMetadataV2Request(
       contact,
       createdDate,
       parentSubjects,
-      notes
+      notes,
+      teamName
     )
   }
 }

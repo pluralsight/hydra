@@ -96,7 +96,7 @@ final class BootstrapEndpointV2Spec
       deprecated = false,
       None,
       Public,
-      NonEmptyList.of(Email.create("test@pluralsight.com").get),
+      NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
       Instant.now,
       List.empty,
       None
