@@ -52,7 +52,8 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
       NonEmptyList.of(ContactMethod.create("test@test.com").get),
       createdDate,
       List.empty,
-      None
+      None,
+      "dvs-teamName"
     )
 
     val (encodedKey, encodedValue, headers) =
@@ -71,6 +72,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
          |"deprecated": false,
          |"deprecatedDate": null,
          |"dataClassification":"Public",
+         |"teamName":"dvs-teamName",
          |"contact":[
          |  {
          |    "hydra.kafka.model.ContactMethod.Email": {"address": "test@test.com"}
@@ -98,7 +100,8 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
       NonEmptyList.of(ContactMethod.create("test@test.com").get),
       createdDate,
       List.empty,
-      None
+      None,
+      "dvs-teamName"
     )
 
     val (encodedKey, encodedValue, headers) =

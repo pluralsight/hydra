@@ -218,7 +218,7 @@ object TopicMetadataV2Value {
         field("createdDate", _.createdDate),
         field("parentSubjects", _.parentSubjects),
         field("notes", _.notes),
-        field("teamName", _.teamName)
+        field("teamName", _.teamName, default = None)
         ).mapN(TopicMetadataV2Value.apply)
   }
 }

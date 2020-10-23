@@ -97,7 +97,9 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
         NonEmptyList.one(Slack.create("#channel").get),
         Instant.now,
         List(),
-        None)
+        None,
+        "dvs-teamName"
+        )
     (TopicMetadataV2.encode[IO](key, Some(value), None), key, value)
   }
 }

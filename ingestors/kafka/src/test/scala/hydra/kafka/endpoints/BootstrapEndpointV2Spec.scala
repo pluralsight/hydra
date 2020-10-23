@@ -99,7 +99,8 @@ final class BootstrapEndpointV2Spec
       NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
       Instant.now,
       List.empty,
-      None
+      None,
+      "dvs-teamName"
     ).toJson.compactPrint
 
     "accept a valid request" in {

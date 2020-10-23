@@ -124,7 +124,8 @@ final case class TopicMetadataV2Response(
                                           contact: NonEmptyList[ContactMethod],
                                           createdDate: Instant,
                                           parentSubjects: List[Subject],
-                                          notes: Option[String]
+                                          notes: Option[String],
+                                          teamName: String,
                                         )
 object TopicMetadataV2Response {
   def fromTopicMetadataContainer(m: TopicMetadataContainer): TopicMetadataV2Response = {
@@ -139,7 +140,8 @@ object TopicMetadataV2Response {
       v.contact,
       v.createdDate,
       v.parentSubjects,
-      v.notes
+      v.notes,
+      v.teamName
     )
   }
 }

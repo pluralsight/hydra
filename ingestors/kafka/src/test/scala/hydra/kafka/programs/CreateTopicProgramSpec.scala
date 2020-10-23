@@ -63,7 +63,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       NonEmptyList.of(Email.create(email).get),
       createdDate,
       List.empty,
-      None
+      None,
+      "dvs-teamName"
     )
 
   "CreateTopicSpec" must {
