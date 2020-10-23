@@ -318,7 +318,10 @@ sealed trait TopicMetadataV2Parser
           j.getFields("notes").headOption.map(_.convertTo[String])
         )
         val teamName = toResult(
-          j.getFields("teamName").headOption.map(_.convertTo[String]).getOrElse(throwDeserializationError("teamName", "String"))
+          j.fields.get("teamName") match {
+            case Some(teamName) => teamName.convertTo[Option[String]]
+            case None => throwDeserializationError("teamName", "String")
+          }
         )
         (
           schemas,

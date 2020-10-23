@@ -71,7 +71,7 @@ final case class TopicMetadataV2Request(
     createdDate: Instant,
     parentSubjects: List[Subject],
     notes: Option[String],
-    teamName: String
+    teamName: Option[String]
 ) {
 
   def toValue: TopicMetadataV2Value = {
@@ -125,7 +125,7 @@ final case class TopicMetadataV2Response(
                                           createdDate: Instant,
                                           parentSubjects: List[Subject],
                                           notes: Option[String],
-                                          teamName: String,
+                                          teamName: Option[String],
                                         )
 object TopicMetadataV2Response {
   def fromTopicMetadataContainer(m: TopicMetadataContainer): TopicMetadataV2Response = {

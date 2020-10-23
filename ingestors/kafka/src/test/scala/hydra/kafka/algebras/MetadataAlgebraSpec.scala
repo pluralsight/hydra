@@ -98,7 +98,7 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
         Instant.now,
         List(),
         None,
-        "dvs-teamName"
+        Some("dvs-teamName")
         )
     (TopicMetadataV2.encode[IO](key, Some(value), None), key, value)
   }

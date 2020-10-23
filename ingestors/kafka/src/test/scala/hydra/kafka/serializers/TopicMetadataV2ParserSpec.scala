@@ -326,7 +326,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
           tmv2.createdDate,
           parentSubjects,
           notes,
-          teamName
+          Some(teamName)
         )
     }
 
@@ -347,7 +347,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
           Subject.createValidated("dvs.Foo").get,
           "#slack_channel",
           "email@address.com",
-          "teamName",
+          "dvs-teamName",
           allOptionalFieldsPresent = false
         )()
       val tmv2 = TopicMetadataV2Format.read(jsonData)
@@ -366,7 +366,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
           tmv2.createdDate,
           parentSubjects = List(),
           notes,
-          teamName
+          Some(teamName)
         )
     }
 
@@ -547,7 +547,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         createdDate = createdDate,
         parentSubjects = parentSubjects,
         notes = notes,
-        teamName = teamName
+        teamName = Some(teamName)
       )
       TopicMetadataV2Format.write(topicMetadataV2) shouldBe
         createJsValueOfTopicMetadataV2Request(
@@ -575,7 +575,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val tmc = TopicMetadataContainer(TopicMetadataV2Key(subject),
         TopicMetadataV2Value(StreamTypeV2.Entity, false, None, Public,
           NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get),
-          Instant.now(), List.empty, None, "dvs-teamName"),
+          Instant.now(), List.empty, None, Some("dvs-teamName")),
         Some(new SchemaFormat(isKey = true).read(validAvroSchema)),
         Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
       val response = TopicMetadataV2Response.fromTopicMetadataContainer(tmc)
@@ -621,7 +621,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val before = Instant.now
       val tmc = TopicMetadataContainer(TopicMetadataV2Key(subject),
         TopicMetadataV2Value(StreamTypeV2.Entity, true, None,
-          Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None, "dvs-teamName"),
+          Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None, Some("dvs-teamName")),
         Some(new SchemaFormat(isKey = true).read(validAvroSchema)),
         Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
       val request = TopicMetadataV2Request.apply(Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,
@@ -636,7 +636,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val now = Instant.now
       val tmc = TopicMetadataContainer(TopicMetadataV2Key(subject),
         TopicMetadataV2Value(StreamTypeV2.Entity, true, Some(now),
-          Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None, "dvs-teamName"),
+          Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None, Some("dvs-teamName")),
         Some(new SchemaFormat(isKey = true).read(validAvroSchema)),
         Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
       val request = TopicMetadataV2Request.apply(Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,
@@ -652,7 +652,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val subject = Subject.createValidated("dvs.valid").get
       val tmc = TopicMetadataContainer(TopicMetadataV2Key(subject),
         TopicMetadataV2Value(StreamTypeV2.Entity, false, None,
-          Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None, "dvs-teamName"),
+          Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None, Some("dvs-teamName")),
         Some(new SchemaFormat(isKey = true).read(validAvroSchema)),
         Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
       val request = TopicMetadataV2Request.apply(Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,

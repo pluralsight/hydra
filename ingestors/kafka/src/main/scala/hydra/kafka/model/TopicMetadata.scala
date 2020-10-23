@@ -144,7 +144,7 @@ final case class TopicMetadataV2Value(
     createdDate: Instant,
     parentSubjects: List[Subject],
     notes: Option[String],
-    teamName: String
+    teamName: Option[String]
 )
 
 object TopicMetadataV2Value {
@@ -218,7 +218,7 @@ object TopicMetadataV2Value {
         field("createdDate", _.createdDate),
         field("parentSubjects", _.parentSubjects),
         field("notes", _.notes),
-        field("teamName", _.teamName, default = None)
+        field("teamName", _.teamName, default = Some(None))
         ).mapN(TopicMetadataV2Value.apply)
   }
 }

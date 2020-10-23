@@ -100,7 +100,7 @@ final class BootstrapEndpointV2Spec
       Instant.now,
       List.empty,
       None,
-      "dvs-teamName"
+      Some("dvs-teamName")
     ).toJson.compactPrint
 
     "accept a valid request" in {

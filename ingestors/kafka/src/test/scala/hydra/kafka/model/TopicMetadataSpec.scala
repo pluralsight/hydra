@@ -53,12 +53,13 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
       createdDate,
       List.empty,
       None,
-      "dvs-teamName"
+      Some("dvs-teamName")
     )
 
     val (encodedKey, encodedValue, headers) =
       TopicMetadataV2.encode[IO](key, Some(value)).unsafeRunSync()
 
+    val haha = TopicMetadataV2Key.codec.schema.toOption.get
     encodedKey shouldBe new GenericRecordBuilder(
       TopicMetadataV2Key.codec.schema.toOption.get
     ).set("subject", key.subject.value)
@@ -101,7 +102,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
       createdDate,
       List.empty,
       None,
-      "dvs-teamName"
+      Some("dvs-teamName")
     )
 
     val (encodedKey, encodedValue, headers) =
