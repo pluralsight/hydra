@@ -151,12 +151,13 @@ object KafkaAdminAlgebra {
         getAdminClientResource.use(_.listConsumerGroupOffsets(consumerGroup)
           .partitionsToOffsetAndMetadata.map(_.map(r => TopicAndPartition(r._1) -> Offset(r._2))))
 
-      override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] =
+      override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] = {
         getConsumerResource.use { consumer =>
           consumer.partitionsFor(topic).map(_.map(p => new TopicPartition(p.topic, p.partition))).flatMap { topicPartition =>
             consumer.endOffsets(topicPartition.toSet).map(_.map(in => TopicAndPartition(in._1) -> Offset(in._2)))
           }
         }
+      }
 
       override def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]] = {
         for {

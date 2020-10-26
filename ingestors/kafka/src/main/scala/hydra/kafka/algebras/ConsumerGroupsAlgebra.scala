@@ -31,6 +31,7 @@ trait ConsumerGroupsAlgebra[F[_]] {
   def getConsumersForTopic(topicName: String): F[TopicConsumers]
   def getTopicsForConsumer(consumerGroupName: String): F[ConsumerTopics]
   def getAllConsumers: F[List[ConsumerTopics]]
+  def startConsumers: F[Unit]
 }
 
 object ConsumerGroupsAlgebra {
@@ -54,22 +55,14 @@ object ConsumerGroupsAlgebra {
                                                                  kafkaClientAlgebra: KafkaClientAlgebra[F],
                                                                  kafkaAdminAlgebra: KafkaAdminAlgebra[F],
                                                                  schemaRegistryAlgebra: SchemaRegistry[F]): F[ConsumerGroupsAlgebra[F]] = {
+
     val dvsConsumersStream: fs2.Stream[F, (GenericRecord, Option[GenericRecord], Option[Headers])] = kafkaClientAlgebra.consumeMessages(dvsConsumersTopic.value, uniquePerNodeConsumerGroup, commitOffsets = false)
     val dvsConsumerOffsetStream = kafkaClientAlgebra.consumeMessagesWithOffsetInfo(consumerOffsetsOffsetsTopicConfig.value, uniquePerNodeConsumerGroup, commitOffsets = false)
 
     for {
       consumerGroupsStorageFacade <- Ref[F].of(ConsumerGroupsStorageFacade.empty)
-      schemaRegistryClient <- schemaRegistryAlgebra.getSchemaRegistryClient
-      latestOffsets <- kafkaAdminAlgebra.getLatestOffsets(consumerOffsetsOffsetsTopicConfig.value)
-      simplifiedLatestOffsets = latestOffsets.map(l => l._1.partition -> l._2.value)
-      deferred <- Deferred[F, PartitionOffsetMap]
-      cache <- Ref[F].of(Map[Int, Long]())
-      backgroundProcess <- Concurrent[F].start(getOffsetsToSeekTo(cache, simplifiedLatestOffsets, deferred, dvsConsumerOffsetStream))
-      partitionMap <- deferred.get
-      _ <- backgroundProcess.cancel
-      _ <- Concurrent[F].start(consumerOffsetsToInternalOffsets(kafkaInternalTopic, dvsConsumersTopic.value, bootstrapServers, commonConsumerGroup, schemaRegistryClient, partitionMap, consumerOffsetsOffsetsTopicConfig.value))
-      _ <- Concurrent[F].start(consumeDVSConsumersTopicIntoCache(dvsConsumersStream, consumerGroupsStorageFacade))
     } yield new ConsumerGroupsAlgebra[F] {
+
       override def getConsumersForTopic(topicName: String): F[TopicConsumers] =
         consumerGroupsStorageFacade.get.map(_.getConsumersForTopicName(topicName))
 
@@ -78,6 +71,21 @@ object ConsumerGroupsAlgebra {
 
       override def getAllConsumers: F[List[ConsumerTopics]] =
         consumerGroupsStorageFacade.get.map(_.getAllConsumers)
+
+      override def startConsumers: F[Unit] = {
+        for {
+          schemaRegistryClient <- schemaRegistryAlgebra.getSchemaRegistryClient
+          latestOffsets <- kafkaAdminAlgebra.getLatestOffsets(consumerOffsetsOffsetsTopicConfig.value)
+          simplifiedLatestOffsets = latestOffsets.map(l => l._1.partition -> l._2.value)
+          deferred <- Deferred[F, PartitionOffsetMap]
+          cache <- Ref[F].of(Map[Int, Long]())
+          backgroundProcess <- Concurrent[F].start(getOffsetsToSeekTo(cache, simplifiedLatestOffsets, deferred, dvsConsumerOffsetStream))
+          partitionMap <- deferred.get
+          _ <- backgroundProcess.cancel
+          _ <- Concurrent[F].start(consumerOffsetsToInternalOffsets(kafkaInternalTopic, dvsConsumersTopic.value, bootstrapServers, commonConsumerGroup, schemaRegistryClient, partitionMap, consumerOffsetsOffsetsTopicConfig.value))
+          _ <- Concurrent[F].start(consumeDVSConsumersTopicIntoCache(dvsConsumersStream, consumerGroupsStorageFacade))
+        } yield ()
+      }
     }
   }
 
