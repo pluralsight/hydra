@@ -1,12 +1,14 @@
 package hydra.kafka.algebras
 
 import akka.actor.ActorSystem
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ContextShift, IO, Sync, Timer}
 import hydra.kafka.algebras.KafkaAdminAlgebra.{LagOffsets, Offset, Topic, TopicAndPartition}
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.algebras.KafkaAdminAlgebra.{LagOffsets, Offset, TopicAndPartition}
 import hydra.kafka.algebras.KafkaClientAlgebra.getOptionalGenericRecordDeserializer
 import hydra.kafka.util.KafkaUtils.TopicDetails
+import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
+import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
@@ -21,6 +23,9 @@ final class KafkaAdminAlgebraSpec
     with EmbeddedKafka {
 
   private val port = 8023
+
+  implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
+    Slf4jLogger.getLogger[F]
 
   implicit private val kafkaConfig: EmbeddedKafkaConfig =
     EmbeddedKafkaConfig(kafkaPort = port, zooKeeperPort = 3027)
