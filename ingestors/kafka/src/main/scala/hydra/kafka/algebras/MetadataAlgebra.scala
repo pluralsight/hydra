@@ -36,8 +36,7 @@ object MetadataAlgebra {
                         consumeMetadataEnabled: Boolean
                       ): F[MetadataAlgebra[F]] = {
     val metadataStream: fs2.Stream[F, (GenericRecord, Option[GenericRecord])] = if (consumeMetadataEnabled) {
-      val stream = kafkaClientAlgebra.consumeMessages(metadataTopicName, consumerGroup)
-      stream.map(record => (record._1, record._2))
+      kafkaClientAlgebra.consumeMessages(metadataTopicName, consumerGroup, commitOffsets = false).map(record => (record._1, record._2))
     } else {
       fs2.Stream.empty
     }

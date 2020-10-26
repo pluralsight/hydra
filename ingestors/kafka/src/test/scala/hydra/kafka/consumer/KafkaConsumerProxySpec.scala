@@ -37,7 +37,7 @@ class KafkaConsumerProxySpec
     with ImplicitSender {
 
   implicit val config =
-    EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
+    EmbeddedKafkaConfig(kafkaPort = 8012, zooKeeperPort = 3111)
 
   override def beforeAll() = {
     super.beforeAll()

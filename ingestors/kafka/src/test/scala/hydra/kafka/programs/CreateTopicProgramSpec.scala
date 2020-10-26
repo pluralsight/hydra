@@ -10,7 +10,7 @@ import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.kafka.algebras.KafkaAdminAlgebra.{Topic, TopicName}
-import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, PublishError, PublishResponse}
+import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, Offset, Partition, PublishError, PublishResponse}
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.ContactMethod.Email
@@ -511,13 +511,15 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         publishTo.update(_ + (topicName -> record)).map(_ => PublishResponse(0, 0)).attemptNarrow[PublishError]
       }
 
-    override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, Record] = fs2.Stream.empty
+    override def consumeMessages(topicName: TopicName, consumerGroup: String, commitOffsets: Boolean): fs2.Stream[IO, Record] = fs2.Stream.empty
 
     override def publishStringKeyMessage(record: (Option[String], Option[GenericRecord], Option[Headers]), topicName: TopicName): IO[Either[PublishError, PublishResponse]] = ???
 
-    override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[IO, (Option[String], Option[GenericRecord], Option[Headers])] = ???
+    override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[IO, (Option[String], Option[GenericRecord], Option[Headers])] = ???
 
     override def withProducerRecordSizeLimit(sizeLimitBytes: Long): IO[KafkaClientAlgebra[IO]] = ???
+
+    override def consumeMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[IO, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset))] = fs2.Stream.empty
   }
 
   private final class TestMetadataAlgebraWithPublishTo(consumeFrom: Ref[IO, Map[Subject, TopicMetadataContainer]]) extends MetadataAlgebra[IO] {
