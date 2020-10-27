@@ -51,7 +51,7 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
       Monad[F].unit
     }
 
-  private def bootstrapDVSConsumersTopic: F[Unit] =
+  private def bootstrapDVSConsumersTopic: F[Unit] = {
     TopicConsumer.getSchemas[F].flatMap { schemas =>
       createTopicProgram.createTopic(
         dvsConsumersTopicConfig.topicName,
@@ -71,6 +71,7 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
         TopicDetails(dvsConsumersTopicConfig.numPartitions, dvsConsumersTopicConfig.replicationFactor, Map("cleanup.policy" -> "compact"))
       )
     }
+  }
 
   private def bootstrapConsumerOffsetsOffsetsTopic: F[Unit] =
     TopicConsumerOffset.getSchemas[F].flatMap { schemas =>
