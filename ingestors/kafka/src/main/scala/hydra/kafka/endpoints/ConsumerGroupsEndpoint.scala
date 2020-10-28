@@ -30,16 +30,15 @@ class ConsumerGroupsEndpoint[F[_]: Futurable](consumerGroupsAlgebra: ConsumerGro
             }
           } ~ pathPrefix("getByTopic" / Segment) { topic =>
             pathEndOrSingleSlash {
-                onComplete(
-                  Futurable[F].unsafeToFuture(consumerGroupsAlgebra.getConsumersForTopic(topic))
-                ) {
-                  case Success(topicConsumers) =>
-                    addPromHttpMetric(topic, StatusCodes.OK.toString, "/v2/consumer-groups/getByTopic")
-                    complete(StatusCodes.OK, topicConsumers)
-                  case Failure(exception) =>
-                    addPromHttpMetric(topic, StatusCodes.InternalServerError.toString, "/v2/consumer-groups/getByTopic")
-                    complete(StatusCodes.InternalServerError, exception.getMessage)
-                }
+              onComplete(
+                Futurable[F].unsafeToFuture(consumerGroupsAlgebra.getConsumersForTopic(topic))
+              ) {
+                case Success(topicConsumers) =>
+                  addPromHttpMetric(topic, StatusCodes.OK.toString, "/v2/consumer-groups/getByTopic")
+                  complete(StatusCodes.OK, topicConsumers)
+                case Failure(exception) =>
+                  addPromHttpMetric(topic, StatusCodes.InternalServerError.toString, "/v2/consumer-groups/getByTopic")
+                  complete(StatusCodes.InternalServerError, exception.getMessage)
               }
             }
           }
