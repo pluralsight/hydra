@@ -60,6 +60,7 @@ object TopicConsumer {
       .rethrow
       .flatMap {
         case (k: GenericRecord, v: GenericRecord) => Monad[F].pure((k, Option(v)))
+        case (k: GenericRecord, _) => Monad[F].pure((k, None))
         case (k, v) =>
           MonadError[F, Throwable].raiseError(
             AvroEncodingFailure(
