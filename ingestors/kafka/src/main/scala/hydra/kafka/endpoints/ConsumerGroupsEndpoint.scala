@@ -30,21 +30,15 @@ class ConsumerGroupsEndpoint[F[_]: Futurable](consumerGroupsAlgebra: ConsumerGro
             }
           } ~ pathPrefix("getByTopic" / Segment) { topic =>
             pathEndOrSingleSlash {
-              Subject.createValidated(topic) match {
-                case Some(subject) =>
-                  onComplete(
-                    Futurable[F].unsafeToFuture(consumerGroupsAlgebra.getConsumersForTopic(subject.value))
-                  ) {
-                    case Success(topicConsumers) =>
-                      addPromHttpMetric(topic, StatusCodes.OK.toString, "/v2/consumer-groups/getByTopic")
-                      complete(StatusCodes.OK, topicConsumers)
-                    case Failure(exception) =>
-                      addPromHttpMetric(topic, StatusCodes.InternalServerError.toString, "/v2/consumer-groups/getByTopic")
-                      complete(StatusCodes.InternalServerError, exception.getMessage)
-                  }
-                case None =>
-                  addPromHttpMetric(topic, StatusCodes.BadRequest.toString, "/v2/consumer-groups/getByTopic")
-                  complete(StatusCodes.BadRequest, Subject.invalidFormat)
+              onComplete(
+                Futurable[F].unsafeToFuture(consumerGroupsAlgebra.getConsumersForTopic(topic))
+              ) {
+                case Success(topicConsumers) =>
+                  addPromHttpMetric(topic, StatusCodes.OK.toString, "/v2/consumer-groups/getByTopic")
+                  complete(StatusCodes.OK, topicConsumers)
+                case Failure(exception) =>
+                  addPromHttpMetric(topic, StatusCodes.InternalServerError.toString, "/v2/consumer-groups/getByTopic")
+                  complete(StatusCodes.InternalServerError, exception.getMessage)
               }
             }
           }
