@@ -56,7 +56,7 @@ object TopicConsumer {
           ).tupled.toEither.leftMap { a =>
           TopicConsumerAvroSchemaFailure(a)
         }
-      }.map(a => a)
+      }
       .rethrow
       .flatMap {
         case (k: GenericRecord, v: GenericRecord) => Monad[F].pure((k, Option(v)))
