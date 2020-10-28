@@ -107,9 +107,9 @@ object TopicMetadataV2Request {
       }
     }
 
-    val invalidFormat = "Invalid Subject. Subject must start with skills, flow, tech, fin, dvs, or an underscore(_). " +
+    val invalidFormat = "Invalid Topic Name. Topic Name must start with skills, flow, tech, fin, dvs, or an underscore(_). " +
       " It may contain only alphanumeric characters, hyphens(-) and periods(.)" +
-      " and must not contain \".-\", \"-.\", \"..\", or \"--\" anywhere within the topic."
+      " and must not contain consecutive special characters anywhere within the topic name."
   }
 }
 
