@@ -75,14 +75,15 @@ object ConsumerGroupsAlgebra {
       override def startConsumers: F[Unit] = {
         for {
           schemaRegistryClient <- schemaRegistryAlgebra.getSchemaRegistryClient
-          latestOffsets <- kafkaAdminAlgebra.getLatestOffsets(consumerOffsetsOffsetsTopicConfig.value)
-          simplifiedLatestOffsets = latestOffsets.map(l => l._1.partition -> l._2.value)
-          deferred <- Deferred[F, PartitionOffsetMap]
-          cache <- Ref[F].of(Map[Int, Long]())
-          backgroundProcess <- Concurrent[F].start(getOffsetsToSeekTo(cache, simplifiedLatestOffsets, deferred, dvsConsumerOffsetStream))
-          partitionMap <- deferred.get
-          _ <- backgroundProcess.cancel
-          _ <- Concurrent[F].start(consumerOffsetsToInternalOffsets(kafkaInternalTopic, dvsConsumersTopic.value, bootstrapServers, commonConsumerGroup, schemaRegistryClient, partitionMap, consumerOffsetsOffsetsTopicConfig.value))
+          // TODO These are for optimizing the reading from consumerOffsetsToInternalOffsets to be done in a later PR
+//          latestOffsets <- kafkaAdminAlgebra.getLatestOffsets(consumerOffsetsOffsetsTopicConfig.value)
+//          simplifiedLatestOffsets = latestOffsets.map(l => l._1.partition -> l._2.value)
+//          deferred <- Deferred[F, PartitionOffsetMap]
+//          cache <- Ref[F].of(Map[Int, Long]())
+//          backgroundProcess <- Concurrent[F].start(getOffsetsToSeekTo(cache, simplifiedLatestOffsets, deferred, dvsConsumerOffsetStream))
+//          partitionMap <- deferred.get
+//          _ <- backgroundProcess.cancel
+          _ <- Concurrent[F].start(consumerOffsetsToInternalOffsets(kafkaInternalTopic, dvsConsumersTopic.value, bootstrapServers, commonConsumerGroup, schemaRegistryClient, Map(), consumerOffsetsOffsetsTopicConfig.value))
           _ <- Concurrent[F].start(consumeDVSConsumersTopicIntoCache(dvsConsumersStream, consumerGroupsStorageFacade))
         } yield ()
       }
@@ -133,17 +134,17 @@ object ConsumerGroupsAlgebra {
     }
   }
 
-  private def processRecord[F[_]: ConcurrentEffect](
+  private def processRecord[F[_]: ConcurrentEffect: Logger](
                                                      cr: CommittableConsumerRecord[F, Option[BaseKey], Option[OffsetAndMetadata]],
                                                      s: SchemaRegistryClient,
                                                      destinationTopic: String,
                                                      dvsInternalKafkaOffsetTopic: String
                                                    ): fs2.Stream[F, ProducerRecords[Array[Byte], Array[Byte], Unit]] = {
-    (cr.record.key, cr.record.value) match {
+    ((cr.record.key, cr.record.value) match {
       case (Some(OffsetKey(_, k)), offsetMaybe) =>
-        val topic = k.topicPartition.topic()
-        val consumerGroupMaybe = Option(k.group)
-        val consumerKeyMaybe = consumerGroupMaybe.map(TopicConsumerKey(topic, _))
+        val topicMaybe: Option[String] = Option(k.topicPartition.topic())
+        val consumerGroupMaybe: Option[String] = Option(k.group)
+        val consumerKeyMaybe: Option[TopicConsumerKey] = consumerGroupMaybe.flatMap(cg => topicMaybe.map(t => TopicConsumerKey(t, cg)))
         val consumerValue = offsetMaybe.map(o => Instant.ofEpochMilli(o.commitTimestamp)).map(TopicConsumerValue.apply)
 
         consumerKeyMaybe match {
@@ -170,6 +171,8 @@ object ConsumerGroupsAlgebra {
         }
       case _ =>
         fs2.Stream.empty
+    }).handleErrorWith { error =>
+      fs2.Stream.eval(Logger[F].warn(s"DVSConsumerStreamFailure: ${error.getMessage}")) *> fs2.Stream.empty
     }
   }
 
