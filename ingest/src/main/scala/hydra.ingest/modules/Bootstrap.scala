@@ -42,7 +42,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
             List.empty,
             Some(
               "This is the topic that Hydra uses to keep track of metadata for topics."
-            )
+            ),
+            Some("Data-Platform")
           ),
           TopicDetails(cfg.numPartitions, cfg.replicationFactor)
         )

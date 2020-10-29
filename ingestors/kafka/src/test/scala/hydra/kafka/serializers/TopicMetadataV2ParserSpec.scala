@@ -301,12 +301,14 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         email,
         slackChannel,
         parentSubjects,
-        notes
+        notes,
+        teamName
       ) =
         createJsValueOfTopicMetadataV2Request(
           Subject.createValidated("dvs.Foo").get,
           "#slack_channel",
-          "email@address.com"
+          "email@address.com",
+          "dvs-teamName"
         )()
       val tmv2 = TopicMetadataV2Format.read(jsonData)
 
@@ -323,7 +325,8 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
           NonEmptyList(email, slackChannel :: Nil),
           tmv2.createdDate,
           parentSubjects,
-          notes
+          notes,
+          Some(teamName)
         )
     }
 
@@ -337,12 +340,14 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         email,
         slackChannel,
         _,
-        notes
+        notes,
+        teamName
       ) =
         createJsValueOfTopicMetadataV2Request(
           Subject.createValidated("dvs.Foo").get,
           "#slack_channel",
           "email@address.com",
+          "dvs-teamName",
           allOptionalFieldsPresent = false
         )()
       val tmv2 = TopicMetadataV2Format.read(jsonData)
@@ -360,7 +365,8 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
           NonEmptyList(email, slackChannel :: Nil),
           tmv2.createdDate,
           parentSubjects = List(),
-          notes
+          notes,
+          Some(teamName)
         )
     }
 
@@ -394,7 +400,8 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       subject: Subject,
       slackChannel: String,
       email: String,
-      allOptionalFieldsPresent: Boolean = true
+      teamName: String,
+        allOptionalFieldsPresent: Boolean = true
   )(
       streamType: StreamTypeV2 = StreamTypeV2.Entity,
       deprecated: Boolean = false,
@@ -402,7 +409,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       validAvroSchema: JsValue = validAvroSchema,
       parentSubjects: List[Subject] = List(),
       notes: Option[String] = None,
-      createdDate: Instant = Instant.now()
+      createdDate: Instant = Instant.now(),
   ): (
       JsValue,
       Subject,
@@ -412,7 +419,8 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       Email,
       Slack,
       List[Subject],
-      Option[String]
+      Option[String],
+      String
   ) = {
     val jsValue = s"""
          |{
@@ -422,6 +430,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
          |  },
          |  "streamType": "${streamType.toString}",
          |  "dataClassification":"${dataClassification.toString}",
+         |  "teamName":"${teamName}",
          |  "contact": {
          |    "slackChannel": "$slackChannel",
          |    "email": "$email"
@@ -440,7 +449,8 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       Email.create(email).get,
       Slack.create(slackChannel).get,
       parentSubjects,
-      notes
+      notes,
+      teamName
     )
   }
 
@@ -522,6 +532,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         Subject.createValidated("dvs.valid-parent-2").get
       )
       val notes = Some("Notes go here.")
+      val teamName = "dvs-teamName"
 
       val topicMetadataV2 = TopicMetadataV2Request(
         schemas = Schemas(
@@ -535,13 +546,15 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         contact = contact,
         createdDate = createdDate,
         parentSubjects = parentSubjects,
-        notes = notes
+        notes = notes,
+        teamName = Some(teamName)
       )
       TopicMetadataV2Format.write(topicMetadataV2) shouldBe
         createJsValueOfTopicMetadataV2Request(
           subject,
           slack.channel.value,
-          email.address.value
+          email.address.value,
+          teamName
         )(
           streamType,
           deprecated,
@@ -560,12 +573,15 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
     "TopicMetadataV2Format write matches TopicMetadataResponseV2Format write" in {
       val subject = Subject.createValidated("dvs.valid").get
       val tmc = TopicMetadataContainer(TopicMetadataV2Key(subject),
-        TopicMetadataV2Value(StreamTypeV2.Entity, false, None, Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None),
+        TopicMetadataV2Value(StreamTypeV2.Entity, false, None, Public,
+          NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get),
+          Instant.now(), List.empty, None, Some("dvs-teamName")),
         Some(new SchemaFormat(isKey = true).read(validAvroSchema)),
         Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
       val response = TopicMetadataV2Response.fromTopicMetadataContainer(tmc)
       val request = TopicMetadataV2Request.apply(Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,
-        tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.dataClassification,tmc.value.contact,tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes)
+        tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.dataClassification,tmc.value.contact,
+        tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes, teamName = tmc.value.teamName)
 
       TopicMetadataV2Format.write(request).compactPrint shouldBe
         TopicMetadataResponseV2Format.write(response).compactPrint.replace(",\"subject\":\"dvs.valid\"", "")
@@ -605,11 +621,12 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val before = Instant.now
       val tmc = TopicMetadataContainer(TopicMetadataV2Key(subject),
         TopicMetadataV2Value(StreamTypeV2.Entity, true, None,
-          Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None),
+          Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None, Some("dvs-teamName")),
         Some(new SchemaFormat(isKey = true).read(validAvroSchema)),
         Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
       val request = TopicMetadataV2Request.apply(Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,
-        tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.dataClassification,tmc.value.contact,tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes)
+        tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.dataClassification,tmc.value.contact,
+        tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes,tmc.value.teamName)
       val firstDeprecatedDate = TopicMetadataV2Format.read(request.toJson).deprecatedDate.getOrElse(None)
       firstDeprecatedDate shouldBe None
     }
@@ -619,11 +636,12 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val now = Instant.now
       val tmc = TopicMetadataContainer(TopicMetadataV2Key(subject),
         TopicMetadataV2Value(StreamTypeV2.Entity, true, Some(now),
-          Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None),
+          Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None, Some("dvs-teamName")),
         Some(new SchemaFormat(isKey = true).read(validAvroSchema)),
         Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
       val request = TopicMetadataV2Request.apply(Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,
-        tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.dataClassification,tmc.value.contact,tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes)
+        tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.dataClassification,tmc.value.contact,tmc.value.createdDate,
+        tmc.value.parentSubjects,tmc.value.notes,tmc.value.teamName)
       val firstDeprecatedDate = TopicMetadataV2Format.read(request.toJson).deprecatedDate.get
       val now2 = Instant.now
       now2.isAfter(firstDeprecatedDate) shouldBe true
@@ -634,11 +652,12 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val subject = Subject.createValidated("dvs.valid").get
       val tmc = TopicMetadataContainer(TopicMetadataV2Key(subject),
         TopicMetadataV2Value(StreamTypeV2.Entity, false, None,
-          Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None),
+          Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None, Some("dvs-teamName")),
         Some(new SchemaFormat(isKey = true).read(validAvroSchema)),
         Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
       val request = TopicMetadataV2Request.apply(Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,
-        tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.dataClassification,tmc.value.contact,tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes)
+        tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.dataClassification,tmc.value.contact,
+        tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes, tmc.value.teamName)
       val firstDeprecatedDate = TopicMetadataV2Format.read(request.toJson).deprecatedDate.getOrElse(None)
       firstDeprecatedDate shouldBe None
     }
