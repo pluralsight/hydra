@@ -34,7 +34,7 @@ class ConsumerGroupsEndpoint[F[_]: Futurable](consumerGroupsAlgebra: ConsumerGro
                 Futurable[F].unsafeToFuture(consumerGroupsAlgebra.getConsumersForTopic(topic))
               ) {
                 case Success(topicConsumers) =>
-                  addPromHttpMetric(topic, StatusCodes.OK.toString, "/v2/consumer-groups/getByTopic")
+                  addPromHttpMetric(topic, StatusCodes.OK.toString, "/v2/consumer-groups/getByTopic/")
                   complete(StatusCodes.OK, topicConsumers)
                 case Failure(exception) =>
                   addPromHttpMetric(topic, StatusCodes.InternalServerError.toString, "/v2/consumer-groups/getByTopic")

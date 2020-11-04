@@ -34,7 +34,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
-class BootstrapEndpoint(override val system:ActorSystem) extends RouteSupport
+class  BootstrapEndpoint(override val system:ActorSystem) extends RouteSupport
   with LoggingAdapter
   with TopicMetadataAdapter
   with HydraDirectives

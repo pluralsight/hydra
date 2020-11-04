@@ -47,11 +47,6 @@ class KafkaIngestor extends Ingestor with KafkaProducerSupport {
 
   private implicit val timeout = Timeout(timeoutDuration)
 
-  private val topicActor = context.actorOf(
-    KafkaTopicsActor
-      .props(KafkaConfigSupport.kafkaConfig.getConfig("kafka.admin"))
-  )
-
   ingest {
     case Publish(request) =>
       val hasTopic = request.metadataValue(HYDRA_KAFKA_TOPIC_PARAM).isDefined

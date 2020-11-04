@@ -13,6 +13,7 @@ import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
 import hydra.kafka.model.TopicConsumerOffset.{TopicConsumerOffsetKey, TopicConsumerOffsetValue}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{TopicConsumer, TopicConsumerOffset}
+import hydra.kafka.util.ConsumerGroupsOffsetConsumer
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
@@ -150,7 +151,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
           (for {
             cache <- Ref[IO].of(Map.empty[Int, Long])
             deferred <- Deferred[IO, PartitionOffsetMap]
-            backgroundProcess <- Concurrent[IO].start(ConsumerGroupsAlgebra.getOffsetsToSeekTo(cache, latestPartitionOffset, deferred, dvsConsumerOffsetStream))
+            backgroundProcess <- Concurrent[IO].start(ConsumerGroupsOffsetConsumer.getOffsetsToSeekTo(cache, latestPartitionOffset, deferred, dvsConsumerOffsetStream))
             _ <- deferred.get
             _ <- backgroundProcess.cancel
           } yield succeed).unsafeRunSync()
