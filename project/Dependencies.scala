@@ -172,7 +172,7 @@ object Dependencies {
   }
 
   object Integration {
-    private val testcontainersJavaVersion = "1.15.0-rc2"
+    private val testcontainersJavaVersion = "1.15.0"
     val testContainers = Seq(
       "com.dimafeng" %% "testcontainers-scala-scalatest" % testContainersVersion % "it",
       "com.dimafeng" %% "testcontainers-scala-kafka" % testContainersVersion % "it",
