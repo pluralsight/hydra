@@ -32,7 +32,7 @@ object Dependencies {
   val scalaTestVersion = "3.2.2"
   val scalazVersion = "7.3.2"
   val sprayJsonVersion = "1.3.5"
-  val testContainersVersion = "0.38.4"
+  val testContainersVersion = "0.38.6"
   val typesafeConfigVersion = "1.3.2"
   val vulcanVersion = "1.2.0"
 
