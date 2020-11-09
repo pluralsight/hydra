@@ -135,4 +135,26 @@ final class SimpleStringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     record.get.get("testing") shouldBe Map("one" -> 1, "two" -> 2, "three" -> 3).map(kv => new Utf8(kv._1) -> kv._2).asJava
   }
 
+  it should "convert map of complex type" in {
+    val innerSchema = SchemaBuilder.record("InnerTest")
+      .fields().optionalString("blah").endRecord()
+    val schema = SchemaBuilder.record("Test").fields()
+      .name("testing").`type`.map.values.`type`(innerSchema).noDefault().endRecord()
+    val json =
+      """
+        |{
+        |  "testing": {
+        |    "one": {"blah": "one"},
+        |    "two": {"blah": "two"},
+        |    "three": {"blah": "three"}
+        |  }
+        |}
+        |""".stripMargin
+    val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
+    import collection.JavaConverters._
+    val toGenRecord: String => GenericRecord = str => new GenericRecordBuilder(innerSchema).set("blah", new Utf8(str)).build()
+    record.get.get("testing") shouldBe Map("one" -> "one", "two" -> "two", "three" -> "three")
+      .map(kv => new Utf8(kv._1) -> kv._2).mapValues(toGenRecord).asJava
+  }
+
 }

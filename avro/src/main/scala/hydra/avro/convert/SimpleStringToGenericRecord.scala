@@ -50,10 +50,19 @@ object SimpleStringToGenericRecord {
       }
     }
 
+    private def handleMap(json: JsValue, schema: Schema): JsValue = {
+      val itemsSchema = schema.getValueType
+      json match {
+        case JsObject(items) => JsObject(items.mapValues(jsonToGenericRecordJson(_, itemsSchema)))
+        case _ => ??? // TODO return error DO NOT MERGE
+      }
+    }
+
     private def jsonToGenericRecordJson(json: JsValue, schema: Schema): JsValue = schema.getType match {
       case Schema.Type.RECORD => handleRecord(json, schema)
       case Schema.Type.UNION => handleUnion(json, schema)
       case Schema.Type.ARRAY => handleArray(json, schema)
+      case Schema.Type.MAP => handleMap(json, schema)
       case _ => json
     }
 
