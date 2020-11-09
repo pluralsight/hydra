@@ -3,72 +3,75 @@ package hydra.avro.convert
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 import spray.json._
-
-import scala.annotation.tailrec
+import cats.implicits._
 
 object SimpleStringToGenericRecord {
+
+  final case class UnexpectedTypeFoundInGenericRecordConversion[A](typeExpected: Class[A], found: JsValue) extends
+    Exception(s"Expected ${typeExpected.getSimpleName} but found $found")
 
   implicit class SimpleStringToGenericRecordOps(str: String) {
 
     import StringToGenericRecord._
     import collection.JavaConverters._
 
-    private def handleRecord(json: JsValue, schema: Schema): JsObject = {
-      val newFieldsMap = schema.getFields.asScala.map { field =>
-        val maybeThisFieldJson = json match {
-          case JsObject(fields) => fields.get(field.name)
-          case other => ??? // TODO do not merge
+    private def handleRecord(json: JsValue, schema: Schema): Try[JsValue] = {
+      val newFieldsMap = schema.getFields.asScala.toList.traverse { field =>
+        val maybeThisFieldJson: Try[Option[JsValue]] = json match {
+          case JsObject(fields) => Success(fields.get(field.name))
+          case other => Failure(UnexpectedTypeFoundInGenericRecordConversion[JsObject](classOf[JsObject], other))
         }
-        maybeThisFieldJson match {
-          case Some(fjson) => field.name -> jsonToGenericRecordJson(fjson, field.schema)
-          case None => field.name -> jsonToGenericRecordJson(JsNull, field.schema)
+        maybeThisFieldJson.flatMap {
+          case Some(fjson) => jsonToGenericRecordJson(fjson, field.schema).map(field.name -> _)
+          case None => jsonToGenericRecordJson(JsNull, field.schema).map(field.name ->  _)
         }
-      }.toMap
-      JsObject(newFieldsMap)
+      }.map(f => JsObject(f.toMap))
+      newFieldsMap
     }
 
-    private def handleUnion(json: JsValue, schema: Schema): JsValue = {
+    private def handleUnion(json: JsValue, schema: Schema): Try[JsValue] = {
       json match {
-        case JsNull => JsNull
+        case JsNull => Success(JsNull)
         case otherJson =>
           val maybeNonNullInnerType = schema.getTypes.asScala.find(_.getType != Schema.Type.NULL)
           maybeNonNullInnerType match {
             case Some(nonNullInnerType) =>
-              JsObject(nonNullInnerType.getFullName -> otherJson)
-            case None => ??? // TODO return error DO NOT MERGE
+              Success(JsObject(nonNullInnerType.getFullName -> otherJson))
+            case None => Success(json)
           }
       }
     }
 
-    private def handleArray(json: JsValue, schema: Schema): JsValue = {
+    private def handleArray(json: JsValue, schema: Schema): Try[JsValue] = {
       val itemsSchema = schema.getElementType
       json match {
-        case JsArray(items) => JsArray(items.map(jsonToGenericRecordJson(_, itemsSchema)))
-        case _ => ??? // TODO return error DO NOT MERGE
+        case JsArray(items) => items.traverse(jsonToGenericRecordJson(_, itemsSchema)).map(JsArray(_))
+        case _ => Failure(UnexpectedTypeFoundInGenericRecordConversion[JsArray](classOf[JsArray], json))
       }
     }
 
-    private def handleMap(json: JsValue, schema: Schema): JsValue = {
+    private def handleMap(json: JsValue, schema: Schema): Try[JsValue] = {
       val itemsSchema = schema.getValueType
       json match {
-        case JsObject(items) => JsObject(items.mapValues(jsonToGenericRecordJson(_, itemsSchema)))
-        case _ => ??? // TODO return error DO NOT MERGE
+        case JsObject(items) => items.toList.traverse(kv => jsonToGenericRecordJson(kv._2, itemsSchema)
+          .map(kv._1 -> _)).map(l => JsObject(l.toMap))
+        case _ => Failure(UnexpectedTypeFoundInGenericRecordConversion[JsObject](classOf[JsObject], json))
       }
     }
 
-    private def jsonToGenericRecordJson(json: JsValue, schema: Schema): JsValue = schema.getType match {
+    private def jsonToGenericRecordJson(json: JsValue, schema: Schema): Try[JsValue] = schema.getType match {
       case Schema.Type.RECORD => handleRecord(json, schema)
       case Schema.Type.UNION => handleUnion(json, schema)
       case Schema.Type.ARRAY => handleArray(json, schema)
       case Schema.Type.MAP => handleMap(json, schema)
-      case _ => json
+      case _ => Success(json)
     }
 
     def toGenericRecordSimple(schema: Schema, useStrictValidation: Boolean): Try[GenericRecord] = {
       val jsonOfPayload = jsonToGenericRecordJson(str.parseJson, schema)
-      jsonOfPayload.compactPrint.toGenericRecord(schema, useStrictValidation)
+      jsonOfPayload.flatMap(_.compactPrint.toGenericRecord(schema, useStrictValidation))
     }
 
   }

@@ -5,6 +5,9 @@ import org.apache.avro.generic.{GenericData, GenericRecord, GenericRecordBuilder
 import org.apache.avro.util.Utf8
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import spray.json.{JsArray, JsObject, JsString}
+
+import scala.util.Failure
 
 final class SimpleStringToGenericRecordSpec extends AnyFlatSpec with Matchers {
 
@@ -19,6 +22,17 @@ final class SimpleStringToGenericRecordSpec extends AnyFlatSpec with Matchers {
         |""".stripMargin
     val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
     record.get.get("testing") shouldBe new Utf8("test")
+  }
+
+  it should "raise error when converting record with wrong type" in {
+    val schema = SchemaBuilder.record("Test").fields()
+      .name("testing").`type`.array.items.stringType.noDefault().endRecord()
+    val json =
+      """
+        |"testing"
+        |""".stripMargin
+    val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
+    record shouldBe Failure(UnexpectedTypeFoundInGenericRecordConversion[JsObject](classOf[JsObject], JsString("testing")))
   }
 
   it should "convert basic union type with null as one member" in {
@@ -48,6 +62,19 @@ final class SimpleStringToGenericRecordSpec extends AnyFlatSpec with Matchers {
         |""".stripMargin
     val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
     record.get.get("testing") shouldBe new GenericRecordBuilder(innerSchema).set("blah", "test").build()
+  }
+
+  it should "handle union with only null type" in {
+    val schema = SchemaBuilder.record("Test").fields()
+      .name("testing").`type`.unionOf().nullType().endUnion().noDefault().endRecord()
+    val json =
+      """
+        |{
+        |  "testing": null
+        |}
+        |""".stripMargin
+    val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
+    Option(record.get.get("testing")) shouldBe None
   }
 
   it should "allow the null branch of the union to be specified" in {
@@ -85,6 +112,19 @@ final class SimpleStringToGenericRecordSpec extends AnyFlatSpec with Matchers {
       case g: GenericData.Array[_] => g.toArray shouldBe List("one", "two", "three").map(new Utf8(_)).asJava.toArray
       case other => fail(s"$other not a recognized type")
     }
+  }
+
+  it should "raise error when converting array with wrong type" in {
+    val schema = SchemaBuilder.record("Test").fields()
+      .name("testing").`type`.array.items.stringType.noDefault().endRecord()
+    val json =
+      """
+        |{
+        |  "testing": "fail"
+        |}
+        |""".stripMargin
+    val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
+    record shouldBe Failure(UnexpectedTypeFoundInGenericRecordConversion[JsArray](classOf[JsArray], JsString("fail")))
   }
 
   it should "convert array of records" in {
@@ -133,6 +173,19 @@ final class SimpleStringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
     import collection.JavaConverters._
     record.get.get("testing") shouldBe Map("one" -> 1, "two" -> 2, "three" -> 3).map(kv => new Utf8(kv._1) -> kv._2).asJava
+  }
+
+  it should "raise error when converting map with wrong type" in {
+    val schema = SchemaBuilder.record("Test").fields()
+      .name("testing").`type`.map.values.intType.noDefault().endRecord()
+    val json =
+      """
+        |{
+        |  "testing": "fail"
+        |}
+        |""".stripMargin
+    val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
+    record shouldBe Failure(UnexpectedTypeFoundInGenericRecordConversion[JsObject](classOf[JsObject], JsString("fail")))
   }
 
   it should "convert map of complex type" in {
