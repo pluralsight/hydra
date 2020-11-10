@@ -10,7 +10,7 @@ import org.scalatest.wordspec.AnyWordSpecLike
 import vulcan.Codec
 import vulcan.generic._
 import cats.syntax.all._
-import hydra.kafka.algebras.KafkaClientAlgebra.PublishError.RecordTooLarge
+import hydra.kafka.algebras.KafkaClientAlgebra.PublishError.{RecordTooLarge, TopicNotFoundInMetadata}
 import hydra.kafka.algebras.KafkaClientAlgebra.{OffsetInfoNotRetrievableInTest, PublishResponse}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
@@ -71,6 +71,19 @@ class KafkaClientAlgebraSpec
       avroTests(schemaRegistry, kafkaClient, !isTest)
       stringKeyTests(schemaRegistry, kafkaClient, !isTest)
       nullKeyTests(schemaRegistry, kafkaClient, !isTest)
+      if (!isTest) {
+        topicNotExistsTests(schemaRegistry, kafkaClient)
+      }
+    }
+  }
+
+  private def topicNotExistsTests(schemaRegistry: SchemaRegistry[IO], kafkaClient: KafkaClientAlgebra[IO]): Unit = {
+    "return an error when publishing to a topic that does not exist" in {
+      val (topic, (_, key), value) = topicAndKeyAndValue("doesnotexist","key1","value1")
+      (schemaRegistry.registerSchema(subject = s"$topic-key", key.getSchema) *>
+        schemaRegistry.registerSchema(subject = s"$topic-value", value.getSchema) *>
+        kafkaClient.publishMessage((key, Some(value), None), topic)).unsafeRunSync().leftMap(_.getMessage) shouldBe
+        Left("Topic doesnotexist was not found in metadata after 4500 ms.")
     }
   }
 
