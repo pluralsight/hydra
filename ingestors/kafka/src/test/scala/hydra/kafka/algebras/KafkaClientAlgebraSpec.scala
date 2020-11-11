@@ -10,8 +10,11 @@ import org.scalatest.wordspec.AnyWordSpecLike
 import vulcan.Codec
 import vulcan.generic._
 import cats.syntax.all._
-import hydra.kafka.algebras.KafkaClientAlgebra.PublishError.RecordTooLarge
+import hydra.kafka.algebras.KafkaClientAlgebra.PublishError.{RecordTooLarge, TopicNotFoundInMetadata}
 import hydra.kafka.algebras.KafkaClientAlgebra.{OffsetInfoNotRetrievableInTest, PublishResponse}
+import hydra.kafka.util.KafkaUtils.TopicDetails
+import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
+import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 
 import scala.concurrent.ExecutionContext
 
@@ -26,7 +29,7 @@ class KafkaClientAlgebraSpec
   private val port = 8092
 
   implicit private val kafkaConfig: EmbeddedKafkaConfig =
-    EmbeddedKafkaConfig(kafkaPort = port, zooKeeperPort = 3182)
+    EmbeddedKafkaConfig(kafkaPort = port, zooKeeperPort = 3182, Map("auto.create.topics.enable" -> "false"))
 
   implicit private val contextShift: ContextShift[IO] =
     IO.contextShift(ExecutionContext.global)
@@ -36,6 +39,7 @@ class KafkaClientAlgebraSpec
   override def beforeAll(): Unit = {
     super.beforeAll()
     EmbeddedKafka.start()
+    createTopics.unsafeRunSync()
   }
 
   override def afterAll(): Unit = {
@@ -43,6 +47,14 @@ class KafkaClientAlgebraSpec
     EmbeddedKafka.stop()
   }
 
+  private def createTopics: IO[Unit] = {
+    val topicsToCreate: List[String] = List("topic1", "topic2", "stringTopic1", "stringTopic2", "nullTopic1")
+    KafkaAdminAlgebra.live[IO](s"localhost:$port")
+      .flatMap(adminClient => topicsToCreate.traverse(adminClient.createTopic(_, TopicDetails(1, 1)))).void
+  }
+
+  private implicit val catsLogger: SelfAwareStructuredLogger[IO] =
+    Slf4jLogger.getLogger[IO]
 
   (for {
     schemaRegistryAlgebra1 <- SchemaRegistry.test[IO]
@@ -59,6 +71,19 @@ class KafkaClientAlgebraSpec
       avroTests(schemaRegistry, kafkaClient, !isTest)
       stringKeyTests(schemaRegistry, kafkaClient, !isTest)
       nullKeyTests(schemaRegistry, kafkaClient, !isTest)
+      if (!isTest) {
+        topicNotExistsTests(schemaRegistry, kafkaClient)
+      }
+    }
+  }
+
+  private def topicNotExistsTests(schemaRegistry: SchemaRegistry[IO], kafkaClient: KafkaClientAlgebra[IO]): Unit = {
+    "return an error when publishing to a topic that does not exist" in {
+      val (topic, (_, key), value) = topicAndKeyAndValue("doesnotexist","key1","value1")
+      (schemaRegistry.registerSchema(subject = s"$topic-key", key.getSchema) *>
+        schemaRegistry.registerSchema(subject = s"$topic-value", value.getSchema) *>
+        kafkaClient.publishMessage((key, Some(value), None), topic)).unsafeRunSync().leftMap(_.getMessage) shouldBe
+        Left("Topic doesnotexist was not found in metadata after 4500 ms.")
     }
   }
 
