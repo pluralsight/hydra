@@ -153,7 +153,7 @@ object KafkaClientAlgebra {
                                                           headers: Headers
                                                         )
 
-  def attemptProduce[F[_], K, V, A](
+  private def attemptProduce[F[_], K, V, A](
                               settings: ProducerSettings[F, K, V],
                               producer: KafkaProducer[F, K, V]
                             )(
