@@ -163,7 +163,7 @@ object KafkaClientAlgebra {
     for {
       queue <- fs2.concurrent.Queue.unbounded[F, ProduceRecordInfo[F]]
       _ <- Concurrent[F].start(queue.dequeue.flatMap { payload =>
-        val record = ProducerRecord(payload.topicName, payload.key.orNull, payload.value.orNull).withHeaders(payload.headers)
+        val record = ProducerRecord(payload.topicName, payload.key.orNull, payload.value.orNull)
         val producerRecords: ProducerRecords[Array[Byte], Array[Byte], Deferred[F, Either[PublishError, PublishResponse]]] =
           ProducerRecords.one(record, payload.promise)
         fs2.Stream.emit[F, ProducerRecords[Array[Byte], Array[Byte], Deferred[F, Either[PublishError, PublishResponse]]]](producerRecords)
@@ -219,16 +219,12 @@ object KafkaClientAlgebra {
                                      topicName: TopicName,
                                      convert: A => RecordFormat,
                                      timeoutDuration: FiniteDuration): F[Either[PublishError, PublishResponse]] = {
-        val kafkaHeaders: Headers = record._3 match {
-          case Some(headersExist) => headersExist
-          case _ => Headers.empty
-        }
         for {
           d <- Deferred[F, Either[PublishError, PublishResponse]]
-          k <- keySerializer.serialize(topicName, kafkaHeaders, convert(record._1))
-          v <- record._2.traverse(r => valSerializer.serialize(topicName, kafkaHeaders, GenericRecordFormat(r)))
+          k <- keySerializer.serialize(topicName, Headers.empty, convert(record._1))
+          v <- record._2.traverse(r => valSerializer.serialize(topicName, Headers.empty, GenericRecordFormat(r)))
           _ <- checkSizeLimit[F](k, v, sizeLimitBytes)
-          _ <- queue.enqueue1(ProduceRecordInfo(k.some, v, topicName, d, kafkaHeaders))
+          _ <- queue.enqueue1(ProduceRecordInfo(k.some, v, topicName, d, Headers.empty))
           resolve <- Concurrent.timeoutTo[F, Either[PublishError, PublishResponse]](d.get, timeoutDuration, Sync[F].pure(Left(PublishError.Timeout)))
         } yield resolve
       }
