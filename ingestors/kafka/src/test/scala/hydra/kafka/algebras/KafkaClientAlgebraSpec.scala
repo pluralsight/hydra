@@ -72,8 +72,7 @@ class KafkaClientAlgebraSpec
       stringKeyTests(schemaRegistry, kafkaClient, !isTest)
       nullKeyTests(schemaRegistry, kafkaClient, !isTest)
       if (!isTest) {
-        // TODO: Bring this back ASAP
-//        topicNotExistsTests(schemaRegistry, kafkaClient)
+        topicNotExistsTests(schemaRegistry, kafkaClient)
       }
     }
   }
