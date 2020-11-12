@@ -9,6 +9,7 @@ import fs2.concurrent.Queue
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError.{RecordTooLarge, TopicNotFoundInMetadata}
+import io.chrisdavenport.log4cats.Logger
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import io.confluent.kafka.serializers.{AbstractKafkaAvroSerDeConfig, KafkaAvroDeserializer, KafkaAvroSerializer}
 import org.apache.avro.generic.GenericRecord
@@ -152,7 +153,7 @@ object KafkaClientAlgebra {
 
                                                         )
 
-  private def getProducerQueue[F[_]: ConcurrentEffect: ContextShift]
+  private def getProducerQueue[F[_]: ConcurrentEffect: ContextShift: Logger]
   (bootstrapServers: String, publishMaxBlockMs: FiniteDuration): F[fs2.concurrent.Queue[F, ProduceRecordInfo[F]]] = {
     import fs2.kafka._
     val producerSettings =
@@ -162,22 +163,16 @@ object KafkaClientAlgebra {
         .withProperty("max.block.ms", publishMaxBlockMs.toMillis.toString)
     for {
       queue <- fs2.concurrent.Queue.unbounded[F, ProduceRecordInfo[F]]
-      _ <- Concurrent[F].start(queue.dequeue.flatMap { payload =>
-        val record = ProducerRecord(payload.topicName, payload.key.orNull, payload.value.orNull)
-        val producerRecords: ProducerRecords[Array[Byte], Array[Byte], Deferred[F, Either[PublishError, PublishResponse]]] =
-          ProducerRecords.one(record, payload.promise)
-        fs2.Stream.emit[F, ProducerRecords[Array[Byte], Array[Byte], Deferred[F, Either[PublishError, PublishResponse]]]](producerRecords)
-          .through(produce(producerSettings))
-          .attempt
-          .flatMap {
-            case Right(i) =>
-              fs2.Stream.chunk(i.records).evalMap(r => i.passthrough.complete(PublishResponse(r._2.partition, r._2.offset).asRight))
-            case Left(t: org.apache.kafka.common.errors.TimeoutException) if t.getMessage.contains("not present in metadata after") =>
-              fs2.Stream.eval(payload.promise.complete(PublishError.TopicNotFoundInMetadata(payload.topicName, publishMaxBlockMs, t).asLeft))
-            case Left(error) =>
-              fs2.Stream.eval(payload.promise.complete(PublishError.OtherPublishError(error).asLeft))
-          }
-      }.compile.drain)
+      _ <- Concurrent[F].start(queue.dequeue.map { payload =>
+        val record = ProducerRecord(payload.topicName, payload.key.orNull, payload.value.orNull).withHeaders(payload.headers)
+        ProducerRecords.one(record, payload.promise)
+      }.through(produce(producerSettings)).attempt
+        .flatMap {
+          case Right(i) =>
+            fs2.Stream.chunk(i.records).evalMap(r => i.passthrough.complete(PublishResponse(r._2.partition, r._2.offset).asRight))
+          case Left(error) =>
+            fs2.Stream.eval(Logger[F].error(error)("Error encountered in ingestion producer queue."))
+        }.compile.drain)
     } yield queue
   }
 
@@ -219,12 +214,16 @@ object KafkaClientAlgebra {
                                      topicName: TopicName,
                                      convert: A => RecordFormat,
                                      timeoutDuration: FiniteDuration): F[Either[PublishError, PublishResponse]] = {
+        val kafkaHeaders: Headers = record._3 match {
+          case Some(headersExist) => headersExist
+          case _ => Headers.empty
+        }
         for {
           d <- Deferred[F, Either[PublishError, PublishResponse]]
-          k <- keySerializer.serialize(topicName, Headers.empty, convert(record._1))
-          v <- record._2.traverse(r => valSerializer.serialize(topicName, Headers.empty, GenericRecordFormat(r)))
+          k <- keySerializer.serialize(topicName, kafkaHeaders, convert(record._1))
+          v <- record._2.traverse(r => valSerializer.serialize(topicName, kafkaHeaders, GenericRecordFormat(r)))
           _ <- checkSizeLimit[F](k, v, sizeLimitBytes)
-          _ <- queue.enqueue1(ProduceRecordInfo(k.some, v, topicName, d, Headers.empty))
+          _ <- queue.enqueue1(ProduceRecordInfo(k.some, v, topicName, d, kafkaHeaders))
           resolve <- Concurrent.timeoutTo[F, Either[PublishError, PublishResponse]](d.get, timeoutDuration, Sync[F].pure(Left(PublishError.Timeout)))
         } yield resolve
       }
@@ -258,7 +257,7 @@ object KafkaClientAlgebra {
     }
   }
 
-  def live[F[_]: ContextShift: ConcurrentEffect: Timer](
+  def live[F[_]: ContextShift: ConcurrentEffect: Timer: Logger](
       bootstrapServers: String,
       schemaRegistryAlgebra: SchemaRegistry[F],
       recordSizeLimit: Option[Long] = None,
