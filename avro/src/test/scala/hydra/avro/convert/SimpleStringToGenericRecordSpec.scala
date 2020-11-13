@@ -24,6 +24,17 @@ final class SimpleStringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     record.get.get("testing") shouldBe new Utf8("test")
   }
 
+  it should "convert basic enum record" in {
+    val schema = SchemaBuilder.record("Test").fields()
+      .name("testing").`type`.enumeration("testEnum").symbols("ONE", "TWO").noDefault().endRecord()
+    val json =
+      """
+        |{"testing": "ONE"}
+        |""".stripMargin
+    val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
+    record.get.get("testing").toString shouldBe "ONE"
+  }
+
   it should "raise error when converting record with wrong type" in {
     val schema = SchemaBuilder.record("Test").fields()
       .name("testing").`type`.array.items.stringType.noDefault().endRecord()
