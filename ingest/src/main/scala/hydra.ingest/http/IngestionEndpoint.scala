@@ -117,9 +117,8 @@ class IngestionEndpoint[F[_]: Futurable](
         optionalHeaderValueByName(correlationIdHeader) { cIdOpt =>
           entity(as[V2IngestRequest]) { reqMaybeHeader =>
             val req = cIdOpt match {
-              case Some(id) => reqMaybeHeader.copy(reqMaybeHeader.keyPayload, reqMaybeHeader.valPayload,
-                reqMaybeHeader.validationStrategy, Some(Headers.fromSeq(List(Header.apply(correlationIdHeader, id)))))
-              case _ => reqMaybeHeader.copy(reqMaybeHeader.keyPayload, reqMaybeHeader.valPayload, reqMaybeHeader.validationStrategy, None)
+              case Some(id) => reqMaybeHeader.copy(headers = Some(Headers.fromSeq(List(Header.apply(correlationIdHeader, id)))))
+              case _ => reqMaybeHeader
             }
             Subject.createValidated(topic) match {
               case Some(t) =>
