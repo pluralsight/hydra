@@ -70,8 +70,11 @@ trait HydraIngestJsonSupport extends HydraJsonSupport {
       V2IngestRequest(int.key.compactPrint, int.value.map(_.compactPrint), int.validationStrategy, int.useSimpleFormat.getOrElse(true))
     }
 
-    // Intentionally unimplemented, `V2IngestRequest` is only a request not a response
-    override def write(obj: V2IngestRequest): JsValue = ???
+    override def write(obj: V2IngestRequest): JsValue = {
+      intermediateV2IngestRequestFormat.write(IntermediateV2IngestRequest(
+        obj.keyPayload.parseJson.asJsObject, obj.valPayload.map(_.parseJson.asJsObject),
+        obj.validationStrategy, Some(obj.useSimpleJsonFormat)))
+    }
   }
 
   implicit val ingestorInfoFormat = jsonFormat4(IngestorInfo)
