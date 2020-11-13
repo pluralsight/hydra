@@ -5,6 +5,7 @@ import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.syntax.all._
 import cats.{Monad, MonadError}
+import fs2.Pipe
 import fs2.concurrent.Queue
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
@@ -150,11 +151,18 @@ object KafkaClientAlgebra {
                                                           topicName: TopicName,
                                                           promise: Deferred[F, Either[PublishError, PublishResponse]],
                                                           headers: Headers
-
                                                         )
 
+  private def attemptProduce[F[_], K, V, A](
+                              settings: ProducerSettings[F, K, V],
+                              producer: KafkaProducer[F, K, V]
+                            )(
+                              implicit F: Concurrent[F]
+                            ): Pipe[F, (ProducerRecords[K, V, Unit], A), (Either[Throwable, ProducerResult[K, V, Unit]], A)] =
+    _.evalMap(r => producer.produce(r._1).map(_ -> r._2)).mapAsync(settings.parallelism)(i => i._1.attempt.map(_ -> i._2))
+
   private def getProducerQueue[F[_]: ConcurrentEffect: ContextShift: Logger]
-  (bootstrapServers: String, publishMaxBlockMs: FiniteDuration): F[fs2.concurrent.Queue[F, ProduceRecordInfo[F]]] = {
+    (bootstrapServers: String, publishMaxBlockMs: FiniteDuration): F[fs2.concurrent.Queue[F, ProduceRecordInfo[F]]] = {
     import fs2.kafka._
     val producerSettings =
       ProducerSettings[F, Array[Byte], Array[Byte]]
@@ -163,16 +171,22 @@ object KafkaClientAlgebra {
         .withProperty("max.block.ms", publishMaxBlockMs.toMillis.toString)
     for {
       queue <- fs2.concurrent.Queue.unbounded[F, ProduceRecordInfo[F]]
-      _ <- Concurrent[F].start(queue.dequeue.map { payload =>
-        val record = ProducerRecord(payload.topicName, payload.key.orNull, payload.value.orNull).withHeaders(payload.headers)
-        ProducerRecords.one(record, payload.promise)
-      }.through(produce(producerSettings)).attempt
-        .flatMap {
-          case Right(i) =>
-            fs2.Stream.chunk(i.records).evalMap(r => i.passthrough.complete(PublishResponse(r._2.partition, r._2.offset).asRight))
-          case Left(error) =>
-            fs2.Stream.eval(Logger[F].error(error)("Error encountered in ingestion producer queue."))
-        }.compile.drain)
+      _ <- Concurrent[F].start {
+        producerStream[F].using(producerSettings).flatMap { producer =>
+          queue.dequeue.map { payload =>
+            val record = ProducerRecord(payload.topicName, payload.key.orNull, payload.value.orNull).withHeaders(payload.headers)
+            (ProducerRecords.one(record), payload)
+          }.through(attemptProduce(producerSettings, producer))
+            .flatMap {
+              case (Right(result), payload) =>
+                fs2.Stream.chunk(result.records).evalMap(r => payload.promise.complete(PublishResponse(r._2.partition, r._2.offset).asRight))
+              case (Left(t: org.apache.kafka.common.errors.TimeoutException), payload) if t.getMessage.contains("not present in metadata after") =>
+                fs2.Stream.eval(payload.promise.complete(PublishError.TopicNotFoundInMetadata(payload.topicName, publishMaxBlockMs, t).asLeft))
+              case (Left(error), payload) =>
+                fs2.Stream.eval(payload.promise.complete(PublishError.OtherPublishError(error).asLeft))
+            }
+        }.compile.drain
+      }
     } yield queue
   }
 
