@@ -169,6 +169,7 @@ object KafkaClientAlgebra {
         .withBootstrapServers(bootstrapServers)
         .withAcks(Acks.All)
         .withProperty("max.block.ms", publishMaxBlockMs.toMillis.toString)
+        .withRetries(retries = 0)
     for {
       queue <- fs2.concurrent.Queue.unbounded[F, ProduceRecordInfo[F]]
       _ <- Concurrent[F].start {
