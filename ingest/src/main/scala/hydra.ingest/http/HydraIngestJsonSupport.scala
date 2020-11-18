@@ -29,7 +29,8 @@ private object HydraIngestJsonSupport {
   private final case class IntermediateV2IngestRequest(
                                                         key: JsObject,
                                                         value: Option[JsObject],
-                                                        validationStrategy: Option[ValidationStrategy]
+                                                        validationStrategy: Option[ValidationStrategy],
+                                                        useSimpleFormat: Option[Boolean]
                                                       )
 }
 
@@ -61,16 +62,19 @@ trait HydraIngestJsonSupport extends HydraJsonSupport {
   }
 
   private implicit val intermediateV2IngestRequestFormat: JsonFormat[IntermediateV2IngestRequest] =
-    jsonFormat3(IntermediateV2IngestRequest)
+    jsonFormat4(IntermediateV2IngestRequest)
 
   implicit object V2IngestRequestFormat extends RootJsonFormat[V2IngestRequest] {
     override def read(json: JsValue): V2IngestRequest = {
       val int = intermediateV2IngestRequestFormat.read(json)
-      V2IngestRequest(int.key.compactPrint, int.value.map(_.compactPrint), int.validationStrategy)
+      V2IngestRequest(int.key.compactPrint, int.value.map(_.compactPrint), int.validationStrategy, int.useSimpleFormat.getOrElse(true))
     }
 
-    // Intentionally unimplemented, `V2IngestRequest` is only a request not a response
-    override def write(obj: V2IngestRequest): JsValue = ???
+    override def write(obj: V2IngestRequest): JsValue = {
+      intermediateV2IngestRequestFormat.write(IntermediateV2IngestRequest(
+        obj.keyPayload.parseJson.asJsObject, obj.valPayload.map(_.parseJson.asJsObject),
+        obj.validationStrategy, Some(obj.useSimpleJsonFormat)))
+    }
   }
 
   implicit val ingestorInfoFormat = jsonFormat4(IngestorInfo)
