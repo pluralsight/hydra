@@ -88,7 +88,7 @@ object Main extends IOApp with ConfigSupport with LoggingAdapter {
         _ <- report
         _ <- serverIO(routes, Settings.HydraSettings)
         _ <- if (config.consumerGroupsAlgebraConfig.consumerGroupsConsumerEnabled) {
-          algebras.consumerGroups.startConsumers
+          algebras.consumerGroups.startConsumer
         } else {
           IO.unit
         }
