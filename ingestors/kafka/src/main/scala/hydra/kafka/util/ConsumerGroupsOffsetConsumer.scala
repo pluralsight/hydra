@@ -3,7 +3,7 @@ package hydra.kafka.util
 import java.nio.ByteBuffer
 import java.time.Instant
 
-import cats.Order
+import cats.{Applicative, Order, data}
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.implicits._
@@ -26,9 +26,13 @@ import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.common.TopicPartition
 
 import scala.collection.JavaConverters._
+import scala.collection.SortedSet
 import scala.util.Try
 
 object ConsumerGroupsOffsetConsumer {
+
+  var myMap = (0 to 50).map((_, 0L)).toMap
+
   def start[F[_]: ContextShift: ConcurrentEffect: Timer: Logger](
                                                                   kafkaClientAlgebra: KafkaClientAlgebra[F],
                                                                   kafkaAdminAlgebra: KafkaAdminAlgebra[F],
@@ -44,16 +48,25 @@ object ConsumerGroupsOffsetConsumer {
 
     for {
       schemaRegistryClient <- schemaRegistryAlgebra.getSchemaRegistryClient
-      latestOffsets <- kafkaAdminAlgebra.getLatestOffsets(consumerOffsetsOffsetsTopicConfig.value)
-      blah <- kafkaAdminAlgebra.describeTopic(consumerOffsetsOffsetsTopicConfig.value)
-      simplifiedLatestOffsets = latestOffsets.map(l => l._1.partition -> l._2.value)
       deferred <- Deferred[F, PartitionOffsetMap]
-      cache <- Ref[F].of(Map[Int, Long]())
-      backgroundProcess <- Concurrent[F].start(getOffsetsToSeekTo(cache, simplifiedLatestOffsets, deferred, dvsConsumerOffsetStream))
+      hydraConsumerOffsetsOffsetsLatestOffsets <- kafkaAdminAlgebra.getLatestOffsets(consumerOffsetsOffsetsTopicConfig.value).map(_.map(l => l._1.partition -> l._2.value))
+      hydraConsumerOffsetsOffsetsCache <- Ref[F].of[PartitionOffsetMap](hydraConsumerOffsetsOffsetsLatestOffsets.filter(_._2 == 0))
+      initialPartitionCache <- initializePartitions(kafkaAdminAlgebra, kafkaInternalTopic)
+      backgroundProcess <- Concurrent[F].start(getOffsetsToSeekTo(initialPartitionCache, deferred, dvsConsumerOffsetStream,hydraConsumerOffsetsOffsetsLatestOffsets, hydraConsumerOffsetsOffsetsCache))
       partitionMap <- deferred.get
       _ <- backgroundProcess.cancel
       _ <- Concurrent[F].start(consumerOffsetsToInternalOffsets(kafkaInternalTopic, dvsConsumersTopic.value, bootstrapServers, commonConsumerGroup, schemaRegistryClient, partitionMap, consumerOffsetsOffsetsTopicConfig.value))
     } yield ()
+  }
+
+  // Gets partition info for the kafkaInternalTopic "__consumer_offsets" and initializes each to offset to 0
+  private def initializePartitions[F[_]: ConcurrentEffect](kafkaAdminAlgebra: KafkaAdminAlgebra[F], kafkaInternalTopic: String): F[Ref[F, PartitionOffsetMap]] = {
+    for {
+      consumerOffsetsLatestOffsets <- kafkaAdminAlgebra.getLatestOffsets(kafkaInternalTopic).map { m =>
+        m.map(p => (p._1.partition, 0L))
+      }
+      cache <- Ref[F].of(consumerOffsetsLatestOffsets)
+    } yield cache
   }
 
   private def getConsumerGroupDeserializer[F[_]: Sync, A](byteBufferToA: ByteBuffer => A): Deserializer[F, Option[A]] =
@@ -103,6 +116,10 @@ object ConsumerGroupsOffsetConsumer {
             } yield  {
               val p = ProducerRecord(destinationTopic, k, v)
               val p2 = ProducerRecord(dvsInternalKafkaOffsetTopic, offsetK, offsetV)
+//              val partition = cr.offset.topicPartition.partition()
+//              myMap = myMap + (partition -> cr.offset.offsetAndMetadata.offset())
+//              val string = myMap.toList.sortBy(_._1).map(m => s"${m._1}:${m._2}").mkString(" | ")
+//              println(string)
               ProducerRecords(List(p, p2))
             })
           case None =>
@@ -156,24 +173,39 @@ object ConsumerGroupsOffsetConsumer {
     implicit val order: Order[TopicPartition] =
       (x: TopicPartition, y: TopicPartition) => if (x.partition() > y.partition()) 1 else if (x.partition() < y.partition()) -1 else 0
     stream.flatTap { b =>
-      fs2.Stream.eval {
-        b.subscribeTo(sourceTopic)
-      }
+      fs2.Stream.eval(
+        if (p.nonEmpty) {
+          val topicPartitionList = p.iterator.map(_._1).map(new TopicPartition(sourceTopic, _)).toList
+          val topicPartitions = data.NonEmptySet.of[TopicPartition](topicPartitionList.head, topicPartitionList.tail:_*)
+          b.assign(topicPartitions).recoverWith { case e =>
+            Logger[F].error(s"AssignToTopic for __consumer_offsets Error: ${e.getMessage}") *> ConcurrentEffect[F].unit
+          } *>
+          p.iterator.toList.traverse { case (p, o) =>
+              b.seek(new TopicPartition(sourceTopic, p), o).recoverWith { case e =>
+                Logger[F].error(s"SeekToOffset for __consumer_offsets Error: ${e.getMessage}") *> ConcurrentEffect[F].unit
+              }
+          }.flatMap(_ => Applicative[F].unit)
+        } else {
+          b.subscribeTo(sourceTopic)
+        }
+      )
     }
   }
 
   private[kafka] def getOffsetsToSeekTo[F[_]: ConcurrentEffect](
-                                                                    cache: Ref[F, PartitionOffsetMap],
-                                                                    latestPartitionOffset: PartitionOffsetMap,
-                                                                    deferred: Deferred[F, PartitionOffsetMap],
-                                                                    dvsConsumerOffsetStream: fs2.Stream[F, (Record, OffsetInfo)]
+                                                                 consumerOffsetsCache: Ref[F, PartitionOffsetMap],
+                                                                 deferred: Deferred[F, PartitionOffsetMap],
+                                                                 dvsConsumerOffsetStream: fs2.Stream[F, (Record, OffsetInfo)],
+                                                                 hydraConsumerOffsetsOffsetsLatestOffsets: PartitionOffsetMap,
+                                                                 hydraConsumerOffsetsOffsetsCache: Ref[F, PartitionOffsetMap]
                                                                   ): F[Unit] = {
-    def onStart = if (latestPartitionOffset.values.forall(_ == 0L)) deferred.complete(Map()) else ConcurrentEffect[F].unit
+    def onStart = if (hydraConsumerOffsetsOffsetsLatestOffsets.values.forall(_ == 0L)) deferred.complete(Map()) else ConcurrentEffect[F].unit
     def isComplete: F[Unit] = for {
-      map <- cache.get
-      isFulfilled = map.keys.size == latestPartitionOffset.values.count(_ > 0)
+      consumerOffsets <- consumerOffsetsCache.get
+      hydraConsumerOffsetsOffsets <- hydraConsumerOffsetsOffsetsCache.get
+      isFulfilled = hydraConsumerOffsetsOffsetsLatestOffsets.forall(p => hydraConsumerOffsetsOffsets.getOrElse(p._1, 0L) == p._2)
       _ <- if (isFulfilled) {
-        deferred.complete(map)
+        deferred.complete(consumerOffsets)
       } else {
         ConcurrentEffect[F].unit
       }
@@ -181,26 +213,11 @@ object ConsumerGroupsOffsetConsumer {
 
     onStart *> dvsConsumerOffsetStream.flatMap { case ((key, value, _), (partition, offset)) =>
       fs2.Stream.eval(TopicConsumerOffset.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
-        if (latestPartitionOffset.get(partition).map(_ - 1).contains(offset) && topicValue.isDefined) {
-//          val formatter = java.text.NumberFormat.getIntegerInstance
-//          println("******************************************************")
-//          println("******************************************************")
-//          println("******************************************************")
-//          println("***********************HIT****************************")
-//          println(s"Partition: $partition - Offset: ${formatter.format(offset)}")
-//          println("******************************************************")
-//          println("******************************************************")
-//          println("******************************************************")
-          cache.update(_ + (topicKey.partition -> topicValue.get.offset))
-        } else {
-//          val formatter = java.text.NumberFormat.getIntegerInstance
-//          println(s"Partition: $partition - Offset: ${formatter.format(offset)}")
-          ConcurrentEffect[F].unit
-        }
+        consumerOffsetsCache.update(_ + (topicKey.partition -> topicValue.get.offset)) *>
+          hydraConsumerOffsetsOffsetsCache.update(_ + (partition -> (offset + 1L)))
       }).flatTap { _ =>
         fs2.Stream.eval(isComplete)
       }
     }.compile.drain
   }
-
 }
