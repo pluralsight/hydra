@@ -116,10 +116,6 @@ object ConsumerGroupsOffsetConsumer {
             } yield  {
               val p = ProducerRecord(destinationTopic, k, v)
               val p2 = ProducerRecord(dvsInternalKafkaOffsetTopic, offsetK, offsetV)
-//              val partition = cr.offset.topicPartition.partition()
-//              myMap = myMap + (partition -> cr.offset.offsetAndMetadata.offset())
-//              val string = myMap.toList.sortBy(_._1).map(m => s"${m._1}:${m._2}").mkString(" | ")
-//              println(string)
               ProducerRecords(List(p, p2))
             })
           case None =>
@@ -153,6 +149,7 @@ object ConsumerGroupsOffsetConsumer {
 
     val producerSettings = ProducerSettings[F, Array[Byte], Array[Byte]]
       .withBootstrapServers(bootstrapServers)
+      .withRetries(0)
       .withAcks(Acks.All)
     val consumer = consumerStream(settings)
     seekToLatestOffsets(sourceTopic)(consumer, partitionMap)
