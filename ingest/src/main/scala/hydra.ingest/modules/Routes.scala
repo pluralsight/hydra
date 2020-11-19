@@ -22,7 +22,8 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
     val topicDetails =
       TopicDetails(
         cfg.createTopicConfig.defaultNumPartions,
-        cfg.createTopicConfig.defaultReplicationFactor
+        cfg.createTopicConfig.defaultReplicationFactor,
+        Map("cleanup.policy" -> "compact")
       )
     new BootstrapEndpointV2(programs.createTopic, topicDetails).route
   } else {
