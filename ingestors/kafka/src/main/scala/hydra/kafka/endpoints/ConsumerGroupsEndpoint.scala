@@ -22,10 +22,10 @@ class ConsumerGroupsEndpoint[F[_]: Futurable](consumerGroupsAlgebra: ConsumerGro
           pathEndOrSingleSlash {
             onComplete(Futurable[F].unsafeToFuture(consumerGroupsAlgebra.getAllConsumers)) {
               case Success(consumers) =>
-                addPromHttpMetric("", StatusCodes.OK.toString, "/v2/consumer-groups/")
+                addPromHttpMetric("", StatusCodes.OK.toString, "/v2/consumer-groups")
                 complete(StatusCodes.OK, consumers)
               case Failure(exception) =>
-                addPromHttpMetric("", StatusCodes.InternalServerError.toString, "/v2/consumer-groups/")
+                addPromHttpMetric("", StatusCodes.InternalServerError.toString, "/v2/consumer-groups")
                 complete(StatusCodes.InternalServerError, exception.getMessage)
             }
           } ~ pathPrefix("getByTopic" / Segment) { topic =>
@@ -46,10 +46,10 @@ class ConsumerGroupsEndpoint[F[_]: Futurable](consumerGroupsAlgebra: ConsumerGro
           pathEndOrSingleSlash {
             onComplete(Futurable[F].unsafeToFuture(consumerGroupsAlgebra.getTopicsForConsumer(consumerGroupName))) {
               case Success(topics) =>
-                addPromHttpMetric(consumerGroupName, StatusCodes.OK.toString, "/v2/topics/getByConsumerGroupName/")
+                addPromHttpMetric(consumerGroupName, StatusCodes.OK.toString, "/v2/topics/getByConsumerGroupName")
                 complete(StatusCodes.OK, topics)
               case Failure(exception) =>
-                addPromHttpMetric(consumerGroupName, StatusCodes.InternalServerError.toString, "/v2/topics/getByConsumerGroupName/")
+                addPromHttpMetric(consumerGroupName, StatusCodes.InternalServerError.toString, "/v2/topics/getByConsumerGroupName")
                 complete(StatusCodes.InternalServerError, exception.getMessage)
             }
           }
