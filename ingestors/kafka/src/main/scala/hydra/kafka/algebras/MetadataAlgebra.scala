@@ -6,6 +6,7 @@ import cats.syntax.all._
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, TopicName}
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
+import hydra.kafka.model.TopicMetadataV2.MetadataAvroSchemaFailure
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request, TopicMetadataV2Value}
 import org.apache.avro.generic.GenericRecord
@@ -54,14 +55,17 @@ object MetadataAlgebra {
                   }
                 }.recover {
                   case e =>
-                    Logger[F].error(s"Error retrieving Schema from SchemaRegistry on Kafka Read: ${e.getMessage}")
                     val topicMetadataV2Transport = TopicMetadataContainer(topicMetadataKey, topicMetadataValue, None, None)
+                    Logger[F].error(s"Error retrieving Schema from SchemaRegistry on Kafka Read: ${e.getMessage}") *>
                     ref.update(_.addMetadata(topicMetadataV2Transport))
                 }
               case None =>
                 Logger[F].error("Metadata value not found")
             }
           }
+        }.recoverWith {
+          case e: MetadataAvroSchemaFailure =>
+            fs2.Stream.eval(Logger[F].warn(s"Error in metadata consumer $e"))
         }
       }.compile.drain)
       algebra <- getMetadataAlgebra[F](ref, schemaRegistryAlgebra)
