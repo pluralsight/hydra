@@ -95,6 +95,19 @@ trait SchemaRegistry[F[_]] {
 
 object SchemaRegistry {
 
+  private[registry] implicit class CheckKeySchemaEvolution[F[_]: Sync](schemasF: F[List[Schema]]) {
+    def checkKeyEvolution(subject: String, newSchema: Schema): F[List[Schema]] = schemasF.flatTap[Unit] {
+      case _ if subject.endsWith("-value") => Sync[F].unit
+      case Nil => Sync[F].unit
+      case oldSchemas =>
+        if (oldSchemas.forall(_.hashCode == newSchema.hashCode)) {
+          Sync[F].unit
+        } else {
+          Sync[F].raiseError(IncompatibleSchemaException(s"Key schema evolutions are not permitted unless to add inconsequential elements i.e. doc fields."))
+        }
+    }
+  }
+
   final case class IncompatibleSchemaException(message: String) extends
     RuntimeException(message)
 
@@ -119,21 +132,6 @@ object SchemaRegistry {
 
   private def getFromSchemaRegistryClient[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient): SchemaRegistry[F] =
     new SchemaRegistry[F] {
-
-      private implicit class CheckKeySchemaEvolution(schemasF: F[List[Schema]]) {
-        def checkKeyEvolution(subject: String, newSchema: Schema): F[List[Schema]] = schemasF.flatTap[Unit] {
-          case _ if subject.endsWith("-value") => Sync[F].unit
-          case Nil => Sync[F].unit
-          case oldSchema :: Nil =>
-            if (oldSchema.hashCode == newSchema.hashCode) {
-              Sync[F].unit
-            } else {
-              Sync[F].raiseError(IncompatibleSchemaException(s"Key schema evolutions are not permitted."))
-            }
-          case _ =>
-            Sync[F].raiseError(IncompatibleSchemaException(s"There are too many versions registered for the subject $subject"))
-        }
-      }
 
       override def registerSchema(
           subject: String,
