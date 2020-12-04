@@ -44,10 +44,7 @@ object StringToGenericRecord {
       case JsObject(fields) if schema.getType == Schema.Type.RECORD =>
         val allSubFields = fields.map(kv => kv._1 -> Option(schema.getField(kv._1))).filter(_._2.isEmpty)
         def checkAllSubFields: List[String] = fields.flatMap(kv => getExtraFields(kv._2, schema.getField(kv._1).schema)).toList
-        allSubFields.keys.toList match {
-          case keys => keys ++ checkAllSubFields
-          case Nil => checkAllSubFields
-        }
+        allSubFields.keys.toList ++ checkAllSubFields
       case JsObject(fields) if schema.getType == Schema.Type.UNION =>
         if (fields.size > 1) {
           val schemaFieldNames = schema.getTypes.asScala.map(_.getFullName)

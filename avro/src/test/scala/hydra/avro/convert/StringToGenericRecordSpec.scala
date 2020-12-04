@@ -3,7 +3,6 @@ package hydra.avro.convert
 import java.time.Instant
 import java.util.UUID
 
-import org.apache.avro.generic.GenericData
 import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import org.apache.avro.util.Utf8
 import org.scalatest.flatspec.AnyFlatSpec
