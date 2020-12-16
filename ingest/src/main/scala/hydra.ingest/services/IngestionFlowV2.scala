@@ -28,6 +28,7 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
 
   import IngestionFlowV2._
   import hydra.avro.convert.StringToGenericRecord._
+  import hydra.avro.convert.SimpleStringToGenericRecord._
 
   implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
 
@@ -63,8 +64,12 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
 
   private def getSchemas(request: V2IngestRequest, topic: Subject): F[(GenericRecord, Option[GenericRecord])] = {
     val useStrictValidation = request.validationStrategy.getOrElse(ValidationStrategy.Strict) == ValidationStrategy.Strict
-    def getRecord(payload: String, schema: Schema): Try[GenericRecord] =
+    def getRecord(payload: String, schema: Schema): Try[GenericRecord] = if (request.useSimpleJsonFormat) {
+      payload.toGenericRecordSimple(schema, useStrictValidation)
+    } else {
       payload.toGenericRecord(schema, useStrictValidation)
+    }
+
     for {
       kSchema <- getSchemaWrapper(topic, isKey = true)
       vSchema <- getSchemaWrapper(topic, isKey = false)
@@ -85,6 +90,7 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
 object IngestionFlowV2 {
   final case class V2IngestRequest(keyPayload: String, valPayload: Option[String],
                                    validationStrategy: Option[ValidationStrategy],
+                                   useSimpleJsonFormat: Boolean,
                                    headers: Option[Headers] = None)
 
   final case class AvroConversionAugmentedException(message: String) extends RuntimeException(message)
