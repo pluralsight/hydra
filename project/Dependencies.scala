@@ -29,7 +29,7 @@ object Dependencies {
   val reflectionsVersion = "0.9.12"
   val scalaCacheVersion = "0.28.0"
   val scalaMockVersion = "5.1.0"
-  val scalaTestVersion = "3.2.2"
+  val scalaTestVersion = "3.2.3"
   val scalazVersion = "7.3.2"
   val sprayJsonVersion = "1.3.5"
   val testContainersVersion = "0.38.7"
