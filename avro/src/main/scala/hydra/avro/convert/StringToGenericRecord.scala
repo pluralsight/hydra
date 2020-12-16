@@ -7,6 +7,7 @@ import org.apache.avro.generic.{GenericDatumReader, GenericRecord}
 import org.apache.avro.io.DecoderFactory
 import cats.syntax.all._
 import org.apache.avro.util.Utf8
+import spray.json.{JsObject, JsValue}
 
 import scala.util.{Failure, Success, Try}
 
@@ -38,34 +39,27 @@ object StringToGenericRecord {
       fields.traverse(f => checkAll(record.get(f.name), f.schema.some)).void
     }
 
-    private def getAllPayloadFieldNames: Set[String] = {
-      import spray.json._
-      def loop(cur: JsValue, extraName: Option[String]): Set[String] = cur match {
-        case JsObject(f) => f.flatMap { case (k: String, v: JsValue) =>
-          loop(v, k.some) ++ Set(extraName.getOrElse("") + k)
-        }.toSet
-        case _ => Set.empty
-      }
-      loop(s.parseJson, None)
-    }
-
-    private def getAllSchemaFieldNames(schema: Schema): Set[String] = {
-      import Schema.Type._
-      import collection.JavaConverters._
-      def loop(sch: Schema, extraName: Option[String]): Set[String] = sch.getType match {
-        case RECORD => sch.getFields.asScala.toSet.flatMap { f: Schema.Field =>
-          loop(f.schema, f.name.some) ++ Set(extraName.getOrElse("") + f.name)
+    import collection.JavaConverters._
+    private def getExtraFields(json: JsValue, schema: Schema): List[String] = json match {
+      case JsObject(fields) if schema.getType == Schema.Type.RECORD =>
+        val allSubFields = fields.map(kv => kv._1 -> Option(schema.getField(kv._1))).filter(_._2.isEmpty)
+        def checkAllSubFields: List[String] = fields.flatMap(kv => getExtraFields(kv._2, schema.getField(kv._1).schema)).toList
+        allSubFields.keys.toList ++ checkAllSubFields
+      case JsObject(fields) if schema.getType == Schema.Type.UNION =>
+        if (fields.size > 1) {
+          val schemaFieldNames = schema.getTypes.asScala.map(_.getFullName)
+          fields.keys.filter(k => schemaFieldNames.contains(k)).toList
+        } else {
+          List.empty
         }
-        case UNION => sch.getTypes.asScala.toList.flatMap(f => loop(f, f.getFullName.some) ++ List(extraName.getOrElse("") + f.getFullName)).toSet
-        case _ => Set.empty
-      }
-      loop(schema, None)
+      case _ => List.empty
     }
 
     def toGenericRecord(schema: Schema, useStrictValidation: Boolean): Try[GenericRecord] = Try {
       if (useStrictValidation) {
-        val diff = getAllPayloadFieldNames diff getAllSchemaFieldNames(schema)
-        if (diff.nonEmpty) throw ValidationExtraFieldsError(diff)
+        import spray.json._
+        val newDiff = getExtraFields(s.parseJson, schema)
+        if (newDiff.nonEmpty) throw ValidationExtraFieldsError(newDiff.toSet)
       }
       val decoderFactory = new DecoderFactory
       val decoder = decoderFactory.jsonDecoder(schema, s)

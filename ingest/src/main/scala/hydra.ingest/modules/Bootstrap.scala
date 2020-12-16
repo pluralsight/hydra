@@ -45,7 +45,7 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
             ),
             Some("Data-Platform")
           ),
-          TopicDetails(cfg.numPartitions, cfg.replicationFactor)
+          TopicDetails(cfg.numPartitions, cfg.replicationFactor, Map("cleanup.policy" -> "compact"))
         )
       }
     } else {

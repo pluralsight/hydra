@@ -7,7 +7,7 @@ object Dependencies {
   val akkaKafkaStreamVersion = "2.0.4"
   val akkaVersion = "2.6.7"
   val avroVersion = "1.10.0"
-  val catsEffectVersion = "2.2.0"
+  val catsEffectVersion = "2.3.0"
   val catsLoggerVersion = "1.1.1"
   val catsRetryVersion = "1.1.1"
   val catsVersion = "2.2.0"
@@ -24,15 +24,15 @@ object Dependencies {
   val kamonPVersion = "2.1.4"
   val kamonVersion = "2.1.4"
   val log4jVersion = "2.13.3"
-  val powerMockVersion = "2.0.9" //needed for mocking static java methods
-  val refinedVersion = "0.9.17"
+  val powerMockVersion = "2.0.7" //needed for mocking static java methods
+  val refinedVersion = "0.9.19"
   val reflectionsVersion = "0.9.12"
   val scalaCacheVersion = "0.28.0"
-  val scalaMockVersion = "5.0.0"
+  val scalaMockVersion = "5.1.0"
   val scalaTestVersion = "3.2.2"
   val scalazVersion = "7.3.2"
   val sprayJsonVersion = "1.3.5"
-  val testContainersVersion = "0.38.4"
+  val testContainersVersion = "0.38.7"
   val typesafeConfigVersion = "1.3.2"
   val vulcanVersion = "1.2.0"
 
@@ -172,7 +172,7 @@ object Dependencies {
   }
 
   object Integration {
-    private val testcontainersJavaVersion = "1.15.0-rc2"
+    private val testcontainersJavaVersion = "1.15.1"
     val testContainers = Seq(
       "com.dimafeng" %% "testcontainers-scala-scalatest" % testContainersVersion % "it",
       "com.dimafeng" %% "testcontainers-scala-kafka" % testContainersVersion % "it",
