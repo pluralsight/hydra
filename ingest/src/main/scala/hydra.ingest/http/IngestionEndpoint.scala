@@ -193,6 +193,7 @@ class IngestionEndpoint[F[_]: Futurable](
             if (alternateIngestFlowEnabled && useAlternateIngestFlow(hydraRequest)) {
               sendAltFlow(hydraRequest,topic)
             } else {
+              log.warn("Old ingest flow being used for request: {}", hydraRequest)
               imperativelyComplete { ctx =>
                 requestHandler ! InitiateHttpRequest(
                   hydraRequest,
