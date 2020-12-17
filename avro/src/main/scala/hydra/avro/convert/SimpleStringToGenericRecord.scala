@@ -18,7 +18,7 @@ object SimpleStringToGenericRecord {
     import collection.JavaConverters._
 
     private def handleRecord(json: JsValue, schema: Schema): Try[JsValue] = {
-      val newFieldsMap = schema.getFields.asScala.toList.traverse { field =>
+      schema.getFields.asScala.toList.traverse { field =>
         val maybeThisFieldJson: Try[Option[JsValue]] = json match {
           case JsObject(fields) => Success(fields.get(field.name))
           case other => Failure(UnexpectedTypeFoundInGenericRecordConversion[JsObject](classOf[JsObject], other))
@@ -28,7 +28,6 @@ object SimpleStringToGenericRecord {
           case None => jsonToGenericRecordJson(JsNull, field.schema).map(field.name ->  _)
         }
       }.map(f => JsObject(f.toMap))
-      newFieldsMap
     }
 
     private def handleUnion(json: JsValue, schema: Schema): Try[JsValue] = {
@@ -70,10 +69,9 @@ object SimpleStringToGenericRecord {
     }
 
     def toGenericRecordSimple(schema: Schema, useStrictValidation: Boolean): Try[GenericRecord] = {
+      val jsonValidation = if (useStrictValidation) { checkStrictValidation(str, schema) } else Success()
       val jsonOfPayload = jsonToGenericRecordJson(str.parseJson, schema)
-      jsonOfPayload.flatMap(_.compactPrint.toGenericRecord(schema, useStrictValidation))
+      jsonValidation.flatMap(_ => jsonOfPayload.flatMap(_.compactPrint.toGenericRecordPostValidation(schema)))
     }
-
   }
-
 }

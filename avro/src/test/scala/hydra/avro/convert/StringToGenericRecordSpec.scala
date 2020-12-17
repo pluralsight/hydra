@@ -212,5 +212,4 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     import collection.JavaConverters._
     record.get.get("testing") shouldBe Map("one" -> 1, "two" -> 2, "three" -> 3).map(kv => new Utf8(kv._1) -> kv._2).asJava
   }
-
 }
