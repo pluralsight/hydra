@@ -47,10 +47,7 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
       new ConsumerGroupsEndpoint(algebras.consumerGroups).route ~
       new IngestorRegistryEndpoint().route ~
       new IngestionWebSocketEndpoint().route ~
-      new IngestionEndpoint(cfg.ingestConfig.alternateIngestEnabled,
-                            programs.ingestionFlow,
-                            programs.ingestionFlowV2,
-                            cfg.ingestConfig.useOldIngestIfUAContains).route ~
+      new IngestionEndpoint(programs.ingestionFlow, programs.ingestionFlowV2).route ~
       new TopicsEndpoint(consumerProxy)(system.dispatcher).route ~
       new TopicDeletionEndpoint(programs.topicDeletion,cfg.topicDeletionConfig.deleteTopicPassword).route ~
       HealthEndpoint.route ~
