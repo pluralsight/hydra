@@ -7,15 +7,13 @@ object Dependencies {
   val akkaKafkaStreamVersion = "2.0.4"
   val akkaVersion = "2.6.7"
   val avroVersion = "1.10.0"
-  val catsEffectVersion = "2.2.0"
+  val catsEffectVersion = "2.3.0"
   val catsLoggerVersion = "1.1.1"
   val catsRetryVersion = "1.1.1"
   val catsVersion = "2.2.0"
   val cirisVersion = "1.2.1"
   val confluentVersion = "5.4.2"
-  val easyMockVersion = "4.2" //needed for mocking static java methods
   val fs2KafkaVersion = "1.0.0"
-  val h2DbVersion = "1.4.200"
   val jacksonCoreVersion = "2.10.4"
   val jacksonDatabindVersion = "2.10.4"
   val jodaConvertVersion = "2.2.1"
@@ -23,16 +21,14 @@ object Dependencies {
   val kafkaVersion = "2.4.1"
   val kamonPVersion = "2.1.4"
   val kamonVersion = "2.1.4"
-  val log4jVersion = "2.14.0"
-  val powerMockVersion = "2.0.7" //needed for mocking static java methods
-  val refinedVersion = "0.9.17"
+  val log4jVersion = "2.13.3"
+  val refinedVersion = "0.9.19"
   val reflectionsVersion = "0.9.12"
   val scalaCacheVersion = "0.28.0"
-  val scalaMockVersion = "5.0.0"
+  val scalaMockVersion = "5.1.0"
   val scalaTestVersion = "3.2.2"
-  val scalazVersion = "7.3.2"
   val sprayJsonVersion = "1.3.5"
-  val testContainersVersion = "0.38.4"
+  val testContainersVersion = "0.38.8"
   val typesafeConfigVersion = "1.3.2"
   val vulcanVersion = "1.2.0"
 
@@ -69,8 +65,6 @@ object Dependencies {
     val typesafeConfig = "com.typesafe" % "config" % typesafeConfigVersion
 
     val sprayJson = "io.spray" %% "spray-json" % sprayJsonVersion
-
-    val scalaz = "org.scalaz" %% "scalaz-core" % scalazVersion
 
     val retry = "com.softwaremill.retry" %% "retry" % "0.3.3"
 
@@ -123,8 +117,6 @@ object Dependencies {
 
     val avro = "org.apache.avro" % "avro" % avroVersion
 
-    val jsonLenses = "net.virtual-void" %% "json-lenses" % "0.6.2"
-
     val joda = Seq(
       "joda-time" % "joda-time" % jodaTimeVersion,
       "org.joda" % "joda-convert" % jodaConvertVersion
@@ -143,7 +135,6 @@ object Dependencies {
       "com.fasterxml.jackson.core" % "jackson-databind" % jacksonDatabindVersion
     )
 
-    val postgres = "org.postgresql" % "postgresql" % "42.2.14"
   }
 
   object Test {
@@ -155,30 +146,19 @@ object Dependencies {
     )
 
     val scalaTest = "org.scalatest" %% "scalatest" % scalaTestVersion % "test"
-    val easyMock = "org.easymock" % "easymock" % easyMockVersion % "test"
-
-    val powerMock = Seq(
-      "org.powermock" % "powermock-api-easymock" % powerMockVersion % "test",
-      "org.powermock" % "powermock-module-junit4" % powerMockVersion % "test"
-    )
 
     val scalaMock = "org.scalamock" %% "scalamock" % scalaMockVersion % "test"
     val junit = "junit" % "junit" % "4.13" % "test"
 
-    val h2db = "com.h2database" % "h2" % h2DbVersion % "test"
-
-    val embeddedPostgres =
-      "com.opentable.components" % "otj-pg-embedded" % "0.13.3" % "test"
   }
 
   object Integration {
-    private val testcontainersJavaVersion = "1.15.0-rc2"
+    private val testcontainersJavaVersion = "1.15.1"
     val testContainers = Seq(
       "com.dimafeng" %% "testcontainers-scala-scalatest" % testContainersVersion % "it",
       "com.dimafeng" %% "testcontainers-scala-kafka" % testContainersVersion % "it",
       "org.testcontainers" % "testcontainers"                  % testcontainersJavaVersion  % "it",
       "org.testcontainers" % "database-commons"                % testcontainersJavaVersion  % "it",
-      "org.testcontainers" % "postgresql"                      % testcontainersJavaVersion  % "it",
       "org.testcontainers" % "jdbc"                            % testcontainersJavaVersion  % "it"
     )
 
@@ -191,11 +171,10 @@ object Dependencies {
   val integrationDeps: Seq[ModuleID] = testContainers
 
   val testDeps: Seq[ModuleID] =
-    Seq(scalaTest, junit, scalaMock, easyMock, embeddedPostgres) ++
-      powerMock ++ akkaTest
+    Seq(scalaTest, junit, scalaMock) ++ akkaTest
 
   val baseDeps: Seq[ModuleID] =
-    akka ++ Seq(scalaz, avro) ++ cats ++ logging ++ joda ++ testDeps
+    akka ++ Seq(avro) ++ cats ++ logging ++ joda ++ testDeps
 
   val avroDeps: Seq[ModuleID] =
     baseDeps ++ confluent ++ jackson ++ guavacache ++ catsEffect
@@ -203,17 +182,14 @@ object Dependencies {
   val coreDeps: Seq[ModuleID] = akka ++ baseDeps ++
     Seq(
       reflections,
-      postgres,
-      h2db,
       retry
     ) ++ guavacache ++
     confluent ++ kamon
 
-  val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(ciris, embeddedKafka)
+  val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(ciris, embeddedKafka, sprayJson)
 
   val kafkaDeps: Seq[ModuleID] = coreDeps ++ Seq(
     akkaKafkaStream,
-    jsonLenses,
     refined
   ) ++ kafka ++ akkaHttpHal ++ vulcan ++ fs2Kafka ++ integrationDeps
 

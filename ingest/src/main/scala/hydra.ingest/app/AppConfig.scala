@@ -114,18 +114,18 @@ object AppConfig {
 
   final case class ConsumerGroupsAlgebraConfig(
                                                       kafkaInternalConsumerGroupsTopic: String,
-                                                      commonConsumerGroup: ConsumerGroup
+                                                      commonConsumerGroup: ConsumerGroup,
+                                                      consumerGroupsConsumerEnabled: Boolean
                                                     )
 
   private val consumerGroupAlgebraConfig: ConfigValue[ConsumerGroupsAlgebraConfig] =
       (
         env("KAFKA_CONSUMER_GROUPS_INTERNAL_TOPIC_NAME").as[String].default("__consumer_offsets"),
-        env("HYDRA_CONSUMER_GROUPS_COMMON_CONSUMER_GROUP").as[ConsumerGroup].default("kafkaInternalConsumerGroupsTopic-ConsumerGroupName")
-      ).parMapN(ConsumerGroupsAlgebraConfig)
+          env("HYDRA_CONSUMER_GROUPS_COMMON_CONSUMER_GROUP").as[ConsumerGroup].default("kafkaInternalConsumerGroupsTopic-ConsumerGroupName"),
+            env("CONSUMER_GROUPS_CONSUMER_ENABLED").as[Boolean].default(true)
+        ).parMapN(ConsumerGroupsAlgebraConfig)
 
   final case class IngestConfig(
-                                 alternateIngestEnabled: Boolean,
-                                 useOldIngestIfUAContains: Set[String],
                                  recordSizeLimitBytes: Option[Long]
                                )
 
@@ -137,10 +137,8 @@ object AppConfig {
 
   private val ingestConfig: ConfigValue[IngestConfig] =
     (
-      env("HYDRA_INGEST_ALTERNATE_ENABLED").as[Boolean].default(false),
-      env("HYDRA_INGEST_ALTERNATE_IGNORE_UA_STRINGS").as[Set[String]].default(Set.empty),
       env("HYDRA_INGEST_RECORD_SIZE_LIMIT_BYTES").as[Long].option
-    ).parMapN(IngestConfig)
+    ).map(IngestConfig)
 
   final case class TopicDeletionConfig(deleteTopicPassword: String)
 

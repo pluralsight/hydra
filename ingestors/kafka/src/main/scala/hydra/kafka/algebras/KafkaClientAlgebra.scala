@@ -5,10 +5,12 @@ import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.syntax.all._
 import cats.{Monad, MonadError}
+import fs2.Pipe
 import fs2.concurrent.Queue
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
-import hydra.kafka.algebras.KafkaClientAlgebra.PublishError.RecordTooLarge
+import hydra.kafka.algebras.KafkaClientAlgebra.PublishError.{RecordTooLarge, TopicNotFoundInMetadata}
+import io.chrisdavenport.log4cats.Logger
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import io.confluent.kafka.serializers.{AbstractKafkaAvroSerDeConfig, KafkaAvroDeserializer, KafkaAvroSerializer}
 import org.apache.avro.generic.GenericRecord
@@ -126,6 +128,8 @@ object KafkaClientAlgebra {
         with NoStackTrace
     final case class OtherPublishError(cause: Throwable)
       extends PublishError(cause.getMessage, cause.some)
+    final case class TopicNotFoundInMetadata(topicName: String, timeout: FiniteDuration, cause: Throwable) extends
+      PublishError(s"Topic $topicName was not found in metadata after ${timeout.toMillis} ms.", cause.some)
   }
 
   private def checkSizeLimit[F[_]: MonadError[*[_], Throwable]](k: Array[Byte], v: Option[Array[Byte]], sizeLimitBytes: Option[Long]): F[Unit] = {
@@ -147,32 +151,43 @@ object KafkaClientAlgebra {
                                                           topicName: TopicName,
                                                           promise: Deferred[F, Either[PublishError, PublishResponse]],
                                                           headers: Headers
-
                                                         )
 
-  private def getProducerQueue[F[_]: ConcurrentEffect: ContextShift]
-  (bootstrapServers: String): F[fs2.concurrent.Queue[F, ProduceRecordInfo[F]]] = {
+  private def attemptProduce[F[_], K, V, A](
+                              settings: ProducerSettings[F, K, V],
+                              producer: KafkaProducer[F, K, V]
+                            )(
+                              implicit F: Concurrent[F]
+                            ): Pipe[F, (ProducerRecords[K, V, Unit], A), (Either[Throwable, ProducerResult[K, V, Unit]], A)] =
+    _.evalMap(r => producer.produce(r._1).map(_ -> r._2)).mapAsync(settings.parallelism)(i => i._1.attempt.map(_ -> i._2))
+
+  private def getProducerQueue[F[_]: ConcurrentEffect: ContextShift: Logger]
+    (bootstrapServers: String, publishMaxBlockMs: FiniteDuration): F[fs2.concurrent.Queue[F, ProduceRecordInfo[F]]] = {
     import fs2.kafka._
     val producerSettings =
       ProducerSettings[F, Array[Byte], Array[Byte]]
         .withBootstrapServers(bootstrapServers)
         .withAcks(Acks.All)
+        .withProperty("max.block.ms", publishMaxBlockMs.toMillis.toString)
+        .withRetries(retries = 0)
     for {
       queue <- fs2.concurrent.Queue.unbounded[F, ProduceRecordInfo[F]]
-      _ <- Concurrent[F].start(queue.dequeue.flatMap { payload =>
-        val record = ProducerRecord(payload.topicName, payload.key.orNull, payload.value.orNull).withHeaders(payload.headers)
-        val producerRecords: ProducerRecords[Array[Byte], Array[Byte], Deferred[F, Either[PublishError, PublishResponse]]] =
-          ProducerRecords.one(record, payload.promise)
-        fs2.Stream.emit[F, ProducerRecords[Array[Byte], Array[Byte], Deferred[F, Either[PublishError, PublishResponse]]]](producerRecords)
-          .through(produce(producerSettings))
-          .attempt
-          .flatMap {
-            case Right(i) =>
-              fs2.Stream.chunk(i.records).evalMap(r => i.passthrough.complete(PublishResponse(r._2.partition, r._2.offset).asRight))
-            case Left(error) =>
-              fs2.Stream.emit(payload.promise.complete(PublishError.OtherPublishError(error).asLeft))
-          }
-      }.compile.drain)
+      _ <- Concurrent[F].start {
+        producerStream[F].using(producerSettings).flatMap { producer =>
+          queue.dequeue.map { payload =>
+            val record = ProducerRecord(payload.topicName, payload.key.orNull, payload.value.orNull).withHeaders(payload.headers)
+            (ProducerRecords.one(record), payload)
+          }.through(attemptProduce(producerSettings, producer))
+            .flatMap {
+              case (Right(result), payload) =>
+                fs2.Stream.chunk(result.records).evalMap(r => payload.promise.complete(PublishResponse(r._2.partition, r._2.offset).asRight))
+              case (Left(t: org.apache.kafka.common.errors.TimeoutException), payload) if t.getMessage.contains("not present in metadata after") =>
+                fs2.Stream.eval(payload.promise.complete(PublishError.TopicNotFoundInMetadata(payload.topicName, publishMaxBlockMs, t).asLeft))
+              case (Left(error), payload) =>
+                fs2.Stream.eval(payload.promise.complete(PublishError.OtherPublishError(error).asLeft))
+            }
+        }.compile.drain
+      }
     } yield queue
   }
 
@@ -182,7 +197,9 @@ object KafkaClientAlgebra {
                                                                            keySerializer: Serializer[F, RecordFormat],
                                                                            valSerializer: Serializer[F, RecordFormat],
                                                                            sizeLimitBytes: Option[Long] = None,
-                                                                           publishTimeoutDuration: FiniteDuration): F[KafkaClientAlgebra[F]] = Sync[F].delay {
+                                                                           publishTimeoutDuration: FiniteDuration,
+                                                                           publishMaxBlockMs: FiniteDuration
+                                                                          ): F[KafkaClientAlgebra[F]] = Sync[F].delay {
     new KafkaClientAlgebra[F] {
       override def publishMessage(record: Record, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
         produceMessage[GenericRecord](record, topicName, GenericRecordFormat.apply, publishTimeoutDuration)
@@ -205,7 +222,7 @@ object KafkaClientAlgebra {
       }
 
       override def withProducerRecordSizeLimit(sizeLimitBytes: Long): F[KafkaClientAlgebra[F]] =
-        getLiveInstance[F](bootstrapServers)(queue, schemaRegistryClient, keySerializer, valSerializer, sizeLimitBytes.some, publishTimeoutDuration)
+        getLiveInstance[F](bootstrapServers)(queue, schemaRegistryClient, keySerializer, valSerializer, sizeLimitBytes.some, publishTimeoutDuration, publishMaxBlockMs)
 
       private def produceMessage[A](
                                      record: (A, Option[GenericRecord], Option[Headers]),
@@ -255,19 +272,20 @@ object KafkaClientAlgebra {
     }
   }
 
-  def live[F[_]: ContextShift: ConcurrentEffect: Timer](
+  def live[F[_]: ContextShift: ConcurrentEffect: Timer: Logger](
       bootstrapServers: String,
       schemaRegistryAlgebra: SchemaRegistry[F],
       recordSizeLimit: Option[Long] = None,
-      publishTimeoutDuration: FiniteDuration = 5.seconds
+      publishTimeoutDuration: FiniteDuration = 5.seconds,
+      publishMaxBlockMs: FiniteDuration = 4.5.seconds
   ): F[KafkaClientAlgebra[F]] =
     for {
       schemaRegistryClient <- schemaRegistryAlgebra.getSchemaRegistryClient
-      queue <- getProducerQueue[F](bootstrapServers)
+      queue <- getProducerQueue[F](bootstrapServers, publishMaxBlockMs)
       k <- getLiveInstance(bootstrapServers)(
         queue, schemaRegistryClient,
         getSerializer(schemaRegistryClient)(isKey = true),
-        getSerializer(schemaRegistryClient)(isKey = false), None, publishTimeoutDuration)
+        getSerializer(schemaRegistryClient)(isKey = false), None, publishTimeoutDuration, publishMaxBlockMs)
       kWithSizeLimit <- recordSizeLimit.traverse(k.withProducerRecordSizeLimit)
     } yield kWithSizeLimit.getOrElse(k)
 
