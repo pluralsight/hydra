@@ -11,7 +11,7 @@ object JsonPathKeys {
   def getKey(key: String, json: String): String = {
     if (key.startsWith("{$.")) {
       val theKey = key.substring(3, key.length - 1)
-      JsonParser(json).asJsObject.fields.getOrElse(theKey, "").toString.replace("\"","")
+      JsonParser(json).asJsObject.fields.getOrElse(theKey, key).toString.replace("\"","")
     } else {
       key
     }
@@ -20,7 +20,7 @@ object JsonPathKeys {
   def getKey(key: String, json: JsValue): String = {
     if (key.startsWith("{$.")) {
       val theKey = key.substring(3, key.length - 1)
-      json.asJsObject.fields.getOrElse(theKey, "").toString.replace("\"","")
+      json.asJsObject.fields.getOrElse(theKey, key).toString.replace("\"","")
     } else {
       key
     }
