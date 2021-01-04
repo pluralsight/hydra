@@ -1,9 +1,10 @@
 package hydra.avro.registry
 
-import cats.effect.IO
-import cats.implicits._
+import cats.effect.{IO, Sync}
+import cats.syntax.all._
 import cats.{Applicative, Monad, MonadError}
 import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
+import org.apache.avro.Schema.Parser
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
@@ -98,11 +99,81 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
       allVersions <- schemaRegistry.getAllVersions(subject)
     } yield {
       it must "return an error when a key schema evolution is attempted" in {
-        error shouldBe IncompatibleSchemaException("Key schema evolutions are not permitted.").asLeft
+        error shouldBe IncompatibleSchemaException("Key schema evolutions are not permitted unless to add inconsequential elements i.e. doc fields.").asLeft
         allVersions shouldBe List(1)
       }
     }
   }
+
+  def recordBuilder(name: String, withDoc: Boolean = false, doc: String = ""): Schema = {
+    val testSchemaString =
+      s"""{
+            "type":"record",
+            "name":"$name",
+            "fields":[
+              {
+                "name":"id",
+                "type":"string"
+              }
+            ]
+          }"""
+
+    val testSchemaStringWithDoc =
+      s"""{
+            "type":"record",
+            "name":"$name",
+            "fields":[
+              {
+                "name":"id",
+                "type":"string",
+                "doc":"$doc"
+              }
+            ]
+          }"""
+
+    new Parser().parse(if (withDoc) testSchemaStringWithDoc else testSchemaString)
+  }
+
+  private def testInconsequentialKeyEvolutions[F[_]: MonadError[*[_], Throwable]: Sync]: F[Unit] = {
+    val firstIteration = recordBuilder("schemaName")
+    val evolvedSchema = recordBuilder("schemaName", withDoc = true, "Documentation")
+    val lastIteration = recordBuilder("schemaName", withDoc = true, "Documentation Updated")
+
+    val schemasF: F[List[Schema]] = Applicative[F].pure(List[Schema](firstIteration, evolvedSchema))
+    val subject = "testSubjectAdd-key"
+
+    SchemaRegistry.CheckKeySchemaEvolution(schemasF).checkKeyEvolution(subject, lastIteration).map { _ =>
+      it must "succeed when inconsequential updates are made to the key schema" in {
+        succeed
+      }
+    }
+  }
+
+  private def testNoPriorKeySchema[F[_]: MonadError[*[_], Throwable]: Sync]: F[Unit] = {
+    val lastIteration = recordBuilder("schemaName", withDoc = true, "Documentation Updated")
+
+    val schemasF: F[List[Schema]] = Applicative[F].pure(List[Schema]())
+    val subject = "testSubjectAdd-key"
+
+    SchemaRegistry.CheckKeySchemaEvolution(schemasF).checkKeyEvolution(subject, lastIteration).map { _ =>
+      it must "succeed when no previous key schemas exist" in {
+        succeed
+      }
+    }
+  }
+
+  private def testValueSchemaBeingChecked[F[_]: MonadError[*[_], Throwable]: Sync]: F[Unit] = {
+    val lastIteration = recordBuilder("schemaName", withDoc = true, "Documentation Updated")
+    val schemasF: F[List[Schema]] = Applicative[F].pure(List[Schema]())
+    val subject = "testSubjectAdd-key"
+
+    SchemaRegistry.CheckKeySchemaEvolution(schemasF).checkKeyEvolution(subject, lastIteration).map { _ =>
+      it must "succeed when value schema is being checked" in {
+        succeed
+      }
+    }
+  }
+
 
   private def testDeleteSchemaVersion[F[_]: Monad](
       schemaRegistry: SchemaRegistry[F]
@@ -194,7 +265,7 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
     } yield ()
   }
 
-  private def runTests[F[_]: MonadError[*[_], Throwable]](
+  private def runTests[F[_]: MonadError[*[_], Throwable]: Sync](
       schemaRegistry: F[SchemaRegistry[F]]
   ): F[Unit] = {
     for {
@@ -204,6 +275,9 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
       _ <- schemaRegistry.flatMap(testErrorKeyEvolution[F])
       _ <- schemaRegistry.flatMap(testDeleteSchemaVersion[F])
       _ <- schemaRegistry.flatMap(testGetAllSubjects[F])
+      _ <- testInconsequentialKeyEvolutions[F]
+      _ <- testNoPriorKeySchema[F]
+      _ <- testValueSchemaBeingChecked[F]
       _ <- testSchemaEvolutionValidation[F]
     } yield ()
   }

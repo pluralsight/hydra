@@ -1,5 +1,6 @@
 package hydra.avro.convert
 
+import java.time.Instant
 import java.util.UUID
 
 import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
@@ -23,6 +24,42 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
       .requiredString("testing").endRecord()
     val record = """{"testing": "test"}""".toGenericRecord(schema, useStrictValidation = true)
     record.get.get("testing") shouldBe new Utf8("test")
+  }
+
+  it should "convert union record" in {
+    val schema = SchemaBuilder.record("Test").fields()
+      .optionalString("testing").endRecord()
+    val record = """{"testing": {"string": "test"}}""".toGenericRecord(schema, useStrictValidation = true)
+    record.get.get("testing") shouldBe new Utf8("test")
+  }
+
+  it should "convert union record with explicit null branch" in {
+    val schema = SchemaBuilder.record("Test").fields()
+      .optionalString("testing").endRecord()
+    val record = """{"testing": {"null": null}}""".toGenericRecord(schema, useStrictValidation = true)
+    record.get.get("testing") shouldBe null
+  }
+
+  it should "convert union record with implicit null branch" in {
+    val schema = SchemaBuilder.record("Test").fields()
+      .optionalString("testing").endRecord()
+    val record = """{"testing": null}""".toGenericRecord(schema, useStrictValidation = true)
+    record.get.get("testing") shouldBe null
+  }
+
+  it should "convert union record with inner record with implicit null branch" in {
+    val schema = SchemaBuilder.record("Test").namespace("my.namespace").fields().name("testing").`type`()
+      .unionOf().nullType().and().record("TestingInner").fields()
+      .requiredInt("testInner").endRecord().endUnion().nullDefault().endRecord()
+    val record = """{"testing": {"my.namespace.TestingInner": {"testInner": 2020}}}""".toGenericRecord(schema, useStrictValidation = true)
+    record.get.get("testing").toString shouldBe "{\"testInner\": 2020}"
+  }
+
+  it should "reject union record with explicit null branch containing extra fields" in {
+    val schema = SchemaBuilder.record("Test").fields()
+      .optionalString("testing").endRecord()
+    val record = """{"testing": {"null": null, "another": 2020}}""".toGenericRecord(schema, useStrictValidation = true)
+    record shouldBe a[Failure[_]]
   }
 
   it should "return an error for extra field and Strict validation" in {
@@ -135,4 +172,44 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     record shouldBe a[Success[_]]
   }
 
+  it should "validate TimestampMillis logical type" in {
+    val schema = SchemaBuilder.record("testVal")
+      .fields()
+      .name("testTs")
+      .`type`(LogicalTypes.timestampMillis.addToSchema(Schema.create(Schema.Type.LONG)))
+      .noDefault
+      .endRecord
+    val record = """{"testTs": 819283928392839283928398293829382938298329839283928392839283928398}""".toGenericRecord(schema, useStrictValidation = true)
+    record shouldBe a[Failure[_]]
+  }
+
+  it should "accept a valid TimestampMillis logical type" in {
+    val ts = Instant.now
+    val schema = SchemaBuilder.record("testVal")
+      .fields()
+      .name("testTs")
+      .`type`(LogicalTypes.timestampMillis.addToSchema(Schema.create(Schema.Type.LONG)))
+      .noDefault
+      .endRecord
+    val record = s"""{"testTs": ${ts.toEpochMilli}}""".toGenericRecord(schema, useStrictValidation = true)
+    record shouldBe a[Success[_]]
+  }
+
+  it should "convert map of simple type" in {
+    val schema = SchemaBuilder.record("Test").fields()
+      .name("testing").`type`.map.values.intType.noDefault().endRecord()
+    val json =
+      """
+        |{
+        |  "testing": {
+        |    "one": 1,
+        |    "two": 2,
+        |    "three": 3
+        |  }
+        |}
+        |""".stripMargin
+    val record = json.toGenericRecord(schema, useStrictValidation = true)
+    import collection.JavaConverters._
+    record.get.get("testing") shouldBe Map("one" -> 1, "two" -> 2, "three" -> 3).map(kv => new Utf8(kv._1) -> kv._2).asJava
+  }
 }

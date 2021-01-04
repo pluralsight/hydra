@@ -3,7 +3,6 @@ package hydra.core.ingest
 import akka.actor.ActorSystem
 import akka.serialization.SerializationExtension
 import akka.testkit.TestKit
-import com.romix.akka.serialization.kryo.KryoSerializer
 import hydra.core.protocol.InitiateRequest
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import org.scalatest.matchers.should.Matchers
@@ -88,50 +87,5 @@ class HydraRequestSpec
       )
     }
 
-    it("should be serializable with Kryo") {
-      val serialization = SerializationExtension(system)
-      val hr = HydraRequest(
-        "123",
-        metadata = Map("test" -> "value", "test1" -> "value1"),
-        payload = "test"
-      )
-
-      serialization
-        .findSerializerFor(hr)
-        .getClass shouldBe classOf[KryoSerializer]
-      //round trip
-      val serialized = serialization.serialize(hr)
-      serialized.isSuccess shouldBe true
-
-      val des = serialization.deserialize(serialized.get, classOf[HydraRequest])
-      des.isSuccess shouldBe true
-      des.get == hr shouldBe true
-    }
-
-    it(
-      "should be serializable with Kryo when wrapped in an InitiateRequest class"
-    ) {
-      val serialization = SerializationExtension(system)
-
-      val req = InitiateRequest(
-        HydraRequest(
-          "123",
-          metadata = Map("test" -> "value"),
-          payload = "test"
-        ),
-        2.seconds
-      )
-      serialization
-        .findSerializerFor(req)
-        .getClass shouldBe classOf[KryoSerializer]
-      //round trip
-      val serialized = serialization.serialize(req)
-      serialized.isSuccess shouldBe true
-
-      val des =
-        serialization.deserialize(serialized.get, classOf[InitiateRequest])
-      des.isSuccess shouldBe true
-      des.get == req shouldBe true
-    }
   }
 }

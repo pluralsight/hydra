@@ -1,7 +1,8 @@
 package hydra.ingest.services
 
 import cats.effect.{Concurrent, ContextShift, IO}
-import cats.implicits._
+import cats.syntax.all._
+import fs2.kafka.{Header, Headers}
 import hydra.avro.registry.SchemaRegistry
 import hydra.core.transport.ValidationStrategy
 import hydra.ingest.services.IngestionFlowV2.V2IngestRequest
@@ -19,7 +20,7 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
   private implicit val mode: scalacache.Mode[IO] = scalacache.CatsEffect.modes.async
 
-  private val testSubject: Subject = Subject.createValidated("exp.test.v0.Testing").get
+  private val testSubject: Subject = Subject.createValidated("dvs.test.v0.Testing").get
 
   private val testKeyPayload: String =
     """{"id": "testing"}"""
@@ -43,19 +44,41 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
   } yield kafkaClient
 
   it should "ingest a record" in {
-    val testRequest = V2IngestRequest(testKeyPayload, testValPayload.some, ValidationStrategy.Strict.some)
+    val testRequest = V2IngestRequest(testKeyPayload, testValPayload.some, ValidationStrategy.Strict.some, useSimpleJsonFormat = false)
     ingest(testRequest).flatMap { kafkaClient =>
-      kafkaClient.consumeMessages(testSubject.value, "test-consumer").take(1).compile.toList.map { publishedMessages =>
+      kafkaClient.consumeMessages(testSubject.value, "test-consumer", commitOffsets = false).take(1).compile.toList.map { publishedMessages =>
         val firstMessage = publishedMessages.head
         (firstMessage._1.toString, firstMessage._2.get.toString) shouldBe (testKeyPayload, testValPayload)
       }
     }.unsafeRunSync()
   }
 
-  it should "ingest a tombstone record" in {
-    val testRequest = V2IngestRequest(testKeyPayload, None, ValidationStrategy.Strict.some)
+  it should "ingest a record with the simple format" in {
+    val testRequest = V2IngestRequest(testKeyPayload, testValPayload.some, ValidationStrategy.Strict.some, useSimpleJsonFormat = true)
     ingest(testRequest).flatMap { kafkaClient =>
-      kafkaClient.consumeMessages(testSubject.value, "test-consumer").take(1).compile.toList.map { publishedMessages =>
+      kafkaClient.consumeMessages(testSubject.value, "test-consumer", commitOffsets = false).take(1).compile.toList.map { publishedMessages =>
+        val firstMessage = publishedMessages.head
+        (firstMessage._1.toString, firstMessage._2.get.toString) shouldBe (testKeyPayload, testValPayload)
+      }
+    }.unsafeRunSync()
+  }
+
+  it should "ingest a record with a correlationId" in {
+    val headers = Headers.fromSeq(List(Header.apply("ps-correlation-id","somethinghere1234")))
+    val testRequest = V2IngestRequest(testKeyPayload, testValPayload.some, ValidationStrategy.Strict.some, useSimpleJsonFormat = false,
+      Some(headers))
+    ingest(testRequest).flatMap { kafkaClient =>
+      kafkaClient.consumeMessages(testSubject.value, "test-consumer", commitOffsets = false).take(1).compile.toList.map { publishedMessages =>
+        val firstMessage = publishedMessages.head
+        (firstMessage._1.toString, firstMessage._2.get.toString, firstMessage._3.get.toString) shouldBe (testKeyPayload, testValPayload, headers.toString)
+      }
+    }.unsafeRunSync()
+  }
+
+  it should "ingest a tombstone record" in {
+    val testRequest = V2IngestRequest(testKeyPayload, None, ValidationStrategy.Strict.some, useSimpleJsonFormat = false)
+    ingest(testRequest).flatMap { kafkaClient =>
+      kafkaClient.consumeMessages(testSubject.value, "test-consumer", commitOffsets = false).take(1).compile.toList.map { publishedMessages =>
         val firstMessage = publishedMessages.head
         (firstMessage._1.toString, firstMessage._2) shouldBe (testKeyPayload, None)
       }
@@ -66,9 +89,9 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
     val testKeyPayloadAlt: String = """{"id": "testing", "random": "blah"}"""
     val testValPayloadAlt: String =s"""{"testField": true, "other": 1000}"""
 
-    val testRequest = V2IngestRequest(testKeyPayloadAlt, testValPayloadAlt.some, ValidationStrategy.Relaxed.some)
+    val testRequest = V2IngestRequest(testKeyPayloadAlt, testValPayloadAlt.some, ValidationStrategy.Relaxed.some, useSimpleJsonFormat = false)
     ingest(testRequest).flatMap { kafkaClient =>
-      kafkaClient.consumeMessages(testSubject.value, "test-consumer").take(1).compile.toList.map { publishedMessages =>
+      kafkaClient.consumeMessages(testSubject.value, "test-consumer", commitOffsets = false).take(1).compile.toList.map { publishedMessages =>
         val firstMessage = publishedMessages.head
         (firstMessage._1.toString, firstMessage._2.get.toString) shouldBe (testKeyPayload, testValPayload)
       }
@@ -79,7 +102,7 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
     val testKeyPayloadAlt: String = """{"id": "testing", "random": "blah"}"""
     val testValPayloadAlt: String =s"""{"testField": true, "other": 1000}"""
 
-    val testRequest = V2IngestRequest(testKeyPayloadAlt, testValPayloadAlt.some, ValidationStrategy.Strict.some)
+    val testRequest = V2IngestRequest(testKeyPayloadAlt, testValPayloadAlt.some, ValidationStrategy.Strict.some, useSimpleJsonFormat = false)
     ingest(testRequest).attempt.unsafeRunSync() shouldBe a[Left[_, _]]
   }
 
@@ -87,7 +110,7 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
     val testKeyPayloadAlt: String = """{"id": "testing", "random": "blah"}"""
     val testValPayloadAlt: String =s"""{"testField": true, "other": 1000}"""
 
-    val testRequest = V2IngestRequest(testKeyPayloadAlt, testValPayloadAlt.some, None)
+    val testRequest = V2IngestRequest(testKeyPayloadAlt, testValPayloadAlt.some, None, useSimpleJsonFormat = false)
     ingest(testRequest).attempt.unsafeRunSync() shouldBe a[Left[_, _]]
   }
 
@@ -95,7 +118,7 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
     val testKeyPayloadAlt: String = """{"id": "testing"}"""
     val testValPayloadAlt: String =s"""{"testFieldOther": 1000}"""
 
-    val testRequest = V2IngestRequest(testKeyPayloadAlt, testValPayloadAlt.some, ValidationStrategy.Strict.some)
+    val testRequest = V2IngestRequest(testKeyPayloadAlt, testValPayloadAlt.some, ValidationStrategy.Strict.some, useSimpleJsonFormat = false)
     ingest(testRequest).attempt.unsafeRunSync() shouldBe a[Left[_, _]]
   }
 

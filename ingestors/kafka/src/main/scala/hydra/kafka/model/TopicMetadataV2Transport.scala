@@ -65,37 +65,51 @@ final case class TopicMetadataV2Request(
     schemas: Schemas,
     streamType: StreamTypeV2,
     deprecated: Boolean,
+    deprecatedDate: Option[Instant],
     dataClassification: DataClassification,
     contact: NonEmptyList[ContactMethod],
     createdDate: Instant,
     parentSubjects: List[Subject],
-    notes: Option[String]
+    notes: Option[String],
+    teamName: Option[String]
 ) {
 
   def toValue: TopicMetadataV2Value = {
     TopicMetadataV2Value(
       streamType,
       deprecated,
+      deprecatedDate,
       dataClassification,
       contact,
       createdDate,
       parentSubjects,
-      notes
+      notes,
+      teamName
     )
   }
 }
 
 object TopicMetadataV2Request {
-  type SubjectRegex = MatchesRegex[W.`"""^[a-zA-Z0-9_\\-\\.]+$"""`.T]
+  type SubjectRegex = MatchesRegex[W.`"""^(?:skills|flow|tech|fin|dvs|_[a-zA-Z0-9]+)\\.[a-zA-Z0-9\\-\\.]+"""`.T]
   type Subject = String Refined SubjectRegex
 
   object Subject {
 
     def createValidated(value: String): Option[Subject] = {
-      refineV[SubjectRegex](value).toOption
+      if(value.length > 255 ||
+        value.contains(".-") ||
+        value.contains("-.") ||
+        value.contains("..") ||
+        value.contains("--")) {
+        None
+      } else {
+        refineV[SubjectRegex](value).toOption
+      }
     }
 
-    val invalidFormat = "Invalid Subject. Subject may contain only alphanumeric characters, hyphens(-), underscores(_), and periods(.)"
+    val invalidFormat = "Invalid Topic Name. Topic Name must start with skills, flow, tech, fin, dvs, or an underscore(_). " +
+      " It may contain only alphanumeric characters, hyphens(-) and periods(.)" +
+      " and must not contain consecutive special characters anywhere within the topic name."
   }
 }
 
@@ -105,11 +119,13 @@ final case class TopicMetadataV2Response(
                                           schemas: MaybeSchemas,
                                           streamType: StreamTypeV2,
                                           deprecated: Boolean,
+                                          deprecatedDate: Option[Instant],
                                           dataClassification: DataClassification,
                                           contact: NonEmptyList[ContactMethod],
                                           createdDate: Instant,
                                           parentSubjects: List[Subject],
-                                          notes: Option[String]
+                                          notes: Option[String],
+                                          teamName: Option[String],
                                         )
 object TopicMetadataV2Response {
   def fromTopicMetadataContainer(m: TopicMetadataContainer): TopicMetadataV2Response = {
@@ -119,11 +135,13 @@ object TopicMetadataV2Response {
       MaybeSchemas(keySchema, valueSchema),
       v.streamType,
       v.deprecated,
+      v.deprecatedDate,
       v.dataClassification,
       v.contact,
       v.createdDate,
       v.parentSubjects,
-      v.notes
+      v.notes,
+      v.teamName
     )
   }
 }

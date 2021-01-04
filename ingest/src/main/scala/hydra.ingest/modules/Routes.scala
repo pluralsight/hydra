@@ -9,7 +9,7 @@ import hydra.common.util.{ActorUtils, Futurable}
 import hydra.ingest.app.AppConfig.AppConfig
 import hydra.ingest.http._
 import hydra.kafka.consumer.KafkaConsumerProxy
-import hydra.kafka.endpoints.{BootstrapEndpoint, BootstrapEndpointV2, TopicMetadataEndpoint, TopicsEndpoint}
+import hydra.kafka.endpoints.{BootstrapEndpoint, BootstrapEndpointV2, ConsumerGroupsEndpoint, TopicMetadataEndpoint, TopicsEndpoint}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 
 import scala.concurrent.ExecutionContext
@@ -41,16 +41,15 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
 
     val consumerProxy = system.actorSelection(consumerPath)
 
-    new SchemasEndpoint().route ~
+    new SchemasEndpoint(consumerProxy).route ~
       new BootstrapEndpoint(system).route ~
       new TopicMetadataEndpoint(consumerProxy, algebras.metadata).route ~
+      new ConsumerGroupsEndpoint(algebras.consumerGroups).route ~
       new IngestorRegistryEndpoint().route ~
       new IngestionWebSocketEndpoint().route ~
-      new IngestionEndpoint(cfg.ingestConfig.alternateIngestEnabled,
-                            programs.ingestionFlow,
-                            programs.ingestionFlowV2,
-                            cfg.ingestConfig.useOldIngestIfUAContains).route ~
+      new IngestionEndpoint(programs.ingestionFlow, programs.ingestionFlowV2).route ~
       new TopicsEndpoint(consumerProxy)(system.dispatcher).route ~
+      new TopicDeletionEndpoint(programs.topicDeletion,cfg.topicDeletionConfig.deleteTopicPassword).route ~
       HealthEndpoint.route ~
       bootstrapEndpointV2
   }

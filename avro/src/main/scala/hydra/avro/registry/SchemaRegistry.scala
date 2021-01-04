@@ -3,9 +3,10 @@ package hydra.avro.registry
 import cats.effect.Sync
 import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, MockSchemaRegistryClient, SchemaRegistryClient}
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
-import cats.implicits._
+import cats.syntax.all._
 import io.confluent.kafka.schemaregistry.avro.AvroCompatibilityChecker
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
+import javax.security.auth.Subject
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
@@ -37,6 +38,14 @@ trait SchemaRegistry[F[_]] {
     * @return Unit
     */
   def deleteSchemaOfVersion(subject: String, version: SchemaVersion): F[Unit]
+
+  /**
+    * Deletes the subject from the versionCache, idCache, and schemaCache
+    * of the CachedSchemaRegistryClient
+    * @param subject The subject using -key or -value to delete
+    * @return Unit
+    */
+  def deleteSchemaSubject(subject: String): F[Unit]
 
   /**
     * Retrieves the SchemaVersion if the given subject and schema match an item in SchemaRegistry.
@@ -86,6 +95,19 @@ trait SchemaRegistry[F[_]] {
 
 object SchemaRegistry {
 
+  private[registry] implicit class CheckKeySchemaEvolution[F[_]: Sync](schemasF: F[List[Schema]]) {
+    def checkKeyEvolution(subject: String, newSchema: Schema): F[List[Schema]] = schemasF.flatTap[Unit] {
+      case _ if subject.endsWith("-value") => Sync[F].unit
+      case Nil => Sync[F].unit
+      case oldSchemas =>
+        if (oldSchemas.forall(_.hashCode == newSchema.hashCode)) {
+          Sync[F].unit
+        } else {
+          Sync[F].raiseError(IncompatibleSchemaException(s"Key schema evolutions are not permitted unless to add inconsequential elements i.e. doc fields."))
+        }
+    }
+  }
+
   final case class IncompatibleSchemaException(message: String) extends
     RuntimeException(message)
 
@@ -111,21 +133,6 @@ object SchemaRegistry {
   private def getFromSchemaRegistryClient[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient): SchemaRegistry[F] =
     new SchemaRegistry[F] {
 
-      private implicit class CheckKeySchemaEvolution(schemasF: F[List[Schema]]) {
-        def checkKeyEvolution(subject: String, newSchema: Schema): F[List[Schema]] = schemasF.flatTap[Unit] {
-          case _ if subject.endsWith("-value") => Sync[F].unit
-          case Nil => Sync[F].unit
-          case oldSchema :: Nil =>
-            if (oldSchema.hashCode == newSchema.hashCode) {
-              Sync[F].unit
-            } else {
-              Sync[F].raiseError(IncompatibleSchemaException(s"Key schema evolutions are not permitted."))
-            }
-          case _ =>
-            Sync[F].raiseError(IncompatibleSchemaException(s"There are too many versions registered for the subject $subject"))
-        }
-      }
-
       override def registerSchema(
           subject: String,
           schema: Schema
@@ -149,6 +156,8 @@ object SchemaRegistry {
         Sync[F].delay(
           schemaRegistryClient.deleteSchemaVersion(subject, version.toString)
         )
+
+
 
       override def getVersion(
           subject: String,
@@ -185,6 +194,10 @@ object SchemaRegistry {
         }.toOption
       }
 
+      override def deleteSchemaSubject(subject: String): F[Unit] =
+        Sync[F].delay {
+          schemaRegistryClient.deleteSubject(subject)
+        }
     }
 
 }

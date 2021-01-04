@@ -1,12 +1,14 @@
 package hydra.kafka.algebras
 
 import akka.actor.ActorSystem
-import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.effect.{ContextShift, IO, Sync, Timer}
+import hydra.kafka.algebras.KafkaAdminAlgebra.{LagOffsets, Offset, Topic, TopicAndPartition}
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.algebras.KafkaAdminAlgebra.{LagOffsets, Offset, TopicAndPartition}
 import hydra.kafka.algebras.KafkaClientAlgebra.getOptionalGenericRecordDeserializer
 import hydra.kafka.util.KafkaUtils.TopicDetails
+import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
+import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
@@ -21,6 +23,9 @@ final class KafkaAdminAlgebraSpec
     with EmbeddedKafka {
 
   private val port = 8023
+
+  implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
+    Slf4jLogger.getLogger[F]
 
   implicit private val kafkaConfig: EmbeddedKafkaConfig =
     EmbeddedKafkaConfig(kafkaPort = port, zooKeeperPort = 3027)
@@ -75,13 +80,28 @@ final class KafkaAdminAlgebraSpec
         kafkaClient.getTopicNames.unsafeRunSync() shouldBe List(topicName)
       }
 
-      "delete a topic" in {
+      "validate topic exists" in {
+        val topicCreated = "topic_created"
+        (for {
+          _ <- kafkaClient.createTopic(topicCreated, TopicDetails(1,1))
+          maybeTopic <- kafkaClient.describeTopic(topicCreated)
+        } yield maybeTopic shouldBe Some(Topic(topicCreated,1)) ).unsafeRunSync()
+      }
+
+      "delete a topic and describe" in {
         val topicToDelete = "topic_to_delete"
         (for {
           _ <- kafkaClient.createTopic(topicToDelete, TopicDetails(1, 1))
           _ <- kafkaClient.deleteTopic(topicToDelete)
           maybeTopic <- kafkaClient.describeTopic(topicToDelete)
         } yield maybeTopic should not be defined).unsafeRunSync()
+      }
+
+      "delete multiple topics" in {
+        val topicsToDelete = List("topic1","topic2","topic3","topic4","topic5")
+        topicsToDelete.map(topic => kafkaClient.createTopic(topic, TopicDetails(1, 1)).unsafeRunSync())
+        kafkaClient.deleteTopics(topicsToDelete).unsafeRunSync()
+        topicsToDelete.map(topic => kafkaClient.describeTopic(topic).unsafeRunSync() shouldBe None)
       }
 
       if (!isTest) {
@@ -101,7 +121,7 @@ final class KafkaAdminAlgebraSpec
         }
 
         def consumeTest(): Unit = {
-          val consumerSettings = ConsumerSettings(
+          val consumerSettings: ConsumerSettings[IO, String, String] = ConsumerSettings(
             keyDeserializer = Deserializer[IO, String],
             valueDeserializer = Deserializer[IO, String]
           )

@@ -5,8 +5,9 @@ import java.util.UUID
 
 import cats.data.Validated.{Invalid, Valid}
 import cats.data.{NonEmptyList, Validated}
-import cats.implicits._
+import cats.syntax.all._
 import cats.{Applicative, ApplicativeError, Monad, MonadError}
+import fs2.kafka.Headers
 import hydra.avro.convert.{ISODateConverter, IsoDate}
 import hydra.core.marshallers._
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -52,8 +53,9 @@ object TopicMetadataV2 {
 
   def encode[F[_]: MonadError[*[_], Throwable]](
       key: TopicMetadataV2Key,
-      value: Option[TopicMetadataV2Value]
-  ): F[(GenericRecord, Option[GenericRecord])] = {
+      value: Option[TopicMetadataV2Value],
+      headers: Option[Headers] = None
+  ): F[(GenericRecord, Option[GenericRecord], Option[Headers])] = {
     Monad[F]
       .pure {
         val valueResult: Option[Either[AvroError, Any]] = value.map(TopicMetadataV2Value.codec.encode)
@@ -74,11 +76,11 @@ object TopicMetadataV2 {
       }
       .rethrow
       .flatMap {
-        case (k: GenericRecord, v: GenericRecord) => Monad[F].pure((k, Option(v)))
+        case (k: GenericRecord, v: GenericRecord) => Monad[F].pure((k, Option(v), headers))
         case (k, v) =>
           MonadError[F, Throwable].raiseError(
             AvroEncodingFailure(
-              NonEmptyList.of(k, v).map(_.getClass.getSimpleName)
+              NonEmptyList.of(k, v, headers).map(_.getClass.getSimpleName)
             )
           )
       }
@@ -99,7 +101,7 @@ object TopicMetadataV2 {
             valueResult match {
               case Some(Left(avroError)) =>
                avroError.invalidNel
-              case Some(Right(topicMetadataV2Value)) =>
+              case Some (Right(topicMetadataV2Value)) =>
                 Some(topicMetadataV2Value).validNel
               case None => None.validNel
             }
@@ -136,11 +138,13 @@ object TopicMetadataV2Key {
 final case class TopicMetadataV2Value(
     streamType: StreamTypeV2,
     deprecated: Boolean,
+    deprecatedDate: Option[Instant],
     dataClassification: DataClassification,
     contact: NonEmptyList[ContactMethod],
     createdDate: Instant,
     parentSubjects: List[Subject],
-    notes: Option[String]
+    notes: Option[String],
+    teamName: Option[String]
 )
 
 object TopicMetadataV2Value {
@@ -201,5 +205,20 @@ object TopicMetadataV2Value {
     Codec.derive[ContactMethod]
 
   implicit val codec: Codec[TopicMetadataV2Value] =
-    Codec.derive[TopicMetadataV2Value]
+  Codec.record[TopicMetadataV2Value](
+    name = "TopicMetadataV2Value",
+    namespace = "_hydra.v2"
+  ) {
+    field =>
+      (field("streamType", _.streamType),
+        field("deprecated", _.deprecated),
+        field("deprecatedDate", _.deprecatedDate, default = Some(None)),
+        field("dataClassification", _.dataClassification),
+        field("contact", _.contact),
+        field("createdDate", _.createdDate),
+        field("parentSubjects", _.parentSubjects),
+        field("notes", _.notes),
+        field("teamName", _.teamName, default = Some(None))
+        ).mapN(TopicMetadataV2Value.apply)
+  }
 }

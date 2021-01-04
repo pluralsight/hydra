@@ -16,7 +16,7 @@ lazy val defaultSettings = Seq(
   excludeDependencies += "org.slf4j" % "slf4j-log4j12",
   excludeDependencies += "log4j" % "log4j",
   addCompilerPlugin(
-    "org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full
+    "org.typelevel" %% "kind-projector" % "0.11.2" cross CrossVersion.full
   ),
   packageOptions in (Compile, packageBin) +=
     Package.ManifestAttributes("Implementation-Build" -> buildNumber),
@@ -84,7 +84,8 @@ lazy val moduleSettings =
 lazy val root = Project(
   id = "hydra",
   base = file(".")
-).settings(defaultSettings)
+)
+  .settings(moduleSettings)
   .aggregate(common, core, avro, ingest, kafka)
 
 lazy val common = Project(
@@ -110,8 +111,9 @@ lazy val kafka = Project(
   id = "kafka",
   base = file("ingestors/kafka")
 ).dependsOn(core)
+  .configs(IntegrationTest)
   .settings(
-    moduleSettings,
+    moduleSettings ++ Defaults.itSettings,
     name := "hydra-kafka",
     libraryDependencies ++= Dependencies.kafkaDeps
   )

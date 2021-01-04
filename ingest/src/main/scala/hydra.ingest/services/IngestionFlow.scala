@@ -3,7 +3,7 @@ package hydra.ingest.services
 import java.io.IOException
 
 import cats.MonadError
-import cats.implicits._
+import cats.syntax.all._
 import com.pluralsight.hydra.avro.JsonToAvroConversionException
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.resource.SchemaResourceLoader.SchemaNotFoundException
@@ -56,7 +56,7 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](
         }
         val v1Key = getV1RecordKey(schemaWrapper, payloadTryMaybe, request)
         MonadError[F, Throwable].fromTry(payloadTryMaybe).flatMap { payloadMaybe =>
-          kafkaClient.publishStringKeyMessage((v1Key, payloadMaybe), topic).void
+          kafkaClient.publishStringKeyMessage((v1Key, payloadMaybe, None), topic).void
         }
       }
       case None => MonadError[F, Throwable].raiseError(MissingTopicNameException(request))

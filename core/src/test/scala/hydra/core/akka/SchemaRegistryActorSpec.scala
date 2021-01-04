@@ -125,6 +125,18 @@ class SchemaRegistryActorSpec
     listener.expectNoMessage(3.seconds)
   }
 
+  it should "respond with FetchSchemasResponse" in {
+    val (probe, schemaRegistryActor) = fixture
+    schemaRegistryActor.tell(FetchSchemasRequest(List("hydra.test.Tester", "hydra.test.TesterWithKey")), probe.ref)
+    probe.expectMsgPF() {
+      case FetchSchemasResponse(valueSchemas) =>
+        valueSchemas shouldBe List(
+          ("hydra.test.Tester", Option(SchemaResource(1, 1, testSchema))),
+          ("hydra.test.TesterWithKey", Option(SchemaResource(1, 1, testSchema)))
+        )
+    }
+  }
+
   it should "respond with FetchSchemaResponse with a key" in {
     val (probe, schemaRegistryActor) = fixture
 
