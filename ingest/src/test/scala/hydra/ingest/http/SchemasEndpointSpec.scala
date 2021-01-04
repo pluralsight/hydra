@@ -42,7 +42,7 @@ class SchemasEndpointSpec
   import ConfigSupport._
 
   implicit val kafkaConfig: EmbeddedKafkaConfig =
-    EmbeddedKafkaConfig(kafkaPort = 8092, zooKeeperPort = 3181)
+    EmbeddedKafkaConfig(kafkaPort = 8062, zooKeeperPort = 3161)
 
   override def createActorSystem(): ActorSystem =
     ActorSystem(actorSystemNameFrom(getClass))

@@ -195,4 +195,21 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     record shouldBe a[Success[_]]
   }
 
+  it should "convert map of simple type" in {
+    val schema = SchemaBuilder.record("Test").fields()
+      .name("testing").`type`.map.values.intType.noDefault().endRecord()
+    val json =
+      """
+        |{
+        |  "testing": {
+        |    "one": 1,
+        |    "two": 2,
+        |    "three": 3
+        |  }
+        |}
+        |""".stripMargin
+    val record = json.toGenericRecord(schema, useStrictValidation = true)
+    import collection.JavaConverters._
+    record.get.get("testing") shouldBe Map("one" -> 1, "two" -> 2, "three" -> 3).map(kv => new Utf8(kv._1) -> kv._2).asJava
+  }
 }
