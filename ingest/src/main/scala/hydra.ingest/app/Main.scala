@@ -66,7 +66,7 @@ object Main extends IOApp with ConfigSupport with LoggingAdapter {
       r <- routes.routes
       server <- IO.fromFuture(
         IO(
-          Http().newServerAt(settings.httpInterface, settings.httpPort).bindFlow(r)
+          Http().bindAndHandle(r, settings.httpInterface, settings.httpPort)
         )
       )
     } yield server
@@ -81,12 +81,17 @@ object Main extends IOApp with ConfigSupport with LoggingAdapter {
           .make[IO](config)
         programs <- Programs.make[IO](config, algebras)
         bootstrap <- Bootstrap
-          .make[IO](programs.createTopic, config.v2MetadataTopicConfig)
+          .make[IO](programs.createTopic, config.v2MetadataTopicConfig, config.dvsConsumersTopicConfig, config.consumerOffsetsOffsetsTopicConfig)
         _ <- actorsIO()
         _ <- bootstrap.bootstrapAll
         routes <- Routes.make[IO](programs, algebras, config)
         _ <- report
         _ <- serverIO(routes, Settings.HydraSettings)
+        _ <- if (config.consumerGroupsAlgebraConfig.consumerGroupsConsumerEnabled) {
+          algebras.consumerGroups.startConsumer
+        } else {
+          IO.unit
+        }
       } yield ()
     }
   }

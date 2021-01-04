@@ -4,13 +4,10 @@ import akka.actor.ActorPath
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import hydra.core.HydraException
 import hydra.core.ingest.IngestionReport
-import hydra.core.protocol.{
-  IngestorCompleted,
-  IngestorError,
-  IngestorStatus,
-  InvalidRequest
-}
+import hydra.core.protocol.{IngestorCompleted, IngestorError, IngestorStatus, InvalidRequest}
+import hydra.core.transport.ValidationStrategy
 import hydra.ingest.IngestorInfo
+import hydra.ingest.services.IngestionFlowV2.V2IngestRequest
 import org.joda.time.DateTime
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.funspec.AnyFunSpecLike
@@ -24,6 +21,11 @@ class HydraIngestJsonSupportSpec
   import spray.json._
 
   describe("Hydra Json Support") {
+    it("converts V2 Ingest Request") {
+      val ingestRequest = V2IngestRequest("""{"one":1}""", None, Some(ValidationStrategy.Strict), useSimpleJsonFormat = false)
+      ingestRequest.toJson.convertTo[V2IngestRequest] shouldBe ingestRequest
+    }
+
     it("converts IngestorInfo objects") {
       val time = DateTime.now
       val info = IngestorInfo(

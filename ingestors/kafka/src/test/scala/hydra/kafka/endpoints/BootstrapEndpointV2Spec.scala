@@ -96,10 +96,11 @@ final class BootstrapEndpointV2Spec
       deprecated = false,
       None,
       Public,
-      NonEmptyList.of(Email.create("test@pluralsight.com").get),
+      NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
       Instant.now,
       List.empty,
-      None
+      None,
+      Some("dvs-teamName")
     ).toJson.compactPrint
 
     "accept a valid request" in {
@@ -123,6 +124,31 @@ final class BootstrapEndpointV2Spec
           ) ~> check {
             val r = responseAs[String]
             r shouldBe Subject.invalidFormat
+            response.status shouldBe StatusCodes.BadRequest
+          }
+        }
+        .unsafeRunSync()
+    }
+
+    "reject a request without a team name" in {
+      val noTeamName = TopicMetadataV2Request(
+        Schemas(getTestSchema("key"), getTestSchema("value")),
+        StreamTypeV2.Entity,
+        deprecated = false,
+        None,
+        Public,
+        NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
+        Instant.now,
+        List.empty,
+        None,
+        None
+      ).toJson.compactPrint
+      testCreateTopicProgram
+        .map { bootstrapEndpoint =>
+          Put("/v2/topics/dvs.testing", HttpEntity(ContentTypes.`application/json`, noTeamName)) ~> Route.seal(
+            bootstrapEndpoint.route
+          ) ~> check {
+            val r = responseAs[String]
             response.status shouldBe StatusCodes.BadRequest
           }
         }

@@ -5,6 +5,7 @@ import java.time.Instant
 import cats.data.NonEmptyList
 import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.syntax.all._
+import fs2.kafka.Headers
 import hydra.avro.registry.SchemaRegistry
 import hydra.core.marshallers.History
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
@@ -86,7 +87,7 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
     }
   }
 
-  private def getMetadataGenericRecords(subject: Subject): (IO[(GenericRecord, Option[GenericRecord])], TopicMetadataV2Key, TopicMetadataV2Value) = {
+  private def getMetadataGenericRecords(subject: Subject): (IO[(GenericRecord, Option[GenericRecord], Option[Headers])], TopicMetadataV2Key, TopicMetadataV2Value) = {
     val key = TopicMetadataV2Key(subject)
     val value = TopicMetadataV2Value(
         StreamTypeV2.Entity,
@@ -96,7 +97,9 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
         NonEmptyList.one(Slack.create("#channel").get),
         Instant.now,
         List(),
-        None)
-    (TopicMetadataV2.encode[IO](key, Some(value)), key, value)
+        None,
+        Some("dvs-teamName")
+        )
+    (TopicMetadataV2.encode[IO](key, Some(value), None), key, value)
   }
 }

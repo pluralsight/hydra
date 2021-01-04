@@ -100,7 +100,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
 
   private def publishMetadata(
       topicName: Subject,
-      createTopicRequest: TopicMetadataV2Request
+      createTopicRequest: TopicMetadataV2Request,
   ): F[Unit] = {
     for {
       metadata <- metadataAlgebra.getMetadataFor(topicName)
@@ -116,7 +116,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
           }
       }
       message = (TopicMetadataV2Key(topicName), createTopicRequest.copy(createdDate = createdDate, deprecatedDate = deprecatedDate).toValue)
-      records <- TopicMetadataV2.encode[F](message._1, Some(message._2))
+      records <- TopicMetadataV2.encode[F](message._1, Some(message._2), None)
       _ <- kafkaClient
         .publishMessage(records, v2MetadataTopicName.value)
         .rethrow

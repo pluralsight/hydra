@@ -8,6 +8,7 @@ import cats.syntax.all._
 import fs2.kafka._
 import hydra.core.protocol._
 import hydra.kafka.util.KafkaUtils.TopicDetails
+import io.chrisdavenport.log4cats.Logger
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.clients.admin.NewTopic
 import org.apache.kafka.common.TopicPartition
@@ -107,8 +108,9 @@ object KafkaAdminAlgebra {
   final case class KafkaDeleteTopicErrorList(errors: NonEmptyList[KafkaDeleteTopicError])
     extends Exception (s"Topic(s) failed to delete:\n${errors.map(_.errorMessage).toList.mkString("\n")}")
 
-  def live[F[_]: Sync: ConcurrentEffect: ContextShift: Timer](
+  def live[F[_]: Sync: ConcurrentEffect: ContextShift: Timer: Logger](
       bootstrapServers: String,
+      useSsl: Boolean = false
   ): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
     new KafkaAdminAlgebra[F] {
 
@@ -150,12 +152,39 @@ object KafkaAdminAlgebra {
         getAdminClientResource.use(_.listConsumerGroupOffsets(consumerGroup)
           .partitionsToOffsetAndMetadata.map(_.map(r => TopicAndPartition(r._1) -> Offset(r._2))))
 
-      override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] =
-        getConsumerResource.use { consumer =>
-          consumer.partitionsFor(topic).map(_.map(p => new TopicPartition(p.topic, p.partition))).flatMap { topicPartition =>
-            consumer.endOffsets(topicPartition.toSet).map(_.map(in => TopicAndPartition(in._1) -> Offset(in._2)))
+      override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] = {
+        getConsumerResource.use { consumerMaybe =>
+          Option(consumerMaybe) match {
+            case Some(consumer) =>
+              consumer.partitionsFor(topic).flatMap { partitionInfosMaybe =>
+                Option(partitionInfosMaybe) match {
+                  case Some(partitionInfos) =>
+                    val p = partitionInfos.map(p => new TopicPartition(p.topic, p.partition))
+                    Sync[F].delay(p)
+                  case None =>
+                    Logger[F].warn(s"PartitionInfoList for topic $topic is null.") *> Sync[F].pure(List[TopicPartition]())
+                }
+              }.flatMap { topicPartitionMaybe =>
+                Option(topicPartitionMaybe) match {
+                  case Some(topicPartition) =>
+                    consumer.endOffsets(topicPartition.toSet).flatMap { endOffsetsMaybe =>
+                      Option(endOffsetsMaybe) match {
+                        case Some(endOffsets) =>
+                          val endOffsetMap = endOffsets.map(in => TopicAndPartition(in._1) -> Offset(in._2))
+                          Sync[F].delay(endOffsetMap)
+                        case None =>
+                          Logger[F].warn(s"EndOffsets for topic $topic and topicPartition ${topicPartition} is null.") *> Sync[F].pure(Map.empty[KafkaAdminAlgebra.TopicAndPartition, Offset])
+                      }
+                    }
+                  case None =>
+                    Logger[F].warn(s"One PartitionInfo for topic $topic is null.") *> Sync[F].pure(Map.empty[KafkaAdminAlgebra.TopicAndPartition, Offset])
+                }
+              }
+            case None =>
+              Logger[F].warn(s"Consumer for topic $topic is null.") *> Sync[F].pure(Map.empty[KafkaAdminAlgebra.TopicAndPartition, Offset])
           }
         }
+      }
 
       override def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]] = {
         for {
@@ -171,15 +200,17 @@ object KafkaAdminAlgebra {
 
       private def getConsumerResource: Resource[F, KafkaConsumer[F, _, _]] = {
         val des = Deserializer[F, String]
-        consumerResource[F, String, String](
-          ConsumerSettings.apply(des, des).withBootstrapServers(bootstrapServers)
-        )
+        consumerResource[F, String, String] {
+          val s = ConsumerSettings.apply(des, des).withBootstrapServers(bootstrapServers)
+          if (useSsl) s.withProperty("security.protocol", "SSL") else s
+        }
       }
 
       private def getAdminClientResource: Resource[F, KafkaAdminClient[F]] = {
-        adminClientResource(
-          AdminClientSettings.apply.withBootstrapServers(bootstrapServers)
-        )
+        adminClientResource {
+          val s = AdminClientSettings.apply.withBootstrapServers(bootstrapServers)
+          if (useSsl) s.withProperty("security.protocol", "SSL") else s
+        }
       }
     }
   }

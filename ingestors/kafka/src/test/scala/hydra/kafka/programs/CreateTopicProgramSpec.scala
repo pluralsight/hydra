@@ -6,10 +6,11 @@ import cats.data.NonEmptyList
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.syntax.all._
+import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.kafka.algebras.KafkaAdminAlgebra.{Topic, TopicName}
-import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, PublishError, PublishResponse}
+import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, Offset, Partition, PublishError, PublishResponse}
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.ContactMethod.Email
@@ -34,6 +35,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
   implicit val timer: Timer[IO] = IO.timer(concurrent.ExecutionContext.global)
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
+  type Record = (GenericRecord, Option[GenericRecord], Option[Headers])
 
   private def metadataAlgebraF(
                                 metadataTopic: String,
@@ -61,7 +63,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       NonEmptyList.of(Email.create(email).get),
       createdDate,
       List.empty,
-      None
+      None,
+      Some("dvs-teamName")
     )
 
   "CreateTopicSpec" must {
@@ -308,7 +311,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafkaAdmin <- KafkaAdminAlgebra.test[IO]
-        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord])])
+        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(publishTo)
         )
@@ -323,7 +326,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           metadata
         ).createTopic(subject, request, TopicDetails(1, 1))
         published <- publishTo.get
-      } yield published shouldBe Map(metadataTopic -> (m._1, m._2))).unsafeRunSync()
+      } yield published shouldBe Map(metadataTopic -> (m._1, m._2, None))).unsafeRunSync()
     }
 
     "ingest updated metadata into the metadata topic - verify created date did not change" in {
@@ -339,7 +342,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafkaAdmin <- KafkaAdminAlgebra.test[IO]
-        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord])])
+        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(publishTo)
         )
@@ -361,8 +364,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         _ <- createTopicProgram.createTopic(subject, updatedRequest, TopicDetails(1, 1))
         updatedMap <- publishTo.get
       } yield {
-        metadataMap shouldBe Map(metadataTopic -> (m._1, m._2))
-        updatedMap shouldBe Map(metadataTopic -> (updatedM._1, updatedM._2))
+        metadataMap shouldBe Map(metadataTopic -> (m._1, m._2, None))
+        updatedMap shouldBe Map(metadataTopic -> (updatedM._1, updatedM._2, None))
       }).unsafeRunSync()
     }
 
@@ -374,7 +377,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafkaAdmin <- KafkaAdminAlgebra.test[IO]
-        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord])])
+        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(
             publishTo,
@@ -403,7 +406,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafkaAdmin <- KafkaAdminAlgebra.test[IO]
-        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord])])
+        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(
             publishTo,
@@ -433,7 +436,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafkaAdmin <- KafkaAdminAlgebra.test[IO]
-        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord])])
+        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(publishTo)
         )
@@ -468,7 +471,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafkaAdmin <- KafkaAdminAlgebra.test[IO]
-        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord])])
+        publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(publishTo)
         )
@@ -498,24 +501,26 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
   }
 
   private final class TestKafkaClientAlgebraWithPublishTo(
-                                                          publishTo: Ref[IO, Map[TopicName, (GenericRecord, Option[GenericRecord])]],
+                                                          publishTo: Ref[IO, Map[TopicName, Record]],
                                                           failOnPublish: Boolean = false
   ) extends KafkaClientAlgebra[IO] {
 
-    override def publishMessage(record: (GenericRecord, Option[GenericRecord]), topicName: TopicName): IO[Either[PublishError, PublishResponse]] =
+    override def publishMessage(record: Record, topicName: TopicName): IO[Either[PublishError, PublishResponse]] =
       if (failOnPublish) {
         IO.pure(Left(PublishError.Timeout))
       } else {
         publishTo.update(_ + (topicName -> record)).map(_ => PublishResponse(0, 0)).attemptNarrow[PublishError]
       }
 
-    override def consumeMessages(topicName: TopicName, consumerGroup: String): fs2.Stream[IO, (GenericRecord, Option[GenericRecord])] = fs2.Stream.empty
+    override def consumeMessages(topicName: TopicName, consumerGroup: String, commitOffsets: Boolean): fs2.Stream[IO, Record] = fs2.Stream.empty
 
-    override def publishStringKeyMessage(record: (Option[String], Option[GenericRecord]), topicName: TopicName): IO[Either[PublishError, PublishResponse]] = ???
+    override def publishStringKeyMessage(record: (Option[String], Option[GenericRecord], Option[Headers]), topicName: TopicName): IO[Either[PublishError, PublishResponse]] = ???
 
-    override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[IO, (Option[String], Option[GenericRecord])] = ???
+    override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[IO, (Option[String], Option[GenericRecord], Option[Headers])] = ???
 
     override def withProducerRecordSizeLimit(sizeLimitBytes: Long): IO[KafkaClientAlgebra[IO]] = ???
+
+    override def consumeMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[IO, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset))] = fs2.Stream.empty
   }
 
   private final class TestMetadataAlgebraWithPublishTo(consumeFrom: Ref[IO, Map[Subject, TopicMetadataContainer]]) extends MetadataAlgebra[IO] {
