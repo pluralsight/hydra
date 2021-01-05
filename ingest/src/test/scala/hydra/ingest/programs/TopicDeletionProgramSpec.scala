@@ -2,9 +2,9 @@ package hydra.ingest.programs
 
 import cats.data.Validated.{Invalid, Valid}
 import cats.data.{NonEmptyList, ValidatedNel}
-import cats.effect.{IO, Sync}
+import cats.effect.{Concurrent, ContextShift, IO, Sync}
 import hydra.avro.registry.SchemaRegistry
-import hydra.kafka.algebras.KafkaAdminAlgebra
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.flatspec.AnyFlatSpec
@@ -12,9 +12,22 @@ import org.scalatest.matchers.should.Matchers
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.kafka.algebras.KafkaAdminAlgebra.{KafkaDeleteTopicError, KafkaDeleteTopicErrorList, LagOffsets, Offset, Topic, TopicAndPartition, TopicName}
-import io.confluent.kafka.schemaregistry.client.{SchemaRegistryClient}
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
+import hydra.kafka.model.TopicMetadataV2Request.Subject
+import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
+import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+
+import scala.concurrent.ExecutionContext
 
 class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
+  implicit private val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+  private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
+  private val v2MetadataTopicName = "testV2MetadataTopic"
+  private val v1MetadataTopicName = "testV1MetadataTopic"
+  private val consumerGroup = "consumer groups"
+
+  implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
+    Slf4jLogger.getLogger[F]
 
   def schemaBadTest[F[_]: Sync](simulateBadDeletion: Boolean): F[SchemaRegistry[F]] =
     SchemaRegistry.test[F].map(sr => getFromBadSchemaRegistryClient[F](sr, simulateBadDeletion))
@@ -121,6 +134,8 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
     (for {
       kafkaAlgebra <- kafkaAdminAlgebra
       schemaAlgebra <- schemaRegistry
+      kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
+      metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
       // create all topics
       _ <- topicNames.traverse(topic => kafkaAlgebra.createTopic(topic,TopicDetails(1,1)))
       // register all topics
@@ -128,7 +143,14 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       // upgrade any topics needed
       _ <- registerTopics(List(upgradeTopic._1), schemaAlgebra, registerKey, upgradeTopic._2)
       // delete all given topics
-      errors <-  new TopicDeletionProgram[IO](kafkaAlgebra, schemaAlgebra).deleteTopic(topicNamesToDelete)
+      errors <-  new TopicDeletionProgram[IO](
+            kafkaAlgebra,
+            kafkaClientAlgebra,
+            Subject.createValidated(v2MetadataTopicName).get,
+            v1MetadataTopicName,
+            schemaAlgebra,
+            metadataAlgebra
+          ).deleteTopic(topicNamesToDelete)
       // get all topic names
       allTopics <- kafkaAlgebra.getTopicNames
       // get all versions of any given topic
