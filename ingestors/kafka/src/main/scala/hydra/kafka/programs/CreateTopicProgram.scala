@@ -123,17 +123,6 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     } yield ()
   }
 
-//  private def deleteMetadata(
-//      topicName: Subject,
-//  ): F[Unit] = {
-//    for {
-//        records <- TopicMetadataV2.encode[F](TopicMetadataV2Key(topicName), None, None)
-//      _ <- kafkaClient
-//          .publishMessage(records, v2MetadataTopicName.value)
-//          .rethrow
-//    } yield ()
-//  }
-
   def createTopic(
       topicName: Subject,
       createTopicRequest: TopicMetadataV2Request,
