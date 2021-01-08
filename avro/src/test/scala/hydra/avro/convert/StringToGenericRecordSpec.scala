@@ -3,7 +3,6 @@ package hydra.avro.convert
 import java.time.Instant
 import java.util.UUID
 
-import org.apache.avro.generic.GenericData
 import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import org.apache.avro.util.Utf8
 import org.scalatest.flatspec.AnyFlatSpec
@@ -213,5 +212,4 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     import collection.JavaConverters._
     record.get.get("testing") shouldBe Map("one" -> 1, "two" -> 2, "three" -> 3).map(kv => new Utf8(kv._1) -> kv._2).asJava
   }
-
 }

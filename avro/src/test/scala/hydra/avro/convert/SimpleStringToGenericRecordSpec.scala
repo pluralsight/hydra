@@ -1,5 +1,6 @@
 package hydra.avro.convert
 
+import hydra.avro.convert.StringToGenericRecord.ValidationExtraFieldsError
 import org.apache.avro.SchemaBuilder
 import org.apache.avro.generic.{GenericData, GenericRecord, GenericRecordBuilder}
 import org.apache.avro.util.Utf8
@@ -221,4 +222,10 @@ final class SimpleStringToGenericRecordSpec extends AnyFlatSpec with Matchers {
       .map(kv => new Utf8(kv._1) -> kv._2).mapValues(toGenRecord).asJava
   }
 
+  it should "throw a Strict Validation Error if Json contains additional fields" in {
+    val schema = SchemaBuilder.record("Strict").fields().requiredString("id").optionalBoolean("boolOpt").endRecord()
+    val json = """{"id":"123abc","additionalField":false}"""
+    val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
+    record shouldBe a[Failure[ValidationExtraFieldsError]]
+  }
 }
