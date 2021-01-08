@@ -9,7 +9,7 @@ object Dependencies {
   val avroVersion = "1.10.0"
   val catsEffectVersion = "2.3.0"
   val catsLoggerVersion = "1.1.1"
-  val catsRetryVersion = "1.1.1"
+  val catsRetryVersion = "2.1.0"
   val catsVersion = "2.2.0"
   val cirisVersion = "1.2.1"
   val confluentVersion = "5.4.2"
@@ -28,6 +28,8 @@ object Dependencies {
   val scalaMockVersion = "5.1.0"
   val scalaTestVersion = "3.2.3"
   val sprayJsonVersion = "1.3.5"
+  val scalaTestVersion = "3.2.3"
+  val sprayJsonVersion = "1.3.6"
   val testContainersVersion = "0.38.8"
   val typesafeConfigVersion = "1.3.2"
   val vulcanVersion = "1.2.0"
@@ -148,7 +150,7 @@ object Dependencies {
     val scalaTest = "org.scalatest" %% "scalatest" % scalaTestVersion % "test"
 
     val scalaMock = "org.scalamock" %% "scalamock" % scalaMockVersion % "test"
-    val junit = "junit" % "junit" % "4.13" % "test"
+    val junit = "junit" % "junit" % "4.13.1" % "test"
 
   }
 
