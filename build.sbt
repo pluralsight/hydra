@@ -142,7 +142,7 @@ lazy val ingest = Project(
     buildInfoPackage := "hydra.ingest.bootstrap",
     buildInfoOptions += BuildInfoOption.ToJson,
     buildInfoOptions += BuildInfoOption.BuildTime,
-    javaAgents += "org.aspectj" % "aspectjweaver" % "1.8.14",
+    javaAgents += "org.aspectj" % "aspectjweaver" % "1.9.6",
     name := "hydra-ingest",
     libraryDependencies ++= Dependencies.ingestDeps
   )
