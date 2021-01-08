@@ -27,8 +27,6 @@ object Dependencies {
   val scalaCacheVersion = "0.28.0"
   val scalaMockVersion = "5.1.0"
   val scalaTestVersion = "3.2.3"
-  val sprayJsonVersion = "1.3.5"
-  val scalaTestVersion = "3.2.3"
   val sprayJsonVersion = "1.3.6"
   val testContainersVersion = "0.38.8"
   val typesafeConfigVersion = "1.3.2"
