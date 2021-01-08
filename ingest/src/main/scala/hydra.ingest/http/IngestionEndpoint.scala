@@ -18,7 +18,7 @@ package hydra.ingest.http
 
 import akka.actor._
 import akka.http.scaladsl.model.{HttpRequest, StatusCode, StatusCodes}
-import akka.http.scaladsl.server.{ExceptionHandler, Rejection, Route}
+import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import cats.syntax.all._
 import fs2.kafka.{Header, Headers}
 import hydra.common.config.ConfigSupport._
@@ -29,44 +29,21 @@ import hydra.core.ingest.{CorrelationIdBuilder, HydraRequest, IngestionReport, R
 import hydra.core.marshallers.GenericError
 import hydra.core.monitor.HydraMetrics.addPromHttpMetric
 import hydra.core.protocol._
-import hydra.ingest.bootstrap.HydraIngestorRegistryClient
 import hydra.ingest.services.IngestionFlow.{AvroConversionAugmentedException, MissingTopicNameException, SchemaNotFoundAugmentedException}
 import hydra.ingest.services.IngestionFlowV2.V2IngestRequest
-import hydra.ingest.services.{IngestionFlow, IngestionFlowV2, IngestionHandlerGateway}
+import hydra.ingest.services.{IngestionFlow, IngestionFlowV2}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 
 import scala.collection.immutable.Map
-import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-
-/**
-  * Created by alexsilva on 12/22/15.
-  */
 class IngestionEndpoint[F[_]: Futurable](
-                                          alternateIngestFlowEnabled: Boolean,
                                           ingestionFlow: IngestionFlow[F],
-                                          ingestionV2Flow: IngestionFlowV2[F],
-                                          useOldIngestIfUAContains: Set[String],
-                                          requestHandlerPathName: Option[String] = None
+                                          ingestionV2Flow: IngestionFlowV2[F]
                                         )(implicit system: ActorSystem) extends RouteSupport with HydraIngestJsonSupport {
 
   import hydra.ingest.bootstrap.RequestFactories._
-
-  //for performance reasons, we give this endpoint its own instance of the gateway
-  private val registryPath =
-    HydraIngestorRegistryClient.registryPath(applicationConfig)
-
-  private val requestHandler = system.actorOf(
-    IngestionHandlerGateway.props(registryPath),
-    requestHandlerPathName.getOrElse("ingestion_Http_handler_gateway")
-  )
-
-  private val ingestTimeout = applicationConfig
-    .getDurationOpt("ingest.timeout")
-    .getOrElse(500.millis)
 
   override val route: Route =
     handleExceptions(exceptionHandler("UnknownTopic")) {
@@ -93,13 +70,6 @@ class IngestionEndpoint[F[_]: Futurable](
   }
 
   private def cId = CorrelationIdBuilder.generate()
-
-  private def useAlternateIngestFlow(request: HydraRequest): Boolean = {
-    request.metadata.find(e => e._1.equalsIgnoreCase("User-Agent")) match {
-      case Some(ua) if useOldIngestIfUAContains.exists(ua._2.startsWith) => false
-      case _ => true
-    }
-  }
 
   private def getV2ReponseCode(e: Throwable): (StatusCode, Option[String]) = e match {
     case PublishError.Timeout => (StatusCodes.RequestTimeout, None)
@@ -140,7 +110,7 @@ class IngestionEndpoint[F[_]: Futurable](
       }
     }
 
-  private def sendAltFlow(hydraRequest: HydraRequest,topic: String): Route = {
+  private def publishFlow(hydraRequest: HydraRequest,topic: String): Route = {
     extractExecutionContext { implicit ec =>
       onComplete(Futurable[F].unsafeToFuture(ingestionFlow.ingest(hydraRequest))) {
         case Success(_) =>
@@ -190,18 +160,8 @@ class IngestionEndpoint[F[_]: Futurable](
         onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>
           val topic = hydraRequest.metadataValue(HYDRA_KAFKA_TOPIC_PARAM).getOrElse("UnknownTopic")
           handleExceptions(exceptionHandler(topic)) {
-            if (alternateIngestFlowEnabled && useAlternateIngestFlow(hydraRequest)) {
-              sendAltFlow(hydraRequest,topic)
-            } else {
-              imperativelyComplete { ctx =>
-                requestHandler ! InitiateHttpRequest(
-                  hydraRequest,
-                  ingestTimeout,
-                  ctx
-                )
-              }
+            publishFlow(hydraRequest,topic)
           }
-        }
       }
     }
   }
@@ -225,5 +185,3 @@ class IngestionEndpoint[F[_]: Futurable](
         }
   }
 }
-
-case object DeleteDirectiveNotAllowedRejection extends Rejection
