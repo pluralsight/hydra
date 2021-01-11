@@ -57,7 +57,6 @@ class TopicsEndpoint(consumerProxy:ActorSelection)(implicit ec:ExecutionContext)
                       case cause => ctx.fail(cause)
                     }
                   )
-                // Not sure if we want to log this endpoint
                 addHttpMetric(topicName, StatusCodes.OK.toString, "transports/kafka/consumer/topics/", startTime)
                 complete(source)
 
