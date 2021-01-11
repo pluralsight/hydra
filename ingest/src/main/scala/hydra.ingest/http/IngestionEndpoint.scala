@@ -184,7 +184,7 @@ class IngestionEndpoint[F[_]: Futurable](
             .getOrElse(false)) {
             log.error("Ingestion 400 ERROR: " + e.getMessage)
           }
-          addHttpMetric(topic, StatusCodes.BadRequest,"ingestionEndpoint", startTime, "Unknown Method", error = e.getMessage.some)
+          addHttpMetric(topic, StatusCodes.BadRequest,"ingestionEndpoint", startTime, "POST", error = e.getMessage.some)
           complete(400, GenericError(400, e.getMessage))
         }
 
