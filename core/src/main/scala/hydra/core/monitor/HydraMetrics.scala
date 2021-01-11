@@ -89,8 +89,8 @@ object HydraMetrics extends LoggingAdapter {
         )
     )
 
-    val maybePartition = partitionOffset.map(partOff => "Partition" -> JsNumber(partOff._1))
-    val maybeOffset = partitionOffset.map(partOff => "Offset" -> JsNumber(partOff._2))
+    val maybePartition = partitionOffset.map(partOff => "partition" -> JsNumber(partOff._1))
+    val maybeOffset = partitionOffset.map(partOff => "offset" -> JsNumber(partOff._2))
 
     val jsonLog =
       JsObject(Map("topic" -> JsString(topic), "response_code" -> JsNumber(responseCode.intValue),
