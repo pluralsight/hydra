@@ -30,8 +30,8 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
   import concurrent.ExecutionContext.Implicits.global
   implicit private val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
-  private val v2MetadataTopicName = "testV2MetadataTopic"
-  private val v1MetadataTopicName = "testV1MetadataTopic"
+  private val v2MetadataTopicName = "_test.V2.MetadataTopic"
+  private val v1MetadataTopicName = "_test.V1.MetadataTopic"
   private val consumerGroup = "consumer groups"
 
   implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =

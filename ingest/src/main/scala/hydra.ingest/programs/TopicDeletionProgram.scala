@@ -7,7 +7,7 @@ import hydra.kafka.algebras.KafkaAdminAlgebra.KafkaDeleteTopicErrorList
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import cats.data.{NonEmptyList, ValidatedNel}
 import cats.implicits._
-import hydra.ingest.programs.TopicDeletionProgram.{MetadataFailToDelete, SchemaDeleteTopicErrorList, SchemaFailToDelete, SchemaRegistryError}
+import hydra.ingest.programs.TopicDeletionProgram._
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
 import hydra.kafka.model.{TopicMetadata, TopicMetadataV2, TopicMetadataV2Key}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -18,7 +18,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
                                                                     v2MetadataTopicName: Subject,
                                                                     v1MetadataTopicName: String,
                                               schemaClient: SchemaRegistry[F],
-                                                                    topicMetadata: MetadataAlgebra[F]) {
+                                                                    metadataAlgebra: MetadataAlgebra[F]) {
 
   def deleteFromSchemaRegistry(topicNames: List[String]): F[ValidatedNel[SchemaRegistryError, Unit]] = {
     topicNames.flatMap(topic => List(topic + "-key", topic + "-value")).traverse { subject =>
@@ -36,10 +36,11 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
           val failedTopicNames = error.errors.map(_.topicName).toList.toSet
           topicNames.toSet.diff(failedTopicNames).toList
       }
-      deleteFromSchemaRegistry(topicsToDeleteSchemaFor).map(schemaResult =>
-        schemaResult.toEither.leftMap(a => SchemaDeletionErrors(SchemaDeleteTopicErrorList(a)))
-          .toValidatedNel.combine(result.leftMap(KafkaDeletionErrors).toValidatedNel)
-      )
+      deleteFromSchemaRegistry(topicsToDeleteSchemaFor).flatMap(schemaResult =>
+        lookupAndDeleteMetadataForTopics(topicsToDeleteSchemaFor).map(metadataResult =>
+          metadataResult.toEither.leftMap(errors => TopicMetadataDeletionErrors(MetadataDeleteTopicErrorList(errors)))
+            .toValidatedNel.combine(schemaResult.toEither.leftMap(a => SchemaDeletionErrors(SchemaDeleteTopicErrorList(a)))
+          .toValidatedNel.combine(result.leftMap(KafkaDeletionErrors).toValidatedNel))))
     }
   }
 
@@ -47,7 +48,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
     topicNames.traverse(topicName => {
       Subject.createValidated(topicName) match {
         case Some(subject) =>
-          topicMetadata.getMetadataFor(subject).flatMap(metadata => {
+          metadataAlgebra.getMetadataFor(subject).flatMap(metadata => {
             metadata match {
               case Some(_) =>
                 deleteV2Metadata(subject).attempt.map {
@@ -100,8 +101,12 @@ object TopicDeletionProgram {
 
   final case class MetadataFailToDelete(subject: String, metadataTopic: String, cause: Throwable)
     extends Exception(s"Unable to delete $subject from $metadataTopic", cause)
+
+  final case class MetadataDeleteTopicErrorList(errors: NonEmptyList[MetadataFailToDelete])
+    extends Exception(s"Topic(s) failed to delete metadata: \n${errors.map(er => s"${er.metadataTopic} - ${er.subject}").toList.mkString("\n")}")
 }
 
 sealed abstract class DeleteTopicError extends RuntimeException
 final case class KafkaDeletionErrors(kafkaDeleteTopicErrorList: KafkaDeleteTopicErrorList) extends DeleteTopicError
 final case class SchemaDeletionErrors(schemaDeleteTopicErrorList: SchemaDeleteTopicErrorList) extends DeleteTopicError
+final case class TopicMetadataDeletionErrors(metadataDeleteTopicErrorList: MetadataDeleteTopicErrorList) extends DeleteTopicError
