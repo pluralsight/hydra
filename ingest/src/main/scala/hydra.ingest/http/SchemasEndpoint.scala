@@ -93,7 +93,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
                 (schemaRegistryActor ? FetchSubjectsRequest)
                   .mapTo[FetchSubjectsResponse]
               ) { response =>
-                addHttpMetric("", OK.toString, "/schemas", startTime, response.subjects.toString)
+                addHttpMetric("", OK.toString, "/schemas", startTime)
                 complete(OK, response.subjects)
               }
             } ~ path(Segment) { subject =>
@@ -105,7 +105,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
                 (schemaRegistryActor ? FetchAllSchemaVersionsRequest(subject))
                   .mapTo[FetchAllSchemaVersionsResponse]
               ) { response =>
-                addHttpMetric(subject, OK.toString, "/schemas/.../versions", startTime, response.toString)
+                addHttpMetric(subject, OK.toString, "/schemas/.../versions", startTime)
                 complete(OK, response.versions.map(SchemasEndpointResponse(_)))
               }
             } ~ path(Segment / "versions" / IntNumber) { (subject, version) =>
@@ -115,7 +115,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
                   version
                 )).mapTo[FetchSchemaVersionResponse]
               ) { response =>
-                addHttpMetric(subject, OK.toString, "/schemas/.../versions/" + version, startTime, response.toString)
+                addHttpMetric(subject, OK.toString, "/schemas/.../versions/" + version, startTime)
                 complete(OK, SchemasEndpointResponse(response.schemaResource))
               }
             }
@@ -157,11 +157,11 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
     ) { response =>
       extractExecutionContext { implicit ec =>
         if (includeKeySchema) {
-          addHttpMetric(subject, OK.toString, "/v2/schemas/", startTime, response.toString)
+          addHttpMetric(subject, OK.toString, "/v2/schemas/", startTime)
           complete(OK, SchemasWithKeyEndpointResponse.apply(response))
         } else {
           val schemaResource = response.schemaResource
-          addHttpMetric(subject, OK.toString, "/schema/", startTime, response.toString)
+          addHttpMetric(subject, OK.toString, "/schema/", startTime)
           schemaOnly.map{_ =>
             complete(OK, schemaResource.schema.toString)}
             .getOrElse {
@@ -179,7 +179,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
     ) {
       response => {
         extractExecutionContext { implicit ec =>
-          addHttpMetric("",OK.toString, "/schemas", startTime, response.toString)
+          addHttpMetric("",OK.toString, "/schemas", startTime)
           complete(OK, BatchSchemasResponse.apply(response))
         }
       }
@@ -201,7 +201,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
                 )
               )
             ) {
-              addHttpMetric(registeredSchema.schemaResource.schema.getFullName, Created.toString, "/schemas", startTime, registeredSchema.toString)
+              addHttpMetric(registeredSchema.schemaResource.schema.getFullName, Created.toString, "/schemas", startTime)
               complete(Created, SchemasEndpointResponse(registeredSchema))
             }
           }
@@ -213,7 +213,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
   private[http] def excptHandler(startTime: Instant): ExceptionHandler = ExceptionHandler {
     case e: RestClientException if e.getErrorCode == 40401 =>
       extractExecutionContext { implicit ec =>
-        addHttpMetric("", NotFound.toString, "schemasEndpoint", startTime, e.getMessage, Some(e.getMessage))
+        addHttpMetric("", NotFound.toString, "schemasEndpoint", startTime, error = Some(e.getMessage))
         complete(NotFound, GenericServiceResponse(404, e.getMessage))
       }
 
@@ -221,7 +221,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
       val registryHttpStatus = e.getStatus
       val registryErrorCode = e.getErrorCode
       extractExecutionContext { implicit ec =>
-        addHttpMetric("", registryHttpStatus.toString, "schemasEndpoint", startTime, e.getMessage, Some(s"Rest Client Exception - $e.getMessage"))
+        addHttpMetric("", registryHttpStatus.toString, "schemasEndpoint", startTime, error = Some(s"Rest Client Exception - $e.getMessage"))
         complete(
           registryHttpStatus,
           GenericServiceResponse(
@@ -233,7 +233,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
 
     case e: SchemaParseException =>
       extractExecutionContext { implicit ec =>
-        addHttpMetric("", BadRequest.toString, "schemasEndpoint", startTime, e.getMessage, Some(s"Schema Parse Exception - ${e.getMessage}"))
+        addHttpMetric("", BadRequest.toString, "schemasEndpoint", startTime, error = Some(s"Schema Parse Exception - ${e.getMessage}"))
         complete(
           BadRequest,
           GenericServiceResponse(
@@ -247,7 +247,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
       extractExecutionContext { implicit ec =>
         extractUri { uri =>
           log.warn(s"Request to $uri failed with exception: {}", e)
-          addHttpMetric("", BadRequest.toString, "schemasEndpoint", startTime, e.getMessage, Some(e.getMessage))
+          addHttpMetric("", BadRequest.toString, "schemasEndpoint", startTime, error = Some(e.getMessage))
           complete(
             BadRequest,
             GenericServiceResponse(

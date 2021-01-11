@@ -58,7 +58,7 @@ class TopicsEndpoint(consumerProxy:ActorSelection)(implicit ec:ExecutionContext)
                     }
                   )
                 // Not sure if we want to log this endpoint
-                addHttpMetric(topicName, StatusCodes.OK.toString, "transports/kafka/consumer/topics/", startTime, source.toString())
+                addHttpMetric(topicName, StatusCodes.OK.toString, "transports/kafka/consumer/topics/", startTime)
                 complete(source)
 
             }

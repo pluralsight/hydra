@@ -56,17 +56,17 @@ final class BootstrapEndpointV2[F[_]: Futurable](
                         .createTopic(validatedTopic, t, defaultTopicDetails))
                     ) {
                       case Success(_) =>
-                        addHttpMetric(topicName, StatusCodes.OK.toString, "V2Bootstrap", startTime, StatusCodes.OK.toString)
+                        addHttpMetric(topicName, StatusCodes.OK.toString, "V2Bootstrap", startTime)
                         complete(StatusCodes.OK)
                       case Failure(IncompatibleSchemaException(m)) =>
-                        addHttpMetric(topicName, StatusCodes.BadRequest.toString, "V2Bootstrap", startTime, m, Some(s"$IncompatibleSchemaException"))
+                        addHttpMetric(topicName, StatusCodes.BadRequest.toString, "V2Bootstrap", startTime, error = Some(s"$IncompatibleSchemaException"))
                         complete(StatusCodes.BadRequest, m)
                       case Failure(e) =>
-                        addHttpMetric(topicName, StatusCodes.InternalServerError.toString, "V2Bootstrap", startTime, e.getMessage, Some(e.getMessage))
+                        addHttpMetric(topicName, StatusCodes.InternalServerError.toString, "V2Bootstrap", startTime, error = Some(e.getMessage))
                         complete(StatusCodes.InternalServerError, e)
                     }
                   case None =>
-                    addHttpMetric(topicName, StatusCodes.BadRequest.toString, "V2Bootstrap", startTime, Subject.invalidFormat, Some(Subject.invalidFormat))
+                    addHttpMetric(topicName, StatusCodes.BadRequest.toString, "V2Bootstrap", startTime, error = Some(Subject.invalidFormat))
                     complete(StatusCodes.BadRequest, Subject.invalidFormat)
                 }
               }
@@ -80,7 +80,7 @@ final class BootstrapEndpointV2[F[_]: Futurable](
   private def exceptionHandler(topic: String, startTime: Instant) = ExceptionHandler {
     case e =>
       extractExecutionContext { implicit ec =>
-        addHttpMetric(topic, StatusCodes.InternalServerError.toString,"V2Bootstrap", startTime, e.getMessage, Some(e.getMessage))
+        addHttpMetric(topic, StatusCodes.InternalServerError.toString,"V2Bootstrap", startTime, error = Some(e.getMessage))
         complete(500, e.getMessage)
       }
   }

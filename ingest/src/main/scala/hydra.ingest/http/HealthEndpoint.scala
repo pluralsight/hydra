@@ -18,7 +18,7 @@ object HealthEndpoint extends RouteSupport with DefaultJsonProtocol with SprayJs
         extractExecutionContext { implicit ec =>
           pathEndOrSingleSlash {
             get {
-              addHttpMetric("", StatusCodes.OK.toString, "/health", startTime, BuildInfo.toJson)
+              addHttpMetric("", StatusCodes.OK.toString, "/health", startTime)
               complete(BuildInfo.toJson)
             }
           }
@@ -30,7 +30,7 @@ object HealthEndpoint extends RouteSupport with DefaultJsonProtocol with SprayJs
   private def exceptionHandler(startTime: Instant) = ExceptionHandler {
     case e =>
       extractExecutionContext { implicit ec =>
-        addHttpMetric("", StatusCodes.InternalServerError.toString,"/health", startTime, e.getMessage, Some(e.getMessage))
+        addHttpMetric("", StatusCodes.InternalServerError.toString,"/health", startTime, error = Some(e.getMessage))
         complete(500, e.getMessage)
       }
   }

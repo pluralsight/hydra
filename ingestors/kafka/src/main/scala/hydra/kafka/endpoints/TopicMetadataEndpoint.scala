@@ -73,10 +73,10 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                 n match {
                   case Some(_) =>
                     val response = topicList.map(_.keys)
-                    addHttpMetric("",StatusCodes.OK.toString,"/transports/kafka/topics-keys", startTime, response.toString)
+                    addHttpMetric("",StatusCodes.OK.toString,"/transports/kafka/topics-keys", startTime)
                     complete(response)
                   case None =>
-                    addHttpMetric("",StatusCodes.OK.toString,"/transports/kafka/topics", startTime, topicList.toString)
+                    addHttpMetric("",StatusCodes.OK.toString,"/transports/kafka/topics", startTime)
                     complete(topicList)
                 }
               }
@@ -85,13 +85,12 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                 topics
                   .get(name)
                   .map { response =>
-                    addHttpMetric(name, StatusCodes.OK.toString, "/transports/kafka/topics/", startTime, response.toString)
+                    addHttpMetric(name, StatusCodes.OK.toString, "/transports/kafka/topics/", startTime)
                     complete(response)
                   }
                   .getOrElse(
                     failWith{
-                      addHttpMetric(name, StatusCodes.NotFound.toString, "/transports/kafka/topics/", startTime,
-                        s"Topic $name not found.", Some(s"Topic $name not found"))
+                      addHttpMetric(name, StatusCodes.NotFound.toString, "/transports/kafka/topics/", startTime, error = Some(s"Topic $name not found"))
                       new NotFoundException(s"Topic $name not found.")}
                   )
               }
@@ -116,10 +115,10 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
       onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getAllMetadata)) {
         case Success(metadata) =>
           val response = metadata.map(TopicMetadataV2Response.fromTopicMetadataContainer).filterNot(_.subject.value.startsWith("_"))
-          addHttpMetric("", StatusCodes.OK.toString,"/v2/streams", startTime, response.toString)
+          addHttpMetric("", StatusCodes.OK.toString,"/v2/streams", startTime)
           complete(StatusCodes.OK, response)
         case Failure(e) =>
-          addHttpMetric("", StatusCodes.InternalServerError.toString, "/v2/streams", startTime, e.getMessage, Some(e.getMessage))
+          addHttpMetric("", StatusCodes.InternalServerError.toString, "/v2/streams", startTime, error = Some(e.getMessage))
           complete(StatusCodes.InternalServerError, e)
       }
     }
@@ -129,22 +128,21 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
     pathEndOrSingleSlash {
       Subject.createValidated(topic) match {
         case None =>
-          addHttpMetric(topic, StatusCodes.BadRequest.toString,"/v2/topics/", startTime, Subject.invalidFormat, Some(Subject.invalidFormat))
+          addHttpMetric(topic, StatusCodes.BadRequest.toString,"/v2/topics/", startTime, error = Some(Subject.invalidFormat))
           complete(StatusCodes.BadRequest, Subject.invalidFormat)
         case Some(subject) =>
           onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getMetadataFor(subject))) {
             case Success(maybeContainer) =>
               maybeContainer match {
                 case Some(container) =>
-                  addHttpMetric(topic, StatusCodes.OK.toString, "/v2/topics/", startTime, container.toString)
+                  addHttpMetric(topic, StatusCodes.OK.toString, "/v2/topics/", startTime)
                   complete(StatusCodes.OK, TopicMetadataV2Response.fromTopicMetadataContainer(container))
                 case None =>
-                  addHttpMetric(topic, StatusCodes.NotFound.toString, "/v2/topics/", startTime,
-                    s"Subject ${subject.value} could not be found.", Some(s"Subject ${subject.value} could not be found."))
+                  addHttpMetric(topic, StatusCodes.NotFound.toString, "/v2/topics/", startTime, error = Some(s"Subject ${subject.value} could not be found."))
                   complete(StatusCodes.NotFound, s"Subject ${subject.value} could not be found.")
               }
             case Failure(e) =>
-              addHttpMetric(topic, StatusCodes.InternalServerError.toString,"/v2/topics/", startTime, e.getMessage, Some(e.getMessage))
+              addHttpMetric(topic, StatusCodes.InternalServerError.toString,"/v2/topics/", startTime, error = Some(e.getMessage))
               complete(StatusCodes.InternalServerError, e)
           }
       }
@@ -165,11 +163,11 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
         onSuccess(kafkaUtils.createTopic(req.topic, details, to)) { result =>
           Try(result.all.get(timeout.duration.toSeconds, TimeUnit.SECONDS))
             .map { _ =>
-              addHttpMetric(req.topic, StatusCodes.OK.toString, "TopicCreation", startTime, topicInfo(req.topic).toString)
+              addHttpMetric(req.topic, StatusCodes.OK.toString, "TopicCreation", startTime)
               complete(StatusCodes.OK, topicInfo(req.topic))}
             .recover {
               case e: Exception =>
-                addHttpMetric(req.topic,StatusCodes.BadRequest.toString, "TopicCreation", startTime, e.getMessage, Some(e.getMessage))
+                addHttpMetric(req.topic,StatusCodes.BadRequest.toString, "TopicCreation", startTime, error = Some(e.getMessage))
                 complete(
                   StatusCodes.BadRequest,
                   CreateTopicResponseError(e.getMessage)
@@ -202,13 +200,13 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
 
   private def exceptionHandler(startTime: Instant) = ExceptionHandler {
     case e: IllegalArgumentException =>
-      addHttpMetric("",StatusCodes.BadRequest.toString, "topicMetadataEndpoint", startTime, e.getMessage, Some(e.getMessage))
+      addHttpMetric("",StatusCodes.BadRequest.toString, "topicMetadataEndpoint", startTime, error = Some(e.getMessage))
       complete(HttpResponse(BadRequest, entity = e.getMessage))
     case e: NotFoundException =>
-      addHttpMetric("",StatusCodes.NotFound.toString, "topicMetadataEndpoint", startTime, e.msg, Some(e.getMessage))
+      addHttpMetric("",StatusCodes.NotFound.toString, "topicMetadataEndpoint", startTime, error = Some(e.getMessage))
       complete(HttpResponse(NotFound, entity = e.msg))
     case e =>
-      addHttpMetric("", InternalServerError.toString, "topicMetadataEndpoint", startTime, e.getMessage, Some(e.getMessage))
+      addHttpMetric("", InternalServerError.toString, "topicMetadataEndpoint", startTime, error = Some(e.getMessage))
       complete(HttpResponse(InternalServerError, entity = e.getMessage))
   }
 }

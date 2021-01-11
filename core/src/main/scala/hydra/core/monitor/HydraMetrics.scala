@@ -7,7 +7,7 @@ import kamon.Kamon
 import kamon.metric.{Counter, Gauge, Histogram}
 import kamon.tag.TagSet
 import scalacache.guava.GuavaCache
-import spray.json.{JsObject, JsString}
+import spray.json.{JsNumber, JsObject, JsString}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -75,7 +75,8 @@ object HydraMetrics extends LoggingAdapter {
   }
 
   def addHttpMetric(topic: String, responseCode: String, path: String,
-                    startTime: Instant, response: String, error: Option[String] = None)(implicit ec: ExecutionContext): Unit = {
+                    startTime: Instant, partition: Option[Int] = None, offset: Option[Long] = None,
+                    error: Option[String] = None)(implicit ec: ExecutionContext): Unit = {
     incrementGauge(
       lookupKey =
         s"_${topic}_${responseCode}_${path}",
@@ -86,9 +87,17 @@ object HydraMetrics extends LoggingAdapter {
           "path" -> path
         )
     )
-    val jsonLog = JsObject("Topic" -> JsString(topic), "Response Code" -> JsString(responseCode),
-      "Endpoint" -> JsString(path), "Latency" -> JsString(Duration.between(startTime, Instant.now).toMillis.toString),
-      "Response" -> JsString(response), "Error" -> JsString(error.getOrElse("None")))
+
+    val jsonLog = if(partition.isDefined && offset.isDefined) {
+      JsObject("Topic" -> JsString(topic), "Response Code" -> JsString(responseCode),
+        "Endpoint" -> JsString(path), "Latency" -> JsString(Duration.between(startTime, Instant.now).toMillis.toString),
+        "Partition" -> JsNumber(partition.get), "Offset" -> JsNumber(offset.get),
+        "Error" -> JsString(error.getOrElse("")))
+    } else {
+      JsObject("Topic" -> JsString(topic), "Response Code" -> JsString(responseCode),
+        "Endpoint" -> JsString(path), "Latency" -> JsNumber(Duration.between(startTime, Instant.now).toMillis.toString),
+        "Error" -> JsString(error.getOrElse("")))
+    }
     log.info(jsonLog.toString)
   }
 }
