@@ -49,7 +49,7 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
 
   private def validResponse(topics: List[String], userDeleting: String, path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
     topics.foreach { topicName =>
-      addHttpMetric(topicName, StatusCodes.OK.toString(), path, startTime)
+      addHttpMetric(topicName, StatusCodes.OK, path, startTime, "DELETE")
       log.info(s"User $userDeleting deleted topic: $topicName")
     }
     complete(StatusCodes.OK, topics)
@@ -61,16 +61,16 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
       response.map(_.topicOrSubject.contains("-value")).contains(true)) {
       val failedTopicNames = response.map(der => der.topicOrSubject)
       val successfulTopics = topics.toSet.diff(failedTopicNames.toSet).toList
-      failedTopicNames.map(topicName => addHttpMetric(topicName, StatusCodes.Accepted.toString(),
-        path, startTime, error = Some(response.toString)))
+      failedTopicNames.map(topicName => addHttpMetric(topicName, StatusCodes.Accepted,
+        path, startTime,"DELETE", error = Some(response.toString)))
       successfulTopics.foreach{ topicName =>
-        addHttpMetric(topicName, StatusCodes.OK.toString(), path, startTime)
+        addHttpMetric(topicName, StatusCodes.OK, path, startTime, "DELETE")
         log.info(s"User $userDeleting deleted topic $topicName")
       }
       complete(StatusCodes.Accepted, response)
     }
     else {
-      topics.map(topicName => addHttpMetric(topicName, StatusCodes.InternalServerError.toString(), path, startTime))
+      topics.map(topicName => addHttpMetric(topicName, StatusCodes.InternalServerError, path, startTime, "DELETE"))
       complete(StatusCodes.InternalServerError, response)
     }
   }
@@ -101,7 +101,7 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
         }
       }
       case Failure(e) => {
-        topics.map(topicName => addHttpMetric(topicName, StatusCodes.InternalServerError.toString(), path, startTime, error = Some(e.getMessage)))
+        topics.map(topicName => addHttpMetric(topicName, StatusCodes.InternalServerError, path, startTime,"DELETE", error = Some(e.getMessage)))
         complete(StatusCodes.InternalServerError, e.getMessage)
       }
     }
@@ -133,7 +133,7 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
                         val response = schemaErrorsToResponse(List(SchemaDeletionErrors(SchemaDeleteTopicErrorList(e))))
                         if (response.length >= 2) {
                           // With one topic coming in if we get anything >= to 2 there was at least a -key and a -value error
-                          addHttpMetric(topic, StatusCodes.InternalServerError.toString(), "/v2/topics/schemas", startTime, error = Some(response.toString))
+                          addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/topics/schemas", startTime,"DELETE", error = Some(response.toString))
                           complete(StatusCodes.InternalServerError, response)
                         } else {
                           returnResponse(List(topic), userName, response, "/v2/topics/schemas", startTime)
@@ -142,7 +142,7 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
                     }
                   }
                   case Failure(e) => {
-                    addHttpMetric(topic, StatusCodes.InternalServerError.toString(), "/v2/topics/schemas", startTime, error = Some(e.getMessage))
+                    addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/topics/schemas", startTime,"DELETE", error = Some(e.getMessage))
                     complete(StatusCodes.InternalServerError, e.getMessage)
                   }
                 }
@@ -165,7 +165,7 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
   private def exceptionHandler(startTime: Instant) = ExceptionHandler {
     case e =>
       extractExecutionContext{ implicit ec =>
-        addHttpMetric("", StatusCodes.InternalServerError.toString,"/v2/topics", startTime, error = Some(e.getMessage))
+        addHttpMetric("", StatusCodes.InternalServerError,"/v2/topics", startTime, "DELETE", error = Some(e.getMessage))
         complete(500, e.getMessage)
       }
   }

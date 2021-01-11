@@ -2,6 +2,7 @@ package hydra.core.monitor
 
 import java.time.{Duration, Instant}
 
+import akka.http.scaladsl.model.StatusCode
 import hydra.common.logging.LoggingAdapter
 import kamon.Kamon
 import kamon.metric.{Counter, Gauge, Histogram}
@@ -74,8 +75,8 @@ object HydraMetrics extends LoggingAdapter {
     getOrCreateHistogram(lookupKey, metricName, tags).map(_.record(value))
   }
 
-  def addHttpMetric(topic: String, responseCode: String, path: String,
-                    startTime: Instant, partition: Option[Int] = None, offset: Option[Long] = None,
+  def addHttpMetric(topic: String, responseCode: StatusCode, path: String,
+                    startTime: Instant, method: String, partitionOffset: Option[(Int,Long)] = None,
                     error: Option[String] = None)(implicit ec: ExecutionContext): Unit = {
     incrementGauge(
       lookupKey =
@@ -83,21 +84,19 @@ object HydraMetrics extends LoggingAdapter {
         metricName = "ingest_topic_response",
         tags = Seq(
           "topic" -> topic,
-          "responseCode" -> responseCode,
+          "responseCode" -> responseCode.toString,
           "path" -> path
         )
     )
 
-    val jsonLog = if(partition.isDefined && offset.isDefined) {
-      JsObject("topic" -> JsString(topic), "response_code" -> JsString(responseCode),
-        "endpoint" -> JsString(path), "latency" -> JsString(Duration.between(startTime, Instant.now).toMillis.toString),
-        "partition" -> JsNumber(partition.get), "offset" -> JsNumber(offset.get),
-        "error" -> JsString(error.getOrElse("")))
-    } else {
-      JsObject("topic" -> JsString(topic), "response_code" -> JsString(responseCode),
+    val maybePartition = partitionOffset.map(partOff => "Partition" -> JsNumber(partOff._1))
+    val maybeOffset = partitionOffset.map(partOff => "Offset" -> JsNumber(partOff._2))
+
+    val jsonLog =
+      JsObject(Map("topic" -> JsString(topic), "response_code" -> JsNumber(responseCode.intValue),
         "endpoint" -> JsString(path), "latency" -> JsNumber(Duration.between(startTime, Instant.now).toMillis.toString),
-        "error" -> JsString(error.getOrElse("")))
-    }
+        "request_method" -> JsString(method), "error" -> JsString(error.getOrElse(""))) ++ maybePartition ++ maybeOffset)
+
     log.info(jsonLog.toString)
   }
 }

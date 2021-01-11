@@ -63,22 +63,22 @@ class BootstrapEndpoint(override val system:ActorSystem) extends RouteSupport
                       message match {
 
                         case BootstrapSuccess(metadata) =>
-                          addHttpMetric(topic, StatusCodes.OK.toString, "Bootstrap", startTime)
+                          addHttpMetric(topic, StatusCodes.OK, "Bootstrap", startTime, "POST")
                           complete(StatusCodes.OK, toResource(metadata))
 
                         case BootstrapFailure(reasons) =>
-                          addHttpMetric(topic, StatusCodes.BadRequest.toString, "Bootstrap", startTime, error = Some(reasons.toString))
+                          addHttpMetric(topic, StatusCodes.BadRequest, "Bootstrap", startTime, "POST", error = Some(reasons.toString))
                           complete(StatusCodes.BadRequest, reasons)
 
                         case e: Exception =>
                           log.error("Unexpected error in TopicBootstrapActor", e)
-                          addHttpMetric(topic, StatusCodes.InternalServerError.toString, "Bootstrap", startTime, error = Some(e.getMessage))
+                          addHttpMetric(topic, StatusCodes.InternalServerError, "Bootstrap", startTime, "POST", error = Some(e.getMessage))
                           complete(StatusCodes.InternalServerError, e.getMessage)
                       }
 
                     case Failure(ex) =>
                       log.error("Unexpected error in BootstrapEndpoint", ex)
-                      addHttpMetric(topic, StatusCodes.InternalServerError.toString, "Bootstrap", startTime, error = Some(ex.getMessage))
+                      addHttpMetric(topic, StatusCodes.InternalServerError, "Bootstrap", startTime, "POST", error = Some(ex.getMessage))
                       complete(StatusCodes.InternalServerError, ex.getMessage)
                   }
                 }
@@ -97,14 +97,14 @@ class BootstrapEndpoint(override val system:ActorSystem) extends RouteSupport
     extractExecutionContext { implicit ec =>
       onSuccess(bootstrapActor ? GetStreams(subject)) {
         case GetStreamsResponse(metadata) =>
-          addHttpMetric("", StatusCodes.OK.toString, "getAllStreams", startTime)
+          addHttpMetric("", StatusCodes.OK, "getAllStreams", startTime, "GET")
           complete(StatusCodes.OK, metadata.map(toResource))
         case Failure(ex) =>
-          addHttpMetric("", StatusCodes.OK.toString, "getAllStreams", startTime, error = Some(ex.getMessage))
+          addHttpMetric("", StatusCodes.OK, "getAllStreams", startTime, "GET", error = Some(ex.getMessage))
           throw ex
         case x =>
           log.error("Unexpected error in BootstrapEndpoint", x)
-          addHttpMetric("", StatusCodes.InternalServerError.toString, "getAllStreams", startTime, error = Some(x.toString))
+          addHttpMetric("", StatusCodes.InternalServerError, "getAllStreams", startTime, "GET", error = Some(x.toString))
           complete(StatusCodes.InternalServerError, "Unknown error")
       }
     }
@@ -113,7 +113,7 @@ class BootstrapEndpoint(override val system:ActorSystem) extends RouteSupport
   private def exceptionHandler(topic: String, startTime: Instant) = ExceptionHandler {
     case e =>
       extractExecutionContext { implicit ec =>
-        addHttpMetric(topic, StatusCodes.InternalServerError.toString,"Bootstrap", startTime, error = Some(e.getMessage))
+        addHttpMetric(topic, StatusCodes.InternalServerError,"Bootstrap", startTime, "Unknown Method", error = Some(e.getMessage))
         complete(500, e.getMessage)
       }
   }

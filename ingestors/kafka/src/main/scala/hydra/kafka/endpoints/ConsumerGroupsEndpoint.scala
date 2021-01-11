@@ -25,10 +25,10 @@ class ConsumerGroupsEndpoint[F[_]: Futurable](consumerGroupsAlgebra: ConsumerGro
           pathEndOrSingleSlash {
             onComplete(Futurable[F].unsafeToFuture(consumerGroupsAlgebra.getAllConsumers)) {
               case Success(consumers) =>
-                addHttpMetric("", StatusCodes.OK.toString, "/v2/consumer-groups", startTime)
+                addHttpMetric("", StatusCodes.OK, "/v2/consumer-groups", startTime, "GET")
                 complete(StatusCodes.OK, consumers)
               case Failure(exception) =>
-                addHttpMetric("", StatusCodes.InternalServerError.toString, "/v2/consumer-groups", startTime, error = Some(exception.getMessage))
+                addHttpMetric("", StatusCodes.InternalServerError, "/v2/consumer-groups", startTime, "GET", error = Some(exception.getMessage))
                 complete(StatusCodes.InternalServerError, exception.getMessage)
             }
           } ~ pathPrefix("getByTopic" / Segment) { topic =>
@@ -37,10 +37,10 @@ class ConsumerGroupsEndpoint[F[_]: Futurable](consumerGroupsAlgebra: ConsumerGro
                 Futurable[F].unsafeToFuture(consumerGroupsAlgebra.getConsumersForTopic(topic))
               ) {
                 case Success(topicConsumers) =>
-                  addHttpMetric(topic, StatusCodes.OK.toString, "/v2/consumer-groups/getByTopic", startTime)
+                  addHttpMetric(topic, StatusCodes.OK, "/v2/consumer-groups/getByTopic", startTime, "GET")
                   complete(StatusCodes.OK, topicConsumers)
                 case Failure(exception) =>
-                  addHttpMetric(topic, StatusCodes.InternalServerError.toString, "/v2/consumer-groups/getByTopic", startTime, error = Some(exception.getMessage))
+                  addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/consumer-groups/getByTopic", startTime, "GET", error = Some(exception.getMessage))
                   complete(StatusCodes.InternalServerError, exception.getMessage)
               }
             }
@@ -50,10 +50,10 @@ class ConsumerGroupsEndpoint[F[_]: Futurable](consumerGroupsAlgebra: ConsumerGro
           pathEndOrSingleSlash {
             onComplete(Futurable[F].unsafeToFuture(consumerGroupsAlgebra.getTopicsForConsumer(consumerGroupName))) {
               case Success(topics) =>
-                addHttpMetric(consumerGroupName, StatusCodes.OK.toString, "/v2/topics/getByConsumerGroupName", startTime)
+                addHttpMetric(consumerGroupName, StatusCodes.OK, "/v2/topics/getByConsumerGroupName", startTime, "GET")
                 complete(StatusCodes.OK, topics)
               case Failure(exception) =>
-                addHttpMetric(consumerGroupName, StatusCodes.InternalServerError.toString, "/v2/topics/getByConsumerGroupName", startTime, error = Some(exception.getMessage))
+                addHttpMetric(consumerGroupName, StatusCodes.InternalServerError, "/v2/topics/getByConsumerGroupName", startTime, "GET", error = Some(exception.getMessage))
                 complete(StatusCodes.InternalServerError, exception.getMessage)
             }
           }
