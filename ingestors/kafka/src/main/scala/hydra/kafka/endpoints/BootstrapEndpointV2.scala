@@ -15,6 +15,8 @@
  */
 package hydra.kafka.endpoints
 
+import java.time.Instant
+
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
@@ -23,7 +25,7 @@ import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
 import hydra.common.util.Futurable
 import hydra.core.http.CorsSupport
 import hydra.core.marshallers.GenericError
-import hydra.core.monitor.HydraMetrics.addPromHttpMetric
+import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.kafka.model.TopicMetadataV2Request
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.CreateTopicProgram
@@ -42,7 +44,8 @@ final class BootstrapEndpointV2[F[_]: Futurable](
   val route: Route = cors(settings) {
     extractExecutionContext { implicit ec =>
       pathPrefix("v2" / "topics" / Segment) { topicName =>
-        handleExceptions(exceptionHandler(topicName)) {
+        val startTime = Instant.now
+        handleExceptions(exceptionHandler(topicName, startTime)) {
           pathEndOrSingleSlash {
             put {
               entity(as[TopicMetadataV2Request]) { t =>
@@ -53,17 +56,17 @@ final class BootstrapEndpointV2[F[_]: Futurable](
                         .createTopic(validatedTopic, t, defaultTopicDetails))
                     ) {
                       case Success(_) =>
-                        addPromHttpMetric(topicName, StatusCodes.OK.toString, "V2Bootstrap")
+                        addHttpMetric(topicName, StatusCodes.OK.toString, "V2Bootstrap", startTime, StatusCodes.OK.toString)
                         complete(StatusCodes.OK)
                       case Failure(IncompatibleSchemaException(m)) =>
-                        addPromHttpMetric(topicName, StatusCodes.BadRequest.toString, "V2Bootstrap")
+                        addHttpMetric(topicName, StatusCodes.BadRequest.toString, "V2Bootstrap", startTime, m, Some(s"$IncompatibleSchemaException"))
                         complete(StatusCodes.BadRequest, m)
                       case Failure(e) =>
-                        addPromHttpMetric(topicName, StatusCodes.InternalServerError.toString, "V2Bootstrap")
+                        addHttpMetric(topicName, StatusCodes.InternalServerError.toString, "V2Bootstrap", startTime, e.getMessage, Some(e.getMessage))
                         complete(StatusCodes.InternalServerError, e)
                     }
                   case None =>
-                    addPromHttpMetric(topicName, StatusCodes.BadRequest.toString, "V2Bootstrap")
+                    addHttpMetric(topicName, StatusCodes.BadRequest.toString, "V2Bootstrap", startTime, Subject.invalidFormat, Some(Subject.invalidFormat))
                     complete(StatusCodes.BadRequest, Subject.invalidFormat)
                 }
               }
@@ -74,10 +77,10 @@ final class BootstrapEndpointV2[F[_]: Futurable](
     }
   }
 
-  private def exceptionHandler(topic: String) = ExceptionHandler {
+  private def exceptionHandler(topic: String, startTime: Instant) = ExceptionHandler {
     case e =>
       extractExecutionContext { implicit ec =>
-        addPromHttpMetric(topic, StatusCodes.InternalServerError.toString,"V2Bootstrap")
+        addHttpMetric(topic, StatusCodes.InternalServerError.toString,"V2Bootstrap", startTime, e.getMessage, Some(e.getMessage))
         complete(500, e.getMessage)
       }
   }

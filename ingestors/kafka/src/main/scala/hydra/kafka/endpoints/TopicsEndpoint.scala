@@ -1,5 +1,7 @@
 package hydra.kafka.endpoints
 
+import java.time.Instant
+
 import akka.actor.ActorSelection
 import akka.http.scaladsl.common.EntityStreamingSupport
 import akka.http.scaladsl.model.StatusCodes
@@ -11,7 +13,7 @@ import hydra.core.http.RouteSupport
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetLatestOffsets, LatestOffsetsResponse}
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
-import hydra.core.monitor.HydraMetrics.addPromHttpMetric
+import hydra.core.monitor.HydraMetrics.addHttpMetric
 
 import scala.collection.immutable.Map
 import scala.concurrent.duration._
@@ -28,8 +30,9 @@ class TopicsEndpoint(consumerProxy:ActorSelection)(implicit ec:ExecutionContext)
 
   implicit val jsonStreamingSupport = EntityStreamingSupport.json()
 
-  override val route =
+  override val route = {
     path("transports" / "kafka" / "consumer" / "topics" / Segment) {
+      val startTime = Instant.now
       topicName =>
         get {
           extractRequestContext { ctx =>
@@ -54,13 +57,15 @@ class TopicsEndpoint(consumerProxy:ActorSelection)(implicit ec:ExecutionContext)
                       case cause => ctx.fail(cause)
                     }
                   )
-                addPromHttpMetric(topicName, StatusCodes.OK.toString, "transports/kafka/consumer/topics/")
+                // Not sure if we want to log this endpoint
+                addHttpMetric(topicName, StatusCodes.OK.toString, "transports/kafka/consumer/topics/", startTime, source.toString())
                 complete(source)
 
             }
           }
         }
     }
+  }
 
   def shouldCancel(
       fpartitions: Future[Map[TopicPartition, Long]],

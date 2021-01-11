@@ -1,13 +1,17 @@
 package hydra.core.monitor
 
+import java.time.{Duration, Instant}
+
+import hydra.common.logging.LoggingAdapter
 import kamon.Kamon
 import kamon.metric.{Counter, Gauge, Histogram}
 import kamon.tag.TagSet
 import scalacache.guava.GuavaCache
+import spray.json.{JsObject, JsString}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-object HydraMetrics {
+object HydraMetrics extends LoggingAdapter {
 
   import scalacache.modes.scalaFuture._
 
@@ -70,7 +74,8 @@ object HydraMetrics {
     getOrCreateHistogram(lookupKey, metricName, tags).map(_.record(value))
   }
 
-  def addPromHttpMetric(topic: String, responseCode: String, path: String)(implicit ec: ExecutionContext): Unit = {
+  def addHttpMetric(topic: String, responseCode: String, path: String,
+                    startTime: Instant, response: String, error: Option[String] = None)(implicit ec: ExecutionContext): Unit = {
     incrementGauge(
       lookupKey =
         s"_${topic}_${responseCode}_${path}",
@@ -81,5 +86,9 @@ object HydraMetrics {
           "path" -> path
         )
     )
+    val jsonLog = JsObject("Topic" -> JsString(topic), "Response Code" -> JsString(responseCode),
+      "Endpoint" -> JsString(path), "Latency" -> JsString(Duration.between(startTime, Instant.now).toMillis.toString),
+      "Response" -> JsString(response), "Error" -> JsString(error.getOrElse("None")))
+    log.info(jsonLog.toString)
   }
 }

@@ -1,12 +1,14 @@
 package hydra.kafka.endpoints
 
+import java.time.Instant
+
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives.extractExecutionContext
 import akka.http.scaladsl.server.Route
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import hydra.common.util.Futurable
 import hydra.core.http.{CorsSupport, RouteSupport}
-import hydra.core.monitor.HydraMetrics.addPromHttpMetric
+import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.kafka.algebras.ConsumerGroupsAlgebra
 import hydra.kafka.marshallers.ConsumerGroupMarshallers
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -19,13 +21,14 @@ class ConsumerGroupsEndpoint[F[_]: Futurable](consumerGroupsAlgebra: ConsumerGro
     extractExecutionContext { implicit ec =>
       get {
         pathPrefix("v2" / "consumer-groups") {
+          val startTime = Instant.now
           pathEndOrSingleSlash {
             onComplete(Futurable[F].unsafeToFuture(consumerGroupsAlgebra.getAllConsumers)) {
               case Success(consumers) =>
-                addPromHttpMetric("", StatusCodes.OK.toString, "/v2/consumer-groups")
+                addHttpMetric("", StatusCodes.OK.toString, "/v2/consumer-groups", startTime, consumers.toString)
                 complete(StatusCodes.OK, consumers)
               case Failure(exception) =>
-                addPromHttpMetric("", StatusCodes.InternalServerError.toString, "/v2/consumer-groups")
+                addHttpMetric("", StatusCodes.InternalServerError.toString, "/v2/consumer-groups", startTime, exception.getMessage, Some(exception.getMessage))
                 complete(StatusCodes.InternalServerError, exception.getMessage)
             }
           } ~ pathPrefix("getByTopic" / Segment) { topic =>
@@ -34,22 +37,23 @@ class ConsumerGroupsEndpoint[F[_]: Futurable](consumerGroupsAlgebra: ConsumerGro
                 Futurable[F].unsafeToFuture(consumerGroupsAlgebra.getConsumersForTopic(topic))
               ) {
                 case Success(topicConsumers) =>
-                  addPromHttpMetric(topic, StatusCodes.OK.toString, "/v2/consumer-groups/getByTopic")
+                  addHttpMetric(topic, StatusCodes.OK.toString, "/v2/consumer-groups/getByTopic", startTime, topicConsumers.toString)
                   complete(StatusCodes.OK, topicConsumers)
                 case Failure(exception) =>
-                  addPromHttpMetric(topic, StatusCodes.InternalServerError.toString, "/v2/consumer-groups/getByTopic")
+                  addHttpMetric(topic, StatusCodes.InternalServerError.toString, "/v2/consumer-groups/getByTopic", startTime, exception.getMessage, Some(exception.getMessage))
                   complete(StatusCodes.InternalServerError, exception.getMessage)
               }
             }
           }
         } ~ pathPrefix("v2" / "topics" / "getByConsumerGroupName" / Segment) { consumerGroupName =>
+          val startTime = Instant.now
           pathEndOrSingleSlash {
             onComplete(Futurable[F].unsafeToFuture(consumerGroupsAlgebra.getTopicsForConsumer(consumerGroupName))) {
               case Success(topics) =>
-                addPromHttpMetric(consumerGroupName, StatusCodes.OK.toString, "/v2/topics/getByConsumerGroupName")
+                addHttpMetric(consumerGroupName, StatusCodes.OK.toString, "/v2/topics/getByConsumerGroupName", startTime, topics.toString)
                 complete(StatusCodes.OK, topics)
               case Failure(exception) =>
-                addPromHttpMetric(consumerGroupName, StatusCodes.InternalServerError.toString, "/v2/topics/getByConsumerGroupName")
+                addHttpMetric(consumerGroupName, StatusCodes.InternalServerError.toString, "/v2/topics/getByConsumerGroupName", startTime, exception.getMessage, Some(exception.getMessage))
                 complete(StatusCodes.InternalServerError, exception.getMessage)
             }
           }

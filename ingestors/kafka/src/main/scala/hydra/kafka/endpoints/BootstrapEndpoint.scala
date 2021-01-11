@@ -16,6 +16,8 @@
 
 package hydra.kafka.endpoints
 
+import java.time.Instant
+
 import akka.actor._
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives.{complete, extractExecutionContext}
@@ -26,7 +28,7 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.{CorsSupport, HydraDirectives, RouteSupport}
 import hydra.core.marshallers.TopicMetadataRequest
-import hydra.core.monitor.HydraMetrics.addPromHttpMetric
+import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.kafka.model.TopicMetadataAdapter
 import hydra.kafka.services.TopicBootstrapActor._
 
@@ -44,9 +46,10 @@ class BootstrapEndpoint(override val system:ActorSystem) extends RouteSupport
   private implicit val timeout = Timeout(10.seconds)
 
   override val route: Route = cors(settings) {
-    handleExceptions(exceptionHandler("Bootstrap")) {
+    handleExceptions(exceptionHandler("Bootstrap", Instant.now)) {
       extractExecutionContext { implicit ec =>
         pathPrefix("streams") {
+          val startTime = Instant.now
           pathEndOrSingleSlash {
             post {
               requestEntityPresent {
@@ -60,56 +63,57 @@ class BootstrapEndpoint(override val system:ActorSystem) extends RouteSupport
                       message match {
 
                         case BootstrapSuccess(metadata) =>
-                          addPromHttpMetric(topic, StatusCodes.OK.toString, "Bootstrap")
+                          addHttpMetric(topic, StatusCodes.OK.toString, "Bootstrap", startTime, toResource(metadata).toString)
                           complete(StatusCodes.OK, toResource(metadata))
 
                         case BootstrapFailure(reasons) =>
-                          addPromHttpMetric(topic, StatusCodes.BadRequest.toString, "Bootstrap")
+                          addHttpMetric(topic, StatusCodes.BadRequest.toString, "Bootstrap", startTime, reasons.toString, Some(reasons.toString))
                           complete(StatusCodes.BadRequest, reasons)
 
                         case e: Exception =>
                           log.error("Unexpected error in TopicBootstrapActor", e)
-                          addPromHttpMetric(topic, StatusCodes.InternalServerError.toString, "Bootstrap")
+                          addHttpMetric(topic, StatusCodes.InternalServerError.toString, "Bootstrap", startTime, e.getMessage, Some(e.getMessage))
                           complete(StatusCodes.InternalServerError, e.getMessage)
                       }
 
                     case Failure(ex) =>
                       log.error("Unexpected error in BootstrapEndpoint", ex)
-                      addPromHttpMetric(topic, StatusCodes.InternalServerError.toString, "Bootstrap")
+                      addHttpMetric(topic, StatusCodes.InternalServerError.toString, "Bootstrap", startTime, ex.getMessage, Some(ex.getMessage))
                       complete(StatusCodes.InternalServerError, ex.getMessage)
                   }
                 }
               }
             }
           } ~ get {
-            pathEndOrSingleSlash(getAllStreams(None)) ~
-              path(Segment)(subject => getAllStreams(Some(subject)))
+            pathEndOrSingleSlash(getAllStreams(None, startTime)) ~
+              path(Segment)(subject => getAllStreams(Some(subject), startTime))
           }
         }
       }
     }
   }
 
-  private def getAllStreams(subject: Option[String]): Route = {
+  private def getAllStreams(subject: Option[String], startTime: Instant): Route = {
     extractExecutionContext { implicit ec =>
       onSuccess(bootstrapActor ? GetStreams(subject)) {
         case GetStreamsResponse(metadata) =>
-          addPromHttpMetric("", StatusCodes.OK.toString, "getAllStreams")
+          addHttpMetric("", StatusCodes.OK.toString, "getAllStreams", startTime, metadata.map(toResource).toString)
           complete(StatusCodes.OK, metadata.map(toResource))
         case Failure(ex) =>
+          addHttpMetric("", StatusCodes.OK.toString, "getAllStreams", startTime, ex.getMessage, Some(ex.getMessage))
           throw ex
         case x =>
           log.error("Unexpected error in BootstrapEndpoint", x)
-          addPromHttpMetric("", StatusCodes.InternalServerError.toString, "getAllStreams")
+          addHttpMetric("", StatusCodes.InternalServerError.toString, "getAllStreams", startTime, x.toString, Some(x.toString))
           complete(StatusCodes.InternalServerError, "Unknown error")
       }
     }
   }
 
-  private def exceptionHandler(topic: String) = ExceptionHandler {
+  private def exceptionHandler(topic: String, startTime: Instant) = ExceptionHandler {
     case e =>
       extractExecutionContext { implicit ec =>
-        addPromHttpMetric(topic, StatusCodes.InternalServerError.toString,"Bootstrap")
+        addHttpMetric(topic, StatusCodes.InternalServerError.toString,"Bootstrap", startTime, e.getMessage, Some(e.getMessage))
         complete(500, e.getMessage)
       }
   }
