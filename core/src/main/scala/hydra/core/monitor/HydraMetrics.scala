@@ -89,12 +89,12 @@ object HydraMetrics extends LoggingAdapter {
     )
 
     val jsonLog = if(partition.isDefined && offset.isDefined) {
-      JsObject("Topic" -> JsString(topic), "Response Code" -> JsString(responseCode),
+      JsObject("Topic" -> JsString(topic), "ResponseCode" -> JsString(responseCode),
         "Endpoint" -> JsString(path), "Latency" -> JsString(Duration.between(startTime, Instant.now).toMillis.toString),
         "Partition" -> JsNumber(partition.get), "Offset" -> JsNumber(offset.get),
         "Error" -> JsString(error.getOrElse("")))
     } else {
-      JsObject("Topic" -> JsString(topic), "Response Code" -> JsString(responseCode),
+      JsObject("Topic" -> JsString(topic), "ResponseCode" -> JsString(responseCode),
         "Endpoint" -> JsString(path), "Latency" -> JsNumber(Duration.between(startTime, Instant.now).toMillis.toString),
         "Error" -> JsString(error.getOrElse("")))
     }
