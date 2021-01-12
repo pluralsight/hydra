@@ -1,13 +1,18 @@
 package hydra.core.monitor
 
+import java.time.{Duration, Instant}
+
+import akka.http.scaladsl.model.StatusCode
+import hydra.common.logging.LoggingAdapter
 import kamon.Kamon
 import kamon.metric.{Counter, Gauge, Histogram}
 import kamon.tag.TagSet
 import scalacache.guava.GuavaCache
+import spray.json.{JsNumber, JsObject, JsString}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-object HydraMetrics {
+object HydraMetrics extends LoggingAdapter {
 
   import scalacache.modes.scalaFuture._
 
@@ -70,16 +75,28 @@ object HydraMetrics {
     getOrCreateHistogram(lookupKey, metricName, tags).map(_.record(value))
   }
 
-  def addPromHttpMetric(topic: String, responseCode: String, path: String)(implicit ec: ExecutionContext): Unit = {
+  def addHttpMetric(topic: String, responseCode: StatusCode, path: String,
+                    startTime: Instant, method: String, partitionOffset: Option[(Int,Long)] = None,
+                    error: Option[String] = None)(implicit ec: ExecutionContext): Unit = {
     incrementGauge(
       lookupKey =
         s"_${topic}_${responseCode}_${path}",
         metricName = "ingest_topic_response",
         tags = Seq(
           "topic" -> topic,
-          "responseCode" -> responseCode,
+          "responseCode" -> responseCode.toString,
           "path" -> path
         )
     )
+
+    val maybePartition = partitionOffset.map(partOff => "partition" -> JsNumber(partOff._1))
+    val maybeOffset = partitionOffset.map(partOff => "offset" -> JsNumber(partOff._2))
+
+    val jsonLog =
+      JsObject(Map("topic" -> JsString(topic), "response_code" -> JsNumber(responseCode.intValue),
+        "endpoint" -> JsString(path), "latency" -> JsNumber(Duration.between(startTime, Instant.now).toMillis.toString),
+        "request_method" -> JsString(method), "error" -> JsString(error.getOrElse(""))) ++ maybePartition ++ maybeOffset)
+
+    log.info(jsonLog.toString)
   }
 }

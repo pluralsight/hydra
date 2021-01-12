@@ -16,6 +16,8 @@
 
 package hydra.ingest.http
 
+import java.time.Instant
+
 import akka.actor._
 import akka.http.scaladsl.model.{HttpRequest, StatusCode, StatusCodes}
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
@@ -27,7 +29,7 @@ import hydra.core.http.RouteSupport
 import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
 import hydra.core.ingest.{CorrelationIdBuilder, HydraRequest, IngestionReport, RequestParams}
 import hydra.core.marshallers.GenericError
-import hydra.core.monitor.HydraMetrics.addPromHttpMetric
+import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.core.protocol._
 import hydra.ingest.services.IngestionFlow.{AvroConversionAugmentedException, MissingTopicNameException, SchemaNotFoundAugmentedException}
 import hydra.ingest.services.IngestionFlowV2.V2IngestRequest
@@ -45,28 +47,37 @@ class IngestionEndpoint[F[_]: Futurable](
 
   import hydra.ingest.bootstrap.RequestFactories._
 
-  override val route: Route =
-    handleExceptions(exceptionHandler("UnknownTopic")) {
+  override val route: Route = {
+    handleExceptions(exceptionHandler("UnknownTopic", Instant.now, extractMethod.toString)) {
       pathPrefix("ingest") {
+        val startTime = Instant.now
         pathEndOrSingleSlash {
           post {
-            requestEntityPresent {
-              publishRequest
+            handleExceptions(exceptionHandler("UnknownTopic", Instant.now, "POST")) {
+              requestEntityPresent {
+                publishRequest(startTime)
+              }
             }
-          } ~ deleteRequest
+          } ~ deleteRequest(startTime)
         }
       } ~
-      pathPrefix("v2" / "topics" / Segment / "records") { topicName =>
-        pathEndOrSingleSlash {
-          post {
-            publishRequestV2(topicName)
+        pathPrefix("v2" / "topics" / Segment / "records") { topicName =>
+          val startTime = Instant.now
+          pathEndOrSingleSlash {
+            post {
+              handleExceptions(exceptionHandler(topicName, Instant.now, "POST")) {
+                publishRequestV2(topicName, startTime)
+              }
+            }
           }
         }
-      }
     }
+  }
 
-  private def deleteRequest = delete {
-    headerValueByName(RequestParams.HYDRA_RECORD_KEY_PARAM)(_ => publishRequest)
+  private def deleteRequest(startTime: Instant) = delete {
+    handleExceptions(exceptionHandler("UnknownTopic", Instant.now, "DELETE")) {
+      headerValueByName(RequestParams.HYDRA_RECORD_KEY_PARAM)(_ => publishRequest(startTime))
+    }
   }
 
   private def cId = CorrelationIdBuilder.generate()
@@ -81,92 +92,95 @@ class IngestionEndpoint[F[_]: Futurable](
 
   private val correlationIdHeader = "ps-correlation-id"
 
-  private def publishRequestV2(topic: String): Route =
-    handleExceptions(exceptionHandler(topic)) {
-      extractExecutionContext { implicit ec =>
-        optionalHeaderValueByName(correlationIdHeader) { cIdOpt =>
-          entity(as[V2IngestRequest]) { reqMaybeHeader =>
-            val req = cIdOpt match {
-              case Some(id) => reqMaybeHeader.copy(headers = Some(Headers.fromSeq(List(Header.apply(correlationIdHeader, id)))))
-              case _ => reqMaybeHeader
-            }
-            Subject.createValidated(topic) match {
-              case Some(t) =>
-                onComplete(Futurable[F].unsafeToFuture(ingestionV2Flow.ingest(req, t))) {
-                  case Success(resp) =>
-                    addPromHttpMetric(topic, StatusCodes.OK.toString, "/v2/topics/.../records")
-                    complete(resp)
-                  case Failure(e) =>
-                    val status = getV2ReponseCode(e)
-                    addPromHttpMetric(topic, status._1.toString, "/v2/topics/.../records")
-                    complete(status)
-                }
-              case None =>
-                addPromHttpMetric(topic, StatusCodes.BadRequest.toString, "/v2/topics/.../records")
-                complete(StatusCodes.BadRequest, Subject.invalidFormat)
-            }
+  private def publishRequestV2(topic: String, startTime: Instant): Route =
+    extractExecutionContext { implicit ec =>
+      optionalHeaderValueByName(correlationIdHeader) { cIdOpt =>
+        entity(as[V2IngestRequest]) { reqMaybeHeader =>
+          val req = cIdOpt match {
+            case Some(id) => reqMaybeHeader.copy(headers = Some(Headers.fromSeq(List(Header.apply(correlationIdHeader, id)))))
+            case _ => reqMaybeHeader
+          }
+          Subject.createValidated(topic) match {
+            case Some(t) =>
+              onComplete(Futurable[F].unsafeToFuture(ingestionV2Flow.ingest(req, t))) {
+                case Success(resp) =>
+                  addHttpMetric(topic, StatusCodes.OK, "/v2/topics/.../records", startTime, "POST",
+                    partitionOffset = Some(resp.partition, resp.offset.getOrElse(0)))
+                  complete(resp)
+                case Failure(e) =>
+                  val status = getV2ReponseCode(e)
+                  addHttpMetric(topic, status._1, "/v2/topics/.../records",
+                    startTime, "POST", error = e.getMessage.some)
+                  complete(status)
+              }
+            case None =>
+              addHttpMetric(topic, StatusCodes.BadRequest,
+                "/v2/topics/.../records", startTime, "POST", error = Subject.invalidFormat.some)
+              complete(StatusCodes.BadRequest, Subject.invalidFormat)
           }
         }
       }
     }
 
-  private def publishFlow(hydraRequest: HydraRequest,topic: String): Route = {
+  private def publishFlow(hydraRequest: HydraRequest,topic: String, startTime: Instant): Route = {
     extractExecutionContext { implicit ec =>
       onComplete(Futurable[F].unsafeToFuture(ingestionFlow.ingest(hydraRequest))) {
         case Success(_) =>
-          addPromHttpMetric(topic, StatusCodes.OK.toString(), "/ingest")
+          addHttpMetric(topic, StatusCodes.OK, "/ingest", startTime, "POST")
           complete(IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorCompleted), StatusCodes.OK.intValue))
         case Failure(PublishError.Timeout) =>
+          val responseCode = StatusCodes.RequestTimeout
           val errorMsg =
             s"${hydraRequest.correlationId}: Ack:${hydraRequest.ackStrategy}; Validation: ${hydraRequest.validationStrategy};" +
               s" Metadata:${hydraRequest.metadata}; Payload: ${hydraRequest.payload} Ingestors: Alt-Ingest-Flow"
           log.error(s"Ingestion timed out for request $errorMsg")
-          addPromHttpMetric(topic, StatusCodes.RequestTimeout.toString,"/ingest")
-          val responseCode = StatusCodes.RequestTimeout
+          addHttpMetric(topic, StatusCodes.RequestTimeout,"/ingest", startTime, "POST", error = s"Timeout - $errorMsg".some)
           complete(responseCode, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorTimeout), responseCode.intValue))
         case Failure(e@PublishError.RecordTooLarge(actual, limit)) =>
+          val responseCode = StatusCodes.PayloadTooLarge
           val errorMsg =
             s"${hydraRequest.correlationId}: Ack:${hydraRequest.ackStrategy}; Validation: ${hydraRequest.validationStrategy};" +
               s" Metadata:${hydraRequest.metadata}; Ingestors: Alt-Ingest-Flow"
           log.error(s"Record too large. Found $actual bytes when limit is $limit bytes $errorMsg")
-          val responseCode = StatusCodes.PayloadTooLarge
-          addPromHttpMetric(topic, responseCode.toString,"/ingest")
+          addHttpMetric(topic, responseCode,"/ingest", startTime, "POST", error = s"Record Too Large - $errorMsg".some)
           complete(responseCode, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorError(e)), responseCode.intValue))
         case Failure(_: MissingTopicNameException) =>
-          // Yeah, a 404 is a bad idea, but that is what the old v1 flow does so we are keeping it the same
-          addPromHttpMetric(topic, StatusCodes.NotFound.toString,"/ingest")
           val responseCode = StatusCodes.NotFound
+          // Yeah, a 404 is a bad idea, but that is what the old v1 flow does so we are keeping it the same
+          addHttpMetric(topic, StatusCodes.NotFound,"/ingest", startTime, "POST", error = MissingTopicNameException.toString.some)
           complete(responseCode, IngestionReport(hydraRequest.correlationId, Map(), responseCode.intValue))
         case Failure(r: AvroConversionAugmentedException) =>
-          addPromHttpMetric(topic, StatusCodes.BadRequest.toString,"/ingest")
-          complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(r)), StatusCodes.BadRequest.intValue))
+          addHttpMetric(topic, StatusCodes.BadRequest,"/ingest",startTime, "POST", error = AvroConversionAugmentedException.toString.some)
+          complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId,
+            Map("kafka_ingestor" -> InvalidRequest(r)), StatusCodes.BadRequest.intValue))
         case Failure(e: SchemaNotFoundAugmentedException) =>
-          addPromHttpMetric(topic, StatusCodes.BadRequest.toString,"/ingest")
-          complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> InvalidRequest(e)), StatusCodes.BadRequest.intValue))
+          addHttpMetric(topic, StatusCodes.BadRequest,"/ingest", startTime, "POST", error = s"Schema Not found ${e.getMessage}".some)
+          complete(StatusCodes.BadRequest, IngestionReport(hydraRequest.correlationId,
+            Map("kafka_ingestor" -> InvalidRequest(e)), StatusCodes.BadRequest.intValue))
         case Failure(other) =>
           val responseCode = StatusCodes.ServiceUnavailable
           val errorMsg =
             s"Exception: $other; ${hydraRequest.correlationId}: Ack:${hydraRequest.ackStrategy}; Validation: ${hydraRequest.validationStrategy};" +
               s" Metadata:${hydraRequest.metadata}; Payload: ${hydraRequest.payload} Ingestors: Alt-Ingest-Flow"
           log.error(s"Ingestion failed for request $errorMsg")
-          addPromHttpMetric(topic, StatusCodes.ServiceUnavailable.toString,"/ingest")
+          addHttpMetric(topic, responseCode,"/ingest", startTime, "POST", error = s"Failure - $errorMsg".some)
           complete(responseCode, IngestionReport(hydraRequest.correlationId, Map("kafka_ingestor" -> IngestorError(other)), responseCode.intValue))
       }
     }
   }
 
-  private def publishRequest: Route = parameter("correlationId" ?) { cIdOpt =>
+  private def publishRequest(startTime: Instant): Route = parameter("correlationId" ?) { cIdOpt =>
     extractRequest { req =>
         onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>
           val topic = hydraRequest.metadataValue(HYDRA_KAFKA_TOPIC_PARAM).getOrElse("UnknownTopic")
-          handleExceptions(exceptionHandler(topic)) {
-            publishFlow(hydraRequest,topic)
+          handleExceptions(exceptionHandler(topic, startTime, "POST")) {
+            publishFlow(hydraRequest,topic, startTime)
           }
       }
     }
   }
 
-  private def exceptionHandler(topic: String) = ExceptionHandler {
+  private def exceptionHandler(topic: String, startTime: Instant, method: String) = ExceptionHandler {
       case e: IllegalArgumentException =>
         extractExecutionContext { implicit ec =>
           if (applicationConfig
@@ -174,13 +188,13 @@ class IngestionEndpoint[F[_]: Futurable](
             .getOrElse(false)) {
             log.error("Ingestion 400 ERROR: " + e.getMessage)
           }
-          addPromHttpMetric(topic, StatusCodes.BadRequest.toString,"ingestionEndpoint")
+          addHttpMetric(topic, StatusCodes.BadRequest,"ingestionEndpoint", startTime, method, error = e.getMessage.some)
           complete(400, GenericError(400, e.getMessage))
         }
 
       case e =>
         extractExecutionContext { implicit ec =>
-          addPromHttpMetric(topic, StatusCodes.InternalServerError.toString,"ingestionEndpoint")
+          addHttpMetric(topic, StatusCodes.InternalServerError,"ingestionEndpoint", startTime, method, error = e.getMessage.some)
           complete(500, GenericError(500, e.getMessage))
         }
   }
