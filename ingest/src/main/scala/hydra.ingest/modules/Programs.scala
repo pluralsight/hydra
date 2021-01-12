@@ -26,7 +26,7 @@ final class Programs[F[_]: Logger: Sync: Timer: Mode] private(
     algebras.kafkaAdmin,
     algebras.kafkaClient,
     retryPolicy,
-    cfg.v2MetadataTopicConfig.topicName,
+    cfg.metadataTopicsConfig.topicNameV2,
     algebras.metadata
   )
 

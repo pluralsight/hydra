@@ -5,7 +5,7 @@ import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Sync, Timer}
 import cats.syntax.all._
 import fs2.kafka.Headers
 import hydra.avro.registry.SchemaRegistry
-import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, V2MetadataTopicConfig}
+import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, MetadataTopicsConfig}
 import hydra.kafka.algebras.KafkaAdminAlgebra.Topic
 import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, Offset, Partition, PublishError, PublishResponse, TopicName}
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
@@ -35,7 +35,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
   private val cooTopicSubject = Subject.createValidated("dvs.consumer-offsets-offsets").get
 
   private def createTestCase(
-      metadataConfig: V2MetadataTopicConfig,
+      metadataConfig: MetadataTopicsConfig,
       consumersTopicConfig: DVSConsumersTopicConfig,
       consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig
 
@@ -85,9 +85,11 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
 
     "create the metadata topic, consumers topic, and consumerOffsetsOffsets topic" in {
       val config =
-        V2MetadataTopicConfig(
+        MetadataTopicsConfig(
+          Subject.createValidated("dvs.does.not.matter").get,
           metadataSubject,
-          createOnStartup = true,
+          createV1OnStartup = false,
+          createV2OnStartup = true,
           createV2TopicsEnabled = true,
           ContactMethod.create("test@test.com").get,
           1,
@@ -112,9 +114,11 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
 
     "not create the metadata topic" in {
       val config =
-        V2MetadataTopicConfig(
+        MetadataTopicsConfig(
+          Subject.createValidated("dvs.does.not.matter").get,
           metadataSubject,
-          createOnStartup = false,
+          createV1OnStartup = false,
+          createV2OnStartup = false,
           createV2TopicsEnabled = false,
           ContactMethod.create("test@test.com").get,
           1,

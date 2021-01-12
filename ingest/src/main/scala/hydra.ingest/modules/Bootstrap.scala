@@ -7,14 +7,14 @@ import cats.effect.Sync
 import cats.syntax.all._
 import cats.{Monad, MonadError}
 import hydra.core.marshallers.History
-import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, V2MetadataTopicConfig}
+import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, MetadataTopicsConfig}
 import hydra.kafka.model._
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.util.KafkaUtils.TopicDetails
 
 final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
     createTopicProgram: CreateTopicProgram[F],
-    cfg: V2MetadataTopicConfig,
+    cfg: MetadataTopicsConfig,
     dvsConsumersTopicConfig: DVSConsumersTopicConfig,
     cooTopicConfig: ConsumerOffsetsOffsetsTopicConfig
 ) {
@@ -27,10 +27,10 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
     } yield ()
 
   private def bootstrapMetadataTopic: F[Unit] =
-    if (cfg.createOnStartup) {
+    if (cfg.createV2OnStartup) {
       TopicMetadataV2.getSchemas[F].flatMap { schemas =>
         createTopicProgram.createTopic(
-          cfg.topicName,
+          cfg.topicNameV2,
           TopicMetadataV2Request(
             schemas,
             StreamTypeV2.Entity,
@@ -104,10 +104,10 @@ object Bootstrap {
 
   def make[F[_]: Sync](
       createTopicProgram: CreateTopicProgram[F],
-      v2MetadataTopicConfig: V2MetadataTopicConfig,
+      metadataTopicsConfig: MetadataTopicsConfig,
       consumersTopicConfig: DVSConsumersTopicConfig,
       consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig
   ): F[Bootstrap[F]] = Sync[F].delay {
-    new Bootstrap[F](createTopicProgram, v2MetadataTopicConfig, consumersTopicConfig, consumerOffsetsOffsetsTopicConfig)
+    new Bootstrap[F](createTopicProgram, metadataTopicsConfig, consumersTopicConfig, consumerOffsetsOffsetsTopicConfig)
   }
 }
