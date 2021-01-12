@@ -114,7 +114,7 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
     }
 
   override val route: Route = {
-    handleExceptions(exceptionHandler(Instant.now)) {
+    handleExceptions(exceptionHandler(Instant.now, extractMethod.toString)) {
       extractExecutionContext { implicit ec =>
         pathPrefix("v2" / "topics") {
           val startTime = Instant.now
@@ -162,10 +162,10 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
     }
   }
 
-  private def exceptionHandler(startTime: Instant) = ExceptionHandler {
+  private def exceptionHandler(startTime: Instant, method: String) = ExceptionHandler {
     case e =>
       extractExecutionContext{ implicit ec =>
-        addHttpMetric("", StatusCodes.InternalServerError,"/v2/topics", startTime, "DELETE", error = Some(e.getMessage))
+        addHttpMetric("", StatusCodes.InternalServerError,"/v2/topics", startTime, method, error = Some(e.getMessage))
         complete(500, e.getMessage)
       }
   }

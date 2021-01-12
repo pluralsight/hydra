@@ -65,7 +65,7 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
     extractExecutionContext { implicit ec =>
       pathPrefix("transports" / "kafka") {
         val startTime = Instant.now
-        handleExceptions(exceptionHandler(startTime)) {
+        handleExceptions(exceptionHandler(startTime, extractMethod.toString)) {
           get {
             path("topics") {
               parameters('pattern ?, 'fields ?) { (pattern, n) =>
@@ -198,15 +198,15 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
     }
   }
 
-  private def exceptionHandler(startTime: Instant) = ExceptionHandler {
+  private def exceptionHandler(startTime: Instant, method: String) = ExceptionHandler {
     case e: IllegalArgumentException =>
-      addHttpMetric("",StatusCodes.BadRequest, "topicMetadataEndpoint", startTime, "Unknown Method", error = Some(e.getMessage))
+      addHttpMetric("",StatusCodes.BadRequest, "topicMetadataEndpoint", startTime, method, error = Some(e.getMessage))
       complete(HttpResponse(BadRequest, entity = e.getMessage))
     case e: NotFoundException =>
-      addHttpMetric("",StatusCodes.NotFound, "topicMetadataEndpoint", startTime, "Unknown Method", error = Some(e.getMessage))
+      addHttpMetric("",StatusCodes.NotFound, "topicMetadataEndpoint", startTime, method, error = Some(e.getMessage))
       complete(HttpResponse(NotFound, entity = e.msg))
     case e =>
-      addHttpMetric("", InternalServerError, "topicMetadataEndpoint", startTime, "Unknown Method", error = Some(e.getMessage))
+      addHttpMetric("", InternalServerError, "topicMetadataEndpoint", startTime, method, error = Some(e.getMessage))
       complete(HttpResponse(InternalServerError, entity = e.getMessage))
   }
 }

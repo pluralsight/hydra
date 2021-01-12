@@ -38,7 +38,7 @@ class MockEndpoint(
   }
 
   val schemaRouteExceptionHandler: ExceptionHandler = {
-    new SchemasEndpoint(consumerProxy).excptHandler(Instant.now)
+    new SchemasEndpoint(consumerProxy).excptHandler(Instant.now, "MockEndpoint")
   }
 
   def route: Route = {

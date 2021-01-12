@@ -46,7 +46,7 @@ class BootstrapEndpoint(override val system:ActorSystem) extends RouteSupport
   private implicit val timeout = Timeout(10.seconds)
 
   override val route: Route = cors(settings) {
-    handleExceptions(exceptionHandler("Bootstrap", Instant.now)) {
+    handleExceptions(exceptionHandler("Bootstrap", Instant.now, extractMethod.toString)) {
       extractExecutionContext { implicit ec =>
         pathPrefix("streams") {
           val startTime = Instant.now
@@ -110,10 +110,10 @@ class BootstrapEndpoint(override val system:ActorSystem) extends RouteSupport
     }
   }
 
-  private def exceptionHandler(topic: String, startTime: Instant) = ExceptionHandler {
+  private def exceptionHandler(topic: String, startTime: Instant, method: String) = ExceptionHandler {
     case e =>
       extractExecutionContext { implicit ec =>
-        addHttpMetric(topic, StatusCodes.InternalServerError,"Bootstrap", startTime, "Unknown Method", error = Some(e.getMessage))
+        addHttpMetric(topic, StatusCodes.InternalServerError,"Bootstrap", startTime, method, error = Some(e.getMessage))
         complete(500, e.getMessage)
       }
   }

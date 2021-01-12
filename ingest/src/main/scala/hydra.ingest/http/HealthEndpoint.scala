@@ -12,7 +12,7 @@ import hydra.core.monitor.HydraMetrics.addHttpMetric
 
 object HealthEndpoint extends RouteSupport with DefaultJsonProtocol with SprayJsonSupport {
   override val route: Route = {
-    handleExceptions(exceptionHandler(Instant.now)) {
+    handleExceptions(exceptionHandler(Instant.now, extractMethod.toString)) {
       path("health") {
         val startTime = Instant.now
         extractExecutionContext { implicit ec =>
@@ -27,10 +27,10 @@ object HealthEndpoint extends RouteSupport with DefaultJsonProtocol with SprayJs
     }
   }
 
-  private def exceptionHandler(startTime: Instant) = ExceptionHandler {
+  private def exceptionHandler(startTime: Instant, method: String) = ExceptionHandler {
     case e =>
       extractExecutionContext { implicit ec =>
-        addHttpMetric("", StatusCodes.InternalServerError,"/health", startTime, "Unknown Method", error = Some(e.getMessage))
+        addHttpMetric("", StatusCodes.InternalServerError,"/health", startTime, method, error = Some(e.getMessage))
         complete(500, e.getMessage)
       }
   }

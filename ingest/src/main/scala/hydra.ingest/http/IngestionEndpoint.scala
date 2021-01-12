@@ -48,13 +48,15 @@ class IngestionEndpoint[F[_]: Futurable](
   import hydra.ingest.bootstrap.RequestFactories._
 
   override val route: Route = {
-    handleExceptions(exceptionHandler("UnknownTopic", Instant.now)) {
+    handleExceptions(exceptionHandler("UnknownTopic", Instant.now, extractMethod.toString)) {
       pathPrefix("ingest") {
         val startTime = Instant.now
         pathEndOrSingleSlash {
           post {
-            requestEntityPresent {
-              publishRequest(startTime)
+            handleExceptions(exceptionHandler("UnknownTopic", Instant.now, "POST")) {
+              requestEntityPresent {
+                publishRequest(startTime)
+              }
             }
           } ~ deleteRequest(startTime)
         }
@@ -63,7 +65,9 @@ class IngestionEndpoint[F[_]: Futurable](
           val startTime = Instant.now
           pathEndOrSingleSlash {
             post {
-              publishRequestV2(topicName, startTime)
+              handleExceptions(exceptionHandler(topicName, Instant.now, "POST")) {
+                publishRequestV2(topicName, startTime)
+              }
             }
           }
         }
@@ -71,7 +75,9 @@ class IngestionEndpoint[F[_]: Futurable](
   }
 
   private def deleteRequest(startTime: Instant) = delete {
-    headerValueByName(RequestParams.HYDRA_RECORD_KEY_PARAM)(_ => publishRequest(startTime))
+    handleExceptions(exceptionHandler("UnknownTopic", Instant.now, "DELETE")) {
+      headerValueByName(RequestParams.HYDRA_RECORD_KEY_PARAM)(_ => publishRequest(startTime))
+    }
   }
 
   private def cId = CorrelationIdBuilder.generate()
@@ -87,32 +93,30 @@ class IngestionEndpoint[F[_]: Futurable](
   private val correlationIdHeader = "ps-correlation-id"
 
   private def publishRequestV2(topic: String, startTime: Instant): Route =
-    handleExceptions(exceptionHandler(topic, startTime)) {
-      extractExecutionContext { implicit ec =>
-        optionalHeaderValueByName(correlationIdHeader) { cIdOpt =>
-          entity(as[V2IngestRequest]) { reqMaybeHeader =>
-            val req = cIdOpt match {
-              case Some(id) => reqMaybeHeader.copy(headers = Some(Headers.fromSeq(List(Header.apply(correlationIdHeader, id)))))
-              case _ => reqMaybeHeader
-            }
-            Subject.createValidated(topic) match {
-              case Some(t) =>
-                onComplete(Futurable[F].unsafeToFuture(ingestionV2Flow.ingest(req, t))) {
-                  case Success(resp) =>
-                    addHttpMetric(topic, StatusCodes.OK, "/v2/topics/.../records", startTime, "POST",
-                      partitionOffset = Some(resp.partition, resp.offset.getOrElse(0)))
-                    complete(resp)
-                  case Failure(e) =>
-                    val status = getV2ReponseCode(e)
-                    addHttpMetric(topic, status._1, "/v2/topics/.../records",
-                      startTime, "POST", error = e.getMessage.some)
-                    complete(status)
-                }
-              case None =>
-                addHttpMetric(topic, StatusCodes.BadRequest,
-                  "/v2/topics/.../records", startTime, "POST", error = Subject.invalidFormat.some)
-                complete(StatusCodes.BadRequest, Subject.invalidFormat)
-            }
+    extractExecutionContext { implicit ec =>
+      optionalHeaderValueByName(correlationIdHeader) { cIdOpt =>
+        entity(as[V2IngestRequest]) { reqMaybeHeader =>
+          val req = cIdOpt match {
+            case Some(id) => reqMaybeHeader.copy(headers = Some(Headers.fromSeq(List(Header.apply(correlationIdHeader, id)))))
+            case _ => reqMaybeHeader
+          }
+          Subject.createValidated(topic) match {
+            case Some(t) =>
+              onComplete(Futurable[F].unsafeToFuture(ingestionV2Flow.ingest(req, t))) {
+                case Success(resp) =>
+                  addHttpMetric(topic, StatusCodes.OK, "/v2/topics/.../records", startTime, "POST",
+                    partitionOffset = Some(resp.partition, resp.offset.getOrElse(0)))
+                  complete(resp)
+                case Failure(e) =>
+                  val status = getV2ReponseCode(e)
+                  addHttpMetric(topic, status._1, "/v2/topics/.../records",
+                    startTime, "POST", error = e.getMessage.some)
+                  complete(status)
+              }
+            case None =>
+              addHttpMetric(topic, StatusCodes.BadRequest,
+                "/v2/topics/.../records", startTime, "POST", error = Subject.invalidFormat.some)
+              complete(StatusCodes.BadRequest, Subject.invalidFormat)
           }
         }
       }
@@ -169,14 +173,14 @@ class IngestionEndpoint[F[_]: Futurable](
     extractRequest { req =>
         onSuccess(createRequest[HttpRequest](cIdOpt.getOrElse(cId), req)) { hydraRequest =>
           val topic = hydraRequest.metadataValue(HYDRA_KAFKA_TOPIC_PARAM).getOrElse("UnknownTopic")
-          handleExceptions(exceptionHandler(topic, startTime)) {
+          handleExceptions(exceptionHandler(topic, startTime, "POST")) {
             publishFlow(hydraRequest,topic, startTime)
           }
       }
     }
   }
 
-  private def exceptionHandler(topic: String, startTime: Instant) = ExceptionHandler {
+  private def exceptionHandler(topic: String, startTime: Instant, method: String) = ExceptionHandler {
       case e: IllegalArgumentException =>
         extractExecutionContext { implicit ec =>
           if (applicationConfig
@@ -184,13 +188,13 @@ class IngestionEndpoint[F[_]: Futurable](
             .getOrElse(false)) {
             log.error("Ingestion 400 ERROR: " + e.getMessage)
           }
-          addHttpMetric(topic, StatusCodes.BadRequest,"ingestionEndpoint", startTime, "POST", error = e.getMessage.some)
+          addHttpMetric(topic, StatusCodes.BadRequest,"ingestionEndpoint", startTime, method, error = e.getMessage.some)
           complete(400, GenericError(400, e.getMessage))
         }
 
       case e =>
         extractExecutionContext { implicit ec =>
-          addHttpMetric(topic, StatusCodes.InternalServerError,"ingestionEndpoint", startTime, "Unknown Method", error = e.getMessage.some)
+          addHttpMetric(topic, StatusCodes.InternalServerError,"ingestionEndpoint", startTime, method, error = e.getMessage.some)
           complete(500, GenericError(500, e.getMessage))
         }
   }

@@ -83,7 +83,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
     .getOrElse(false)
 
   override def route: Route = cors(settings) {
-    handleExceptions(excptHandler(Instant.now)) {
+    handleExceptions(excptHandler(Instant.now, extractMethod.toString)) {
       extractExecutionContext { implicit ec =>
         pathPrefix("schemas") {
           val startTime = Instant.now
@@ -210,10 +210,10 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
     }
   }
 
-  private[http] def excptHandler(startTime: Instant): ExceptionHandler = ExceptionHandler {
+  private[http] def excptHandler(startTime: Instant, method: String): ExceptionHandler = ExceptionHandler {
     case e: RestClientException if e.getErrorCode == 40401 =>
       extractExecutionContext { implicit ec =>
-        addHttpMetric("", NotFound, "schemasEndpoint", startTime, "GET", error = Some(e.getMessage))
+        addHttpMetric("", NotFound, "schemasEndpoint", startTime, method, error = Some(e.getMessage))
         complete(NotFound, GenericServiceResponse(404, e.getMessage))
       }
 
@@ -221,7 +221,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
       val registryHttpStatus = e.getStatus
       val registryErrorCode = e.getErrorCode
       extractExecutionContext { implicit ec =>
-        addHttpMetric("", registryHttpStatus, "schemasEndpoint", startTime, "Unknown Method", error = Some(s"Rest Client Exception - $e.getMessage"))
+        addHttpMetric("", registryHttpStatus, "schemasEndpoint", startTime, method, error = Some(s"Rest Client Exception - $e.getMessage"))
         complete(
           registryHttpStatus,
           GenericServiceResponse(
@@ -233,7 +233,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
 
     case e: SchemaParseException =>
       extractExecutionContext { implicit ec =>
-        addHttpMetric("", BadRequest, "schemasEndpoint", startTime, "POST", error = Some(s"Schema Parse Exception - ${e.getMessage}"))
+        addHttpMetric("", BadRequest, "schemasEndpoint", startTime, method, error = Some(s"Schema Parse Exception - ${e.getMessage}"))
         complete(
           BadRequest,
           GenericServiceResponse(
@@ -247,7 +247,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
       extractExecutionContext { implicit ec =>
         extractUri { uri =>
           log.warn(s"Request to $uri failed with exception: {}", e)
-          addHttpMetric("", BadRequest, "schemasEndpoint", startTime, "Unknown Method", error = Some(e.getMessage))
+          addHttpMetric("", BadRequest, "schemasEndpoint", startTime, method, error = Some(e.getMessage))
           complete(
             BadRequest,
             GenericServiceResponse(

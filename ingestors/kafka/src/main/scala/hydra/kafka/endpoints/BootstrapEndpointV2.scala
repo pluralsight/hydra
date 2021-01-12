@@ -45,7 +45,7 @@ final class BootstrapEndpointV2[F[_]: Futurable](
     extractExecutionContext { implicit ec =>
       pathPrefix("v2" / "topics" / Segment) { topicName =>
         val startTime = Instant.now
-        handleExceptions(exceptionHandler(topicName, startTime)) {
+        handleExceptions(exceptionHandler(topicName, startTime, extractMethod.toString)) {
           pathEndOrSingleSlash {
             put {
               entity(as[TopicMetadataV2Request]) { t =>
@@ -77,10 +77,10 @@ final class BootstrapEndpointV2[F[_]: Futurable](
     }
   }
 
-  private def exceptionHandler(topic: String, startTime: Instant) = ExceptionHandler {
+  private def exceptionHandler(topic: String, startTime: Instant, method: String) = ExceptionHandler {
     case e =>
       extractExecutionContext { implicit ec =>
-        addHttpMetric(topic, StatusCodes.InternalServerError,"V2Bootstrap", startTime, "Unknown Method", error = Some(e.getMessage))
+        addHttpMetric(topic, StatusCodes.InternalServerError,"V2Bootstrap", startTime, method, error = Some(e.getMessage))
         complete(500, e.getMessage)
       }
   }
