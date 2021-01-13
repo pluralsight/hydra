@@ -16,7 +16,7 @@ import hydra.kafka.model.TopicMetadataV2Request.Subject
 final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: KafkaAdminAlgebra[F],
                                                                     kafkaClient: KafkaClientAlgebra[F],
                                                                     v2MetadataTopicName: Subject,
-                                                                    v1MetadataTopicName: String,
+                                                                    v1MetadataTopicName: Subject,
                                               schemaClient: SchemaRegistry[F],
                                                                     metadataAlgebra: MetadataAlgebra[F]) {
 
