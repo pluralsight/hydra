@@ -31,10 +31,13 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
 
   private def bootstrapMetadataTopicV1: F[Unit] = {
     if (cfg.createV1OnStartup) {
-      kafkaAdmin.createTopic(
-        cfg.topicNameV1.value,
-        TopicDetails(cfg.numPartitions, cfg.replicationFactor, Map("cleanup.policy" -> "compact"))
-      )
+      kafkaAdmin.describeTopic(cfg.topicNameV1.value).flatMap {
+        case Some(_) => Monad[F].unit
+        case None => kafkaAdmin.createTopic(
+          cfg.topicNameV1.value,
+          TopicDetails(cfg.numPartitions, cfg.replicationFactor, Map("cleanup.policy" -> "compact"))
+        )
+      }
     } else {
       Monad[F].unit
     }
