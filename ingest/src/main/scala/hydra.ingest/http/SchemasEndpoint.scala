@@ -129,10 +129,10 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
   }
 
   private val v2Route = {
-    val startTime = Instant.now
     pathPrefix("v2") {
       get {
         pathPrefix("schemas") {
+          val startTime = Instant.now
           pathEndOrSingleSlash {
             extractExecutionContext { implicit ec =>
               onSuccess(topics) { topics =>
@@ -143,6 +143,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
         } ~
         pathPrefix("schemas" / Segment) { subject =>
           pathEndOrSingleSlash {
+            val startTime = Instant.now
             getSchema(includeKeySchema = true, subject, None, startTime)
           }
         }
