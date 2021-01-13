@@ -16,6 +16,8 @@
 
 package hydra.ingest.http
 
+import java.time.Instant
+
 import akka.actor.{ActorSelection, ActorSystem}
 import akka.http.javadsl.server.PathMatcher1
 import akka.http.scaladsl.model.StatusCodes._
@@ -34,7 +36,7 @@ import hydra.core.marshallers.GenericServiceResponse
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.SchemaParseException
 import spray.json.{JsArray, JsObject, JsValue, RootJsonFormat}
-import hydra.core.monitor.HydraMetrics.addPromHttpMetric
+import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.kafka.consumer.KafkaConsumerProxy.{ListTopics, ListTopicsResponse}
 import org.apache.kafka.common.PartitionInfo
 import scalacache.cachingF
@@ -81,28 +83,29 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
     .getOrElse(false)
 
   override def route: Route = cors(settings) {
-    handleExceptions(excptHandler) {
+    handleExceptions(excptHandler(Instant.now, extractMethod.toString)) {
       extractExecutionContext { implicit ec =>
         pathPrefix("schemas") {
+          val startTime = Instant.now
           get {
             pathEndOrSingleSlash {
               onSuccess(
                 (schemaRegistryActor ? FetchSubjectsRequest)
                   .mapTo[FetchSubjectsResponse]
               ) { response =>
-                addPromHttpMetric("", OK.toString, "/schemas")
+                addHttpMetric("", OK, "/schemas", startTime, "GET")
                 complete(OK, response.subjects)
               }
             } ~ path(Segment) { subject =>
               parameters('schema ?) { schemaOnly: Option[String] =>
-                getSchema(includeKeySchema = false, subject, schemaOnly)
+                getSchema(includeKeySchema = false, subject, schemaOnly, startTime)
               }
             } ~ path(Segment / "versions") { subject =>
               onSuccess(
                 (schemaRegistryActor ? FetchAllSchemaVersionsRequest(subject))
                   .mapTo[FetchAllSchemaVersionsResponse]
               ) { response =>
-                addPromHttpMetric(subject, OK.toString, "/schemas/.../versions")
+                addHttpMetric(subject, OK, "/schemas/.../versions", startTime, "GET")
                 complete(OK, response.versions.map(SchemasEndpointResponse(_)))
               }
             } ~ path(Segment / "versions" / IntNumber) { (subject, version) =>
@@ -112,51 +115,54 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
                   version
                 )).mapTo[FetchSchemaVersionResponse]
               ) { response =>
-                addPromHttpMetric(subject, OK.toString, "/schemas/.../versions/" + version)
+                addHttpMetric(subject, OK, "/schemas/.../versions/" + version, startTime, "GET")
                 complete(OK, SchemasEndpointResponse(response.schemaResource))
               }
             }
           } ~
             post {
-              registerNewSchema
+              registerNewSchema(startTime)
             }
         } ~ v2Route
       }
     }
   }
 
-  private val v2Route =
+  private val v2Route = {
     pathPrefix("v2") {
       get {
         pathPrefix("schemas") {
+          val startTime = Instant.now
           pathEndOrSingleSlash {
             extractExecutionContext { implicit ec =>
               onSuccess(topics) { topics =>
-                getSchemas(topics.keys.toList)
+                getSchemas(topics.keys.toList, startTime)
               }
             }
           }
         } ~
         pathPrefix("schemas" / Segment) { subject =>
           pathEndOrSingleSlash {
-            getSchema(includeKeySchema = true, subject, None)
+            val startTime = Instant.now
+            getSchema(includeKeySchema = true, subject, None, startTime)
           }
         }
       }
     }
+  }
 
-  def getSchema(includeKeySchema: Boolean, subject: String, schemaOnly: Option[String]): Route = {
+  def getSchema(includeKeySchema: Boolean, subject: String, schemaOnly: Option[String], startTime: Instant): Route = {
     onSuccess(
       (schemaRegistryActor ? FetchSchemaRequest(subject))
         .mapTo[FetchSchemaResponse]
     ) { response =>
       extractExecutionContext { implicit ec =>
         if (includeKeySchema) {
-          addPromHttpMetric(subject, OK.toString, "/v2/schemas/")
+          addHttpMetric(subject, OK, "/v2/schemas/", startTime, "GET")
           complete(OK, SchemasWithKeyEndpointResponse.apply(response))
         } else {
           val schemaResource = response.schemaResource
-          addPromHttpMetric(subject, OK.toString, "/schema/")
+          addHttpMetric(subject, OK, "/schema/", startTime, "GET")
           schemaOnly.map{_ =>
             complete(OK, schemaResource.schema.toString)}
             .getOrElse {
@@ -167,21 +173,21 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
     }
   }
 
-  def getSchemas(subjects: List[String]): Route = {
+  def getSchemas(subjects: List[String], startTime: Instant): Route = {
     onSuccess(
       (schemaRegistryActor ? FetchSchemasRequest(subjects))
         .mapTo[FetchSchemasResponse]
     ) {
       response => {
         extractExecutionContext { implicit ec =>
-          addPromHttpMetric("",OK.toString, "/schemas")
+          addHttpMetric("", OK , "/schemas", startTime, "GET")
           complete(OK, BatchSchemasResponse.apply(response))
         }
       }
     }
   }
 
-  private def registerNewSchema: Route = {
+  private def registerNewSchema(startTime: Instant): Route = {
     entity(as[String]) { json =>
       extractExecutionContext { implicit ec =>
         extractRequest { request =>
@@ -196,7 +202,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
                 )
               )
             ) {
-              addPromHttpMetric(registeredSchema.schemaResource.schema.getFullName, Created.toString, "/schemas")
+              addHttpMetric(registeredSchema.schemaResource.schema.getFullName, Created, "/schemas", startTime, "POST")
               complete(Created, SchemasEndpointResponse(registeredSchema))
             }
           }
@@ -205,10 +211,10 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
     }
   }
 
-  private[http] val excptHandler: ExceptionHandler = ExceptionHandler {
+  private[http] def excptHandler(startTime: Instant, method: String): ExceptionHandler = ExceptionHandler {
     case e: RestClientException if e.getErrorCode == 40401 =>
       extractExecutionContext { implicit ec =>
-        addPromHttpMetric("", NotFound.toString, "schemasEndpoint")
+        addHttpMetric("", NotFound, "schemasEndpoint", startTime, method, error = Some(e.getMessage))
         complete(NotFound, GenericServiceResponse(404, e.getMessage))
       }
 
@@ -216,7 +222,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
       val registryHttpStatus = e.getStatus
       val registryErrorCode = e.getErrorCode
       extractExecutionContext { implicit ec =>
-        addPromHttpMetric("", registryHttpStatus.toString, "schemasEndpoint")
+        addHttpMetric("", registryHttpStatus, "schemasEndpoint", startTime, method, error = Some(s"Rest Client Exception - $e.getMessage"))
         complete(
           registryHttpStatus,
           GenericServiceResponse(
@@ -228,7 +234,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
 
     case e: SchemaParseException =>
       extractExecutionContext { implicit ec =>
-        addPromHttpMetric("", BadRequest.toString, "schemasEndpoint")
+        addHttpMetric("", BadRequest, "schemasEndpoint", startTime, method, error = Some(s"Schema Parse Exception - ${e.getMessage}"))
         complete(
           BadRequest,
           GenericServiceResponse(
@@ -242,7 +248,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
       extractExecutionContext { implicit ec =>
         extractUri { uri =>
           log.warn(s"Request to $uri failed with exception: {}", e)
-          addPromHttpMetric("", BadRequest.toString, "schemasEndpoint")
+          addHttpMetric("", BadRequest, "schemasEndpoint", startTime, method, error = Some(e.getMessage))
           complete(
             BadRequest,
             GenericServiceResponse(
