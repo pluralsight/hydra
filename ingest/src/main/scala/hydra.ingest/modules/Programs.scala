@@ -46,8 +46,8 @@ final class Programs[F[_]: Logger: Sync: Timer: Mode] private(
   val topicDeletion: TopicDeletionProgram[F] = new TopicDeletionProgram[F](
     algebras.kafkaAdmin,
     algebras.kafkaClient,
-    cfg.v2MetadataTopicConfig.topicName,
-    "_hydra.metadata.topic",
+    cfg.metadataTopicsConfig.topicNameV2,
+    cfg.metadataTopicsConfig.topicNameV1,
     algebras.schemaRegistry,
     algebras.metadata
   )

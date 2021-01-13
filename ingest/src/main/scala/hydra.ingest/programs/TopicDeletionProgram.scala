@@ -49,16 +49,16 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
       Subject.createValidated(topicName) match {
         case Some(subject) =>
           metadataAlgebra.getMetadataFor(subject).flatMap {
-              case Some(_) =>
-                deleteV2Metadata(subject).attempt.map {
-                  _.leftMap(error => MetadataFailToDelete(topicName, v1MetadataTopicName, error)).toValidatedNel
-                }
-              case other =>
-                deleteV1Metadata(topicName).attempt.map {
-                  _.leftMap(error => MetadataFailToDelete(topicName, v1MetadataTopicName, error)).toValidatedNel
-                }
-            }
-          })
+            case Some(_) =>
+              deleteV2Metadata(subject).attempt.map {
+                _.leftMap(error => MetadataFailToDelete(topicName, v1MetadataTopicName, error)).toValidatedNel
+              }
+            case other =>
+              deleteV1Metadata(topicName).attempt.map {
+                _.leftMap(error => MetadataFailToDelete(topicName, v1MetadataTopicName, error)).toValidatedNel
+              }
+          }
+
         case other =>
           deleteV1Metadata(topicName).attempt.map {
             _.leftMap(error => MetadataFailToDelete(topicName, v1MetadataTopicName, error)).toValidatedNel
@@ -79,7 +79,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
   private def deleteV1Metadata(topicName: String): F[Unit] = {
     for {
       _ <- kafkaClient
-          .publishStringKeyMessage((Some(topicName), None, None), v1MetadataTopicName)
+          .publishStringKeyMessage((Some(topicName), None, None), v1MetadataTopicName.toString())
           .rethrow
     } yield ()
   }
@@ -98,7 +98,7 @@ object TopicDeletionProgram {
   final case class SchemaDeleteTopicErrorList(errors: NonEmptyList[SchemaRegistryError])
     extends Exception (s"Topic(s) failed to delete:\n${errors.map(_.errorMessage).toList.mkString("\n")}")
 
-  final case class MetadataFailToDelete(subject: String, metadataTopic: String, cause: Throwable)
+  final case class MetadataFailToDelete(subject: String, metadataTopic: Subject, cause: Throwable)
     extends Exception(s"Unable to delete $subject from $metadataTopic", cause)
 
   final case class MetadataDeleteTopicErrorList(errors: NonEmptyList[MetadataFailToDelete])

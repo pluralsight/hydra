@@ -21,9 +21,6 @@ trait MetadataAlgebra[F[_]] {
   def getMetadataFor(subject: Subject): F[Option[TopicMetadataContainer]]
 
   def getAllMetadata: F[List[TopicMetadataContainer]]
-
-  def addMetadata(topicMetadataContainer: TopicMetadataContainer): F[Unit]
-
 }
 
 object MetadataAlgebra {
@@ -74,20 +71,6 @@ object MetadataAlgebra {
     } yield algebra
   }
 
-  def test[F[_]: Sync: Concurrent]() = {
-    Ref[F].of(MetadataStorageFacade.empty).map(cache =>
-    new MetadataAlgebra[F] {
-      override def getMetadataFor(subject: Subject): F[Option[TopicMetadataContainer]] =
-        cache.get.map(_.getMetadataByTopicName(subject))
-
-      override def getAllMetadata: F[List[TopicMetadataContainer]] =
-        cache.get.map(_.getAllMetadata)
-
-      override def addMetadata(topicMetadataContainer: TopicMetadataContainer): F[Unit] =
-        cache.update(_.addMetadata(topicMetadataContainer))
-    })
-  }
-
   private def getMetadataAlgebra[F[_]: Sync: Logger](cache: Ref[F, MetadataStorageFacade], schemaRegistryAlgebra: SchemaRegistry[F]): F[MetadataAlgebra[F]] = {
     Sync[F].delay {
       new MetadataAlgebra[F] {
@@ -103,9 +86,6 @@ object MetadataAlgebra {
             val (good2go, needs2beUpdated) = metadata.partition(m => m.keySchema.isDefined && m.valueSchema.isDefined)
             needs2beUpdated.traverse(updateCacheWithNewSchemaRegistryValues).map(_ ++ good2go)
           }
-
-        // Intentionally undefined since it's mainly for tests
-        override def addMetadata(topicMetadataContainer: TopicMetadataContainer): F[Unit] = ???
 
         /**
           * Updates TopicMetadataContainer with new values from SchemaRegistry
@@ -126,6 +106,29 @@ object MetadataAlgebra {
         }
       }
     }
+  }
+}
+
+trait TestMetadataAlgebra[F[_]] extends MetadataAlgebra[F] {
+  import TestMetadataAlgebra._
+  def addMetadata(topicMetadataContainer: TopicMetadataContainer): F[Unit]
+}
+
+object TestMetadataAlgebra {
+  def apply[F[_]: Sync: Concurrent: Logger](): F[TestMetadataAlgebra[F]] = {
+    Ref[F].of(MetadataStorageFacade.empty).map(cache =>
+      new TestMetadataAlgebra[F] {
+        override def getMetadataFor(subject: Subject): F[Option[TopicMetadataContainer]] =
+        cache.get.map(_.getMetadataByTopicName(subject))
+
+        override def getAllMetadata: F[List[TopicMetadataContainer]] =
+        cache.get.map(_.getAllMetadata)
+
+        def addMetadata(topicMetadataContainer: TopicMetadataContainer): F[Unit] =
+        cache.update(_.addMetadata(topicMetadataContainer))
+
+      }
+    )
   }
 }
 
