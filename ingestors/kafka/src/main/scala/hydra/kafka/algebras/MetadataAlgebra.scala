@@ -21,9 +21,6 @@ trait MetadataAlgebra[F[_]] {
   def getMetadataFor(subject: Subject): F[Option[TopicMetadataContainer]]
 
   def getAllMetadata: F[List[TopicMetadataContainer]]
-
-  def addMetadata(topicMetadataContainer: TopicMetadataContainer): F[Unit]
-
 }
 
 object MetadataAlgebra {
@@ -32,12 +29,12 @@ object MetadataAlgebra {
   final case class TopicMetadataContainer(key: TopicMetadataV2Key, value: TopicMetadataV2Value, keySchema: Option[Schema], valueSchema: Option[Schema])
 
   def make[F[_]: Sync: Concurrent: Logger](
-                        metadataTopicName: TopicName,
-                        consumerGroup: ConsumerGroup,
-                        kafkaClientAlgebra: KafkaClientAlgebra[F],
-                        schemaRegistryAlgebra: SchemaRegistry[F],
-                        consumeMetadataEnabled: Boolean
-                      ): F[MetadataAlgebra[F]] = {
+                                            metadataTopicName: TopicName,
+                                            consumerGroup: ConsumerGroup,
+                                            kafkaClientAlgebra: KafkaClientAlgebra[F],
+                                            schemaRegistryAlgebra: SchemaRegistry[F],
+                                            consumeMetadataEnabled: Boolean
+                                          ): F[MetadataAlgebra[F]] = {
     val metadataStream: fs2.Stream[F, (GenericRecord, Option[GenericRecord])] = if (consumeMetadataEnabled) {
       kafkaClientAlgebra.consumeMessages(metadataTopicName, consumerGroup, commitOffsets = false).map(record => (record._1, record._2))
     } else {
@@ -59,7 +56,7 @@ object MetadataAlgebra {
                   case e =>
                     val topicMetadataV2Transport = TopicMetadataContainer(topicMetadataKey, topicMetadataValue, None, None)
                     Logger[F].error(s"Error retrieving Schema from SchemaRegistry on Kafka Read: ${e.getMessage}") *>
-                    ref.update(_.addMetadata(topicMetadataV2Transport))
+                      ref.update(_.addMetadata(topicMetadataV2Transport))
                 }
               case None =>
                 Logger[F].error("Metadata value not found")
@@ -72,20 +69,6 @@ object MetadataAlgebra {
       }.compile.drain)
       algebra <- getMetadataAlgebra[F](ref, schemaRegistryAlgebra)
     } yield algebra
-  }
-
-  def test[F[_]: Sync: Concurrent]() = {
-    Ref[F].of(MetadataStorageFacade.empty).map(cache =>
-    new MetadataAlgebra[F] {
-      override def getMetadataFor(subject: Subject): F[Option[TopicMetadataContainer]] =
-        cache.get.map(_.getMetadataByTopicName(subject))
-
-      override def getAllMetadata: F[List[TopicMetadataContainer]] =
-        cache.get.map(_.getAllMetadata)
-
-      override def addMetadata(topicMetadataContainer: TopicMetadataContainer): F[Unit] =
-        cache.update(_.addMetadata(topicMetadataContainer))
-    })
   }
 
   private def getMetadataAlgebra[F[_]: Sync: Logger](cache: Ref[F, MetadataStorageFacade], schemaRegistryAlgebra: SchemaRegistry[F]): F[MetadataAlgebra[F]] = {
@@ -103,9 +86,6 @@ object MetadataAlgebra {
             val (good2go, needs2beUpdated) = metadata.partition(m => m.keySchema.isDefined && m.valueSchema.isDefined)
             needs2beUpdated.traverse(updateCacheWithNewSchemaRegistryValues).map(_ ++ good2go)
           }
-
-        // Intentionally undefined since it's mainly for tests
-        override def addMetadata(topicMetadataContainer: TopicMetadataContainer): F[Unit] = ???
 
         /**
           * Updates TopicMetadataContainer with new values from SchemaRegistry
@@ -126,6 +106,29 @@ object MetadataAlgebra {
         }
       }
     }
+  }
+}
+
+trait TestMetadataAlgebra[F[_]] extends MetadataAlgebra[F] {
+  import TestMetadataAlgebra._
+  def addMetadata(topicMetadataContainer: TopicMetadataContainer): F[Unit]
+}
+
+object TestMetadataAlgebra {
+  def apply[F[_]: Sync: Concurrent: Logger](): F[TestMetadataAlgebra[F]] = {
+    Ref[F].of(MetadataStorageFacade.empty).map(cache =>
+      new TestMetadataAlgebra[F] {
+        override def getMetadataFor(subject: Subject): F[Option[TopicMetadataContainer]] =
+          cache.get.map(_.getMetadataByTopicName(subject))
+
+        override def getAllMetadata: F[List[TopicMetadataContainer]] =
+          cache.get.map(_.getAllMetadata)
+
+        def addMetadata(topicMetadataContainer: TopicMetadataContainer): F[Unit] =
+          cache.update(_.addMetadata(topicMetadataContainer))
+
+      }
+    )
   }
 }
 

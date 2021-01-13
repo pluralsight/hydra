@@ -49,16 +49,16 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
       Subject.createValidated(topicName) match {
         case Some(subject) =>
           metadataAlgebra.getMetadataFor(subject).flatMap {
-              case Some(_) =>
-                deleteV2Metadata(subject).attempt.map {
-                  _.leftMap(error => MetadataFailToDelete(topicName, v1MetadataTopicName, error)).toValidatedNel
-                }
-              case other =>
-                deleteV1Metadata(topicName).attempt.map {
-                  _.leftMap(error => MetadataFailToDelete(topicName, v1MetadataTopicName, error)).toValidatedNel
-                }
-            }
-          })
+            case Some(_) =>
+              deleteV2Metadata(subject).attempt.map {
+                _.leftMap(error => MetadataFailToDelete(topicName, v1MetadataTopicName, error)).toValidatedNel
+              }
+            case other =>
+              deleteV1Metadata(topicName).attempt.map {
+                _.leftMap(error => MetadataFailToDelete(topicName, v1MetadataTopicName, error)).toValidatedNel
+              }
+          }
+          
         case other =>
           deleteV1Metadata(topicName).attempt.map {
             _.leftMap(error => MetadataFailToDelete(topicName, v1MetadataTopicName, error)).toValidatedNel

@@ -528,8 +528,6 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
     override def getAllMetadata: IO[List[MetadataAlgebra.TopicMetadataContainer]] = ???
 
-    override def addMetadata(topicMetadataContainer: TopicMetadataContainer): IO[Unit] = ???
-
     def addToMetadata(subject: Subject, t: TopicMetadataV2Request): IO[Unit] =
       consumeFrom.update(_ + (subject -> TopicMetadataContainer(TopicMetadataV2Key(subject), t.toValue, None, None)))
   }
