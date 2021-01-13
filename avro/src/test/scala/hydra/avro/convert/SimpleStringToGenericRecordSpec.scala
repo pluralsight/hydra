@@ -228,4 +228,11 @@ final class SimpleStringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
     record shouldBe a[Failure[ValidationExtraFieldsError]]
   }
+
+  it should "Use the Schema default if no json value is provided" in {
+    val schema = SchemaBuilder.record("SchemaDefaults").fields().requiredString("id").name("bool1").`type`().booleanType().booleanDefault(true).endRecord()
+    val json = """{"id":"123"}"""
+    val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
+    record.get.get("bool1") shouldBe true
+  }
 }

@@ -25,7 +25,7 @@ object SimpleStringToGenericRecord {
         }
         maybeThisFieldJson.flatMap {
           case Some(fjson) => jsonToGenericRecordJson(fjson, field.schema).map(field.name -> _)
-          case None => jsonToGenericRecordJson(JsNull, field.schema).map(field.name ->  _)
+          case None => jsonToGenericRecordJson(JsNull, field.schema).map(a => field.name -> field.defaultVal().toString.parseJson)
         }
       }.map(f => JsObject(f.toMap))
     }
