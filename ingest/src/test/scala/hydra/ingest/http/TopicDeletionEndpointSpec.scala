@@ -30,8 +30,8 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
   import concurrent.ExecutionContext.Implicits.global
   implicit private val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
-  private val v2MetadataTopicName = "_test.V2.MetadataTopic"
-  private val v1MetadataTopicName = "_test.V1.MetadataTopic"
+  private val v2MetadataTopicName = Subject.createValidated("_test.V2.MetadataTopic").get
+  private val v1MetadataTopicName = Subject.createValidated("_test.V1.MetadataTopic").get
   private val consumerGroup = "consumer groups"
 
   implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
@@ -129,7 +129,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
     val validCredentials = BasicHttpCredentials("John", "myPass")
 
     "return 200 with single deletion in body" in {
-      val topic = List("exp.blah.blah", v2MetadataTopicName, v1MetadataTopicName)
+      val topic = List("exp.blah.blah", v2MetadataTopicName.toString, v1MetadataTopicName.toString)
       (for {
         kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
         schemaAlgebra <- SchemaRegistry.test[IO]
@@ -144,7 +144,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           new TopicDeletionProgram[IO](
             kafkaAlgebra,
             kafkaClientAlgebra,
-            Subject.createValidated(v2MetadataTopicName).get,
+            v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
             metadataAlgebra
@@ -159,7 +159,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
     }
 
     "return 200 with single schema deletion" in {
-      val topic = List("exp.blah.blah", v2MetadataTopicName, v1MetadataTopicName)
+      val topic = List("exp.blah.blah", v2MetadataTopicName.toString, v1MetadataTopicName.toString)
       (for {
         kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
         schemaAlgebra <- SchemaRegistry.test[IO]
@@ -174,7 +174,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           new TopicDeletionProgram[IO](
             kafkaAlgebra,
             kafkaClientAlgebra,
-            Subject.createValidated(v2MetadataTopicName).get,
+            v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
             metadataAlgebra
@@ -201,7 +201,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           new TopicDeletionProgram[IO](
             kafkaAlgebra,
             kafkaClientAlgebra,
-            Subject.createValidated(v2MetadataTopicName).get,
+            v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
             metadataAlgebra
@@ -228,7 +228,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           new TopicDeletionProgram[IO](
             kafkaAlgebra,
             kafkaClientAlgebra,
-            Subject.createValidated(v2MetadataTopicName).get,
+            v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
             metadataAlgebra
@@ -257,7 +257,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           new TopicDeletionProgram[IO](
             kafkaAlgebra,
             kafkaClientAlgebra,
-            Subject.createValidated(v2MetadataTopicName).get,
+            v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
             metadataAlgebra
@@ -286,7 +286,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           new TopicDeletionProgram[IO](
             kafkaAlgebra,
             kafkaClientAlgebra,
-            Subject.createValidated(v2MetadataTopicName).get,
+            v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
             metadataAlgebra
@@ -315,7 +315,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           new TopicDeletionProgram[IO](
             kafkaAlgebra,
             kafkaClientAlgebra,
-            Subject.createValidated(v2MetadataTopicName).get,
+            v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
             metadataAlgebra
@@ -344,7 +344,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           new TopicDeletionProgram[IO](
             kafkaAlgebra,
             kafkaClientAlgebra,
-            Subject.createValidated(v2MetadataTopicName).get,
+            v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
             metadataAlgebra
@@ -373,7 +373,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           new TopicDeletionProgram[IO](
             kafkaAlgebra,
             kafkaClientAlgebra,
-            Subject.createValidated(v2MetadataTopicName).get,
+            v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
             metadataAlgebra
@@ -402,7 +402,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           new TopicDeletionProgram[IO](
             kafkaAlgebra,
             kafkaClientAlgebra,
-            Subject.createValidated(v2MetadataTopicName).get,
+           v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
             metadataAlgebra
@@ -431,7 +431,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           new TopicDeletionProgram[IO](
             kafkaAlgebra,
             kafkaClientAlgebra,
-            Subject.createValidated(v2MetadataTopicName).get,
+            v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
             metadataAlgebra

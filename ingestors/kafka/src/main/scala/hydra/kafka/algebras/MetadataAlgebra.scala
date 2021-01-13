@@ -29,14 +29,14 @@ object MetadataAlgebra {
   final case class TopicMetadataContainer(key: TopicMetadataV2Key, value: TopicMetadataV2Value, keySchema: Option[Schema], valueSchema: Option[Schema])
 
   def make[F[_]: Sync: Concurrent: Logger](
-                                            metadataTopicName: TopicName,
+                                            metadataTopicName: Subject,
                                             consumerGroup: ConsumerGroup,
                                             kafkaClientAlgebra: KafkaClientAlgebra[F],
                                             schemaRegistryAlgebra: SchemaRegistry[F],
                                             consumeMetadataEnabled: Boolean
                                           ): F[MetadataAlgebra[F]] = {
     val metadataStream: fs2.Stream[F, (GenericRecord, Option[GenericRecord])] = if (consumeMetadataEnabled) {
-      kafkaClientAlgebra.consumeMessages(metadataTopicName, consumerGroup, commitOffsets = false).map(record => (record._1, record._2))
+      kafkaClientAlgebra.consumeMessages(metadataTopicName.toString, consumerGroup, commitOffsets = false).map(record => (record._1, record._2))
     } else {
       fs2.Stream.empty
     }
