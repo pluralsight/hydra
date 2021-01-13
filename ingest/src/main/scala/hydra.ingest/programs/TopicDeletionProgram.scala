@@ -58,7 +58,6 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
                 _.leftMap(error => MetadataFailToDelete(topicName, v1MetadataTopicName, error)).toValidatedNel
               }
           }
-
         case other =>
           deleteV1Metadata(topicName).attempt.map {
             _.leftMap(error => MetadataFailToDelete(topicName, v1MetadataTopicName, error)).toValidatedNel
@@ -79,7 +78,11 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
   private def deleteV1Metadata(topicName: String): F[Unit] = {
     for {
       _ <- kafkaClient
+<<<<<<< HEAD
           .publishStringKeyMessage((Some(topicName), None, None), v1MetadataTopicName.toString())
+=======
+          .publishStringKeyMessage((Some(topicName), None, None), v1MetadataTopicName)
+>>>>>>> 46a2d0264f55ae89c07b09ae486f84c1a5badfca
           .rethrow
     } yield ()
   }
@@ -98,7 +101,11 @@ object TopicDeletionProgram {
   final case class SchemaDeleteTopicErrorList(errors: NonEmptyList[SchemaRegistryError])
     extends Exception (s"Topic(s) failed to delete:\n${errors.map(_.errorMessage).toList.mkString("\n")}")
 
+<<<<<<< HEAD
   final case class MetadataFailToDelete(subject: String, metadataTopic: Subject, cause: Throwable)
+=======
+  final case class MetadataFailToDelete(subject: String, metadataTopic: String, cause: Throwable)
+>>>>>>> 46a2d0264f55ae89c07b09ae486f84c1a5badfca
     extends Exception(s"Unable to delete $subject from $metadataTopic", cause)
 
   final case class MetadataDeleteTopicErrorList(errors: NonEmptyList[MetadataFailToDelete])
