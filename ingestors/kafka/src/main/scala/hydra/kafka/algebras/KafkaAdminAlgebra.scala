@@ -226,11 +226,7 @@ object KafkaAdminAlgebra {
         ref.get.map(_.get(name))
 
       override def getTopicNames: F[List[TopicName]] =
-        ref.get.map(
-          k => {
-            k.keys.toList
-          }
-        )
+        ref.get.map(_.keys.toList)
 
       override def createTopic(
           name: TopicName,
