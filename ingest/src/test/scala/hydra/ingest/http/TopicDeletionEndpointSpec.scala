@@ -135,7 +135,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = false)
-        _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1)))
+        _ <- topic.traverse(t => kafkaAlgebra.createTopic(t.toString,TopicDetails(1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
         allTopics <- kafkaAlgebra.getTopicNames
       } yield {

@@ -58,7 +58,6 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
                 _.leftMap(error => MetadataFailToDelete(topicName, v1MetadataTopicName, error)).toValidatedNel
               }
           }
-          
         case other =>
           deleteV1Metadata(topicName).attempt.map {
             _.leftMap(error => MetadataFailToDelete(topicName, v1MetadataTopicName, error)).toValidatedNel
