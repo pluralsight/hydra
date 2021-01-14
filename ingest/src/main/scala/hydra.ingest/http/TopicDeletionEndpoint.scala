@@ -114,7 +114,8 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
     }
 
   override val route: Route = {
-    handleExceptions(exceptionHandler(Instant.now, extractMethod.toString)) {
+    extractMethod { method =>
+    handleExceptions(exceptionHandler(Instant.now, method.value)) {
       extractExecutionContext { implicit ec =>
         pathPrefix("v2" / "topics") {
           val startTime = Instant.now
@@ -159,6 +160,7 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
           }
         }
       }
+    }
     }
   }
 

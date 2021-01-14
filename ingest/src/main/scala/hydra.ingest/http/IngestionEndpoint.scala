@@ -48,29 +48,29 @@ class IngestionEndpoint[F[_]: Futurable](
   import hydra.ingest.bootstrap.RequestFactories._
 
   override val route: Route = {
-    handleExceptions(exceptionHandler("UnknownTopic", Instant.now, extractMethod.toString)) {
-      pathPrefix("ingest") {
-        val startTime = Instant.now
-        pathEndOrSingleSlash {
-          post {
-            handleExceptions(exceptionHandler("UnknownTopic", Instant.now, "POST")) {
-              requestEntityPresent {
-                publishRequest(startTime)
-              }
-            }
-          } ~ deleteRequest(startTime)
-        }
-      } ~
-        pathPrefix("v2" / "topics" / Segment / "records") { topicName =>
+    extractMethod { method =>
+      handleExceptions(exceptionHandler("UnknownTopic", Instant.now, method.value)) {
+        pathPrefix("ingest") {
           val startTime = Instant.now
           pathEndOrSingleSlash {
             post {
-              handleExceptions(exceptionHandler(topicName, Instant.now, "POST")) {
-                publishRequestV2(topicName, startTime)
+              requestEntityPresent {
+                publishRequest(startTime)
+              }
+            } ~ deleteRequest(startTime)
+          }
+        } ~
+          pathPrefix("v2" / "topics" / Segment / "records") { topicName =>
+            val startTime = Instant.now
+            pathEndOrSingleSlash {
+              post {
+                handleExceptions(exceptionHandler(topicName, Instant.now, method.value)) {
+                  publishRequestV2(topicName, startTime)
+                }
               }
             }
           }
-        }
+      }
     }
   }
 

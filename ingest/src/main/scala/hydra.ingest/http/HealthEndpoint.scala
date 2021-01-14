@@ -12,14 +12,16 @@ import hydra.core.monitor.HydraMetrics.addHttpMetric
 
 object HealthEndpoint extends RouteSupport with DefaultJsonProtocol with SprayJsonSupport {
   override val route: Route = {
-    handleExceptions(exceptionHandler(Instant.now, extractMethod.toString)) {
-      path("health") {
-        val startTime = Instant.now
-        extractExecutionContext { implicit ec =>
-          pathEndOrSingleSlash {
-            get {
-              addHttpMetric("", StatusCodes.OK, "/health", startTime, "GET")
-              complete(BuildInfo.toJson)
+    extractMethod { method =>
+      handleExceptions(exceptionHandler(Instant.now, method.value)) {
+        path("health") {
+          val startTime = Instant.now
+          extractExecutionContext { implicit ec =>
+            pathEndOrSingleSlash {
+              get {
+                addHttpMetric("", StatusCodes.OK, "/health", startTime, "GET")
+                complete(BuildInfo.toJson)
+              }
             }
           }
         }

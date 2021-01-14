@@ -83,47 +83,49 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
     .getOrElse(false)
 
   override def route: Route = cors(settings) {
-    handleExceptions(excptHandler(Instant.now, extractMethod.toString)) {
-      extractExecutionContext { implicit ec =>
-        pathPrefix("schemas") {
-          val startTime = Instant.now
-          get {
-            pathEndOrSingleSlash {
-              onSuccess(
-                (schemaRegistryActor ? FetchSubjectsRequest)
-                  .mapTo[FetchSubjectsResponse]
-              ) { response =>
-                addHttpMetric("", OK, "/schemas", startTime, "GET")
-                complete(OK, response.subjects)
+    extractMethod { method =>
+      handleExceptions(excptHandler(Instant.now, method.value)) {
+        extractExecutionContext { implicit ec =>
+          pathPrefix("schemas") {
+            val startTime = Instant.now
+            get {
+              pathEndOrSingleSlash {
+                onSuccess(
+                  (schemaRegistryActor ? FetchSubjectsRequest)
+                    .mapTo[FetchSubjectsResponse]
+                ) { response =>
+                  addHttpMetric("", OK, "/schemas", startTime, method.value)
+                  complete(OK, response.subjects)
+                }
+              } ~ path(Segment) { subject =>
+                parameters('schema ?) { schemaOnly: Option[String] =>
+                  getSchema(includeKeySchema = false, subject, schemaOnly, startTime)
+                }
+              } ~ path(Segment / "versions") { subject =>
+                onSuccess(
+                  (schemaRegistryActor ? FetchAllSchemaVersionsRequest(subject))
+                    .mapTo[FetchAllSchemaVersionsResponse]
+                ) { response =>
+                  addHttpMetric(subject, OK, "/schemas/.../versions", startTime, method.value)
+                  complete(OK, response.versions.map(SchemasEndpointResponse(_)))
+                }
+              } ~ path(Segment / "versions" / IntNumber) { (subject, version) =>
+                onSuccess(
+                  (schemaRegistryActor ? FetchSchemaVersionRequest(
+                    subject,
+                    version
+                  )).mapTo[FetchSchemaVersionResponse]
+                ) { response =>
+                  addHttpMetric(subject, OK, "/schemas/.../versions/" + version, startTime, method.value)
+                  complete(OK, SchemasEndpointResponse(response.schemaResource))
+                }
               }
-            } ~ path(Segment) { subject =>
-              parameters('schema ?) { schemaOnly: Option[String] =>
-                getSchema(includeKeySchema = false, subject, schemaOnly, startTime)
+            } ~
+              post {
+                registerNewSchema(startTime)
               }
-            } ~ path(Segment / "versions") { subject =>
-              onSuccess(
-                (schemaRegistryActor ? FetchAllSchemaVersionsRequest(subject))
-                  .mapTo[FetchAllSchemaVersionsResponse]
-              ) { response =>
-                addHttpMetric(subject, OK, "/schemas/.../versions", startTime, "GET")
-                complete(OK, response.versions.map(SchemasEndpointResponse(_)))
-              }
-            } ~ path(Segment / "versions" / IntNumber) { (subject, version) =>
-              onSuccess(
-                (schemaRegistryActor ? FetchSchemaVersionRequest(
-                  subject,
-                  version
-                )).mapTo[FetchSchemaVersionResponse]
-              ) { response =>
-                addHttpMetric(subject, OK, "/schemas/.../versions/" + version, startTime, "GET")
-                complete(OK, SchemasEndpointResponse(response.schemaResource))
-              }
-            }
-          } ~
-            post {
-              registerNewSchema(startTime)
-            }
-        } ~ v2Route
+          } ~ v2Route
+        }
       }
     }
   }

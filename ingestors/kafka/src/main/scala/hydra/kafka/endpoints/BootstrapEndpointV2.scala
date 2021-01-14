@@ -43,31 +43,33 @@ final class BootstrapEndpointV2[F[_]: Futurable](
 
   val route: Route = cors(settings) {
     extractExecutionContext { implicit ec =>
-      pathPrefix("v2" / "topics" / Segment) { topicName =>
-        val startTime = Instant.now
-        handleExceptions(exceptionHandler(topicName, startTime, extractMethod.toString)) {
-          pathEndOrSingleSlash {
-            put {
-              entity(as[TopicMetadataV2Request]) { t =>
-                Subject.createValidated(topicName) match {
-                  case Some(validatedTopic) =>
-                    onComplete(
-                      Futurable[F].unsafeToFuture(createTopicProgram
-                        .createTopic(validatedTopic, t, defaultTopicDetails))
-                    ) {
-                      case Success(_) =>
-                        addHttpMetric(topicName, StatusCodes.OK, "V2Bootstrap", startTime, "PUT")
-                        complete(StatusCodes.OK)
-                      case Failure(IncompatibleSchemaException(m)) =>
-                        addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(s"$IncompatibleSchemaException"))
-                        complete(StatusCodes.BadRequest, m)
-                      case Failure(e) =>
-                        addHttpMetric(topicName, StatusCodes.InternalServerError, "V2Bootstrap", startTime, "PUT", error = Some(e.getMessage))
-                        complete(StatusCodes.InternalServerError, e)
-                    }
-                  case None =>
-                    addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(Subject.invalidFormat))
-                    complete(StatusCodes.BadRequest, Subject.invalidFormat)
+      extractMethod { method =>
+        pathPrefix("v2" / "topics" / Segment) { topicName =>
+          val startTime = Instant.now
+          handleExceptions(exceptionHandler(topicName, startTime, method.value)) {
+            pathEndOrSingleSlash {
+              put {
+                entity(as[TopicMetadataV2Request]) { t =>
+                  Subject.createValidated(topicName) match {
+                    case Some(validatedTopic) =>
+                      onComplete(
+                        Futurable[F].unsafeToFuture(createTopicProgram
+                          .createTopic(validatedTopic, t, defaultTopicDetails))
+                      ) {
+                        case Success(_) =>
+                          addHttpMetric(topicName, StatusCodes.OK, "V2Bootstrap", startTime, "PUT")
+                          complete(StatusCodes.OK)
+                        case Failure(IncompatibleSchemaException(m)) =>
+                          addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(s"$IncompatibleSchemaException"))
+                          complete(StatusCodes.BadRequest, m)
+                        case Failure(e) =>
+                          addHttpMetric(topicName, StatusCodes.InternalServerError, "V2Bootstrap", startTime, "PUT", error = Some(e.getMessage))
+                          complete(StatusCodes.InternalServerError, e)
+                      }
+                    case None =>
+                      addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(Subject.invalidFormat))
+                      complete(StatusCodes.BadRequest, Subject.invalidFormat)
+                  }
                 }
               }
             }

@@ -62,50 +62,53 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
     (t.startsWith("_") && showSystemTopics) || !t.startsWith("_")
 
   override val route = cors(settings) {
-    extractExecutionContext { implicit ec =>
-      pathPrefix("transports" / "kafka") {
-        val startTime = Instant.now
-        handleExceptions(exceptionHandler(startTime, extractMethod.toString)) {
-          get {
-            path("topics") {
-              parameters('pattern ?, 'fields ?) { (pattern, n) =>
-                val topicList = pattern.map(filterByPattern) getOrElse topics
-                n match {
-                  case Some(_) =>
-                    val response = topicList.map(_.keys)
-                    addHttpMetric("",StatusCodes.OK,"/transports/kafka/topics-keys", startTime, "GET")
-                    complete(response)
-                  case None =>
-                    addHttpMetric("",StatusCodes.OK,"/transports/kafka/topics", startTime, "GET")
-                    complete(topicList)
+    extractMethod { method =>
+      extractExecutionContext { implicit ec =>
+        pathPrefix("transports" / "kafka") {
+          val startTime = Instant.now
+          handleExceptions(exceptionHandler(startTime, method.value)) {
+            get {
+              path("topics") {
+                parameters('pattern ?, 'fields ?) { (pattern, n) =>
+                  val topicList = pattern.map(filterByPattern) getOrElse topics
+                  n match {
+                    case Some(_) =>
+                      val response = topicList.map(_.keys)
+                      addHttpMetric("", StatusCodes.OK, "/transports/kafka/topics-keys", startTime, "GET")
+                      complete(response)
+                    case None =>
+                      addHttpMetric("", StatusCodes.OK, "/transports/kafka/topics", startTime, "GET")
+                      complete(topicList)
+                  }
+                }
+              } ~ path("topics" / Segment) { name =>
+                onSuccess(topics) { topics =>
+                  topics
+                    .get(name)
+                    .map { response =>
+                      addHttpMetric(name, StatusCodes.OK, "/transports/kafka/topics/", startTime, "GET")
+                      complete(response)
+                    }
+                    .getOrElse(
+                      failWith {
+                        addHttpMetric(name, StatusCodes.NotFound, "/transports/kafka/topics/", startTime, "GET", error = Some(s"Topic $name not found"))
+                        new NotFoundException(s"Topic $name not found.")
+                      }
+                    )
                 }
               }
-            } ~ path("topics" / Segment) { name =>
-              onSuccess(topics) { topics =>
-                topics
-                  .get(name)
-                  .map { response =>
-                    addHttpMetric(name, StatusCodes.OK, "/transports/kafka/topics/", startTime, "GET")
-                    complete(response)
-                  }
-                  .getOrElse(
-                    failWith{
-                      addHttpMetric(name, StatusCodes.NotFound, "/transports/kafka/topics/", startTime, "GET", error = Some(s"Topic $name not found"))
-                      new NotFoundException(s"Topic $name not found.")}
-                  )
-              }
-            }
-          } ~ createTopic(startTime)
-        }
-      } ~ pathPrefix("v2" / "topics") {
-        val startTime = Instant.now
-        getAllV2Metadata(startTime) ~
-          pathPrefix(Segment) { topicName =>
-            getV2Metadata(topicName, startTime)
+            } ~ createTopic(startTime)
           }
-      } ~ pathPrefix("v2" / "streams") {
-        val startTime = Instant.now
-        getAllV2Metadata(startTime)
+        } ~ pathPrefix("v2" / "topics") {
+          val startTime = Instant.now
+          getAllV2Metadata(startTime) ~
+            pathPrefix(Segment) { topicName =>
+              getV2Metadata(topicName, startTime)
+            }
+        } ~ pathPrefix("v2" / "streams") {
+          val startTime = Instant.now
+          getAllV2Metadata(startTime)
+        }
       }
     }
   }
