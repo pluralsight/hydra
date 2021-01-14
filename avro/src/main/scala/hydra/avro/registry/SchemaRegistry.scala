@@ -115,6 +115,9 @@ object SchemaRegistry {
   final case class IncompatibleSchemaException(message: String) extends
     RuntimeException(message)
 
+  final case class MalformedSchemaException(message: String) extends
+    RuntimeException(message)
+
   type SchemaId = Int
   type SchemaVersion = Int
 
@@ -150,19 +153,24 @@ object SchemaRegistry {
         Monoid[A].combine(isThisLayerValid, areOtherLayersValid)
       }
 
-      private def areLogicalTypeBaseTypeCompat(sch: Schema): Boolean = {
+      private def checkLogicalTypesCompat(sch: Schema): F[Unit] = {
         implicit val monoidBooleanAnd: Monoid[Boolean] = new Monoid[Boolean] {
           def combine(x: Boolean, y: Boolean): Boolean = x && y
           def empty: Boolean = true
         }
         val Uuid = LogicalTypes.uuid.getName
         val TimestampMillis = LogicalTypes.timestampMillis.getName
-        foldMapAll(sch) { s =>
-          Option(s.getLogicalType.getName) match {
+        val isValid = foldMapAll(sch) { s =>
+          Option(s.getLogicalType).map(_.getName) match {
             case Some(TimestampMillis) => s.getType == Schema.Type.LONG
             case Some(Uuid) => s.getType == Schema.Type.STRING
             case _ => true
           }
+        }
+        if (isValid) {
+          Sync[F].unit
+        } else {
+          Sync[F].raiseError(MalformedSchemaException("Logical Types and base types must all match."))
         }
       }
 
@@ -173,7 +181,8 @@ object SchemaRegistry {
         for {
           versions <- getAllVersions(subject)
           schemas <- versions.traverse(getSchemaFor(subject, _)).map(_.flatten).checkKeyEvolution(subject, schema)
-          validated <- Sync[F].delay(validate(schema, schemas.reverse))
+          validated <- Sync[F].pure(validate(schema, schemas.reverse))
+          _ <- checkLogicalTypesCompat[F](schema)
           schemaVersion <- if (validated) {
             Sync[F].delay(schemaRegistryClient.register(subject, schema))
           } else {
