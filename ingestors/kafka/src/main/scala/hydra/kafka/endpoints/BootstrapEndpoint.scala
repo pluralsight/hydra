@@ -46,47 +46,49 @@ class BootstrapEndpoint(override val system:ActorSystem) extends RouteSupport
   private implicit val timeout = Timeout(10.seconds)
 
   override val route: Route = cors(settings) {
-    handleExceptions(exceptionHandler("Bootstrap", Instant.now, extractMethod.toString)) {
-      extractExecutionContext { implicit ec =>
-        pathPrefix("streams") {
-          val startTime = Instant.now
-          pathEndOrSingleSlash {
-            post {
-              requestEntityPresent {
-                entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
-                  val topic = topicMetadataRequest.schema.getFields("namespace", "name").mkString(".").replaceAll("\"","")
-                  onComplete(
-                    bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)
-                  ) {
+    extractMethod { method =>
+      handleExceptions(exceptionHandler("Bootstrap", Instant.now, method.value)) {
+        extractExecutionContext { implicit ec =>
+          pathPrefix("streams") {
+            val startTime = Instant.now
+            pathEndOrSingleSlash {
+              post {
+                requestEntityPresent {
+                  entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
+                    val topic = topicMetadataRequest.schema.getFields("namespace", "name").mkString(".").replaceAll("\"", "")
+                    onComplete(
+                      bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)
+                    ) {
 
-                    case Success(message) =>
-                      message match {
+                      case Success(message) =>
+                        message match {
 
-                        case BootstrapSuccess(metadata) =>
-                          addHttpMetric(topic, StatusCodes.OK, "Bootstrap", startTime, "POST")
-                          complete(StatusCodes.OK, toResource(metadata))
+                          case BootstrapSuccess(metadata) =>
+                            addHttpMetric(topic, StatusCodes.OK, "Bootstrap", startTime, "POST")
+                            complete(StatusCodes.OK, toResource(metadata))
 
-                        case BootstrapFailure(reasons) =>
-                          addHttpMetric(topic, StatusCodes.BadRequest, "Bootstrap", startTime, "POST", error = Some(reasons.toString))
-                          complete(StatusCodes.BadRequest, reasons)
+                          case BootstrapFailure(reasons) =>
+                            addHttpMetric(topic, StatusCodes.BadRequest, "Bootstrap", startTime, "POST", error = Some(reasons.toString))
+                            complete(StatusCodes.BadRequest, reasons)
 
-                        case e: Exception =>
-                          log.error("Unexpected error in TopicBootstrapActor", e)
-                          addHttpMetric(topic, StatusCodes.InternalServerError, "Bootstrap", startTime, "POST", error = Some(e.getMessage))
-                          complete(StatusCodes.InternalServerError, e.getMessage)
-                      }
+                          case e: Exception =>
+                            log.error("Unexpected error in TopicBootstrapActor", e)
+                            addHttpMetric(topic, StatusCodes.InternalServerError, "Bootstrap", startTime, "POST", error = Some(e.getMessage))
+                            complete(StatusCodes.InternalServerError, e.getMessage)
+                        }
 
-                    case Failure(ex) =>
-                      log.error("Unexpected error in BootstrapEndpoint", ex)
-                      addHttpMetric(topic, StatusCodes.InternalServerError, "Bootstrap", startTime, "POST", error = Some(ex.getMessage))
-                      complete(StatusCodes.InternalServerError, ex.getMessage)
+                      case Failure(ex) =>
+                        log.error("Unexpected error in BootstrapEndpoint", ex)
+                        addHttpMetric(topic, StatusCodes.InternalServerError, "Bootstrap", startTime, "POST", error = Some(ex.getMessage))
+                        complete(StatusCodes.InternalServerError, ex.getMessage)
+                    }
                   }
                 }
               }
+            } ~ get {
+              pathEndOrSingleSlash(getAllStreams(None, startTime)) ~
+                path(Segment)(subject => getAllStreams(Some(subject), startTime))
             }
-          } ~ get {
-            pathEndOrSingleSlash(getAllStreams(None, startTime)) ~
-              path(Segment)(subject => getAllStreams(Some(subject), startTime))
           }
         }
       }
