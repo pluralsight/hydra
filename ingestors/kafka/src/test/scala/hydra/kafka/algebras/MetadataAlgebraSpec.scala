@@ -49,7 +49,7 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
   (for {
     kafkaClient <- KafkaClientAlgebra.test[IO]
     schemaRegistry <- SchemaRegistry.test[IO]
-    metadata <- MetadataAlgebra.make(metadataTopicName, consumerGroup, kafkaClient, schemaRegistry, consumeMetadataEnabled = true)
+    metadata <- MetadataAlgebra.make(Subject.createValidated(metadataTopicName).get, consumerGroup, kafkaClient, schemaRegistry, consumeMetadataEnabled = true)
   } yield {
     runTests(metadata, kafkaClient)
   }).unsafeRunSync()

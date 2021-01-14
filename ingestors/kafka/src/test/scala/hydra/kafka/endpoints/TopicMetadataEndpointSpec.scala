@@ -69,7 +69,7 @@ class TopicMetadataEndpointSpec
   val route: Route = (for {
     kafkaClient <- KafkaClientAlgebra.test[IO]
     schemaRegistry <- SchemaRegistry.test[IO]
-    metadataAlgebra <- MetadataAlgebra.make[IO]("topicName-Bill", "I'm_A_Jerk", kafkaClient, schemaRegistry, consumeMetadataEnabled = false)
+    metadataAlgebra <- MetadataAlgebra.make[IO](Subject.createValidated("_topicName.Bill").get, "I'm_A_Jerk", kafkaClient, schemaRegistry, consumeMetadataEnabled = false)
   } yield new TopicMetadataEndpoint(consumerProxy, metadataAlgebra).route).unsafeRunSync()
 
   val node = new Node(0, "host", 1)
