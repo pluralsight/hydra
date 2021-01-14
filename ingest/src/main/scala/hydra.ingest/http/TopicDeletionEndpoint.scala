@@ -171,5 +171,4 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
         complete(500, e.getMessage)
       }
   }
-
 }
