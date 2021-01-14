@@ -14,6 +14,7 @@ import org.apache.avro.LogicalTypes
 import cats.kernel.Monoid
 import cats.Foldable
 import cats.Eval
+import org.apache.avro.LogicalType
 
 /**
   * Internal interface to interact with the SchemaRegistryClient from Confluent.
@@ -115,8 +116,12 @@ object SchemaRegistry {
   final case class IncompatibleSchemaException(message: String) extends
     RuntimeException(message)
 
-  final case class MalformedSchemaException(message: String) extends
-    RuntimeException(message)
+  final case class LogicalTypeBaseTypeMismatch(baseType: Schema.Type, logicalType: LogicalType, fieldName: String)
+  final case class LogicalTypeBaseTypeMismatchErrors(errors: List[LogicalTypeBaseTypeMismatch]) extends
+    RuntimeException(
+      errors.map(e => s"Field named '${e.fieldName}' contains mismatch in " +
+        s"baseType of '${e.baseType.getName}' and logicalType of '${e.logicalType.getName}'").mkString
+    )
 
   type SchemaId = Int
   type SchemaVersion = Int
@@ -140,16 +145,19 @@ object SchemaRegistry {
   private def getFromSchemaRegistryClient[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient): SchemaRegistry[F] =
     new SchemaRegistry[F] {
 
-      private def foldMapAll[A: Monoid](start: Schema)(f: Schema => A): A = {
-        val isThisLayerValid = f(start)
-        val allSchemas = start.getType match {
-          case Schema.Type.RECORD => start.getFields.asScala.toList.map(_.schema)
-          case Schema.Type.UNION => start.getTypes.asScala.toList
-          case Schema.Type.MAP => List(start.getValueType)
-          case Schema.Type.ARRAY => List(start.getElementType)
+      private implicit class SchemaOps(sch: Schema) {
+        def fields: List[Schema.Field] = sch.getType match {
+          case Schema.Type.RECORD => sch.getFields.asScala.toList
+          case Schema.Type.UNION => sch.getTypes.asScala.toList.flatMap(_.fields)
+          case Schema.Type.MAP => sch.getValueType.fields
+          case Schema.Type.ARRAY => sch.getElementType.fields
           case _ => List.empty
         }
-        val areOtherLayersValid = allSchemas.foldMap(foldMapAll[A](_)(f))
+      }
+
+      private def foldMapAll[A: Monoid](start: Schema.Field)(f: Schema.Field => A): A = {
+        val isThisLayerValid = f(start)
+        val areOtherLayersValid = start.schema.fields.foldMap(foldMapAll[A](_)(f))
         Monoid[A].combine(isThisLayerValid, areOtherLayersValid)
       }
 
@@ -158,19 +166,26 @@ object SchemaRegistry {
           def combine(x: Boolean, y: Boolean): Boolean = x && y
           def empty: Boolean = true
         }
-        val Uuid = LogicalTypes.uuid.getName
-        val TimestampMillis = LogicalTypes.timestampMillis.getName
-        val isValid = foldMapAll(sch) { s =>
-          Option(s.getLogicalType).map(_.getName) match {
-            case Some(TimestampMillis) => s.getType == Schema.Type.LONG
-            case Some(Uuid) => s.getType == Schema.Type.STRING
-            case _ => true
+        val Uuid = LogicalTypes.uuid
+        val TimestampMillis = LogicalTypes.timestampMillis
+        val errors = sch.fields.foldMap(foldMapAll(_) { field =>
+          val s = field.schema
+          def checkTypesMatch(expected: Schema.Type, logicalType: LogicalType): List[LogicalTypeBaseTypeMismatch] = {
+            if (s.getType == expected) {
+               List.empty
+            } else {
+              List(LogicalTypeBaseTypeMismatch(s.getType, logicalType, field.name))
+            }
           }
-        }
-        if (isValid) {
-          Sync[F].unit
-        } else {
-          Sync[F].raiseError(MalformedSchemaException("Logical Types and base types must all match."))
+          Option(s.getLogicalType) match {
+            case Some(TimestampMillis) => checkTypesMatch(Schema.Type.LONG, TimestampMillis)
+            case Some(Uuid) => checkTypesMatch(Schema.Type.STRING, Uuid)
+            case _ => List.empty
+          }
+        })
+        errors match {
+          case Nil => Sync[F].unit
+          case errs => Sync[F].raiseError(LogicalTypeBaseTypeMismatchErrors(errs))
         }
       }
 
@@ -182,7 +197,7 @@ object SchemaRegistry {
           versions <- getAllVersions(subject)
           schemas <- versions.traverse(getSchemaFor(subject, _)).map(_.flatten).checkKeyEvolution(subject, schema)
           validated <- Sync[F].pure(validate(schema, schemas.reverse))
-          _ <- checkLogicalTypesCompat[F](schema)
+          _ <- checkLogicalTypesCompat(schema)
           schemaVersion <- if (validated) {
             Sync[F].delay(schemaRegistryClient.register(subject, schema))
           } else {
