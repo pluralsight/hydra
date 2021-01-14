@@ -8,6 +8,10 @@ import org.apache.avro.Schema.Parser
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
+import org.apache.avro.LogicalTypes
+import hydra.avro.registry.SchemaRegistry.LogicalTypeBaseTypeMismatch
+import hydra.avro.registry.SchemaRegistry.LogicalTypeBaseTypeMismatchErrors
+import org.apache.avro.LogicalType
 
 class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
 
@@ -265,7 +269,30 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
     } yield ()
   }
 
-  private def runTests[F[_]: MonadError[*[_], Throwable]: Sync](
+  private def testLogicalTypeBaseTypeMismatch[F[_]: MonadError[*[_], Throwable]](
+      schemaRegistry: SchemaRegistry[F]
+  ): F[Unit] = {
+    val subject = "testSubjectAdd-value"
+    val schema = SchemaBuilder.record("testVal")
+      .fields()
+      .name("testUuid")
+      .`type`(LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.INT)))
+      .noDefault
+      .endRecord
+    for {
+      result <- schemaRegistry.registerSchema(subject, schema).attempt
+      allVersions <- schemaRegistry.getAllVersions(subject)
+    } yield {
+      it must "not add schema when logical type and base type do not match" in {
+        result shouldBe LogicalTypeBaseTypeMismatchErrors(
+          List(LogicalTypeBaseTypeMismatch(Schema.Type.INT, LogicalTypes.uuid, "testUuid"))
+        ).asLeft
+        allVersions shouldBe List.empty
+      }
+    }
+  }
+
+  private def runTests[F[_]: Sync](
       schemaRegistry: F[SchemaRegistry[F]]
   ): F[Unit] = {
     for {
@@ -275,6 +302,7 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
       _ <- schemaRegistry.flatMap(testErrorKeyEvolution[F])
       _ <- schemaRegistry.flatMap(testDeleteSchemaVersion[F])
       _ <- schemaRegistry.flatMap(testGetAllSubjects[F])
+      _ <- schemaRegistry.flatMap(testLogicalTypeBaseTypeMismatch[F])
       _ <- testInconsequentialKeyEvolutions[F]
       _ <- testNoPriorKeySchema[F]
       _ <- testValueSchemaBeingChecked[F]
