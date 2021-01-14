@@ -10,6 +10,10 @@ import javax.security.auth.Subject
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
+import org.apache.avro.LogicalTypes
+import cats.kernel.Monoid
+import cats.Foldable
+import cats.Eval
 
 /**
   * Internal interface to interact with the SchemaRegistryClient from Confluent.
@@ -132,6 +136,35 @@ object SchemaRegistry {
 
   private def getFromSchemaRegistryClient[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient): SchemaRegistry[F] =
     new SchemaRegistry[F] {
+
+      private def foldMapAll[A: Monoid](start: Schema)(f: Schema => A): A = {
+        val isThisLayerValid = f(start)
+        val allSchemas = start.getType match {
+          case Schema.Type.RECORD => start.getFields.asScala.toList.map(_.schema)
+          case Schema.Type.UNION => start.getTypes.asScala.toList
+          case Schema.Type.MAP => List(start.getValueType)
+          case Schema.Type.ARRAY => List(start.getElementType)
+          case _ => List.empty
+        }
+        val areOtherLayersValid = allSchemas.foldMap(foldMapAll[A](_)(f))
+        Monoid[A].combine(isThisLayerValid, areOtherLayersValid)
+      }
+
+      private def areLogicalTypeBaseTypeCompat(sch: Schema): Boolean = {
+        implicit val monoidBooleanAnd: Monoid[Boolean] = new Monoid[Boolean] {
+          def combine(x: Boolean, y: Boolean): Boolean = x && y
+          def empty: Boolean = true
+        }
+        val Uuid = LogicalTypes.uuid.getName
+        val TimestampMillis = LogicalTypes.timestampMillis.getName
+        foldMapAll(sch) { s =>
+          Option(s.getLogicalType.getName) match {
+            case Some(TimestampMillis) => s.getType == Schema.Type.LONG
+            case Some(Uuid) => s.getType == Schema.Type.STRING
+            case _ => true
+          }
+        }
+      }
 
       override def registerSchema(
           subject: String,
