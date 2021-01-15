@@ -162,10 +162,6 @@ object SchemaRegistry {
       }
 
       private def checkLogicalTypesCompat(sch: Schema): F[Unit] = {
-        implicit val monoidBooleanAnd: Monoid[Boolean] = new Monoid[Boolean] {
-          def combine(x: Boolean, y: Boolean): Boolean = x && y
-          def empty: Boolean = true
-        }
         val Uuid = LogicalTypes.uuid
         val TimestampMillis = LogicalTypes.timestampMillis
         val errors = sch.fields.foldMap(foldMapAll(_) { field =>
