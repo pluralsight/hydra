@@ -251,11 +251,11 @@ final class SimpleStringToGenericRecordSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "Use the default for a subrecord when no json value is provided" in {
-    val innerSchema = SchemaBuilder.record("innerRecord").fields().optionalInt("intOpt").endRecord()
+    val innerSchema = SchemaBuilder.record("innerRecord").fields().requiredInt("intOpt").endRecord()
     val genericRecord: GenericData.Record = new GenericRecordBuilder(innerSchema).set("intOpt", 12).build()
     val schema = SchemaBuilder.record("SchemaDefaults").fields().name("subrecord").`type`().record("innerRecord").fields().requiredInt("intOpt").endRecord().recordDefault(genericRecord).endRecord()
     val json = """{}"""
     val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
-    assert(record.get.get("subrecord") == new GenericRecordBuilder(innerSchema).set("intOpt", 12).build())
+    record.get.get("subrecord") shouldBe new GenericRecordBuilder(innerSchema).set("intOpt", 12).build()
   }
 }

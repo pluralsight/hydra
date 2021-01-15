@@ -39,10 +39,11 @@ object SimpleStringToGenericRecord {
             fields.get(field.name).map { fjson =>
               jsonToGenericRecordJson(fjson, field.schema).map(field.name -> _)
             }.getOrElse {
-              if (field.hasDefaultValue)
+              if (field.hasDefaultValue) {
                 defaultToJson(field)
-              else
+              } else {
                 jsonToGenericRecordJson(JsNull, field.schema).map(field.name -> _)
+              }
             }
           }.map(f => JsObject(f.toMap))
         case other => Failure(UnexpectedTypeFoundInGenericRecordConversion[JsObject](classOf[JsObject], other))
