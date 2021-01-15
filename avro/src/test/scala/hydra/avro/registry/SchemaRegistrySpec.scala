@@ -11,7 +11,6 @@ import org.scalatest.matchers.should.Matchers
 import org.apache.avro.LogicalTypes
 import hydra.avro.registry.SchemaRegistry.LogicalTypeBaseTypeMismatch
 import hydra.avro.registry.SchemaRegistry.LogicalTypeBaseTypeMismatchErrors
-import org.apache.avro.LogicalType
 
 class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
 
@@ -269,27 +268,41 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
     } yield ()
   }
 
-  private def testLogicalTypeBaseTypeMismatch[F[_]: MonadError[*[_], Throwable]](
+  private def testLogicalTypeMismatch[F[_]: MonadError[*[_], Throwable]](
       schemaRegistry: SchemaRegistry[F]
-  ): F[Unit] = {
+  )(sch: Schema, description: String): F[Unit] = {
     val subject = "testSubjectAdd-value"
     val schema = SchemaBuilder.record("testVal")
       .fields()
-      .name("testUuid")
-      .`type`(LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.INT)))
+      .name("test").`type`(sch)
       .noDefault
       .endRecord
     for {
       result <- schemaRegistry.registerSchema(subject, schema).attempt
       allVersions <- schemaRegistry.getAllVersions(subject)
     } yield {
-      it must "not add schema when logical type and base type do not match" in {
+      it must description in {
         result shouldBe LogicalTypeBaseTypeMismatchErrors(
-          List(LogicalTypeBaseTypeMismatch(Schema.Type.INT, LogicalTypes.uuid, "testUuid"))
+          List(LogicalTypeBaseTypeMismatch(Schema.Type.INT, LogicalTypes.uuid, "test"))
         ).asLeft
         allVersions shouldBe List.empty
       }
     }
+  }
+
+  private def testLogicalTypeBaseTypeMismatch[F[_]: MonadError[*[_], Throwable]](
+      schemaRegistry: SchemaRegistry[F]
+  ): F[Unit] = {
+    val test = testLogicalTypeMismatch[F](schemaRegistry) _
+    val s1 = LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.INT))
+    val s2 = SchemaBuilder.array.items
+      .`type`(LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.INT)))
+    val s3 = SchemaBuilder.map.values
+      .`type`(LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.INT)))
+
+    test(s1, "not add schema when logical type and base type on top level do not match") *>
+    test(s2, "not add schema when logical type and base type inside array do not match") *>
+    test(s3, "not add schema when logical type and base type inside map do not match")
   }
 
   private def runTests[F[_]: Sync](

@@ -144,25 +144,26 @@ object SchemaRegistry {
     new SchemaRegistry[F] {
 
       private implicit class SchemaOps(sch: Schema) {
-        def fields: List[Schema.Field] = sch.getType match {
+        def fields(fieldName: String, box: Boolean = false): List[Schema.Field] = sch.getType match {
           case Schema.Type.RECORD => sch.getFields.asScala.toList
-          case Schema.Type.UNION => sch.getTypes.asScala.toList.flatMap(_.fields)
-          case Schema.Type.MAP => sch.getValueType.fields
-          case Schema.Type.ARRAY => sch.getElementType.fields
+          case Schema.Type.UNION => sch.getTypes.asScala.toList.flatMap(_.fields(fieldName, true))
+          case Schema.Type.MAP => sch.getValueType.fields(fieldName, true)
+          case Schema.Type.ARRAY => sch.getElementType.fields(fieldName, true)
+          case _ if box => List(new Schema.Field(fieldName, sch))
           case _ => List.empty
         }
       }
 
       private def foldMapAll[A: Monoid](start: Schema.Field)(f: Schema.Field => A): A = {
         val isThisLayerValid = f(start)
-        val areOtherLayersValid = start.schema.fields.foldMap(foldMapAll[A](_)(f))
+        val areOtherLayersValid = start.schema.fields(start.name).foldMap(foldMapAll[A](_)(f))
         Monoid[A].combine(isThisLayerValid, areOtherLayersValid)
       }
 
       private def checkLogicalTypesCompat(sch: Schema): F[Unit] = {
         val Uuid = LogicalTypes.uuid
         val TimestampMillis = LogicalTypes.timestampMillis
-        val errors = sch.fields.foldMap(foldMapAll(_) { field =>
+        val errors = sch.fields("topLevel").foldMap(foldMapAll(_) { field =>
           val s = field.schema
           def checkTypesMatch(expected: Schema.Type, logicalType: LogicalType): List[LogicalTypeBaseTypeMismatch] = {
             if (s.getType == expected) {
