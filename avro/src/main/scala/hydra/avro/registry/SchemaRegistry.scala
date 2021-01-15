@@ -11,10 +11,8 @@ import javax.security.auth.Subject
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 import org.apache.avro.LogicalTypes
-import cats.kernel.Monoid
-import cats.Foldable
-import cats.Eval
 import org.apache.avro.LogicalType
+import cats.kernel.Monoid
 
 /**
   * Internal interface to interact with the SchemaRegistryClient from Confluent.
