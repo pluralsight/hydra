@@ -294,19 +294,20 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
       schemaRegistry: SchemaRegistry[F]
   ): F[Unit] = {
     val test = testLogicalTypeMismatch[F](schemaRegistry) _
-    val s1 = LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.INT))
+    val mismatch = LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.INT))
+    val s1 = mismatch
     val s2 = SchemaBuilder.array.items
-      .`type`(LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.INT)))
+      .`type`(mismatch)
     val s3 = SchemaBuilder.map.values
-      .`type`(LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.INT)))
+      .`type`(mismatch)
     val s4 = SchemaBuilder.unionOf.nullType.and
-      .`type`(LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.INT)))
+      .`type`(mismatch)
       .endUnion()
     val s5 = SchemaBuilder.unionOf.nullType.and.stringType.and
-      .`type`(LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.INT)))
+      .`type`(mismatch)
       .endUnion()
     val s6 = SchemaBuilder.record("testVal2").fields().name("test")
-      .`type`(LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.INT)))
+      .`type`(mismatch)
       .noDefault.endRecord
 
     test(s1, "not add schema when logical type and base type on top level do not match") *>
