@@ -1,7 +1,7 @@
 package hydra.avro.convert
 
 import hydra.avro.convert.StringToGenericRecord.ValidationExtraFieldsError
-import org.apache.avro.SchemaBuilder
+import org.apache.avro.{Schema, SchemaBuilder}
 import org.apache.avro.generic.{GenericData, GenericRecord, GenericRecordBuilder}
 import org.apache.avro.util.Utf8
 import org.scalatest.flatspec.AnyFlatSpec
@@ -229,10 +229,33 @@ final class SimpleStringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     record shouldBe a[Failure[ValidationExtraFieldsError]]
   }
 
-  it should "Use the Schema default if no json value is provided" in {
+  it should "Use the Schema default for boolean if no json value is provided" in {
     val schema = SchemaBuilder.record("SchemaDefaults").fields().requiredString("id").name("bool1").`type`().booleanType().booleanDefault(true).endRecord()
     val json = """{"id":"123"}"""
-    val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
+    val record = json.toGenericRecordSimple(schema)
     record.get.get("bool1") shouldBe true
+  }
+
+  it should "Use the Schema default for string if no json value is provided" in {
+    val schema = SchemaBuilder.record("SchemaDefaults").fields().requiredString("id").name("string1").`type`().stringType().stringDefault("helloThere").endRecord()
+    val json = """{"id":"123"}"""
+    val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
+    record.get.get("string1") shouldBe new Utf8("helloThere")
+  }
+
+  it should "Return null when no default is provided" in {
+    val schema = SchemaBuilder.record("SchemaDefaults").fields().requiredString("id").optionalBoolean("bool1").endRecord()
+    val json = """{"id":"123"}"""
+    val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
+    record.get.get("bool1") shouldBe null
+  }
+
+  it should "Use the default for a subrecord when no json value is provided" in {
+    val innerSchema = SchemaBuilder.record("innerRecord").fields().optionalInt("intOpt").endRecord()
+    val genericRecord: GenericData.Record = new GenericRecordBuilder(innerSchema).set("intOpt", 12).build()
+    val schema = SchemaBuilder.record("SchemaDefaults").fields().name("subrecord").`type`().record("innerRecord").fields().requiredInt("intOpt").endRecord().recordDefault(genericRecord).endRecord()
+    val json = """{}"""
+    val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
+    assert(record.get.get("subrecord") == new GenericRecordBuilder(innerSchema).set("intOpt", 12).build())
   }
 }

@@ -1,11 +1,12 @@
 package hydra.avro.convert
 
 import org.apache.avro.Schema
-import org.apache.avro.generic.GenericRecord
+import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
 
 import scala.util.{Failure, Success, Try}
 import spray.json._
 import cats.implicits._
+import org.apache.avro.Schema.Type._
 
 object SimpleStringToGenericRecord {
 
@@ -17,18 +18,37 @@ object SimpleStringToGenericRecord {
     import StringToGenericRecord._
     import collection.JavaConverters._
 
-    private def handleRecord(json: JsValue, schema: Schema): Try[JsValue] = {
-      schema.getFields.asScala.toList.traverse { field =>
-        val maybeThisFieldJson: Try[Option[JsValue]] = json match {
-          case JsObject(fields) => Success(fields.get(field.name))
-          case other => Failure(UnexpectedTypeFoundInGenericRecordConversion[JsObject](classOf[JsObject], other))
-        }
-        maybeThisFieldJson.flatMap {
-          case Some(fjson) => jsonToGenericRecordJson(fjson, field.schema).map(field.name -> _)
-          case None => jsonToGenericRecordJson(JsNull, field.schema).map(a => field.name -> field.defaultVal().toString.parseJson)
-        }
-      }.map(f => JsObject(f.toMap))
+//    private def handleRecord(json: JsValue, schema: Schema): Try[JsObject] = {
+//      schema.getFields.asScala.toList.traverse { field =>
+//        val maybeThisFieldJson: Try[Option[JsValue]] = json match {
+//          case JsObject(fields) => Success(fields.get(field.name))
+//          case _ if field.hasDefaultValue => defaultToJson(field.schema().getType, field.defaultVal())
+//          case other => Failure(UnexpectedTypeFoundInGenericRecordConversion[JsObject](classOf[JsObject], other))
+//        }
+//        maybeThisFieldJson.flatMap {
+//          case Some(fjson) => jsonToGenericRecordJson(fjson, field.schema).map(field.name -> _)
+//          case None => jsonToGenericRecordJson(JsNull, field.schema).map(field.name -> _)
+//        }
+//      }.map(f => JsObject(f.toMap))
+//    }
+
+    private def handleRecord(json: JsValue, schema: Schema): Try[JsObject] = {
+      json match {
+        case JsObject(fields) =>
+          schema.getFields.asScala.toList.traverse { field =>
+            fields.get(field.name).map { fjson =>
+              jsonToGenericRecordJson(fjson, field.schema).map(field.name -> _)
+            }.getOrElse {
+              if (field.hasDefaultValue)
+                defaultToJson(field)
+              else
+                jsonToGenericRecordJson(JsNull, field.schema).map(field.name -> _)
+            }
+          }.map(f => JsObject(f.toMap))
+        case other => Failure(UnexpectedTypeFoundInGenericRecordConversion[JsObject](classOf[JsObject], other))
+      }
     }
+
 
     private def handleUnion(json: JsValue, schema: Schema): Try[JsValue] = {
       json match {
@@ -68,10 +88,29 @@ object SimpleStringToGenericRecord {
       case _ => Success(json)
     }
 
-    def toGenericRecordSimple(schema: Schema, useStrictValidation: Boolean): Try[GenericRecord] = {
+    def toGenericRecordSimple(schema: Schema, useStrictValidation: Boolean = false): Try[GenericRecord] = {
       val jsonValidation = if (useStrictValidation) { checkStrictValidation(str, schema) } else Success()
-      val jsonOfPayload = jsonToGenericRecordJson(str.parseJson, schema)
+      val jsonOfPayload: Try[JsValue] = jsonToGenericRecordJson(str.parseJson, schema)
+
       jsonValidation.flatMap(_ => jsonOfPayload.flatMap(_.compactPrint.toGenericRecordPostValidation(schema)))
     }
+  }
+
+  private def defaultToJson(field: Schema.Field): Try[(String, JsValue)] = Try {
+    field.name -> (field.schema().getType match {
+      case RECORD =>
+          import com.fasterxml.jackson.databind.ObjectMapper
+          val mapper = new ObjectMapper
+          val jsonString = mapper.writeValueAsString(field.defaultVal())
+          jsonString.parseJson
+      case MAP | ARRAY | BOOLEAN =>
+        field.defaultVal().toString.parseJson
+      case ENUM | BYTES | STRING | FIXED =>
+        JsString.apply(field.defaultVal().toString)
+      case INT | FLOAT | LONG | DOUBLE =>
+        JsNumber(field.defaultVal().toString)
+      case NULL | UNION =>
+        JsNull
+    })
   }
 }
