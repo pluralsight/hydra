@@ -144,12 +144,12 @@ object SchemaRegistry {
     new SchemaRegistry[F] {
 
       private implicit class SchemaOps(sch: Schema) {
-        def fields(fieldName: String, box: Boolean = false): List[Schema.Field] = sch.getType match {
+        def fields(fieldName: String, diveDeeper: Boolean = false): List[Schema.Field] = sch.getType match {
           case Schema.Type.RECORD => sch.getFields.asScala.toList
-          case Schema.Type.UNION => sch.getTypes.asScala.toList.flatMap(_.fields(fieldName, true))
-          case Schema.Type.MAP => sch.getValueType.fields(fieldName, true)
-          case Schema.Type.ARRAY => sch.getElementType.fields(fieldName, true)
-          case _ if box => List(new Schema.Field(fieldName, sch))
+          case Schema.Type.UNION => sch.getTypes.asScala.toList.flatMap(_.fields(fieldName, diveDeeper = true))
+          case Schema.Type.MAP => sch.getValueType.fields(fieldName, diveDeeper = true)
+          case Schema.Type.ARRAY => sch.getElementType.fields(fieldName, diveDeeper = true)
+          case _ if diveDeeper => List(new Schema.Field(fieldName, sch))
           case _ => List.empty
         }
       }
