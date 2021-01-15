@@ -154,27 +154,29 @@ object SchemaRegistry {
         }
       }
 
+      // This function is needed because `foldMap` is not going to recursively go through
+      // all subtrees on its own.
       private def foldMapAll[A: Monoid](start: Schema.Field)(f: Schema.Field => A): A = {
         val isThisLayerValid = f(start)
         val areOtherLayersValid = start.schema.fields(start.name).foldMap(foldMapAll[A](_)(f))
         Monoid[A].combine(isThisLayerValid, areOtherLayersValid)
       }
 
+      private def checkTypesMatch(f: Schema.Field, expected: Schema.Type, logicalType: LogicalType): List[LogicalTypeBaseTypeMismatch] = {
+        if (f.schema.getType == expected) {
+            List.empty
+        } else {
+          List(LogicalTypeBaseTypeMismatch(f.schema.getType, logicalType, f.name))
+        }
+      }
+
       private def checkLogicalTypesCompat(sch: Schema): F[Unit] = {
         val Uuid = LogicalTypes.uuid
         val TimestampMillis = LogicalTypes.timestampMillis
         val errors = sch.fields("topLevel").foldMap(foldMapAll(_) { field =>
-          val s = field.schema
-          def checkTypesMatch(expected: Schema.Type, logicalType: LogicalType): List[LogicalTypeBaseTypeMismatch] = {
-            if (s.getType == expected) {
-               List.empty
-            } else {
-              List(LogicalTypeBaseTypeMismatch(s.getType, logicalType, field.name))
-            }
-          }
-          Option(s.getLogicalType) match {
-            case Some(TimestampMillis) => checkTypesMatch(Schema.Type.LONG, TimestampMillis)
-            case Some(Uuid) => checkTypesMatch(Schema.Type.STRING, Uuid)
+          Option(field.schema.getLogicalType) match {
+            case Some(TimestampMillis) => checkTypesMatch(field, Schema.Type.LONG, TimestampMillis)
+            case Some(Uuid) => checkTypesMatch(field, Schema.Type.STRING, Uuid)
             case _ => List.empty
           }
         })

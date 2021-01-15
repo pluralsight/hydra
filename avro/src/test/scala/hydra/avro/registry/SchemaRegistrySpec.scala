@@ -299,10 +299,23 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
       .`type`(LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.INT)))
     val s3 = SchemaBuilder.map.values
       .`type`(LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.INT)))
+    val s4 = SchemaBuilder.unionOf.nullType.and
+      .`type`(LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.INT)))
+      .endUnion()
+    val s5 = SchemaBuilder.unionOf.nullType.and.stringType.and
+      .`type`(LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.INT)))
+      .endUnion()
+    val s6 = SchemaBuilder.record("testVal2").fields().name("test")
+      .`type`(LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.INT)))
+      .noDefault.endRecord
 
     test(s1, "not add schema when logical type and base type on top level do not match") *>
     test(s2, "not add schema when logical type and base type inside array do not match") *>
-    test(s3, "not add schema when logical type and base type inside map do not match")
+    test(s3, "not add schema when logical type and base type inside map do not match") *>
+    test(s4, "not add schema when logical type and base type inside union do not match") *>
+    test(s5, "not add schema when logical type and base type inside triple union do not match") *>
+    test(s6, "not add schema when logical type and base type inside record do not match")
+
   }
 
   private def runTests[F[_]: Sync](
