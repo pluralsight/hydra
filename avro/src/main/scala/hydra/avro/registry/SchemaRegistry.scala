@@ -146,7 +146,7 @@ object SchemaRegistry {
     new SchemaRegistry[F] {
 
       private implicit class SchemaOps(sch: Schema) {
-        def fields(fieldName: String): List[Schema.Field] = fieldsEval(fieldName, box = false).value
+        def fields: List[Schema.Field] = fieldsEval("topLevel", box = false).value
         private[SchemaOps] def fieldsEval(fieldName: String, box: Boolean = false): Eval[List[Schema.Field]] = sch.getType match {
           case Schema.Type.RECORD => Eval.defer(sch.getFields.asScala.toList.flatTraverse(nf => nf.schema.fieldsEval(nf.name, box = true)))
           case Schema.Type.UNION => Eval.defer(sch.getTypes.asScala.toList.flatTraverse(_.fieldsEval(fieldName, box = true)))
@@ -168,7 +168,7 @@ object SchemaRegistry {
       private def checkLogicalTypesCompat(sch: Schema): F[Unit] = {
         val Uuid = LogicalTypes.uuid
         val TimestampMillis = LogicalTypes.timestampMillis
-        val errors = sch.fields("topLevel").foldMap { field =>
+        val errors = sch.fields.foldMap { field =>
           Option(field.schema.getLogicalType) match {
             case Some(TimestampMillis) => checkTypesMatch(field, Schema.Type.LONG, TimestampMillis)
             case Some(Uuid) => checkTypesMatch(field, Schema.Type.STRING, Uuid)
