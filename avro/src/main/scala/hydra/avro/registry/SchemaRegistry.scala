@@ -146,13 +146,13 @@ object SchemaRegistry {
     new SchemaRegistry[F] {
 
       private implicit class SchemaOps(sch: Schema) {
-        def fields(fieldName: String, diveDeeper: Boolean = false): List[Schema.Field] = fieldsEval(fieldName, diveDeeper).value
-        private[SchemaOps] def fieldsEval(fieldName: String, diveDeeper: Boolean = false): Eval[List[Schema.Field]] = sch.getType match {
-          case Schema.Type.RECORD => Eval.defer(sch.getFields.asScala.toList.flatTraverse(nf => nf.schema.fieldsEval(nf.name, diveDeeper = true)))
-          case Schema.Type.UNION => Eval.defer(sch.getTypes.asScala.toList.flatTraverse(_.fieldsEval(fieldName, diveDeeper = true)))
-          case Schema.Type.MAP => sch.getValueType.fieldsEval(fieldName, diveDeeper = true)
-          case Schema.Type.ARRAY => sch.getElementType.fieldsEval(fieldName, diveDeeper = true)
-          case _ if diveDeeper => Eval.now(List(new Schema.Field(fieldName, sch)))
+        def fields(fieldName: String): List[Schema.Field] = fieldsEval(fieldName, box = false).value
+        private[SchemaOps] def fieldsEval(fieldName: String, box: Boolean = false): Eval[List[Schema.Field]] = sch.getType match {
+          case Schema.Type.RECORD => Eval.defer(sch.getFields.asScala.toList.flatTraverse(nf => nf.schema.fieldsEval(nf.name, box = true)))
+          case Schema.Type.UNION => Eval.defer(sch.getTypes.asScala.toList.flatTraverse(_.fieldsEval(fieldName, box = true)))
+          case Schema.Type.MAP => sch.getValueType.fieldsEval(fieldName, box = true)
+          case Schema.Type.ARRAY => sch.getElementType.fieldsEval(fieldName, box = true)
+          case _ if box => Eval.now(List(new Schema.Field(fieldName, sch)))
           case _ => Eval.now(List.empty)
         }
       }
