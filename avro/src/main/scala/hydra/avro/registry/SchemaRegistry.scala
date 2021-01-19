@@ -148,24 +148,12 @@ object SchemaRegistry {
       private implicit class SchemaOps(sch: Schema) {
         def fields(fieldName: String, diveDeeper: Boolean = false): List[Schema.Field] = fieldsEval(fieldName, diveDeeper).value
         private[SchemaOps] def fieldsEval(fieldName: String, diveDeeper: Boolean = false): Eval[List[Schema.Field]] = sch.getType match {
-          case Schema.Type.RECORD => Eval.now(sch.getFields.asScala.toList)
-          case Schema.Type.UNION => Eval.defer(sch.getTypes.asScala.toList.traverse(_.fieldsEval(fieldName, diveDeeper = true)).map(_.flatten))
-          case Schema.Type.MAP => Eval.defer(sch.getValueType.fieldsEval(fieldName, diveDeeper = true))
-          case Schema.Type.ARRAY => Eval.defer(sch.getElementType.fieldsEval(fieldName, diveDeeper = true))
+          case Schema.Type.RECORD => Eval.defer(sch.getFields.asScala.toList.flatTraverse(nf => nf.schema.fieldsEval(nf.name, diveDeeper = true)))
+          case Schema.Type.UNION => Eval.defer(sch.getTypes.asScala.toList.flatTraverse(_.fieldsEval(fieldName, diveDeeper = true)))
+          case Schema.Type.MAP => sch.getValueType.fieldsEval(fieldName, diveDeeper = true)
+          case Schema.Type.ARRAY => sch.getElementType.fieldsEval(fieldName, diveDeeper = true)
           case _ if diveDeeper => Eval.now(List(new Schema.Field(fieldName, sch)))
           case _ => Eval.now(List.empty)
-        }
-      }
-
-      // This function is needed because `foldMap` is not going to recursively go through
-      // all subtrees on its own.
-      @tailrec
-      private def foldMapAll[A: Monoid](start: List[Schema.Field])(f: Schema.Field => A): A = {
-        val nextFields = start.flatMap(fi => fi.schema.fields(fi.name))
-        if (nextFields.isEmpty) {
-          start.foldMap(f)
-        } else {
-          foldMapAll(nextFields)(f)
         }
       }
 
@@ -180,7 +168,7 @@ object SchemaRegistry {
       private def checkLogicalTypesCompat(sch: Schema): F[Unit] = {
         val Uuid = LogicalTypes.uuid
         val TimestampMillis = LogicalTypes.timestampMillis
-        val errors = foldMapAll(sch.fields("topLevel")) { field =>
+        val errors = sch.fields("topLevel").foldMap { field =>
           Option(field.schema.getLogicalType) match {
             case Some(TimestampMillis) => checkTypesMatch(field, Schema.Type.LONG, TimestampMillis)
             case Some(Uuid) => checkTypesMatch(field, Schema.Type.STRING, Uuid)
