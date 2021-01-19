@@ -155,8 +155,8 @@ object SchemaRegistry {
         private[SchemaOps] def fieldsEval(fieldName: String, box: Boolean = false): Eval[List[Schema.Field]] = sch.getType match {
           case Schema.Type.RECORD => Eval.defer(sch.getFields.asScala.toList.flatTraverse(nf => nf.schema.fieldsEval(nf.name, box = true)))
           case Schema.Type.UNION => Eval.defer(sch.getTypes.asScala.toList.flatTraverse(_.fieldsEval(fieldName, box = true)))
-          case Schema.Type.MAP => sch.getValueType.fieldsEval(fieldName, box = true)
-          case Schema.Type.ARRAY => sch.getElementType.fieldsEval(fieldName, box = true)
+          case Schema.Type.MAP => Eval.defer(sch.getValueType.fieldsEval(fieldName, box = true))
+          case Schema.Type.ARRAY => Eval.defer(sch.getElementType.fieldsEval(fieldName, box = true))
           case _ if box => Eval.now(List(new Schema.Field(fieldName, sch)))
           case _ => Eval.now(List.empty)
         }
