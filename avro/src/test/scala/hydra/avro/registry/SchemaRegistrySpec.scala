@@ -301,14 +301,24 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
     val s4 = SchemaBuilder.unionOf.nullType.and.`type`(mismatch).endUnion()
     val s5 = SchemaBuilder.unionOf.nullType.and.stringType.and.`type`(mismatch).endUnion()
     val s6 = SchemaBuilder.record("testVal2").fields().name("test").`type`(mismatch).noDefault.endRecord
+    val s7 = deeplyNestedSchema(100000, s1)
 
     test(s1, "not add schema when logical type and base type on top level do not match") *>
     test(s2, "not add schema when logical type and base type inside array do not match") *>
     test(s3, "not add schema when logical type and base type inside map do not match") *>
     test(s4, "not add schema when logical type and base type inside union do not match") *>
     test(s5, "not add schema when logical type and base type inside triple union do not match") *>
-    test(s6, "not add schema when logical type and base type inside record do not match")
+    test(s6, "not add schema when logical type and base type inside record do not match") *>
+    test(s7, "not add schema when logical type and base type inside deeply nested record do not match")
+  }
 
+  private def deeplyNestedSchema(n: Int, soFar: Schema): Schema = {
+    if (n == 0) {
+      soFar
+    } else {
+      val next = SchemaBuilder.record("test").fields().name("test").`type`(soFar).noDefault().endRecord()
+      deeplyNestedSchema(n - 1, next)
+    }
   }
 
   private def runTests[F[_]: Sync](

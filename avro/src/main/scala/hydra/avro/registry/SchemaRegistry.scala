@@ -14,6 +14,7 @@ import org.apache.avro.LogicalTypes
 import org.apache.avro.LogicalType
 import cats.kernel.Monoid
 import scala.annotation.tailrec
+import cats.Eval
 
 /**
   * Internal interface to interact with the SchemaRegistryClient from Confluent.
@@ -145,13 +146,14 @@ object SchemaRegistry {
     new SchemaRegistry[F] {
 
       private implicit class SchemaOps(sch: Schema) {
-        def fields(fieldName: String, diveDeeper: Boolean = false): List[Schema.Field] = sch.getType match {
-          case Schema.Type.RECORD => sch.getFields.asScala.toList
-          case Schema.Type.UNION => sch.getTypes.asScala.toList.flatMap(_.fields(fieldName, diveDeeper = true))
-          case Schema.Type.MAP => sch.getValueType.fields(fieldName, diveDeeper = true)
-          case Schema.Type.ARRAY => sch.getElementType.fields(fieldName, diveDeeper = true)
-          case _ if diveDeeper => List(new Schema.Field(fieldName, sch))
-          case _ => List.empty
+        def fields(fieldName: String, diveDeeper: Boolean = false): List[Schema.Field] = fieldsEval(fieldName, diveDeeper).value
+        private[SchemaOps] def fieldsEval(fieldName: String, diveDeeper: Boolean = false): Eval[List[Schema.Field]] = sch.getType match {
+          case Schema.Type.RECORD => Eval.now(sch.getFields.asScala.toList)
+          case Schema.Type.UNION => Eval.defer(sch.getTypes.asScala.toList.traverse(_.fieldsEval(fieldName, diveDeeper = true)).map(_.flatten))
+          case Schema.Type.MAP => Eval.defer(sch.getValueType.fieldsEval(fieldName, diveDeeper = true))
+          case Schema.Type.ARRAY => Eval.defer(sch.getElementType.fieldsEval(fieldName, diveDeeper = true))
+          case _ if diveDeeper => Eval.now(List(new Schema.Field(fieldName, sch)))
+          case _ => Eval.now(List.empty)
         }
       }
 
