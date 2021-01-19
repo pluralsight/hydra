@@ -13,6 +13,7 @@ import scala.util.{Failure, Success, Try}
 import org.apache.avro.LogicalTypes
 import org.apache.avro.LogicalType
 import cats.kernel.Monoid
+import scala.annotation.tailrec
 
 /**
   * Internal interface to interact with the SchemaRegistryClient from Confluent.
@@ -156,10 +157,14 @@ object SchemaRegistry {
 
       // This function is needed because `foldMap` is not going to recursively go through
       // all subtrees on its own.
-      private def foldMapAll[A: Monoid](start: Schema.Field)(f: Schema.Field => A): A = {
-        val isThisLayerValid = f(start)
-        val areOtherLayersValid = start.schema.fields(start.name).foldMap(foldMapAll[A](_)(f))
-        Monoid[A].combine(isThisLayerValid, areOtherLayersValid)
+      @tailrec
+      private def foldMapAll[A: Monoid](start: List[Schema.Field])(f: Schema.Field => A): A = {
+        val nextFields = start.flatMap(fi => fi.schema.fields(fi.name))
+        if (nextFields.isEmpty) {
+          start.foldMap(f)
+        } else {
+          foldMapAll(nextFields)(f)
+        }
       }
 
       private def checkTypesMatch(f: Schema.Field, expected: Schema.Type, logicalType: LogicalType): List[LogicalTypeBaseTypeMismatch] = {
@@ -173,13 +178,13 @@ object SchemaRegistry {
       private def checkLogicalTypesCompat(sch: Schema): F[Unit] = {
         val Uuid = LogicalTypes.uuid
         val TimestampMillis = LogicalTypes.timestampMillis
-        val errors = sch.fields("topLevel").foldMap(foldMapAll(_) { field =>
+        val errors = foldMapAll(sch.fields("topLevel")) { field =>
           Option(field.schema.getLogicalType) match {
             case Some(TimestampMillis) => checkTypesMatch(field, Schema.Type.LONG, TimestampMillis)
             case Some(Uuid) => checkTypesMatch(field, Schema.Type.STRING, Uuid)
             case _ => List.empty
           }
-        })
+        }
         errors match {
           case Nil => Sync[F].unit
           case errs => Sync[F].raiseError(LogicalTypeBaseTypeMismatchErrors(errs))
