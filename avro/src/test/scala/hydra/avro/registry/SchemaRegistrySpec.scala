@@ -15,6 +15,7 @@ import org.apache.avro.Schema.Parser
 import org.apache.avro.SchemaBuilder
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
+import scala.annotation.tailrec
 
 class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
 
@@ -316,6 +317,7 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
     test(s7, "not add schema when logical type and base type inside deeply nested record do not match")
   }
 
+  @tailrec
   private def deeplyNestedSchema(n: Int, soFar: Schema): Schema = {
     if (n == 0) {
       soFar
