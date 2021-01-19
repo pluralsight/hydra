@@ -1,16 +1,20 @@
 package hydra.avro.registry
 
-import cats.effect.{IO, Sync}
+import cats.Applicative
+import cats.Monad
+import cats.MonadError
+import cats.effect.IO
+import cats.effect.Sync
 import cats.syntax.all._
-import cats.{Applicative, Monad, MonadError}
 import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
-import org.apache.avro.Schema.Parser
-import org.apache.avro.{Schema, SchemaBuilder}
-import org.scalatest.flatspec.AnyFlatSpecLike
-import org.scalatest.matchers.should.Matchers
-import org.apache.avro.LogicalTypes
 import hydra.avro.registry.SchemaRegistry.LogicalTypeBaseTypeMismatch
 import hydra.avro.registry.SchemaRegistry.LogicalTypeBaseTypeMismatchErrors
+import org.apache.avro.LogicalTypes
+import org.apache.avro.Schema
+import org.apache.avro.Schema.Parser
+import org.apache.avro.SchemaBuilder
+import org.scalatest.flatspec.AnyFlatSpecLike
+import org.scalatest.matchers.should.Matchers
 
 class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
 

@@ -1,20 +1,25 @@
 package hydra.avro.registry
 
-import cats.effect.Sync
-import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, MockSchemaRegistryClient, SchemaRegistryClient}
-import org.apache.avro.{Schema, SchemaValidatorBuilder}
-import cats.syntax.all._
-import io.confluent.kafka.schemaregistry.avro.AvroCompatibilityChecker
-import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import javax.security.auth.Subject
 
 import scala.collection.JavaConverters._
-import scala.util.{Failure, Success, Try}
-import org.apache.avro.LogicalTypes
-import org.apache.avro.LogicalType
-import cats.kernel.Monoid
-import scala.annotation.tailrec
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
+
 import cats.Eval
+import cats.effect.Sync
+import cats.kernel.Monoid
+import cats.syntax.all._
+import io.confluent.kafka.schemaregistry.avro.AvroCompatibilityChecker
+import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
+import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
+import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
+import org.apache.avro.LogicalType
+import org.apache.avro.LogicalTypes
+import org.apache.avro.Schema
+import org.apache.avro.SchemaValidatorBuilder
 
 /**
   * Internal interface to interact with the SchemaRegistryClient from Confluent.
