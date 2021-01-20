@@ -8,12 +8,7 @@ import com.pluralsight.hydra.avro.JsonConverter
 import com.typesafe.config.{ConfigFactory, ConfigValue, ConfigValueFactory}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadata
-import hydra.kafka.services.StreamsManagerActor.{
-  GetStreamActor,
-  GetStreamActorResponse,
-  InitializedStream,
-  MetadataProcessed
-}
+import hydra.kafka.services.StreamsManagerActor.{GetMetadata, GetMetadataResponse, GetStreamActor, GetStreamActorResponse, InitializedStream, MetadataProcessed, TopicMetadataMessage}
 import hydra.kafka.util.KafkaUtils
 import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
 import io.confluent.kafka.serializers.KafkaAvroSerializer
@@ -32,7 +27,6 @@ import spray.json._
 import scala.concurrent.duration._
 import scala.io.Source
 import akka.actor.ActorRef
-import hydra.kafka.services.StreamsManagerActor.TopicMetadataMessage
 import org.apache.kafka.clients.producer.ProducerRecord
 
 class StreamsManagerActorSpec
@@ -361,6 +355,37 @@ class StreamsManagerActorSpec
     val probe = TestProbe()
     streamsManagerActor.tell(TopicMetadataMessage("exp.assessment.SkillAssessmentTopicsScored", None), probe.ref)
     probe.expectMsg(MetadataProcessed)
+  }
+
+  it should "remove metadata from metadataMap after a null value is received" in {
+    val streamsManagerActor: ActorRef = system.actorOf(
+      StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient),
+      name = "stream_manager7"
+    )
+    val topicMetadata = s"""{
+                           |	"id":"79a1627e-04a6-11e9-8eb2-f2801f1b9fd1",
+                           | "createdDate":"${formatter.print(DateTime.now)}",
+                           | "subject": "exp.assessment.SkillAssessmentTopicsScored",
+                           |	"streamType": "History",
+                           | "derived": false,
+                           |	"dataClassification": "Public",
+                           |	"contact": "slackity slack dont talk back",
+                           |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+                           |	"notes": "here are some notes topkek",
+                           |	"schemaId": 1
+                           |}""".stripMargin.parseJson
+      .convertTo[TopicMetadata]
+    val probe = TestProbe()
+    val expectedMap: Map[String, TopicMetadata] = Map[String, TopicMetadata]() + (topicMetadata.subject -> topicMetadata)
+    streamsManagerActor.tell(TopicMetadataMessage("exp.assessment.SkillAssessmentTopicsScored", Some(topicMetadata)), probe.ref)
+    probe.expectMsg(MetadataProcessed)
+    streamsManagerActor.tell(GetMetadata, probe.ref)
+    probe.expectMsg(GetMetadataResponse(expectedMap))
+    streamsManagerActor.tell(TopicMetadataMessage("exp.assessment.SkillAssessmentTopicsScored", None), probe.ref)
+    probe.expectMsg(MetadataProcessed)
+    val newExpectedMap = expectedMap - (topicMetadata.subject)
+    streamsManagerActor.tell(GetMetadata, probe.ref)
+    probe.expectMsg(GetMetadataResponse(newExpectedMap))
   }
 
 }
