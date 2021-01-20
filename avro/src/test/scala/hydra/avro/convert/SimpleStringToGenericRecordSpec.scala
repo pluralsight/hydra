@@ -1,9 +1,12 @@
 package hydra.avro.convert
 
+import java.nio.ByteBuffer
+
 import hydra.avro.convert.StringToGenericRecord.ValidationExtraFieldsError
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.apache.avro.generic.{GenericData, GenericRecord, GenericRecordBuilder}
 import org.apache.avro.util.Utf8
+import org.apache.kafka.common.utils.Bytes
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import spray.json.{JsArray, JsObject, JsString}
@@ -229,11 +232,31 @@ final class SimpleStringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     record shouldBe a[Failure[ValidationExtraFieldsError]]
   }
 
-  it should "Use the Schema default for boolean if no json value is provided" in {
-    val schema = SchemaBuilder.record("SchemaDefaults").fields().requiredString("id").name("bool1").`type`().booleanType().booleanDefault(true).endRecord()
-    val json = """{"id":"123"}"""
-    val record = json.toGenericRecordSimple(schema)
-    record.get.get("bool1") shouldBe true
+  it should "Use the Schema default for string, boolean, bytes, double, float, int, long, null, enum, and fixed if no json value is provided" in {
+    val schema = SchemaBuilder.record("SchemaDefaults").fields()
+      .name("string1").`type`().stringType().stringDefault("helloThere")
+      .name("bool1").`type`().booleanType().booleanDefault(true)
+      .name("bytes1").`type`().bytesType().bytesDefault(Array[Byte](2, 4, 1, 9))
+      .name("double1").`type`().doubleType().doubleDefault(123.45)
+      .name("float1").`type`().floatType().floatDefault(123.45F)
+      .name("int1").`type`().intType().intDefault(123)
+      .name("long1").`type`().longType().longDefault(123L)
+      .name("null1").`type`().nullType().nullDefault()
+      .name("enum1").`type`().enumeration("asf").symbols("FOOTBALL","HOCKEY","GOLF").enumDefault("GOLF")
+      .name("fixed1").`type`().fixed("fixedValue").size(4).fixedDefault(Array[Byte](2, 4, 1, 9))
+      .endRecord()
+    val json = """{}"""
+    val record = json.toGenericRecordSimple(schema).get
+    record.get("string1") shouldBe new Utf8("helloThere")
+    record.get("bool1") shouldBe true
+    record.get("bytes1").asInstanceOf[ByteBuffer].array() shouldBe Array[Byte](2, 4, 1, 9)
+    record.get("double1") shouldBe 123.45
+    record.get("float1") shouldBe 123.45F
+    record.get("int1") shouldBe 123
+    record.get("long1") shouldBe 123L
+    record.get("null1") shouldBe null
+    record.get("enum1") shouldBe new GenericData.EnumSymbol(record.getSchema, "GOLF")
+    record.get("fixed1") shouldBe new GenericData.Fixed(record.getSchema, Array[Byte](2, 4, 1, 9))
   }
 
   it should "Use the Schema default for string if no json value is provided" in {
@@ -241,13 +264,6 @@ final class SimpleStringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     val json = """{"id":"123"}"""
     val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
     record.get.get("string1") shouldBe new Utf8("helloThere")
-  }
-
-  it should "Return null when no default is provided" in {
-    val schema = SchemaBuilder.record("SchemaDefaults").fields().requiredString("id").optionalBoolean("bool1").endRecord()
-    val json = """{"id":"123"}"""
-    val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
-    record.get.get("bool1") shouldBe null
   }
 
   it should "Use the default for a subrecord when no json value is provided" in {
@@ -258,4 +274,14 @@ final class SimpleStringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
     record.get.get("subrecord") shouldBe new GenericRecordBuilder(innerSchema).set("intOpt", 12).build()
   }
+
+  it should "verify that"
+
+  it should "Return null when no default is provided" in {
+    val schema = SchemaBuilder.record("SchemaDefaults").fields().requiredString("id").optionalBoolean("bool1").endRecord()
+    val json = """{"id":"123"}"""
+    val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
+    record.get.get("bool1") shouldBe null
+  }
+
 }

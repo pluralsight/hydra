@@ -18,20 +18,6 @@ object SimpleStringToGenericRecord {
     import StringToGenericRecord._
     import collection.JavaConverters._
 
-//    private def handleRecord(json: JsValue, schema: Schema): Try[JsObject] = {
-//      schema.getFields.asScala.toList.traverse { field =>
-//        val maybeThisFieldJson: Try[Option[JsValue]] = json match {
-//          case JsObject(fields) => Success(fields.get(field.name))
-//          case _ if field.hasDefaultValue => defaultToJson(field.schema().getType, field.defaultVal())
-//          case other => Failure(UnexpectedTypeFoundInGenericRecordConversion[JsObject](classOf[JsObject], other))
-//        }
-//        maybeThisFieldJson.flatMap {
-//          case Some(fjson) => jsonToGenericRecordJson(fjson, field.schema).map(field.name -> _)
-//          case None => jsonToGenericRecordJson(JsNull, field.schema).map(field.name -> _)
-//        }
-//      }.map(f => JsObject(f.toMap))
-//    }
-
     private def handleRecord(json: JsValue, schema: Schema): Try[JsObject] = {
       json match {
         case JsObject(fields) =>
@@ -106,7 +92,9 @@ object SimpleStringToGenericRecord {
           jsonString.parseJson
       case MAP | ARRAY | BOOLEAN =>
         field.defaultVal().toString.parseJson
-      case ENUM | BYTES | STRING | FIXED =>
+      case FIXED | BYTES =>
+        JsString(new String(field.defaultVal().asInstanceOf[Array[Byte]]))
+      case ENUM | BYTES | STRING =>
         JsString.apply(field.defaultVal().toString)
       case INT | FLOAT | LONG | DOUBLE =>
         JsNumber(field.defaultVal().toString)
