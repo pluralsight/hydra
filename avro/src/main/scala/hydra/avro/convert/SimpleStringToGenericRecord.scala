@@ -12,6 +12,8 @@ object SimpleStringToGenericRecord {
 
   final case class UnexpectedTypeFoundInGenericRecordConversion[A](typeExpected: Class[A], found: JsValue) extends
     Exception(s"Expected ${typeExpected.getSimpleName} but found $found")
+  final case class UnexpectedDefaultTypeFoundInGenericRecordConversion(expectedType: Schema.Type, found: AnyRef) extends
+    Exception(s"Expected ${expectedType.getName} but found $found.")
 
   implicit class SimpleStringToGenericRecordOps(str: String) {
 
@@ -83,26 +85,28 @@ object SimpleStringToGenericRecord {
     }
   }
 
-  private def defaultToJson(field: Schema.Field): Try[(String, JsValue)] = Try {
-    def defaultToJsonLoop(defaultVal: AnyRef): JsValue = {
+  private def defaultToJson(field: Schema.Field): Try[(String, JsValue)] = {
+    /* Case Match matches on all types returnable from field.defaultVal() which utilizes JacksonUtils in avro dependency */
+    def defaultToJsonLoop(defaultVal: AnyRef): Try[JsValue] = {
        defaultVal match {
-         case null | JsonProperties.NULL_VALUE => JsNull
+         case null | JsonProperties.NULL_VALUE => Success(JsNull)
          case b: java.lang.Boolean =>
-           JsBoolean(b)
+           Success(JsBoolean(b))
          case _: java.lang.Integer | _: java.lang.Float | _: java.lang.Long | _: java.lang.Double =>
-           JsNumber(defaultVal.toString)
+           Success(JsNumber(defaultVal.toString))
          case s: java.lang.String =>
-           JsString(s)
+           Success(JsString(s))
          case b: Array[Byte] =>
-           JsString(new String(b))
+           Success(JsString(new String(b)))
          case l: java.util.List[Object] =>
            import scala.collection.JavaConverters._
-           JsArray(l.asScala.map(defaultToJsonLoop).toVector)
+           l.asScala.toList.traverse(defaultToJsonLoop).map(_.toVector).map(JsArray(_))
          case m: java.util.LinkedHashMap[String, Object] =>
            import scala.collection.JavaConverters._
-           JsObject(m.asScala.map(t => t._1 -> defaultToJsonLoop(t._2)).toMap)
+           m.asScala.toList.traverse(t => defaultToJsonLoop(t._2).map(t._1 -> _)).map(_.toMap).map(JsObject(_))
+         case _ => Failure(UnexpectedDefaultTypeFoundInGenericRecordConversion(field.schema.getType, defaultVal))
        }
     }
-    field.name -> defaultToJsonLoop(field.defaultVal())
+    defaultToJsonLoop(field.defaultVal()).map(field.name -> _)
   }
 }
