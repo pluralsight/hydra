@@ -3,7 +3,7 @@ package hydra.avro.convert
 import java.nio.ByteBuffer
 
 import hydra.avro.convert.StringToGenericRecord.ValidationExtraFieldsError
-import org.apache.avro.{Schema, SchemaBuilder}
+import org.apache.avro.SchemaBuilder
 import org.apache.avro.generic.{GenericData, GenericRecord, GenericRecordBuilder}
 import org.apache.avro.util.Utf8
 import org.scalatest.flatspec.AnyFlatSpec

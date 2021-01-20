@@ -1,12 +1,11 @@
 package hydra.avro.convert
 
+import cats.implicits._
+import org.apache.avro.generic.GenericRecord
 import org.apache.avro.{JsonProperties, Schema}
-import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
+import spray.json._
 
 import scala.util.{Failure, Success, Try}
-import spray.json._
-import cats.implicits._
-import org.apache.avro.Schema.Type._
 
 object SimpleStringToGenericRecord {
 
@@ -18,6 +17,7 @@ object SimpleStringToGenericRecord {
   implicit class SimpleStringToGenericRecordOps(str: String) {
 
     import StringToGenericRecord._
+
     import collection.JavaConverters._
 
     private def handleRecord(json: JsValue, schema: Schema): Try[JsObject] = {
@@ -86,7 +86,7 @@ object SimpleStringToGenericRecord {
   }
 
   private def defaultToJson(field: Schema.Field): Try[(String, JsValue)] = {
-    /* Case Match matches on all types returnable from field.defaultVal() which utilizes JacksonUtils in avro dependency */
+    /* Matches on types from field.defaultVal() which uses the org.apache.avro.util.internal.JacksonUtils toObject function */
     def defaultToJsonLoop(defaultVal: AnyRef): Try[JsValue] = {
        defaultVal match {
          case null | JsonProperties.NULL_VALUE => Success(JsNull)
