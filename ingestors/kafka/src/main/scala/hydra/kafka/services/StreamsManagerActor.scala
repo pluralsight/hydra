@@ -74,6 +74,15 @@ class StreamsManagerActor(
       context.become(streaming(stream, metadataMap + (t.subject -> t)))
       sender ! MetadataProcessed
 
+    case t: TopicMetadataMessage =>
+      val newMap = t.topicMetadata match {
+        case Some(value) => metadataMap + (t.subject -> value)
+        case None => metadataMap - t.subject
+      }
+
+      context.become(streaming(stream, newMap))
+      sender ! MetadataProcessed
+
     case StopStream =>
       pipe(stream._1.shutdown().map(_ => StreamStopped)) to sender
 
@@ -109,6 +118,8 @@ object StreamsManagerActor {
 
   case object InitializedStream
 
+  case class TopicMetadataMessage(subject: String, topicMetadata: Option[TopicMetadata])
+
   def getMetadataTopicName(c: Config) =
     c.getStringOpt("metadata-topic-name")
       .getOrElse("_hydra.metadata.topic")
@@ -139,20 +150,23 @@ object StreamsManagerActor {
     Consumer
       .plainSource(settings, Subscriptions.topics(metadataTopicName))
       .map { msg =>
-        val record = msg.value.asInstanceOf[GenericRecord]
-        TopicMetadata(
-          record.get("subject").toString,
-          record.get("schemaId").toString.toInt,
-          record.get("streamType").toString,
-          record.get("derived").toString.toBoolean,
-          Try(Option(record.get("deprecated"))).toOption.flatten.map(_.toString.toBoolean),
-          record.get("dataClassification").toString,
-          record.get("contact").toString,
-          Try(Option(record.get("additionalDocumentation"))).toOption.flatten.map(_.toString),
-          Try(Option(record.get("notes"))).toOption.flatten.map(_.toString),
-          UUID.fromString(record.get("id").toString),
-          formatter.parseDateTime(record.get("createdDate").toString)
-        )
+        val topicMetadata = Option(msg.value).map { value =>
+          val record = value.asInstanceOf[GenericRecord]
+          TopicMetadata(
+            record.get("subject").toString,
+            record.get("schemaId").toString.toInt,
+            record.get("streamType").toString,
+            record.get("derived").toString.toBoolean,
+            Try(Option(record.get("deprecated"))).toOption.flatten.map(_.toString.toBoolean),
+            record.get("dataClassification").toString,
+            record.get("contact").toString,
+            Try(Option(record.get("additionalDocumentation"))).toOption.flatten.map(_.toString),
+            Try(Option(record.get("notes"))).toOption.flatten.map(_.toString),
+            UUID.fromString(record.get("id").toString),
+            formatter.parseDateTime(record.get("createdDate").toString)
+          )
+        }
+        TopicMetadataMessage(msg.key, topicMetadata)
       }
       .toMat(
         Sink.actorRefWithBackpressure(
