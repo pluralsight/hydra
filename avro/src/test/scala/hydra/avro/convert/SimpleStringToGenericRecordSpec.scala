@@ -6,7 +6,6 @@ import hydra.avro.convert.StringToGenericRecord.ValidationExtraFieldsError
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.apache.avro.generic.{GenericData, GenericRecord, GenericRecordBuilder}
 import org.apache.avro.util.Utf8
-import org.apache.kafka.common.utils.Bytes
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import spray.json.{JsArray, JsObject, JsString}
@@ -259,13 +258,6 @@ final class SimpleStringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     record.get("fixed1") shouldBe new GenericData.Fixed(record.getSchema, Array[Byte](2, 4, 1, 9))
   }
 
-  it should "Use the Schema default for string if no json value is provided" in {
-    val schema = SchemaBuilder.record("SchemaDefaults").fields().requiredString("id").name("string1").`type`().stringType().stringDefault("helloThere").endRecord()
-    val json = """{"id":"123"}"""
-    val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
-    record.get.get("string1") shouldBe new Utf8("helloThere")
-  }
-
   it should "Use the default for a subrecord when no json value is provided" in {
     val innerSchema = SchemaBuilder.record("innerRecord").fields().requiredInt("intOpt").endRecord()
     val genericRecord: GenericData.Record = new GenericRecordBuilder(innerSchema).set("intOpt", 12).build()
@@ -275,7 +267,31 @@ final class SimpleStringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     record.get.get("subrecord") shouldBe new GenericRecordBuilder(innerSchema).set("intOpt", 12).build()
   }
 
-  it should "verify that"
+  it should "Use the default for an Array" in {
+    import collection.JavaConverters._
+    val schema = SchemaBuilder.record("SchemaDefaults").fields().name("array").`type`.array.items.intType.arrayDefault(List(1,2,3).asJava).endRecord()
+    val json = """{}"""
+    val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
+    record.get.get("array") shouldBe List(1,2,3).asJava
+  }
+
+  it should "Use the default for an Array with complex types" in {
+    import collection.JavaConverters._
+    val innerSchema = SchemaBuilder.record("arrayRecord").fields.optionalBoolean("boolOpt").endRecord()
+    def grb(t: Boolean = true) = new GenericRecordBuilder(innerSchema).build()
+    val schema = SchemaBuilder.record("SchemaDefaults").fields().name("array").`type`.array.items(innerSchema).arrayDefault(List(grb(),grb(),grb(t = false)).asJava).endRecord()
+    val json = """{}"""
+    val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
+    record.get.get("array") shouldBe List(grb(),grb(),grb(t = false)).asJava
+  }
+
+  it should "Use the default for a Map" in {
+    import collection.JavaConverters._
+    val schema = SchemaBuilder.record("SchemaDefaults").fields().name("map").`type`.map.values.intType.mapDefault(Map("one" -> 1).asJava).endRecord()
+    val json = """{}"""
+    val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
+    record.get.get("map") shouldBe Map(new Utf8("one") -> 1).asJava
+  }
 
   it should "Return null when no default is provided" in {
     val schema = SchemaBuilder.record("SchemaDefaults").fields().requiredString("id").optionalBoolean("bool1").endRecord()

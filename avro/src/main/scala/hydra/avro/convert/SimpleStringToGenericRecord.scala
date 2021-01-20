@@ -1,6 +1,6 @@
 package hydra.avro.convert
 
-import org.apache.avro.Schema
+import org.apache.avro.{JsonProperties, Schema}
 import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
 
 import scala.util.{Failure, Success, Try}
@@ -84,22 +84,25 @@ object SimpleStringToGenericRecord {
   }
 
   private def defaultToJson(field: Schema.Field): Try[(String, JsValue)] = Try {
-    field.name -> (field.schema().getType match {
-      case RECORD =>
-          import com.fasterxml.jackson.databind.ObjectMapper
-          val mapper = new ObjectMapper
-          val jsonString = mapper.writeValueAsString(field.defaultVal())
-          jsonString.parseJson
-      case MAP | ARRAY | BOOLEAN =>
-        field.defaultVal().toString.parseJson
-      case FIXED | BYTES =>
-        JsString(new String(field.defaultVal().asInstanceOf[Array[Byte]]))
-      case ENUM | BYTES | STRING =>
-        JsString.apply(field.defaultVal().toString)
-      case INT | FLOAT | LONG | DOUBLE =>
-        JsNumber(field.defaultVal().toString)
-      case NULL | UNION =>
-        JsNull
-    })
+    def defaultToJsonLoop(defaultVal: AnyRef): JsValue = {
+       defaultVal match {
+         case null | JsonProperties.NULL_VALUE => JsNull
+         case b: java.lang.Boolean =>
+           JsBoolean(b)
+         case _: java.lang.Integer | _: java.lang.Float | _: java.lang.Long | _: java.lang.Double =>
+           JsNumber(defaultVal.toString)
+         case s: java.lang.String =>
+           JsString(s)
+         case b: Array[Byte] =>
+           JsString(new String(b))
+         case l: java.util.List[Object] =>
+           import scala.collection.JavaConverters._
+           JsArray(l.asScala.map(defaultToJsonLoop).toVector)
+         case m: java.util.LinkedHashMap[String, Object] =>
+           import scala.collection.JavaConverters._
+           JsObject(m.asScala.map(t => t._1 -> defaultToJsonLoop(t._2)).toMap)
+       }
+    }
+    field.name -> defaultToJsonLoop(field.defaultVal())
   }
 }
