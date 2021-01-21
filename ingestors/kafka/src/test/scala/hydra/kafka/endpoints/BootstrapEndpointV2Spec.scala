@@ -65,7 +65,7 @@ final class BootstrapEndpointV2Spec
       s <- SchemaRegistry.test[IO]
       k <- KafkaAdminAlgebra.test[IO]
       kc <- KafkaClientAlgebra.test[IO]
-      m <- MetadataAlgebra.make("_metadata.topic.name", "bootstrap.consumer.group", kc, s, true)
+      m <- MetadataAlgebra.make(Subject.createValidated("_metadata.topic.name").get, "bootstrap.consumer.group", kc, s, true)
     } yield getTestCreateTopicProgram(s, k, kc, m)
 
   "BootstrapEndpointV2" must {
@@ -182,7 +182,7 @@ final class BootstrapEndpointV2Spec
         override def deleteSchemaSubject(subject: String): IO[Unit] = err
       }
       KafkaClientAlgebra.test[IO].flatMap { client =>
-        MetadataAlgebra.make("123", "456", client, failingSchemaRegistry, true).flatMap { m =>
+        MetadataAlgebra.make(Subject.createValidated("_metadata.topic.123.name").get, "456", client, failingSchemaRegistry, true).flatMap { m =>
           KafkaAdminAlgebra
             .test[IO]
             .map { kafka =>

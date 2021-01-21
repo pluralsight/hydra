@@ -1,15 +1,25 @@
 package hydra.avro.registry
 
-import cats.effect.Sync
-import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, MockSchemaRegistryClient, SchemaRegistryClient}
-import org.apache.avro.{Schema, SchemaValidatorBuilder}
-import cats.syntax.all._
-import io.confluent.kafka.schemaregistry.avro.AvroCompatibilityChecker
-import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import javax.security.auth.Subject
 
 import scala.collection.JavaConverters._
-import scala.util.{Failure, Success, Try}
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
+
+import cats.Eval
+import cats.effect.Sync
+import cats.kernel.Monoid
+import cats.syntax.all._
+import io.confluent.kafka.schemaregistry.avro.AvroCompatibilityChecker
+import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
+import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
+import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
+import org.apache.avro.LogicalType
+import org.apache.avro.LogicalTypes
+import org.apache.avro.Schema
+import org.apache.avro.SchemaValidatorBuilder
 
 /**
   * Internal interface to interact with the SchemaRegistryClient from Confluent.
@@ -111,6 +121,13 @@ object SchemaRegistry {
   final case class IncompatibleSchemaException(message: String) extends
     RuntimeException(message)
 
+  final case class LogicalTypeBaseTypeMismatch(baseType: Schema.Type, logicalType: LogicalType, fieldName: String)
+  final case class LogicalTypeBaseTypeMismatchErrors(errors: List[LogicalTypeBaseTypeMismatch]) extends
+    RuntimeException(
+      errors.map(e => s"Field named '${e.fieldName}' contains mismatch in " +
+        s"baseType of '${e.baseType.getName}' and logicalType of '${e.logicalType.getName}'").mkString
+    )
+
   type SchemaId = Int
   type SchemaVersion = Int
 
@@ -133,6 +150,42 @@ object SchemaRegistry {
   private def getFromSchemaRegistryClient[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient): SchemaRegistry[F] =
     new SchemaRegistry[F] {
 
+      private implicit class SchemaOps(sch: Schema) {
+        def fields: List[Schema.Field] = fieldsEval("topLevel", box = false).value
+        private[SchemaOps] def fieldsEval(fieldName: String, box: Boolean = false): Eval[List[Schema.Field]] = sch.getType match {
+          case Schema.Type.RECORD => Eval.defer(sch.getFields.asScala.toList.flatTraverse(nf => nf.schema.fieldsEval(nf.name, box = true)))
+          case Schema.Type.UNION => Eval.defer(sch.getTypes.asScala.toList.flatTraverse(_.fieldsEval(fieldName, box = true)))
+          case Schema.Type.MAP => Eval.defer(sch.getValueType.fieldsEval(fieldName, box = true))
+          case Schema.Type.ARRAY => Eval.defer(sch.getElementType.fieldsEval(fieldName, box = true))
+          case _ if box => Eval.now(List(new Schema.Field(fieldName, sch)))
+          case _ => Eval.now(List.empty)
+        }
+      }
+
+      private def checkTypesMatch(f: Schema.Field, expected: Schema.Type, logicalType: LogicalType): List[LogicalTypeBaseTypeMismatch] = {
+        if (f.schema.getType == expected) {
+            List.empty
+        } else {
+          List(LogicalTypeBaseTypeMismatch(f.schema.getType, logicalType, f.name))
+        }
+      }
+
+      private def checkLogicalTypesCompat(sch: Schema): F[Unit] = {
+        val Uuid = LogicalTypes.uuid
+        val TimestampMillis = LogicalTypes.timestampMillis
+        val errors = sch.fields.foldMap { field =>
+          Option(field.schema.getLogicalType) match {
+            case Some(TimestampMillis) => checkTypesMatch(field, Schema.Type.LONG, TimestampMillis)
+            case Some(Uuid) => checkTypesMatch(field, Schema.Type.STRING, Uuid)
+            case _ => List.empty
+          }
+        }
+        errors match {
+          case Nil => Sync[F].unit
+          case errs => Sync[F].raiseError(LogicalTypeBaseTypeMismatchErrors(errs))
+        }
+      }
+
       override def registerSchema(
           subject: String,
           schema: Schema
@@ -140,7 +193,8 @@ object SchemaRegistry {
         for {
           versions <- getAllVersions(subject)
           schemas <- versions.traverse(getSchemaFor(subject, _)).map(_.flatten).checkKeyEvolution(subject, schema)
-          validated <- Sync[F].delay(validate(schema, schemas.reverse))
+          validated <- Sync[F].pure(validate(schema, schemas.reverse))
+          _ <- checkLogicalTypesCompat(schema)
           schemaVersion <- if (validated) {
             Sync[F].delay(schemaRegistryClient.register(subject, schema))
           } else {

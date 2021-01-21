@@ -1,5 +1,7 @@
 package hydra.ingest.http.mock
 
+import java.time.Instant
+
 import akka.actor.{ActorSelection, ActorSystem}
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
@@ -35,8 +37,9 @@ class MockEndpoint(
     throw new RestClientException(errorMessage, statusCode, errorCode)
   }
 
-  val schemaRouteExceptionHandler: ExceptionHandler =
-    new SchemasEndpoint(consumerProxy).excptHandler
+  val schemaRouteExceptionHandler: ExceptionHandler = {
+    new SchemasEndpoint(consumerProxy).excptHandler(Instant.now, "MockEndpoint")
+  }
 
   def route: Route = {
     pathPrefix("throwRestClientException") {

@@ -41,7 +41,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
                                 metadataTopic: String,
                                 s: SchemaRegistry[IO],
                                 k: KafkaClientAlgebra[IO]
-                              ) = MetadataAlgebra.make(metadataTopic, "consumerGroup", k, s, consumeMetadataEnabled = true)
+                              ) = MetadataAlgebra.make(Subject.createValidated(metadataTopic).get, "consumerGroup", k, s, consumeMetadataEnabled = true)
 
   private val keySchema = getSchema("key")
   private val valueSchema = getSchema("val")
@@ -146,7 +146,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         ref <- Ref[IO]
           .of(TestState(deleteSchemaWasCalled = false, 0))
         schemaRegistry = getSchemaRegistry(ref)
-        metadata <- metadataAlgebraF("test", schemaRegistry, kafkaClient)
+        metadata <- metadataAlgebraF("_test.name", schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
           kafka,
@@ -199,7 +199,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         kafkaClient <- KafkaClientAlgebra.test[IO]
         ref <- Ref[IO].of(0)
         schemaRegistry = getSchemaRegistry(ref)
-        metadata <- metadataAlgebraF("test", schemaRegistry, kafkaClient)
+        metadata <- metadataAlgebraF("_test.name", schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
           kafka,
@@ -259,7 +259,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         ref <- Ref[IO]
           .of(TestState(schemaRegistryState))
         schemaRegistry = getSchemaRegistry(ref)
-        metadata <- metadataAlgebraF("test", schemaRegistry, kafkaClient)
+        metadata <- metadataAlgebraF("_test.name", schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
           schemaRegistry,
           kafka,
