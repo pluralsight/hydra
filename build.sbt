@@ -185,3 +185,5 @@ lazy val dockerSettings = Seq(
     )
   )
 )
+
+ThisBuild / githubWorkflowPublishTargetBranches := Seq.empty
