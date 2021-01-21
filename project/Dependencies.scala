@@ -68,7 +68,7 @@ object Dependencies {
 
     val retry = "com.softwaremill.retry" %% "retry" % "0.3.3"
 
-    val embeddedKafka = "net.manub" %% "scalatest-embedded-kafka" % "2.0.0"
+    val embeddedKafka = "io.github.embeddedkafka" %% "embedded-kafka" % "2.7.0" % Test
 
     lazy val kamon = Seq(
       "io.kamon" %% "kamon-core" % kamonVersion,
