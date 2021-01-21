@@ -78,7 +78,7 @@ object Dependencies {
     val kafka = Seq(
       "org.apache.kafka" %% "kafka" % kafkaVersion,
       "org.apache.kafka" % "kafka-clients" % kafkaVersion,
-      embeddedKafka % "test"
+      embeddedKafka
     )
 
     val confluent: Seq[ModuleID] =
