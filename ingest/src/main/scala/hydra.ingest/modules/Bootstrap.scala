@@ -7,30 +7,47 @@ import cats.effect.Sync
 import cats.syntax.all._
 import cats.{Monad, MonadError}
 import hydra.core.marshallers.History
-import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, V2MetadataTopicConfig}
+import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, MetadataTopicsConfig}
 import hydra.kafka.model._
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.util.KafkaUtils.TopicDetails
+import hydra.kafka.algebras.KafkaAdminAlgebra
 
 final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
     createTopicProgram: CreateTopicProgram[F],
-    cfg: V2MetadataTopicConfig,
+    cfg: MetadataTopicsConfig,
     dvsConsumersTopicConfig: DVSConsumersTopicConfig,
-    cooTopicConfig: ConsumerOffsetsOffsetsTopicConfig
+    cooTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
+    kafkaAdmin: KafkaAdminAlgebra[F]
 ) {
 
   def bootstrapAll: F[Unit] =
     for {
-      _ <- bootstrapMetadataTopic
+      _ <- bootstrapMetadataTopicV2
+      _ <- bootstrapMetadataTopicV1
       _ <- bootstrapDVSConsumersTopic
       _ <- bootstrapConsumerOffsetsOffsetsTopic
     } yield ()
 
-  private def bootstrapMetadataTopic: F[Unit] =
-    if (cfg.createOnStartup) {
+  private def bootstrapMetadataTopicV1: F[Unit] = {
+    if (cfg.createV1OnStartup) {
+      kafkaAdmin.describeTopic(cfg.topicNameV1.value).flatMap {
+        case Some(_) => Monad[F].unit
+        case None => kafkaAdmin.createTopic(
+          cfg.topicNameV1.value,
+          TopicDetails(cfg.numPartitions, cfg.replicationFactor, Map("cleanup.policy" -> "compact"))
+        )
+      }
+    } else {
+      Monad[F].unit
+    }
+  }
+
+  private def bootstrapMetadataTopicV2: F[Unit] =
+    if (cfg.createV2OnStartup) {
       TopicMetadataV2.getSchemas[F].flatMap { schemas =>
         createTopicProgram.createTopic(
-          cfg.topicName,
+          cfg.topicNameV2,
           TopicMetadataV2Request(
             schemas,
             StreamTypeV2.Entity,
@@ -104,10 +121,11 @@ object Bootstrap {
 
   def make[F[_]: Sync](
       createTopicProgram: CreateTopicProgram[F],
-      v2MetadataTopicConfig: V2MetadataTopicConfig,
+      metadataTopicsConfig: MetadataTopicsConfig,
       consumersTopicConfig: DVSConsumersTopicConfig,
-      consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig
+      consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
+      kafkaAdmin: KafkaAdminAlgebra[F]
   ): F[Bootstrap[F]] = Sync[F].delay {
-    new Bootstrap[F](createTopicProgram, v2MetadataTopicConfig, consumersTopicConfig, consumerOffsetsOffsetsTopicConfig)
+    new Bootstrap[F](createTopicProgram, metadataTopicsConfig, consumersTopicConfig, consumerOffsetsOffsetsTopicConfig, kafkaAdmin)
   }
 }

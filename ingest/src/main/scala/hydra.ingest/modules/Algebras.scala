@@ -25,10 +25,10 @@ object Algebras {
       )
       kafkaAdmin <- KafkaAdminAlgebra.live[F](config.createTopicConfig.bootstrapServers)
       kafkaClient <- KafkaClientAlgebra.live[F](config.createTopicConfig.bootstrapServers, schemaRegistry, config.ingestConfig.recordSizeLimitBytes)
-      metadata <- MetadataAlgebra.make[F](config.v2MetadataTopicConfig.topicName.value,
-        config.v2MetadataTopicConfig.consumerGroup, kafkaClient, schemaRegistry, config.v2MetadataTopicConfig.createOnStartup)
+      metadata <- MetadataAlgebra.make[F](config.metadataTopicsConfig.topicNameV2,
+        config.metadataTopicsConfig.consumerGroup, kafkaClient, schemaRegistry, config.metadataTopicsConfig.createV2OnStartup)
       consumerGroups <- ConsumerGroupsAlgebra.make[F](config.consumerGroupsAlgebraConfig.kafkaInternalConsumerGroupsTopic,
         config.dvsConsumersTopicConfig.topicName, config.consumerOffsetsOffsetsTopicConfig.topicName, config.createTopicConfig.bootstrapServers,
-        config.v2MetadataTopicConfig.consumerGroup, config.consumerGroupsAlgebraConfig.commonConsumerGroup, kafkaClient, kafkaAdmin, schemaRegistry)
+        config.metadataTopicsConfig.consumerGroup, config.consumerGroupsAlgebraConfig.commonConsumerGroup, kafkaClient, kafkaAdmin, schemaRegistry)
     } yield new Algebras[F](schemaRegistry, kafkaAdmin, kafkaClient, metadata, consumerGroups)
 }

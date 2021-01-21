@@ -18,7 +18,7 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
                                                  (implicit system: ActorSystem) extends RouteConcatenation with ConfigSupport {
 
   private implicit val ec: ExecutionContext = system.dispatcher
-  private val bootstrapEndpointV2 = if (cfg.v2MetadataTopicConfig.createV2TopicsEnabled) {
+  private val bootstrapEndpointV2 = if (cfg.metadataTopicsConfig.createV2TopicsEnabled) {
     val topicDetails =
       TopicDetails(
         cfg.createTopicConfig.defaultNumPartions,

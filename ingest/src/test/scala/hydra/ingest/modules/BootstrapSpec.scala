@@ -5,7 +5,7 @@ import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Sync, Timer}
 import cats.syntax.all._
 import fs2.kafka.Headers
 import hydra.avro.registry.SchemaRegistry
-import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, V2MetadataTopicConfig}
+import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, MetadataTopicsConfig}
 import hydra.kafka.algebras.KafkaAdminAlgebra.Topic
 import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, Offset, Partition, PublishError, PublishResponse, TopicName}
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
@@ -30,12 +30,13 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
   implicit private val cs: ContextShift[IO] = IO.contextShift(concurrent.ExecutionContext.global)
   implicit private val c: ConcurrentEffect[IO] = IO.ioConcurrentEffect
 
-  private val metadataSubject = Subject.createValidated("dvs.metadata").get
+  private val metadataSubjectV1 = Subject.createValidated("dvs.metadata.v1").get
+  private val metadataSubjectV2 = Subject.createValidated("dvs.metadata").get
   private val consumersTopicSubject = Subject.createValidated("dvs.consumers-topic").get
   private val cooTopicSubject = Subject.createValidated("dvs.consumer-offsets-offsets").get
 
   private def createTestCase(
-      metadataConfig: V2MetadataTopicConfig,
+      metadataConfig: MetadataTopicsConfig,
       consumersTopicConfig: DVSConsumersTopicConfig,
       consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig
 
@@ -46,21 +47,22 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
       kafkaAdmin <- KafkaAdminAlgebra.test[IO]
       ref <- Ref[IO].of(List.empty[(GenericRecord, Option[GenericRecord], Option[Headers])])
       kafkaClient = new TestKafkaClientAlgebraWithPublishTo(ref)
-      metadata <- MetadataAlgebra.make(metadataSubject.value, "consumer_group",kafkaClient, schemaRegistry, consumeMetadataEnabled = true)
+      metadata <- MetadataAlgebra.make(metadataSubjectV2, "consumer_group",kafkaClient, schemaRegistry, consumeMetadataEnabled = true)
       c = new CreateTopicProgram[IO](
         schemaRegistry,
         kafkaAdmin,
         kafkaClient,
         retry,
-        metadataSubject,
+        metadataSubjectV2,
         metadata
       )
-      boot <- Bootstrap.make[IO](c, metadataConfig, consumersTopicConfig, consumerOffsetsOffsetsTopicConfig)
+      boot <- Bootstrap.make[IO](c, metadataConfig, consumersTopicConfig, consumerOffsetsOffsetsTopicConfig, kafkaAdmin)
       _ <- boot.bootstrapAll
-      topicCreated <- kafkaAdmin.describeTopic(metadataSubject.value)
+      topicCreated <- kafkaAdmin.describeTopic(metadataSubjectV2.value)
+      topicCreated1 <- kafkaAdmin.describeTopic(metadataSubjectV1.value)
       topicCreated2 <- kafkaAdmin.describeTopic(consumersTopicConfig.topicName.value)
       topicCreated3 <- kafkaAdmin.describeTopic(consumerOffsetsOffsetsTopicConfig.topicName.value)
-      topics = List(topicCreated, topicCreated2, topicCreated3).flatten
+      topics = List(topicCreated, topicCreated1, topicCreated2, topicCreated3).flatten
       schemasAdded <- schemaRegistry.getAllSubjects
       messagesPublished <- ref.get
     } yield (topics, schemasAdded, messagesPublished)
@@ -83,11 +85,13 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
         1
       )
 
-    "create the metadata topic, consumers topic, and consumerOffsetsOffsets topic" in {
+    "create the metadata topics, consumers topic, and consumerOffsetsOffsets topic" in {
       val config =
-        V2MetadataTopicConfig(
-          metadataSubject,
-          createOnStartup = true,
+        MetadataTopicsConfig(
+          metadataSubjectV1,
+          metadataSubjectV2,
+          createV1OnStartup = true,
+          createV2OnStartup = true,
           createV2TopicsEnabled = true,
           ContactMethod.create("test@test.com").get,
           1,
@@ -97,10 +101,11 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
       createTestCase(config, consumersTopicConfig, consumerOffsetsTopicConfig)
         .map {
           case (topicsCreated, schemasAdded, messagesPublished) =>
-            topicsCreated should contain allOf(Topic(metadataSubject.value, 1), Topic(consumersTopicSubject.value, 1), Topic(cooTopicSubject.value, 1))
+            topicsCreated should contain allOf(Topic(metadataSubjectV1.value, 1), Topic(metadataSubjectV2.value, 1),
+              Topic(consumersTopicSubject.value, 1), Topic(cooTopicSubject.value, 1))
             schemasAdded should contain allOf (
-              metadataSubject.value + "-key",
-              metadataSubject.value + "-value",
+              metadataSubjectV2.value + "-key",
+              metadataSubjectV2.value + "-value",
               consumersTopicSubject.value + "-key",
               consumersTopicSubject.value + "-value",
               cooTopicSubject.value + "-key",
@@ -112,9 +117,11 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
 
     "not create the metadata topic" in {
       val config =
-        V2MetadataTopicConfig(
-          metadataSubject,
-          createOnStartup = false,
+        MetadataTopicsConfig(
+          metadataSubjectV1,
+          metadataSubjectV2,
+          createV1OnStartup = false,
+          createV2OnStartup = false,
           createV2TopicsEnabled = false,
           ContactMethod.create("test@test.com").get,
           1,
@@ -125,10 +132,10 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
       createTestCase(config, consumersTopicConfig, consumerOffsetsTopicConfig)
         .map {
           case (topicsCreated, schemasAdded, messagesPublished) =>
-            topicsCreated should not contain Topic(metadataSubject.value, 1)
-            schemasAdded should contain noneOf (metadataSubject.value + "-key", metadataSubject.value + "-value")
+            topicsCreated should not contain Topic(metadataSubjectV2.value, 1)
+            schemasAdded should contain noneOf (metadataSubjectV2.value + "-key", metadataSubjectV2.value + "-value")
             val keySchema = TopicMetadataV2.getSchemas.unsafeRunSync().key
-            messagesPublished.flatMap(m => TopicMetadataV2Key.codec.decode(m._1, keySchema).toOption.map(_.subject)) should not contain metadataSubject
+            messagesPublished.flatMap(m => TopicMetadataV2Key.codec.decode(m._1, keySchema).toOption.map(_.subject)) should not contain metadataSubjectV2
         }
         .unsafeRunSync()
     }

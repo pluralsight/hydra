@@ -1,13 +1,21 @@
 package hydra.avro.registry
 
-import cats.effect.{IO, Sync}
+import cats.Applicative
+import cats.Monad
+import cats.MonadError
+import cats.effect.IO
+import cats.effect.Sync
 import cats.syntax.all._
-import cats.{Applicative, Monad, MonadError}
 import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
+import hydra.avro.registry.SchemaRegistry.LogicalTypeBaseTypeMismatch
+import hydra.avro.registry.SchemaRegistry.LogicalTypeBaseTypeMismatchErrors
+import org.apache.avro.LogicalTypes
+import org.apache.avro.Schema
 import org.apache.avro.Schema.Parser
-import org.apache.avro.{Schema, SchemaBuilder}
+import org.apache.avro.SchemaBuilder
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
+import scala.annotation.tailrec
 
 class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
 
@@ -265,7 +273,61 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
     } yield ()
   }
 
-  private def runTests[F[_]: MonadError[*[_], Throwable]: Sync](
+  private def testLogicalTypeMismatch[F[_]: MonadError[*[_], Throwable]](
+      schemaRegistry: SchemaRegistry[F]
+  )(sch: Schema, description: String): F[Unit] = {
+    val subject = "testSubjectAdd-value"
+    val schema = SchemaBuilder.record("testVal")
+      .fields()
+      .name("test").`type`(sch)
+      .noDefault
+      .endRecord
+    for {
+      result <- schemaRegistry.registerSchema(subject, schema).attempt
+      allVersions <- schemaRegistry.getAllVersions(subject)
+    } yield {
+      it must description in {
+        result shouldBe LogicalTypeBaseTypeMismatchErrors(
+          List(LogicalTypeBaseTypeMismatch(Schema.Type.INT, LogicalTypes.uuid, "test"))
+        ).asLeft
+        allVersions shouldBe List.empty
+      }
+    }
+  }
+
+  private def testLogicalTypeBaseTypeMismatch[F[_]: MonadError[*[_], Throwable]](
+      schemaRegistry: SchemaRegistry[F]
+  ): F[Unit] = {
+    val test = testLogicalTypeMismatch[F](schemaRegistry) _
+    val mismatch = LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.INT))
+    val s1 = mismatch
+    val s2 = SchemaBuilder.array.items.`type`(mismatch)
+    val s3 = SchemaBuilder.map.values.`type`(mismatch)
+    val s4 = SchemaBuilder.unionOf.nullType.and.`type`(mismatch).endUnion()
+    val s5 = SchemaBuilder.unionOf.nullType.and.stringType.and.`type`(mismatch).endUnion()
+    val s6 = SchemaBuilder.record("testVal2").fields().name("test").`type`(mismatch).noDefault.endRecord
+    val s7 = deeplyNestedSchema(10000, s1)
+
+    test(s1, "not add schema when logical type and base type on top level do not match") *>
+    test(s2, "not add schema when logical type and base type inside array do not match") *>
+    test(s3, "not add schema when logical type and base type inside map do not match") *>
+    test(s4, "not add schema when logical type and base type inside union do not match") *>
+    test(s5, "not add schema when logical type and base type inside triple union do not match") *>
+    test(s6, "not add schema when logical type and base type inside record do not match") *>
+    test(s7, "not add schema when logical type and base type inside deeply nested record do not match")
+  }
+
+  @tailrec
+  private def deeplyNestedSchema(n: Int, soFar: Schema): Schema = {
+    if (n == 0) {
+      soFar
+    } else {
+      val next = SchemaBuilder.record("test").fields().name("test").`type`(soFar).noDefault().endRecord()
+      deeplyNestedSchema(n - 1, next)
+    }
+  }
+
+  private def runTests[F[_]: Sync](
       schemaRegistry: F[SchemaRegistry[F]]
   ): F[Unit] = {
     for {
@@ -275,6 +337,7 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
       _ <- schemaRegistry.flatMap(testErrorKeyEvolution[F])
       _ <- schemaRegistry.flatMap(testDeleteSchemaVersion[F])
       _ <- schemaRegistry.flatMap(testGetAllSubjects[F])
+      _ <- schemaRegistry.flatMap(testLogicalTypeBaseTypeMismatch[F])
       _ <- testInconsequentialKeyEvolutions[F]
       _ <- testNoPriorKeySchema[F]
       _ <- testValueSchemaBeingChecked[F]

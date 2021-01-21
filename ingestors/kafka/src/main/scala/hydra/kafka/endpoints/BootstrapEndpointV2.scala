@@ -15,6 +15,8 @@
  */
 package hydra.kafka.endpoints
 
+import java.time.Instant
+
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
@@ -23,7 +25,7 @@ import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
 import hydra.common.util.Futurable
 import hydra.core.http.CorsSupport
 import hydra.core.marshallers.GenericError
-import hydra.core.monitor.HydraMetrics.addPromHttpMetric
+import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.kafka.model.TopicMetadataV2Request
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.CreateTopicProgram
@@ -41,30 +43,33 @@ final class BootstrapEndpointV2[F[_]: Futurable](
 
   val route: Route = cors(settings) {
     extractExecutionContext { implicit ec =>
-      pathPrefix("v2" / "topics" / Segment) { topicName =>
-        handleExceptions(exceptionHandler(topicName)) {
-          pathEndOrSingleSlash {
-            put {
-              entity(as[TopicMetadataV2Request]) { t =>
-                Subject.createValidated(topicName) match {
-                  case Some(validatedTopic) =>
-                    onComplete(
-                      Futurable[F].unsafeToFuture(createTopicProgram
-                        .createTopic(validatedTopic, t, defaultTopicDetails))
-                    ) {
-                      case Success(_) =>
-                        addPromHttpMetric(topicName, StatusCodes.OK.toString, "V2Bootstrap")
-                        complete(StatusCodes.OK)
-                      case Failure(IncompatibleSchemaException(m)) =>
-                        addPromHttpMetric(topicName, StatusCodes.BadRequest.toString, "V2Bootstrap")
-                        complete(StatusCodes.BadRequest, m)
-                      case Failure(e) =>
-                        addPromHttpMetric(topicName, StatusCodes.InternalServerError.toString, "V2Bootstrap")
-                        complete(StatusCodes.InternalServerError, e)
-                    }
-                  case None =>
-                    addPromHttpMetric(topicName, StatusCodes.BadRequest.toString, "V2Bootstrap")
-                    complete(StatusCodes.BadRequest, Subject.invalidFormat)
+      extractMethod { method =>
+        pathPrefix("v2" / "topics" / Segment) { topicName =>
+          val startTime = Instant.now
+          handleExceptions(exceptionHandler(topicName, startTime, method.value)) {
+            pathEndOrSingleSlash {
+              put {
+                entity(as[TopicMetadataV2Request]) { t =>
+                  Subject.createValidated(topicName) match {
+                    case Some(validatedTopic) =>
+                      onComplete(
+                        Futurable[F].unsafeToFuture(createTopicProgram
+                          .createTopic(validatedTopic, t, defaultTopicDetails))
+                      ) {
+                        case Success(_) =>
+                          addHttpMetric(topicName, StatusCodes.OK, "V2Bootstrap", startTime, "PUT")
+                          complete(StatusCodes.OK)
+                        case Failure(IncompatibleSchemaException(m)) =>
+                          addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(s"$IncompatibleSchemaException"))
+                          complete(StatusCodes.BadRequest, m)
+                        case Failure(e) =>
+                          addHttpMetric(topicName, StatusCodes.InternalServerError, "V2Bootstrap", startTime, "PUT", error = Some(e.getMessage))
+                          complete(StatusCodes.InternalServerError, e)
+                      }
+                    case None =>
+                      addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(Subject.invalidFormat))
+                      complete(StatusCodes.BadRequest, Subject.invalidFormat)
+                  }
                 }
               }
             }
@@ -74,10 +79,10 @@ final class BootstrapEndpointV2[F[_]: Futurable](
     }
   }
 
-  private def exceptionHandler(topic: String) = ExceptionHandler {
+  private def exceptionHandler(topic: String, startTime: Instant, method: String) = ExceptionHandler {
     case e =>
       extractExecutionContext { implicit ec =>
-        addPromHttpMetric(topic, StatusCodes.InternalServerError.toString,"V2Bootstrap")
+        addHttpMetric(topic, StatusCodes.InternalServerError,"V2Bootstrap", startTime, method, error = Some(e.getMessage))
         complete(500, e.getMessage)
       }
   }

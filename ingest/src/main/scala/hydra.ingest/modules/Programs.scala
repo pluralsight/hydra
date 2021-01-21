@@ -5,6 +5,7 @@ import cats.syntax.all._
 import hydra.ingest.app.AppConfig.AppConfig
 import hydra.ingest.programs.TopicDeletionProgram
 import hydra.ingest.services.{IngestionFlow, IngestionFlowV2}
+import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.CreateTopicProgram
 import io.chrisdavenport.log4cats.Logger
 import retry.RetryPolicies._
@@ -26,7 +27,7 @@ final class Programs[F[_]: Logger: Sync: Timer: Mode] private(
     algebras.kafkaAdmin,
     algebras.kafkaClient,
     retryPolicy,
-    cfg.v2MetadataTopicConfig.topicName,
+    cfg.metadataTopicsConfig.topicNameV2,
     algebras.metadata
   )
 
@@ -44,7 +45,11 @@ final class Programs[F[_]: Logger: Sync: Timer: Mode] private(
 
   val topicDeletion: TopicDeletionProgram[F] = new TopicDeletionProgram[F](
     algebras.kafkaAdmin,
-    algebras.schemaRegistry
+    algebras.kafkaClient,
+    cfg.metadataTopicsConfig.topicNameV2,
+    cfg.metadataTopicsConfig.topicNameV1,
+    algebras.schemaRegistry,
+    algebras.metadata
   )
 
 }

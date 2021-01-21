@@ -16,7 +16,7 @@ lazy val defaultSettings = Seq(
   excludeDependencies += "org.slf4j" % "slf4j-log4j12",
   excludeDependencies += "log4j" % "log4j",
   addCompilerPlugin(
-    "org.typelevel" %% "kind-projector" % "0.11.2" cross CrossVersion.full
+    "org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full
   ),
   packageOptions in (Compile, packageBin) +=
     Package.ManifestAttributes("Implementation-Build" -> buildNumber),
@@ -185,3 +185,5 @@ lazy val dockerSettings = Seq(
     )
   )
 )
+
+ThisBuild / githubWorkflowPublishTargetBranches := Seq.empty

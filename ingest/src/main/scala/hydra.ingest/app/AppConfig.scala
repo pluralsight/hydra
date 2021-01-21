@@ -47,9 +47,11 @@ object AppConfig {
   private implicit val subjectConfigDecoder: ConfigDecoder[String, Subject] =
     ConfigDecoder.identity[String].mapOption("Subject")(Subject.createValidated)
 
-  final case class V2MetadataTopicConfig(
-      topicName: Subject,
-      createOnStartup: Boolean,
+  final case class MetadataTopicsConfig(
+      topicNameV1: Subject,
+      topicNameV2: Subject,
+      createV1OnStartup: Boolean,
+      createV2OnStartup: Boolean,
       createV2TopicsEnabled: Boolean,
       contactMethod: ContactMethod,
       numPartitions: Int,
@@ -63,11 +65,15 @@ object AppConfig {
       .identity[String]
       .mapOption("ContactMethod")(ContactMethod.create)
 
-  private val v2MetadataTopicConfig: ConfigValue[V2MetadataTopicConfig] =
+  private val metadataTopicsConfig: ConfigValue[MetadataTopicsConfig] =
     (
+      env("HYDRA_V1_METADATA_TOPIC_NAME")
+        .as[Subject]
+        .default(Subject.createValidated("_hydra.metadata.topic").get),
       env("HYDRA_V2_METADATA_TOPIC_NAME")
         .as[Subject]
         .default(Subject.createValidated("_hydra.v2.metadata").get),
+      env("HYDRA_V1_METADATA_CREATE_ON_STARTUP").as[Boolean].default(true),
       env("HYDRA_V2_METADATA_CREATE_ON_STARTUP").as[Boolean].default(false),
       env("HYDRA_V2_CREATE_TOPICS_ENABLED").as[Boolean].default(false),
       env(
@@ -76,7 +82,7 @@ object AppConfig {
       env("HYDRA_DEFAULT_PARTITIONS").as[Int].default(10),
       env("HYDRA_REPLICATION_FACTOR").as[Short].default(3),
       env("HYDRA_V2_METADATA_CONSUMER_GROUP")
-    ).parMapN(V2MetadataTopicConfig)
+    ).parMapN(MetadataTopicsConfig)
 
   final case class DVSConsumersTopicConfig(
                                             topicName: Subject,
@@ -149,7 +155,7 @@ object AppConfig {
 
   final case class AppConfig(
       createTopicConfig: CreateTopicConfig,
-      v2MetadataTopicConfig: V2MetadataTopicConfig,
+      metadataTopicsConfig: MetadataTopicsConfig,
       ingestConfig: IngestConfig,
       topicDeletionConfig: TopicDeletionConfig,
       dvsConsumersTopicConfig: DVSConsumersTopicConfig,
@@ -160,7 +166,7 @@ object AppConfig {
   val appConfig: ConfigValue[AppConfig] =
     (
       createTopicConfig,
-      v2MetadataTopicConfig,
+      metadataTopicsConfig,
       ingestConfig,
       topicDeletionConfig,
       dvsConsumersTopicConfig,
