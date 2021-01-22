@@ -68,7 +68,7 @@ object Dependencies {
 
     val retry = "com.softwaremill.retry" %% "retry" % "0.3.3"
 
-    val embeddedKafka = "net.manub" %% "scalatest-embedded-kafka" % "2.0.0"
+    val embeddedKafka = "io.github.embeddedkafka" %% "embedded-kafka" % "2.4.1.1" % "test"
 
     lazy val kamon = Seq(
       "io.kamon" %% "kamon-core" % kamonVersion,
@@ -78,7 +78,7 @@ object Dependencies {
     val kafka = Seq(
       "org.apache.kafka" %% "kafka" % kafkaVersion,
       "org.apache.kafka" % "kafka-clients" % kafkaVersion,
-      embeddedKafka % "test"
+      embeddedKafka
     )
 
     val confluent: Seq[ModuleID] =
