@@ -74,7 +74,7 @@ final case class TopicMetadataV2Request(
     parentSubjects: List[Subject],
     notes: Option[String],
     teamName: Option[String],
-    numPartitions: TopicMetadataV2Request.NumPartitions
+    numPartitions: Option[TopicMetadataV2Request.NumPartitions]
 ) {
 
   def toValue: TopicMetadataV2Value = {
@@ -95,9 +95,7 @@ final case class TopicMetadataV2Request(
 object TopicMetadataV2Request {
   type NumPartitionsPredicate = Greater[W.`9`.T] And Less[W.`51`.T]
   type NumPartitions = Int Refined NumPartitionsPredicate
-  object NumPartitions extends RefinedTypeOps[NumPartitions, Int] {
-    val default: NumPartitions = refineMV[NumPartitionsPredicate](10)
-  }
+  object NumPartitions extends RefinedTypeOps[NumPartitions, Int]
   type SubjectRegex = MatchesRegex[W.`"""^(?:skills|flow|tech|fin|dvs|_[a-zA-Z0-9]+)\\.[a-zA-Z0-9\\-\\.]+"""`.T]
   type Subject = String Refined SubjectRegex
 

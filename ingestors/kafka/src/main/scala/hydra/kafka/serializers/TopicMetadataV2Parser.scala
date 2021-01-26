@@ -17,6 +17,8 @@ import spray.json.{DefaultJsonProtocol, DeserializationException, JsObject, JsSt
 import collection.JavaConverters._
 
 import scala.util.{Failure, Success, Try}
+import spray.json.JsonFormat
+import spray.json.JsNumber
 
 object TopicMetadataV2Parser extends TopicMetadataV2Parser {
   case object IntentionallyUnimplemented extends RuntimeException
@@ -252,6 +254,19 @@ sealed trait TopicMetadataV2Parser
     }
   }
 
+  implicit val topicMetadataNumPartitionsFormat: JsonFormat[TopicMetadataV2Request.NumPartitions] = new RootJsonFormat[TopicMetadataV2Request.NumPartitions] {
+    def read(json: JsValue): TopicMetadataV2Request.NumPartitions = {
+      val int = json.convertTo[Int]
+      TopicMetadataV2Request.NumPartitions.from(int) match {
+        case Right(value) => value
+        case Left(value) => throw new DeserializationException(value)
+      }
+    }
+    
+    def write(obj: TopicMetadataV2Request.NumPartitions): JsValue = JsNumber(obj.value)
+    
+  }
+
   implicit object TopicMetadataV2Format
       extends RootJsonFormat[TopicMetadataV2Request] {
 
@@ -329,7 +344,7 @@ sealed trait TopicMetadataV2Parser
               case Some(numP) => numP
               case None => throwDeserializationError("numPartitions", "Int [10-50]")
             }
-          }.getOrElse(TopicMetadataV2Request.NumPartitions.default)
+          }
         )
         (
           schemas,

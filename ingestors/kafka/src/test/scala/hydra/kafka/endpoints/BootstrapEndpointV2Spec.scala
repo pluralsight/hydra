@@ -100,7 +100,8 @@ final class BootstrapEndpointV2Spec
       Instant.now,
       List.empty,
       None,
-      Some("dvs-teamName")
+      Some("dvs-teamName"),
+      None
     ).toJson.compactPrint
 
     "accept a valid request" in {
@@ -140,6 +141,7 @@ final class BootstrapEndpointV2Spec
         NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
         Instant.now,
         List.empty,
+        None,
         None,
         None
       ).toJson.compactPrint

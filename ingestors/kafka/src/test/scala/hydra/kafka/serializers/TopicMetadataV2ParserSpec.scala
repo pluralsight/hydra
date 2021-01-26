@@ -326,7 +326,8 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
           tmv2.createdDate,
           parentSubjects,
           notes,
-          Some(teamName)
+          Some(teamName),
+          None
         )
     }
 
@@ -366,7 +367,8 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
           tmv2.createdDate,
           parentSubjects = List(),
           notes,
-          Some(teamName)
+          Some(teamName),
+          None
         )
     }
 
@@ -547,7 +549,8 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         createdDate = createdDate,
         parentSubjects = parentSubjects,
         notes = notes,
-        teamName = Some(teamName)
+        teamName = Some(teamName),
+        numPartitions = None
       )
       TopicMetadataV2Format.write(topicMetadataV2) shouldBe
         createJsValueOfTopicMetadataV2Request(
@@ -581,7 +584,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val response = TopicMetadataV2Response.fromTopicMetadataContainer(tmc)
       val request = TopicMetadataV2Request.apply(Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,
         tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.dataClassification,tmc.value.contact,
-        tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes, teamName = tmc.value.teamName)
+        tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes, teamName = tmc.value.teamName, None)
 
       TopicMetadataV2Format.write(request).compactPrint shouldBe
         TopicMetadataResponseV2Format.write(response).compactPrint.replace(",\"subject\":\"dvs.valid\"", "")
@@ -626,7 +629,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
       val request = TopicMetadataV2Request.apply(Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,
         tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.dataClassification,tmc.value.contact,
-        tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes,tmc.value.teamName)
+        tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes,tmc.value.teamName, None)
       val firstDeprecatedDate = TopicMetadataV2Format.read(request.toJson).deprecatedDate.getOrElse(None)
       firstDeprecatedDate shouldBe None
     }
@@ -641,7 +644,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
       val request = TopicMetadataV2Request.apply(Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,
         tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.dataClassification,tmc.value.contact,tmc.value.createdDate,
-        tmc.value.parentSubjects,tmc.value.notes,tmc.value.teamName)
+        tmc.value.parentSubjects,tmc.value.notes,tmc.value.teamName, None)
       val firstDeprecatedDate = TopicMetadataV2Format.read(request.toJson).deprecatedDate.get
       val now2 = Instant.now
       now2.isAfter(firstDeprecatedDate) shouldBe true
@@ -657,7 +660,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
       val request = TopicMetadataV2Request.apply(Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,
         tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.dataClassification,tmc.value.contact,
-        tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes, tmc.value.teamName)
+        tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes, tmc.value.teamName, None)
       val firstDeprecatedDate = TopicMetadataV2Format.read(request.toJson).deprecatedDate.getOrElse(None)
       firstDeprecatedDate shouldBe None
     }

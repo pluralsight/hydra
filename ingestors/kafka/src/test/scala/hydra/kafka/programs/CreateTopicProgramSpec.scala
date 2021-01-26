@@ -64,7 +64,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       createdDate,
       List.empty,
       None,
-      Some("dvs-teamName")
+      Some("dvs-teamName"),
+      None
     )
 
   "CreateTopicSpec" must {
