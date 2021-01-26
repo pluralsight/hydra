@@ -25,8 +25,10 @@ import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import retry.{RetryPolicies, RetryPolicy}
+import eu.timepit.refined._
 
 import scala.concurrent.ExecutionContext
+import hydra.kafka.model.TopicMetadataV2Request.NumPartitions
 
 class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
@@ -52,7 +54,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       email: String = "test@test.com",
       createdDate: Instant = Instant.now(),
       deprecated: Boolean = false,
-      deprecatedDate: Option[Instant] = None
+      deprecatedDate: Option[Instant] = None,
+      numPartitions: Option[NumPartitions] = None
   ): TopicMetadataV2Request =
     TopicMetadataV2Request(
       Schemas(keySchema, valueSchema),
@@ -497,6 +500,30 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         ud shouldBe null
         Instant.parse(dd.toString) shouldBe a[Instant]
       }).unsafeRunSync()
+    }
+
+    "create topic with custom number of partitions" in {
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      val subject = "dvs.subject"
+      (for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
+        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
+        _ <- new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafka,
+          kafkaClient,
+          policy,
+          Subject.createValidated("dvs.test-metadata-topic").get,
+          metadata
+        ).createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createTopicMetadataRequest(keySchema, valueSchema, numPartitions = refineMV[TopicMetadataV2Request.NumPartitionsPredicate](22).some),
+          TopicDetails(1, 1)
+        )
+        topic <- kafka.describeTopic(subject)
+      } yield topic.get shouldBe Topic(subject, 22)).unsafeRunSync()
     }
 
   }
