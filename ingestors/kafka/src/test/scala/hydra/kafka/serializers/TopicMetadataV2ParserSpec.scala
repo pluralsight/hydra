@@ -12,8 +12,10 @@ import hydra.kafka.serializers.Errors._
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
+import eu.timepit.refined._
 
 import scala.concurrent.duration._
+import hydra.kafka.model.TopicMetadataV2Request.NumPartitions
 
 class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
   import TopicMetadataV2Parser._
@@ -412,6 +414,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       parentSubjects: List[Subject] = List(),
       notes: Option[String] = None,
       createdDate: Instant = Instant.now(),
+      numPartitions: Option[NumPartitions] = None
   ): (
       JsValue,
       Subject,
@@ -440,7 +443,8 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
          |  ${if (allOptionalFieldsPresent) {
                        s""","parentSubjects": ${parentSubjects.toJson.compactPrint},"deprecated":$deprecated,"createdDate":"${createdDate.toString}""""
                      } else ""}
-         |  ${if (notes.isDefined) s""","notes": "${notes.get}"""" else ""}}
+         |  ${if (notes.isDefined) s""","notes": "${notes.get}"""" else ""}
+         |  ${if (numPartitions.isDefined) s""","numPartitions": ${numPartitions.get.value}""" else ""}}
          |""".stripMargin.parseJson
     (
       jsValue,
@@ -536,6 +540,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val notes = Some("Notes go here.")
       val teamName = "dvs-teamName"
 
+      val np = Some(refineMV[TopicMetadataV2Request.NumPartitionsPredicate](22))
       val topicMetadataV2 = TopicMetadataV2Request(
         schemas = Schemas(
           keySchema,
@@ -550,7 +555,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         parentSubjects = parentSubjects,
         notes = notes,
         teamName = Some(teamName),
-        numPartitions = None
+        numPartitions = np
       )
       TopicMetadataV2Format.write(topicMetadataV2) shouldBe
         createJsValueOfTopicMetadataV2Request(
@@ -565,7 +570,8 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
           validAvroSchema,
           parentSubjects,
           notes,
-          createdDate
+          createdDate,
+          np
         )._1
     }
 
