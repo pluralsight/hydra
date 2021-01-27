@@ -128,7 +128,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       createTopicRequest: TopicMetadataV2Request,
       defaultTopicDetails: TopicDetails
   ): F[Unit] = {
-    val td = createTopicRequest.numPartitions.map(numP => defaultTopicDetails.copy(numPartitions = numP.value)).getOrElse(defaultTopicDetails)
+    val td = createTopicRequest.numPartitions
+      .map(numP => defaultTopicDetails.copy(numPartitions = numP.value)).getOrElse(defaultTopicDetails)
     (for {
       _ <- registerSchemas(
         topicName,
