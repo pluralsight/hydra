@@ -60,7 +60,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
             Some(
               "This is the topic that Hydra uses to keep track of metadata for topics."
             ),
-            Some("Data-Platform")
+            Some("Data-Platform"),
+            None
           ),
           TopicDetails(cfg.numPartitions, cfg.replicationFactor, Map("cleanup.policy" -> "compact"))
         )
@@ -85,7 +86,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
           Some(
             "This is the topic that Hydra uses to keep track of a summarized list (no partition/offset info) of consumer groups."
           ),
-          Some("Data-Platform")
+          Some("Data-Platform"),
+          None
         ),
         TopicDetails(dvsConsumersTopicConfig.numPartitions, dvsConsumersTopicConfig.replicationFactor, Map("cleanup.policy" -> "compact"))
       )
@@ -108,7 +110,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
           Some(
             "This is the topic that Hydra uses to keep track of the offsets we've consumed in the __consumer_offsets topic that Kakfa manages."
           ),
-          Some("Data-Platform")
+          Some("Data-Platform"),
+          None
         ),
         TopicDetails(cooTopicConfig.numPartitions, cooTopicConfig.replicationFactor, Map("cleanup.policy" -> "compact"))
       )

@@ -126,15 +126,17 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   def createTopic(
       topicName: Subject,
       createTopicRequest: TopicMetadataV2Request,
-      topicDetails: TopicDetails
+      defaultTopicDetails: TopicDetails
   ): F[Unit] = {
+    val td = createTopicRequest.numPartitions
+      .map(numP => defaultTopicDetails.copy(numPartitions = numP.value)).getOrElse(defaultTopicDetails)
     (for {
       _ <- registerSchemas(
         topicName,
         createTopicRequest.schemas.key,
         createTopicRequest.schemas.value
       )
-      _ <- createTopicResource(topicName, topicDetails)
+      _ <- createTopicResource(topicName, td)
       _ <- Resource.liftF(publishMetadata(topicName, createTopicRequest))
     } yield ()).use(_ => Bracket[F, Throwable].unit)
   }
