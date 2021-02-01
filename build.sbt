@@ -6,13 +6,14 @@ val buildNumber =
   scala.util.Properties.envOrNone("version").map(v => "." + v).getOrElse("")
 val hydraVersion = "0.11.3" + buildNumber
 val jvmMaxMemoryFlag = sys.env.getOrElse("MAX_JVM_MEMORY_FLAG", "-Xmx2g")
+import Keys._
 
 lazy val defaultSettings = Seq(
   organization := "pluralsight",
   version := hydraVersion,
-  scalaVersion := "2.12.11",
+  scalaVersion := "2.13.3",
   description := "Hydra",
-  libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
+  libraryDependencies += "org.scala-lang" % "scala-reflect" % "2.13.3",
   excludeDependencies += "org.slf4j" % "slf4j-log4j12",
   excludeDependencies += "log4j" % "log4j",
   addCompilerPlugin(

@@ -46,7 +46,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
 
   private implicit class RetryAndAssert[A](boolIO: IO[A]) {
     def retryIfFalse(check: A => Boolean): IO[Assertion] =
-      boolIO.map(check).retryingM(identity, policy, noop).map(assert(_))
+      boolIO.map(check).retryingOnFailures(identity, policy, noop).map(assert(_))
   }
 
   override def afterAll(): Unit = {
