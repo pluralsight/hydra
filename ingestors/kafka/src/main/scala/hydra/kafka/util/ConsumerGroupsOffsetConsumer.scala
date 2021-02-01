@@ -88,9 +88,10 @@ object ConsumerGroupsOffsetConsumer {
 
   private def processRecord[F[_]: ConcurrentEffect: Logger](
                                                              cr: CommittableConsumerRecord[F, Option[BaseKey], Option[OffsetAndMetadata]],
-                                                             s: SchemaRegistryClient,
                                                              destinationTopic: String,
-                                                             dvsInternalKafkaOffsetTopic: String
+                                                             dvsInternalKafkaOffsetTopic: String,
+                                                             keySerializer: Serializer[F, GenericRecord],
+                                                             valueSerializer: Serializer[F, GenericRecord]
                                                            ): fs2.Stream[F, ProducerRecords[Array[Byte], Array[Byte], Unit]] = {
     ((cr.record.key, cr.record.value) match {
       case (Some(OffsetKey(_, k)), offsetMaybe) =>
@@ -109,10 +110,10 @@ object ConsumerGroupsOffsetConsumer {
               )
               (key, value) = topicConsumer
               (offsetKey, offsetValue) = topicConsumerOffset
-              k <- getSerializer[F, GenericRecord](s)(isKey = true).serialize(destinationTopic, Headers.empty, key)
-              v <- getSerializer[F, GenericRecord](s)(isKey = false).serialize(destinationTopic, Headers.empty, value.orNull)
-              offsetK <- getSerializer[F, GenericRecord](s)(isKey = true).serialize(dvsInternalKafkaOffsetTopic, Headers.empty, offsetKey)
-              offsetV <- getSerializer[F, GenericRecord](s)(isKey = false).serialize(dvsInternalKafkaOffsetTopic, Headers.empty, offsetValue)
+              k <- keySerializer.serialize(destinationTopic, Headers.empty, key)
+              v <- valueSerializer.serialize(destinationTopic, Headers.empty, value.orNull)
+              offsetK <- keySerializer.serialize(dvsInternalKafkaOffsetTopic, Headers.empty, offsetKey)
+              offsetV <- valueSerializer.serialize(dvsInternalKafkaOffsetTopic, Headers.empty, offsetValue)
             } yield  {
               val p = ProducerRecord(destinationTopic, k, v)
               val p2 = ProducerRecord(dvsInternalKafkaOffsetTopic, offsetK, offsetV)
@@ -152,10 +153,19 @@ object ConsumerGroupsOffsetConsumer {
       .withRetries(0)
       .withAcks(Acks.All)
     val consumer = consumerStream(settings)
+    val keySerializer = getSerializer[F, GenericRecord](s)(isKey = true)
+    val valueSerializer = getSerializer[F, GenericRecord](s)(isKey = false)
+
     seekToLatestOffsets(sourceTopic)(consumer, partitionMap)
       .flatMap(_.stream)
       .flatMap { cr =>
-        processRecord(cr, s, destinationTopic, dvsInternalKafkaOffsetTopic)
+        processRecord(
+          cr,
+          destinationTopic,
+          dvsInternalKafkaOffsetTopic,
+          keySerializer,
+          valueSerializer
+        )
       }
       .through(produce(producerSettings))
       .compile.drain
@@ -177,11 +187,11 @@ object ConsumerGroupsOffsetConsumer {
           b.assign(topicPartitions).recoverWith { case e =>
             Logger[F].error(s"AssignToTopic for __consumer_offsets Error: ${e.getMessage}") *> ConcurrentEffect[F].unit
           } *>
-          p.iterator.toList.traverse { case (p, o) =>
+            p.iterator.toList.traverse { case (p, o) =>
               b.seek(new TopicPartition(sourceTopic, p), o).recoverWith { case e =>
                 Logger[F].error(s"SeekToOffset for __consumer_offsets Error: ${e.getMessage}") *> ConcurrentEffect[F].unit
               }
-          }.flatMap(_ => Applicative[F].unit)
+            }.flatMap(_ => Applicative[F].unit)
         } else {
           b.subscribeTo(sourceTopic)
         }
@@ -195,7 +205,7 @@ object ConsumerGroupsOffsetConsumer {
                                                                  dvsConsumerOffsetStream: fs2.Stream[F, (Record, OffsetInfo)],
                                                                  hydraConsumerOffsetsOffsetsLatestOffsets: PartitionOffsetMap,
                                                                  hydraConsumerOffsetsOffsetsCache: Ref[F, PartitionOffsetMap]
-                                                                  ): F[Unit] = {
+                                                               ): F[Unit] = {
     def onStart = if (hydraConsumerOffsetsOffsetsLatestOffsets.values.forall(_ == 0L)) deferred.complete(Map()) else ConcurrentEffect[F].unit
     def isComplete: F[Unit] = for {
       consumerOffsets <- consumerOffsetsCache.get
