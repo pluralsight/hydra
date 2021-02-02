@@ -2,10 +2,10 @@ package hydra.kafka.programs
 
 import java.time.Instant
 
-import cats.effect.{Bracket, ExitCase, Resource}
+import cats.effect.{Bracket, ExitCase, Resource, Sync}
 import cats.syntax.all._
 import hydra.avro.registry.SchemaRegistry
-import hydra.avro.registry.SchemaRegistry.SchemaVersion
+import hydra.avro.registry.SchemaRegistry.{IncompatibleSchemaException, SchemaVersion}
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
@@ -130,14 +130,18 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   ): F[Unit] = {
     val td = createTopicRequest.numPartitions
       .map(numP => defaultTopicDetails.copy(numPartitions = numP.value)).getOrElse(defaultTopicDetails)
-    (for {
-      _ <- registerSchemas(
-        topicName,
-        createTopicRequest.schemas.key,
-        createTopicRequest.schemas.value
-      )
-      _ <- createTopicResource(topicName, td)
-      _ <- Resource.liftF(publishMetadata(topicName, createTopicRequest))
-    } yield ()).use(_ => Bracket[F, Throwable].unit)
+    if(createTopicRequest.schemas.key.getFields.size() <= 0) {
+      Bracket[F, Throwable].raiseError(IncompatibleSchemaException("Must include Fields in Key"))
+    } else {
+      (for {
+        _ <- registerSchemas(
+          topicName,
+          createTopicRequest.schemas.key,
+          createTopicRequest.schemas.value
+        )
+        _ <- createTopicResource(topicName, td)
+        _ <- Resource.liftF(publishMetadata(topicName, createTopicRequest))
+      } yield ()).use(_ => Bracket[F, Throwable].unit)
+    }
   }
 }
