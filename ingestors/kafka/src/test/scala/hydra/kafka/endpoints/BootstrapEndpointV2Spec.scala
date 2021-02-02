@@ -90,6 +90,26 @@ final class BootstrapEndpointV2Spec
         .noDefault()
         .endRecord()
 
+    val badKeySchema: Schema =
+    SchemaBuilder
+      .record("key")
+      .fields()
+      .endRecord()
+
+    val badKeySchemaRequest = TopicMetadataV2Request(
+      Schemas(badKeySchema, getTestSchema("value")),
+      StreamTypeV2.Entity,
+      deprecated = false,
+      None,
+      Public,
+      NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
+      Instant.now,
+      List.empty,
+      None,
+      Some("dvs-teamName"),
+      None
+    ).toJson.compactPrint
+
     val validRequest = TopicMetadataV2Request(
       Schemas(getTestSchema("key"), getTestSchema("value")),
       StreamTypeV2.Entity,
@@ -125,6 +145,19 @@ final class BootstrapEndpointV2Spec
           ) ~> check {
             val r = responseAs[String]
             r shouldBe Subject.invalidFormat
+            response.status shouldBe StatusCodes.BadRequest
+          }
+        }
+        .unsafeRunSync()
+    }
+
+    "reject a request with key missing field" in {
+      testCreateTopicProgram
+        .map { bootstrapEndpoint =>
+          Put("/v2/topics/invalid%20name", HttpEntity(ContentTypes.`application/json`, badKeySchemaRequest)) ~> Route.seal(
+            bootstrapEndpoint.route
+          ) ~> check {
+            val r = responseAs[String]
             response.status shouldBe StatusCodes.BadRequest
           }
         }
