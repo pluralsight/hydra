@@ -206,6 +206,12 @@ final class IngestionEndpointSpec
         status shouldBe StatusCodes.BadRequest
       }
     }
+    "reject an request without information in the key" in {
+      val request = Post("/v2/topics/dvs.blah.blah/records", HttpEntity(ContentTypes.`application/json`, """{"key":{}, "value":{"test": 2}}"""))
+      request ~> Route.seal(ingestRouteAlt) ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
     "accept a complete request" in {
       val request = Post("/v2/topics/dvs.blah.blah/records", HttpEntity(ContentTypes.`application/json`, """{"key":{"test": 1}, "value":{"test": 2}}"""))
       request ~> Route.seal(ingestRouteAlt) ~> check {

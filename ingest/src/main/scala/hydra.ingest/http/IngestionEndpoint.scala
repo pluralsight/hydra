@@ -36,6 +36,7 @@ import hydra.ingest.services.IngestionFlowV2.V2IngestRequest
 import hydra.ingest.services.{IngestionFlow, IngestionFlowV2}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
 import hydra.kafka.model.TopicMetadataV2Request.Subject
+import org.apache.avro.AvroTypeException
 
 import scala.collection.immutable.Map
 import scala.util.{Failure, Success, Try}
@@ -87,6 +88,7 @@ class IngestionEndpoint[F[_]: Futurable](
     case e: PublishError.RecordTooLarge => (StatusCodes.PayloadTooLarge, e.getMessage.some)
     case r: IngestionFlowV2.AvroConversionAugmentedException => (StatusCodes.BadRequest, r.message.some)
     case r: IngestionFlowV2.SchemaNotFoundAugmentedException => (StatusCodes.BadRequest, Try(r.schemaNotFoundException.getMessage).toOption)
+    case t: AvroTypeException => (StatusCodes.BadRequest, t.getMessage.some)
     case e => (StatusCodes.InternalServerError, Try(e.getMessage).toOption)
   }
 
