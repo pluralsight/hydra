@@ -148,7 +148,7 @@ object Dependencies {
     val scalaTest = "org.scalatest" %% "scalatest" % scalaTestVersion % "test"
 
     val scalaMock = "org.scalamock" %% "scalamock" % scalaMockVersion % "test"
-    val junit = "junit" % "junit" % "4.13.1" % "test"
+    val junit = "junit" % "junit" % "4.13.2" % "test"
 
   }
 
