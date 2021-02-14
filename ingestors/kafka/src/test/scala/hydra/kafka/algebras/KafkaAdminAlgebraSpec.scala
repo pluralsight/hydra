@@ -15,6 +15,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.ExecutionContext
+import fs2.kafka.{ KafkaConsumer, KafkaProducer }
 
 final class KafkaAdminAlgebraSpec
     extends AnyWordSpecLike
@@ -116,7 +117,7 @@ final class KafkaAdminAlgebraSpec
           ).withBootstrapServers(bootstrapServers)
           val record = ProducerRecord[String, String](topicName, "key", "value")
           fs2.Stream.eval(IO.pure(ProducerRecords.one(record)))
-            .through(produce(producerSettings))
+            .through(KafkaProducer.pipeKafkaProducer.pipe(producerSettings))
             .compile.drain.unsafeRunSync()
         }
 
@@ -128,7 +129,7 @@ final class KafkaAdminAlgebraSpec
             .withAutoOffsetReset(AutoOffsetReset.Earliest)
             .withBootstrapServers(bootstrapServers)
             .withGroupId(consumerGroup)
-          consumerStream(consumerSettings)
+          KafkaConsumer.streamKafkaConsumer.streamKafkaConsumer.streamKafkaConsumer.streamKafkaConsumer.streamKafkaConsumer.stream(consumerSettings)
             .evalTap(_.subscribeTo(topicName))
             .flatMap(_.stream)
             .evalTap(_.offset.commit)
