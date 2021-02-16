@@ -59,7 +59,7 @@ object MetadataAlgebra {
                       ref.update(_.addMetadata(topicMetadataV2Transport))
                 }
               case None =>
-                Logger[F].error("Metadata value not found")
+                ref.update(_.removeMetadata(topicMetadataKey))
             }
           }
         }.recoverWith {
@@ -127,6 +127,8 @@ object TestMetadataAlgebra {
         def addMetadata(topicMetadataContainer: TopicMetadataContainer): F[Unit] =
           cache.update(_.addMetadata(topicMetadataContainer))
 
+        def removeMetadata(topicMetadataV2Key: TopicMetadataV2Key): F[Unit] =
+          cache.update(_.removeMetadata(topicMetadataV2Key))
       }
     )
   }
@@ -135,8 +137,12 @@ object TestMetadataAlgebra {
 private case class MetadataStorageFacade(metadataMap: Map[Subject, TopicMetadataContainer]) {
   def getMetadataByTopicName(subject: Subject): Option[TopicMetadataContainer] = metadataMap.get(subject)
   def getAllMetadata: List[TopicMetadataContainer] = metadataMap.values.toList
-  def addMetadata(metadata: TopicMetadataContainer): MetadataStorageFacade =
+  def addMetadata(metadata: TopicMetadataContainer): MetadataStorageFacade = {
     this.copy(this.metadataMap + (metadata.key.subject -> metadata))
+  }
+  def removeMetadata(key: TopicMetadataV2Key): MetadataStorageFacade = {
+    this.copy(this.metadataMap - key.subject)
+  }
 }
 
 private object MetadataStorageFacade {
