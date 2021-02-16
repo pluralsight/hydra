@@ -39,7 +39,7 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
 
   private implicit class RetryAndAssert[A](boolIO: IO[A]) {
     def retryIfFalse(check: A => Boolean): IO[Assertion] =
-      boolIO.map(check).retryingM(identity, policy, noop).map(assert(_))
+      boolIO.map(check).retryingOnFailures(identity, policy, noop).map(assert(_))
   }
 
 
@@ -84,10 +84,32 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
           allMetadata <- metadataAlgebra.getAllMetadata
         } yield allMetadata should have length 2).unsafeRunSync()
       }
+
+      "deletes topic from metadata" in {
+        val subject = Subject.createValidated("dvs.subject1").get
+        val (genericRecordsIO, key, value) = getMetadataGenericRecords(subject)
+        val (genericRecordsIOWithoutValue, _, _) = getMetadataGenericRecords(subject, nullValue = true)
+
+        (for {
+          record <- genericRecordsIO
+          nullRecord <- genericRecordsIOWithoutValue
+          _ <- kafkaClientAlgebra.publishMessage(record, metadataTopicName)
+          _ <- metadataAlgebra.getMetadataFor(subject).retryIfFalse(_.isDefined)
+          metadata1 <- metadataAlgebra.getAllMetadata
+          _ <- kafkaClientAlgebra.publishMessage(nullRecord, metadataTopicName)
+          _ <- metadataAlgebra.getMetadataFor(subject).retryIfFalse(_.isEmpty)
+          metadata <- metadataAlgebra.getMetadataFor(subject)
+          metadata2 <- metadataAlgebra.getAllMetadata
+        } yield {
+          metadata shouldBe None
+          metadata1.length shouldBe (metadata2.length + 1)
+          assert(metadata1.nonEmpty)
+        }).unsafeRunSync()
+      }
     }
   }
 
-  private def getMetadataGenericRecords(subject: Subject): (IO[(GenericRecord, Option[GenericRecord], Option[Headers])], TopicMetadataV2Key, TopicMetadataV2Value) = {
+  private def getMetadataGenericRecords(subject: Subject, nullValue: Boolean = false): (IO[(GenericRecord, Option[GenericRecord], Option[Headers])], TopicMetadataV2Key, TopicMetadataV2Value) = {
     val key = TopicMetadataV2Key(subject)
     val value = TopicMetadataV2Value(
         StreamTypeV2.Entity,
@@ -100,6 +122,6 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
         None,
         Some("dvs-teamName")
         )
-    (TopicMetadataV2.encode[IO](key, Some(value), None), key, value)
+    (TopicMetadataV2.encode[IO](key, if (nullValue) None else Some(value), None), key, value)
   }
 }
