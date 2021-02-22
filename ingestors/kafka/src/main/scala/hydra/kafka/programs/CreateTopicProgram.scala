@@ -143,7 +143,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
         }
         if (mismatches.isEmpty) ().pure else Bracket[F, Throwable].raiseError(IncompatibleKeyAndValueFieldNames(mismatches))
     }
-    Resource.pure(containsMismatches)
+    Resource.liftF(containsMismatches)
   }
 
   def createTopic(
@@ -174,6 +174,6 @@ object CreateTopicProgram {
   final case class KeyAndValueMismatch(fieldName: String, keyFieldSchema: Schema, valueFieldSchema: Schema)
   final case class IncompatibleKeyAndValueFieldNames(errors: List[KeyAndValueMismatch]) extends
     RuntimeException(
-      errors.map(e => s"Field ${e.fieldName} has mismatched type in key: ${e.keyFieldSchema.toString} and value: ${e.valueFieldSchema.toString}").mkString + " Fields with same names in key and value schemas must have same type."
+      (List("Fields with same names in key and value schemas must have same type:", "Field Name\tKey Schema\tValue Schema") ++ errors.map(e => s"${e.fieldName}\t${e.keyFieldSchema.toString}\t${e.valueFieldSchema}")).mkString("\n")
     )
 }

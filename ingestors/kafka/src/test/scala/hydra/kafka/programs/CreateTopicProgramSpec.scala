@@ -29,6 +29,7 @@ import eu.timepit.refined._
 
 import scala.concurrent.ExecutionContext
 import hydra.kafka.model.TopicMetadataV2Request.NumPartitions
+import hydra.kafka.programs.CreateTopicProgram.IncompatibleKeyAndValueFieldNames
 
 class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
@@ -460,8 +461,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         _ <- createTopicProgram.createTopic(subject, updatedRequest, TopicDetails(1, 1))
         updatedMap <- publishTo.get
       } yield {
-        val dd = metadataMap.get(metadataTopic).get._2.get.get("deprecatedDate")
-        val ud = updatedMap.get(metadataTopic).get._2.get.get("deprecatedDate")
+        val dd = metadataMap(metadataTopic)._2.get.get("deprecatedDate")
+        val ud = updatedMap(metadataTopic)._2.get.get("deprecatedDate")
         ud shouldBe dd
       }).unsafeRunSync()
     }
@@ -495,8 +496,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         _ <- createTopicProgram.createTopic(subject, updatedRequest, TopicDetails(1, 1))
         updatedMap <- publishTo.get
       } yield {
-        val ud = metadataMap.get(metadataTopic).get._2.get.get("deprecatedDate")
-        val dd = updatedMap.get(metadataTopic).get._2.get.get("deprecatedDate")
+        val ud = metadataMap(metadataTopic)._2.get.get("deprecatedDate")
+        val dd = updatedMap(metadataTopic)._2.get.get("deprecatedDate")
         ud shouldBe null
         Instant.parse(dd.toString) shouldBe a[Instant]
       }).unsafeRunSync()
@@ -525,6 +526,73 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         topic <- kafka.describeTopic(subject)
       } yield topic.get shouldBe Topic(subject, 22)).unsafeRunSync()
     }
+
+    "throw error on topic with key and value field named same but with different type" in {
+      val mismatchedValueSchema =
+        SchemaBuilder
+        .record("name")
+        .fields()
+        .name("isTrue")
+        .`type`()
+        .booleanType()
+        .noDefault()
+        .endRecord()
+
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      an [IncompatibleKeyAndValueFieldNames] shouldBe thrownBy {(for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
+        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
+        _ <- new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafka,
+          kafkaClient,
+          policy,
+          Subject.createValidated("dvs.test-metadata-topic").get,
+          metadata
+        ).createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createTopicMetadataRequest(keySchema, mismatchedValueSchema),
+          TopicDetails(1, 1)
+        )
+      } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}
+    }
+
+    "successfully evolve schema which had mismatched types in past topic" in {
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      val subject = "dvs.subject"
+      val mismatchedValueSchema =
+        SchemaBuilder
+          .record("name")
+          .fields()
+          .name("isTrue")
+          .`type`()
+          .booleanType()
+          .noDefault()
+          .endRecord()
+
+      (for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
+        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
+        _ <- new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafka,
+          kafkaClient,
+          policy,
+          Subject.createValidated("dvs.test-metadata-topic").get,
+          metadata
+        ).createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createTopicMetadataRequest(keySchema, valueSchema),
+          TopicDetails(1, 1)
+        )
+        topic <- kafka.describeTopic(subject)
+      } yield topic.get shouldBe Topic(subject, 22)).unsafeRunSync()
+    }
+
 
   }
 
