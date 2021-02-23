@@ -4,7 +4,7 @@ import java.time.Instant
 
 import cats.data.NonEmptyList
 import cats.effect.concurrent.Ref
-import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
+import cats.effect.{Bracket, Concurrent, ContextShift, IO, Resource, Sync, Timer}
 import cats.syntax.all._
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
@@ -30,6 +30,7 @@ import eu.timepit.refined._
 import scala.concurrent.ExecutionContext
 import hydra.kafka.model.TopicMetadataV2Request.NumPartitions
 import hydra.kafka.programs.CreateTopicProgram.IncompatibleKeyAndValueFieldNames
+import org.scalatest.compatible.Assertion
 
 class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
@@ -561,39 +562,28 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
     "successfully evolve schema which had mismatched types in past topic" in {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      val subject = "dvs.subject"
-      val mismatchedValueSchema =
-        SchemaBuilder
-          .record("name")
-          .fields()
-          .name("isTrue")
-          .`type`()
-          .booleanType()
-          .noDefault()
-          .endRecord()
+      val subject = Subject.createValidated("dvs.subject").get
+      val mismatchedValueSchema = SchemaBuilder.record("name").fields().name("isTrue").`type`().booleanType().noDefault().endRecord()
+      val mismatchedValueSchemaEvolution = SchemaBuilder.record("name").fields().name("isTrue").`type`().booleanType().noDefault().nullableInt("nullInt", 12).endRecord()
 
-      (for {
-        schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO]
-        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
-        _ <- new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        ).createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, valueSchema),
+      val topicMetadataV2Request = createTopicMetadataRequest(keySchema, mismatchedValueSchema)
+      val resource: Resource[IO, Assertion] = (for {
+        schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
+        metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
+        ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
+        _ <- ctProgram.registerSchemas(subject ,keySchema, mismatchedValueSchema)
+        _ <- ctProgram.createTopicResource(subject, TopicDetails(1,1))
+        _ <- Resource.liftF(ctProgram.publishMetadata(subject, topicMetadataV2Request))
+        _ <- Resource.liftF(ctProgram.createTopic(
+          subject,
+          createTopicMetadataRequest(keySchema, mismatchedValueSchemaEvolution),
           TopicDetails(1, 1)
-        )
-        topic <- kafka.describeTopic(subject)
-      } yield topic.get shouldBe Topic(subject, 22)).unsafeRunSync()
+        ))
+      } yield (succeed))
+      resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()
     }
-
-
   }
 
   private final class TestKafkaClientAlgebraWithPublishTo(

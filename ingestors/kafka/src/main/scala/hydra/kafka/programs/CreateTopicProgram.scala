@@ -65,7 +65,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       .void
   }
 
-  private def registerSchemas(
+  private[programs] def registerSchemas(
       subject: Subject,
       keySchema: Schema,
       valueSchema: Schema
@@ -77,7 +77,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     )
   }
 
-  private def createTopicResource(
+  private[programs] def createTopicResource(
       subject: Subject,
       topicDetails: TopicDetails
   ): Resource[F, Unit] = {
@@ -101,7 +101,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       .void
   }
 
-  private def publishMetadata(
+  private[programs] def publishMetadata(
       topicName: Subject,
       createTopicRequest: TopicMetadataV2Request,
   ): F[Unit] = {
