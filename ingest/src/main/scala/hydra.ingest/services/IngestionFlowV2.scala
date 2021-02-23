@@ -19,6 +19,7 @@ import scalacache.guava._
 import scalacache.memoization._
 
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters.asScalaBufferConverter
 import scala.util.{Failure, Try}
 
 final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
@@ -82,7 +83,9 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
 
   def ingest(request: V2IngestRequest, topic: Subject): F[PublishResponse] = {
     getSchemas(request, topic).flatMap { case (key, value) =>
-      kafkaClient.publishMessage((key, value, request.headers), topic.value).rethrow
+      MonadError[F, Throwable].fromEither(validateKeyAndValueSchemas(key, value)).flatMap { _ =>
+        kafkaClient.publishMessage((key, value, request.headers), topic.value).rethrow
+      }
     }
   }
 }
@@ -96,4 +99,22 @@ object IngestionFlowV2 {
   final case class AvroConversionAugmentedException(message: String) extends RuntimeException(message)
   final case class SchemaNotFoundAugmentedException(schemaNotFoundException: SchemaNotFoundException, topic: String)
     extends RuntimeException(s"Schema '$topic' cannot be loaded. Cause: ${schemaNotFoundException.getClass.getName}: Schema not found for $topic")
+  case object KeyAndValueMismatchedValuesException
+    extends RuntimeException("All field names existing in both the key and value schemas must have the same value.")
+
+  private[services] def validateKeyAndValueSchemas(key: GenericRecord, valueOpt: Option[GenericRecord]): Either[Throwable, Unit] = {
+    valueOpt match {
+      case Some(value) =>
+        val keyAndValueMismatch = key.getSchema.getFields.asScala.toList.exists { k =>
+          value.hasField(k.name()) && key.get(k.name()) != value.get(k.name())
+        }
+        if (keyAndValueMismatch) {
+          Left(KeyAndValueMismatchedValuesException)
+        } else {
+          Right(())
+        }
+      case None =>
+        Right(())
+    }
+  }
 }

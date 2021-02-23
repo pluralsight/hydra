@@ -5,9 +5,10 @@ import cats.syntax.all._
 import fs2.kafka.{Header, Headers}
 import hydra.avro.registry.SchemaRegistry
 import hydra.core.transport.ValidationStrategy
-import hydra.ingest.services.IngestionFlowV2.V2IngestRequest
+import hydra.ingest.services.IngestionFlowV2.{KeyAndValueMismatchedValuesException, V2IngestRequest}
 import hydra.kafka.algebras.KafkaClientAlgebra
 import hydra.kafka.model.TopicMetadataV2Request.Subject
+import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -120,6 +121,47 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
 
     val testRequest = V2IngestRequest(testKeyPayloadAlt, testValPayloadAlt.some, ValidationStrategy.Strict.some, useSimpleJsonFormat = false)
     ingest(testRequest).attempt.unsafeRunSync() shouldBe a[Left[_, _]]
+  }
+
+  it should "reject payload with differing value of same name in key and value" in {
+    val key = new GenericRecordBuilder(SchemaBuilder.record("key").fields().requiredString("id").endRecord())
+      .set("id","12345")
+      .build()
+    val value = new GenericRecordBuilder(SchemaBuilder.record("value").fields().requiredString("id").endRecord())
+      .set("id","54321")
+      .build()
+    IngestionFlowV2.validateKeyAndValueSchemas(key, value.some) match {
+      case Left(error) =>
+        error shouldBe KeyAndValueMismatchedValuesException
+      case _ => fail("Failed to properly validate key and value")
+    }
+  }
+
+  it should "accept payload with same value of same name in key and value" in {
+    val key = new GenericRecordBuilder(SchemaBuilder.record("key").fields().requiredString("id").endRecord())
+      .set("id","12345")
+      .build()
+    val value = new GenericRecordBuilder(SchemaBuilder.record("value").fields().requiredString("id").endRecord())
+      .set("id","12345")
+      .build()
+    IngestionFlowV2.validateKeyAndValueSchemas(key, value.some) shouldBe a[Right[Throwable,Unit]]
+  }
+
+  it should "accept payload with unique fields in key and value" in {
+    val key = new GenericRecordBuilder(SchemaBuilder.record("key").fields().requiredString("id").endRecord())
+      .set("id","12345")
+      .build()
+    val value = new GenericRecordBuilder(SchemaBuilder.record("value").fields().requiredString("notId").endRecord())
+      .set("notId","12345")
+      .build()
+    IngestionFlowV2.validateKeyAndValueSchemas(key, value.some) shouldBe a[Right[Throwable,Unit]]
+  }
+
+  it should "accept payload with null value" in {
+    val key = new GenericRecordBuilder(SchemaBuilder.record("key").fields().requiredString("id").endRecord())
+      .set("id","12345")
+      .build()
+    IngestionFlowV2.validateKeyAndValueSchemas(key, None) shouldBe a[Right[Throwable,Unit]]
   }
 
 }
