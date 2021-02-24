@@ -99,8 +99,13 @@ object IngestionFlowV2 {
   final case class AvroConversionAugmentedException(message: String) extends RuntimeException(message)
   final case class SchemaNotFoundAugmentedException(schemaNotFoundException: SchemaNotFoundException, topic: String)
     extends RuntimeException(s"Schema '$topic' cannot be loaded. Cause: ${schemaNotFoundException.getClass.getName}: Schema not found for $topic")
-  case object KeyAndValueMismatchedValuesException
-    extends RuntimeException("All field names existing in both the key and value schemas must have the same value.")
+
+  final case class KeyAndValueMismatch(fieldName: String, keyValue: AnyRef, valValue: AnyRef)
+  final case class KeyAndValueMismatchedValuesException(mismatches: List[KeyAndValueMismatch])
+    extends RuntimeException(
+      (List(s"Fields that exist in key schema and value schema must have same value.","Field Name\tKey Value\tValue Value") ++
+        mismatches.map(m => s"${m.fieldName}\t${m.keyValue.toString}\t${m.valValue.toString}")).mkString("\n")
+    )
 
   private[services] def validateKeyAndValueSchemas(key: GenericRecord, valueOpt: Option[GenericRecord]): Either[Throwable, Unit] = {
     valueOpt match {
@@ -109,7 +114,14 @@ object IngestionFlowV2 {
           value.hasField(k.name()) && key.get(k.name()) != value.get(k.name())
         }
         if (keyAndValueMismatch) {
-          Left(KeyAndValueMismatchedValuesException)
+          val keyAndValueMismatch = key.getSchema.getFields.asScala.toList.flatMap { k =>
+            if (value.hasField(k.name()) && key.get(k.name()) != value.get(k.name())) {
+              Some(KeyAndValueMismatch(k.name(), key.get(k.name()), value.get(k.name())))
+            } else {
+              None
+            }
+          }
+          Left(KeyAndValueMismatchedValuesException(keyAndValueMismatch))
         } else {
           Right(())
         }

@@ -5,7 +5,7 @@ import cats.syntax.all._
 import fs2.kafka.{Header, Headers}
 import hydra.avro.registry.SchemaRegistry
 import hydra.core.transport.ValidationStrategy
-import hydra.ingest.services.IngestionFlowV2.{KeyAndValueMismatchedValuesException, V2IngestRequest}
+import hydra.ingest.services.IngestionFlowV2.{KeyAndValueMismatch, KeyAndValueMismatchedValuesException, V2IngestRequest}
 import hydra.kafka.algebras.KafkaClientAlgebra
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
@@ -132,7 +132,7 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
       .build()
     IngestionFlowV2.validateKeyAndValueSchemas(key, value.some) match {
       case Left(error) =>
-        error shouldBe KeyAndValueMismatchedValuesException
+        error shouldBe KeyAndValueMismatchedValuesException(KeyAndValueMismatch("id","12345","54321"):: Nil)
       case _ => fail("Failed to properly validate key and value")
     }
   }
