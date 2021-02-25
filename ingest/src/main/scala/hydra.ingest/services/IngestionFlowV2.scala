@@ -19,6 +19,7 @@ import scalacache.guava._
 import scalacache.memoization._
 
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters.asScalaBufferConverter
 import scala.util.{Failure, Try}
 
 final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
@@ -82,7 +83,9 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
 
   def ingest(request: V2IngestRequest, topic: Subject): F[PublishResponse] = {
     getSchemas(request, topic).flatMap { case (key, value) =>
-      kafkaClient.publishMessage((key, value, request.headers), topic.value).rethrow
+      MonadError[F, Throwable].fromEither(validateKeyAndValueSchemas(key, value)).flatMap { _ =>
+        kafkaClient.publishMessage((key, value, request.headers), topic.value).rethrow
+      }
     }
   }
 }
@@ -96,4 +99,34 @@ object IngestionFlowV2 {
   final case class AvroConversionAugmentedException(message: String) extends RuntimeException(message)
   final case class SchemaNotFoundAugmentedException(schemaNotFoundException: SchemaNotFoundException, topic: String)
     extends RuntimeException(s"Schema '$topic' cannot be loaded. Cause: ${schemaNotFoundException.getClass.getName}: Schema not found for $topic")
+
+  final case class KeyAndValueMismatch(fieldName: String, keyValue: AnyRef, valValue: AnyRef)
+  final case class KeyAndValueMismatchedValuesException(mismatches: List[KeyAndValueMismatch])
+    extends RuntimeException(
+      (List(s"Fields that exist in key schema and value schema must have same value.","Field Name\tKey Value\tValue Value") ++
+        mismatches.map(m => s"${m.fieldName}\t${m.keyValue.toString}\t${m.valValue.toString}")).mkString("\n")
+    )
+
+  private[services] def validateKeyAndValueSchemas(key: GenericRecord, valueOpt: Option[GenericRecord]): Either[Throwable, Unit] = {
+    valueOpt match {
+      case Some(value) =>
+        val keyAndValueMismatch = key.getSchema.getFields.asScala.toList.exists { k =>
+          value.hasField(k.name()) && key.get(k.name()) != value.get(k.name())
+        }
+        if (keyAndValueMismatch) {
+          val keyAndValueMismatch = key.getSchema.getFields.asScala.toList.flatMap { k =>
+            if (value.hasField(k.name()) && key.get(k.name()) != value.get(k.name())) {
+              Some(KeyAndValueMismatch(k.name(), key.get(k.name()), value.get(k.name())))
+            } else {
+              None
+            }
+          }
+          Left(KeyAndValueMismatchedValuesException(keyAndValueMismatch))
+        } else {
+          Right(())
+        }
+      case None =>
+        Right(())
+    }
+  }
 }
