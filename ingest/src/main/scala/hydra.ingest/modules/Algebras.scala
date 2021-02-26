@@ -5,7 +5,7 @@ import cats.syntax.all._
 import hydra.avro.registry.SchemaRegistry
 import hydra.ingest.app.AppConfig.AppConfig
 import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 final class Algebras[F[_]] private (
     val schemaRegistry: SchemaRegistry[F],

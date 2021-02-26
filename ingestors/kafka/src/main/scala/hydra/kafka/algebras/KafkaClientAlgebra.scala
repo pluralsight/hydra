@@ -10,7 +10,7 @@ import fs2.concurrent.Queue
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError.{RecordTooLarge, TopicNotFoundInMetadata}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import io.confluent.kafka.serializers.{AbstractKafkaAvroSerDeConfig, KafkaAvroDeserializer, KafkaAvroSerializer}
 import org.apache.avro.generic.GenericRecord

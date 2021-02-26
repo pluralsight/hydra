@@ -12,8 +12,8 @@ import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.model.ContactMethod.Slack
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{Public, StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request, TopicMetadataV2Value}
-import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
-import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.SelfAwareStructuredLogger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import org.apache.avro.generic.GenericRecord
 import org.scalatest.Assertion
 import org.scalatest.matchers.should.Matchers

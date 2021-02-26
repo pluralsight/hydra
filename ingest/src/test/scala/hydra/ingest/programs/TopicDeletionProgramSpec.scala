@@ -20,8 +20,8 @@ import hydra.kafka.model.{Public, Schemas, StreamTypeV2, TopicMetadataV2, TopicM
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.CreateTopicProgram
-import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
-import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.SelfAwareStructuredLogger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import retry.{RetryPolicies, RetryPolicy}
 
 import scala.concurrent.ExecutionContext

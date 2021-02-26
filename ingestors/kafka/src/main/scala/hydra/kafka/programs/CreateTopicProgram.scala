@@ -11,7 +11,7 @@ import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{Schemas, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
 import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyAndValueMismatch}
 import hydra.kafka.util.KafkaUtils.TopicDetails
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.apache.avro.Schema
 import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy, _}

@@ -7,7 +7,7 @@ import hydra.ingest.programs.TopicDeletionProgram
 import hydra.ingest.services.{IngestionFlow, IngestionFlowV2}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.CreateTopicProgram
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import retry.RetryPolicies._
 import retry.RetryPolicy
 import scalacache.Mode

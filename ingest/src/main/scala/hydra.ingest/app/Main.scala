@@ -11,8 +11,8 @@ import ConfigSupport._
 import hydra.common.logging.LoggingAdapter
 import hydra.ingest.bootstrap.ActorFactory
 import hydra.ingest.modules.{Algebras, Bootstrap, Programs, Routes}
-import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
-import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.SelfAwareStructuredLogger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import kamon.Kamon
 import kamon.prometheus.PrometheusReporter
 
