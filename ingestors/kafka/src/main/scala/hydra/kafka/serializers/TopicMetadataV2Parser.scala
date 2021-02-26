@@ -12,10 +12,10 @@ import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import hydra.kafka.serializers.Errors._
 import hydra.kafka.serializers.TopicMetadataV2Parser.IntentionallyUnimplemented
-import org.apache.avro.Schema
+import org.apache.avro.{Schema, SchemaParseException}
 import spray.json.{DefaultJsonProtocol, DeserializationException, JsObject, JsString, JsValue, RootJsonFormat}
-import collection.JavaConverters._
 
+import collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 import spray.json.JsonFormat
 import spray.json.JsNumber
@@ -242,12 +242,15 @@ sealed trait TopicMetadataV2Parser
 
     override def read(json: JsValue): Schema = {
       val jsonString = json.compactPrint
-      val schema = Try(new Schema.Parser().parse(jsonString)).getOrElse(
-        throw DeserializationException(InvalidSchema(json, isKey).errorMessage)
-      )
+      val schema = try {
+        new Schema.Parser().parse(jsonString)
+      } catch {
+        case e: Throwable => throw DeserializationException(InvalidSchema(json, isKey, Some(e)).errorMessage)
+      }
 
       if(isNamespaceInvalid(schema)) {
-        throw DeserializationException(InvalidSchema(json, isKey).errorMessage)
+        throw DeserializationException(InvalidSchema(json, isKey,
+          Some(InvalidNamespace("Invalid character dash (-)"))).errorMessage)
       } else {
         schema
       }
@@ -456,10 +459,18 @@ object Errors {
   def invalidSlackChannelProvided(value: JsValue) =
     s"Field `slackChannel` must be all lowercase with no spaces and less than 80 characters, received ${value.compactPrint}."
 
-  final case class InvalidSchema(value: JsValue, isKey: Boolean) {
+  final case class InvalidSchema(value: JsValue, isKey: Boolean, error: Option[Throwable] = none) {
 
-    def errorMessage: String =
-      s"${value.compactPrint} is not a properly formatted Avro Schema for field `${if (isKey) "key" else "value"}`."
+    def errorMessage: String = {
+      s"${value.compactPrint} is not a properly formatted Avro Schema for field `${if (isKey) "key" else "value"}`." +
+        s"${error.map(e => s"\nError: ${e.getMessage}\n").getOrElse("")}"
+    }
+  }
+
+  final case class InvalidNamespace(reason: String) extends Throwable {
+    override def getMessage: String = {
+      s"One or more of the Namespaces provided are invalid due to: $reason"
+    }
   }
 
   final case class InvalidSubject(jsValue: JsValue) {
