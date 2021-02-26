@@ -3,13 +3,12 @@ package hydra.kafka.serializers
 import java.time.Instant
 
 import cats.data.NonEmptyList
-import hydra.core.marshallers._
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.model.ContactMethod.{Email, Slack}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import hydra.kafka.serializers.Errors._
-import org.apache.avro.{Schema, SchemaBuilder, SchemaParseException}
+import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import eu.timepit.refined._

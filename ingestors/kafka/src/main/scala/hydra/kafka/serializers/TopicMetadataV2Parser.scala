@@ -12,7 +12,7 @@ import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import hydra.kafka.serializers.Errors._
 import hydra.kafka.serializers.TopicMetadataV2Parser.IntentionallyUnimplemented
-import org.apache.avro.{Schema, SchemaParseException}
+import org.apache.avro.Schema
 import spray.json.{DefaultJsonProtocol, DeserializationException, JsObject, JsString, JsValue, RootJsonFormat}
 
 import collection.JavaConverters._
