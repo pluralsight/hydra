@@ -3,7 +3,6 @@ package hydra.kafka.serializers
 import java.time.Instant
 
 import cats.data.NonEmptyList
-import hydra.core.marshallers._
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.model.ContactMethod.{Email, Slack}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -232,31 +231,35 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val jsValue = JsObject.empty
       the[DeserializationException] thrownBy {
         new SchemaFormat(isKey = false).read(jsValue).getName
-      } should have message InvalidSchema(jsValue, isKey = false).errorMessage
+      } should have message InvalidSchema(jsValue, isKey = false).errorMessage.concat("\nError: No type: {}\n")
     }
 
     "throw an error with '-' in the namespace of a schema" in {
       the[DeserializationException] thrownBy {
         new SchemaFormat(isKey = false).read(invalidAvroSchemaNamespace).getName
       } should have message InvalidSchema(invalidAvroSchemaNamespace, isKey = false).errorMessage
+        .concat("\nError: One or more of the Namespaces provided are invalid due to: Invalid character dash (-)\n")
     }
 
     "throw an error with '-' in the name of a schema" in {
       the[DeserializationException] thrownBy {
         new SchemaFormat(isKey = false).read(invalidAvroSchemaName).getName
       } should have message InvalidSchema(invalidAvroSchemaName, isKey = false).errorMessage
+          .concat("\nError: Illegal character in: Some-Name\n")
     }
 
     "throw an error with '-' in the namespace of a nested schema" in {
       the[DeserializationException] thrownBy {
         new SchemaFormat(isKey = false).read(invalidAvroSchemaNestedNamespace).getName
       } should have message InvalidSchema(invalidAvroSchemaNestedNamespace, isKey = false).errorMessage
+        .concat("\nError: One or more of the Namespaces provided are invalid due to: Invalid character dash (-)\n")
     }
 
     "throw an error with '-' in the name of a nested schema" in {
       the[DeserializationException] thrownBy {
         new SchemaFormat(isKey = false).read(invalidAvroSchemaNestedName).getName
       } should have message InvalidSchema(invalidAvroSchemaNestedName, isKey = false).errorMessage
+        .concat("\nError: Illegal character in: int-record\n")
     }
 
     "parse a valid Schemas object" in {
@@ -276,8 +279,8 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
     "throw a comprehensive error given an incomplete Schemas object" in {
       val errorMessage = IncompleteSchemas(
         List(
-          InvalidSchema(JsObject.empty, isKey = true).errorMessage,
-          InvalidSchema(JsObject.empty, isKey = false).errorMessage
+          InvalidSchema(JsObject.empty, isKey = true).errorMessage.concat("\nError: No type: {}\n"),
+          InvalidSchema(JsObject.empty, isKey = false).errorMessage.concat("\nError: No type: {}\n")
         ).mkString(" ")
       ).errorMessage
       the[DeserializationException] thrownBy {
