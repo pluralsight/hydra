@@ -6,7 +6,7 @@ import java.util.concurrent.TimeUnit
 import akka.actor.ActorSelection
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
-import akka.http.scaladsl.server.ExceptionHandler
+import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import hydra.common.config.ConfigSupport._
@@ -17,7 +17,7 @@ import hydra.kafka.algebras.MetadataAlgebra
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.TopicMetadataV2Response
+import hydra.kafka.model.{ContactMethod, DataClassification, Schemas, StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request, TopicMetadataV2Response}
 import hydra.kafka.serializers.TopicMetadataV2Parser
 import hydra.kafka.util.KafkaUtils
 import hydra.kafka.util.KafkaUtils.TopicDetails
@@ -31,6 +31,8 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import TopicMetadataV2Parser._
+import cats.data.NonEmptyList
+import hydra.avro.registry.SchemaRegistry
 
 /**
   * A cluster metadata endpoint implemented exclusively with akka streams.
@@ -38,7 +40,9 @@ import TopicMetadataV2Parser._
   * Created by alexsilva on 3/18/17.
   */
 class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
-                                             metadataAlgebra: MetadataAlgebra[F])
+                                             metadataAlgebra: MetadataAlgebra[F],
+                                             schemaRegistry: SchemaRegistry[F],
+                                             metadataFacade: MetadataAlgebra[F])
                                             (implicit ec:ExecutionContext)
   extends RouteSupport
     with HydraKafkaJsonSupport
@@ -107,13 +111,85 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
             }
         } ~ pathPrefix("v2" / "streams") {
           val startTime = Instant.now
-          getAllV2Metadata(startTime)
+          get {
+            getAllV2Metadata(startTime)
+          } ~ path(Segment)  { topic =>
+            post {
+              postV2Metadata(startTime, topic)
+            }
+          }
         }
       }
     }
   }
 
-  private def getAllV2Metadata(startTime: Instant) = get {
+  /*
+    private def deleteV2Metadata(topicName: Subject): F[Unit] = {
+    for {
+      records <- TopicMetadataV2.encode[F](TopicMetadataV2Key(topicName), None, None)
+      _ <- kafkaClient
+        .publishMessage(records, v2MetadataTopicName.value)
+        .rethrow
+    } yield ()
+  }
+
+  TopicMetadataV2Request(
+    schemas: Schemas,
+    streamType: StreamTypeV2,
+    deprecated: Boolean,
+    deprecatedDate: Option[Instant],
+    dataClassification: DataClassification,
+    contact: NonEmptyList[ContactMethod],
+    createdDate: Instant,
+    parentSubjects: List[Subject],
+    notes: Option[String],
+    teamName: Option[String],
+    numPartitions: Option[TopicMetadataV2Request.NumPartitions]
+)
+   */
+
+  final case class MetadataOnlyRequest(streamType: StreamTypeV2,
+                                       deprecated: Boolean,
+                                       deprecatedDate: Option[Instant],
+                                       dataClassification: DataClassification,
+                                       contact: NonEmptyList[ContactMethod],
+                                       createdDate: Instant,
+                                       parentSubjects: List[Subject],
+                                       notes: Option[String],
+                                       teamName: Option[String],
+                                       numPartitions: Option[TopicMetadataV2Request.NumPartitions])
+
+
+  private def postV2Metadata(startTime: Instant, topic: String): Route = {
+    Subject.createValidated(topic) match {
+      case Some(t) => {
+        entity(as[MetadataOnlyRequest]) { mor =>
+          onComplete(Futurable[F].unsafeToFuture(schemaRegistry.getLatestSchemaBySubject(topic + "-key")))
+          {
+            case keySchema => { // key may or may not exist
+              onComplete(Futurable[F].unsafeToFuture(schemaRegistry.getLatestSchemaBySubject(topic + "-value"))) {
+                case valueSchema => { // value schema should exist?
+                  // get key and value into Schemas object
+                  // final case class Schemas(key: Schema, value: Schema)
+                  val schemas = Schemas
+                  val req = TopicMetadataV2Request.apply(schemas,mor.streamType,
+                    mor.deprecated,mor.deprecatedDate,mor.dataClassification,mor.contact,mor.createdDate,
+                    mor.parentSubjects,mor.notes,mor.teamName,mor.numPartitions)
+                  // Then do something like line 104 in CreateTopicProgram
+                }
+              }
+            }
+          }
+        }
+      }
+      case None =>
+        addHttpMetric(topic, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(Subject.invalidFormat))
+        complete(StatusCodes.BadRequest, Subject.invalidFormat)
+    }
+
+  }
+
+  private def getAllV2Metadata(startTime: Instant): Route = {
     pathEndOrSingleSlash {
       onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getAllMetadata)) {
         case Success(metadata) =>
