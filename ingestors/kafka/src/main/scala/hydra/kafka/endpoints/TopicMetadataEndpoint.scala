@@ -126,37 +126,12 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
     }
   }
 
-  /*
-    private def deleteV2Metadata(topicName: Subject): F[Unit] = {
-    for {
-      records <- TopicMetadataV2.encode[F](TopicMetadataV2Key(topicName), None, None)
-      _ <- kafkaClient
-        .publishMessage(records, v2MetadataTopicName.value)
-        .rethrow
-    } yield ()
-  }
-
-  TopicMetadataV2Request(
-    schemas: Schemas,
-    streamType: StreamTypeV2,
-    deprecated: Boolean,
-    deprecatedDate: Option[Instant],
-    dataClassification: DataClassification,
-    contact: NonEmptyList[ContactMethod],
-    createdDate: Instant,
-    parentSubjects: List[Subject],
-    notes: Option[String],
-    teamName: Option[String],
-    numPartitions: Option[TopicMetadataV2Request.NumPartitions]
-)
-   */
-
   def getKeyValSchema(subject: Subject): Future[Schemas] = {
     for {
       keySchema <- Futurable[F].unsafeToFuture(schemaRegistry.getLatestSchemaBySubject(subject + "-key"))
       valueSchema <- Futurable[F].unsafeToFuture(schemaRegistry.getLatestSchemaBySubject(subject + "-value"))
-    } yield (Schemas(keySchema.getOrElse(throw new SchemaParseException("Unable to get Key Schema")),
-      valueSchema.getOrElse(throw new SchemaParseException("Unable to get Value Schema"))))
+    } yield Schemas(keySchema.getOrElse(throw new SchemaParseException("Unable to get Key Schema, please create Key Schema in Schema Registry and try again")),
+      valueSchema.getOrElse(throw new SchemaParseException("Unable to get Value Schema, please create Value Schema in Schema Registry and try again")))
   }
 
 
@@ -164,23 +139,27 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
     Subject.createValidated(topic) match {
       case Some(t) => {
         entity(as[MetadataOnlyRequest]) { mor =>
-          onComplete(getKeyValSchema(t)) {
-            case Failure(exception) => {
-              // Add metrics
-              complete(StatusCodes.BadRequest, exception.getMessage)
-            }
-            case Success(schemas) => {
-              val req = TopicMetadataV2Request.apply(schemas, mor.streamType,
-                mor.deprecated, mor.deprecatedDate, mor.dataClassification, mor.contact, mor.createdDate,
-                mor.parentSubjects, mor.notes, mor.teamName, mor.numPartitions)
-              onComplete(
-                Futurable[F].unsafeToFuture(createTopicProgram
-                  .publishMetadata(t, req))
-              ) {
-                case Failure(exception) =>
-                  complete(StatusCodes.InternalServerError, s"You hit this failure congrats: ${exception.getMessage}")// what return type?
-                case Success(value) =>
-                  complete(StatusCodes.OK, s"Should be there yo: $value")
+          extractMethod { method =>
+            onComplete(getKeyValSchema(t)) {
+              case Failure(exception) => {
+                addHttpMetric(topic, StatusCodes.BadRequest, "/v2/metadata", startTime, method.value)
+                complete(StatusCodes.BadRequest, exception.getMessage)
+              }
+              case Success(schemas) => {
+                val req = TopicMetadataV2Request.apply(schemas, mor.streamType,
+                  mor.deprecated, mor.deprecatedDate, mor.dataClassification, mor.contact, mor.createdDate,
+                  mor.parentSubjects, mor.notes, mor.teamName, mor.numPartitions)
+                onComplete(
+                  Futurable[F].unsafeToFuture(createTopicProgram
+                    .publishMetadata(t, req))
+                ) {
+                  case Failure(exception) =>
+                    addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/metadata", startTime, method.value)
+                    complete(StatusCodes.InternalServerError, s"Unable to create Metadata for topic $topic : ${exception.getMessage}")
+                  case Success(value) =>
+                    addHttpMetric(topic, StatusCodes.OK, "/v2/metadata", startTime, method.value)
+                    complete(StatusCodes.OK)
+                }
               }
             }
           }
