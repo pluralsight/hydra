@@ -1,6 +1,7 @@
 package hydra.kafka.endpoints
 
 import akka.actor.{Actor, ActorRef, ActorSelection, Props}
+import akka.http.javadsl.server.MalformedRequestContentRejection
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
@@ -284,10 +285,15 @@ class TopicMetadataEndpointSpec
       }
     }
 
-    "return 400 with improper metadata" in {
+    "return 400 with missing schemas" in {
+      Put("/v2/metadata/dvs.subject.noschema", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> route ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
+
+    "reject invalid metadata" in {
       Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, invalidRequest)) ~> route ~> check {
-        response.status shouldBe StatusCodes.BadRequest
-//        responseAs[String] shouldBe
+        rejection shouldBe a[MalformedRequestContentRejection]
       }
     }
   }

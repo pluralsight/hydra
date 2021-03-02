@@ -35,6 +35,7 @@ import cats.data.NonEmptyList
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.programs.CreateTopicProgram
 import org.apache.avro.{Schema, SchemaParseException}
+import spray.json.DeserializationException
 
 /**
   * A cluster metadata endpoint implemented exclusively with akka streams.
@@ -118,8 +119,10 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
           }
         } ~ pathPrefix("v2" / "metadata" / Segment) { topic =>
           val startTime = Instant.now
-          put {
-            putV2Metadata(startTime, topic)
+          handleExceptions(exceptionHandler(startTime, method.value, topic)) {
+            put {
+              putV2Metadata(startTime, topic)
+            }
           }
         }
       }
@@ -260,13 +263,16 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
     }
   }
 
-  private def exceptionHandler(startTime: Instant, method: String) = ExceptionHandler {
+  private def exceptionHandler(startTime: Instant, method: String, topic: String = "") = ExceptionHandler {
     case e: IllegalArgumentException =>
       addHttpMetric("",StatusCodes.BadRequest, "topicMetadataEndpoint", startTime, method, error = Some(e.getMessage))
       complete(HttpResponse(BadRequest, entity = e.getMessage))
     case e: NotFoundException =>
       addHttpMetric("",StatusCodes.NotFound, "topicMetadataEndpoint", startTime, method, error = Some(e.getMessage))
       complete(HttpResponse(NotFound, entity = e.msg))
+    case e: DeserializationException =>
+      addHttpMetric(topic, StatusCodes.BadRequest, "topicMetadataEndpoint", startTime, method, error=Some(e.getMessage))
+      complete(HttpResponse(BadRequest, entity = e.getMessage))
     case e =>
       addHttpMetric("", InternalServerError, "topicMetadataEndpoint", startTime, method, error = Some(e.getMessage))
       complete(HttpResponse(InternalServerError, entity = e.getMessage))
