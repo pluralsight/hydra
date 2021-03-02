@@ -31,8 +31,11 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import TopicMetadataV2Parser._
+import akka.http.scaladsl.server.Directives.onComplete
 import cats.data.NonEmptyList
 import hydra.avro.registry.SchemaRegistry
+import hydra.kafka.programs.CreateTopicProgram
+import org.apache.avro.{Schema, SchemaParseException}
 
 /**
   * A cluster metadata endpoint implemented exclusively with akka streams.
@@ -42,7 +45,8 @@ import hydra.avro.registry.SchemaRegistry
 class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                                              metadataAlgebra: MetadataAlgebra[F],
                                              schemaRegistry: SchemaRegistry[F],
-                                             metadataFacade: MetadataAlgebra[F])
+                                             createTopicProgram: CreateTopicProgram[F],
+                                             defaultTopicDetails: TopicDetails)
                                             (implicit ec:ExecutionContext)
   extends RouteSupport
     with HydraKafkaJsonSupport
@@ -157,26 +161,53 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                                        parentSubjects: List[Subject],
                                        notes: Option[String],
                                        teamName: Option[String],
-                                       numPartitions: Option[TopicMetadataV2Request.NumPartitions])
+                                       numPartitions: Option[TopicMetadataV2Request.NumPartitions]) {
+    def toValue: MetadataOnlyRequest = {
+      MetadataOnlyRequest(
+        streamType,
+        deprecated,
+        deprecatedDate,
+        dataClassification,
+        contact,
+        createdDate,
+        parentSubjects,
+        notes,
+        teamName,
+        numPartitions
+      )
+    }
+  }
+
+  def getKeyValSchema(subject: Subject): Future[Schemas] = {
+    for {
+      keySchema <- Futurable[F].unsafeToFuture(schemaRegistry.getLatestSchemaBySubject(subject + "-key"))
+      valueSchema <- Futurable[F].unsafeToFuture(schemaRegistry.getLatestSchemaBySubject(subject + "-value"))
+    } yield (Schemas(keySchema.getOrElse(throw new SchemaParseException("Unable to get Key Schema")),
+      valueSchema.getOrElse(throw new SchemaParseException("Unable to get Value Schema"))))
+  }
 
 
   private def postV2Metadata(startTime: Instant, topic: String): Route = {
     Subject.createValidated(topic) match {
       case Some(t) => {
         entity(as[MetadataOnlyRequest]) { mor =>
-          onComplete(Futurable[F].unsafeToFuture(schemaRegistry.getLatestSchemaBySubject(topic + "-key")))
-          {
-            case keySchema => { // key may or may not exist
-              onComplete(Futurable[F].unsafeToFuture(schemaRegistry.getLatestSchemaBySubject(topic + "-value"))) {
-                case valueSchema => { // value schema should exist?
-                  // get key and value into Schemas object
-                  // final case class Schemas(key: Schema, value: Schema)
-                  val schemas = Schemas
-                  val req = TopicMetadataV2Request.apply(schemas,mor.streamType,
-                    mor.deprecated,mor.deprecatedDate,mor.dataClassification,mor.contact,mor.createdDate,
-                    mor.parentSubjects,mor.notes,mor.teamName,mor.numPartitions)
-                  // Then do something like line 104 in CreateTopicProgram
-                }
+          onComplete(getKeyValSchema(t)) {
+            case Failure(exception) => {
+              // Add metrics
+              complete(StatusCodes.BadRequest, exception.getMessage)
+            }
+            case Success(schemas) => {
+              val req = TopicMetadataV2Request.apply(schemas, mor.streamType,
+                mor.deprecated, mor.deprecatedDate, mor.dataClassification, mor.contact, mor.createdDate,
+                mor.parentSubjects, mor.notes, mor.teamName, mor.numPartitions)
+              onComplete(
+                Futurable[F].unsafeToFuture(createTopicProgram
+                  .publishMetadata(t, req))
+              ) {
+                case Failure(exception) =>
+                  complete(StatusCodes.InternalServerError, s"You hit this failure congrats: ${exception.getMessage}")// what return type?
+                case Success(value) =>
+                  complete(StatusCodes.OK, s"Should be there yo: $value")
               }
             }
           }
