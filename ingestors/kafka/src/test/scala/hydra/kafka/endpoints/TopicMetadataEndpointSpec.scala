@@ -4,11 +4,11 @@ import akka.actor.{Actor, ActorRef, ActorSelection, Props}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
-import cats.effect.{Concurrent, ContextShift, IO, Sync}
+import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
-import hydra.kafka.algebras.{KafkaClientAlgebra, MetadataAlgebra}
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
@@ -22,6 +22,9 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.ExecutionContext
+import hydra.kafka.programs.CreateTopicProgram
+import hydra.kafka.util.KafkaUtils.TopicDetails
+import retry.{RetryPolicies, RetryPolicy}
 
 
 class TopicMetadataEndpointSpec
@@ -47,6 +50,7 @@ class TopicMetadataEndpointSpec
 
   implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   implicit val concurrent: Concurrent[IO] = IO.ioConcurrentEffect
+  private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -66,11 +70,30 @@ class TopicMetadataEndpointSpec
 
   val consumerProxy: ActorSelection = system.actorSelection(consumerPath)
 
+  private def getTestCreateTopicProgram(
+                                         s: SchemaRegistry[IO],
+                                         ka: KafkaAdminAlgebra[IO],
+                                         kc: KafkaClientAlgebra[IO],
+                                         m: MetadataAlgebra[IO]
+                                       ): CreateTopicProgram[IO] = {
+    val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      new CreateTopicProgram[IO](
+        s,
+        ka,
+        kc,
+        retryPolicy,
+        Subject.createValidated("dvs.hello-world").get,
+        m
+      )
+  }
+
   val route: Route = (for {
     kafkaClient <- KafkaClientAlgebra.test[IO]
     schemaRegistry <- SchemaRegistry.test[IO]
+    ka <- KafkaAdminAlgebra.test[IO]
     metadataAlgebra <- MetadataAlgebra.make[IO](Subject.createValidated("_topicName.Bill").get, "I'm_A_Jerk", kafkaClient, schemaRegistry, consumeMetadataEnabled = false)
-  } yield new TopicMetadataEndpoint(consumerProxy, metadataAlgebra).route).unsafeRunSync()
+    createTopicProgram = getTestCreateTopicProgram(schemaRegistry, ka, kafkaClient, metadataAlgebra)
+  } yield new TopicMetadataEndpoint(consumerProxy, metadataAlgebra, schemaRegistry, createTopicProgram).route).unsafeRunSync()
 
   val node = new Node(0, "host", 1)
 

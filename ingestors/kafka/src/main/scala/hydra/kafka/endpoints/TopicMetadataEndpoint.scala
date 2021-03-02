@@ -17,8 +17,8 @@ import hydra.kafka.algebras.MetadataAlgebra
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{ContactMethod, DataClassification, Schemas, StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request, TopicMetadataV2Response}
-import hydra.kafka.serializers.TopicMetadataV2Parser
+import hydra.kafka.model.{ContactMethod, DataClassification, MetadataOnlyRequest, Schemas, StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request, TopicMetadataV2Response}
+import hydra.kafka.serializers.TopicMetadataV2Parser._
 import hydra.kafka.util.KafkaUtils
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.kafka.common.PartitionInfo
@@ -30,7 +30,6 @@ import scala.collection.immutable.Map
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
-import TopicMetadataV2Parser._
 import akka.http.scaladsl.server.Directives.onComplete
 import cats.data.NonEmptyList
 import hydra.avro.registry.SchemaRegistry
@@ -45,8 +44,7 @@ import org.apache.avro.{Schema, SchemaParseException}
 class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                                              metadataAlgebra: MetadataAlgebra[F],
                                              schemaRegistry: SchemaRegistry[F],
-                                             createTopicProgram: CreateTopicProgram[F],
-                                             defaultTopicDetails: TopicDetails)
+                                             createTopicProgram: CreateTopicProgram[F])
                                             (implicit ec:ExecutionContext)
   extends RouteSupport
     with HydraKafkaJsonSupport
@@ -117,10 +115,11 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
           val startTime = Instant.now
           get {
             getAllV2Metadata(startTime)
-          } ~ path(Segment)  { topic =>
-            post {
-              postV2Metadata(startTime, topic)
-            }
+          }
+        } ~ pathPrefix("v2" / "metadata" / Segment) { topic =>
+          val startTime = Instant.now
+          put {
+            putV2Metadata(startTime, topic)
           }
         }
       }
@@ -152,32 +151,6 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
 )
    */
 
-  final case class MetadataOnlyRequest(streamType: StreamTypeV2,
-                                       deprecated: Boolean,
-                                       deprecatedDate: Option[Instant],
-                                       dataClassification: DataClassification,
-                                       contact: NonEmptyList[ContactMethod],
-                                       createdDate: Instant,
-                                       parentSubjects: List[Subject],
-                                       notes: Option[String],
-                                       teamName: Option[String],
-                                       numPartitions: Option[TopicMetadataV2Request.NumPartitions]) {
-    def toValue: MetadataOnlyRequest = {
-      MetadataOnlyRequest(
-        streamType,
-        deprecated,
-        deprecatedDate,
-        dataClassification,
-        contact,
-        createdDate,
-        parentSubjects,
-        notes,
-        teamName,
-        numPartitions
-      )
-    }
-  }
-
   def getKeyValSchema(subject: Subject): Future[Schemas] = {
     for {
       keySchema <- Futurable[F].unsafeToFuture(schemaRegistry.getLatestSchemaBySubject(subject + "-key"))
@@ -187,7 +160,7 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
   }
 
 
-  private def postV2Metadata(startTime: Instant, topic: String): Route = {
+  private def putV2Metadata(startTime: Instant, topic: String): Route = {
     Subject.createValidated(topic) match {
       case Some(t) => {
         entity(as[MetadataOnlyRequest]) { mor =>

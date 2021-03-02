@@ -117,7 +117,24 @@ object TopicMetadataV2Request {
       " It may contain only alphanumeric characters, hyphens(-) and periods(.)" +
       " and must not contain consecutive special characters anywhere within the topic name."
   }
+
+  def fromMetadataOnlyRequest(schemas: Schemas, mor: MetadataOnlyRequest) = {
+    TopicMetadataV2Request(
+      schemas,
+      mor.streamType,
+      mor.deprecated,
+      mor.deprecatedDate,
+      mor.dataClassification,
+      mor.contact,
+      mor.createdDate,
+      mor.parentSubjects,
+      mor.notes,
+      mor.teamName,
+      mor.numPartitions
+    )
+  }
 }
+
 
 final case class MaybeSchemas(key: Option[Schema], value: Option[Schema])
 final case class TopicMetadataV2Response(
@@ -150,6 +167,32 @@ object TopicMetadataV2Response {
       v.teamName
     )
   }
+}
+
+final case class MetadataOnlyRequest(streamType: StreamTypeV2,
+                                    deprecated: Boolean,
+                                    deprecatedDate: Option[Instant],
+                                    dataClassification: DataClassification,
+                                    contact: NonEmptyList[ContactMethod],
+                                    createdDate: Instant,
+                                    parentSubjects: List[Subject],
+                                    notes: Option[String],
+                                    teamName: Option[String],
+                                    numPartitions: Option[TopicMetadataV2Request.NumPartitions]) {
+//  def toValue: MetadataOnlyRequest = {
+//    MetadataOnlyRequest(
+//      streamType,
+//      deprecated,
+//      deprecatedDate,
+//      dataClassification,
+//      contact,
+//      createdDate,
+//      parentSubjects,
+//      notes,
+//      teamName,
+//      numPartitions
+//    )
+//  }
 }
 
 
