@@ -179,20 +179,6 @@ final case class MetadataOnlyRequest(streamType: StreamTypeV2,
                                     notes: Option[String],
                                     teamName: Option[String],
                                     numPartitions: Option[TopicMetadataV2Request.NumPartitions]) {
-//  def toValue: MetadataOnlyRequest = {
-//    MetadataOnlyRequest(
-//      streamType,
-//      deprecated,
-//      deprecatedDate,
-//      dataClassification,
-//      contact,
-//      createdDate,
-//      parentSubjects,
-//      notes,
-//      teamName,
-//      numPartitions
-//    )
-//  }
 }
 
 

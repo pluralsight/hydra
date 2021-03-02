@@ -149,9 +149,7 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                 complete(StatusCodes.BadRequest, exception.getMessage)
               }
               case Success(schemas) => {
-                val req = TopicMetadataV2Request.apply(schemas, mor.streamType,
-                  mor.deprecated, mor.deprecatedDate, mor.dataClassification, mor.contact, mor.createdDate,
-                  mor.parentSubjects, mor.notes, mor.teamName, mor.numPartitions)
+                val req = TopicMetadataV2Request.fromMetadataOnlyRequest(schemas, mor)
                 onComplete(
                   Futurable[F].unsafeToFuture(createTopicProgram
                     .publishMetadata(t, req))
