@@ -278,7 +278,7 @@ sealed trait TopicMetadataV2Parser
 
     override def read(json: JsValue): TopicMetadataV2Request = json match {
       case j: JsObject =>
-        val mor = MetadataOnlyRequestFormat.read(json)
+        val metadataValidationResult = MetadataOnlyRequestFormat.getValidationResult(json)
         val schemas = toResult(
           SchemasFormat.read(
             j.getFields("schemas")
@@ -291,11 +291,17 @@ sealed trait TopicMetadataV2Parser
               )
           )
         )
-        schemas match {
-          case Valid(validSchemas) => TopicMetadataV2Request.fromMetadataOnlyRequest(validSchemas, mor)
+        (schemas, metadataValidationResult) match {
+          case (Valid(s), Valid(m)) => TopicMetadataV2Request.fromMetadataOnlyRequest(s, m)
 
-          case Invalid(e) =>
-            throw DeserializationException(e.map(_.errorMessage).mkString_(" "))
+          case (Invalid(es), Invalid(em)) =>
+            throw DeserializationException(es.combine(em).map(_.errorMessage).mkString_(" "))
+
+          case (Invalid(es), Valid(_)) =>
+            throw DeserializationException(es.map(_.errorMessage).mkString_(" "))
+
+          case (Valid(_), Invalid(em)) =>
+            throw DeserializationException(em.map(_.errorMessage).mkString_(" "))
         }
       case j =>
         throw DeserializationException(invalidPayloadProvided(j))
@@ -306,7 +312,15 @@ sealed trait TopicMetadataV2Parser
     override def write(obj: MetadataOnlyRequest): JsValue = {
       JsString(obj.toString)
     }
-    override def read(json: JsValue): MetadataOnlyRequest = json match {
+    override def read(json: JsValue): MetadataOnlyRequest =  {
+      getValidationResult(json) match {
+          case Valid(metadataOnlyRequest) => metadataOnlyRequest
+          case Invalid(e) =>
+            throw DeserializationException(e.map(_.errorMessage).mkString_(" "))
+        }
+    }
+
+    def getValidationResult(json: JsValue): MetadataValidationResult[MetadataOnlyRequest] = json match {
       case j: JsObject =>
         val subject = toResult(
           SubjectFormat
@@ -378,13 +392,7 @@ sealed trait TopicMetadataV2Parser
           notes,
           teamName,
           numPartitions
-          ).mapN(MetadataOnlyRequest.apply) match {
-          case Valid(metadataOnlyRequest) => metadataOnlyRequest
-          case Invalid(e) =>
-            throw DeserializationException(e.map(_.errorMessage).mkString_(" "))
-        }
-      case j =>
-        throw DeserializationException(invalidPayloadProvided(j))
+          ).mapN(MetadataOnlyRequest.apply)
     }
   }
 

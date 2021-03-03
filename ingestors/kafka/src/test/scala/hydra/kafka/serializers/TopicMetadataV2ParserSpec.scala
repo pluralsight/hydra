@@ -133,11 +133,11 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val slackChannel = "#dev-data-platform"
       val json =
         s"""
-          |{
-          | "email":"$email",
-          | "slackChannel":"$slackChannel"
-          |}
-          |""".stripMargin
+           |{
+           | "email":"$email",
+           | "slackChannel":"$slackChannel"
+           |}
+           |""".stripMargin
       val jsValue = json.parseJson
       ContactFormat.read(jsValue).toList should contain allOf (Slack
         .create(
@@ -245,7 +245,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       the[DeserializationException] thrownBy {
         new SchemaFormat(isKey = false).read(invalidAvroSchemaName).getName
       } should have message InvalidSchema(invalidAvroSchemaName, isKey = false).errorMessage
-          .concat("\nError: Illegal character in: Some-Name\n")
+        .concat("\nError: Illegal character in: Some-Name\n")
     }
 
     "throw an error with '-' in the namespace of a nested schema" in {
@@ -265,11 +265,11 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
     "parse a valid Schemas object" in {
       val json =
         s"""
-          |{
-          | "key":${validAvroSchema.compactPrint},
-          |"value":${validAvroSchema.compactPrint}
-          |}
-          |""".stripMargin.parseJson
+           |{
+           | "key":${validAvroSchema.compactPrint},
+           |"value":${validAvroSchema.compactPrint}
+           |}
+           |""".stripMargin.parseJson
       SchemasFormat.read(json) shouldBe Schemas(
         new SchemaFormat(isKey = true).read(validAvroSchema),
         new SchemaFormat(isKey = false).read(validAvroSchema)
@@ -308,7 +308,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         parentSubjects,
         notes,
         teamName
-      ) =
+        ) =
         createJsValueOfTopicMetadataV2Request(
           Subject.createValidated("dvs.Foo").get,
           "#slack_channel",
@@ -348,7 +348,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         _,
         notes,
         teamName
-      ) =
+        ) =
         createJsValueOfTopicMetadataV2Request(
           Subject.createValidated("dvs.Foo").get,
           "#slack_channel",
@@ -393,6 +393,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       assert(
         containsAllOf(
           error,
+          "Field `schemas`",
           "Field `streamType`",
           "Field `dataClassification`",
           "Field `contact`"
@@ -403,22 +404,22 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
   }
 
   private def createJsValueOfTopicMetadataV2Request(
-      subject: Subject,
-      slackChannel: String,
-      email: String,
-      teamName: String,
-        allOptionalFieldsPresent: Boolean = true
-  )(
-      streamType: StreamTypeV2 = StreamTypeV2.Entity,
-      deprecated: Boolean = false,
-      dataClassification: DataClassification = Public,
-      validAvroSchema: JsValue = validAvroSchema,
-      parentSubjects: List[Subject] = List(),
-      notes: Option[String] = None,
-      createdDate: Instant = Instant.now(),
-      numPartitions: Option[NumPartitions] = None
-  ): (
-      JsValue,
+                                                     subject: Subject,
+                                                     slackChannel: String,
+                                                     email: String,
+                                                     teamName: String,
+                                                     allOptionalFieldsPresent: Boolean = true
+                                                   )(
+                                                     streamType: StreamTypeV2 = StreamTypeV2.Entity,
+                                                     deprecated: Boolean = false,
+                                                     dataClassification: DataClassification = Public,
+                                                     validAvroSchema: JsValue = validAvroSchema,
+                                                     parentSubjects: List[Subject] = List(),
+                                                     notes: Option[String] = None,
+                                                     createdDate: Instant = Instant.now(),
+                                                     numPartitions: Option[NumPartitions] = None
+                                                   ): (
+    JsValue,
       Subject,
       StreamTypeV2,
       Boolean,
@@ -428,26 +429,26 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       List[Subject],
       Option[String],
       String
-  ) = {
+    ) = {
     val jsValue = s"""
-         |{
-         |  "schemas": {
-         |   "key": ${validAvroSchema.compactPrint},
-         |   "value": ${validAvroSchema.compactPrint}
-         |  },
-         |  "streamType": "${streamType.toString}",
-         |  "dataClassification":"${dataClassification.toString}",
-         |  "teamName":"${teamName}",
-         |  "contact": {
-         |    "slackChannel": "$slackChannel",
-         |    "email": "$email"
-         |  }
-         |  ${if (allOptionalFieldsPresent) {
-                       s""","parentSubjects": ${parentSubjects.toJson.compactPrint},"deprecated":$deprecated,"createdDate":"${createdDate.toString}""""
-                     } else ""}
-         |  ${if (notes.isDefined) s""","notes": "${notes.get}"""" else ""}
-         |  ${if (numPartitions.isDefined) s""","numPartitions": ${numPartitions.get.value}""" else ""}}
-         |""".stripMargin.parseJson
+                     |{
+                     |  "schemas": {
+                     |   "key": ${validAvroSchema.compactPrint},
+                     |   "value": ${validAvroSchema.compactPrint}
+                     |  },
+                     |  "streamType": "${streamType.toString}",
+                     |  "dataClassification":"${dataClassification.toString}",
+                     |  "teamName":"${teamName}",
+                     |  "contact": {
+                     |    "slackChannel": "$slackChannel",
+                     |    "email": "$email"
+                     |  }
+                     |  ${if (allOptionalFieldsPresent) {
+      s""","parentSubjects": ${parentSubjects.toJson.compactPrint},"deprecated":$deprecated,"createdDate":"${createdDate.toString}""""
+    } else ""}
+                     |  ${if (notes.isDefined) s""","notes": "${notes.get}"""" else ""}
+                     |  ${if (numPartitions.isDefined) s""","numPartitions": ${numPartitions.get.value}""" else ""}}
+                     |""".stripMargin.parseJson
     (
       jsValue,
       subject,
