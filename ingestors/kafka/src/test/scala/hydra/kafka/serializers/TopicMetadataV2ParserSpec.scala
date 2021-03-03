@@ -393,7 +393,6 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       assert(
         containsAllOf(
           error,
-          "Field `schemas`",
           "Field `streamType`",
           "Field `dataClassification`",
           "Field `contact`"
