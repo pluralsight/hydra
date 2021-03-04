@@ -6,7 +6,7 @@ import java.util.concurrent.TimeUnit
 import akka.actor.ActorSelection
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
-import akka.http.scaladsl.server.ExceptionHandler
+import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import hydra.common.config.ConfigSupport._
@@ -17,8 +17,8 @@ import hydra.kafka.algebras.MetadataAlgebra
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.TopicMetadataV2Response
-import hydra.kafka.serializers.TopicMetadataV2Parser
+import hydra.kafka.model.{ContactMethod, DataClassification, MetadataOnlyRequest, Schemas, StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request, TopicMetadataV2Response}
+import hydra.kafka.serializers.TopicMetadataV2Parser._
 import hydra.kafka.util.KafkaUtils
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.kafka.common.PartitionInfo
@@ -30,7 +30,12 @@ import scala.collection.immutable.Map
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
-import TopicMetadataV2Parser._
+import akka.http.scaladsl.server.Directives.onComplete
+import cats.data.NonEmptyList
+import hydra.avro.registry.SchemaRegistry
+import hydra.kafka.programs.CreateTopicProgram
+import org.apache.avro.{Schema, SchemaParseException}
+import spray.json.DeserializationException
 
 /**
   * A cluster metadata endpoint implemented exclusively with akka streams.
@@ -38,7 +43,9 @@ import TopicMetadataV2Parser._
   * Created by alexsilva on 3/18/17.
   */
 class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
-                                             metadataAlgebra: MetadataAlgebra[F])
+                                             metadataAlgebra: MetadataAlgebra[F],
+                                             schemaRegistry: SchemaRegistry[F],
+                                             createTopicProgram: CreateTopicProgram[F])
                                             (implicit ec:ExecutionContext)
   extends RouteSupport
     with HydraKafkaJsonSupport
@@ -107,13 +114,66 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
             }
         } ~ pathPrefix("v2" / "streams") {
           val startTime = Instant.now
-          getAllV2Metadata(startTime)
+          get {
+            getAllV2Metadata(startTime)
+          }
+        } ~ pathPrefix("v2" / "metadata" / Segment) { topic =>
+          val startTime = Instant.now
+          handleExceptions(exceptionHandler(startTime, method.value, topic)) {
+            put {
+              putV2Metadata(startTime, topic)
+            }
+          }
         }
       }
     }
   }
 
-  private def getAllV2Metadata(startTime: Instant) = get {
+  def getKeyValSchema(subject: Subject): Future[Schemas] = {
+    for {
+      keySchema <- Futurable[F].unsafeToFuture(schemaRegistry.getLatestSchemaBySubject(subject + "-key"))
+      valueSchema <- Futurable[F].unsafeToFuture(schemaRegistry.getLatestSchemaBySubject(subject + "-value"))
+    } yield Schemas(keySchema.getOrElse(throw new SchemaParseException("Unable to get Key Schema, please create Key Schema in Schema Registry and try again")),
+      valueSchema.getOrElse(throw new SchemaParseException("Unable to get Value Schema, please create Value Schema in Schema Registry and try again")))
+  }
+
+
+  private def putV2Metadata(startTime: Instant, topic: String): Route = {
+    Subject.createValidated(topic) match {
+      case Some(t) => {
+        entity(as[MetadataOnlyRequest]) { mor =>
+          extractMethod { method =>
+            onComplete(getKeyValSchema(t)) {
+              case Failure(exception) => {
+                addHttpMetric(topic, StatusCodes.BadRequest, "/v2/metadata", startTime, method.value)
+                complete(StatusCodes.BadRequest, exception.getMessage)
+              }
+              case Success(schemas) => {
+                val req = TopicMetadataV2Request.fromMetadataOnlyRequest(schemas, mor)
+                onComplete(
+                  Futurable[F].unsafeToFuture(createTopicProgram
+                    .publishMetadata(t, req))
+                ) {
+                  case Failure(exception) =>
+                    addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/metadata", startTime, method.value)
+                    complete(StatusCodes.InternalServerError, s"Unable to create Metadata for topic $topic : ${exception.getMessage}")
+                  case Success(value) =>
+                    addHttpMetric(topic, StatusCodes.OK, "/v2/metadata", startTime, method.value)
+                    complete(StatusCodes.OK)
+                }
+              }
+            }
+          }
+        }
+      }
+      case None =>
+        addHttpMetric(topic, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(Subject.invalidFormat))
+        complete(StatusCodes.BadRequest, Subject.invalidFormat)
+    }
+
+  }
+
+  private def getAllV2Metadata(startTime: Instant): Route = {
     pathEndOrSingleSlash {
       onComplete(Futurable[F].unsafeToFuture(metadataAlgebra.getAllMetadata)) {
         case Success(metadata) =>
@@ -201,13 +261,16 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
     }
   }
 
-  private def exceptionHandler(startTime: Instant, method: String) = ExceptionHandler {
+  private def exceptionHandler(startTime: Instant, method: String, topic: String = "") = ExceptionHandler {
     case e: IllegalArgumentException =>
       addHttpMetric("",StatusCodes.BadRequest, "topicMetadataEndpoint", startTime, method, error = Some(e.getMessage))
       complete(HttpResponse(BadRequest, entity = e.getMessage))
     case e: NotFoundException =>
       addHttpMetric("",StatusCodes.NotFound, "topicMetadataEndpoint", startTime, method, error = Some(e.getMessage))
       complete(HttpResponse(NotFound, entity = e.msg))
+    case e: DeserializationException =>
+      addHttpMetric(topic, StatusCodes.BadRequest, "topicMetadataEndpoint", startTime, method, error=Some(e.getMessage))
+      complete(HttpResponse(BadRequest, entity = e.getMessage))
     case e =>
       addHttpMetric("", InternalServerError, "topicMetadataEndpoint", startTime, method, error = Some(e.getMessage))
       complete(HttpResponse(InternalServerError, entity = e.getMessage))

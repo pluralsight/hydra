@@ -278,10 +278,7 @@ sealed trait TopicMetadataV2Parser
 
     override def read(json: JsValue): TopicMetadataV2Request = json match {
       case j: JsObject =>
-        val subject = toResult(
-          SubjectFormat
-            .read(j.getFields("subject").headOption.getOrElse(JsString.empty))
-        )
+        val metadataValidationResult = MetadataOnlyRequestFormat.getValidationResult(json)
         val schemas = toResult(
           SchemasFormat.read(
             j.getFields("schemas")
@@ -293,6 +290,41 @@ sealed trait TopicMetadataV2Parser
                 )
               )
           )
+        )
+        (schemas, metadataValidationResult) match {
+          case (Valid(s), Valid(m)) => TopicMetadataV2Request.fromMetadataOnlyRequest(s, m)
+
+          case (Invalid(es), Invalid(em)) =>
+            throw DeserializationException(es.combine(em).map(_.errorMessage).mkString_(" "))
+
+          case (Invalid(es), Valid(_)) =>
+            throw DeserializationException(es.map(_.errorMessage).mkString_(" "))
+
+          case (Valid(_), Invalid(em)) =>
+            throw DeserializationException(em.map(_.errorMessage).mkString_(" "))
+        }
+      case j =>
+        throw DeserializationException(invalidPayloadProvided(j))
+    }
+  }
+
+  implicit object MetadataOnlyRequestFormat extends RootJsonFormat[MetadataOnlyRequest] {
+    override def write(obj: MetadataOnlyRequest): JsValue = {
+      JsString(obj.toString)
+    }
+    override def read(json: JsValue): MetadataOnlyRequest =  {
+      getValidationResult(json) match {
+          case Valid(metadataOnlyRequest) => metadataOnlyRequest
+          case Invalid(e) =>
+            throw DeserializationException(e.map(_.errorMessage).mkString_(" "))
+        }
+    }
+
+    def getValidationResult(json: JsValue): MetadataValidationResult[MetadataOnlyRequest] = json match {
+      case j: JsObject =>
+        val subject = toResult(
+          SubjectFormat
+            .read(j.getFields("subject").headOption.getOrElse(JsString.empty))
         )
         val streamType = toResult(
           StreamTypeV2Format.read(
@@ -350,7 +382,6 @@ sealed trait TopicMetadataV2Parser
           }
         )
         (
-          schemas,
           streamType,
           deprecated,
           deprecatedDate,
@@ -361,13 +392,7 @@ sealed trait TopicMetadataV2Parser
           notes,
           teamName,
           numPartitions
-        ).mapN(TopicMetadataV2Request.apply) match {
-          case Valid(topicMetadataRequest) => topicMetadataRequest
-          case Invalid(e) =>
-            throw DeserializationException(e.map(_.errorMessage).mkString_(" "))
-        }
-      case j =>
-        throw DeserializationException(invalidPayloadProvided(j))
+          ).mapN(MetadataOnlyRequest.apply)
     }
   }
 

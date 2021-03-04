@@ -101,7 +101,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       .void
   }
 
-  private[programs] def publishMetadata(
+  def publishMetadata(
       topicName: Subject,
       createTopicRequest: TopicMetadataV2Request,
   ): F[Unit] = {
