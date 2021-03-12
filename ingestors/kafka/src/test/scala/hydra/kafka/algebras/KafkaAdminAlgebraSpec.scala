@@ -65,7 +65,7 @@ final class KafkaAdminAlgebraSpec
   private def runTests(kafkaClient: KafkaAdminAlgebra[IO], isTest: Boolean = false): Unit = {
     (if (isTest) "KafkaAdmin#test" else "KafkaAdmin#live") must {
       "create a topic" in {
-        val topicDetails = TopicDetails(3, 1.toShort)
+        val topicDetails = TopicDetails(3, 1, 1)
         (kafkaClient.createTopic(topicName, topicDetails) *> kafkaClient
           .describeTopic(topicName)
           .map {
@@ -83,7 +83,7 @@ final class KafkaAdminAlgebraSpec
       "validate topic exists" in {
         val topicCreated = "topic_created"
         (for {
-          _ <- kafkaClient.createTopic(topicCreated, TopicDetails(1,1))
+          _ <- kafkaClient.createTopic(topicCreated, TopicDetails(1,1,1))
           maybeTopic <- kafkaClient.describeTopic(topicCreated)
         } yield maybeTopic shouldBe Some(Topic(topicCreated,1)) ).unsafeRunSync()
       }
@@ -91,7 +91,7 @@ final class KafkaAdminAlgebraSpec
       "delete a topic and describe" in {
         val topicToDelete = "topic_to_delete"
         (for {
-          _ <- kafkaClient.createTopic(topicToDelete, TopicDetails(1, 1))
+          _ <- kafkaClient.createTopic(topicToDelete, TopicDetails(1, 1, 1))
           _ <- kafkaClient.deleteTopic(topicToDelete)
           maybeTopic <- kafkaClient.describeTopic(topicToDelete)
         } yield maybeTopic should not be defined).unsafeRunSync()
@@ -99,7 +99,7 @@ final class KafkaAdminAlgebraSpec
 
       "delete multiple topics" in {
         val topicsToDelete = List("topic1","topic2","topic3","topic4","topic5")
-        topicsToDelete.map(topic => kafkaClient.createTopic(topic, TopicDetails(1, 1)).unsafeRunSync())
+        topicsToDelete.map(topic => kafkaClient.createTopic(topic, TopicDetails(1, 1, 1)).unsafeRunSync())
         kafkaClient.deleteTopics(topicsToDelete).unsafeRunSync()
         topicsToDelete.map(topic => kafkaClient.describeTopic(topic).unsafeRunSync() shouldBe None)
       }

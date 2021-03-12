@@ -45,7 +45,9 @@ import spray.json.DeserializationException
 class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                                              metadataAlgebra: MetadataAlgebra[F],
                                              schemaRegistry: SchemaRegistry[F],
-                                             createTopicProgram: CreateTopicProgram[F])
+                                             createTopicProgram: CreateTopicProgram[F],
+                                             defaultMinInsyncReplicas: Short
+                                            )
                                             (implicit ec:ExecutionContext)
   extends RouteSupport
     with HydraKafkaJsonSupport
@@ -221,7 +223,7 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
     post {
       entity(as[CreateTopicReq]) { req =>
         val details =
-          new TopicDetails(req.partitions, req.replicationFactor, req.config)
+          new TopicDetails(req.partitions, req.replicationFactor, defaultMinInsyncReplicas, req.config)
         val to = timeout.duration.toMillis.toInt
         onSuccess(kafkaUtils.createTopic(req.topic, details, to)) { result =>
           Try(result.all.get(timeout.duration.toSeconds, TimeUnit.SECONDS))

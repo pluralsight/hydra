@@ -74,6 +74,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
         consumersTopicSubject,
         ContactMethod.create("test@test.com").get,
         1,
+        1,
         1
       )
 
@@ -81,6 +82,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
       ConsumerOffsetsOffsetsTopicConfig(
         cooTopicSubject,
         ContactMethod.create("test@test.com").get,
+        1,
         1,
         1
       )
@@ -94,6 +96,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
           createV2OnStartup = true,
           createV2TopicsEnabled = true,
           ContactMethod.create("test@test.com").get,
+          1,
           1,
           1,
           "consumerGroup"
@@ -124,6 +127,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
           createV2OnStartup = false,
           createV2TopicsEnabled = false,
           ContactMethod.create("test@test.com").get,
+          1,
           1,
           1,
           "consumerGroup"

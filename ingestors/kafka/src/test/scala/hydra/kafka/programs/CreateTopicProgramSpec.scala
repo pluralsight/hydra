@@ -95,7 +95,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           .createTopic(
             Subject.createValidated("dvs.subject").get,
             createTopicMetadataRequest(keySchema, valueSchema),
-            TopicDetails(1, 1)
+            TopicDetails(1, 1, 1)
           )
           .unsafeRunSync()
         containsSingleKeyAndValue <- schemaRegistry.getAllSubjects.map(
@@ -163,7 +163,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         ).createTopic(
             Subject.createValidated("dvs.subject").get,
             createTopicMetadataRequest(keySchema, valueSchema),
-            TopicDetails(1, 1)
+            TopicDetails(1, 1, 1)
           )
           .attempt
         result <- ref.get
@@ -216,7 +216,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         ).createTopic(
             Subject.createValidated("dvs.subject").get,
             createTopicMetadataRequest(keySchema, valueSchema),
-            TopicDetails(1, 1)
+            TopicDetails(1, 1, 1)
           )
           .attempt
         result <- ref.get
@@ -276,7 +276,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         ).createTopic(
             Subject.createValidated("dvs.subject").get,
             createTopicMetadataRequest(keySchema, valueSchema),
-            TopicDetails(1, 1)
+            TopicDetails(1, 1, 1)
           )
           .attempt
         result <- ref.get
@@ -301,7 +301,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         ).createTopic(
           Subject.createValidated("dvs.subject").get,
           createTopicMetadataRequest(keySchema, valueSchema),
-          TopicDetails(1, 1)
+          TopicDetails(1, 1, 1)
         )
         topic <- kafka.describeTopic(subject)
       } yield topic.get shouldBe Topic(subject, 1)).unsafeRunSync()
@@ -330,7 +330,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           retryPolicy = policy,
           v2MetadataTopicName = Subject.createValidated(metadataTopic).get,
           metadata
-        ).createTopic(subject, request, TopicDetails(1, 1))
+        ).createTopic(subject, request, TopicDetails(1, 1, 1))
         published <- publishTo.get
       } yield published shouldBe Map(metadataTopic -> (m._1, m._2, None))).unsafeRunSync()
     }
@@ -364,10 +364,10 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           v2MetadataTopicName = Subject.createValidated(metadataTopic).get,
           metadata
         )
-        _ <- createTopicProgram.createTopic(subject, request, TopicDetails(1, 1))
+        _ <- createTopicProgram.createTopic(subject, request, TopicDetails(1, 1, 1))
         _ <- metadata.addToMetadata(subject, request)
         metadataMap <- publishTo.get
-        _ <- createTopicProgram.createTopic(subject, updatedRequest, TopicDetails(1, 1))
+        _ <- createTopicProgram.createTopic(subject, updatedRequest, TopicDetails(1, 1, 1))
         updatedMap <- publishTo.get
       } yield {
         metadataMap shouldBe Map(metadataTopic -> (m._1, m._2, None))
@@ -398,7 +398,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           policy,
           Subject.createValidated(metadataTopic).get,
           metadata
-        ).createTopic(Subject.createValidated(subject).get, request, TopicDetails(1, 1)).attempt
+        ).createTopic(Subject.createValidated(subject).get, request, TopicDetails(1, 1, 1)).attempt
         topic <- kafkaAdmin.describeTopic(subject)
       } yield topic should not be defined).unsafeRunSync()
     }
@@ -407,7 +407,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
       val subject = "dvs.subject"
       val metadataTopic = "dvs.test-metadata-topic"
-      val topicDetails = TopicDetails(1, 1)
+      val topicDetails = TopicDetails(1, 1, 1)
       val request = createTopicMetadataRequest(keySchema, valueSchema)
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
@@ -456,10 +456,10 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           v2MetadataTopicName = Subject.createValidated(metadataTopic).get,
           metadata
         )
-        _ <- createTopicProgram.createTopic(subject, request, TopicDetails(1, 1))
+        _ <- createTopicProgram.createTopic(subject, request, TopicDetails(1, 1, 1))
         _ <- metadata.addToMetadata(subject, request)
         metadataMap <- publishTo.get
-        _ <- createTopicProgram.createTopic(subject, updatedRequest, TopicDetails(1, 1))
+        _ <- createTopicProgram.createTopic(subject, updatedRequest, TopicDetails(1, 1, 1))
         updatedMap <- publishTo.get
       } yield {
         val dd = metadataMap(metadataTopic)._2.get.get("deprecatedDate")
@@ -491,10 +491,10 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           v2MetadataTopicName = Subject.createValidated(metadataTopic).get,
           metadata
         )
-        _ <- createTopicProgram.createTopic(subject, request, TopicDetails(1, 1))
+        _ <- createTopicProgram.createTopic(subject, request, TopicDetails(1, 1, 1))
         _ <- metadata.addToMetadata(subject, request)
         metadataMap <- publishTo.get
-        _ <- createTopicProgram.createTopic(subject, updatedRequest, TopicDetails(1, 1))
+        _ <- createTopicProgram.createTopic(subject, updatedRequest, TopicDetails(1, 1, 1))
         updatedMap <- publishTo.get
       } yield {
         val ud = metadataMap(metadataTopic)._2.get.get("deprecatedDate")
@@ -522,7 +522,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         ).createTopic(
           Subject.createValidated("dvs.subject").get,
           createTopicMetadataRequest(keySchema, valueSchema, numPartitions = refineMV[TopicMetadataV2Request.NumPartitionsPredicate](22).some),
-          TopicDetails(1, 1)
+          TopicDetails(1, 1, 1)
         )
         topic <- kafka.describeTopic(subject)
       } yield topic.get shouldBe Topic(subject, 22)).unsafeRunSync()
@@ -555,7 +555,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         ).createTopic(
           Subject.createValidated("dvs.subject").get,
           createTopicMetadataRequest(keySchema, mismatchedValueSchema),
-          TopicDetails(1, 1)
+          TopicDetails(1, 1, 1)
         )
       } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}
     }
@@ -574,12 +574,12 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
         ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
         _ <- ctProgram.registerSchemas(subject ,keySchema, mismatchedValueSchema)
-        _ <- ctProgram.createTopicResource(subject, TopicDetails(1,1))
+        _ <- ctProgram.createTopicResource(subject, TopicDetails(1,1,1))
         _ <- Resource.liftF(ctProgram.publishMetadata(subject, topicMetadataV2Request))
         _ <- Resource.liftF(ctProgram.createTopic(
           subject,
           createTopicMetadataRequest(keySchema, mismatchedValueSchemaEvolution),
-          TopicDetails(1, 1)
+          TopicDetails(1, 1, 1)
         ))
       } yield (succeed))
       resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()
