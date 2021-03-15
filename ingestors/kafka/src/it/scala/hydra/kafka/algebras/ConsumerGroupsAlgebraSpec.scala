@@ -194,7 +194,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
   }
 
   private def createTopic(subject: String, keyGR: GenericRecord, valueGR: GenericRecord, schemaRegistry: SchemaRegistry[IO], kafkaAdminAlgebra: KafkaAdminAlgebra[IO]): Unit = {
-    (kafkaAdminAlgebra.createTopic(subject, TopicDetails(1, 1)) *>
+    (kafkaAdminAlgebra.createTopic(subject, TopicDetails(1, 1, 1)) *>
     schemaRegistry.registerSchema(s"$subject-key", keyGR.getSchema) *>
     schemaRegistry.registerSchema(s"$subject-value", valueGR.getSchema)).unsafeRunSync()
   }
@@ -206,7 +206,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
   private def createDVSConsumerTopic(schemaRegistry: SchemaRegistry[IO], kafkaAdminAlgebra: KafkaAdminAlgebra[IO]): (GenericRecord, GenericRecord) = {
     val topic = dvsConsumerTopic.value
     TopicConsumer.encode[IO](TopicConsumerKey("t", "c"), TopicConsumerValue(Instant.now).some).flatMap { case (k, Some(v)) =>
-      kafkaAdminAlgebra.createTopic(topic, TopicDetails(1, 1)).flatMap { _ =>
+      kafkaAdminAlgebra.createTopic(topic, TopicDetails(1, 1, 1)).flatMap { _ =>
         schemaRegistry.registerSchema(topic, k.getSchema) *>
           schemaRegistry.registerSchema(topic, v.getSchema)
       } *>
@@ -218,7 +218,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
   private def createDVSInternalKafkaOffsetsTopic(schemaRegistry: SchemaRegistry[IO], kafkaAdminAlgebra: KafkaAdminAlgebra[IO]): (GenericRecord, GenericRecord) = {
     val topic = dvsInternalKafkaOffsetsTopic.value
     TopicConsumerOffset.encode[IO](TopicConsumerOffsetKey("t", 0), TopicConsumerOffsetValue(0)).flatMap { case (k, v) =>
-      kafkaAdminAlgebra.createTopic(topic, TopicDetails(1, 1)).flatMap { _ =>
+      kafkaAdminAlgebra.createTopic(topic, TopicDetails(1, 1, 1)).flatMap { _ =>
         schemaRegistry.registerSchema(topic, k.getSchema) *>
           schemaRegistry.registerSchema(topic, v.getSchema)
       } *>

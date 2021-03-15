@@ -74,8 +74,11 @@ object KafkaUtils extends ConfigSupport {
   final case class TopicDetails(
       numPartitions: Int,
       replicationFactor: Short,
-      configs: Map[String, String] = Map.empty
-  )
+      minInsyncReplicas: Short,
+      private val partialConfig: Map[String, String] = Map.empty
+  ) {
+    val configs: Map[String, String] = partialConfig + ("min.insync.replicas" -> minInsyncReplicas.toString)
+  }
 
   private val _consumerSettings = consumerSettings(rootConfig)
 

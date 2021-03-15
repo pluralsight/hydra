@@ -22,7 +22,8 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
     val topicDetails =
       TopicDetails(
         cfg.createTopicConfig.defaultNumPartions,
-        cfg.createTopicConfig.defaultReplicationFactor
+        cfg.createTopicConfig.defaultReplicationFactor,
+        cfg.createTopicConfig.defaultMinInsyncReplicas
       )
     new BootstrapEndpointV2(programs.createTopic, topicDetails).route
   } else {
@@ -43,7 +44,7 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
 
     new SchemasEndpoint(consumerProxy).route ~
       new BootstrapEndpoint(system).route ~
-      new TopicMetadataEndpoint(consumerProxy, algebras.metadata, algebras.schemaRegistry, programs.createTopic).route ~
+      new TopicMetadataEndpoint(consumerProxy, algebras.metadata, algebras.schemaRegistry, programs.createTopic, cfg.createTopicConfig.defaultMinInsyncReplicas).route ~
       new ConsumerGroupsEndpoint(algebras.consumerGroups).route ~
       new IngestorRegistryEndpoint().route ~
       new IngestionWebSocketEndpoint().route ~

@@ -35,7 +35,7 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
         case Some(_) => Monad[F].unit
         case None => kafkaAdmin.createTopic(
           cfg.topicNameV1.value,
-          TopicDetails(cfg.numPartitions, cfg.replicationFactor, Map("cleanup.policy" -> "compact"))
+          TopicDetails(cfg.numPartitions, cfg.replicationFactor, cfg.minInsyncReplicas, Map("cleanup.policy" -> "compact"))
         )
       }
     } else {
@@ -63,7 +63,7 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
             Some("Data-Platform"),
             None
           ),
-          TopicDetails(cfg.numPartitions, cfg.replicationFactor, Map("cleanup.policy" -> "compact"))
+          TopicDetails(cfg.numPartitions, cfg.replicationFactor, cfg.minInsyncReplicas, Map("cleanup.policy" -> "compact"))
         )
       }
     } else {
@@ -89,7 +89,12 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
           Some("Data-Platform"),
           None
         ),
-        TopicDetails(dvsConsumersTopicConfig.numPartitions, dvsConsumersTopicConfig.replicationFactor, Map("cleanup.policy" -> "compact"))
+        TopicDetails(
+          dvsConsumersTopicConfig.numPartitions,
+          dvsConsumersTopicConfig.replicationFactor,
+          dvsConsumersTopicConfig.minInsyncReplicas,
+          Map("cleanup.policy" -> "compact")
+        )
       )
     }
   }
@@ -113,7 +118,12 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
           Some("Data-Platform"),
           None
         ),
-        TopicDetails(cooTopicConfig.numPartitions, cooTopicConfig.replicationFactor, Map("cleanup.policy" -> "compact"))
+        TopicDetails(
+          cooTopicConfig.numPartitions,
+          cooTopicConfig.replicationFactor,
+          cooTopicConfig.minInsyncReplicas,
+          Map("cleanup.policy" -> "compact")
+        )
       )
     }
 

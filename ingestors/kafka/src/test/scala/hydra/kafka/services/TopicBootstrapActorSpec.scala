@@ -435,6 +435,7 @@ class TopicBootstrapActorSpec
         |{
         |  partitions = 3
         |  replication-factor = 3
+        |  min-insync-replicas = 1
         |  timeout = 300
         |  failure-retry-millis = 3000
         |}

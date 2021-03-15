@@ -50,7 +50,7 @@ class KafkaClientAlgebraSpec
   private def createTopics: IO[Unit] = {
     val topicsToCreate: List[String] = List("topic1", "topic2", "stringTopic1", "stringTopic2", "nullTopic1")
     KafkaAdminAlgebra.live[IO](s"localhost:$port")
-      .flatMap(adminClient => topicsToCreate.traverse(adminClient.createTopic(_, TopicDetails(1, 1)))).void
+      .flatMap(adminClient => topicsToCreate.traverse(adminClient.createTopic(_, TopicDetails(1, 1, 1)))).void
   }
 
   private implicit val catsLogger: SelfAwareStructuredLogger[IO] =
