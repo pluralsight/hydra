@@ -12,6 +12,7 @@ import hydra.avro.convert.{ISODateConverter, IsoDate}
 import hydra.core.marshallers._
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.generic.GenericRecord
+import org.apache.avro.io.{Encoder, EncoderFactory}
 import spray.json.DefaultJsonProtocol
 import vulcan.generic._
 import vulcan.refined._
@@ -42,7 +43,7 @@ object TopicMetadataV2 {
   def getSchemas[F[_]: ApplicativeError[*[_], Throwable]]: F[Schemas] = {
     (
       Validated.fromEither(TopicMetadataV2Key.codec.schema).toValidatedNel,
-      Validated.fromEither(TopicMetadataV2Value.codec.schema).toValidatedNel
+      Validated.fromEither(TopicMetadataV2ValueV2.codec.schema).toValidatedNel
     ).mapN(Schemas.apply) match {
       case Valid(s) =>
         Applicative[F].pure(s)
@@ -58,7 +59,7 @@ object TopicMetadataV2 {
   ): F[(GenericRecord, Option[GenericRecord], Option[Headers])] = {
     Monad[F]
       .pure {
-        val valueResult: Option[Either[AvroError, Any]] = value.map(TopicMetadataV2Value.codec.encode)
+        val valueResult: Option[Either[AvroError, Any]] = value.map(a => TopicMetadataV2ValueV2.codec.encode(a.toTopicMetadataV2ValueV2))
         (
           Validated
             .fromEither(TopicMetadataV2Key.codec.encode(key))
@@ -94,7 +95,7 @@ object TopicMetadataV2 {
     getSchemas[F].flatMap { schemas =>
       Monad[F]
         .pure {
-          val valueResult: Option[Either[AvroError, TopicMetadataV2Value]] = value.map(TopicMetadataV2Value.codec.decode(_, schemas.value))
+          val valueResult: Option[Either[AvroError, TopicMetadataV2Value]] = value.map(TopicMetadataV2ValueV2.codec.decode(_, schemas.value).map(_.toTopicMetadataV2Value))
           (
             Validated
               .fromEither(TopicMetadataV2Key.codec.decode(key, schemas.key))
@@ -136,6 +137,35 @@ object TopicMetadataV2Key {
 }
 
 @AvroNamespace("_hydra.v2")
+final case class TopicMetadataV2ValueV2(
+                                         streamType: StreamTypeV2,
+                                         deprecated: Boolean,
+                                         deprecatedDate: Option[Instant],
+                                         dataClassification: DataClassification,
+                                         contact: NonEmptyList[ContactMethod],
+                                         createdDate: Instant,
+                                         parentSubjects: List[Subject],
+                                         notes: Option[String],
+                                         teamName: Option[String],
+                                         tags: Option[Map[String,String]]
+                                       ) {
+  def toTopicMetadataV2Value: TopicMetadataV2Value = {
+    TopicMetadataV2Value(
+      streamType,
+      deprecated,
+      deprecatedDate,
+      dataClassification,
+      contact,
+      createdDate,
+      parentSubjects,
+      notes,
+      teamName,
+      tags.getOrElse(Map.empty)
+    )
+  }
+}
+
+
 final case class TopicMetadataV2Value(
     streamType: StreamTypeV2,
     deprecated: Boolean,
@@ -145,10 +175,26 @@ final case class TopicMetadataV2Value(
     createdDate: Instant,
     parentSubjects: List[Subject],
     notes: Option[String],
-    teamName: Option[String]
-)
+    teamName: Option[String],
+    tags: Map[String,String]
+) {
+  def toTopicMetadataV2ValueV2: TopicMetadataV2ValueV2 = {
+    TopicMetadataV2ValueV2(
+      streamType,
+      deprecated,
+      deprecatedDate,
+      dataClassification,
+      contact,
+      createdDate,
+      parentSubjects,
+      notes,
+      teamName,
+      tags.some
+    )
+  }
+}
 
-object TopicMetadataV2Value {
+object TopicMetadataV2ValueV2 {
 
   implicit val streamTypeCodec: Codec[StreamTypeV2] =
     Codec.deriveEnum[StreamTypeV2](
@@ -205,8 +251,8 @@ object TopicMetadataV2Value {
   private implicit val contactMethodCodec: Codec[ContactMethod] =
     Codec.derive[ContactMethod]
 
-  implicit val codec: Codec[TopicMetadataV2Value] =
-  Codec.record[TopicMetadataV2Value](
+  implicit val codec: Codec[TopicMetadataV2ValueV2] =
+  Codec.record[TopicMetadataV2ValueV2](
     name = "TopicMetadataV2Value",
     namespace = "_hydra.v2"
   ) {
@@ -219,7 +265,8 @@ object TopicMetadataV2Value {
         field("createdDate", _.createdDate),
         field("parentSubjects", _.parentSubjects),
         field("notes", _.notes),
-        field("teamName", _.teamName, default = Some(None))
-        ).mapN(TopicMetadataV2Value.apply)
+        field("teamName", _.teamName, default = Some(None)),
+        field("tags", _.tags, default = Some(None))
+        ).mapN(TopicMetadataV2ValueV2.apply)
   }
 }

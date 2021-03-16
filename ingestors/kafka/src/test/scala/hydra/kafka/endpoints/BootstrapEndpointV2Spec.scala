@@ -107,7 +107,8 @@ final class BootstrapEndpointV2Spec
       List.empty,
       None,
       Some("dvs-teamName"),
-      None
+      None,
+      Map.empty
     ).toJson.compactPrint
 
     val validRequest = TopicMetadataV2Request(
@@ -121,7 +122,8 @@ final class BootstrapEndpointV2Spec
       List.empty,
       None,
       Some("dvs-teamName"),
-      None
+      None,
+      Map.empty
     ).toJson.compactPrint
 
     "accept a valid request" in {
@@ -176,7 +178,8 @@ final class BootstrapEndpointV2Spec
         List.empty,
         None,
         None,
-        None
+        None,
+        Map.empty
       ).toJson.compactPrint
       testCreateTopicProgram
         .map { bootstrapEndpoint =>

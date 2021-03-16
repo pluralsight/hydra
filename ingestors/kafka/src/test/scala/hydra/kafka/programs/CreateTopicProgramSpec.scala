@@ -57,7 +57,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       createdDate: Instant = Instant.now(),
       deprecated: Boolean = false,
       deprecatedDate: Option[Instant] = None,
-      numPartitions: Option[NumPartitions] = None
+      numPartitions: Option[NumPartitions] = None,
+      tags: Option[Map[String,String]] = None
   ): TopicMetadataV2Request =
     TopicMetadataV2Request(
       Schemas(keySchema, valueSchema),
@@ -70,7 +71,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       List.empty,
       None,
       Some("dvs-teamName"),
-      numPartitions
+      numPartitions,
+      Map.empty
     )
 
   "CreateTopicSpec" must {
