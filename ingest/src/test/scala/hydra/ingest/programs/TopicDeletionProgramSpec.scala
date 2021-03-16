@@ -191,7 +191,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       expectedDeletedV2Topics <- IO.pure(getExpectedDeletedTopics(v2TopicNames, topicNamesToDelete, kafkaTopicNamesToFail))
       _ <- writeV2TopicMetadata(v2TopicNames, metadataAlgebra)
       // create all topics
-      _ <- (v1TopicNames++v2TopicNames).traverse(topic => kafkaAdmin.createTopic(topic,TopicDetails(1,1)))
+      _ <- (v1TopicNames++v2TopicNames).traverse(topic => kafkaAdmin.createTopic(topic,TopicDetails(1,1,1)))
       // register all topics
       _ <- registerTopics(v1TopicNames, schemaAlgebra, registerKey, upgrade=false)
       _ <- registerTopics(v2TopicNames, schemaAlgebra, registerKey, upgrade=false)

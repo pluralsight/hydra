@@ -115,7 +115,7 @@ class TopicMetadataEndpointSpec
     _ <- schemaRegistry.registerSchema(subjectValue, schema)
     metadataAlgebra <- MetadataAlgebra.make[IO](Subject.createValidated("_topicName.Bill").get, "I'm_A_Jerk", kafkaClient, schemaRegistry, consumeMetadataEnabled = false)
     createTopicProgram = getTestCreateTopicProgram(schemaRegistry, ka, kafkaClient, metadataAlgebra)
-  } yield new TopicMetadataEndpoint(consumerProxy, metadataAlgebra, schemaRegistry, createTopicProgram).route).unsafeRunSync()
+  } yield new TopicMetadataEndpoint(consumerProxy, metadataAlgebra, schemaRegistry, createTopicProgram, 1).route).unsafeRunSync()
 
   val node = new Node(0, "host", 1)
 

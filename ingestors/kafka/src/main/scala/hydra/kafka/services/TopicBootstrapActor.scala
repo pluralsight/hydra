@@ -79,7 +79,7 @@ class TopicBootstrapActor(
   val topicDetails = new TopicDetails(
     bootstrapKafkaConfig.getInt("partitions"),
     bootstrapKafkaConfig.getInt("replication-factor").toShort,
-    Map.empty
+    bootstrapKafkaConfig.getInt("min-insync-replicas").toShort
   )
 
   private val failureRetryInterval = bootstrapKafkaConfig
