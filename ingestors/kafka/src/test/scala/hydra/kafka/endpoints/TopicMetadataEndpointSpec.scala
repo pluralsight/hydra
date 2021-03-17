@@ -2,6 +2,7 @@ package hydra.kafka.endpoints
 
 import akka.actor.{Actor, ActorRef, ActorSelection, Props}
 import akka.http.javadsl.server.MalformedRequestContentRejection
+import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
@@ -252,6 +253,8 @@ class TopicMetadataEndpointSpec
 
   "The /v2/metadata endpoint" should {
 
+    val validCredentials = BasicHttpCredentials("John", "")
+
     val validRequest = """{
                          |    "streamType": "Event",
                          |    "deprecated": true,
@@ -262,7 +265,10 @@ class TopicMetadataEndpointSpec
                          |    "createdDate": "2020-02-02T12:34:56Z",
                          |    "notes": "here are some notes",
                          |    "parentSubjects": [],
-                         |    "teamName": "dvs-teamName"
+                         |    "teamName": "dvs-teamName",
+                         |    "tags": {
+                         |      "Source": "DVS"
+                         |    }
                          |}""".stripMargin
 
     val invalidRequest =
@@ -280,19 +286,22 @@ class TopicMetadataEndpointSpec
         |}""".stripMargin
 
     "return 200 with proper metadata" in {
-      Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> route ~> check {
+      Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, validRequest)) ~>
+        addCredentials(validCredentials) ~> route ~> check {
         response.status shouldBe StatusCodes.OK
       }
     }
 
     "return 400 with missing schemas" in {
-      Put("/v2/metadata/dvs.subject.noschema", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> route ~> check {
+      Put("/v2/metadata/dvs.subject.noschema", HttpEntity(ContentTypes.`application/json`, validRequest)) ~>
+      addCredentials(validCredentials) ~> route ~> check {
         status shouldBe StatusCodes.BadRequest
       }
     }
 
     "reject invalid metadata" in {
-      Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, invalidRequest)) ~> route ~> check {
+      Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, invalidRequest)) ~>
+        addCredentials(validCredentials) ~> route ~> check {
         rejection shouldBe a[MalformedRequestContentRejection]
       }
     }

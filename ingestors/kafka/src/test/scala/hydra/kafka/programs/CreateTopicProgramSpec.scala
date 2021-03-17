@@ -72,7 +72,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       None,
       Some("dvs-teamName"),
       numPartitions,
-      Map.empty
+      List.empty
     )
 
   "CreateTopicSpec" must {

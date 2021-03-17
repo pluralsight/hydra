@@ -147,7 +147,7 @@ final case class TopicMetadataV2ValueV2(
                                          parentSubjects: List[Subject],
                                          notes: Option[String],
                                          teamName: Option[String],
-                                         tags: Option[Map[String,String]]
+                                         tags: Option[List[String]]
                                        ) {
   def toTopicMetadataV2Value: TopicMetadataV2Value = {
     TopicMetadataV2Value(
@@ -160,7 +160,7 @@ final case class TopicMetadataV2ValueV2(
       parentSubjects,
       notes,
       teamName,
-      tags.getOrElse(Map.empty)
+      tags.getOrElse(List.empty)
     )
   }
 }
@@ -176,7 +176,7 @@ final case class TopicMetadataV2Value(
     parentSubjects: List[Subject],
     notes: Option[String],
     teamName: Option[String],
-    tags: Map[String,String]
+    tags: List[String]
 ) {
   def toTopicMetadataV2ValueV2: TopicMetadataV2ValueV2 = {
     TopicMetadataV2ValueV2(

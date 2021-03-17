@@ -383,8 +383,8 @@ sealed trait TopicMetadataV2Parser
         )
         val tags = toResult(
           j.fields.get("tags") match {
-            case Some(t) => t.convertTo[Option[Map[String,String]]].getOrElse(Map.empty)
-            case None => Map.empty[String,String]
+            case Some(t) => t.convertTo[Option[List[String]]].getOrElse(List.empty)
+            case None => List.empty[String]
           }
         )
         (

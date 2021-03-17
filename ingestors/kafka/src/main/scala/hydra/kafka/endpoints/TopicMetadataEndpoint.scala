@@ -31,6 +31,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import akka.http.scaladsl.server.Directives.onComplete
+import akka.http.scaladsl.server.directives.Credentials
 import cats.data.NonEmptyList
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.programs.CreateTopicProgram
@@ -138,7 +139,6 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
     } yield Schemas(keySchema.getOrElse(throw new SchemaParseException("Unable to get Key Schema, please create Key Schema in Schema Registry and try again")),
       valueSchema.getOrElse(throw new SchemaParseException("Unable to get Value Schema, please create Value Schema in Schema Registry and try again")))
   }
-
 
   private def putV2Metadata(startTime: Instant, topic: String): Route = {
     Subject.createValidated(topic) match {

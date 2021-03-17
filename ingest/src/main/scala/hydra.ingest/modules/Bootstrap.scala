@@ -21,6 +21,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
     kafkaAdmin: KafkaAdminAlgebra[F]
 ) {
 
+  private val tags = List("Source: DVS")
+
   def bootstrapAll: F[Unit] =
     for {
       _ <- bootstrapMetadataTopicV2
@@ -62,7 +64,7 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
             ),
             Some("Data-Platform"),
             None,
-            Map("createdBy" -> "DVS")
+            tags
           ),
           TopicDetails(cfg.numPartitions, cfg.replicationFactor, cfg.minInsyncReplicas, Map("cleanup.policy" -> "compact"))
         )
@@ -89,7 +91,7 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
           ),
           Some("Data-Platform"),
           None,
-          Map("createdBy" -> "DVS")
+          tags
         ),
         TopicDetails(
           dvsConsumersTopicConfig.numPartitions,
@@ -119,7 +121,7 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
           ),
           Some("Data-Platform"),
           None,
-          Map("createdBy" -> "DVS")
+          tags
         ),
         TopicDetails(
           cooTopicConfig.numPartitions,

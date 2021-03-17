@@ -54,7 +54,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
       List.empty,
       None,
       Some("dvs-teamName"),
-      Map.empty
+      List.empty
     )
 
     val (encodedKey, encodedValue, headers) =
@@ -105,7 +105,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
       List.empty,
       None,
       Some("dvs-teamName"),
-      Map.empty
+      List.empty
     )
 
     val (encodedKey, encodedValue, headers) =
