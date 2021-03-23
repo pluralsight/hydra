@@ -109,11 +109,15 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
             } ~ createTopic(startTime)
           }
         } ~ pathPrefix("v2" / "topics") {
-          val startTime = Instant.now
-          getAllV2Metadata(startTime) ~
+          get {
+            val startTime = Instant.now
             pathPrefix(Segment) { topicName =>
               getV2Metadata(topicName, startTime)
+            } ~
+            pathEndOrSingleSlash {
+              getAllV2Metadata(startTime)
             }
+          }
         } ~ pathPrefix("v2" / "streams") {
           val startTime = Instant.now
           get {
