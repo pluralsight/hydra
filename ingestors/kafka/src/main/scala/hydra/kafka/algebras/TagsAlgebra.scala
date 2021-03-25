@@ -3,6 +3,7 @@ package hydra.kafka.algebras
 import hydra.avro.convert.SimpleStringToGenericRecord
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishResponse
 import SimpleStringToGenericRecord._
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import hydra.kafka.model.Schemas
 import vulcan.Codec
 import vulcan.generic._
@@ -11,14 +12,18 @@ import cats.data.Validated.{Invalid, Valid}
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, Sync}
 import cats.implicits._
+import hydra.kafka.algebras.HydraTag.jsonFormat1
 import io.chrisdavenport.log4cats.Logger
 import org.apache.avro.generic.GenericRecord
-import spray.json.{JsArray, JsBoolean, JsNull, JsNumber, JsObject, JsString, JsValue, RootJsonFormat}
+import spray.json._
 
 final case class HydraTag(name: String, description: String)
 
-object  HydraTag {
+object  HydraTag extends SprayJsonSupport with DefaultJsonProtocol  {
+  implicit val hydraTagFormat: RootJsonFormat[HydraTag] = jsonFormat2(HydraTag.apply)
+
   implicit val codec: Codec[HydraTag] = Codec.derive[HydraTag]
+
     def getSchemas: Schemas = {
         (
           Validated.fromEither(HydraTag.codec.schema).toValidatedNel,
@@ -31,21 +36,6 @@ object  HydraTag {
       }
     }
 
-  implicit object HydraTagFormat extends RootJsonFormat[HydraTag] {
-    override def write(obj: HydraTag): JsValue = {
-      val hydraMap: Map[String,JsValue] = Map(obj.name -> JsString(obj.description))
-      JsObject(fields = hydraMap)
-    }
-
-    override def read(json: JsValue): HydraTag = {
-      json match {
-        case JsObject(e) if(e.size == 1) =>
-          val key = e.keySet.head
-          val value = e.get(key).getOrElse(throw new Exception(s"Unable to get value for key: $key")).toString()
-          HydraTag(key, value)
-      }
-    }
-  }
 }
 
 
@@ -55,6 +45,11 @@ trait TagsAlgebra[F[_]] {
   def getAllTags: F[List[HydraTag]]
 }
 object TagsAlgebra {
+
+  final case class HydraTagKey(name: String)
+  final case class HydraTagValue(description: String)
+  implicit val hydraTagKeyFormat: RootJsonFormat[HydraTagKey] = jsonFormat1(HydraTagKey.apply)
+  implicit val hydraTagValueFormat: RootJsonFormat[HydraTagValue] = jsonFormat1(HydraTagValue.apply)
 
   def make[F[_]: Sync: Concurrent: Logger](tagsTopic: String,
                                            tagsClient: String,
@@ -94,14 +89,13 @@ object TagsAlgebra {
         override def createOrUpdateTag(tagsTopic: String, tagsRequest: HydraTag,
                                                kafkaClientAlgebra: KafkaClientAlgebra[F]): F[Either[KafkaClientAlgebra.PublishError,PublishResponse]] = {
           val tagsSchemas = HydraTag.getSchemas
-          kafkaClientAlgebra.publishMessage(
-            (tagsRequest.name.toGenericRecordSimple(tagsSchemas.key, useStrictValidation = true)
-              .getOrElse(throw new Exception(s"createOrUpdateTag GenericRecordSimple error: Key ${tagsSchemas.key}"))
-              , Some(
-              tagsRequest.description
-                .toGenericRecordSimple(tagsSchemas.value, useStrictValidation = true)
-                .getOrElse(throw new Exception(s"createOrUpdateTag GenericRecordSimple error: Value ${tagsSchemas.value}")))
-              , None),tagsTopic)
+          val genericRecordKey = HydraTagKey(tagsRequest.name).toJson.toString.toGenericRecordSimple(tagsSchemas.key, useStrictValidation = false)
+            .getOrElse(throw new Exception(s"createOrUpdateTag GenericRecordSimple error: Key ${tagsSchemas.key}"))
+          val genericRecordValue = tagsRequest.toJson.toString.toGenericRecordSimple(tagsSchemas.value, useStrictValidation = false)
+            .getOrElse(throw new Exception(s"createOrUpdateTag GenericRecordSimple error: Value ${tagsSchemas.value}"))
+
+
+          kafkaClientAlgebra.publishMessage((genericRecordKey, Some(genericRecordValue), None), tagsTopic)
         }
       }
     }
