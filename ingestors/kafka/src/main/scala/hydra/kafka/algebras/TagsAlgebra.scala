@@ -13,6 +13,7 @@ import cats.effect.{Concurrent, Sync}
 import cats.implicits._
 import io.chrisdavenport.log4cats.Logger
 import org.apache.avro.generic.GenericRecord
+import spray.json.{JsArray, JsBoolean, JsNull, JsNumber, JsObject, JsString, JsValue, RootJsonFormat}
 
 final case class HydraTag(name: String, description: String)
 
@@ -29,6 +30,22 @@ object  HydraTag {
           throw new Exception(s"HydraTag getSchemas Error(s): ${e.map(a => a.message).toList}")
       }
     }
+
+  implicit object HydraTagFormat extends RootJsonFormat[HydraTag] {
+    override def write(obj: HydraTag): JsValue = {
+      val hydraMap: Map[String,JsValue] = Map(obj.name -> JsString(obj.description))
+      JsObject(fields = hydraMap)
+    }
+
+    override def read(json: JsValue): HydraTag = {
+      json match {
+        case JsObject(e) if(e.size == 1) =>
+          val key = e.keySet.head
+          val value = e.get(key).getOrElse(throw new Exception(s"Unable to get value for key: $key")).toString()
+          HydraTag(key, value)
+      }
+    }
+  }
 }
 
 
