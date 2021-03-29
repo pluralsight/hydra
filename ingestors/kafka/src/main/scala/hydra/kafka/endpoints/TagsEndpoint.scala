@@ -16,7 +16,6 @@ import scala.util.{Failure, Success}
 
 final class TagsEndpoint[F[_]: Futurable]( tagsAlgebra: TagsAlgebra[F],
                                            tagsPassword: String,
-                                           tagsTopic: String,
                                            kafkaClientAlgebra: KafkaClientAlgebra[F])
   extends RouteSupport with DefaultJsonProtocol with SprayJsonSupport {
 
@@ -39,7 +38,7 @@ final class TagsEndpoint[F[_]: Futurable]( tagsAlgebra: TagsAlgebra[F],
             } ~ post {
               authenticateBasic(realm = "", myUserPassAuthenticator) { userName =>
                 entity(as[HydraTag]) { tags =>
-                  onComplete(Futurable[F].unsafeToFuture(tagsAlgebra.createOrUpdateTag(tagsTopic, tags, kafkaClientAlgebra))) {
+                  onComplete(Futurable[F].unsafeToFuture(tagsAlgebra.createOrUpdateTag(tags, kafkaClientAlgebra))) {
                     case Failure(exception) => complete(StatusCodes.InternalServerError, exception.getMessage)
                     case Success(value) => complete(StatusCodes.OK, tags.toString)
                   }

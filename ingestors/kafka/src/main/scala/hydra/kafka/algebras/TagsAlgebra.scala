@@ -50,7 +50,7 @@ object  HydraTag extends SprayJsonSupport with DefaultJsonProtocol  {
 
 
 trait TagsAlgebra[F[_]] {
-  def createOrUpdateTag(tagsTopic: String, tagsRequest: HydraTag,
+  def createOrUpdateTag(tagsRequest: HydraTag,
                               kafkaClientAlgebra: KafkaClientAlgebra[F]): F[Either[KafkaClientAlgebra.PublishError,PublishResponse]]
   def getAllTags: F[List[HydraTag]]
 }
@@ -68,7 +68,7 @@ object TagsAlgebra {
         fs2.Stream.eval {
           value match {
             case Some(value) => {
-              ref.update(_.addMetadata(HydraTag(key.toString, value.toString)))
+              ref.update(_.addMetadata(HydraTag(key.get("name").toString, value.get("description").toString)))
             }
             case None => {
               ref.update(_.removeMetadata(key.toString))
@@ -82,16 +82,16 @@ object TagsAlgebra {
         case e =>
         fs2.Stream.eval(Logger[F].warn(s"Error in TagsAlgebra"))
       }.compile.drain)
-      algebra <- getTagsAlgebra(ref)
+      algebra <- getTagsAlgebra(ref, tagsTopic)
     } yield algebra
   }
 
-  private def getTagsAlgebra[F[_]: Sync: Logger](cache: Ref[F, TagsStorageFacade]): F[TagsAlgebra[F]] = {
+  private def getTagsAlgebra[F[_]: Sync: Logger](cache: Ref[F, TagsStorageFacade], tagsTopic: String): F[TagsAlgebra[F]] = {
     Sync[F].delay {
       new TagsAlgebra[F] {
         override def getAllTags: F[List[HydraTag]] = cache.get.map(_.tagsMap.map(tm => HydraTag(tm._1, tm._2)).toList)
 
-        override def createOrUpdateTag(tagsTopic: String, tagsRequest: HydraTag,
+        override def createOrUpdateTag(tagsRequest: HydraTag,
                                                kafkaClientAlgebra: KafkaClientAlgebra[F]): F[Either[KafkaClientAlgebra.PublishError,PublishResponse]] = {
           val tagsSchemas = HydraTag.getSchemas
           val genericRecordKey = tagsRequest.toJson.toString.toGenericRecordSimple(tagsSchemas.key)

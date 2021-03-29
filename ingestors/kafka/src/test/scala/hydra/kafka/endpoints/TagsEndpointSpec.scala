@@ -28,7 +28,7 @@ class TagsEndpointSpec extends Matchers with AnyWordSpecLike with ScalatestRoute
   val kafkaClientAlgebra = KafkaClientAlgebra.test[IO](schemaRegistry).unsafeRunSync()
 
   val tagsAlgebra = TagsAlgebra.make("dvs.topic","someClient", kafkaClientAlgebra).unsafeRunSync()
-  val route = new TagsEndpoint[IO](tagsAlgebra, "myPass", "tagsTopic", kafkaClientAlgebra).route
+  val route = new TagsEndpoint[IO](tagsAlgebra, "myPass", kafkaClientAlgebra).route
 
   val validCredentials = BasicHttpCredentials("John", "myPass")
 
@@ -40,10 +40,22 @@ class TagsEndpointSpec extends Matchers with AnyWordSpecLike with ScalatestRoute
         status shouldBe StatusCodes.OK
       }
     }
+    "reject a bad tag request" in {
+      Post("/v2/tags", HttpEntity(ContentTypes.`application/json`, """{"nameBAD": "DVS", "description": "Created by DVS"}""")) ~>
+        addCredentials(validCredentials) ~> Route.seal(route) ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
+    "reject a request with no auth" in {
+      Post("/v2/tags", HttpEntity(ContentTypes.`application/json`, """{"name": "DVS", "description": "Created by DVS"}""")) ~>
+        Route.seal(route) ~> check {
+        status shouldBe StatusCodes.Unauthorized
+      }
+    }
     "get all tags in the topic" in {
       Get("/v2/tags", HttpEntity(ContentTypes.`application/json`, "")) ~>
         Route.seal(route) ~> check {
-        responseAs[String] shouldBe """[{"name": "DVS", "description": "Created by DVS"}]"""
+        responseAs[String] shouldBe """[{"description":"Created by DVS","name":"DVS"}]"""
         status shouldBe StatusCodes.OK
       }
     }
