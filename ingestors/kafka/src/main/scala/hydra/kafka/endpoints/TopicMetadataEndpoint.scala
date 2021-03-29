@@ -13,7 +13,7 @@ import hydra.common.config.ConfigSupport._
 import hydra.common.util.Futurable
 import hydra.core.http.{CorsSupport, NotFoundException, RouteSupport}
 import hydra.core.monitor.HydraMetrics.addHttpMetric
-import hydra.kafka.algebras.MetadataAlgebra
+import hydra.kafka.algebras.{MetadataAlgebra, TagsAlgebra}
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -47,7 +47,8 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                                              metadataAlgebra: MetadataAlgebra[F],
                                              schemaRegistry: SchemaRegistry[F],
                                              createTopicProgram: CreateTopicProgram[F],
-                                             defaultMinInsyncReplicas: Short
+                                             defaultMinInsyncReplicas: Short,
+                                             tagsAlgebra: TagsAlgebra[F]
                                             )
                                             (implicit ec:ExecutionContext)
   extends RouteSupport

@@ -5,7 +5,7 @@ import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Sync, Timer}
 import cats.syntax.all._
 import fs2.kafka.Headers
 import hydra.avro.registry.SchemaRegistry
-import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, MetadataTopicsConfig}
+import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, MetadataTopicsConfig, TagsTopicConfig}
 import hydra.kafka.algebras.KafkaAdminAlgebra.Topic
 import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, Offset, Partition, PublishError, PublishResponse, TopicName}
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
@@ -38,7 +38,8 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
   private def createTestCase(
       metadataConfig: MetadataTopicsConfig,
       consumersTopicConfig: DVSConsumersTopicConfig,
-      consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig
+      consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
+      tagsTopicConfig: TagsTopicConfig
 
   ): IO[(List[Topic], List[String], List[(GenericRecord, Option[GenericRecord], Option[Headers])])] = {
     val retry = RetryPolicies.alwaysGiveUp[IO]
@@ -56,7 +57,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
         metadataSubjectV2,
         metadata
       )
-      boot <- Bootstrap.make[IO](c, metadataConfig, consumersTopicConfig, consumerOffsetsOffsetsTopicConfig, kafkaAdmin)
+      boot <- Bootstrap.make[IO](c, metadataConfig, consumersTopicConfig, consumerOffsetsOffsetsTopicConfig, kafkaAdmin, tagsTopicConfig)
       _ <- boot.bootstrapAll
       topicCreated <- kafkaAdmin.describeTopic(metadataSubjectV2.value)
       topicCreated1 <- kafkaAdmin.describeTopic(metadataSubjectV1.value)
@@ -86,6 +87,8 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
         1,
         1
       )
+    val tagsTopicConfig =
+      TagsTopicConfig("_hydra.tags-topic")
 
     "create the metadata topics, consumers topic, and consumerOffsetsOffsets topic" in {
       val config =
@@ -101,7 +104,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
           1,
           "consumerGroup"
         )
-      createTestCase(config, consumersTopicConfig, consumerOffsetsTopicConfig)
+      createTestCase(config, consumersTopicConfig, consumerOffsetsTopicConfig, tagsTopicConfig)
         .map {
           case (topicsCreated, schemasAdded, messagesPublished) =>
             topicsCreated should contain allOf(Topic(metadataSubjectV1.value, 1), Topic(metadataSubjectV2.value, 1),
@@ -113,7 +116,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
               consumersTopicSubject.value + "-value",
               cooTopicSubject.value + "-key",
               cooTopicSubject.value + "-value")
-            messagesPublished should have length 3
+            messagesPublished should have length 4
         }
         .unsafeRunSync()
     }
@@ -133,7 +136,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
           "consumerGroup"
         )
 
-      createTestCase(config, consumersTopicConfig, consumerOffsetsTopicConfig)
+      createTestCase(config, consumersTopicConfig, consumerOffsetsTopicConfig, tagsTopicConfig)
         .map {
           case (topicsCreated, schemasAdded, messagesPublished) =>
             topicsCreated should not contain Topic(metadataSubjectV2.value, 1)

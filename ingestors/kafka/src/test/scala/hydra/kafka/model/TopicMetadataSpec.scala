@@ -28,7 +28,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
     }
   }
 
-  import TopicMetadataV2ValueV2._
+  import TopicMetadataV2ValueOptionalTagList._
   List(StreamTypeV2.Event, StreamTypeV2.Entity, StreamTypeV2.Telemetry).map(
     testCodec[StreamTypeV2]
   )
@@ -65,7 +65,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
     ).set("subject", key.subject.value)
       .build()
 
-    val valueSchema = TopicMetadataV2ValueV2.codec.schema.toOption.get
+    val valueSchema = TopicMetadataV2ValueOptionalTagList.codec.schema.toOption.get
 
     val json =
       s"""{
@@ -130,7 +130,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
     val schemaVersion2 = parser.parse(schemaVersion2String)
     val schemaVersion3 = parser.parse(schemaVersion3String)
     val schemaVersion4 = parser.parse(schemaVersion4String)
-    val schemaCurrent = TopicMetadataV2ValueV2.codec.schema.toOption.get
+    val schemaCurrent = TopicMetadataV2ValueOptionalTagList.codec.schema.toOption.get
     val previousVersions = List(schemaVersion1, schemaVersion2, schemaVersion3, schemaVersion4)
     AvroCompatibilityChecker.FULL_TRANSITIVE_CHECKER.isCompatible(schemaCurrent, previousVersions.asJava) shouldBe true
   }
