@@ -81,6 +81,11 @@ trait KafkaAdminAlgebra[F[_]] {
     */
   def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]]
 
+  /**
+    * @return the list of consumer groups for this cluster
+    */
+  def listConsumerGroups(): F[List[String]]
+
 }
 
 object KafkaAdminAlgebra {
@@ -198,6 +203,10 @@ object KafkaAdminAlgebra {
         }
       }
 
+      override def listConsumerGroups(): F[List[String]] = {
+        getAdminClientResource.use(_.listConsumerGroups.groupIds)
+      }
+
       private def getConsumerResource: Resource[F, KafkaConsumer[F, _, _]] = {
         val des = Deserializer[F, String]
         consumerResource[F, String, String] {
@@ -216,10 +225,14 @@ object KafkaAdminAlgebra {
   }
 
   def test[F[_]: Sync]: F[KafkaAdminAlgebra[F]] =
-    Ref[F].of(Map[TopicName, Topic]()).flatMap(getTestKafkaClient[F])
+    Ref[F].of(Map[TopicName, Topic]()).flatMap(getTestKafkaClient[F](_))
+
+  def test[F[_]: Sync](consumerGroups: List[String] = List.empty): F[KafkaAdminAlgebra[F]] =
+    Ref[F].of(Map[TopicName, Topic]()).flatMap(getTestKafkaClient[F](_, consumerGroups))
 
   private[this] def getTestKafkaClient[F[_]: Sync](
-      ref: Ref[F, Map[TopicName, Topic]]
+      ref: Ref[F, Map[TopicName, Topic]],
+      consumerGroups: List[String] = List.empty
   ): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
     new KafkaAdminAlgebra[F] {
       override def describeTopic(name: TopicName): F[Option[Topic]] =
@@ -260,6 +273,10 @@ object KafkaAdminAlgebra {
               ).toValidatedNel
             }
         }.map(_.combineAll.toEither.leftMap(errorList => KafkaDeleteTopicErrorList(errorList)))
+
+      override def listConsumerGroups(): F[List[String]] = {
+        consumerGroups.pure[F]
+      }
 }
   }
 

@@ -100,6 +100,8 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       override def deleteTopics(topicNames: List[String]): F[Either[KafkaDeleteTopicErrorList, Unit]] =
         Sync[F].pure(Left(new KafkaDeleteTopicErrorList( NonEmptyList.fromList(
           topicNames.map(topic => KafkaDeleteTopicError(topic, new Exception("Unable to delete topic")))).get)))
+
+      override def listConsumerGroups(): F[List[String]] = ???
     }
   }
 
