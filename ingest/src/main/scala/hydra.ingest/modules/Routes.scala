@@ -9,7 +9,7 @@ import hydra.common.util.{ActorUtils, Futurable}
 import hydra.ingest.app.AppConfig.AppConfig
 import hydra.ingest.http._
 import hydra.kafka.consumer.KafkaConsumerProxy
-import hydra.kafka.endpoints.{BootstrapEndpoint, BootstrapEndpointV2, ConsumerGroupsEndpoint, TopicMetadataEndpoint, TopicsEndpoint}
+import hydra.kafka.endpoints.{BootstrapEndpoint, BootstrapEndpointV2, ConsumerGroupsEndpoint, TagsEndpoint, TopicMetadataEndpoint, TopicsEndpoint}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 
 import scala.concurrent.ExecutionContext
@@ -53,6 +53,8 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
       new TopicsEndpoint(consumerProxy)(system.dispatcher).route ~
       new TopicDeletionEndpoint(programs.topicDeletion,cfg.topicDeletionConfig.deleteTopicPassword).route ~
       HealthEndpoint.route ~
+      new TagsEndpoint[F](algebras.tagsAlgebra, cfg.tagsPasswordConfig.tagsPassword,
+        cfg.tagsTopicConfig.tagsTopic, algebras.kafkaClient).route ~
       bootstrapEndpointV2
   }
 }

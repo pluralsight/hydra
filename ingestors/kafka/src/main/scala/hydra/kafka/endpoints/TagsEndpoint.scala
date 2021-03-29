@@ -34,7 +34,7 @@ final class TagsEndpoint[F[_]: Futurable]( tagsAlgebra: TagsAlgebra[F],
             get {
               onComplete(Futurable[F].unsafeToFuture(tagsAlgebra.getAllTags)) {
                 case Failure(exception) => complete(StatusCodes.InternalServerError, exception)
-                case Success(value) => complete(StatusCodes.OK, value.toString)
+                case Success(value) => complete(StatusCodes.OK, value.toJson)
               }
             } ~ post {
               authenticateBasic(realm = "", myUserPassAuthenticator) { userName =>

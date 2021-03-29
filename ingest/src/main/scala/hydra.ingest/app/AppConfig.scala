@@ -162,12 +162,26 @@ object AppConfig {
       env("HYDRA_INGEST_TOPIC_DELETION_PASSWORD").as[String].default("")
     ).map(TopicDeletionConfig)
 
-  final case class TagsEndpointPasswordConfig(metadataTopicPassword: String)
+  final case class TagsEndpointPasswordConfig(tagsPassword: String)
 
   private val tagsEndpointPasswordConfig: ConfigValue[TagsEndpointPasswordConfig] =
     (
       env("TAGS_ENDPOINT_PASSWORD").as[String].default("")
     ).map(TagsEndpointPasswordConfig)
+
+  final case class TagsTopicConfig(tagsTopic: String)
+
+  private val tagsTopicConfig: ConfigValue[TagsTopicConfig] =
+    (
+      env("TAGS_TOPIC").as[String].default("_hydra.tags-topic")
+    ).map(TagsTopicConfig)
+
+  final case class TagsConsumerGroupConfig(tagsConsumerGroup: String)
+
+  private val tagsConsumerGroupConfig: ConfigValue[TagsConsumerGroupConfig] =
+    (
+      env("TAGS_CONSUMER_GROUP").as[String].default("_hydra.tags-consumer-group")
+    ).map(TagsConsumerGroupConfig)
 
 
   final case class AppConfig(
@@ -175,7 +189,9 @@ object AppConfig {
                               metadataTopicsConfig: MetadataTopicsConfig,
                               ingestConfig: IngestConfig,
                               topicDeletionConfig: TopicDeletionConfig,
-                              metadataOnlyTopicPasswordConfig: TagsEndpointPasswordConfig,
+                              tagsPasswordConfig: TagsEndpointPasswordConfig,
+                              tagsTopicConfig: TagsTopicConfig,
+                              tagsConsumerGroupConfig: TagsConsumerGroupConfig,
                               dvsConsumersTopicConfig: DVSConsumersTopicConfig,
                               consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
                               consumerGroupsAlgebraConfig: ConsumerGroupsAlgebraConfig
@@ -188,6 +204,8 @@ object AppConfig {
       ingestConfig,
       topicDeletionConfig,
       tagsEndpointPasswordConfig,
+      tagsTopicConfig,
+      tagsConsumerGroupConfig,
       dvsConsumersTopicConfig,
       consumerOffsetsOffsetsTopicConfig,
       consumerGroupAlgebraConfig
