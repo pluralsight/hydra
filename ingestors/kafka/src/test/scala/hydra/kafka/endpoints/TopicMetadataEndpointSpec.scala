@@ -5,12 +5,12 @@ import akka.http.javadsl.server.MalformedRequestContentRejection
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
-import cats.{Applicative}
+import cats.Applicative
 import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
-import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
+import hydra.kafka.algebras.{HydraTag, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TagsAlgebra}
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
@@ -112,8 +112,10 @@ class TopicMetadataEndpointSpec
     _ <- schemaRegistry.registerSchema(subjectKey, schema)
     _ <- schemaRegistry.registerSchema(subjectValue, schema)
     metadataAlgebra <- MetadataAlgebra.make[IO](Subject.createValidated("_topicName.Bill").get, "I'm_A_Jerk", kafkaClient, schemaRegistry, consumeMetadataEnabled = false)
+    tagsAlgebra <- TagsAlgebra.make[IO]("_hydra.tags-topic", "_hydra.tags-consumer",kafkaClient)
+    _ <- tagsAlgebra.createOrUpdateTag(HydraTag("Source: DVS", "A valid source"))
     createTopicProgram = getTestCreateTopicProgram(schemaRegistry, ka, kafkaClient, metadataAlgebra)
-  } yield new TopicMetadataEndpoint(consumerProxy, metadataAlgebra, schemaRegistry, createTopicProgram, 1).route).unsafeRunSync()
+  } yield new TopicMetadataEndpoint(consumerProxy, metadataAlgebra, schemaRegistry, createTopicProgram, 1, tagsAlgebra).route).unsafeRunSync()
 
   val node = new Node(0, "host", 1)
 

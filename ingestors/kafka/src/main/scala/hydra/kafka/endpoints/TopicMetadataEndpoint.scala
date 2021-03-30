@@ -146,36 +146,43 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
   }
 
   private def putV2Metadata(startTime: Instant, topic: String): Route = {
-    Subject.createValidated(topic) match {
-      case Some(t) => {
-        entity(as[MetadataOnlyRequest]) { mor =>
-          extractMethod { method =>
-            onComplete(getKeyValSchema(t)) {
-              case Failure(exception) => {
-                addHttpMetric(topic, StatusCodes.BadRequest, "/v2/metadata", startTime, method.value)
+    extractMethod { method =>
+      Subject.createValidated(topic) match {
+        case Some(t) => {
+          entity(as[MetadataOnlyRequest]) { mor =>
+            onComplete(Futurable[F].unsafeToFuture(tagsAlgebra.validateTags(mor.tags))) {
+              case Failure(exception) =>{
+                addHttpMetric(topic, StatusCodes.BadRequest, "/v2/metadata", startTime, method.value, error = Some(exception.getMessage))
                 complete(StatusCodes.BadRequest, exception.getMessage)
               }
-              case Success(schemas) => {
-                val req = TopicMetadataV2Request.fromMetadataOnlyRequest(schemas, mor)
-                onComplete(
-                  Futurable[F].unsafeToFuture(createTopicProgram
-                    .publishMetadata(t, req))
-                ) {
-                  case Failure(exception) =>
-                    addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/metadata", startTime, method.value)
-                    complete(StatusCodes.InternalServerError, s"Unable to create Metadata for topic $topic : ${exception.getMessage}")
-                  case Success(value) =>
-                    addHttpMetric(topic, StatusCodes.OK, "/v2/metadata", startTime, method.value)
-                    complete(StatusCodes.OK)
+              case Success(_) =>
+                onComplete(getKeyValSchema(t)) {
+                  case Failure(exception) => {
+                    addHttpMetric(topic, StatusCodes.BadRequest, "/v2/metadata", startTime, method.value)
+                    complete(StatusCodes.BadRequest, exception.getMessage)
+                  }
+                  case Success(schemas) => {
+                    val req = TopicMetadataV2Request.fromMetadataOnlyRequest(schemas, mor)
+                    onComplete(
+                      Futurable[F].unsafeToFuture(createTopicProgram
+                        .publishMetadata(t, req))
+                    ) {
+                      case Failure(exception) =>
+                        addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/metadata", startTime, method.value)
+                        complete(StatusCodes.InternalServerError, s"Unable to create Metadata for topic $topic : ${exception.getMessage}")
+                      case Success(value) =>
+                        addHttpMetric(topic, StatusCodes.OK, "/v2/metadata", startTime, method.value)
+                        complete(StatusCodes.OK)
+                    }
+                  }
                 }
-              }
             }
           }
         }
+        case None =>
+          addHttpMetric(topic, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(Subject.invalidFormat))
+          complete(StatusCodes.BadRequest, Subject.invalidFormat)
       }
-      case None =>
-        addHttpMetric(topic, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(Subject.invalidFormat))
-        complete(StatusCodes.BadRequest, Subject.invalidFormat)
     }
 
   }

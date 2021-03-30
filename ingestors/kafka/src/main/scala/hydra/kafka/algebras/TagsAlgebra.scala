@@ -50,9 +50,11 @@ object  HydraTag extends SprayJsonSupport with DefaultJsonProtocol  {
 
 
 trait TagsAlgebra[F[_]] {
-  def createOrUpdateTag(tagsRequest: HydraTag,
-                              kafkaClientAlgebra: KafkaClientAlgebra[F]): F[Either[KafkaClientAlgebra.PublishError,PublishResponse]]
+  def createOrUpdateTag(tagsRequest: HydraTag): F[Either[KafkaClientAlgebra.PublishError,PublishResponse]]
   def getAllTags: F[List[HydraTag]]
+  def validateTags(tags: List[String]): F[Unit]
+  final case class TagsException(tags: List[HydraTag])
+    extends RuntimeException(s"One or more of the tags provided is invalid. Here is a list of acceptable tags:\n${tags.toJson}")
 }
 object TagsAlgebra {
 
@@ -82,23 +84,34 @@ object TagsAlgebra {
         case e =>
         fs2.Stream.eval(Logger[F].warn(s"Error in TagsAlgebra"))
       }.compile.drain)
-      algebra <- getTagsAlgebra(ref, tagsTopic)
+      algebra <- getTagsAlgebra(ref, tagsTopic, kafkaClientAlgebra)
     } yield algebra
   }
 
-  private def getTagsAlgebra[F[_]: Sync: Logger](cache: Ref[F, TagsStorageFacade], tagsTopic: String): F[TagsAlgebra[F]] = {
+  private def getTagsAlgebra[F[_]: Sync: Logger](cache: Ref[F, TagsStorageFacade],
+                                                 tagsTopic: String, kafkaClientAlgebra: KafkaClientAlgebra[F]): F[TagsAlgebra[F]] = {
     Sync[F].delay {
       new TagsAlgebra[F] {
-        override def getAllTags: F[List[HydraTag]] = cache.get.map(_.tagsMap.map(tm => HydraTag(tm._1, tm._2)).toList)
+        override def getAllTags: F[List[HydraTag]] = cache.get.map(_.getAllTags)
 
-        override def createOrUpdateTag(tagsRequest: HydraTag,
-                                               kafkaClientAlgebra: KafkaClientAlgebra[F]): F[Either[KafkaClientAlgebra.PublishError,PublishResponse]] = {
+        override def createOrUpdateTag(tagsRequest: HydraTag): F[Either[KafkaClientAlgebra.PublishError,PublishResponse]] = {
           val tagsSchemas = HydraTag.getSchemas
           val genericRecordKey = tagsRequest.toJson.toString.toGenericRecordSimple(tagsSchemas.key)
             .getOrElse(throw new Exception(s"createOrUpdateTag GenericRecordSimple error: Key ${tagsSchemas.key}"))
           val genericRecordValue = tagsRequest.toJson.toString.toGenericRecordSimple(tagsSchemas.value)
             .getOrElse(throw new Exception(s"createOrUpdateTag GenericRecordSimple error: Value ${tagsSchemas.value}"))
           kafkaClientAlgebra.publishMessage((genericRecordKey, Some(genericRecordValue), None), tagsTopic)
+        }
+
+        override def validateTags(tags: List[String]): F[Unit] = {
+          cache.get.map(_.validateTags(tags)).flatMap {
+            case true =>
+              Sync[F].pure()
+            case false =>
+              cache.get.map(_.getAllTags)
+              .map(TagsException.apply)
+                .flatMap(Sync[F].raiseError[Unit](_))
+          }
         }
       }
     }
@@ -114,6 +127,8 @@ private case class TagsStorageFacade(tagsMap: Map[String, String]) {
     this.copy(this.tagsMap - key)
   }
   def getAllTags: List[HydraTag] = tagsMap.map(tm => HydraTag(tm._1,tm._2)).toList
+
+  def validateTags(tags: List[String]): Boolean = tags.forall(tagsMap.contains)
 }
 
 private object TagsStorageFacade {

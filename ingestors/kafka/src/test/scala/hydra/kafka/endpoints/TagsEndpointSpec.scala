@@ -28,7 +28,7 @@ class TagsEndpointSpec extends Matchers with AnyWordSpecLike with ScalatestRoute
   val kafkaClientAlgebra = KafkaClientAlgebra.test[IO](schemaRegistry).unsafeRunSync()
 
   val tagsAlgebra = TagsAlgebra.make("dvs.topic","someClient", kafkaClientAlgebra).unsafeRunSync()
-  val route = new TagsEndpoint[IO](tagsAlgebra, "myPass", kafkaClientAlgebra).route
+  val route = new TagsEndpoint[IO](tagsAlgebra, "myPass").route
 
   val validCredentials = BasicHttpCredentials("John", "myPass")
 

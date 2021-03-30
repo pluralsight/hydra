@@ -26,22 +26,31 @@ class TagsAlgebraSpec extends AnyWordSpecLike with Matchers {
     "TagsAlgebraSpec" should {
       "Create a Tag" in {
         val tag = HydraTag("Source: blah", "This comes from blah")
-        tagsAlgebra.createOrUpdateTag(tag, kafkaClientAlgebra)
+        tagsAlgebra.createOrUpdateTag(tag)
           .unsafeRunSync shouldBe Right(PublishResponse(0,0))
       }
       "Create a duplicate Tag" in {
         val tag = HydraTag("Source: blah", "This comes from blah")
-        tagsAlgebra.createOrUpdateTag(tag, kafkaClientAlgebra)
+        tagsAlgebra.createOrUpdateTag(tag)
           .unsafeRunSync shouldBe Right(PublishResponse(0,1))
       }
       "Create a different Tag" in {
         val tag = HydraTag("Source: Bret", "This comes from Bret being on a call while I do this")
-        tagsAlgebra.createOrUpdateTag(tag, kafkaClientAlgebra)
+        tagsAlgebra.createOrUpdateTag(tag)
           .unsafeRunSync shouldBe Right(PublishResponse(0,2))
       }
       "Get Tags" in {
         tagsAlgebra.getAllTags.unsafeRunSync() shouldBe List(HydraTag("Source: blah", "This comes from blah"),
           HydraTag("Source: Bret", "This comes from Bret being on a call while I do this"))
+      }
+      "return true when validating a good tag" in {
+        tagsAlgebra.validateTags(List("Source: blah")).unsafeRunSync() shouldBe ()
+        tagsAlgebra.validateTags(List("Source: Bret")).unsafeRunSync() shouldBe ()
+        tagsAlgebra.validateTags(List("Source: blah", "Source: Bret")).unsafeRunSync() shouldBe ()
+      }
+      "return false when validating a bad tag" in {
+        a [tagsAlgebra.TagsException] shouldBe thrownBy(tagsAlgebra.validateTags(List("Source: KSQL")).unsafeRunSync())
+        a [tagsAlgebra.TagsException] shouldBe thrownBy(tagsAlgebra.validateTags(List("Source: blah", "Source: KSQL")).unsafeRunSync())
       }
     }
   }

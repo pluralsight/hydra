@@ -26,6 +26,7 @@ import hydra.common.util.Futurable
 import hydra.core.http.CorsSupport
 import hydra.core.marshallers.GenericError
 import hydra.core.monitor.HydraMetrics.addHttpMetric
+import hydra.kafka.algebras.TagsAlgebra
 import hydra.kafka.model.TopicMetadataV2Request
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.CreateTopicProgram
@@ -37,6 +38,7 @@ import scala.util.{Failure, Success}
 final class BootstrapEndpointV2[F[_]: Futurable](
     createTopicProgram: CreateTopicProgram[F],
     defaultTopicDetails: TopicDetails,
+    tagsAlgebra: TagsAlgebra[F]
 ) extends CorsSupport {
 
   import TopicMetadataV2Parser._
@@ -50,25 +52,31 @@ final class BootstrapEndpointV2[F[_]: Futurable](
             pathEndOrSingleSlash {
               put {
                 entity(as[TopicMetadataV2Request]) { t =>
-                  Subject.createValidated(topicName) match {
-                    case Some(validatedTopic) =>
-                      onComplete(
-                        Futurable[F].unsafeToFuture(createTopicProgram
-                          .createTopic(validatedTopic, t, defaultTopicDetails))
-                      ) {
-                        case Success(_) =>
-                          addHttpMetric(topicName, StatusCodes.OK, "V2Bootstrap", startTime, "PUT")
-                          complete(StatusCodes.OK)
-                        case Failure(IncompatibleSchemaException(m)) =>
-                          addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(s"$IncompatibleSchemaException"))
-                          complete(StatusCodes.BadRequest, m)
-                        case Failure(e) =>
-                          addHttpMetric(topicName, StatusCodes.InternalServerError, "V2Bootstrap", startTime, "PUT", error = Some(e.getMessage))
-                          complete(StatusCodes.InternalServerError, e)
+                  onComplete(Futurable[F].unsafeToFuture(tagsAlgebra.validateTags(t.tags))) {
+                    case Failure(exception) =>
+                      addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, method.value, error = Some(exception.getMessage))
+                      complete(StatusCodes.BadRequest, exception.getMessage)
+                    case Success(_) =>
+                        Subject.createValidated(topicName) match {
+                          case Some(validatedTopic) =>
+                            onComplete(
+                              Futurable[F].unsafeToFuture(createTopicProgram
+                                .createTopic(validatedTopic, t, defaultTopicDetails))
+                            ) {
+                              case Success(_) =>
+                                addHttpMetric(topicName, StatusCodes.OK, "V2Bootstrap", startTime, "PUT")
+                                complete(StatusCodes.OK)
+                              case Failure(IncompatibleSchemaException(m)) =>
+                                addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(s"$IncompatibleSchemaException"))
+                                complete(StatusCodes.BadRequest, m)
+                              case Failure(e) =>
+                                addHttpMetric(topicName, StatusCodes.InternalServerError, "V2Bootstrap", startTime, "PUT", error = Some(e.getMessage))
+                                complete(StatusCodes.InternalServerError, e)
+                            }
+                          case None =>
+                            addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(Subject.invalidFormat))
+                            complete(StatusCodes.BadRequest, Subject.invalidFormat)
                       }
-                    case None =>
-                      addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(Subject.invalidFormat))
-                      complete(StatusCodes.BadRequest, Subject.invalidFormat)
                   }
                 }
               }

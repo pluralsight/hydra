@@ -9,14 +9,13 @@ import akka.http.scaladsl.server.directives.Credentials
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
 import hydra.core.monitor.HydraMetrics.addHttpMetric
-import hydra.kafka.algebras.{HydraTag, KafkaClientAlgebra, TagsAlgebra}
+import hydra.kafka.algebras.{HydraTag, TagsAlgebra}
 import spray.json._
 
 import scala.util.{Failure, Success}
 
 final class TagsEndpoint[F[_]: Futurable]( tagsAlgebra: TagsAlgebra[F],
-                                           tagsPassword: String,
-                                           kafkaClientAlgebra: KafkaClientAlgebra[F])
+                                           tagsPassword: String)
   extends RouteSupport with DefaultJsonProtocol with SprayJsonSupport {
 
   def myUserPassAuthenticator(credentials: Credentials): Option[String] =
@@ -38,7 +37,7 @@ final class TagsEndpoint[F[_]: Futurable]( tagsAlgebra: TagsAlgebra[F],
             } ~ post {
               authenticateBasic(realm = "", myUserPassAuthenticator) { userName =>
                 entity(as[HydraTag]) { tags =>
-                  onComplete(Futurable[F].unsafeToFuture(tagsAlgebra.createOrUpdateTag(tags, kafkaClientAlgebra))) {
+                  onComplete(Futurable[F].unsafeToFuture(tagsAlgebra.createOrUpdateTag(tags))) {
                     case Failure(exception) => complete(StatusCodes.InternalServerError, exception.getMessage)
                     case Success(value) => complete(StatusCodes.OK, tags.toString)
                   }

@@ -25,7 +25,7 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
         cfg.createTopicConfig.defaultReplicationFactor,
         cfg.createTopicConfig.defaultMinInsyncReplicas
       )
-    new BootstrapEndpointV2(programs.createTopic, topicDetails).route
+    new BootstrapEndpointV2(programs.createTopic, topicDetails, algebras.tagsAlgebra).route
   } else {
     RouteDirectives.reject
   }
@@ -45,7 +45,7 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
     new SchemasEndpoint(consumerProxy).route ~
       new BootstrapEndpoint(system).route ~
       new TopicMetadataEndpoint(consumerProxy, algebras.metadata,
-        algebras.schemaRegistry, programs.createTopic, cfg.createTopicConfig.defaultMinInsyncReplicas).route ~
+        algebras.schemaRegistry, programs.createTopic, cfg.createTopicConfig.defaultMinInsyncReplicas, algebras.tagsAlgebra).route ~
       new ConsumerGroupsEndpoint(algebras.consumerGroups).route ~
       new IngestorRegistryEndpoint().route ~
       new IngestionWebSocketEndpoint().route ~
@@ -53,8 +53,7 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
       new TopicsEndpoint(consumerProxy)(system.dispatcher).route ~
       new TopicDeletionEndpoint(programs.topicDeletion,cfg.topicDeletionConfig.deleteTopicPassword).route ~
       HealthEndpoint.route ~
-      new TagsEndpoint[F](algebras.tagsAlgebra, cfg.tagsPasswordConfig.tagsPassword,
-        algebras.kafkaClient).route ~
+      new TagsEndpoint[F](algebras.tagsAlgebra, cfg.tagsPasswordConfig.tagsPassword).route ~
       bootstrapEndpointV2
   }
 }
