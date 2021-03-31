@@ -70,12 +70,13 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
       complete(StatusCodes.Accepted, response)
     }
     else {
-      topics.map(topicName => addHttpMetric(topicName, StatusCodes.InternalServerError, path, startTime, "DELETE"))
-      complete(StatusCodes.InternalServerError, response)
+      topics.map(topicName => addHttpMetric(topicName, StatusCodes.InternalServerError, path, startTime, "DELETE", error = Some(response.toString)))
+        complete(StatusCodes.InternalServerError, response)
     }
   }
 
-  private def invalidResponse(topics: List[String], userDeleting: String, e: NonEmptyList[DeleteTopicError], path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
+  private def invalidResponse(topics: List[String], userDeleting: String, e: NonEmptyList[DeleteTopicError],
+                              path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
     val allErrors = e.foldLeft((List.empty[SchemaDeletionErrors], List.empty[KafkaDeletionErrors])) { (agg, i) =>
       i match {
         case sde: SchemaDeletionErrors => (agg._1 :+ sde, agg._2)
@@ -168,7 +169,7 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
     case e =>
       extractExecutionContext{ implicit ec =>
         addHttpMetric("", StatusCodes.InternalServerError,"/v2/topics", startTime, method, error = Some(e.getMessage))
-        complete(500, e.getMessage)
+        complete(StatusCodes.InternalServerError, e.getMessage)
       }
   }
 }

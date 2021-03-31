@@ -30,16 +30,26 @@ final class TagsEndpoint[F[_]: Futurable]( tagsAlgebra: TagsAlgebra[F],
         extractExecutionContext { implicit ec =>
           pathPrefix("v2" / "tags") {
             get {
+              val startTime = Instant.now
               onComplete(Futurable[F].unsafeToFuture(tagsAlgebra.getAllTags)) {
-                case Failure(exception) => complete(StatusCodes.InternalServerError, exception)
-                case Success(value) => complete(StatusCodes.OK, value.toJson)
+                case Failure(exception) =>
+                  addHttpMetric("",StatusCodes.InternalServerError,"/v2/tags", startTime, method.value, error = Some(exception.getMessage))
+                  complete(StatusCodes.InternalServerError, exception.getMessage)
+                case Success(value) =>
+                  addHttpMetric("", StatusCodes.OK, "/v2/tags", startTime, method.value)
+                  complete(StatusCodes.OK, value.toJson)
               }
             } ~ post {
+              val startTime = Instant.now
               authenticateBasic(realm = "", myUserPassAuthenticator) { userName =>
                 entity(as[HydraTag]) { tags =>
                   onComplete(Futurable[F].unsafeToFuture(tagsAlgebra.createOrUpdateTag(tags))) {
-                    case Failure(exception) => complete(StatusCodes.InternalServerError, exception.getMessage)
-                    case Success(value) => complete(StatusCodes.OK, tags.toString)
+                    case Failure(exception) =>
+                      addHttpMetric("",StatusCodes.InternalServerError,"/v2/tags", startTime, method.value, error = Some(exception.getMessage))
+                      complete(StatusCodes.InternalServerError, exception.getMessage)
+                    case Success(value) =>
+                      addHttpMetric("",StatusCodes.OK,"/v2/tags",startTime,method.value)
+                      complete(StatusCodes.OK, tags.toString)
                   }
                 }
               }
