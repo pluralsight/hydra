@@ -14,7 +14,7 @@ class CollectionsExtensionSpec extends Matchers with AnyFunSpecLike {
       import CollectionExtensions._
       val m: Map[String, AnyRef] = Map(
         "test" -> "value",
-        "no" -> new Integer(1),
+        "no" -> Integer.valueOf(1),
         "nod" -> "2.0",
         "dt" -> org.joda.time.DateTime.now()
       )
