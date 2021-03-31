@@ -137,18 +137,22 @@ object Dependencies {
 
   }
 
-  object Test {
+  // oneOf test, it, main
+  object TestLibraries {
 
-    val akkaTest = Seq(
-      "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
-      "com.typesafe.akka" %% "akka-http-testkit" % akkaHTTPVersion % "test",
-      "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % "test"
-    )
+    def getTestLibraries(module: String): Seq[ModuleID] = {
+      val akkaTest = Seq(
+        "com.typesafe.akka" %% "akka-testkit" % akkaVersion % module,
+        "com.typesafe.akka" %% "akka-http-testkit" % akkaHTTPVersion % module,
+        "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % module
+      )
 
-    val scalaTest = "org.scalatest" %% "scalatest" % scalaTestVersion % "test"
+      val scalaTest = "org.scalatest" %% "scalatest" % scalaTestVersion % module
 
-    val scalaMock = "org.scalamock" %% "scalamock" % scalaMockVersion % "test"
-    val junit = "junit" % "junit" % "4.13.2" % "test"
+      val scalaMock = "org.scalamock" %% "scalamock" % scalaMockVersion % module
+      val junit = "junit" % "junit" % "4.13.1" % module
+      akkaTest ++ Seq(scalaTest, scalaMock, junit)
+    }
 
   }
 
@@ -168,10 +172,9 @@ object Dependencies {
   import Test._
   import Integration._
 
-  val integrationDeps: Seq[ModuleID] = testContainers
+  val testDeps: Seq[ModuleID] = TestLibraries.getTestLibraries(module = "test")
 
-  val testDeps: Seq[ModuleID] =
-    Seq(scalaTest, junit, scalaMock) ++ akkaTest
+  val integrationDeps: Seq[ModuleID] = testContainers ++ TestLibraries.getTestLibraries(module = "it")
 
   val baseDeps: Seq[ModuleID] =
     akka ++ Seq(avro) ++ cats ++ logging ++ joda ++ testDeps

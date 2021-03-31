@@ -1,7 +1,6 @@
 package hydra.kafka.algebras
 
 import java.time.Instant
-
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.implicits._
@@ -24,7 +23,8 @@ import org.scalatest.{Assertion, BeforeAndAfterAll}
 import retry.RetryPolicies._
 import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy}
-
+import vulcan.Codec
+import vulcan.generic._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.Try
@@ -194,7 +194,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
   }
 
   private def createTopic(subject: String, keyGR: GenericRecord, valueGR: GenericRecord, schemaRegistry: SchemaRegistry[IO], kafkaAdminAlgebra: KafkaAdminAlgebra[IO]): Unit = {
-    (kafkaAdminAlgebra.createTopic(subject, TopicDetails(1, 1)) *>
+    (kafkaAdminAlgebra.createTopic(subject, TopicDetails(1, 1, 1)) *>
     schemaRegistry.registerSchema(s"$subject-key", keyGR.getSchema) *>
     schemaRegistry.registerSchema(s"$subject-value", valueGR.getSchema)).unsafeRunSync()
   }
@@ -206,7 +206,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
   private def createDVSConsumerTopic(schemaRegistry: SchemaRegistry[IO], kafkaAdminAlgebra: KafkaAdminAlgebra[IO]): (GenericRecord, GenericRecord) = {
     val topic = dvsConsumerTopic.value
     TopicConsumer.encode[IO](TopicConsumerKey("t", "c"), TopicConsumerValue(Instant.now).some).flatMap { case (k, Some(v)) =>
-      kafkaAdminAlgebra.createTopic(topic, TopicDetails(1, 1)).flatMap { _ =>
+      kafkaAdminAlgebra.createTopic(topic, TopicDetails(1, 1, 1)).flatMap { _ =>
         schemaRegistry.registerSchema(topic, k.getSchema) *>
           schemaRegistry.registerSchema(topic, v.getSchema)
       } *>
@@ -218,7 +218,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
   private def createDVSInternalKafkaOffsetsTopic(schemaRegistry: SchemaRegistry[IO], kafkaAdminAlgebra: KafkaAdminAlgebra[IO]): (GenericRecord, GenericRecord) = {
     val topic = dvsInternalKafkaOffsetsTopic.value
     TopicConsumerOffset.encode[IO](TopicConsumerOffsetKey("t", 0), TopicConsumerOffsetValue(0)).flatMap { case (k, v) =>
-      kafkaAdminAlgebra.createTopic(topic, TopicDetails(1, 1)).flatMap { _ =>
+      kafkaAdminAlgebra.createTopic(topic, TopicDetails(1, 1, 1)).flatMap { _ =>
         schemaRegistry.registerSchema(topic, k.getSchema) *>
           schemaRegistry.registerSchema(topic, v.getSchema)
       } *>
@@ -227,8 +227,31 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
   }
 
   private def getGenericRecords(subject: String, keyValue: String, value: String): (GenericRecord, GenericRecord) = {
-    val (_, (_, keyRecord), valueRecord) = KafkaClientAlgebraSpec.topicAndKeyAndValue(subject, keyValue, value)
+    val (_, (_, keyRecord), valueRecord) = ConsumerGroupsAlgebraSpec.topicAndKeyAndValue(subject, keyValue, value)
     (keyRecord, valueRecord)
+  }
+
+}
+
+object ConsumerGroupsAlgebraSpec {
+  final case class SimpleCaseClassKey(subject: String)
+
+  object SimpleCaseClassKey {
+    implicit val codec: Codec[SimpleCaseClassKey] =
+      Codec.derive[SimpleCaseClassKey]
+  }
+
+  final case class SimpleCaseClassValue(value: String)
+
+  object SimpleCaseClassValue {
+    implicit val codec: Codec[SimpleCaseClassValue] =
+      Codec.derive[SimpleCaseClassValue]
+  }
+
+  def topicAndKeyAndValue(topic: String, key: String, value: String): (String, (Option[String], GenericRecord), GenericRecord) = {
+    (topic,
+      (Some(key), SimpleCaseClassKey.codec.encode(SimpleCaseClassKey(key)).map(_.asInstanceOf[GenericRecord]).toOption.get),
+      SimpleCaseClassValue.codec.encode(SimpleCaseClassValue(value)).map(_.asInstanceOf[GenericRecord]).toOption.get)
   }
 
 }

@@ -56,7 +56,7 @@ final class BootstrapEndpointV2Spec
         Subject.createValidated("dvs.hello-world").get,
         m
       ),
-      TopicDetails(1, 1)
+      TopicDetails(1, 1, 1)
     )
   }
 

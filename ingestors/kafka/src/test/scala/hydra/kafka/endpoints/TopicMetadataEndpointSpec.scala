@@ -1,17 +1,20 @@
 package hydra.kafka.endpoints
 
 import akka.actor.{Actor, ActorRef, ActorSelection, Props}
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.javadsl.server.MalformedRequestContentRejection
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
-import cats.effect.{Concurrent, ContextShift, IO, Sync}
+import cats.{Applicative, Monad}
+import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
-import hydra.kafka.algebras.{KafkaClientAlgebra, MetadataAlgebra}
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
+import hydra.kafka.model.Schemas
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
@@ -22,6 +25,10 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.ExecutionContext
+import hydra.kafka.programs.CreateTopicProgram
+import hydra.kafka.util.KafkaUtils.TopicDetails
+import org.apache.avro.{Schema, SchemaBuilder}
+import retry.{RetryPolicies, RetryPolicy}
 
 
 class TopicMetadataEndpointSpec
@@ -47,6 +54,7 @@ class TopicMetadataEndpointSpec
 
   implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   implicit val concurrent: Concurrent[IO] = IO.ioConcurrentEffect
+  private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -66,11 +74,48 @@ class TopicMetadataEndpointSpec
 
   val consumerProxy: ActorSelection = system.actorSelection(consumerPath)
 
+  private def getTestCreateTopicProgram(
+                                         s: SchemaRegistry[IO],
+                                         ka: KafkaAdminAlgebra[IO],
+                                         kc: KafkaClientAlgebra[IO],
+                                         m: MetadataAlgebra[IO]
+                                       ): CreateTopicProgram[IO] = {
+    val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      new CreateTopicProgram[IO](
+        s,
+        ka,
+        kc,
+        retryPolicy,
+        Subject.createValidated("dvs.hello-world").get,
+        m
+      )
+  }
+
+  private def getSchema[F[_]: Applicative](name: String): F[Schema] =
+    Applicative[F].pure {
+      SchemaBuilder
+        .record(name)
+        .fields()
+        .name("isTrue")
+        .`type`()
+        .stringType()
+        .noDefault()
+        .endRecord()
+    }
+
+  val subjectKey = "dvs.test.subject-key"
+  val subjectValue = "dvs.test.subject-value"
+
   val route: Route = (for {
     kafkaClient <- KafkaClientAlgebra.test[IO]
     schemaRegistry <- SchemaRegistry.test[IO]
+    ka <- KafkaAdminAlgebra.test[IO]
+    schema <- getSchema("dvs.test.subject")
+    _ <- schemaRegistry.registerSchema(subjectKey, schema)
+    _ <- schemaRegistry.registerSchema(subjectValue, schema)
     metadataAlgebra <- MetadataAlgebra.make[IO](Subject.createValidated("_topicName.Bill").get, "I'm_A_Jerk", kafkaClient, schemaRegistry, consumeMetadataEnabled = false)
-  } yield new TopicMetadataEndpoint(consumerProxy, metadataAlgebra).route).unsafeRunSync()
+    createTopicProgram = getTestCreateTopicProgram(schemaRegistry, ka, kafkaClient, metadataAlgebra)
+  } yield new TopicMetadataEndpoint(consumerProxy, metadataAlgebra, schemaRegistry, createTopicProgram, 1).route).unsafeRunSync()
 
   val node = new Node(0, "host", 1)
 
@@ -201,6 +246,54 @@ class TopicMetadataEndpointSpec
       Get("/v2/topics/invalid!topicasf/") ~> route ~> check {
         response.status shouldBe StatusCodes.BadRequest
         responseAs[String] shouldBe Subject.invalidFormat
+      }
+    }
+  }
+
+  "The /v2/metadata endpoint" should {
+
+    val validRequest = """{
+                         |    "streamType": "Event",
+                         |    "deprecated": true,
+                         |    "dataClassification": "InternalUseOnly",
+                         |    "contact": {
+                         |        "email": "bob@myemail.com"
+                         |    },
+                         |    "createdDate": "2020-02-02T12:34:56Z",
+                         |    "notes": "here are some notes",
+                         |    "parentSubjects": [],
+                         |    "teamName": "dvs-teamName"
+                         |}""".stripMargin
+
+    val invalidRequest =
+      """{
+        |    "streamType": "History",
+        |    "deprecated": true,
+        |    "dataClassification": "InternalUseOnly",
+        |    "contact": {
+        |        "email": "bob@myemail.com"
+        |    },
+        |    "createdDate": "2020-02-02T12:34:56Z",
+        |    "notes": "here are some notes",
+        |    "parentSubjects": [],
+        |    "teamName": "dvs-teamName"
+        |}""".stripMargin
+
+    "return 200 with proper metadata" in {
+      Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> route ~> check {
+        response.status shouldBe StatusCodes.OK
+      }
+    }
+
+    "return 400 with missing schemas" in {
+      Put("/v2/metadata/dvs.subject.noschema", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> route ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
+
+    "reject invalid metadata" in {
+      Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, invalidRequest)) ~> route ~> check {
+        rejection shouldBe a[MalformedRequestContentRejection]
       }
     }
   }

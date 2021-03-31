@@ -8,12 +8,15 @@ import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{IncompatibleSchemaException, SchemaVersion}
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
+import hydra.kafka.model.{Schemas, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
+import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyAndValueMismatch}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
 import org.apache.avro.Schema
 import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy, _}
+
+import scala.jdk.CollectionConverters.collectionAsScalaIterableConverter
 
 final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
                                                                                schemaRegistry: SchemaRegistry[F],
@@ -62,7 +65,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       .void
   }
 
-  private def registerSchemas(
+  private[programs] def registerSchemas(
       subject: Subject,
       keySchema: Schema,
       valueSchema: Schema
@@ -74,7 +77,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     )
   }
 
-  private def createTopicResource(
+  private[programs] def createTopicResource(
       subject: Subject,
       topicDetails: TopicDetails
   ): Resource[F, Unit] = {
@@ -98,7 +101,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       .void
   }
 
-  private def publishMetadata(
+  def publishMetadata(
       topicName: Subject,
       createTopicRequest: TopicMetadataV2Request,
   ): F[Unit] = {
@@ -123,6 +126,26 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     } yield ()
   }
 
+  private def validateKeyAndValueSchemas(schemas: Schemas, subject: Subject): Resource[F, Unit] = {
+    val containsMismatches: F[Unit] = kafkaAdmin.describeTopic(subject.value).flatMap {
+      case Some(_) => Bracket[F, Throwable].unit
+      case None =>
+        val keyFields = schemas.key.getFields.asScala.toList
+        val valueFields = schemas.value.getFields.asScala.toList
+        val mismatches = keyFields.flatMap{ k =>
+          valueFields.flatMap { v =>
+            if (k.name() == v.name() && !k.schema().equals(v.schema())) {
+              Some(KeyAndValueMismatch(k.name(), k.schema(), v.schema()))
+            } else {
+              None
+            }
+          }
+        }
+        if (mismatches.isEmpty) ().pure else Bracket[F, Throwable].raiseError(IncompatibleKeyAndValueFieldNames(mismatches))
+    }
+    Resource.liftF(containsMismatches)
+  }
+
   def createTopic(
       topicName: Subject,
       createTopicRequest: TopicMetadataV2Request,
@@ -134,6 +157,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       Bracket[F, Throwable].raiseError(IncompatibleSchemaException("Must include Fields in Key"))
     } else {
       (for {
+        _ <- validateKeyAndValueSchemas(createTopicRequest.schemas, topicName)
         _ <- registerSchemas(
           topicName,
           createTopicRequest.schemas.key,
@@ -144,4 +168,12 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       } yield ()).use(_ => Bracket[F, Throwable].unit)
     }
   }
+}
+
+object CreateTopicProgram {
+  final case class KeyAndValueMismatch(fieldName: String, keyFieldSchema: Schema, valueFieldSchema: Schema)
+  final case class IncompatibleKeyAndValueFieldNames(errors: List[KeyAndValueMismatch]) extends
+    RuntimeException(
+      (List("Fields with same names in key and value schemas must have same type:", "Field Name\tKey Schema\tValue Schema") ++ errors.map(e => s"${e.fieldName}\t${e.keyFieldSchema.toString}\t${e.valueFieldSchema}")).mkString("\n")
+    )
 }

@@ -43,7 +43,7 @@ class KafkaUtilsSpec
 
   override def beforeAll = {
     EmbeddedKafka.start()
-    val dt = new TopicDetails(1, 1: Short)
+    val dt = new TopicDetails(1, 1, 1)
     ku.createTopic("test-kafka-utils", dt, 10)
   }
 
@@ -169,7 +169,7 @@ class KafkaUtilsSpec
       )
       val kafkaUtils = new KafkaUtils(defaultCfg)
       kafkaUtils.topicExists("test.Hydra").get shouldBe false
-      val details = new TopicDetails(1, 1: Short, configs)
+      val details = new TopicDetails(1, 1: Short, 1, configs)
       whenReady(kafkaUtils.createTopic("test.Hydra", details, 3000)) {
         response =>
           response.all().get() shouldBe null //the kafka API returns a 'Void'
@@ -186,7 +186,7 @@ class KafkaUtilsSpec
       val kafkaUtils = new KafkaUtils(defaultCfg)
       createCustomTopic("hydra.already.Exists")
       kafkaUtils.topicExists("hydra.already.Exists").get shouldBe true
-      val details = new TopicDetails(1, 1, configs)
+      val details = new TopicDetails(1, 1, 1, configs)
       whenReady(
         kafkaUtils.createTopic("hydra.already.Exists", details, 1000).failed
       ) { response => response shouldBe an[IllegalArgumentException] }
@@ -198,7 +198,7 @@ class KafkaUtilsSpec
         "cleanup.policy" -> "under the carpet"
       )
       val kafkaUtils = new KafkaUtils(defaultCfg)
-      val details = new TopicDetails(1, 1, configs)
+      val details = new TopicDetails(1, 1, 1, configs)
       whenReady(kafkaUtils.createTopic("InvalidConfig", details, 1000)) {
         response => intercept[ExecutionException](response.all().get)
       }
