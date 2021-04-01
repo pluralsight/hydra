@@ -150,7 +150,7 @@ object Dependencies {
       val scalaTest = "org.scalatest" %% "scalatest" % scalaTestVersion % module
 
       val scalaMock = "org.scalamock" %% "scalamock" % scalaMockVersion % module
-      val junit = "junit" % "junit" % "4.13.1" % module
+      val junit = "junit" % "junit" % "4.13.2" % module
       akkaTest ++ Seq(scalaTest, scalaMock, junit)
     }
 
