@@ -166,9 +166,9 @@ object AppConfig {
 
   private val tagsConfig: ConfigValue[TagsConfig] =
     (
-      env("TAGS_ENDPOINT_PASSWORD").as[String].default(""),
-      env("TAGS_TOPIC").as[String].default("_hydra.tags-topic"),
-      env("TAGS_CONSUMER_GROUP").as[String].default("_hydra.tags-consumer-group")
+      env("HYDRA_TAGS_ENDPOINT_PASSWORD").as[String].default(""),
+      env("HYDRA_TAGS_TOPIC").as[String].default("_hydra.tags-topic"),
+      env("HYDRA_TAGS_CONSUMER_GROUP").as[String].default("_hydra.tags-consumer-group")
     ).mapN(TagsConfig)
 
   final case class AppConfig(
