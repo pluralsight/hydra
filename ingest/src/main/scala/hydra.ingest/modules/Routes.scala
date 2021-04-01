@@ -53,7 +53,7 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
       new TopicsEndpoint(consumerProxy)(system.dispatcher).route ~
       new TopicDeletionEndpoint(programs.topicDeletion,cfg.topicDeletionConfig.deleteTopicPassword).route ~
       HealthEndpoint.route ~
-      new TagsEndpoint[F](algebras.tagsAlgebra, cfg.tagsPasswordConfig.tagsPassword).route ~
+      new TagsEndpoint[F](algebras.tagsAlgebra, cfg.tagsConfig.tagsPassword).route ~
       bootstrapEndpointV2
   }
 }

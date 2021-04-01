@@ -64,7 +64,7 @@ final class TagsEndpoint[F[_]: Futurable]( tagsAlgebra: TagsAlgebra[F],
     case e =>
       extractExecutionContext{ implicit ec =>
         addHttpMetric("", StatusCodes.InternalServerError,"/v2/tags", startTime, method, error = Some(e.getMessage))
-        complete(500, e.getMessage)
+        complete(StatusCodes.InternalServerError, e.getMessage)
       }
   }
 

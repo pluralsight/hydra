@@ -6,7 +6,7 @@ import cats.data.NonEmptyList
 import cats.effect.Sync
 import cats.syntax.all._
 import cats.{Monad, MonadError}
-import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, MetadataTopicsConfig, TagsTopicConfig}
+import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, MetadataTopicsConfig, TagsConfig}
 import hydra.kafka.model._
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.util.KafkaUtils.TopicDetails
@@ -19,7 +19,7 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
     dvsConsumersTopicConfig: DVSConsumersTopicConfig,
     cooTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
     kafkaAdmin: KafkaAdminAlgebra[F],
-    tagsConfig: TagsTopicConfig
+    tagsConfig: TagsConfig
 ) {
 
   def bootstrapAll: F[Unit] =
@@ -164,7 +164,7 @@ object Bootstrap {
       consumersTopicConfig: DVSConsumersTopicConfig,
       consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
       kafkaAdmin: KafkaAdminAlgebra[F],
-      tagsTopicConfig: TagsTopicConfig
+      tagsTopicConfig: TagsConfig
   ): F[Bootstrap[F]] = Sync[F].delay {
     new Bootstrap[F](createTopicProgram, metadataTopicsConfig, consumersTopicConfig, consumerOffsetsOffsetsTopicConfig, kafkaAdmin, tagsTopicConfig)
   }

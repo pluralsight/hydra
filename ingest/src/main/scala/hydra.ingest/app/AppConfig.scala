@@ -162,36 +162,21 @@ object AppConfig {
       env("HYDRA_INGEST_TOPIC_DELETION_PASSWORD").as[String].default("")
     ).map(TopicDeletionConfig)
 
-  final case class TagsEndpointPasswordConfig(tagsPassword: String)
+  final case class TagsConfig(tagsPassword: String, tagsTopic: String, tagsConsumerGroup: String)
 
-  private val tagsEndpointPasswordConfig: ConfigValue[TagsEndpointPasswordConfig] =
+  private val tagsConfig: ConfigValue[TagsConfig] =
     (
-      env("TAGS_ENDPOINT_PASSWORD").as[String].default("")
-    ).map(TagsEndpointPasswordConfig)
-
-  final case class TagsTopicConfig(tagsTopic: String)
-
-  private val tagsTopicConfig: ConfigValue[TagsTopicConfig] =
-    (
-      env("TAGS_TOPIC").as[String].default("_hydra.tags-topic")
-    ).map(TagsTopicConfig)
-
-  final case class TagsConsumerGroupConfig(tagsConsumerGroup: String)
-
-  private val tagsConsumerGroupConfig: ConfigValue[TagsConsumerGroupConfig] =
-    (
+      env("TAGS_ENDPOINT_PASSWORD").as[String].default(""),
+      env("TAGS_TOPIC").as[String].default("_hydra.tags-topic"),
       env("TAGS_CONSUMER_GROUP").as[String].default("_hydra.tags-consumer-group")
-    ).map(TagsConsumerGroupConfig)
-
+    ).mapN(TagsConfig)
 
   final case class AppConfig(
                               createTopicConfig: CreateTopicConfig,
                               metadataTopicsConfig: MetadataTopicsConfig,
                               ingestConfig: IngestConfig,
                               topicDeletionConfig: TopicDeletionConfig,
-                              tagsPasswordConfig: TagsEndpointPasswordConfig,
-                              tagsTopicConfig: TagsTopicConfig,
-                              tagsConsumerGroupConfig: TagsConsumerGroupConfig,
+                              tagsConfig: TagsConfig,
                               dvsConsumersTopicConfig: DVSConsumersTopicConfig,
                               consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
                               consumerGroupsAlgebraConfig: ConsumerGroupsAlgebraConfig
@@ -203,9 +188,7 @@ object AppConfig {
       metadataTopicsConfig,
       ingestConfig,
       topicDeletionConfig,
-      tagsEndpointPasswordConfig,
-      tagsTopicConfig,
-      tagsConsumerGroupConfig,
+      tagsConfig,
       dvsConsumersTopicConfig,
       consumerOffsetsOffsetsTopicConfig,
       consumerGroupAlgebraConfig

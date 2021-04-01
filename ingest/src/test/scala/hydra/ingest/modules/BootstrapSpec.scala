@@ -5,7 +5,7 @@ import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Sync, Timer}
 import cats.syntax.all._
 import fs2.kafka.Headers
 import hydra.avro.registry.SchemaRegistry
-import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, MetadataTopicsConfig, TagsTopicConfig}
+import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, MetadataTopicsConfig, TagsConfig}
 import hydra.kafka.algebras.KafkaAdminAlgebra.Topic
 import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, Offset, Partition, PublishError, PublishResponse, TopicName}
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
@@ -39,7 +39,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
       metadataConfig: MetadataTopicsConfig,
       consumersTopicConfig: DVSConsumersTopicConfig,
       consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
-      tagsTopicConfig: TagsTopicConfig
+      tagsTopicConfig: TagsConfig
 
   ): IO[(List[Topic], List[String], List[(GenericRecord, Option[GenericRecord], Option[Headers])])] = {
     val retry = RetryPolicies.alwaysGiveUp[IO]
@@ -88,7 +88,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
         1
       )
     val tagsTopicConfig =
-      TagsTopicConfig("_hydra.tags-topic")
+      TagsConfig("", "_hydra.tags-topic", "")
 
     "create the metadata topics, consumers topic, and consumerOffsetsOffsets topic" in {
       val config =
