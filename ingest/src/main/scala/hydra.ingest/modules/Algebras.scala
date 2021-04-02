@@ -4,7 +4,7 @@ import cats.effect.{Async, ConcurrentEffect, ContextShift, Timer}
 import cats.syntax.all._
 import hydra.avro.registry.SchemaRegistry
 import hydra.ingest.app.AppConfig.AppConfig
-import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
+import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TagsAlgebra}
 import io.chrisdavenport.log4cats.Logger
 
 final class Algebras[F[_]] private (
@@ -12,7 +12,8 @@ final class Algebras[F[_]] private (
     val kafkaAdmin: KafkaAdminAlgebra[F],
     val kafkaClient: KafkaClientAlgebra[F],
     val metadata: MetadataAlgebra[F],
-    val consumerGroups: ConsumerGroupsAlgebra[F]
+    val consumerGroups: ConsumerGroupsAlgebra[F],
+    val tagsAlgebra: TagsAlgebra[F]
 )
 
 object Algebras {
@@ -30,5 +31,6 @@ object Algebras {
       consumerGroups <- ConsumerGroupsAlgebra.make[F](config.consumerGroupsAlgebraConfig.kafkaInternalConsumerGroupsTopic,
         config.dvsConsumersTopicConfig.topicName, config.consumerOffsetsOffsetsTopicConfig.topicName, config.createTopicConfig.bootstrapServers,
         config.metadataTopicsConfig.consumerGroup, config.consumerGroupsAlgebraConfig.commonConsumerGroup, kafkaClient, kafkaAdmin, schemaRegistry)
-    } yield new Algebras[F](schemaRegistry, kafkaAdmin, kafkaClient, metadata, consumerGroups)
+      tagsAlgebra <- TagsAlgebra.make(config.tagsConfig.tagsTopic,config.tagsConfig.tagsConsumerGroup,kafkaClient)
+    } yield new Algebras[F](schemaRegistry, kafkaAdmin, kafkaClient, metadata, consumerGroups, tagsAlgebra)
 }

@@ -13,7 +13,7 @@ import hydra.common.config.ConfigSupport._
 import hydra.common.util.Futurable
 import hydra.core.http.{CorsSupport, NotFoundException, RouteSupport}
 import hydra.core.monitor.HydraMetrics.addHttpMetric
-import hydra.kafka.algebras.MetadataAlgebra
+import hydra.kafka.algebras.{MetadataAlgebra, TagsAlgebra}
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -31,6 +31,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import akka.http.scaladsl.server.Directives.onComplete
+import akka.http.scaladsl.server.directives.Credentials
 import cats.data.NonEmptyList
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.programs.CreateTopicProgram
@@ -46,7 +47,8 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                                              metadataAlgebra: MetadataAlgebra[F],
                                              schemaRegistry: SchemaRegistry[F],
                                              createTopicProgram: CreateTopicProgram[F],
-                                             defaultMinInsyncReplicas: Short
+                                             defaultMinInsyncReplicas: Short,
+                                             tagsAlgebra: TagsAlgebra[F]
                                             )
                                             (implicit ec:ExecutionContext)
   extends RouteSupport
@@ -143,38 +145,44 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
       valueSchema.getOrElse(throw new SchemaParseException("Unable to get Value Schema, please create Value Schema in Schema Registry and try again")))
   }
 
-
   private def putV2Metadata(startTime: Instant, topic: String): Route = {
-    Subject.createValidated(topic) match {
-      case Some(t) => {
-        entity(as[MetadataOnlyRequest]) { mor =>
-          extractMethod { method =>
-            onComplete(getKeyValSchema(t)) {
-              case Failure(exception) => {
-                addHttpMetric(topic, StatusCodes.BadRequest, "/v2/metadata", startTime, method.value)
+    extractMethod { method =>
+      Subject.createValidated(topic) match {
+        case Some(t) => {
+          entity(as[MetadataOnlyRequest]) { mor =>
+            onComplete(Futurable[F].unsafeToFuture(tagsAlgebra.validateTags(mor.tags))) {
+              case Failure(exception) =>{
+                addHttpMetric(topic, StatusCodes.BadRequest, "/v2/metadata", startTime, method.value, error = Some(exception.getMessage))
                 complete(StatusCodes.BadRequest, exception.getMessage)
               }
-              case Success(schemas) => {
-                val req = TopicMetadataV2Request.fromMetadataOnlyRequest(schemas, mor)
-                onComplete(
-                  Futurable[F].unsafeToFuture(createTopicProgram
-                    .publishMetadata(t, req))
-                ) {
-                  case Failure(exception) =>
-                    addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/metadata", startTime, method.value)
-                    complete(StatusCodes.InternalServerError, s"Unable to create Metadata for topic $topic : ${exception.getMessage}")
-                  case Success(value) =>
-                    addHttpMetric(topic, StatusCodes.OK, "/v2/metadata", startTime, method.value)
-                    complete(StatusCodes.OK)
+              case Success(_) =>
+                onComplete(getKeyValSchema(t)) {
+                  case Failure(exception) => {
+                    addHttpMetric(topic, StatusCodes.BadRequest, "/v2/metadata", startTime, method.value)
+                    complete(StatusCodes.BadRequest, exception.getMessage)
+                  }
+                  case Success(schemas) => {
+                    val req = TopicMetadataV2Request.fromMetadataOnlyRequest(schemas, mor)
+                    onComplete(
+                      Futurable[F].unsafeToFuture(createTopicProgram
+                        .publishMetadata(t, req))
+                    ) {
+                      case Failure(exception) =>
+                        addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/metadata", startTime, method.value)
+                        complete(StatusCodes.InternalServerError, s"Unable to create Metadata for topic $topic : ${exception.getMessage}")
+                      case Success(value) =>
+                        addHttpMetric(topic, StatusCodes.OK, "/v2/metadata", startTime, method.value)
+                        complete(StatusCodes.OK)
+                    }
+                  }
                 }
-              }
             }
           }
         }
+        case None =>
+          addHttpMetric(topic, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(Subject.invalidFormat))
+          complete(StatusCodes.BadRequest, Subject.invalidFormat)
       }
-      case None =>
-        addHttpMetric(topic, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(Subject.invalidFormat))
-        complete(StatusCodes.BadRequest, Subject.invalidFormat)
     }
 
   }

@@ -274,7 +274,7 @@ sealed trait TopicMetadataV2Parser
       extends RootJsonFormat[TopicMetadataV2Request] {
 
     override def write(obj: TopicMetadataV2Request): JsValue =
-      jsonFormat11(TopicMetadataV2Request.apply).write(obj)
+      jsonFormat12(TopicMetadataV2Request.apply).write(obj)
 
     override def read(json: JsValue): TopicMetadataV2Request = json match {
       case j: JsObject =>
@@ -381,6 +381,12 @@ sealed trait TopicMetadataV2Parser
             }
           }
         )
+        val tags = toResult(
+          j.fields.get("tags") match {
+            case Some(t) => t.convertTo[Option[List[String]]].getOrElse(List.empty)
+            case None => List.empty[String]
+          }
+        )
         (
           streamType,
           deprecated,
@@ -391,7 +397,8 @@ sealed trait TopicMetadataV2Parser
           parentSubjects,
           notes,
           teamName,
-          numPartitions
+          numPartitions,
+          tags
           ).mapN(MetadataOnlyRequest.apply)
     }
   }
@@ -412,7 +419,7 @@ sealed trait TopicMetadataV2Parser
   implicit object TopicMetadataResponseV2Format extends RootJsonFormat[TopicMetadataV2Response] {
     override def read(json: JsValue): TopicMetadataV2Response = throw IntentionallyUnimplemented
 
-    override def write(obj: TopicMetadataV2Response): JsValue = jsonFormat11(TopicMetadataV2Response.apply).write(obj)
+    override def write(obj: TopicMetadataV2Response): JsValue = jsonFormat12(TopicMetadataV2Response.apply).write(obj)
   }
 
   private def throwDeserializationError(key: String, `type`: String) =

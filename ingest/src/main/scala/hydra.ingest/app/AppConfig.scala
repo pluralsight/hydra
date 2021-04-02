@@ -162,14 +162,24 @@ object AppConfig {
       env("HYDRA_INGEST_TOPIC_DELETION_PASSWORD").as[String].default("")
     ).map(TopicDeletionConfig)
 
+  final case class TagsConfig(tagsPassword: String, tagsTopic: String, tagsConsumerGroup: String)
+
+  private val tagsConfig: ConfigValue[TagsConfig] =
+    (
+      env("HYDRA_TAGS_ENDPOINT_PASSWORD").as[String].default(""),
+      env("HYDRA_TAGS_TOPIC").as[String].default("_hydra.tags-topic"),
+      env("HYDRA_TAGS_CONSUMER_GROUP").as[String].default("_hydra.tags-consumer-group")
+    ).mapN(TagsConfig)
+
   final case class AppConfig(
-      createTopicConfig: CreateTopicConfig,
-      metadataTopicsConfig: MetadataTopicsConfig,
-      ingestConfig: IngestConfig,
-      topicDeletionConfig: TopicDeletionConfig,
-      dvsConsumersTopicConfig: DVSConsumersTopicConfig,
-      consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
-      consumerGroupsAlgebraConfig: ConsumerGroupsAlgebraConfig
+                              createTopicConfig: CreateTopicConfig,
+                              metadataTopicsConfig: MetadataTopicsConfig,
+                              ingestConfig: IngestConfig,
+                              topicDeletionConfig: TopicDeletionConfig,
+                              tagsConfig: TagsConfig,
+                              dvsConsumersTopicConfig: DVSConsumersTopicConfig,
+                              consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
+                              consumerGroupsAlgebraConfig: ConsumerGroupsAlgebraConfig
                             )
 
   val appConfig: ConfigValue[AppConfig] =
@@ -178,6 +188,7 @@ object AppConfig {
       metadataTopicsConfig,
       ingestConfig,
       topicDeletionConfig,
+      tagsConfig,
       dvsConsumersTopicConfig,
       consumerOffsetsOffsetsTopicConfig,
       consumerGroupAlgebraConfig

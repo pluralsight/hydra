@@ -5,16 +5,15 @@ import akka.http.javadsl.server.MalformedRequestContentRejection
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
-import cats.{Applicative, Monad}
+import cats.Applicative
 import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
-import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
+import hydra.kafka.algebras.{HydraTag, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TagsAlgebra}
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
-import hydra.kafka.model.Schemas
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
@@ -26,7 +25,6 @@ import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.ExecutionContext
 import hydra.kafka.programs.CreateTopicProgram
-import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.avro.{Schema, SchemaBuilder}
 import retry.{RetryPolicies, RetryPolicy}
 
@@ -114,8 +112,10 @@ class TopicMetadataEndpointSpec
     _ <- schemaRegistry.registerSchema(subjectKey, schema)
     _ <- schemaRegistry.registerSchema(subjectValue, schema)
     metadataAlgebra <- MetadataAlgebra.make[IO](Subject.createValidated("_topicName.Bill").get, "I'm_A_Jerk", kafkaClient, schemaRegistry, consumeMetadataEnabled = false)
+    tagsAlgebra <- TagsAlgebra.make[IO]("_hydra.tags-topic", "_hydra.tags-consumer",kafkaClient)
+    _ <- tagsAlgebra.createOrUpdateTag(HydraTag("Source: DVS", "A valid source"))
     createTopicProgram = getTestCreateTopicProgram(schemaRegistry, ka, kafkaClient, metadataAlgebra)
-  } yield new TopicMetadataEndpoint(consumerProxy, metadataAlgebra, schemaRegistry, createTopicProgram, 1).route).unsafeRunSync()
+  } yield new TopicMetadataEndpoint(consumerProxy, metadataAlgebra, schemaRegistry, createTopicProgram, 1, tagsAlgebra).route).unsafeRunSync()
 
   val node = new Node(0, "host", 1)
 
@@ -262,7 +262,8 @@ class TopicMetadataEndpointSpec
                          |    "createdDate": "2020-02-02T12:34:56Z",
                          |    "notes": "here are some notes",
                          |    "parentSubjects": [],
-                         |    "teamName": "dvs-teamName"
+                         |    "teamName": "dvs-teamName",
+                         |    "tags": ["Source: DVS"]
                          |}""".stripMargin
 
     val invalidRequest =

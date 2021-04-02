@@ -6,19 +6,20 @@ import cats.data.NonEmptyList
 import cats.effect.Sync
 import cats.syntax.all._
 import cats.{Monad, MonadError}
-import hydra.core.marshallers.History
-import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, MetadataTopicsConfig}
+import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, MetadataTopicsConfig, TagsConfig}
 import hydra.kafka.model._
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.util.KafkaUtils.TopicDetails
-import hydra.kafka.algebras.KafkaAdminAlgebra
+import hydra.kafka.algebras.{HydraTag, KafkaAdminAlgebra}
+import hydra.kafka.model.TopicMetadataV2Request.Subject
 
 final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
     createTopicProgram: CreateTopicProgram[F],
     cfg: MetadataTopicsConfig,
     dvsConsumersTopicConfig: DVSConsumersTopicConfig,
     cooTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
-    kafkaAdmin: KafkaAdminAlgebra[F]
+    kafkaAdmin: KafkaAdminAlgebra[F],
+    tagsConfig: TagsConfig
 ) {
 
   def bootstrapAll: F[Unit] =
@@ -27,6 +28,7 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
       _ <- bootstrapMetadataTopicV1
       _ <- bootstrapDVSConsumersTopic
       _ <- bootstrapConsumerOffsetsOffsetsTopic
+      _ <- bootstrapTagsTopic
     } yield ()
 
   private def bootstrapMetadataTopicV1: F[Unit] = {
@@ -61,7 +63,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
               "This is the topic that Hydra uses to keep track of metadata for topics."
             ),
             Some("Data-Platform"),
-            None
+            None,
+            List.empty
           ),
           TopicDetails(cfg.numPartitions, cfg.replicationFactor, cfg.minInsyncReplicas, Map("cleanup.policy" -> "compact"))
         )
@@ -87,7 +90,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
             "This is the topic that Hydra uses to keep track of a summarized list (no partition/offset info) of consumer groups."
           ),
           Some("Data-Platform"),
-          None
+          None,
+          List.empty
         ),
         TopicDetails(
           dvsConsumersTopicConfig.numPartitions,
@@ -116,7 +120,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
             "This is the topic that Hydra uses to keep track of the offsets we've consumed in the __consumer_offsets topic that Kakfa manages."
           ),
           Some("Data-Platform"),
-          None
+          None,
+          List.empty
         ),
         TopicDetails(
           cooTopicConfig.numPartitions,
@@ -126,6 +131,27 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
         )
       )
     }
+
+  private def bootstrapTagsTopic: F[Unit] = {
+    val tagSchemas = HydraTag.getSchemas
+    val tagsSubject = Subject.createValidated(tagsConfig.tagsTopic).getOrElse(throw new Exception(Subject.invalidFormat))
+    createTopicProgram.createTopic(tagsSubject,
+      TopicMetadataV2Request(
+        tagSchemas,
+        StreamTypeV2.Entity,
+        deprecated = false,
+        None,
+        InternalUseOnly,
+        NonEmptyList.of(cooTopicConfig.contactMethod),
+        Instant.now,
+        List.empty,
+        Some("This is the topic that Hydra uses to keep track of the tags that are created for topics"),
+        Some("Data-Platform"),
+        None,
+        List.empty
+      ),
+      TopicDetails(cfg.numPartitions, cfg.replicationFactor, cfg.minInsyncReplicas, Map("cleanup.policy" -> "compact")))
+  }
 
 
 }
@@ -137,8 +163,9 @@ object Bootstrap {
       metadataTopicsConfig: MetadataTopicsConfig,
       consumersTopicConfig: DVSConsumersTopicConfig,
       consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
-      kafkaAdmin: KafkaAdminAlgebra[F]
+      kafkaAdmin: KafkaAdminAlgebra[F],
+      tagsTopicConfig: TagsConfig
   ): F[Bootstrap[F]] = Sync[F].delay {
-    new Bootstrap[F](createTopicProgram, metadataTopicsConfig, consumersTopicConfig, consumerOffsetsOffsetsTopicConfig, kafkaAdmin)
+    new Bootstrap[F](createTopicProgram, metadataTopicsConfig, consumersTopicConfig, consumerOffsetsOffsetsTopicConfig, kafkaAdmin, tagsTopicConfig)
   }
 }

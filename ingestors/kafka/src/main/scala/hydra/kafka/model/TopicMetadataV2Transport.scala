@@ -74,7 +74,8 @@ final case class TopicMetadataV2Request(
     parentSubjects: List[Subject],
     notes: Option[String],
     teamName: Option[String],
-    numPartitions: Option[TopicMetadataV2Request.NumPartitions]
+    numPartitions: Option[TopicMetadataV2Request.NumPartitions],
+    tags: List[String]
 ) {
 
   def toValue: TopicMetadataV2Value = {
@@ -87,7 +88,8 @@ final case class TopicMetadataV2Request(
       createdDate,
       parentSubjects,
       notes,
-      teamName
+      teamName,
+      tags
     )
   }
 }
@@ -130,7 +132,8 @@ object TopicMetadataV2Request {
       mor.parentSubjects,
       mor.notes,
       mor.teamName,
-      mor.numPartitions
+      mor.numPartitions,
+      mor.tags
     )
   }
 }
@@ -149,6 +152,7 @@ final case class TopicMetadataV2Response(
                                           parentSubjects: List[Subject],
                                           notes: Option[String],
                                           teamName: Option[String],
+                                          tags: List[String]
                                         )
 object TopicMetadataV2Response {
   def fromTopicMetadataContainer(m: TopicMetadataContainer): TopicMetadataV2Response = {
@@ -164,7 +168,8 @@ object TopicMetadataV2Response {
       v.createdDate,
       v.parentSubjects,
       v.notes,
-      v.teamName
+      v.teamName,
+      v.tags
     )
   }
 }
@@ -178,7 +183,8 @@ final case class MetadataOnlyRequest(streamType: StreamTypeV2,
                                     parentSubjects: List[Subject],
                                     notes: Option[String],
                                     teamName: Option[String],
-                                    numPartitions: Option[TopicMetadataV2Request.NumPartitions]) {
+                                    numPartitions: Option[TopicMetadataV2Request.NumPartitions],
+                                    tags: List[String]) {
 }
 
 

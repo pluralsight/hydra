@@ -11,7 +11,7 @@ import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.core.marshallers.{History, StreamType}
-import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
+import hydra.kafka.algebras.{HydraTag, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TagsAlgebra}
 import hydra.kafka.model.ContactMethod.{Email, Slack}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
@@ -44,7 +44,8 @@ final class BootstrapEndpointV2Spec
       s: SchemaRegistry[IO],
       ka: KafkaAdminAlgebra[IO],
       kc: KafkaClientAlgebra[IO],
-      m: MetadataAlgebra[IO]
+      m: MetadataAlgebra[IO],
+      t: TagsAlgebra[IO]
   ): BootstrapEndpointV2[IO] = {
     val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
     new BootstrapEndpointV2(
@@ -56,7 +57,8 @@ final class BootstrapEndpointV2Spec
         Subject.createValidated("dvs.hello-world").get,
         m
       ),
-      TopicDetails(1, 1, 1)
+      TopicDetails(1, 1, 1),
+      t
     )
   }
 
@@ -66,7 +68,9 @@ final class BootstrapEndpointV2Spec
       k <- KafkaAdminAlgebra.test[IO]
       kc <- KafkaClientAlgebra.test[IO]
       m <- MetadataAlgebra.make(Subject.createValidated("_metadata.topic.name").get, "bootstrap.consumer.group", kc, s, true)
-    } yield getTestCreateTopicProgram(s, k, kc, m)
+      t <- TagsAlgebra.make[IO]("_hydra.tags-topic","_hydra.tags-consumer", kc)
+      _ <- t.createOrUpdateTag(HydraTag("Source: Something", "something hydra tag"))
+    } yield getTestCreateTopicProgram(s, k, kc, m, t)
 
   "BootstrapEndpointV2" must {
 
@@ -107,7 +111,8 @@ final class BootstrapEndpointV2Spec
       List.empty,
       None,
       Some("dvs-teamName"),
-      None
+      None,
+      List.empty
     ).toJson.compactPrint
 
     val validRequest = TopicMetadataV2Request(
@@ -121,7 +126,8 @@ final class BootstrapEndpointV2Spec
       List.empty,
       None,
       Some("dvs-teamName"),
-      None
+      None,
+      List.empty
     ).toJson.compactPrint
 
     "accept a valid request" in {
@@ -154,7 +160,7 @@ final class BootstrapEndpointV2Spec
     "reject a request with key missing field" in {
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
-          Put("/v2/topics/invalid%20name", HttpEntity(ContentTypes.`application/json`, badKeySchemaRequest)) ~> Route.seal(
+          Put("/v2/topics/dvs.testing", HttpEntity(ContentTypes.`application/json`, badKeySchemaRequest)) ~> Route.seal(
             bootstrapEndpoint.route
           ) ~> check {
             val r = responseAs[String]
@@ -176,7 +182,8 @@ final class BootstrapEndpointV2Spec
         List.empty,
         None,
         None,
-        None
+        None,
+        List.empty
       ).toJson.compactPrint
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
@@ -221,13 +228,71 @@ final class BootstrapEndpointV2Spec
           KafkaAdminAlgebra
             .test[IO]
             .map { kafka =>
+              val kca = KafkaClientAlgebra.test[IO].unsafeRunSync()
+              val ta = TagsAlgebra.make[IO]("_hydra.tags.topic", "_hydra.client",kca).unsafeRunSync()
               Put("/v2/topics/dvs.testing/", HttpEntity(MediaTypes.`application/json`, validRequest)) ~> Route.seal(
-                getTestCreateTopicProgram(failingSchemaRegistry, kafka, client, m).route
+                getTestCreateTopicProgram(failingSchemaRegistry, kafka, client, m, ta).route
               ) ~> check {
                 response.status shouldBe StatusCodes.InternalServerError
               }
             }
         }
+      }.unsafeRunSync()
+    }
+
+    "accept a request with valid tags" in {
+      val validRequest = TopicMetadataV2Request(
+        Schemas(getTestSchema("key"), getTestSchema("value")),
+        StreamTypeV2.Entity,
+        deprecated = false,
+        None,
+        Public,
+        NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
+        Instant.now,
+        List.empty,
+        None,
+        Some("dvs-teamName"),
+        None,
+        List("Source: Something")
+      ).toJson.compactPrint
+
+
+      testCreateTopicProgram.map {
+        boostrapEndpoint =>
+          Put("/v2/topics/dvs.testing", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> Route.seal(
+            boostrapEndpoint.route) ~> check {
+            println(responseAs[String])
+            response.status shouldBe StatusCodes.OK
+          }
+      }.unsafeRunSync()
+    }
+
+    "reject a request with invalid tags" in {
+      val validRequest = TopicMetadataV2Request(
+        Schemas(getTestSchema("key"), getTestSchema("value")),
+        StreamTypeV2.Entity,
+        deprecated = false,
+        None,
+        Public,
+        NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
+        Instant.now,
+        List.empty,
+        None,
+        Some("dvs-teamName"),
+        None,
+        List("Source: NotValid")
+      ).toJson.compactPrint
+
+      val kca = KafkaClientAlgebra.test[IO].unsafeRunSync()
+      val ta = TagsAlgebra.make[IO]("_hydra.tags.topic", "_hydra.client",kca).unsafeRunSync()
+      ta.createOrUpdateTag(HydraTag("Source: Something", "something hydra tag"))
+
+      testCreateTopicProgram.map {
+        boostrapEndpoint =>
+          Put("/v2/topics/dvs.testing", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> Route.seal(
+            boostrapEndpoint.route) ~> check {
+            response.status shouldBe StatusCodes.BadRequest
+          }
       }.unsafeRunSync()
     }
   }

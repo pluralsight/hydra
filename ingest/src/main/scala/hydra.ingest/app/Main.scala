@@ -82,7 +82,7 @@ object Main extends IOApp with ConfigSupport with LoggingAdapter {
         programs <- Programs.make[IO](config, algebras)
         bootstrap <- Bootstrap
           .make[IO](programs.createTopic, config.metadataTopicsConfig,
-           config.dvsConsumersTopicConfig, config.consumerOffsetsOffsetsTopicConfig, algebras.kafkaAdmin)
+           config.dvsConsumersTopicConfig, config.consumerOffsetsOffsetsTopicConfig, algebras.kafkaAdmin, config.tagsConfig)
         _ <- actorsIO()
         _ <- bootstrap.bootstrapAll
         routes <- Routes.make[IO](programs, algebras, config)
