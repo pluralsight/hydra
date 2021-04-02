@@ -39,10 +39,6 @@ class TagsAlgebraSpec extends AnyWordSpecLike with Matchers {
         tagsAlgebra.createOrUpdateTag(tag)
           .unsafeRunSync shouldBe Right(PublishResponse(0,2))
       }
-      "Get Tags" in {
-        tagsAlgebra.getAllTags.unsafeRunSync() shouldBe List(HydraTag("Source: blah", "This comes from blah"),
-          HydraTag("Source: Bret", "This comes from Bret being on a call while I do this"))
-      }
       "return true when validating a good tag" in {
         tagsAlgebra.validateTags(List("Source: blah")).unsafeRunSync() shouldBe ()
         tagsAlgebra.validateTags(List("Source: Bret")).unsafeRunSync() shouldBe ()
