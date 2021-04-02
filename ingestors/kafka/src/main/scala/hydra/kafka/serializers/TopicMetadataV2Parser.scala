@@ -274,14 +274,11 @@ sealed trait TopicMetadataV2Parser
       extends RootJsonFormat[TopicMetadataV2Request] {
 
     override def write(obj: TopicMetadataV2Request): JsValue =
-      jsonFormat11(TopicMetadataV2Request.apply).write(obj)
+      jsonFormat12(TopicMetadataV2Request.apply).write(obj)
 
     override def read(json: JsValue): TopicMetadataV2Request = json match {
       case j: JsObject =>
-        val subject = toResult(
-          SubjectFormat
-            .read(j.getFields("subject").headOption.getOrElse(JsString.empty))
-        )
+        val metadataValidationResult = MetadataOnlyRequestFormat.getValidationResult(json)
         val schemas = toResult(
           SchemasFormat.read(
             j.getFields("schemas")
@@ -293,6 +290,41 @@ sealed trait TopicMetadataV2Parser
                 )
               )
           )
+        )
+        (schemas, metadataValidationResult) match {
+          case (Valid(s), Valid(m)) => TopicMetadataV2Request.fromMetadataOnlyRequest(s, m)
+
+          case (Invalid(es), Invalid(em)) =>
+            throw DeserializationException(es.combine(em).map(_.errorMessage).mkString_(" "))
+
+          case (Invalid(es), Valid(_)) =>
+            throw DeserializationException(es.map(_.errorMessage).mkString_(" "))
+
+          case (Valid(_), Invalid(em)) =>
+            throw DeserializationException(em.map(_.errorMessage).mkString_(" "))
+        }
+      case j =>
+        throw DeserializationException(invalidPayloadProvided(j))
+    }
+  }
+
+  implicit object MetadataOnlyRequestFormat extends RootJsonFormat[MetadataOnlyRequest] {
+    override def write(obj: MetadataOnlyRequest): JsValue = {
+      JsString(obj.toString)
+    }
+    override def read(json: JsValue): MetadataOnlyRequest =  {
+      getValidationResult(json) match {
+          case Valid(metadataOnlyRequest) => metadataOnlyRequest
+          case Invalid(e) =>
+            throw DeserializationException(e.map(_.errorMessage).mkString_(" "))
+        }
+    }
+
+    def getValidationResult(json: JsValue): MetadataValidationResult[MetadataOnlyRequest] = json match {
+      case j: JsObject =>
+        val subject = toResult(
+          SubjectFormat
+            .read(j.getFields("subject").headOption.getOrElse(JsString.empty))
         )
         val streamType = toResult(
           StreamTypeV2Format.read(
@@ -349,8 +381,13 @@ sealed trait TopicMetadataV2Parser
             }
           }
         )
+        val tags = toResult(
+          j.fields.get("tags") match {
+            case Some(t) => t.convertTo[Option[List[String]]].getOrElse(List.empty)
+            case None => List.empty[String]
+          }
+        )
         (
-          schemas,
           streamType,
           deprecated,
           deprecatedDate,
@@ -360,14 +397,9 @@ sealed trait TopicMetadataV2Parser
           parentSubjects,
           notes,
           teamName,
-          numPartitions
-        ).mapN(TopicMetadataV2Request.apply) match {
-          case Valid(topicMetadataRequest) => topicMetadataRequest
-          case Invalid(e) =>
-            throw DeserializationException(e.map(_.errorMessage).mkString_(" "))
-        }
-      case j =>
-        throw DeserializationException(invalidPayloadProvided(j))
+          numPartitions,
+          tags
+          ).mapN(MetadataOnlyRequest.apply)
     }
   }
 
@@ -387,7 +419,7 @@ sealed trait TopicMetadataV2Parser
   implicit object TopicMetadataResponseV2Format extends RootJsonFormat[TopicMetadataV2Response] {
     override def read(json: JsValue): TopicMetadataV2Response = throw IntentionallyUnimplemented
 
-    override def write(obj: TopicMetadataV2Response): JsValue = jsonFormat11(TopicMetadataV2Response.apply).write(obj)
+    override def write(obj: TopicMetadataV2Response): JsValue = jsonFormat12(TopicMetadataV2Response.apply).write(obj)
   }
 
   private def throwDeserializationError(key: String, `type`: String) =

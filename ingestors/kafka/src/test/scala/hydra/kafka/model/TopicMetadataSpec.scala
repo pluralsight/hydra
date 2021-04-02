@@ -28,7 +28,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
     }
   }
 
-  import TopicMetadataV2Value._
+  import TopicMetadataV2ValueOptionalTagList._
   List(StreamTypeV2.Event, StreamTypeV2.Entity, StreamTypeV2.Telemetry).map(
     testCodec[StreamTypeV2]
   )
@@ -53,7 +53,8 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
       createdDate,
       List.empty,
       None,
-      Some("dvs-teamName")
+      Some("dvs-teamName"),
+      List.empty
     )
 
     val (encodedKey, encodedValue, headers) =
@@ -64,7 +65,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
     ).set("subject", key.subject.value)
       .build()
 
-    val valueSchema = TopicMetadataV2Value.codec.schema.toOption.get
+    val valueSchema = TopicMetadataV2ValueOptionalTagList.codec.schema.toOption.get
 
     val json =
       s"""{
@@ -80,14 +81,16 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
          |],
          |"createdDate":"${createdDate.toString}",
          |"parentSubjects": [],
-         |"notes": null
+         |"notes": null,
+         |"tags": null
          |}""".stripMargin
 
     val decoder = DecoderFactory.get().jsonDecoder(valueSchema, json)
     val valueRecord =
       new GenericDatumReader[Any](valueSchema).read(null, decoder)
 
-    encodedValue shouldBe Some(valueRecord)
+    // String replacement due to DecoderFactory decoding differently
+    encodedValue.toString shouldBe Some(valueRecord).toString.replace(""""tags": null""", """"tags": []""")
   }
 
   it must "encode and decode metadataV2" in {
@@ -101,7 +104,8 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
       createdDate,
       List.empty,
       None,
-      Some("dvs-teamName")
+      Some("dvs-teamName"),
+      List.empty
     )
 
     val (encodedKey, encodedValue, headers) =
@@ -119,12 +123,14 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
     val schemaVersion1String = "{\"type\":\"record\",\"name\":\"TopicMetadataV2Value\",\"namespace\":\"_hydra.v2\",\"fields\":[{\"name\":\"streamType\",\"type\":{\"type\":\"enum\",\"name\":\"StreamTypeV2\",\"namespace\":\"hydra.kafka.model\",\"symbols\":[\"Event\",\"Entity\",\"Telemetry\"]}},{\"name\":\"deprecated\",\"type\":\"boolean\"},{\"name\":\"dataClassification\",\"type\":{\"type\":\"enum\",\"name\":\"DataClassification\",\"namespace\":\"hydra.kafka.model\",\"symbols\":[\"Public\",\"InternalUseOnly\",\"ConfidentialPII\",\"RestrictedFinancial\",\"RestrictedEmployeeData\"]}},{\"name\":\"contact\",\"type\":{\"type\":\"array\",\"items\":[{\"type\":\"record\",\"name\":\"Email\",\"namespace\":\"hydra.kafka.model.ContactMethod\",\"fields\":[{\"name\":\"address\",\"type\":\"string\"}]},{\"type\":\"record\",\"name\":\"Slack\",\"namespace\":\"hydra.kafka.model.ContactMethod\",\"fields\":[{\"name\":\"channel\",\"type\":\"string\"}]}]}},{\"name\":\"createdDate\",\"type\":\"string\"},{\"name\":\"parentSubjects\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"notes\",\"type\":[\"null\",\"string\"]}]}"
     val schemaVersion2String = "{\"type\":\"record\",\"name\":\"TopicMetadataV2Value\",\"namespace\":\"_hydra.v2\",\"fields\":[{\"name\":\"streamType\",\"type\":{\"type\":\"enum\",\"name\":\"StreamTypeV2\",\"namespace\":\"hydra.kafka.model\",\"symbols\":[\"Event\",\"Entity\",\"Telemetry\"]}},{\"name\":\"deprecated\",\"type\":\"boolean\"},{\"name\":\"deprecatedDate\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"dataClassification\",\"type\":{\"type\":\"enum\",\"name\":\"DataClassification\",\"namespace\":\"hydra.kafka.model\",\"symbols\":[\"Public\",\"InternalUseOnly\",\"ConfidentialPII\",\"RestrictedFinancial\",\"RestrictedEmployeeData\"]}},{\"name\":\"contact\",\"type\":{\"type\":\"array\",\"items\":[{\"type\":\"record\",\"name\":\"Email\",\"namespace\":\"hydra.kafka.model.ContactMethod\",\"fields\":[{\"name\":\"address\",\"type\":\"string\"}]},{\"type\":\"record\",\"name\":\"Slack\",\"namespace\":\"hydra.kafka.model.ContactMethod\",\"fields\":[{\"name\":\"channel\",\"type\":\"string\"}]}]}},{\"name\":\"createdDate\",\"type\":\"string\"},{\"name\":\"parentSubjects\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"notes\",\"type\":[\"null\",\"string\"]}]}"
     val schemaVersion3String = "{\"type\":\"record\",\"name\":\"TopicMetadataV2Value\",\"namespace\":\"_hydra.v2\",\"fields\":[{\"name\":\"streamType\",\"type\":{\"type\":\"enum\",\"name\":\"StreamTypeV2\",\"namespace\":\"hydra.kafka.model\",\"symbols\":[\"Event\",\"Entity\",\"Telemetry\"]}},{\"name\":\"deprecated\",\"type\":\"boolean\"},{\"name\":\"deprecatedDate\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"dataClassification\",\"type\":{\"type\":\"enum\",\"name\":\"DataClassification\",\"namespace\":\"hydra.kafka.model\",\"symbols\":[\"Public\",\"InternalUseOnly\",\"ConfidentialPII\",\"RestrictedFinancial\",\"RestrictedEmployeeData\"]}},{\"name\":\"contact\",\"type\":{\"type\":\"array\",\"items\":[{\"type\":\"record\",\"name\":\"Email\",\"namespace\":\"hydra.kafka.model.ContactMethod\",\"fields\":[{\"name\":\"address\",\"type\":\"string\"}]},{\"type\":\"record\",\"name\":\"Slack\",\"namespace\":\"hydra.kafka.model.ContactMethod\",\"fields\":[{\"name\":\"channel\",\"type\":\"string\"}]}]}},{\"name\":\"createdDate\",\"type\":\"string\"},{\"name\":\"parentSubjects\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"notes\",\"type\":[\"null\",\"string\"]},{\"name\":\"teamName\",\"type\":[\"null\",\"string\"],\"default\":null}]}"
+    val schemaVersion4String = "{\"type\":\"record\",\"name\":\"TopicMetadataV2Value\",\"namespace\":\"_hydra.v2\",\"fields\":[{\"name\":\"streamType\",\"type\":{\"type\":\"enum\",\"name\":\"StreamTypeV2\",\"namespace\":\"hydra.kafka.model\",\"symbols\":[\"Event\",\"Entity\",\"Telemetry\"]}},{\"name\":\"deprecated\",\"type\":\"boolean\"},{\"name\":\"deprecatedDate\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"dataClassification\",\"type\":{\"type\":\"enum\",\"name\":\"DataClassification\",\"namespace\":\"hydra.kafka.model\",\"symbols\":[\"Public\",\"InternalUseOnly\",\"ConfidentialPII\",\"RestrictedFinancial\",\"RestrictedEmployeeData\"]}},{\"name\":\"contact\",\"type\":{\"type\":\"array\",\"items\":[{\"type\":\"record\",\"name\":\"Email\",\"namespace\":\"hydra.kafka.model.ContactMethod\",\"fields\":[{\"name\":\"address\",\"type\":\"string\"}]},{\"type\":\"record\",\"name\":\"Slack\",\"namespace\":\"hydra.kafka.model.ContactMethod\",\"fields\":[{\"name\":\"channel\",\"type\":\"string\"}]}]}},{\"name\":\"createdDate\",\"type\":\"string\"},{\"name\":\"parentSubjects\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"notes\",\"type\":[\"null\",\"string\"]},{\"name\":\"teamName\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"tags\",\"type\":[\"null\",{\"type\":\"array\",\"items\":\"string\"}],\"default\":null}]}"
     def parser = new Schema.Parser()
     val schemaVersion1 = parser.parse(schemaVersion1String)
     val schemaVersion2 = parser.parse(schemaVersion2String)
     val schemaVersion3 = parser.parse(schemaVersion3String)
-    val schemaCurrent = TopicMetadataV2Value.codec.schema.toOption.get
-    val previousVersions = List(schemaVersion1, schemaVersion2, schemaVersion3)
+    val schemaVersion4 = parser.parse(schemaVersion4String)
+    val schemaCurrent = TopicMetadataV2ValueOptionalTagList.codec.schema.toOption.get
+    val previousVersions = List(schemaVersion1, schemaVersion2, schemaVersion3, schemaVersion4)
     AvroCompatibilityChecker.FULL_TRANSITIVE_CHECKER.isCompatible(schemaCurrent, previousVersions.asJava) shouldBe true
   }
 }

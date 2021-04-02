@@ -74,7 +74,8 @@ final case class TopicMetadataV2Request(
     parentSubjects: List[Subject],
     notes: Option[String],
     teamName: Option[String],
-    numPartitions: Option[TopicMetadataV2Request.NumPartitions]
+    numPartitions: Option[TopicMetadataV2Request.NumPartitions],
+    tags: List[String]
 ) {
 
   def toValue: TopicMetadataV2Value = {
@@ -87,7 +88,8 @@ final case class TopicMetadataV2Request(
       createdDate,
       parentSubjects,
       notes,
-      teamName
+      teamName,
+      tags
     )
   }
 }
@@ -117,7 +119,25 @@ object TopicMetadataV2Request {
       " It may contain only alphanumeric characters, hyphens(-) and periods(.)" +
       " and must not contain consecutive special characters anywhere within the topic name."
   }
+
+  def fromMetadataOnlyRequest(schemas: Schemas, mor: MetadataOnlyRequest) = {
+    TopicMetadataV2Request(
+      schemas,
+      mor.streamType,
+      mor.deprecated,
+      mor.deprecatedDate,
+      mor.dataClassification,
+      mor.contact,
+      mor.createdDate,
+      mor.parentSubjects,
+      mor.notes,
+      mor.teamName,
+      mor.numPartitions,
+      mor.tags
+    )
+  }
 }
+
 
 final case class MaybeSchemas(key: Option[Schema], value: Option[Schema])
 final case class TopicMetadataV2Response(
@@ -132,6 +152,7 @@ final case class TopicMetadataV2Response(
                                           parentSubjects: List[Subject],
                                           notes: Option[String],
                                           teamName: Option[String],
+                                          tags: List[String]
                                         )
 object TopicMetadataV2Response {
   def fromTopicMetadataContainer(m: TopicMetadataContainer): TopicMetadataV2Response = {
@@ -147,9 +168,23 @@ object TopicMetadataV2Response {
       v.createdDate,
       v.parentSubjects,
       v.notes,
-      v.teamName
+      v.teamName,
+      v.tags
     )
   }
+}
+
+final case class MetadataOnlyRequest(streamType: StreamTypeV2,
+                                    deprecated: Boolean,
+                                    deprecatedDate: Option[Instant],
+                                    dataClassification: DataClassification,
+                                    contact: NonEmptyList[ContactMethod],
+                                    createdDate: Instant,
+                                    parentSubjects: List[Subject],
+                                    notes: Option[String],
+                                    teamName: Option[String],
+                                    numPartitions: Option[TopicMetadataV2Request.NumPartitions],
+                                    tags: List[String]) {
 }
 
 

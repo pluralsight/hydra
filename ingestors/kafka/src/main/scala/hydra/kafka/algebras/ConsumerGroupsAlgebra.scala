@@ -20,6 +20,7 @@ trait ConsumerGroupsAlgebra[F[_]] {
   def getConsumersForTopic(topicName: String): F[TopicConsumers]
   def getTopicsForConsumer(consumerGroupName: String): F[ConsumerTopics]
   def getAllConsumers: F[List[ConsumerTopics]]
+  def getAllConsumersByTopic: F[List[TopicConsumers]]
   def startConsumer: F[Unit]
 }
 
@@ -68,6 +69,9 @@ object ConsumerGroupsAlgebra {
           }
         } yield ()
       }
+
+      override def getAllConsumersByTopic: F[List[TopicConsumers]] =
+        consumerGroupsStorageFacade.get.map(_.getAllConsumersByTopic)
     }
   }
 
@@ -103,6 +107,9 @@ private case class ConsumerGroupsStorageFacade(consumerMap: Map[TopicConsumerKey
   }
   def getAllConsumers: List[ConsumerTopics] = {
     consumerMap.keys.map(_.consumerGroupName).toSet.map(getTopicsForConsumerGroupName).toList
+  }
+  def getAllConsumersByTopic: List[TopicConsumers] = {
+    consumerMap.keys.map(_.topicName).toSet.map(getConsumersForTopicName).toList
   }
 }
 

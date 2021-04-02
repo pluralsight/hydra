@@ -29,7 +29,8 @@ object AppConfig {
       baseBackoffDelay: FiniteDuration,
       bootstrapServers: String,
       defaultNumPartions: Int,
-      defaultReplicationFactor: Short
+      defaultReplicationFactor: Short,
+      defaultMinInsyncReplicas: Short
   )
 
   private val createTopicConfig: ConfigValue[CreateTopicConfig] =
@@ -41,7 +42,8 @@ object AppConfig {
         .default(1.second),
       env("HYDRA_KAFKA_PRODUCER_BOOTSTRAP_SERVERS").as[String],
       env("HYDRA_DEFAULT_PARTIONS").as[Int].default(10),
-      env("HYDRA_REPLICATION_FACTOR").as[Short].default(3)
+      env("HYDRA_REPLICATION_FACTOR").as[Short].default(3),
+      env("HYDRA_MIN_INSYNC_REPLICAS").as[Short].default(2)
     ).parMapN(CreateTopicConfig)
 
   private implicit val subjectConfigDecoder: ConfigDecoder[String, Subject] =
@@ -56,6 +58,7 @@ object AppConfig {
       contactMethod: ContactMethod,
       numPartitions: Int,
       replicationFactor: Short,
+      minInsyncReplicas: Short,
       consumerGroup: ConsumerGroup
   )
 
@@ -81,6 +84,7 @@ object AppConfig {
       ).as[ContactMethod],
       env("HYDRA_DEFAULT_PARTITIONS").as[Int].default(10),
       env("HYDRA_REPLICATION_FACTOR").as[Short].default(3),
+      env("HYDRA_MIN_INSYNC_REPLICAS").as[Short].default(2),
       env("HYDRA_V2_METADATA_CONSUMER_GROUP")
     ).parMapN(MetadataTopicsConfig)
 
@@ -88,7 +92,8 @@ object AppConfig {
                                             topicName: Subject,
                                             contactMethod: ContactMethod,
                                             numPartitions: Int,
-                                            replicationFactor: Short
+                                            replicationFactor: Short,
+                                            minInsyncReplicas: Short
                                           )
 
   private val dvsConsumersTopicConfig: ConfigValue[DVSConsumersTopicConfig] =
@@ -98,14 +103,16 @@ object AppConfig {
         .default(Subject.createValidated("_hydra.consumer-groups").get),
       env("HYDRA_V2_METADATA_CONTACT").as[ContactMethod],
       env("HYDRA_DEFAULT_PARTITIONS").as[Int].default(10),
-      env("HYDRA_REPLICATION_FACTOR").as[Short].default(3)
+      env("HYDRA_REPLICATION_FACTOR").as[Short].default(3),
+      env("HYDRA_MIN_INSYNC_REPLICAS").as[Short].default(2),
       ).parMapN(DVSConsumersTopicConfig)
 
   final case class ConsumerOffsetsOffsetsTopicConfig(
                                                       topicName: Subject,
                                                       contactMethod: ContactMethod,
                                                       numPartitions: Int,
-                                                      replicationFactor: Short
+                                                      replicationFactor: Short,
+                                                      minInsyncReplicas: Short
                                                     )
 
   private val consumerOffsetsOffsetsTopicConfig: ConfigValue[ConsumerOffsetsOffsetsTopicConfig] =
@@ -115,7 +122,9 @@ object AppConfig {
         .default(Subject.createValidated("_hydra.consumer-offsets-offsets").get),
       env("HYDRA_V2_METADATA_CONTACT").as[ContactMethod],
       env("HYDRA_DEFAULT_PARTITIONS").as[Int].default(10),
-      env("HYDRA_REPLICATION_FACTOR").as[Short].default(3)
+      env("HYDRA_REPLICATION_FACTOR").as[Short].default(3),
+      env("HYDRA_MIN_INSYNC_REPLICAS").as[Short].default(2),
+
       ).parMapN(ConsumerOffsetsOffsetsTopicConfig)
 
   final case class ConsumerGroupsAlgebraConfig(
@@ -153,14 +162,24 @@ object AppConfig {
       env("HYDRA_INGEST_TOPIC_DELETION_PASSWORD").as[String].default("")
     ).map(TopicDeletionConfig)
 
+  final case class TagsConfig(tagsPassword: String, tagsTopic: String, tagsConsumerGroup: String)
+
+  private val tagsConfig: ConfigValue[TagsConfig] =
+    (
+      env("HYDRA_TAGS_ENDPOINT_PASSWORD").as[String].default(""),
+      env("HYDRA_TAGS_TOPIC").as[String].default("_hydra.tags-topic"),
+      env("HYDRA_TAGS_CONSUMER_GROUP").as[String].default("_hydra.tags-consumer-group")
+    ).mapN(TagsConfig)
+
   final case class AppConfig(
-      createTopicConfig: CreateTopicConfig,
-      metadataTopicsConfig: MetadataTopicsConfig,
-      ingestConfig: IngestConfig,
-      topicDeletionConfig: TopicDeletionConfig,
-      dvsConsumersTopicConfig: DVSConsumersTopicConfig,
-      consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
-      consumerGroupsAlgebraConfig: ConsumerGroupsAlgebraConfig
+                              createTopicConfig: CreateTopicConfig,
+                              metadataTopicsConfig: MetadataTopicsConfig,
+                              ingestConfig: IngestConfig,
+                              topicDeletionConfig: TopicDeletionConfig,
+                              tagsConfig: TagsConfig,
+                              dvsConsumersTopicConfig: DVSConsumersTopicConfig,
+                              consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
+                              consumerGroupsAlgebraConfig: ConsumerGroupsAlgebraConfig
                             )
 
   val appConfig: ConfigValue[AppConfig] =
@@ -169,6 +188,7 @@ object AppConfig {
       metadataTopicsConfig,
       ingestConfig,
       topicDeletionConfig,
+      tagsConfig,
       dvsConsumersTopicConfig,
       consumerOffsetsOffsetsTopicConfig,
       consumerGroupAlgebraConfig

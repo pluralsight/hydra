@@ -9,7 +9,7 @@ import hydra.common.util.{ActorUtils, Futurable}
 import hydra.ingest.app.AppConfig.AppConfig
 import hydra.ingest.http._
 import hydra.kafka.consumer.KafkaConsumerProxy
-import hydra.kafka.endpoints.{BootstrapEndpoint, BootstrapEndpointV2, ConsumerGroupsEndpoint, TopicMetadataEndpoint, TopicsEndpoint}
+import hydra.kafka.endpoints.{BootstrapEndpoint, BootstrapEndpointV2, ConsumerGroupsEndpoint, TagsEndpoint, TopicMetadataEndpoint, TopicsEndpoint}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 
 import scala.concurrent.ExecutionContext
@@ -22,9 +22,10 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
     val topicDetails =
       TopicDetails(
         cfg.createTopicConfig.defaultNumPartions,
-        cfg.createTopicConfig.defaultReplicationFactor
+        cfg.createTopicConfig.defaultReplicationFactor,
+        cfg.createTopicConfig.defaultMinInsyncReplicas
       )
-    new BootstrapEndpointV2(programs.createTopic, topicDetails).route
+    new BootstrapEndpointV2(programs.createTopic, topicDetails, algebras.tagsAlgebra).route
   } else {
     RouteDirectives.reject
   }
@@ -43,7 +44,8 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
 
     new SchemasEndpoint(consumerProxy).route ~
       new BootstrapEndpoint(system).route ~
-      new TopicMetadataEndpoint(consumerProxy, algebras.metadata).route ~
+      new TopicMetadataEndpoint(consumerProxy, algebras.metadata,
+        algebras.schemaRegistry, programs.createTopic, cfg.createTopicConfig.defaultMinInsyncReplicas, algebras.tagsAlgebra).route ~
       new ConsumerGroupsEndpoint(algebras.consumerGroups).route ~
       new IngestorRegistryEndpoint().route ~
       new IngestionWebSocketEndpoint().route ~
@@ -51,6 +53,7 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
       new TopicsEndpoint(consumerProxy)(system.dispatcher).route ~
       new TopicDeletionEndpoint(programs.topicDeletion,cfg.topicDeletionConfig.deleteTopicPassword).route ~
       HealthEndpoint.route ~
+      new TagsEndpoint[F](algebras.tagsAlgebra, cfg.tagsConfig.tagsPassword).route ~
       bootstrapEndpointV2
   }
 }
