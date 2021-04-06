@@ -120,7 +120,6 @@ public class JsonConverter<T extends GenericRecord> {
     public T convert(String json) throws IOException {
         try {
             //let's be proactive and fail fast with strict validation
-            mapper.configure(JsonParser.Feature.AUTO_CLOSE_SOURCE, true);
             Map<String, Object> fields = mapper.readValue(json, Map.class);
             if (strictValidation) performStrictValidation(fields, baseSchema);
             return convert(fields, baseSchema);
