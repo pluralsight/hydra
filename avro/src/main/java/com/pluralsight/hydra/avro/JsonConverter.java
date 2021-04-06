@@ -15,6 +15,7 @@
 
 package com.pluralsight.hydra.avro;
 
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.util.ClassUtil;
@@ -119,6 +120,7 @@ public class JsonConverter<T extends GenericRecord> {
     public T convert(String json) throws IOException {
         try {
             //let's be proactive and fail fast with strict validation
+            mapper.configure(JsonParser.Feature.AUTO_CLOSE_SOURCE, true);
             Map<String, Object> fields = mapper.readValue(json, Map.class);
             if (strictValidation) performStrictValidation(fields, baseSchema);
             return convert(fields, baseSchema);
@@ -188,7 +190,7 @@ public class JsonConverter<T extends GenericRecord> {
                             value = defaultValue.asText();
                             break;
                         case MAP:
-                            Map<String, Object> fieldMap = mapper.readValue(defaultValue.asText(), Map.class);
+                            Map<String, Object> fieldMap = mapper.readValue(defaultValue.toString(), Map.class);
                             Map<String, Object> mvalue = Maps.newHashMap();
                             for (Map.Entry<String, Object> e : fieldMap.entrySet()) {
                                 mvalue.put(e.getKey(), typeConvert(e.getValue(), name, fieldSchema.getValueType()));
@@ -196,7 +198,7 @@ public class JsonConverter<T extends GenericRecord> {
                             value = mvalue;
                             break;
                         case ARRAY:
-                            List fieldArray = mapper.readValue(defaultValue.asText(), List.class);
+                            List fieldArray = mapper.readValue(defaultValue.toString(), List.class);
                             List lvalue = Lists.newArrayList();
                             for (Object elem : fieldArray) {
                                 lvalue.add(typeConvert(elem, name, fieldSchema.getElementType()));
@@ -204,7 +206,7 @@ public class JsonConverter<T extends GenericRecord> {
                             value = lvalue;
                             break;
                         case RECORD:
-                            Map<String, Object> fieldRec = mapper.readValue(defaultValue.asText(), Map.class);
+                            Map<String, Object> fieldRec = mapper.readValue(defaultValue.toString(), Map.class);
                             value = convert(fieldRec, fieldSchema);
                             break;
                         default:

@@ -21,8 +21,11 @@ import org.apache.avro.Schema;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.generic.GenericRecord;
 import org.junit.Test;
+import scala.collection.immutable.List;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 
 import static org.junit.Assert.assertEquals;
 
@@ -176,5 +179,26 @@ public class JsonConverterTest {
         String json = "{ \"field1\": 1, \"field2\": [true, true, false], \"field3\": {\"key\": \"value\"}," + " " +
                 "\"extra\": \"test\"}";
         jc.convert(json);
+    }
+
+    @Test
+    public void testDefaults() throws Exception {
+        Schema.Field field1 = new Schema.Field("arr", Schema.createArray(sc(Type.INT)), "", new ArrayList<Integer>());
+        Schema.Field field2 = new Schema.Field("map", Schema.createMap(sc(Type.STRING)), "", new HashMap<String, String>());
+        ArrayList<Schema.Field> fieldList = new ArrayList<Schema.Field>();
+        fieldList.add(sf("recField", Type.STRING));
+        HashMap<String, String> recordDefault = new HashMap<>();
+        recordDefault.put("recField", "default");
+        Schema.Field field3 = new Schema.Field(
+                "record",
+                Schema.createRecord("recordName", "doc", "namespace", false, fieldList),
+                "",
+                recordDefault
+        );
+        JsonConverter jc = new JsonConverter(sr(field1, field2, field3));
+        String json = "{}";
+        String expect = "{\"arr\": [], \"map\": {}, \"record\": {\"recField\": \"default\"}}";
+        GenericRecord r = jc.convert(json);
+        assertEquals(expect, r.toString());
     }
 }
