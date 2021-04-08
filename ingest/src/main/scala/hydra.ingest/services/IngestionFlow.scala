@@ -64,7 +64,7 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](
   }
 
   private def getV1RecordKey(schemaWrapper: SchemaWrapper, payloadTryMaybe: Try[Option[GenericRecord]], request: HydraRequest): Option[String] = {
-    val headerV1Key = request.metadata.get(HYDRA_RECORD_KEY_PARAM)
+    val headerV1Key = request.metadata.get(HYDRA_RECORD_KEY_PARAM).map(_.replace(",","|"))
     val optionString = schemaWrapper.primaryKeys.toList match {
       case Nil => None
       case l => l.flatMap(pkName => payloadTryMaybe match {
@@ -73,7 +73,7 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](
         case Failure(_) => None
       }).mkString("|").some
     }
-    headerV1Key.map(_.replace(",","|")).orElse(optionString)
+    headerV1Key.orElse(optionString)
   }
 
   private def convertToAvro(topic: String, schemaWrapper: SchemaWrapper, useStrictValidation: Boolean, payloadString: String): Try[AvroRecord] = {
