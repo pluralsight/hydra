@@ -73,7 +73,7 @@ final class IngestionFlow[F[_]: MonadError[*[_], Throwable]: Mode](
         case Failure(_) => None
       }).mkString("|").some
     }
-    headerV1Key.orElse(optionString)
+    headerV1Key.map(_.replace(",","|")).orElse(optionString)
   }
 
   private def convertToAvro(topic: String, schemaWrapper: SchemaWrapper, useStrictValidation: Boolean, payloadString: String): Try[AvroRecord] = {
