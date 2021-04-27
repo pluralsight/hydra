@@ -19,6 +19,7 @@ import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializ
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
+import fs2.kafka.{ KafkaConsumer, KafkaProducer }
 
 trait KafkaClientAlgebra[F[_]] {
   import KafkaClientAlgebra._
@@ -173,7 +174,7 @@ object KafkaClientAlgebra {
     for {
       queue <- fs2.concurrent.Queue.unbounded[F, ProduceRecordInfo[F]]
       _ <- Concurrent[F].start {
-        producerStream[F].using(producerSettings).flatMap { producer =>
+        KafkaProducer.stream[F].using(producerSettings).flatMap { producer =>
           queue.dequeue.map { payload =>
             val record = ProducerRecord(payload.topicName, payload.key.orNull, payload.value.orNull).withHeaders(payload.headers)
             (ProducerRecords.one(record), payload)
@@ -256,7 +257,7 @@ object KafkaClientAlgebra {
           .withAutoOffsetReset(AutoOffsetReset.Earliest)
           .withBootstrapServers(bootstrapServers)
           .withGroupId(consumerGroup)
-        consumerStream(consumerSettings)
+        KafkaConsumer.stream(consumerSettings)
           .evalTap(_.subscribeTo(topicName))
           .flatMap(_.stream)
           .evalTap{ committable =>

@@ -28,6 +28,7 @@ import org.apache.kafka.common.TopicPartition
 import scala.collection.JavaConverters._
 import scala.collection.SortedSet
 import scala.util.Try
+import fs2.kafka.{ KafkaConsumer, KafkaProducer }
 
 object ConsumerGroupsOffsetConsumer {
 
@@ -152,7 +153,7 @@ object ConsumerGroupsOffsetConsumer {
       .withBootstrapServers(bootstrapServers)
       .withRetries(0)
       .withAcks(Acks.All)
-    val consumer = consumerStream(settings)
+    val consumer = KafkaConsumer.stream(settings)
     val keySerializer = getSerializer[F, GenericRecord](s)(isKey = true)
     val valueSerializer = getSerializer[F, GenericRecord](s)(isKey = false)
 
@@ -167,7 +168,7 @@ object ConsumerGroupsOffsetConsumer {
           valueSerializer
         )
       }
-      .through(produce(producerSettings))
+      .through(KafkaProducer.pipe(producerSettings))
       .compile.drain
   }
 
