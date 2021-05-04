@@ -4,6 +4,7 @@ import java.time.Instant
 
 import akka.http.scaladsl.marshallers.sprayjson._
 import akka.http.scaladsl.model.StatusCodes
+import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.http.scaladsl.server.directives.Credentials
 import hydra.common.util.Futurable
@@ -11,12 +12,13 @@ import hydra.core.http.RouteSupport
 import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.kafka.algebras.{HydraTag, TagsAlgebra}
 import spray.json._
+import hydra.core.http.CorsSupport
 
 import scala.util.{Failure, Success}
 
 final class TagsEndpoint[F[_]: Futurable]( tagsAlgebra: TagsAlgebra[F],
                                            tagsPassword: String)
-  extends RouteSupport with DefaultJsonProtocol with SprayJsonSupport {
+  extends RouteSupport with DefaultJsonProtocol with SprayJsonSupport with CorsSupport {
 
   def myUserPassAuthenticator(credentials: Credentials): Option[String] =
     credentials match {
@@ -24,7 +26,7 @@ final class TagsEndpoint[F[_]: Futurable]( tagsAlgebra: TagsAlgebra[F],
       case _ => None
     }
 
-  override val route: Route = {
+  override val route: Route = cors(settings) {
     extractMethod { method =>
       handleExceptions(exceptionHandler(Instant.now, method.value)) {
         extractExecutionContext { implicit ec =>
