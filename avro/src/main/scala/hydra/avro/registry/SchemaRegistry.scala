@@ -238,9 +238,7 @@ object SchemaRegistry {
       //TODO: Test this
       override def getLatestSchemaBySubject(subject: String): F[Option[Schema]] = Sync[F].delay {
         Try {
-          val schema = schemaRegistryClient.getLatestSchemaMetadata(subject).getSchema
-          val parse = new org.apache.avro.Schema.Parser().parse(schema)
-          parse
+          new org.apache.avro.Schema.Parser().parse(schemaRegistryClient.getLatestSchemaMetadata(subject).getSchema)
         }.toOption
       }
 
