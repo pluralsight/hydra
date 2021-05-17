@@ -13,6 +13,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
+import hydra.avro.util.SchemaWrapper
 import hydra.kafka.algebras.KafkaAdminAlgebra.{KafkaDeleteTopicError, KafkaDeleteTopicErrorList, LagOffsets, Offset, Topic, TopicAndPartition, TopicName}
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.model.ContactMethod.Email
@@ -23,6 +24,8 @@ import hydra.kafka.programs.CreateTopicProgram
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import retry.{RetryPolicies, RetryPolicy}
+import scalacache.Cache
+import scalacache.guava.GuavaCache
 
 import scala.concurrent.ExecutionContext
 
@@ -168,6 +171,8 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
   private def getExpectedDeletedTopics(topicNames: List[String], topicNamesToDelete: List[String], kafkaTopicNamesToFail: List[String]): List[String] = {
     return topicNames.toSet.intersect(topicNamesToDelete.toSet).diff(kafkaTopicNamesToFail.toSet).toList
   }
+
+  implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
 
   private def applyTestcase(kafkaAdminAlgebra: IO[KafkaAdminAlgebra[IO]],
                             schemaRegistry: IO[SchemaRegistry[IO]],

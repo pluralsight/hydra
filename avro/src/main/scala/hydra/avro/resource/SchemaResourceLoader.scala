@@ -188,5 +188,5 @@ object SchemaResourceLoader {
   // than max.schemas.per.subject.
   val schemaCache = GuavaCache[Schema]
 
-  final case class SchemaNotFoundException(subject: String) extends Exception(s"Schema not found for $subject")
+  final case class SchemaNotFoundException(subject: String) extends Exception(s"Schema not found for $subject\nThis means your topic was not registered with Schema Registry, you may need to check if this topic exists")
 }

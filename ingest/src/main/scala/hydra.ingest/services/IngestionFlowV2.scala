@@ -25,13 +25,12 @@ import scala.util.{Failure, Try}
 final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
                                                                     schemaRegistry: SchemaRegistry[F],
                                                                     kafkaClient: KafkaClientAlgebra[F],
-                                                                    schemaRegistryBaseUrl: String) {
+                                                                    schemaRegistryBaseUrl: String)
+                                                                    (implicit guavaCache: Cache[SchemaWrapper]){
 
   import IngestionFlowV2._
   import hydra.avro.convert.StringToGenericRecord._
   import hydra.avro.convert.SimpleStringToGenericRecord._
-
-  implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
 
   private def getSchema(subject: String): F[Schema] = {
     schemaRegistry.getLatestSchemaBySubject(subject)
@@ -58,7 +57,8 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
         Failure(AvroConversionAugmentedException(s"${e.getClass.getName}: ${e.getMessage} [$location]"))
       case e: IOException =>
         Failure(AvroConversionAugmentedException(s"${e.getClass.getName}: ${e.getMessage} [$location]"))
-      case e => Failure(e)
+      case e =>
+        Failure(e)
     }
     pf
   }

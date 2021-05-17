@@ -2,6 +2,7 @@ package hydra.ingest.modules
 
 import cats.effect._
 import cats.syntax.all._
+import hydra.avro.util.SchemaWrapper
 import hydra.ingest.app.AppConfig.AppConfig
 import hydra.ingest.programs.TopicDeletionProgram
 import hydra.ingest.services.{IngestionFlow, IngestionFlowV2}
@@ -10,7 +11,8 @@ import hydra.kafka.programs.CreateTopicProgram
 import io.chrisdavenport.log4cats.Logger
 import retry.RetryPolicies._
 import retry.RetryPolicy
-import scalacache.Mode
+import scalacache.{Cache, Mode}
+import scalacache.guava.GuavaCache
 
 final class Programs[F[_]: Logger: Sync: Timer: Mode] private(
     cfg: AppConfig,
@@ -36,6 +38,8 @@ final class Programs[F[_]: Logger: Sync: Timer: Mode] private(
     algebras.kafkaClient,
     cfg.createTopicConfig.schemaRegistryConfig.fullUrl
   )
+
+  implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
 
   val ingestionFlowV2: IngestionFlowV2[F] = new IngestionFlowV2[F](
     algebras.schemaRegistry,
