@@ -2,6 +2,7 @@ package hydra.ingest.programs
 
 import java.time.Instant
 
+import cats.MonadError
 import cats.data.Validated.{Invalid, Valid}
 import cats.data.{NonEmptyList, ValidatedNel}
 import cats.effect.{Bracket, Concurrent, ContextShift, IO, Sync, Timer}
@@ -13,6 +14,9 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
+import hydra.avro.resource.SchemaResourceLoader.SchemaNotFoundException
+import hydra.avro.util.SchemaWrapper
+import hydra.ingest.services.IngestionFlowV2.SchemaNotFoundAugmentedException
 import hydra.kafka.algebras.KafkaAdminAlgebra.{KafkaDeleteTopicError, KafkaDeleteTopicErrorList, LagOffsets, Offset, Topic, TopicAndPartition, TopicName}
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.model.ContactMethod.Email
@@ -23,8 +27,15 @@ import hydra.kafka.programs.CreateTopicProgram
 import org.typelevel.log4cats.SelfAwareStructuredLogger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import retry.{RetryPolicies, RetryPolicy}
-
+import scalacache.Cache
+import scalacache.guava.GuavaCache
+import scalacache.memoization._
+import scalacache.modes.try_._
+import cats.MonadError
+import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
+import java.io.IOException
+import scalacache.Mode
 
 class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
   implicit private val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
@@ -169,6 +180,24 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
     return topicNames.toSet.intersect(topicNamesToDelete.toSet).diff(kafkaTopicNamesToFail.toSet).toList
   }
 
+  implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
+
+  private def getSchema(sr: SchemaRegistry[IO], subject: String): IO[Schema] = {
+    sr.getLatestSchemaBySubject(subject)
+      .flatMap { maybeSchema =>
+        val schemaNotFound = SchemaNotFoundException(subject)
+        MonadError[IO, Throwable].fromOption(maybeSchema, SchemaNotFoundAugmentedException(schemaNotFound, subject))
+      }
+  }
+
+  implicit val mode: Mode[IO] = scalacache.CatsEffect.modes.async
+
+  private def getSchemaWrapper(sr: SchemaRegistry[IO], subject: String): IO[SchemaWrapper] = memoizeF[IO, SchemaWrapper](Some(2.minutes)) {
+    getSchema(sr, subject + "-value").map { sch =>
+      SchemaWrapper.from(sch)
+    }
+  }
+
   private def applyTestcase(kafkaAdminAlgebra: IO[KafkaAdminAlgebra[IO]],
                             schemaRegistry: IO[SchemaRegistry[IO]],
                             v1TopicNames: List[String],
@@ -182,7 +211,6 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
     (for {
       // For v2 topics we need to write the metadata to the v2MetadataTopic because the topic deletion attempts to lookup
       // the v2 metadata and uses the results to determine if we are deleting a v1 or v2 topic.
-
       kafkaAdmin <- kafkaAdminAlgebra
       schemaAlgebra <- schemaRegistry
       kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
@@ -197,6 +225,8 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       _ <- registerTopics(v2TopicNames, schemaAlgebra, registerKey, upgrade=false)
       // upgrade any topics needed
       _ <- registerTopics(List(upgradeTopic._1), schemaAlgebra, registerKey, upgradeTopic._2)
+      // add Schemas to Cache
+      _ <- (v1TopicNames++v2TopicNames).traverse{topic => getSchemaWrapper(schemaAlgebra, topic)}
       // delete all given topics
       errors <-  new TopicDeletionProgram[IO](
         kafkaAdmin,
@@ -246,34 +276,43 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
 
   it should "Delete a Single Topic from Kafka value only" in {
     applyGoodTestcase(List("topic1"), List.empty, List("topic1"))
+    guavaCache.get("topic1").unsafeRunSync() shouldBe None
   }
 
   it should "Delete a Single Topic from Multiple topics in Kafka value only" in {
     applyGoodTestcase(twoTopics, List.empty, List("topic1"))
+    twoTopics.map(topic => guavaCache.get(topic).unsafeRunSync() shouldBe None)
   }
 
   it should "Delete Multiple Topics from Kafka value only" in {
     applyGoodTestcase(twoTopics, List.empty, twoTopics)
+    twoTopics.map(topic => guavaCache.get(topic).unsafeRunSync() shouldBe None)
   }
 
   it should "Delete a Single Topic from Multiple topics in Kafka key and value" in {
     applyGoodTestcase(twoTopics, List.empty, List("topic1"), registerKey = true)
+    twoTopics.map(topic => guavaCache.get(topic).unsafeRunSync() shouldBe None)
   }
 
   it should "Delete a single v2 topic" in {
     applyGoodTestcase(List.empty, List("_topic1.name", "_topic2.name"), List("_topic1.name"), registerKey = true)
+    guavaCache.get("_topic1.name").unsafeRunSync() shouldBe None
   }
 
   it should "Delete multiple v2 topics" in {
     applyGoodTestcase(List.empty, List("_topic1.name", "_topic2.name"), List("_topic1.name", "_topic2.name"), registerKey = true)
+    List("_topic1.name", "_topic2.name").map(topic => guavaCache.get(topic).unsafeRunSync() shouldBe None)
   }
 
   it should "Delete a v1 and v2 topic" in {
     applyGoodTestcase(twoTopics, List("_topic1.name", "_topic2.name"), List("_topic1.name", "_topic2.name"), registerKey = true)
+    List("_topic1.name", "_topic2.name").map(topic => guavaCache.get(topic).unsafeRunSync() shouldBe None)
+    twoTopics.map(topic => guavaCache.get(topic).unsafeRunSync() shouldBe None)
   }
 
   it should "Delete Multiple Topics from Kafka key and value" in {
     applyGoodTestcase(twoTopics, List.empty, twoTopics, registerKey = true)
+    twoTopics.map(topic => guavaCache.get(topic).unsafeRunSync() shouldBe None)
   }
 
   it should "Return a KafkaDeletionError if the topic does not exist" in {

@@ -7,6 +7,7 @@ import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.testkit.TestKit
 import cats.effect.{Concurrent, ContextShift, IO}
 import hydra.avro.registry.SchemaRegistry
+import hydra.avro.util.SchemaWrapper
 import hydra.core.ingest.RequestParams
 import hydra.core.ingest.RequestParams._
 import hydra.core.marshallers.GenericError
@@ -15,6 +16,8 @@ import hydra.kafka.algebras.KafkaClientAlgebra
 import org.apache.avro.SchemaBuilder
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
+import scalacache.Cache
+import scalacache.guava.GuavaCache
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -27,6 +30,7 @@ final class IngestionEndpointSpec
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
+  implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
 
   import scalacache.Mode
   implicit val mode: Mode[IO] = scalacache.CatsEffect.modes.async

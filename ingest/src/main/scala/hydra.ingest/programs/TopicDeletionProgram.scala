@@ -7,10 +7,15 @@ import hydra.kafka.algebras.KafkaAdminAlgebra.KafkaDeleteTopicErrorList
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import cats.data.{NonEmptyList, ValidatedNel}
 import cats.implicits._
+import hydra.avro.util.SchemaWrapper
 import hydra.ingest.programs.TopicDeletionProgram._
+import hydra.ingest.services.IngestionFlowV2
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
 import hydra.kafka.model.{TopicMetadata, TopicMetadataV2, TopicMetadataV2Key}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
+import scalacache.Cache
+import scalacache.guava.GuavaCache
+import scalacache.modes.try_._
 
 
 final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: KafkaAdminAlgebra[F],
@@ -18,7 +23,8 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
                                                                     v2MetadataTopicName: Subject,
                                                                     v1MetadataTopicName: Subject,
                                               schemaClient: SchemaRegistry[F],
-                                                                    metadataAlgebra: MetadataAlgebra[F]) {
+                                                                    metadataAlgebra: MetadataAlgebra[F])
+                                                                   (implicit guavaCache: Cache[SchemaWrapper]){
 
   def deleteFromSchemaRegistry(topicNames: List[String]): F[ValidatedNel[SchemaRegistryError, Unit]] = {
     topicNames.flatMap(topic => List(topic + "-key", topic + "-value")).traverse { subject =>
@@ -40,7 +46,8 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
         lookupAndDeleteMetadataForTopics(topicsToDeleteSchemaFor).map(metadataResult =>
           metadataResult.toEither.leftMap(errors => TopicMetadataDeletionErrors(MetadataDeleteTopicErrorList(errors)))
             .toValidatedNel.combine(schemaResult.toEither.leftMap(a => SchemaDeletionErrors(SchemaDeleteTopicErrorList(a)))
-          .toValidatedNel.combine(result.leftMap(KafkaDeletionErrors).toValidatedNel))))
+          .toValidatedNel.combine(result.leftMap(KafkaDeletionErrors).toValidatedNel)
+          .combine(guavaCache.removeAll().toEither.leftMap(e=> CacheDeletionError(e.getMessage)).map(_ => ()).toValidatedNel))))
     }
   }
 
@@ -108,3 +115,4 @@ sealed abstract class DeleteTopicError extends RuntimeException
 final case class KafkaDeletionErrors(kafkaDeleteTopicErrorList: KafkaDeleteTopicErrorList) extends DeleteTopicError
 final case class SchemaDeletionErrors(schemaDeleteTopicErrorList: SchemaDeleteTopicErrorList) extends DeleteTopicError
 final case class TopicMetadataDeletionErrors(metadataDeleteTopicErrorList: MetadataDeleteTopicErrorList) extends DeleteTopicError
+final case class CacheDeletionError(message: String) extends DeleteTopicError

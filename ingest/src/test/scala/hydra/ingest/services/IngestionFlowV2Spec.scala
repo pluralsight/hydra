@@ -4,6 +4,7 @@ import cats.effect.{Concurrent, ContextShift, IO}
 import cats.syntax.all._
 import fs2.kafka.{Header, Headers}
 import hydra.avro.registry.SchemaRegistry
+import hydra.avro.util.SchemaWrapper
 import hydra.core.transport.ValidationStrategy
 import hydra.ingest.services.IngestionFlowV2.{KeyAndValueMismatch, KeyAndValueMismatchedValuesException, V2IngestRequest}
 import hydra.kafka.algebras.KafkaClientAlgebra
@@ -12,6 +13,8 @@ import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import scalacache.Cache
+import scalacache.guava.GuavaCache
 
 import scala.concurrent.ExecutionContext
 
@@ -34,6 +37,8 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
 
   private val testValSchema: Schema = SchemaBuilder.record("TestRecord")
     .fields().requiredBoolean("testField").endRecord()
+
+  implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
 
   private def ingest(request: V2IngestRequest, altValueSchema: Option[Schema] = None): IO[KafkaClientAlgebra[IO]] = for {
     schemaRegistry <- SchemaRegistry.test[IO]
