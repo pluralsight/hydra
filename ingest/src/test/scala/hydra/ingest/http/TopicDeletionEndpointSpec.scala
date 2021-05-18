@@ -17,9 +17,12 @@ import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit._
+import hydra.avro.util.SchemaWrapper
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import scalacache.Cache
+import scalacache.guava.GuavaCache
 
 import scala.concurrent.ExecutionContext
 
@@ -33,6 +36,8 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
   private val v2MetadataTopicName = Subject.createValidated("_test.V2.MetadataTopic").get
   private val v1MetadataTopicName = Subject.createValidated("_test.V1.MetadataTopic").get
   private val consumerGroup = "consumer groups"
+  implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
+
 
   implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
     Slf4jLogger.getLogger[F]
