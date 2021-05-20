@@ -41,10 +41,10 @@ sealed trait TopicMetadataV2Parser
           .createValidated(value)
           .getOrElse(
             throw DeserializationException(
-              InvalidSubject(JsString(value)).errorMessage
+              Subject.invalidFormat
             )
           )
-      case j => throw DeserializationException(InvalidSubject(j).errorMessage)
+      case j => throw DeserializationException(Subject.invalidFormat)
     }
   }
 
@@ -503,12 +503,6 @@ object Errors {
     override def getMessage: String = {
       s"One or more of the Namespaces provided are invalid due to: $reason"
     }
-  }
-
-  final case class InvalidSubject(jsValue: JsValue) {
-
-    val errorMessage =
-      s"Field `subject` must be a string containing only numbers, letters, hyphens, periods, and underscores, received ${jsValue.compactPrint}."
   }
 
   final case class InvalidSchemas(value: JsValue) {
