@@ -40,7 +40,7 @@ object ContactMethod {
       refineV[EmailRegex](value).toOption.map(Email.apply)
   }
 
-  type SlackRegex = MatchesRegex[W.`"""^[#][^\\sA-Z]{1,79}$"""`.T]
+  type SlackRegex = MatchesRegex[W.`"""^[#]?[^\\sA-Z]{1,79}$"""`.T]
 
   private type SlackChannel =
     String Refined SlackRegex
