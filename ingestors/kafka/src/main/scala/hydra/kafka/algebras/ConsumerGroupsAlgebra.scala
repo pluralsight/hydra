@@ -1,13 +1,13 @@
 package hydra.kafka.algebras
 
 import java.time.Instant
-
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Timer}
 import cats.implicits._
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.algebras.ConsumerGroupsAlgebra.{Consumer, ConsumerTopics, Topic, TopicConsumers}
+import hydra.kafka.algebras.KafkaAdminAlgebra.{LagOffsets, Offset, TopicAndPartition}
 import hydra.kafka.algebras.KafkaClientAlgebra.Record
 import hydra.kafka.model.TopicConsumer
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
@@ -22,18 +22,20 @@ trait ConsumerGroupsAlgebra[F[_]] {
   def getAllConsumers: F[List[ConsumerTopics]]
   def getAllConsumersByTopic: F[List[TopicConsumers]]
   def startConsumer: F[Unit]
+  def getDetailedConsumerInfo(consumerGroupName: String) : F[List[Topic]]
 }
 
 object ConsumerGroupsAlgebra {
 
   type PartitionOffsetMap = Map[Int, Long]
+  final case class PartitionOffset(partition: Int, groupOffset: Offset, largestOffset: Offset, partitionLag: Long)
 
   final case class TopicConsumers(topicName: String, consumers: List[Consumer])
   final case class Consumer(consumerGroupName: String, lastCommit: Instant)
 
   final case class ConsumerTopics(consumerGroupName: String, topics: List[Topic])
-  final case class Topic(topicName: String, lastCommit: Instant)
-
+  final case class Topic(topicName: String, lastCommit: Instant, offsetInformation: Option[List[PartitionOffset]] = None)
+  // This is an Optional List so that we don't display information that is not needed, yes it is gross, yes it looks better this way
 
   def make[F[_]: ContextShift: ConcurrentEffect: Timer: Logger](
                                                                  kafkaInternalTopic: String,
@@ -72,6 +74,17 @@ object ConsumerGroupsAlgebra {
 
       override def getAllConsumersByTopic: F[List[TopicConsumers]] =
         consumerGroupsStorageFacade.get.map(_.getAllConsumersByTopic)
+
+      override def getDetailedConsumerInfo(consumerGroupName: String): F[List[Topic]] = {
+        getTopicsForConsumer(consumerGroupName).flatMap{topicInfo =>
+          topicInfo.topics.traverse{topic =>
+            kAA.getConsumerLag(topic.topicName, consumerGroupName).map {lag =>
+              Topic(topic.topicName, topic.lastCommit, Some(lag.toList.map(a =>
+                PartitionOffset(a._1.partition, a._2.group, a._2.latest, a._2.latest.value - a._2.group.value))))
+            }
+          }
+        }
+      }
     }
   }
 
