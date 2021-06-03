@@ -28,14 +28,13 @@ trait ConsumerGroupsAlgebra[F[_]] {
 object ConsumerGroupsAlgebra {
 
   type PartitionOffsetMap = Map[Int, Long]
-  final case class PartitionOffset(partition: Int, groupOffset: Offset, largestOffset: Offset, partitionLag: Long)
+  final case class PartitionOffset(partition: Int, groupOffset: Long, largestOffset: Long, partitionLag: Long)
 
   final case class TopicConsumers(topicName: String, consumers: List[Consumer])
   final case class Consumer(consumerGroupName: String, lastCommit: Instant)
 
   final case class ConsumerTopics(consumerGroupName: String, topics: List[Topic])
-  final case class Topic(topicName: String, lastCommit: Instant, offsetInformation: Option[List[PartitionOffset]] = None)
-  // This is an Optional List so that we don't display information that is not needed, yes it is gross, yes it looks better this way
+  final case class Topic(topicName: String, lastCommit: Instant, offsetInformation: List[PartitionOffset] = List.empty)
 
   def make[F[_]: ContextShift: ConcurrentEffect: Timer: Logger](
                                                                  kafkaInternalTopic: String,
@@ -79,8 +78,8 @@ object ConsumerGroupsAlgebra {
         getTopicsForConsumer(consumerGroupName).flatMap{topicInfo =>
           topicInfo.topics.traverse{topic =>
             kAA.getConsumerLag(topic.topicName, consumerGroupName).map {lag =>
-              Topic(topic.topicName, topic.lastCommit, Some(lag.toList.map(a =>
-                PartitionOffset(a._1.partition, a._2.group, a._2.latest, a._2.latest.value - a._2.group.value))))
+              Topic(topic.topicName, topic.lastCommit, lag.toList.map(a =>
+                PartitionOffset(a._1.partition, a._2.group.value, a._2.latest.value, a._2.latest.value - a._2.group.value)))
             }
           }
         }
