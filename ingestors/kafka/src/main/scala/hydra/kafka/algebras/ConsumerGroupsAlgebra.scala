@@ -34,7 +34,7 @@ object ConsumerGroupsAlgebra {
   final case class Consumer(consumerGroupName: String, lastCommit: Instant)
 
   final case class ConsumerTopics(consumerGroupName: String, topics: List[Topic])
-  final case class Topic(topicName: String, lastCommit: Instant, offsetInformation: List[PartitionOffset] = List.empty)
+  final case class Topic(topicName: String, lastCommit: Instant, offsetInformation: List[PartitionOffset] = List.empty, totalLag: Option[Long] = None)
 
   def make[F[_]: ContextShift: ConcurrentEffect: Timer: Logger](
                                                                  kafkaInternalTopic: String,
@@ -77,9 +77,9 @@ object ConsumerGroupsAlgebra {
       override def getDetailedConsumerInfo(consumerGroupName: String): F[List[Topic]] = {
         getTopicsForConsumer(consumerGroupName).flatMap{topicInfo =>
           topicInfo.topics.traverse{topic =>
-            kAA.getConsumerLag(topic.topicName, consumerGroupName).map {lag =>
+            kAA.getConsumerLag(topic.topicName, consumerGroupName).map { lag =>
               Topic(topic.topicName, topic.lastCommit, lag.toList.map(a =>
-                PartitionOffset(a._1.partition, a._2.group.value, a._2.latest.value, a._2.latest.value - a._2.group.value)))
+                PartitionOffset(a._1.partition, a._2.group.value, a._2.latest.value, a._2.latest.value - a._2.group.value)), lag.values.map(v => v.latest.value - v.group.value).sum.some)
             }
           }
         }
