@@ -16,13 +16,10 @@
 
 package hydra.ingest.http
 
-import java.time.Instant
-
 import akka.actor.{ActorSelection, ActorSystem}
-import akka.http.javadsl.server.PathMatcher1
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.Location
-import akka.http.scaladsl.server.{ExceptionHandler, PathMatcher, PathMatcher0, Route}
+import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.pattern.ask
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
@@ -33,21 +30,19 @@ import hydra.core.akka.SchemaRegistryActor
 import hydra.core.akka.SchemaRegistryActor._
 import hydra.core.http.{CorsSupport, RouteSupport}
 import hydra.core.marshallers.GenericServiceResponse
-import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
-import org.apache.avro.SchemaParseException
-import spray.json.{JsArray, JsObject, JsValue, RootJsonFormat}
 import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.kafka.consumer.KafkaConsumerProxy.{ListTopics, ListTopicsResponse}
+import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
+import org.apache.avro.SchemaParseException
 import org.apache.kafka.common.PartitionInfo
 import scalacache.cachingF
-import scalacache._
 import scalacache.guava.GuavaCache
 import scalacache.modes.scalaFuture._
-import akka.http.scaladsl.server.ExceptionHandler
+import spray.json.RootJsonFormat
 
-import scala.concurrent.{ExecutionContext, Future}
+import java.time.Instant
 import scala.collection.immutable.Map
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 
 /**
@@ -176,10 +171,10 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
   }
 
   def getSchemas(subjects: List[String], startTime: Instant): Route = {
-    onSuccess(
-      (schemaRegistryActor ? FetchSchemasRequest(subjects))
-        .mapTo[FetchSchemasResponse]
-    ) {
+    val filteredSubjects = subjects.filter(_.contains("cp-kafka-co"))
+    onSuccess {
+      (schemaRegistryActor ? FetchSchemasRequest(filteredSubjects)).mapTo[FetchSchemasResponse]
+    } {
       response => {
         extractExecutionContext { implicit ec =>
           addHttpMetric("", OK , "/schemas", startTime, "GET")
