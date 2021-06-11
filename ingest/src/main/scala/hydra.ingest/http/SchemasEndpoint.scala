@@ -171,7 +171,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
   }
 
   def getSchemas(subjects: List[String], startTime: Instant): Route = {
-    val filteredSubjects = subjects.filter(_.contains("cp-kafka-co"))
+    val filteredSubjects = subjects.filterNot(_.contains("cp-kafka-co"))
     onSuccess {
       (schemaRegistryActor ? FetchSchemasRequest(filteredSubjects)).mapTo[FetchSchemasResponse]
     } {
