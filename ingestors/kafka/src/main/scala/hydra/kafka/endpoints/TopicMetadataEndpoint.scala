@@ -169,11 +169,11 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                       val req = TopicMetadataV2Request.fromMetadataOnlyRequest(schemas, mor)
                       onComplete(
                         Futurable[F].unsafeToFuture(createTopicProgram
-                          .publishMetadata(t, req))
+                          .createTopicFromMetadataOnly(t, req))
                       ) {
                         case Failure(exception) =>
                           addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/metadata", startTime, method.value)
-                          complete(StatusCodes.InternalServerError, s"Unable to create Metadata for topic $topic : ${exception.getMessage}")
+                          complete(StatusCodes.BadRequest, s"Unable to create Metadata for topic $topic : ${exception.getMessage}")
                         case Success(value) =>
                           addHttpMetric(topic, StatusCodes.OK, "/v2/metadata", startTime, method.value)
                           complete(StatusCodes.OK)

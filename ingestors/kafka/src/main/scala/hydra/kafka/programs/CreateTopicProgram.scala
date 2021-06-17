@@ -101,7 +101,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       .void
   }
 
-  def publishMetadata(
+  private def publishMetadata(
       topicName: Subject,
       createTopicRequest: TopicMetadataV2Request,
   ): F[Unit] = {
@@ -127,23 +127,41 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   }
 
   private def validateKeyAndValueSchemas(schemas: Schemas, subject: Subject): Resource[F, Unit] = {
-    val containsMismatches: F[Unit] = kafkaAdmin.describeTopic(subject.value).flatMap {
+   val containsMismatches: F[Unit] = kafkaAdmin.describeTopic(subject.value).flatMap {
       case Some(_) => Bracket[F, Throwable].unit
       case None =>
-        val keyFields = schemas.key.getFields.asScala.toList
-        val valueFields = schemas.value.getFields.asScala.toList
-        val mismatches = keyFields.flatMap{ k =>
-          valueFields.flatMap { v =>
-            if (k.name() == v.name() && !k.schema().equals(v.schema())) {
-              Some(KeyAndValueMismatch(k.name(), k.schema(), v.schema()))
+        (schemas.key.getType, schemas.value.getType) match {
+          case (Schema.Type.RECORD, Schema.Type.RECORD) => {
+            if(schemas.key.getFields.size() <= 0) {
+              Bracket[F, Throwable].raiseError(IncompatibleSchemaException("Must include Fields in Key"))
             } else {
-              None
+              val keyFields = schemas.key.getFields.asScala.toList
+              val valueFields = schemas.value.getFields.asScala.toList
+              val mismatches = keyFields.flatMap { k =>
+                valueFields.flatMap { v =>
+                  if (k.name() == v.name() && !k.schema().equals(v.schema())) {
+                    Some(KeyAndValueMismatch(k.name(), k.schema(), v.schema()))
+                  } else {
+                    None
+                  }
+                }
+              }
+              if (mismatches.isEmpty) ().pure else Bracket[F, Throwable].raiseError(IncompatibleKeyAndValueFieldNames(mismatches))
             }
           }
+          case _ => Bracket[F, Throwable].raiseError(IncompatibleSchemaException("Your key and value schemas must each be of type record. If you are adding metadata for a topic you created externally, you will need to register new key and value schemas"))
         }
-        if (mismatches.isEmpty) ().pure else Bracket[F, Throwable].raiseError(IncompatibleKeyAndValueFieldNames(mismatches))
     }
     Resource.liftF(containsMismatches)
+  }
+
+  def createTopicFromMetadataOnly(
+                   topicName: Subject,
+                   createTopicRequest: TopicMetadataV2Request): F[Unit] = {
+    (for {
+      _ <- validateKeyAndValueSchemas(createTopicRequest.schemas, topicName)
+      _ <- Resource.liftF(publishMetadata(topicName, createTopicRequest))
+    } yield()).use(_ => Bracket[F, Throwable].unit)
   }
 
   def createTopic(
@@ -151,11 +169,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       createTopicRequest: TopicMetadataV2Request,
       defaultTopicDetails: TopicDetails
   ): F[Unit] = {
-    val td = createTopicRequest.numPartitions
-      .map(numP => defaultTopicDetails.copy(numPartitions = numP.value)).getOrElse(defaultTopicDetails)
-    if(createTopicRequest.schemas.key.getFields.size() <= 0) {
-      Bracket[F, Throwable].raiseError(IncompatibleSchemaException("Must include Fields in Key"))
-    } else {
+    val td = createTopicRequest.numPartitions.map(numP =>
+      defaultTopicDetails.copy(numPartitions = numP.value)).getOrElse(defaultTopicDetails)
       (for {
         _ <- validateKeyAndValueSchemas(createTopicRequest.schemas, topicName)
         _ <- registerSchemas(
@@ -165,8 +180,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
         )
         _ <- createTopicResource(topicName, td)
         _ <- Resource.liftF(publishMetadata(topicName, createTopicRequest))
-      } yield ()).use(_ => Bracket[F, Throwable].unit)
-    }
+        } yield ()).use(_ => Bracket[F, Throwable].unit)
   }
 }
 
@@ -176,4 +190,5 @@ object CreateTopicProgram {
     RuntimeException(
       (List("Fields with same names in key and value schemas must have same type:", "Field Name\tKey Schema\tValue Schema") ++ errors.map(e => s"${e.fieldName}\t${e.keyFieldSchema.toString}\t${e.valueFieldSchema}")).mkString("\n")
     )
+
 }
