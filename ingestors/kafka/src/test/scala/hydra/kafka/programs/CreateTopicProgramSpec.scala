@@ -577,7 +577,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
         _ <- ctProgram.registerSchemas(subject ,keySchema, mismatchedValueSchema)
         _ <- ctProgram.createTopicResource(subject, TopicDetails(1,1,1))
-        _ <- Resource.liftF(ctProgram.publishMetadata(subject, topicMetadataV2Request))
+        _ <- Resource.liftF(ctProgram.createTopicFromMetadataOnly(subject, topicMetadataV2Request))
         _ <- Resource.liftF(ctProgram.createTopic(
           subject,
           createTopicMetadataRequest(keySchema, mismatchedValueSchemaEvolution),
@@ -586,6 +586,60 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       } yield (succeed))
       resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()
     }
+
+    "throw error if key schema is not registered as record type before creating topic from metadata only" in {
+      val incorrectKeySchema = new Schema.Parser().parse("""
+                                               |{
+                                               |	"type": "string"
+                                               |}""".stripMargin)
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      val subject = Subject.createValidated("dvs.subject").get
+      val topicMetadataV2Request = createTopicMetadataRequest(incorrectKeySchema, valueSchema)
+      val resource: Resource[IO, Assertion] = (for {
+        schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
+        metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
+        ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
+        _ <- ctProgram.registerSchemas(subject ,incorrectKeySchema, valueSchema)
+        _ <- ctProgram.createTopicResource(subject, TopicDetails(1,1,1))
+        _ <- Resource.liftF(ctProgram.createTopicFromMetadataOnly(subject, topicMetadataV2Request))
+      } yield fail("Should Fail to add Metadata - this yield should not be hit."))}
+
+    "throw error if value schema is not registered as record type before creating topic from metadata only" in {
+      val incorrectValueSchema = new Schema.Parser().parse("""
+                                                           |{
+                                                           |	"type": "string"
+                                                           |}""".stripMargin)
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      val subject = Subject.createValidated("dvs.subject").get
+      val topicMetadataV2Request = createTopicMetadataRequest(keySchema, incorrectValueSchema)
+      val resource: Resource[IO, Assertion] = (for {
+        schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
+        metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
+        ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
+        _ <- ctProgram.registerSchemas(subject ,keySchema, incorrectValueSchema)
+        _ <- ctProgram.createTopicResource(subject, TopicDetails(1,1,1))
+        _ <- Resource.liftF(ctProgram.createTopicFromMetadataOnly(subject, topicMetadataV2Request))
+      } yield fail("Should Fail to add Metadata - this yield should not be hit."))}
+
+    "successfully creating topic from metadata only where key and value schemas are records" in {
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      val subject = Subject.createValidated("dvs.subject").get
+      val topicMetadataV2Request = createTopicMetadataRequest(keySchema, valueSchema)
+      val resource: Resource[IO, Assertion] = (for {
+        schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
+        metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
+        ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
+        _ <- ctProgram.registerSchemas(subject ,keySchema, valueSchema)
+        _ <- ctProgram.createTopicResource(subject, TopicDetails(1,1,1))
+        _ <- Resource.liftF(ctProgram.createTopicFromMetadataOnly(subject, topicMetadataV2Request))
+      } yield (succeed))
+      resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()}
   }
 
   private final class TestKafkaClientAlgebraWithPublishTo(
