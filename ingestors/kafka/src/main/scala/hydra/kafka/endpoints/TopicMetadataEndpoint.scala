@@ -172,7 +172,7 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                           .createTopicFromMetadataOnly(t, req))
                       ) {
                         case Failure(exception) =>
-                          addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/metadata", startTime, method.value)
+                          addHttpMetric(topic, StatusCodes.BadRequest, "/v2/metadata", startTime, method.value)
                           complete(StatusCodes.BadRequest, s"Unable to create Metadata for topic $topic : ${exception.getMessage}")
                         case Success(value) =>
                           addHttpMetric(topic, StatusCodes.OK, "/v2/metadata", startTime, method.value)
