@@ -16,7 +16,7 @@
 
 package hydra.ingest.http
 
-import akka.actor.{ActorSelection, ActorSystem}
+import akka.actor.{ActorRef, ActorSelection, ActorSystem}
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
@@ -39,8 +39,8 @@ import scalacache.cachingF
 import scalacache.guava.GuavaCache
 import scalacache.modes.scalaFuture._
 import spray.json.RootJsonFormat
-
 import java.time.Instant
+import hydra.kafka.services.StreamsManagerActor.{GetMetadata, GetMetadataResponse}
 import scala.collection.immutable.Map
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
@@ -50,11 +50,10 @@ import scala.concurrent.duration._
   *
   * Created by alexsilva on 2/13/16.
   */
-class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSystem)
+class SchemasEndpoint(consumerProxy: ActorSelection, streamsManagerActor: ActorRef)(implicit system: ActorSystem)
     extends RouteSupport
     with ConfigSupport
     with CorsSupport {
-
   private implicit val cache = GuavaCache[Map[String, Seq[PartitionInfo]]]
 
 
@@ -132,8 +131,8 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
           val startTime = Instant.now
           pathEndOrSingleSlash {
             extractExecutionContext { implicit ec =>
-              onSuccess(topics) { topics =>
-                getSchemas(topics.keys.toList, startTime)
+              onSuccess((streamsManagerActor ? GetMetadata).mapTo[GetMetadataResponse].map(_.metadata.keys.toList))  { keyList =>
+                  getSchemas(keyList, startTime)
               }
             }
           }
