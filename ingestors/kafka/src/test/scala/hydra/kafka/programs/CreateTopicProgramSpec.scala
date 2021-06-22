@@ -677,6 +677,33 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()
     }
 
+    "succesfully validate topic schema with key that has field of type union [not null, not null]" in {
+      val union = SchemaBuilder.unionOf().intType().and().stringType().endUnion()
+      val recordWithNullDefault =
+        SchemaBuilder
+          .record("name")
+          .fields()
+          .name("nullableUnion")
+          .`type`(union)
+          .withDefault(5)
+          .endRecord()
+
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      val subject = Subject.createValidated("dvs.subject").get
+      val topicMetadataV2Request = createTopicMetadataRequest(recordWithNullDefault, valueSchema)
+      val resource: Resource[IO, Assertion] = (for {
+        schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
+        metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
+        ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
+        _ <- ctProgram.registerSchemas(subject, recordWithNullDefault, valueSchema)
+        _ <- ctProgram.createTopicResource(subject, TopicDetails(1,1,1))
+        _ <- Resource.liftF(ctProgram.createTopicFromMetadataOnly(subject, topicMetadataV2Request))
+      } yield (succeed))
+      resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()
+    }
+
     "successfully evolve schema which had mismatched types in past topic" in {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
       val subject = Subject.createValidated("dvs.subject").get

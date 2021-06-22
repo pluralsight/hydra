@@ -138,7 +138,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
               val valueFields = schemas.value.getFields.asScala.toList
               val keyNullErrors = keyFields.flatMap(field => field.schema().getType match {
                 case Schema.Type.UNION=> {
-                  if (field.schema.getTypes.asScala.toList.filter(_ isNullable).length > 0)
+                  if (field.schema.getTypes.asScala.toList.exists(_.isNullable))
                     Some(NullableField(field.name(), field.schema()))
                   else None
                 }
