@@ -1,7 +1,6 @@
 package hydra.kafka.programs
 
 import java.time.Instant
-
 import cats.data.NonEmptyList
 import cats.effect.concurrent.Ref
 import cats.effect.{Bracket, Concurrent, ContextShift, IO, Resource, Sync, Timer}
@@ -29,7 +28,7 @@ import eu.timepit.refined._
 
 import scala.concurrent.ExecutionContext
 import hydra.kafka.model.TopicMetadataV2Request.NumPartitions
-import hydra.kafka.programs.CreateTopicProgram.IncompatibleKeyAndValueFieldNames
+import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyHasNullableFields}
 import org.scalatest.compatible.Assertion
 
 class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
@@ -560,6 +559,122 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           TopicDetails(1, 1, 1)
         )
       } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}
+    }
+
+    "throw error on topic with key that has field of type union [null, ...]" in {
+      val union = SchemaBuilder.unionOf().nullType().and().stringType().endUnion()
+      val recordWithNullDefault =
+        SchemaBuilder
+          .record("name")
+          .fields()
+          .name("nullableUnion")
+          .`type`(union)
+          .withDefault(null)
+          .endRecord()
+
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      an [KeyHasNullableFields] shouldBe thrownBy {(for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
+        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
+        _ <- new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafka,
+          kafkaClient,
+          policy,
+          Subject.createValidated("dvs.test-metadata-topic").get,
+          metadata
+        ).createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createTopicMetadataRequest(recordWithNullDefault, valueSchema),
+          TopicDetails(1, 1, 1)
+        )
+      } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}
+    }
+
+    "throw error on topic with key that has field of type null" in {
+      val recordWithNullType =
+        SchemaBuilder
+          .record("name")
+          .fields()
+          .name("nullableField")
+          .`type`("null")
+          .noDefault()
+          .endRecord()
+
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      an [KeyHasNullableFields] shouldBe thrownBy {(for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
+        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
+        _ <- new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafka,
+          kafkaClient,
+          policy,
+          Subject.createValidated("dvs.test-metadata-topic").get,
+          metadata
+        ).createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createTopicMetadataRequest(recordWithNullType, valueSchema),
+          TopicDetails(1, 1, 1)
+        )
+      } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}
+    }
+
+    "succesfully validate topic schema with value that has field of type union [null, ...]" in {
+      val union = SchemaBuilder.unionOf().nullType().and().stringType().endUnion()
+      val recordWithNullDefault =
+        SchemaBuilder
+          .record("name")
+          .fields()
+          .name("nullableUnion")
+          .`type`(union)
+          .withDefault(null)
+          .endRecord()
+
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      val subject = Subject.createValidated("dvs.subject").get
+      val topicMetadataV2Request = createTopicMetadataRequest(keySchema, recordWithNullDefault)
+      val resource: Resource[IO, Assertion] = (for {
+        schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
+        metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
+        ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
+        _ <- ctProgram.registerSchemas(subject ,keySchema, recordWithNullDefault)
+        _ <- ctProgram.createTopicResource(subject, TopicDetails(1,1,1))
+        _ <- Resource.liftF(ctProgram.createTopicFromMetadataOnly(subject, topicMetadataV2Request))
+      } yield (succeed))
+      resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()
+    }
+
+    "succesfully validate topic schema with value that has field of type null" in {
+      val recordWithNullType =
+        SchemaBuilder
+          .record("name")
+          .fields()
+          .name("nullableField")
+          .`type`("null")
+          .noDefault()
+          .endRecord()
+
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      val subject = Subject.createValidated("dvs.subject").get
+      val topicMetadataV2Request = createTopicMetadataRequest(keySchema, recordWithNullType)
+      val resource: Resource[IO, Assertion] = (for {
+        schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
+        metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
+        ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
+        _ <- ctProgram.registerSchemas(subject ,keySchema, recordWithNullType)
+        _ <- ctProgram.createTopicResource(subject, TopicDetails(1,1,1))
+        _ <- Resource.liftF(ctProgram.createTopicFromMetadataOnly(subject, topicMetadataV2Request))
+      } yield (succeed))
+      resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()
     }
 
     "successfully evolve schema which had mismatched types in past topic" in {
