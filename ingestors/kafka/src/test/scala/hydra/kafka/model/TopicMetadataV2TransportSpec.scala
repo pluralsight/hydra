@@ -31,6 +31,13 @@ class TopicMetadataV2TransportSpec extends AnyWordSpecLike with Matchers {
       ContactMethod.Slack.create("Not a slack address") shouldBe None
     }
 
+    "Parse correct slack without hash" in {
+      val correctSlackChannel = "dev-data-platform"
+      val correctSlack = ContactMethod.Slack.create(correctSlackChannel)
+      correctSlack.get shouldBe a[ContactMethod.Slack]
+      correctSlack.get.channel.value shouldEqual (correctSlackChannel)
+    }
+
     "Parse correct Subjects" in {
       val correctSubjectString = "skills.exp-blah-blah"
       val correctSubject = Subject.createValidated(correctSubjectString)

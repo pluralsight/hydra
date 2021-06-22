@@ -280,6 +280,21 @@ class TopicMetadataEndpointSpec
         |    "teamName": "dvs-teamName"
         |}""".stripMargin
 
+    val invalidRequestWithEmptyTagList =
+    """{
+       |    "streamType": "Event",
+       |    "deprecated": true,
+       |    "dataClassification": "InternalUseOnly",
+       |    "contact": {
+       |        "email": "bob@myemail.com"
+       |    },
+       |    "createdDate": "2020-02-02T12:34:56Z",
+       |    "notes": "here are some notes",
+       |    "parentSubjects": [],
+       |    "teamName": "dvs-teamName",
+       |    "tags": []
+       |}""".stripMargin
+
     "return 200 with proper metadata" in {
       Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> route ~> check {
         response.status shouldBe StatusCodes.OK
@@ -288,6 +303,12 @@ class TopicMetadataEndpointSpec
 
     "return 400 with missing schemas" in {
       Put("/v2/metadata/dvs.subject.noschema", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> route ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
+
+    "return 400 with empty tag list" in {
+      Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, invalidRequestWithEmptyTagList)) ~> route ~> check {
         status shouldBe StatusCodes.BadRequest
       }
     }

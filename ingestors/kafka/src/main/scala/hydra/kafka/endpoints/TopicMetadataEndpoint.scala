@@ -2,7 +2,6 @@ package hydra.kafka.endpoints
 
 import java.time.Instant
 import java.util.concurrent.TimeUnit
-
 import akka.actor.ActorSelection
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
@@ -34,6 +33,7 @@ import akka.http.scaladsl.server.Directives.onComplete
 import akka.http.scaladsl.server.directives.Credentials
 import cats.data.NonEmptyList
 import hydra.avro.registry.SchemaRegistry
+import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
 import hydra.kafka.programs.CreateTopicProgram
 import org.apache.avro.{Schema, SchemaParseException}
 import spray.json.DeserializationException
@@ -150,32 +150,43 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
       Subject.createValidated(topic) match {
         case Some(t) => {
           entity(as[MetadataOnlyRequest]) { mor =>
-            onComplete(Futurable[F].unsafeToFuture(tagsAlgebra.validateTags(mor.tags))) {
-              case Failure(exception) =>{
-                addHttpMetric(topic, StatusCodes.BadRequest, "/v2/metadata", startTime, method.value, error = Some(exception.getMessage))
-                complete(StatusCodes.BadRequest, exception.getMessage)
-              }
-              case Success(_) =>
-                onComplete(getKeyValSchema(t)) {
-                  case Failure(exception) => {
-                    addHttpMetric(topic, StatusCodes.BadRequest, "/v2/metadata", startTime, method.value)
-                    complete(StatusCodes.BadRequest, exception.getMessage)
-                  }
-                  case Success(schemas) => {
-                    val req = TopicMetadataV2Request.fromMetadataOnlyRequest(schemas, mor)
-                    onComplete(
-                      Futurable[F].unsafeToFuture(createTopicProgram
-                        .publishMetadata(t, req))
-                    ) {
-                      case Failure(exception) =>
-                        addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/metadata", startTime, method.value)
-                        complete(StatusCodes.InternalServerError, s"Unable to create Metadata for topic $topic : ${exception.getMessage}")
-                      case Success(value) =>
-                        addHttpMetric(topic, StatusCodes.OK, "/v2/metadata", startTime, method.value)
-                        complete(StatusCodes.OK)
+            if (mor.tags.isEmpty) {
+              addHttpMetric(topic, StatusCodes.BadRequest, "/v2/metadata", startTime, method.value)
+              complete(StatusCodes.BadRequest, s"You must include at least one tag to create metadata for topic: $topic")
+            } else {
+              onComplete(Futurable[F].unsafeToFuture(tagsAlgebra.validateTags(mor.tags))) {
+                case Failure(exception) =>{
+                  addHttpMetric(topic, StatusCodes.BadRequest, "/v2/metadata", startTime, method.value, error = Some(exception.getMessage))
+                  complete(StatusCodes.BadRequest, exception.getMessage)
+                }
+                case Success(_) =>
+                  onComplete(getKeyValSchema(t)) {
+                    case Failure(exception) => {
+                      addHttpMetric(topic, StatusCodes.BadRequest, "/v2/metadata", startTime, method.value)
+                      complete(StatusCodes.BadRequest, exception.getMessage)
+                    }
+                    case Success(schemas) => {
+                      val req = TopicMetadataV2Request.fromMetadataOnlyRequest(schemas, mor)
+                      onComplete(
+                        Futurable[F].unsafeToFuture(createTopicProgram
+                          .createTopicFromMetadataOnly(t, req))
+                      ) {
+                        case Failure(exception) => exception match {
+                          case e:IncompatibleSchemaException =>
+                            addHttpMetric(topic, StatusCodes.BadRequest, "/v2/metadata", startTime, method.value, error=Some(e.getMessage))
+                            complete(StatusCodes.BadRequest, s"Unable to create Metadata for topic $topic : ${exception.getMessage}")
+                          case _ =>
+                            addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/metadata", startTime, method.value, error=Some(exception.getMessage))
+                            complete(StatusCodes.InternalServerError, s"Unable to create Metadata for topic $topic : ${exception.getMessage}")
+                        }
+
+                        case Success(value) =>
+                          addHttpMetric(topic, StatusCodes.OK, "/v2/metadata", startTime, method.value)
+                          complete(StatusCodes.OK)
+                      }
                     }
                   }
-                }
+              }
             }
           }
         }

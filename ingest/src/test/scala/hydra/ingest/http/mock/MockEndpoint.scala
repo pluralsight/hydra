@@ -6,10 +6,13 @@ import akka.actor.{ActorSelection, ActorSystem}
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
+import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
 import hydra.ingest.http.SchemasEndpoint
 import hydra.kafka.consumer.KafkaConsumerProxy
+import hydra.kafka.services.StreamsManagerActor
+import hydra.kafka.util.KafkaUtils
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -29,6 +32,16 @@ class MockEndpoint(
 
   val consumerProxy: ActorSelection = system.actorSelection(consumerPath)
 
+  private val bootstrapKafkaConfig =
+    applicationConfig.getConfig("bootstrap-config")
+
+  private val streamsManagerProps = StreamsManagerActor.props(
+    bootstrapKafkaConfig,
+    KafkaUtils.BootstrapServers,
+    ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient
+  )
+  private val streamsManagerActor = system.actorOf(streamsManagerProps)
+
   def throwRestClientException(
       statusCode: Int,
       errorCode: Int,
@@ -38,7 +51,7 @@ class MockEndpoint(
   }
 
   val schemaRouteExceptionHandler: ExceptionHandler = {
-    new SchemasEndpoint(consumerProxy).excptHandler(Instant.now, "MockEndpoint")
+    new SchemasEndpoint(consumerProxy, streamsManagerActor).excptHandler(Instant.now, "MockEndpoint")
   }
 
   def route: Route = {

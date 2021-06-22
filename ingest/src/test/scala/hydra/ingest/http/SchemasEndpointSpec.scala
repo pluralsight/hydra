@@ -1,21 +1,22 @@
 package hydra.ingest.http
 
+import java.util.UUID
+
 import akka.actor.{Actor, ActorRef, ActorSelection, ActorSystem, Props}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.testkit.TestKit
-import cats.effect.IO
-import com.typesafe.config.ConfigFactory
 import hydra.avro.registry.{ConfluentSchemaRegistry, SchemaRegistry}
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
 import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
 import hydra.ingest.http.mock.MockEndpoint
-import hydra.kafka.algebras.{KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.endpoints.{CreateTopicReq, CreateTopicResponseError, TopicMetadataEndpoint}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
+import hydra.kafka.model.TopicMetadata
+import hydra.kafka.services.StreamsManagerActor.{GetMetadata, GetMetadataResponse, TopicMetadataMessage}
 import org.apache.avro.Schema
 import org.apache.kafka.common.{Node, PartitionInfo}
 import org.scalatest.matchers.should.Matchers
@@ -23,9 +24,11 @@ import org.scalatest.wordspec.AnyWordSpecLike
 import spray.json.{JsArray, JsObject, JsValue, RootJsonFormat}
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 
+
 import scala.collection.immutable.Map
 import scala.concurrent.duration._
 import scala.io.Source
+import spray.json._
 
 /**
   * Created by alexsilva on 5/12/17.
@@ -44,6 +47,27 @@ class SchemasEndpointSpec
   implicit val kafkaConfig: EmbeddedKafkaConfig =
     EmbeddedKafkaConfig(kafkaPort = 8062, zooKeeperPort = 3161)
 
+  def getTopicMetadata(topicName: String): TopicMetadata = {
+    TopicMetadata(
+        topicName,
+        1234,
+        "History",
+        false,
+        Option(false),
+        "Public",
+        "test_contact",
+        Option("test_additionalDocumentation"),
+        Option("test_notes"),
+        UUID.randomUUID(),
+        org.joda.time.DateTime.now
+      )
+  }
+
+  val topicMetadataMap = Map(
+    "hydra.test.Tester" -> getTopicMetadata("hydra.test.tester"),
+    "hydra.test.NewTester" -> getTopicMetadata("hydra.test.NewTester")
+  )
+
   override def createActorSystem(): ActorSystem =
     ActorSystem(actorSystemNameFrom(getClass))
 
@@ -54,8 +78,20 @@ class SchemasEndpointSpec
     )
 
   val consumerProxy: ActorSelection = system.actorSelection(consumerPath)
+  val streamsManagerActor: ActorRef = system.actorOf(
+    Props(new Actor {
 
-  val schemasRoute = new SchemasEndpoint(consumerProxy).route
+      override def receive: Receive = {
+        case GetMetadata =>
+          sender ! GetMetadataResponse(topicMetadataMap)
+        case x =>
+          throw new RuntimeException(s"did not expect $x")
+      }
+    }),
+    "streams_manager_actor_test"
+  )
+
+  val schemasRoute = new SchemasEndpoint(consumerProxy, streamsManagerActor).route
   implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
   implicit val endpointV2Format = jsonFormat2(SchemasWithKeyEndpointResponse.apply)
   implicit val schemasWithTopicFormat: RootJsonFormat[SchemasWithTopicResponse] = jsonFormat2(SchemasWithTopicResponse.apply)
@@ -75,7 +111,6 @@ class SchemasEndpointSpec
 
   val newSchema =
     new Schema.Parser().parse(Source.fromResource("schema-new.avsc").mkString)
-
 
   override def beforeAll = {
     super.beforeAll()

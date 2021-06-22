@@ -1,7 +1,6 @@
 package hydra.kafka.programs
 
 import java.time.Instant
-
 import cats.effect.{Bracket, ExitCase, Resource, Sync}
 import cats.syntax.all._
 import hydra.avro.registry.SchemaRegistry
@@ -9,10 +8,10 @@ import hydra.avro.registry.SchemaRegistry.{IncompatibleSchemaException, SchemaVe
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{Schemas, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
-import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyAndValueMismatch}
+import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyAndValueMismatch, KeyHasNullableFields, NullableField}
 import hydra.kafka.util.KafkaUtils.TopicDetails
-import org.typelevel.log4cats.Logger
-import org.apache.avro.Schema
+import io.chrisdavenport.log4cats.Logger
+import org.apache.avro.{Schema}
 import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy, _}
 
@@ -101,7 +100,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       .void
   }
 
-  def publishMetadata(
+  private def publishMetadata(
       topicName: Subject,
       createTopicRequest: TopicMetadataV2Request,
   ): F[Unit] = {
@@ -127,23 +126,52 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   }
 
   private def validateKeyAndValueSchemas(schemas: Schemas, subject: Subject): Resource[F, Unit] = {
-    val containsMismatches: F[Unit] = kafkaAdmin.describeTopic(subject.value).flatMap {
+   val validate: F[Unit] = kafkaAdmin.describeTopic(subject.value).flatMap {
       case Some(_) => Bracket[F, Throwable].unit
       case None =>
-        val keyFields = schemas.key.getFields.asScala.toList
-        val valueFields = schemas.value.getFields.asScala.toList
-        val mismatches = keyFields.flatMap{ k =>
-          valueFields.flatMap { v =>
-            if (k.name() == v.name() && !k.schema().equals(v.schema())) {
-              Some(KeyAndValueMismatch(k.name(), k.schema(), v.schema()))
+        (schemas.key.getType, schemas.value.getType) match {
+          case (Schema.Type.RECORD, Schema.Type.RECORD) => {
+            if(schemas.key.getFields.size() <= 0) {
+              Bracket[F, Throwable].raiseError(IncompatibleSchemaException("Must include Fields in Key"))
             } else {
-              None
+              val keyFields = schemas.key.getFields.asScala.toList
+              val valueFields = schemas.value.getFields.asScala.toList
+              val keyNullErrors = keyFields.flatMap(field => field.schema().getType match {
+                case Schema.Type.UNION=> {
+                  if (field.schema.getTypes.asScala.toList.exists(_.isNullable))
+                    Some(NullableField(field.name(), field.schema()))
+                  else None
+                }
+                case Schema.Type.NULL => Some(NullableField(field.name(), field.schema()))
+                case _ => None
+              })
+              val mismatches = keyFields.flatMap { k =>
+                valueFields.flatMap { v =>
+                  if (k.name() == v.name() && !k.schema().equals(v.schema())) {
+                    Some(KeyAndValueMismatch(k.name(), k.schema(), v.schema()))
+                  } else {
+                    None
+                  }
+                }
+              }
+              if (keyNullErrors.isEmpty) {
+                if (mismatches.isEmpty) ().pure else Bracket[F, Throwable].raiseError(IncompatibleKeyAndValueFieldNames(mismatches))
+              } else Bracket[F, Throwable].raiseError(KeyHasNullableFields(keyNullErrors))
             }
           }
+          case _ => Bracket[F, Throwable].raiseError(IncompatibleSchemaException("Your key and value schemas must each be of type record. If you are adding metadata for a topic you created externally, you will need to register new key and value schemas"))
         }
-        if (mismatches.isEmpty) ().pure else Bracket[F, Throwable].raiseError(IncompatibleKeyAndValueFieldNames(mismatches))
     }
-    Resource.liftF(containsMismatches)
+    Resource.liftF(validate)
+  }
+
+  def createTopicFromMetadataOnly(
+                   topicName: Subject,
+                   createTopicRequest: TopicMetadataV2Request): F[Unit] = {
+    (for {
+      _ <- validateKeyAndValueSchemas(createTopicRequest.schemas, topicName)
+      _ <- Resource.liftF(publishMetadata(topicName, createTopicRequest))
+    } yield()).use(_ => Bracket[F, Throwable].unit)
   }
 
   def createTopic(
@@ -151,11 +179,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       createTopicRequest: TopicMetadataV2Request,
       defaultTopicDetails: TopicDetails
   ): F[Unit] = {
-    val td = createTopicRequest.numPartitions
-      .map(numP => defaultTopicDetails.copy(numPartitions = numP.value)).getOrElse(defaultTopicDetails)
-    if(createTopicRequest.schemas.key.getFields.size() <= 0) {
-      Bracket[F, Throwable].raiseError(IncompatibleSchemaException("Must include Fields in Key"))
-    } else {
+    val td = createTopicRequest.numPartitions.map(numP =>
+      defaultTopicDetails.copy(numPartitions = numP.value)).getOrElse(defaultTopicDetails)
       (for {
         _ <- validateKeyAndValueSchemas(createTopicRequest.schemas, topicName)
         _ <- registerSchemas(
@@ -165,15 +190,20 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
         )
         _ <- createTopicResource(topicName, td)
         _ <- Resource.liftF(publishMetadata(topicName, createTopicRequest))
-      } yield ()).use(_ => Bracket[F, Throwable].unit)
-    }
+        } yield ()).use(_ => Bracket[F, Throwable].unit)
   }
 }
 
 object CreateTopicProgram {
   final case class KeyAndValueMismatch(fieldName: String, keyFieldSchema: Schema, valueFieldSchema: Schema)
+  final case class NullableField(fieldName: String, keyFieldSchema: Schema)
+  final case class KeyHasNullableFields(errors: List[NullableField]) extends
+    RuntimeException(
+      (List("Fields within the key object cannot be nullable:", "Field Name\tKey Schema") ++ errors.map(e => s"${e.fieldName}\t${e.keyFieldSchema.toString}")).mkString("\n")
+    )
   final case class IncompatibleKeyAndValueFieldNames(errors: List[KeyAndValueMismatch]) extends
     RuntimeException(
       (List("Fields with same names in key and value schemas must have same type:", "Field Name\tKey Schema\tValue Schema") ++ errors.map(e => s"${e.fieldName}\t${e.keyFieldSchema.toString}\t${e.valueFieldSchema}")).mkString("\n")
     )
+
 }
