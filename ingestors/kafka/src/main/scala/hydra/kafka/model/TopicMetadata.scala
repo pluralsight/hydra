@@ -146,7 +146,7 @@ final case class TopicMetadataV2ValueOptionalTagList(
                                          dataClassification: DataClassification,
                                          contact: NonEmptyList[ContactMethod],
                                          createdDate: Instant,
-                                         parentSubjects: List[Subject],
+                                         parentSubjects: List[String],
                                          notes: Option[String],
                                          teamName: Option[String],
                                          tags: Option[List[String]]
@@ -175,7 +175,7 @@ final case class TopicMetadataV2Value(
     dataClassification: DataClassification,
     contact: NonEmptyList[ContactMethod],
     createdDate: Instant,
-    parentSubjects: List[Subject],
+    parentSubjects: List[String],
     notes: Option[String],
     teamName: Option[String],
     tags: List[String]
