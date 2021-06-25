@@ -13,7 +13,7 @@ import hydra.kafka.model.TopicConsumer
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.util.ConsumerGroupsOffsetConsumer
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.apache.avro.generic.GenericRecord
 
 trait ConsumerGroupsAlgebra[F[_]] {

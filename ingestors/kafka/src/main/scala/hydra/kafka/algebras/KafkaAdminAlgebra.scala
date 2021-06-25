@@ -8,7 +8,7 @@ import cats.syntax.all._
 import fs2.kafka._
 import hydra.core.protocol._
 import hydra.kafka.util.KafkaUtils.TopicDetails
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.clients.admin.NewTopic
 import org.apache.kafka.common.TopicPartition

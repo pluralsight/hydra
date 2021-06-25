@@ -8,7 +8,7 @@ object Dependencies {
   val akkaVersion = "2.6.7"
   val avroVersion = "1.10.0"
   val catsEffectVersion = "2.3.1"
-  val catsLoggerVersion = "1.1.1"
+  val catsLoggerVersion = "1.2.0"
   val catsRetryVersion = "2.1.0"
   val catsVersion = "2.2.0"
   val cirisVersion = "1.2.1"
@@ -45,7 +45,7 @@ object Dependencies {
 
     val cats = Seq(
       "com.github.cb372" %% "cats-retry" % catsRetryVersion,
-      "io.chrisdavenport" %% "log4cats-slf4j" % catsLoggerVersion,
+      "org.typelevel" %% "log4cats-slf4j" % catsLoggerVersion,
       "org.typelevel" %% "cats-core" % catsVersion,
       "org.typelevel" %% "cats-effect" % catsEffectVersion
     )
