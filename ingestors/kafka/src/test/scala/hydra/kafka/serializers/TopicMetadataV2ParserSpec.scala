@@ -418,7 +418,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       deprecated: Boolean = false,
       dataClassification: DataClassification = Public,
       validAvroSchema: JsValue = validAvroSchema,
-      parentSubjects: List[Subject] = List(),
+      parentSubjects: List[String] = List(),
       notes: Option[String] = None,
       createdDate: Instant = Instant.now(),
       numPartitions: Option[NumPartitions] = None,
@@ -431,7 +431,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       DataClassification,
       Email,
       Slack,
-      List[Subject],
+      List[String],
       Option[String],
       String,
       List[String]
@@ -545,9 +545,8 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val contact = NonEmptyList(email, slack :: Nil)
       val createdDate = Instant.now
       val parentSubjects = List(
-        Subject.createValidated("dvs.valid-parent-1").get,
-        Subject.createValidated("dvs.valid-parent-2").get
-      )
+        "dvs.valid-parent-1",
+        "dvs.valid-parent-2")
       val notes = Some("Notes go here.")
       val teamName = "dvs-teamName"
       val tags = List("Source: DVS")
