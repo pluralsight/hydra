@@ -16,6 +16,7 @@ import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
 import spray.json.RootJsonFormat
 
 import scala.util.control.NoStackTrace
+import fs2.kafka.{ KafkaAdminClient, KafkaConsumer }
 
 /**
   * Internal interface to interact with the KafkaAdminClient from FS2 Kafka.
@@ -201,14 +202,14 @@ object KafkaAdminAlgebra {
 
       private def getConsumerResource: Resource[F, KafkaConsumer[F, _, _]] = {
         val des = Deserializer[F, String]
-        consumerResource[F, String, String] {
+        KafkaConsumer.resource[F, String, String] {
           val s = ConsumerSettings.apply(des, des).withBootstrapServers(bootstrapServers)
           if (useSsl) s.withProperty("security.protocol", "SSL") else s
         }
       }
 
       private def getAdminClientResource: Resource[F, KafkaAdminClient[F]] = {
-        adminClientResource {
+        KafkaAdminClient.resource {
           val s = AdminClientSettings.apply.withBootstrapServers(bootstrapServers)
           if (useSsl) s.withProperty("security.protocol", "SSL") else s
         }
