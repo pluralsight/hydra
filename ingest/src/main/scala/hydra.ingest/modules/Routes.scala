@@ -1,6 +1,6 @@
 package hydra.ingest.modules
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.server.directives.RouteDirectives
 import akka.http.scaladsl.server.{Route, RouteConcatenation}
 import cats.effect.Sync
@@ -56,10 +56,10 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
       KafkaUtils.BootstrapServers,
       ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient
     )
-     val streamsManagerActor = system.actorOf(streamsManagerProps)
+     val streamsManagerActor: ActorRef = system.actorOf(streamsManagerProps, "streamsManagerActor")
 
     new SchemasEndpoint(consumerProxy, streamsManagerActor).route ~
-      new BootstrapEndpoint(system).route ~
+      new BootstrapEndpoint(system, streamsManagerActor).route ~
       new TopicMetadataEndpoint(consumerProxy, algebras.metadata,
         algebras.schemaRegistry, programs.createTopic, cfg.createTopicConfig.defaultMinInsyncReplicas, algebras.tagsAlgebra).route ~
       new ConsumerGroupsEndpoint(algebras.consumerGroups).route ~
