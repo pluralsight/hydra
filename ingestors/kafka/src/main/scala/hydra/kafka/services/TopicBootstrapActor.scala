@@ -51,7 +51,7 @@ import scala.util._
 class TopicBootstrapActor(
     schemaRegistryActor: ActorRef,
     kafkaIngestor: ActorSelection,
-    streamsManagerProps: Props,
+    streamsManagerActor: ActorRef,
     bootstrapConfig: Option[Config] = None
 ) extends Actor
     with ActorLogging
@@ -85,8 +85,6 @@ class TopicBootstrapActor(
   private val failureRetryInterval = bootstrapKafkaConfig
     .getIntOpt("failure-retry-millis")
     .getOrElse(2000)
-
-  private val streamsManagerActor = context.actorOf(streamsManagerProps)
 
   override def preStart(): Unit = {
     pipe(registerSchema(schema)) to self
@@ -308,16 +306,10 @@ object TopicBootstrapActor {
   def props(
       schemaRegistryActor: ActorRef,
       kafkaIngestor: ActorSelection,
-      streamsManagerProps: Props,
+      streamsManagerActor: ActorRef,
       config: Option[Config] = None
   ): Props =
-    Props(
-      classOf[TopicBootstrapActor],
-      schemaRegistryActor,
-      kafkaIngestor,
-      streamsManagerProps,
-      config
-    )
+    Props(new TopicBootstrapActor(schemaRegistryActor, kafkaIngestor, streamsManagerActor, config))
 
   sealed trait TopicBootstrapMessage
 
