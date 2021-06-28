@@ -63,7 +63,8 @@ trait BootstrapEndpointTestActors extends BootstrapEndpointActors {
     TopicBootstrapActor.props(
       schemaRegistryActor,
       kafkaIngestor,
-      streamsManagerActor,
+      system.actorOf(StreamsActorTest.props(bootstrapKafkaConfig, KafkaUtils.BootstrapServers,
+        ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient)),
       Some(bootstrapKafkaConfig)
     )
   )
