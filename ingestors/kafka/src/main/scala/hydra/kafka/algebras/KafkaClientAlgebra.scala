@@ -85,6 +85,19 @@ trait KafkaClientAlgebra[F[_]] {
                      ): fs2.Stream[F, StringRecord]
 
   /**
+    * Consume the Hydra record from Kafka including partition and offset info.
+    * Does not commit offsets. Each time function is called will return
+    * @param topicName - topic name to consume
+    * @param consumerGroup - group id for consume
+    * @return Stream that results in tupled K and V
+    */
+  def consumeStringKeyMessagesWithOffsetInfo(
+                       topicName: TopicName,
+                       consumerGroup: ConsumerGroup,
+                       commitOffsets: Boolean
+                     ): fs2.Stream[F, (StringRecord, OffsetInfo)]
+
+  /**
     * Sets a size limit for the Producer
     * @param sizeLimitBytes The largest number of allowable bytes in a record (inclusive)
     * @return The new algebra that rejects records above `sizeLimitBytes`
@@ -215,6 +228,10 @@ object KafkaClientAlgebra {
 
       override def consumeMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, (Record, (Partition, Offset))] = {
         consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets).map(c => ((c._1, c._2, c._3),(c._4,c._5)))
+      }
+
+      override def consumeStringKeyMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, (StringRecord, (Partition, Offset))] = {
+        consumeMessages[Option[String]](getStringKeyDeserializer, consumerGroup, topicName, commitOffsets).map(c => ((c._1, c._2, c._3),(c._4,c._5)))
       }
 
       override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, StringRecord] = {
@@ -367,6 +384,10 @@ object KafkaClientAlgebra {
     }
 
     override def consumeMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset))] = {
+      fs2.Stream.raiseError[F](OffsetInfoNotRetrievableInTest())
+    }
+
+    override def consumeStringKeyMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, ((Option[String], Option[GenericRecord], Option[Headers]), (Partition, Offset))] = {
       fs2.Stream.raiseError[F](OffsetInfoNotRetrievableInTest())
     }
   }
