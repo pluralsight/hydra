@@ -4,12 +4,13 @@ import cats.MonadError
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
 import hydra.kafka.algebras.KafkaAdminAlgebra.KafkaDeleteTopicErrorList
-import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
-import cats.data.{NonEmptyList, ValidatedNel}
+import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
+import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.implicits._
 import hydra.avro.util.SchemaWrapper
 import hydra.ingest.programs.TopicDeletionProgram._
 import hydra.ingest.services.IngestionFlowV2
+import hydra.kafka.algebras.ConsumerGroupsAlgebra.Consumer
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
 import hydra.kafka.model.{TopicMetadata, TopicMetadataV2, TopicMetadataV2Key}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -17,13 +18,14 @@ import scalacache.Cache
 import scalacache.guava.GuavaCache
 import scalacache.modes.try_._
 
-
 final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: KafkaAdminAlgebra[F],
                                                                     kafkaClient: KafkaClientAlgebra[F],
                                                                     v2MetadataTopicName: Subject,
                                                                     v1MetadataTopicName: Subject,
-                                              schemaClient: SchemaRegistry[F],
-                                                                    metadataAlgebra: MetadataAlgebra[F])
+                                                                    schemaClient: SchemaRegistry[F],
+                                                                    metadataAlgebra: MetadataAlgebra[F],
+                                                                    consumerGroupAlgebra: ConsumerGroupsAlgebra[F],
+                                                                    ignoreConsumers: List[String])
                                                                    (implicit guavaCache: Cache[SchemaWrapper]){
 
   def deleteFromSchemaRegistry(topicNames: List[String]): F[ValidatedNel[SchemaRegistryError, Unit]] = {
@@ -35,19 +37,45 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
   }
 
   def deleteTopic(topicNames: List[String]): F[ValidatedNel[DeleteTopicError, Unit]] = {
-    kafkaAdmin.deleteTopics(topicNames).flatMap { result =>
-      val topicsToDeleteSchemaFor = result match {
-        case Right(_) => topicNames
-        case Left(error) =>
-          val failedTopicNames = error.errors.map(_.topicName).toList.toSet
-          topicNames.toSet.diff(failedTopicNames).toList
+    topicNames.traverse { topic =>
+      consumerGroupAlgebra.getConsumersForTopic(topic).map { topicConsumers =>
+        val filteredConsumers = topicConsumers.consumers.filterNot(consumer => ignoreConsumers.contains(consumer.consumerGroupName))
+        if (filteredConsumers.length > 0) {
+          Left(ConsumersStillExistError(topic, filteredConsumers))
+        } else {
+          Right(topic)
+        }
       }
-      deleteFromSchemaRegistry(topicsToDeleteSchemaFor).flatMap(schemaResult =>
-        lookupAndDeleteMetadataForTopics(topicsToDeleteSchemaFor).map(metadataResult =>
-          metadataResult.toEither.leftMap(errors => TopicMetadataDeletionErrors(MetadataDeleteTopicErrorList(errors)))
-            .toValidatedNel.combine(schemaResult.toEither.leftMap(a => SchemaDeletionErrors(SchemaDeleteTopicErrorList(a)))
-          .toValidatedNel.combine(result.leftMap(KafkaDeletionErrors).toValidatedNel)
-          .combine(guavaCache.removeAll().toEither.leftMap(e=> CacheDeletionError(e.getMessage)).map(_ => ()).toValidatedNel))))
+    }.flatMap{ cge =>
+      val goodTopics: List[String] = cge.map { e =>
+        e match {
+          case Right(value) => value
+          case Left(value) => ""
+        }
+      }.filterNot(_ == "")
+      val consumerErrors = cge.map { e =>
+        val vnel = e match {
+          case Right(_) => Right(())
+          case Left(value) => Left(value)
+        }
+        vnel.toValidatedNel
+      }.combineAll
+      kafkaAdmin.deleteTopics(goodTopics).flatMap { result =>
+        val topicsToDeleteSchemaFor = result match {
+          case Right(_) => goodTopics
+          case Left(error) =>
+            val failedTopicNames = error.errors.map(_.topicName).toList.toSet
+            goodTopics.toSet.diff(failedTopicNames).toList
+        }
+        deleteFromSchemaRegistry(topicsToDeleteSchemaFor).flatMap(schemaResult =>
+          lookupAndDeleteMetadataForTopics(topicsToDeleteSchemaFor).map(metadataResult =>
+            metadataResult.toEither.leftMap(errors => TopicMetadataDeletionErrors(MetadataDeleteTopicErrorList(errors)))
+              .toValidatedNel.combine(schemaResult.toEither.leftMap(a => SchemaDeletionErrors(SchemaDeleteTopicErrorList(a)))
+              .toValidatedNel.combine(result.leftMap(KafkaDeletionErrors).toValidatedNel)
+              .combine{val b = guavaCache.removeAll().toEither.leftMap(e => CacheDeletionError(e.getMessage)).map(_ => ()).toValidatedNel
+                b}
+            .combine(consumerErrors))))
+      }
     }
   }
 
@@ -115,4 +143,5 @@ sealed abstract class DeleteTopicError extends RuntimeException
 final case class KafkaDeletionErrors(kafkaDeleteTopicErrorList: KafkaDeleteTopicErrorList) extends DeleteTopicError
 final case class SchemaDeletionErrors(schemaDeleteTopicErrorList: SchemaDeleteTopicErrorList) extends DeleteTopicError
 final case class TopicMetadataDeletionErrors(metadataDeleteTopicErrorList: MetadataDeleteTopicErrorList) extends DeleteTopicError
+final case class ConsumersStillExistError(topic: String, consumers: List[Consumer]) extends DeleteTopicError
 final case class CacheDeletionError(message: String) extends DeleteTopicError

@@ -1,13 +1,12 @@
 package hydra.ingest.http
 
 import java.time.Instant
-
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.Credentials
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
-import hydra.ingest.programs.{DeleteTopicError, KafkaDeletionErrors, SchemaDeletionErrors, TopicDeletionProgram}
+import hydra.ingest.programs.{ConsumersStillExistError, DeleteTopicError, KafkaDeletionErrors, SchemaDeletionErrors, TopicDeletionProgram}
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
 import spray.json.{DefaultJsonProtocol, RootJsonFormat}
@@ -35,8 +34,10 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
 
   import TopicDeletionEndpoint._
 
-  private def tupleErrorsToResponse(errorTuple: (List[SchemaDeletionErrors], List[KafkaDeletionErrors])): List[DeletionEndpointResponse] = {
-    schemaErrorsToResponse(errorTuple._1) ::: kafkaErrorsToResponse(errorTuple._2)
+  private def tupleErrorsToResponse(errorTuple: (List[SchemaDeletionErrors],
+                                                 List[KafkaDeletionErrors],
+                                                 List[ConsumersStillExistError])): List[DeletionEndpointResponse] = {
+    schemaErrorsToResponse(errorTuple._1) ::: kafkaErrorsToResponse(errorTuple._2) ::: consumerErrorsToResponse(errorTuple._3)
   }
 
   private def schemaErrorsToResponse(schemaResults: List[SchemaDeletionErrors]): List[DeletionEndpointResponse] = {
@@ -45,6 +46,10 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
 
   private def kafkaErrorsToResponse(kafkaResults: List[KafkaDeletionErrors]): List[DeletionEndpointResponse] = {
     kafkaResults.flatMap(_.kafkaDeleteTopicErrorList.errors.map(e => DeletionEndpointResponse(e.topicName, e.errorMessage)).toList)
+  }
+
+  private def consumerErrorsToResponse(consumerError: List[ConsumersStillExistError]): List[DeletionEndpointResponse] = {
+    consumerError.map(err => DeletionEndpointResponse(err.topic, s"The following consumers still exist for the topic: ${err.consumers.mkString(", ")}"))
   }
 
   private def validResponse(topics: List[String], userDeleting: String, path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
@@ -77,10 +82,11 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
 
   private def invalidResponse(topics: List[String], userDeleting: String, e: NonEmptyList[DeleteTopicError],
                               path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
-    val allErrors = e.foldLeft((List.empty[SchemaDeletionErrors], List.empty[KafkaDeletionErrors])) { (agg, i) =>
+    val allErrors = e.foldLeft((List.empty[SchemaDeletionErrors], List.empty[KafkaDeletionErrors], List.empty[ConsumersStillExistError])) { (agg, i) =>
       i match {
-        case sde: SchemaDeletionErrors => (agg._1 :+ sde, agg._2)
-        case kde: KafkaDeletionErrors => (agg._1, agg._2 :+ kde)
+        case sde: SchemaDeletionErrors => (agg._1 :+ sde, agg._2, agg._3)
+        case kde: KafkaDeletionErrors => (agg._1, agg._2 :+ kde, agg._3)
+        case cde: ConsumersStillExistError => (agg._1, agg._2, agg._3 :+ cde)
       }
     }
     val response = tupleErrorsToResponse(allErrors)

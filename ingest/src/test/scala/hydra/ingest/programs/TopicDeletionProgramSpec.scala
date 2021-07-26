@@ -234,7 +234,8 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
         v2MetadataTopicName,
         v1MetadataTopicName,
         schemaAlgebra,
-        metadataAlgebra
+        metadataAlgebra,
+
       ).deleteTopic(topicNamesToDelete)
       // get all topic names
       allTopics <- kafkaAdmin.getTopicNames
