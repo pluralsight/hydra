@@ -1,13 +1,12 @@
 package hydra.ingest.programs
 
 import java.time.Instant
-
 import cats.MonadError
 import cats.data.Validated.{Invalid, Valid}
 import cats.data.{NonEmptyList, ValidatedNel}
 import cats.effect.{Bracket, Concurrent, ContextShift, IO, Sync, Timer}
 import hydra.avro.registry.SchemaRegistry
-import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TestMetadataAlgebra}
+import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TestMetadataAlgebra}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.flatspec.AnyFlatSpec
@@ -32,6 +31,7 @@ import scalacache.guava.GuavaCache
 import scalacache.memoization._
 import scalacache.modes.try_._
 import cats.MonadError
+
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
 import java.io.IOException
@@ -215,6 +215,9 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       schemaAlgebra <- schemaRegistry
       kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
       metadataAlgebra <- TestMetadataAlgebra()
+      consumerGroupAlgebra <- ConsumerGroupsAlgebra.make("",Subject.createValidated("dvs.blah.blah").get,
+        Subject.createValidated("dvs.heyo.blah").get,"","","",
+        kafkaClientAlgebra,kafkaAdmin,schemaAlgebra)
       expectedDeletedV1Topics <- IO.pure(getExpectedDeletedTopics(v1TopicNames, topicNamesToDelete, kafkaTopicNamesToFail))
       expectedDeletedV2Topics <- IO.pure(getExpectedDeletedTopics(v2TopicNames, topicNamesToDelete, kafkaTopicNamesToFail))
       _ <- writeV2TopicMetadata(v2TopicNames, metadataAlgebra)
@@ -235,7 +238,8 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
         v1MetadataTopicName,
         schemaAlgebra,
         metadataAlgebra,
-
+        consumerGroupAlgebra,
+        List.empty
       ).deleteTopic(topicNamesToDelete)
       // get all topic names
       allTopics <- kafkaAdmin.getTopicNames

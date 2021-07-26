@@ -55,7 +55,7 @@ final class Programs[F[_]: Logger: Sync: Timer: Mode] private(
     algebras.schemaRegistry,
     algebras.metadata,
     algebras.consumerGroups,
-    //add consumers to ignore here.
+    cfg.ignoreDeletionConsumerGroups.consumerGroupListToIgnore
   )
 
 }

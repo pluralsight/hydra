@@ -1,9 +1,9 @@
 package hydra.ingest.http
 
 import cats.data.NonEmptyList
-import cats.effect.{Concurrent, ContextShift, IO, Sync}
+import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import hydra.avro.registry.SchemaRegistry
-import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
+import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.matchers.should.Matchers
@@ -37,6 +37,8 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
   private val v1MetadataTopicName = Subject.createValidated("_test.V1.MetadataTopic").get
   private val consumerGroup = "consumer groups"
   implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
+  implicit val timer: Timer[IO] = IO.timer(concurrent.ExecutionContext.global)
+
 
 
   implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
@@ -129,6 +131,14 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
   }
 
 
+  def getConsumerAlgebra(kafkaClientAlgebra: KafkaClientAlgebra[IO],
+                         kafkaAdminAlgebra: KafkaAdminAlgebra[IO],
+                         schemaAlgebra: SchemaRegistry[IO]): IO[ConsumerGroupsAlgebra[IO]] = {
+    ConsumerGroupsAlgebra.make("",Subject.createValidated("dvs.blah.blah").get,
+      Subject.createValidated("dvs.heyo.blah").get,"","","",
+      kafkaClientAlgebra,kafkaAdminAlgebra,schemaAlgebra)
+  }
+
   "The deletionEndpoint path" should {
 
     val validCredentials = BasicHttpCredentials("John", "myPass")
@@ -140,6 +150,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = false)
+        consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t.toString,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
         allTopics <- kafkaAlgebra.getTopicNames
@@ -152,7 +163,9 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
-            metadataAlgebra
+            metadataAlgebra,
+            consumerGroupAlgebra,
+            List.empty
           ),
           "myPass").route
         Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
@@ -170,6 +183,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
         allTopics <- kafkaAlgebra.getTopicNames
@@ -182,7 +196,9 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
-            metadataAlgebra
+            metadataAlgebra,
+            consumerGroupAlgebra,
+            List.empty
           ), "myPass").route
         Delete("/v2/topics/schemas/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
@@ -199,6 +215,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
       } yield {
@@ -209,7 +226,9 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
-            metadataAlgebra
+            metadataAlgebra,
+            consumerGroupAlgebra,
+            List.empty
           ), "myPass").route
         Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah","exp.hello.world","exp.hi.there"]}""")) ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
@@ -226,6 +245,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
       } yield {
@@ -236,7 +256,9 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
-            metadataAlgebra
+            metadataAlgebra,
+            consumerGroupAlgebra,
+            List.empty
           ), "myPass").route
         Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
@@ -253,6 +275,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
         allTopics <- kafkaAlgebra.getTopicNames
@@ -265,7 +288,9 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
-            metadataAlgebra
+            metadataAlgebra,
+            consumerGroupAlgebra,
+            List.empty
           ), "myPass").route
         Delete("/v2/topics/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
@@ -282,6 +307,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
         allTopics <- kafkaAlgebra.getTopicNames
@@ -294,7 +320,9 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
-            metadataAlgebra
+            metadataAlgebra,
+            consumerGroupAlgebra,
+            List.empty
           ), "myPass").route
         Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
           addCredentials(BasicHttpCredentials("John", "badPass")) ~> Route.seal(route) ~> check {
@@ -311,6 +339,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
         allTopics <- kafkaAlgebra.getTopicNames
@@ -323,7 +352,9 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
-            metadataAlgebra
+            metadataAlgebra,
+            consumerGroupAlgebra,
+            List.empty
           ), "myPass").route
         Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
           Route.seal(route) ~> check {
@@ -340,6 +371,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         schemaAlgebra <- schemaBadTest[IO](true, false)
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
         allTopics <- kafkaAlgebra.getTopicNames
@@ -352,7 +384,9 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
-            metadataAlgebra
+            metadataAlgebra,
+            consumerGroupAlgebra,
+            List.empty
           ), "myPass").route
         Delete("/v2/topics/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
@@ -369,6 +403,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         schemaAlgebra <- schemaBadTest[IO](false, true)
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
         allTopics <- kafkaAlgebra.getTopicNames
@@ -381,7 +416,9 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
-            metadataAlgebra
+            metadataAlgebra,
+            consumerGroupAlgebra,
+            List.empty
           ), "myPass").route
         Delete("/v2/topics/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
@@ -398,6 +435,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         schemaAlgebra <- schemaBadTest[IO](true, false)
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
         allTopics <- kafkaAlgebra.getTopicNames
@@ -410,7 +448,9 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
            v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
-            metadataAlgebra
+            metadataAlgebra,
+            consumerGroupAlgebra,
+            List.empty
           ), "myPass").route
         Delete("/v2/topics/schemas/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
@@ -427,6 +467,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         schemaAlgebra <- schemaBadTest[IO](false, true)
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
         allTopics <- kafkaAlgebra.getTopicNames
@@ -439,7 +480,9 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             v2MetadataTopicName,
             v1MetadataTopicName,
             schemaAlgebra,
-            metadataAlgebra
+            metadataAlgebra,
+            consumerGroupAlgebra,
+            List.empty
           ), "myPass").route
         Delete("/v2/topics/schemas/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
