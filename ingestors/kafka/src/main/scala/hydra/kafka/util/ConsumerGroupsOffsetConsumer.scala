@@ -94,9 +94,10 @@ object ConsumerGroupsOffsetConsumer {
                                                              valueSerializer: Serializer[F, GenericRecord]
                                                            ): fs2.Stream[F, ProducerRecords[Array[Byte], Array[Byte], Unit]] = {
     ((cr.record.key, cr.record.value) match {
-      case (Some(OffsetKey(_, k)), offsetMaybe) =>
-        val topicMaybe: Option[String] = Option(k.topicPartition.topic())
-        val consumerGroupMaybe: Option[String] = Option(k.group)
+      case (Some(OffsetKey(_, groupTopicPartition)), offsetMaybe) =>
+        val maybeK = Option(groupTopicPartition)
+        val topicMaybe: Option[String] = maybeK.flatMap(k => Option(k.topicPartition).flatMap(tp => Option(tp.topic())))
+        val consumerGroupMaybe: Option[String] = maybeK.flatMap(k => Option(k.group))
         val consumerKeyMaybe: Option[TopicConsumerKey] = consumerGroupMaybe.flatMap(cg => topicMaybe.map(t => TopicConsumerKey(t, cg)))
         val consumerValue = offsetMaybe.map(o => Instant.ofEpochMilli(o.commitTimestamp)).map(TopicConsumerValue.apply)
 
@@ -151,7 +152,7 @@ object ConsumerGroupsOffsetConsumer {
     val producerSettings = ProducerSettings[F, Array[Byte], Array[Byte]]
       .withBootstrapServers(bootstrapServers)
       .withRetries(0)
-      .withAcks(Acks.All)
+      .withAcks(Acks.One)
     val consumer = consumerStream(settings)
     val keySerializer = getSerializer[F, GenericRecord](s)(isKey = true)
     val valueSerializer = getSerializer[F, GenericRecord](s)(isKey = false)
