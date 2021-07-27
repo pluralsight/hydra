@@ -36,10 +36,11 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
     }.map(_.combineAll)
   }
 
-  def deleteTopic(topicNames: List[String]): F[ValidatedNel[DeleteTopicError, Unit]] = {
+  def deleteTopic(topicNames: List[String], ignoreConsumerGroups: List[String]): F[ValidatedNel[DeleteTopicError, Unit]] = {
     topicNames.traverse { topic =>
       consumerGroupAlgebra.getConsumersForTopic(topic).map { topicConsumers =>
-        val filteredConsumers = topicConsumers.consumers.filterNot(consumer => ignoreConsumers.contains(consumer.consumerGroupName))
+        val fullIgnoreList = ignoreConsumerGroups ++ ignoreConsumers
+        val filteredConsumers = topicConsumers.consumers.filterNot(consumer => fullIgnoreList.contains(consumer.consumerGroupName))
         if (filteredConsumers.length > 0) {
           Left(ConsumersStillExistError(topic, filteredConsumers))
         } else {
@@ -50,7 +51,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
       val goodTopics: List[String] = cge.map { e =>
         e match {
           case Right(value) => value
-          case Left(value) => ""
+          case Left(_) => ""
         }
       }.filterNot(_ == "")
       val consumerErrors = cge.map { e =>

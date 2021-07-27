@@ -52,7 +52,7 @@ object AppConfig {
   final case class IgnoreDeletionConsumerGroups(consumerGroupListToIgnore: List[String])
 
   private val ignoreDeletionConsumerGroups: ConfigValue[IgnoreDeletionConsumerGroups] = (
-    env("HYDRA_IGNORE_DELETION_CONSUMER_GROUP").as[String]
+    env("HYDRA_IGNORE_DELETION_CONSUMER_GROUP").as[String].default("")
   ).map(cfg => IgnoreDeletionConsumerGroups(cfg.split(",").toList))
 
 
