@@ -26,10 +26,11 @@ trait ConsumerGroupMarshallers extends DefaultJsonProtocol with SprayJsonSupport
       Some("topicName" -> JsString(topic.topicName)),
       Some("lastCommit" -> InstantFormat.write(topic.lastCommit)),
       if (topic.offsetInformation.isEmpty) None else Some("offsetInformation" -> JsArray(topic.offsetInformation.sortBy(_.partition).map(partitionOffset.write).toVector)),
-      if (topic.totalLag.isEmpty) None else Some("totalLag" -> JsNumber(topic.totalLag.getOrElse(0L)))
+      if (topic.totalLag.isEmpty) None else Some("totalLag" -> JsNumber(topic.totalLag.getOrElse(0L))),
+      if (topic.state.isEmpty) None else Some("State" -> JsString(topic.state.getOrElse("Unknown")))
     ).flatten.toMap)
 
-    override def read(json: JsValue): Topic = jsonFormat4(Topic.apply).read(json)
+    override def read(json: JsValue): Topic = jsonFormat5(Topic.apply).read(json)
   }
 
   implicit val consumerFormat: RootJsonFormat[ConsumerGroupsAlgebra.Consumer] = jsonFormat2(ConsumerGroupsAlgebra.Consumer)

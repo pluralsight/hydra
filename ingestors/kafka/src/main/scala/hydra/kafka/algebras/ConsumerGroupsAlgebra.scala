@@ -15,6 +15,7 @@ import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.util.ConsumerGroupsOffsetConsumer
 import io.chrisdavenport.log4cats.Logger
 import org.apache.avro.generic.GenericRecord
+import org.apache.kafka.clients.admin.ConsumerGroupDescription
 
 trait ConsumerGroupsAlgebra[F[_]] {
   def getConsumersForTopic(topicName: String): F[TopicConsumers]
@@ -23,6 +24,7 @@ trait ConsumerGroupsAlgebra[F[_]] {
   def getAllConsumersByTopic: F[List[TopicConsumers]]
   def startConsumer: F[Unit]
   def getDetailedConsumerInfo(consumerGroupName: String) : F[List[Topic]]
+  def getConsumerActiveState(consumerGroupName: String): F[String]
 }
 
 object ConsumerGroupsAlgebra {
@@ -34,7 +36,7 @@ object ConsumerGroupsAlgebra {
   final case class Consumer(consumerGroupName: String, lastCommit: Instant)
 
   final case class ConsumerTopics(consumerGroupName: String, topics: List[Topic])
-  final case class Topic(topicName: String, lastCommit: Instant, offsetInformation: List[PartitionOffset] = List.empty, totalLag: Option[Long] = None)
+  final case class Topic(topicName: String, lastCommit: Instant, offsetInformation: List[PartitionOffset] = List.empty, totalLag: Option[Long] = None, state: Option[String] = None)
 
   def make[F[_]: ContextShift: ConcurrentEffect: Timer: Logger](
                                                                  kafkaInternalTopic: String,
@@ -75,12 +77,23 @@ object ConsumerGroupsAlgebra {
         consumerGroupsStorageFacade.get.map(_.getAllConsumersByTopic)
 
       override def getDetailedConsumerInfo(consumerGroupName: String): F[List[Topic]] = {
-        getTopicsForConsumer(consumerGroupName).flatMap{topicInfo =>
-          topicInfo.topics.traverse{topic =>
-            kAA.getConsumerLag(topic.topicName, consumerGroupName).map { lag =>
-              Topic(topic.topicName, topic.lastCommit, lag.toList.map(a =>
-                PartitionOffset(a._1.partition, a._2.group.value, a._2.latest.value, a._2.latest.value - a._2.group.value)), lag.values.map(v => v.latest.value - v.group.value).sum.some)
+        getTopicsForConsumer(consumerGroupName).flatMap { topicInfo =>
+          topicInfo.topics.traverse { topic =>
+            getConsumerActiveState(consumerGroupName).flatMap { state =>
+              kAA.getConsumerLag(topic.topicName, consumerGroupName).map { lag =>
+                Topic(topic.topicName, topic.lastCommit, lag.toList.map(a =>
+                  PartitionOffset(a._1.partition, a._2.group.value, a._2.latest.value, a._2.latest.value - a._2.group.value)), lag.values.map(v => v.latest.value - v.group.value).sum.some, Some(state))
+              }
             }
+          }
+        }
+      }
+
+      override def getConsumerActiveState(consumerGroupName: String): F[String] = {
+        kAA.describeConsumerGroup(consumerGroupName).map { detailed =>
+          detailed match {
+            case Some(value) => value.state().toString
+            case None => "Unknown"
           }
         }
       }
@@ -107,19 +120,24 @@ object ConsumerGroupsAlgebra {
 private case class ConsumerGroupsStorageFacade(consumerMap: Map[TopicConsumerKey, TopicConsumerValue]) {
   def addConsumerGroup(key: TopicConsumerKey, value: TopicConsumerValue): ConsumerGroupsStorageFacade =
     this.copy(this.consumerMap + (key -> value))
+
   def removeConsumerGroup(key: TopicConsumerKey): ConsumerGroupsStorageFacade =
     this.copy(this.consumerMap - key)
+
   def getConsumersForTopicName(topicName: String): TopicConsumers = {
     val consumerGroups = consumerMap.filterKeys(_.topicName == topicName).map(p => Consumer(p._1.consumerGroupName, p._2.lastCommit)).toList
     TopicConsumers(topicName, consumerGroups)
   }
+
   def getTopicsForConsumerGroupName(consumerGroupName: String): ConsumerTopics = {
     val topics = consumerMap.filterKeys(_.consumerGroupName == consumerGroupName).map(p => Topic(p._1.topicName, p._2.lastCommit)).toList
     ConsumerTopics(consumerGroupName, topics)
   }
+
   def getAllConsumers: List[ConsumerTopics] = {
     consumerMap.keys.map(_.consumerGroupName).toSet.map(getTopicsForConsumerGroupName).toList
   }
+
   def getAllConsumersByTopic: List[TopicConsumers] = {
     consumerMap.keys.map(_.topicName).toSet.map(getConsumersForTopicName).toList
   }
