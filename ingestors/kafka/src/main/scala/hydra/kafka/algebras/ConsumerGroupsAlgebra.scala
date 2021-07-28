@@ -24,7 +24,6 @@ trait ConsumerGroupsAlgebra[F[_]] {
   def getAllConsumersByTopic: F[List[TopicConsumers]]
   def startConsumer: F[Unit]
   def getDetailedConsumerInfo(consumerGroupName: String) : F[List[Topic]]
-  def getConsumerActiveState(consumerGroupName: String): F[String]
 }
 
 object ConsumerGroupsAlgebra {
@@ -89,7 +88,7 @@ object ConsumerGroupsAlgebra {
         }
       }
 
-      override def getConsumerActiveState(consumerGroupName: String): F[String] = {
+      private def getConsumerActiveState(consumerGroupName: String): F[String] = {
         kAA.describeConsumerGroup(consumerGroupName).map { detailed =>
           detailed match {
             case Some(value) => value.state().toString
