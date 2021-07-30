@@ -31,6 +31,7 @@ import scalacache.guava.GuavaCache
 import scalacache.memoization._
 import scalacache.modes.try_._
 import cats.MonadError
+import org.apache.kafka.clients.admin.ConsumerGroupDescription
 
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
@@ -111,6 +112,8 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       override def deleteTopics(topicNames: List[String]): F[Either[KafkaDeleteTopicErrorList, Unit]] =
         Sync[F].pure(Left(new KafkaDeleteTopicErrorList( NonEmptyList.fromList(
           topicNames.map(topic => KafkaDeleteTopicError(topic, new Exception("Unable to delete topic")))).get)))
+
+      override def describeConsumerGroup(consumerGroupName: String): F[Option[ConsumerGroupDescription]] = ???
     }
   }
 

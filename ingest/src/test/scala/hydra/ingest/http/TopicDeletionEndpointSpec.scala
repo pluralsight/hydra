@@ -21,6 +21,7 @@ import hydra.avro.util.SchemaWrapper
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import org.apache.kafka.clients.admin.ConsumerGroupDescription
 import scalacache.Cache
 import scalacache.guava.GuavaCache
 
@@ -111,6 +112,8 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           Sync[F].pure(Left(new KafkaDeleteTopicErrorList(NonEmptyList.fromList(
             topicNames.map(topic => KafkaDeleteTopicError(topic, new Exception("Unable to delete topic")))).get)))
       }
+
+      override def describeConsumerGroup(consumerGroupName: String): F[Option[ConsumerGroupDescription]] = ???
     }
   }
 

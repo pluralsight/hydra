@@ -12,13 +12,14 @@ import hydra.core.http.RouteSupport
 import spray.json._
 import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.ingest.programs.TopicDeletionProgram.SchemaDeleteTopicErrorList
+import hydra.kafka.marshallers.ConsumerGroupMarshallers
 
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
 object TopicDeletionEndpoint extends
   DefaultJsonProtocol with
-  SprayJsonSupport
+  SprayJsonSupport with ConsumerGroupMarshallers
 {
   private implicit val endpointFormat = jsonFormat2(DeletionEndpointResponse.apply)
   final case class DeletionEndpointResponse(topicOrSubject: String, message: String)
@@ -65,7 +66,7 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
   }
 
   private def consumerErrorsToResponse(consumerError: List[ConsumersStillExistError]): List[DeletionEndpointResponse] = {
-    consumerError.map(err => DeletionEndpointResponse(err.topic, s"The following consumers still exist for the topic: ${err.consumers.mkString(", ")}"))
+    consumerError.map(err => DeletionEndpointResponse(err.topic, s"The following consumers still exist for the topic: ${err.consumers.toJson.compactPrint}"))
   }
 
   private def validResponse(topics: List[String], userDeleting: String, path: String, startTime: Instant)(implicit ec: ExecutionContext) = {

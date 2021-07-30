@@ -5,8 +5,9 @@ import spray.json.{RootJsonFormat, _}
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import hydra.core.transport.AckStrategy
 import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra}
-import hydra.kafka.algebras.ConsumerGroupsAlgebra.{ConsumerTopics, PartitionOffset, Topic, TopicConsumers}
+import hydra.kafka.algebras.ConsumerGroupsAlgebra.{ConsumerTopics, DetailedConsumerGroup, PartitionOffset, TopicConsumers}
 import hydra.kafka.algebras.KafkaAdminAlgebra.{LagOffsets, Offset, TopicAndPartition}
+import hydra.kafka.serializers.TopicMetadataV2Parser.IntentionallyUnimplemented
 
 trait ConsumerGroupMarshallers extends DefaultJsonProtocol with SprayJsonSupport {
 
@@ -21,19 +22,29 @@ trait ConsumerGroupMarshallers extends DefaultJsonProtocol with SprayJsonSupport
   implicit val lag: RootJsonFormat[LagOffsets] = jsonFormat2(LagOffsets.apply)
   implicit val partitionOffset: RootJsonFormat[PartitionOffset] = jsonFormat4(PartitionOffset.apply)
 
-  implicit object topicFormat extends RootJsonFormat[Topic] {
-    override def write(topic: Topic): JsValue = JsObject(List(
-      Some("topicName" -> JsString(topic.topicName)),
-      Some("lastCommit" -> InstantFormat.write(topic.lastCommit)),
-      if (topic.offsetInformation.isEmpty) None else Some("offsetInformation" -> JsArray(topic.offsetInformation.sortBy(_.partition).map(partitionOffset.write).toVector)),
-      if (topic.totalLag.isEmpty) None else Some("totalLag" -> JsNumber(topic.totalLag.getOrElse(0L))),
-      if (topic.state.isEmpty) None else Some("State" -> JsString(topic.state.getOrElse("Unknown")))
+  implicit object detailedConsumerGroupFormat extends RootJsonFormat[DetailedConsumerGroup] {
+    override def write(detailedConsumerGroup: DetailedConsumerGroup): JsValue = JsObject(List(
+      Some("topicName" -> JsString(detailedConsumerGroup.topicName)),
+      Some("consumerGroupName" -> JsString(detailedConsumerGroup.consumergroupName)),
+      Some("lastCommit" -> InstantFormat.write(detailedConsumerGroup.lastCommit)),
+      if (detailedConsumerGroup.offsetInformation.isEmpty) None else Some("offsetInformation" ->
+        JsArray(detailedConsumerGroup.offsetInformation.sortBy(_.partition).map(partitionOffset.write).toVector)),
+      if (detailedConsumerGroup.totalLag.isEmpty) None else Some("totalLag" -> JsNumber(detailedConsumerGroup.totalLag.getOrElse(0L))),
+      if (detailedConsumerGroup.state.isEmpty) None else Some("State" -> JsString(detailedConsumerGroup.state.getOrElse("Unknown")))
     ).flatten.toMap)
 
-    override def read(json: JsValue): Topic = jsonFormat5(Topic.apply).read(json)
+    override def read(json: JsValue): DetailedConsumerGroup = jsonFormat6(DetailedConsumerGroup.apply).read(json)
   }
 
-  implicit val consumerFormat: RootJsonFormat[ConsumerGroupsAlgebra.Consumer] = jsonFormat2(ConsumerGroupsAlgebra.Consumer)
+  implicit object consumerFormat extends RootJsonFormat[ConsumerGroupsAlgebra.Consumer] {
+    override def write(obj: ConsumerGroupsAlgebra.Consumer): JsValue = JsObject(List(
+      Some("consumerGroupName" -> JsString(obj.consumerGroupName)),
+      Some("lastCommit" -> InstantFormat.write(obj.lastCommit)),
+      if(obj.state.isEmpty) None else Some("state" -> JsString(obj.state.getOrElse("Unknown")))
+    ).flatten.toMap)
+
+    override def read(json: JsValue): ConsumerGroupsAlgebra.Consumer = throw IntentionallyUnimplemented
+  }
 
   implicit val consumerTopicsFormat: RootJsonFormat[ConsumerTopics] = jsonFormat2(ConsumerTopics)
   implicit val topicConsumersFormat: RootJsonFormat[TopicConsumers] = jsonFormat2(TopicConsumers)

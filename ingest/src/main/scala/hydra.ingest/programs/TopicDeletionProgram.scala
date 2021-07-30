@@ -10,7 +10,7 @@ import cats.implicits._
 import hydra.avro.util.SchemaWrapper
 import hydra.ingest.programs.TopicDeletionProgram._
 import hydra.ingest.services.IngestionFlowV2
-import hydra.kafka.algebras.ConsumerGroupsAlgebra.Consumer
+import hydra.kafka.algebras.ConsumerGroupsAlgebra.{Consumer, DetailedConsumerGroup}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
 import hydra.kafka.model.{TopicMetadata, TopicMetadataV2, TopicMetadataV2Key}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -37,17 +37,32 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
   }
 
   def deleteTopic(topicNames: List[String], ignoreConsumerGroups: List[String]): F[ValidatedNel[DeleteTopicError, Unit]] = {
-    topicNames.traverse { topic =>
-      consumerGroupAlgebra.getConsumersForTopic(topic).map { topicConsumers =>
+    val eitherErrorOrTopic: F[List[Either[ConsumersStillExistError, String]]] = topicNames.traverse { topic =>
+      consumerGroupAlgebra.getConsumersForTopic(topic).flatMap { topicConsumers =>
         val fullIgnoreList = ignoreConsumerGroups ++ ignoreConsumers
-        val filteredConsumers = topicConsumers.consumers.filterNot(consumer => fullIgnoreList.contains(consumer.consumerGroupName))
-        if (filteredConsumers.length > 0) {
-          Left(ConsumersStillExistError(topic, filteredConsumers))
-        } else {
-          Right(topic)
+
+        val filteredConsumersF: F[List[DetailedConsumerGroup]] =
+          topicConsumers.consumers
+            .filterNot(consumer => fullIgnoreList.contains(consumer.consumerGroupName))
+            .traverse { consumer =>
+              consumerGroupAlgebra.getDetailedConsumerInfo(consumer.consumerGroupName)
+                .map(listOfInfo => listOfInfo.filter(_.state.getOrElse("Unknown") != "Empty"))
+            }.map(_.flatten)
+
+
+        for {
+          filteredConsumers <- filteredConsumersF
+        } yield {
+          if (filteredConsumers.nonEmpty) {
+            Left(ConsumersStillExistError(topic, filteredConsumers.map(detailedConsumer =>
+              Consumer(detailedConsumer.consumergroupName, detailedConsumer.lastCommit, detailedConsumer.state))))
+          } else {
+            Right(topic)
+          }
         }
       }
-    }.flatMap{ cge =>
+    }
+      eitherErrorOrTopic.flatMap{ cge =>
       val goodTopics: List[String] = cge.map { e =>
         e match {
           case Right(value) => value
