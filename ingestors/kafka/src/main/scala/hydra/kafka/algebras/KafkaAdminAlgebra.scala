@@ -13,6 +13,7 @@ import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.clients.admin.NewTopic
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
+import spray.json.RootJsonFormat
 
 import scala.util.control.NoStackTrace
 import fs2.kafka.{ KafkaAdminClient, KafkaConsumer }
@@ -94,9 +95,9 @@ object KafkaAdminAlgebra {
     def apply(t: TopicPartition): TopicAndPartition =
       new TopicAndPartition(t.topic, t.partition)
   }
-  final case class Offset(value: Long) extends AnyVal
+  final case class Offset(value: Long)
   object Offset {
-    def apply(o: OffsetAndMetadata): Offset =
+    def fromOffsetAndMetadata(o: OffsetAndMetadata): Offset =
       new Offset(o.offset)
   }
   final case class LagOffsets(latest: Offset, group: Offset)
@@ -151,7 +152,7 @@ object KafkaAdminAlgebra {
 
       override def getConsumerGroupOffsets(consumerGroup: String): F[Map[TopicAndPartition, Offset]] =
         getAdminClientResource.use(_.listConsumerGroupOffsets(consumerGroup)
-          .partitionsToOffsetAndMetadata.map(_.map(r => TopicAndPartition(r._1) -> Offset(r._2))))
+          .partitionsToOffsetAndMetadata.map(_.map(r => TopicAndPartition(r._1) -> Offset.fromOffsetAndMetadata(r._2))))
 
       override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] = {
         getConsumerResource.use { consumerMaybe =>

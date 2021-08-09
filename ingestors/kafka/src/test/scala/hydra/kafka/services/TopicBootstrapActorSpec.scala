@@ -162,7 +162,7 @@ class TopicBootstrapActorSpec
       TopicBootstrapActor.props(
         schemaRegistryActor,
         system.actorSelection("/user/kafka_ingestor_test1"),
-        Props(new MockStreamsManagerActor())
+        system.actorOf(Props(new MockStreamsManagerActor()))
       )
     )
 
@@ -218,7 +218,7 @@ class TopicBootstrapActorSpec
       TopicBootstrapActor.props(
         schemaRegistryActor,
         system.actorSelection("/user/kafka_ingestor_test2"),
-        Props(new MockStreamsManagerActor())
+        system.actorOf(Props(new MockStreamsManagerActor()))
       )
     )
 
@@ -268,7 +268,7 @@ class TopicBootstrapActorSpec
       TopicBootstrapActor.props(
         schemaRegistryActor,
         system.actorSelection("/user/kafka_ingestor_test3"),
-        Props(new MockStreamsManagerActor())
+        system.actorOf(Props(new MockStreamsManagerActor()))
       )
     )
 
@@ -317,7 +317,7 @@ class TopicBootstrapActorSpec
       TopicBootstrapActor.props(
         schemaRegistryActor,
         system.actorSelection("/user/kafka_ingestor_test4"),
-        Props(new MockStreamsManagerActor())
+        system.actorOf(Props(new MockStreamsManagerActor()))
       )
     )
 
@@ -366,7 +366,7 @@ class TopicBootstrapActorSpec
       TopicBootstrapActor.props(
         schemaRegistryActor,
         system.actorSelection("/user/kafka_ingestor_test5"),
-        Props(new MockStreamsManagerActor())
+        system.actorOf(Props(new MockStreamsManagerActor()))
       )
     )
 
@@ -447,7 +447,7 @@ class TopicBootstrapActorSpec
       TopicBootstrapActor.props(
         schemaRegistryActor,
         system.actorSelection("/user/kafka_ingestor_test6"),
-        Props(new MockStreamsManagerActor()),
+        system.actorOf(Props(new MockStreamsManagerActor())),
         Some(testConfig)
       )
     )
@@ -514,7 +514,7 @@ class TopicBootstrapActorSpec
       TopicBootstrapActor.props(
         schemaRegistryActor,
         system.actorSelection("/user/kafka_ingestor_test7"),
-        Props(new MockStreamsManagerActor())
+        system.actorOf(Props(new MockStreamsManagerActor()))
       )
     )
 
@@ -563,7 +563,7 @@ class TopicBootstrapActorSpec
       TopicBootstrapActor.props(
         schemaRegistryActor,
         system.actorSelection("kafka_ingestor_test-get-stream"),
-        Props(new MockStreamsManagerActor())
+        system.actorOf(Props(new MockStreamsManagerActor()))
       )
     )
 
@@ -586,7 +586,7 @@ class TopicBootstrapActorSpec
       TopicBootstrapActor.props(
         schemaRegistryActor,
         system.actorSelection("kafka_ingestor_test-get-stream-subject"),
-        Props(new MockStreamsManagerActor())
+        system.actorOf(Props(new MockStreamsManagerActor()))
       )
     )
 
@@ -639,7 +639,7 @@ class TopicBootstrapActorSpec
       TopicBootstrapActor.props(
         schemaRegistryActor,
         system.actorSelection("/user/kafka_ingestor_test8"),
-        Props(new MockStreamsManagerActor())
+        system.actorOf(Props(new MockStreamsManagerActor()))
       )
     )
     probe.expectMsgType[RegisterSchemaRequest]
@@ -700,7 +700,7 @@ class TopicBootstrapActorSpec
       TopicBootstrapActor.props(
         schemaRegistryActor,
         system.actorSelection("/user/kafka_ingestor_test12"),
-        Props(new MockStreamsManagerActor())
+        system.actorOf(Props(new MockStreamsManagerActor()))
       )
     )
 
@@ -754,7 +754,7 @@ class TopicBootstrapActorSpec
       TopicBootstrapActor.props(
         schemaRegistryActor,
         system.actorSelection("/user/kafka_ingestor_test13"),
-        Props(new MockStreamsManagerActor())
+        system.actorOf(Props(new MockStreamsManagerActor()))
       )
     )
 

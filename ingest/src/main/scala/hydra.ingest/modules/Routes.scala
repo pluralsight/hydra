@@ -1,9 +1,10 @@
 package hydra.ingest.modules
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.server.directives.RouteDirectives
 import akka.http.scaladsl.server.{Route, RouteConcatenation}
 import cats.effect.Sync
+import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.avro.util.SchemaWrapper
 import hydra.common.config.ConfigSupport
 import hydra.common.util.{ActorUtils, Futurable}
@@ -11,6 +12,8 @@ import hydra.ingest.app.AppConfig.AppConfig
 import hydra.ingest.http._
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.endpoints.{BootstrapEndpoint, BootstrapEndpointV2, ConsumerGroupsEndpoint, TagsEndpoint, TopicMetadataEndpoint, TopicsEndpoint}
+import hydra.kafka.services.StreamsManagerActor
+import hydra.kafka.util.KafkaUtils
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import scalacache.Cache
 import scalacache.guava.GuavaCache
@@ -45,8 +48,18 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
 
     val consumerProxy = system.actorSelection(consumerPath)
 
-    new SchemasEndpoint(consumerProxy).route ~
-      new BootstrapEndpoint(system).route ~
+     val bootstrapKafkaConfig =
+    applicationConfig.getConfig("bootstrap-config")
+
+     val streamsManagerProps = StreamsManagerActor.props(
+      bootstrapKafkaConfig,
+      KafkaUtils.BootstrapServers,
+      ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient
+    )
+     val streamsManagerActor: ActorRef = system.actorOf(streamsManagerProps, "streamsManagerActor")
+
+    new SchemasEndpoint(consumerProxy, streamsManagerActor).route ~
+      new BootstrapEndpoint(system, streamsManagerActor).route ~
       new TopicMetadataEndpoint(consumerProxy, algebras.metadata,
         algebras.schemaRegistry, programs.createTopic, cfg.createTopicConfig.defaultMinInsyncReplicas, algebras.tagsAlgebra).route ~
       new ConsumerGroupsEndpoint(algebras.consumerGroups).route ~

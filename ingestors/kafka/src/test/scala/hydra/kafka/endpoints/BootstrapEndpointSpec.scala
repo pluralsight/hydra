@@ -1,6 +1,6 @@
 package hydra.kafka.endpoints
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import akka.http.javadsl.server.MalformedRequestContentRejection
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.RequestEntityExpectedRejection
@@ -13,6 +13,8 @@ import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.AvroRecord
+import hydra.kafka.services.StreamsManagerActor
+import hydra.kafka.util.KafkaUtils
 import io.confluent.kafka.serializers.KafkaAvroSerializer
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.avro.Schema
@@ -73,7 +75,18 @@ class BootstrapEndpointSpec
   val ingestorRegistry =
     system.actorOf(Props(new IngestorRegistry), "ingestor_registry")
 
-  private val bootstrapRoute = new BootstrapEndpoint(system).route
+  private[kafka] val bootstrapKafkaConfig =
+    applicationConfig.getConfig("bootstrap-config")
+
+  val streamsManagerProps = StreamsManagerActor.props(
+    bootstrapKafkaConfig,
+    KafkaUtils.BootstrapServers,
+    ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient
+  )
+  val streamsManagerActor: ActorRef = system.actorOf(streamsManagerProps, "streamsManagerActor")
+
+
+  private val bootstrapRoute = new BootstrapEndpoint(system, streamsManagerActor).route
 
   implicit val f = jsonFormat11(TopicMetadata)
 
@@ -367,7 +380,7 @@ class BootstrapEndpointSpec
       )
 
       val bootstrapRouteWithOverridenStreamManager =
-        (new BootstrapEndpoint(system) with BootstrapEndpointTestActors).route
+        (new BootstrapEndpoint(system, streamsManagerActor) with BootstrapEndpointTestActors).route
       Post("/streams", testEntity) ~> bootstrapRouteWithOverridenStreamManager ~> check {
         status shouldBe StatusCodes.OK
       }
@@ -401,7 +414,7 @@ class BootstrapEndpointSpec
       )
 
       val bootstrapRouteWithOverridenStreamManager =
-        (new BootstrapEndpoint(system) with BootstrapEndpointTestActors).route
+        (new BootstrapEndpoint(system, streamsManagerActor) with BootstrapEndpointTestActors).route
       Get("/streams/exp.test-existing.v1.SubjectPreexisted") ~> bootstrapRouteWithOverridenStreamManager ~> check {
         val originalTopicData = responseAs[Seq[TopicMetadata]]
         val originalTopicCreationDate = originalTopicData.head.createdDate

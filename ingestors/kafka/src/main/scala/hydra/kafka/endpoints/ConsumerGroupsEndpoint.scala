@@ -1,17 +1,19 @@
 package hydra.kafka.endpoints
 
 import java.time.Instant
-
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives.extractExecutionContext
 import akka.http.scaladsl.server.Route
+import cats.effect.IO
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import hydra.common.util.Futurable
 import hydra.core.http.{CorsSupport, RouteSupport}
 import hydra.core.monitor.HydraMetrics.addHttpMetric
-import hydra.kafka.algebras.ConsumerGroupsAlgebra
+import hydra.kafka.algebras.KafkaAdminAlgebra.TopicAndPartition
+import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra}
 import hydra.kafka.marshallers.ConsumerGroupMarshallers
 import hydra.kafka.model.TopicMetadataV2Request.Subject
+import spray.json.JsString
 
 import scala.util.{Failure, Success}
 
@@ -35,12 +37,12 @@ class ConsumerGroupsEndpoint[F[_]: Futurable](consumerGroupsAlgebra: ConsumerGro
             } ~ pathPrefix(Segment) { consumerGroupName =>
               val startTime = Instant.now
               pathEndOrSingleSlash {
-                onComplete(Futurable[F].unsafeToFuture(consumerGroupsAlgebra.getTopicsForConsumer(consumerGroupName))) {
-                  case Success(topics) =>
-                    addHttpMetric(consumerGroupName, StatusCodes.OK, "/v2/topic-consumer-groups/...", startTime, method.value)
-                    complete(StatusCodes.OK, topics)
+                onComplete(Futurable[F].unsafeToFuture(consumerGroupsAlgebra.getDetailedConsumerInfo(consumerGroupName))) {
+                  case Success(detailedConsumer) =>
+                    addHttpMetric(consumerGroupName, StatusCodes.OK, "/v2/consumer-groups/...", startTime, method.value)
+                    complete(StatusCodes.OK, detailedConsumer)
                   case Failure(exception) =>
-                    addHttpMetric(consumerGroupName, StatusCodes.InternalServerError, "/v2/topic-consumer-groups/...", startTime, method.value, error = Some(exception.getMessage))
+                    addHttpMetric(consumerGroupName, StatusCodes.InternalServerError, "/v2/consumer-groups/...", startTime, method.value, error = Some(exception.getMessage))
                     complete(StatusCodes.InternalServerError, exception.getMessage)
                 }
               }

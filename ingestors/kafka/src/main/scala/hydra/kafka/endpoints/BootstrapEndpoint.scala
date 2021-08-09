@@ -36,7 +36,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
-class BootstrapEndpoint(override val system:ActorSystem) extends RouteSupport
+class BootstrapEndpoint(override val system:ActorSystem, override val streamsManagerActor: ActorRef) extends RouteSupport
   with LoggingAdapter
   with TopicMetadataAdapter
   with HydraDirectives
@@ -44,6 +44,8 @@ class BootstrapEndpoint(override val system:ActorSystem) extends RouteSupport
   with BootstrapEndpointActors {
 
   private implicit val timeout = Timeout(10.seconds)
+
+
 
   override val route: Route = cors(settings) {
     extractMethod { method =>

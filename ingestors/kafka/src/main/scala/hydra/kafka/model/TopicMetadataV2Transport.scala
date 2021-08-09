@@ -40,7 +40,7 @@ object ContactMethod {
       refineV[EmailRegex](value).toOption.map(Email.apply)
   }
 
-  type SlackRegex = MatchesRegex[W.`"""^[#][^\\sA-Z]{1,79}$"""`.T]
+  type SlackRegex = MatchesRegex[W.`"""^[#]?[^\\sA-Z]{1,79}$"""`.T]
 
   private type SlackChannel =
     String Refined SlackRegex
@@ -71,7 +71,7 @@ final case class TopicMetadataV2Request(
     dataClassification: DataClassification,
     contact: NonEmptyList[ContactMethod],
     createdDate: Instant,
-    parentSubjects: List[Subject],
+    parentSubjects: List[String],
     notes: Option[String],
     teamName: Option[String],
     numPartitions: Option[TopicMetadataV2Request.NumPartitions],
@@ -149,7 +149,7 @@ final case class TopicMetadataV2Response(
                                           dataClassification: DataClassification,
                                           contact: NonEmptyList[ContactMethod],
                                           createdDate: Instant,
-                                          parentSubjects: List[Subject],
+                                          parentSubjects: List[String],
                                           notes: Option[String],
                                           teamName: Option[String],
                                           tags: List[String]
@@ -180,7 +180,7 @@ final case class MetadataOnlyRequest(streamType: StreamTypeV2,
                                     dataClassification: DataClassification,
                                     contact: NonEmptyList[ContactMethod],
                                     createdDate: Instant,
-                                    parentSubjects: List[Subject],
+                                    parentSubjects: List[String],
                                     notes: Option[String],
                                     teamName: Option[String],
                                     numPartitions: Option[TopicMetadataV2Request.NumPartitions],
