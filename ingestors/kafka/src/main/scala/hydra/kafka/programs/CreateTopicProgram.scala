@@ -2,19 +2,21 @@ package hydra.kafka.programs
 
 import java.time.Instant
 import cats.effect.{Bracket, ExitCase, Resource, Sync}
-import cats.syntax.all._
 import hydra.avro.registry.SchemaRegistry
-import hydra.avro.registry.SchemaRegistry.{IncompatibleSchemaException, SchemaVersion}
+import hydra.avro.registry.SchemaRegistry.{IncompatibleSchemaException, IllegalLogicalTypeChange, IllegalLogicalTypeChangeErrors, SchemaVersion}
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{Schemas, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
 import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyAndValueMismatch, KeyHasNullableFields, NullableField}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
-import org.apache.avro.{Schema}
+import org.apache.avro.{LogicalType, Schema}
 import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy, _}
+import cats.implicits._
 
+import scala.::
+import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.collectionAsScalaIterableConverter
 
 final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
@@ -125,39 +127,72 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     } yield ()
   }
 
+  private def validateSchemaEvolution(existingSchema: Schema, newSchema: Schema, collectedErrors: List[IllegalLogicalTypeChange]): Unit = {
+    existingSchema.getFields.asScala.toList.map(existingField => {
+      newSchema.getFields.asScala.toList.map(newField => {
+        if (existingField.name() == newField.name() && existingField.schema() != newField.schema() && existingField.schema().getLogicalType != newField.schema().getLogicalType) {
+            collectedErrors ++ IllegalLogicalTypeChange(existingField.schema().getLogicalType, newField.schema().getLogicalType, newField.name())
+        }
+      })
+    })
+    existingSchema.getFields.asScala.toList.map(existingField => {
+      newSchema.getFields.asScala.toList.map(newField => {
+        if(existingField.schema().getFields.asScala.nonEmpty && newField.schema().getFields.asScala.nonEmpty) {
+          validateSchemaEvolution(existingField.schema(), newField.schema(), collectedErrors)
+        }
+      })
+    })
+  }
+
   private def validateKeyAndValueSchemas(schemas: Schemas, subject: Subject): Resource[F, Unit] = {
    val validate: F[Unit] = kafkaAdmin.describeTopic(subject.value).flatMap {
       case Some(_) => Bracket[F, Throwable].unit
       case None =>
         (schemas.key.getType, schemas.value.getType) match {
           case (Schema.Type.RECORD, Schema.Type.RECORD) => {
+            val keyFields = schemas.key.getFields.asScala.toList
+            val valueFields = schemas.value.getFields.asScala.toList
+            var keyErrors = keyFields.flatMap(field => field.schema().getType match {
+              case Schema.Type.UNION=> {
+                if (field.schema.getTypes.asScala.toList.exists(_.isNullable))
+                  Some(NullableField(field.name(), field.schema()))
+                else None
+              }
+              case Schema.Type.NULL => Some(NullableField(field.name(), field.schema()))
+              case _ => None
+            })
             if(schemas.key.getFields.size() <= 0) {
-              Bracket[F, Throwable].raiseError(IncompatibleSchemaException("Must include Fields in Key"))
-            } else {
-              val keyFields = schemas.key.getFields.asScala.toList
-              val valueFields = schemas.value.getFields.asScala.toList
-              val keyNullErrors = keyFields.flatMap(field => field.schema().getType match {
-                case Schema.Type.UNION=> {
-                  if (field.schema.getTypes.asScala.toList.exists(_.isNullable))
-                    Some(NullableField(field.name(), field.schema()))
-                  else None
-                }
-                case Schema.Type.NULL => Some(NullableField(field.name(), field.schema()))
-                case _ => None
-              })
-              val mismatches = keyFields.flatMap { k =>
-                valueFields.flatMap { v =>
-                  if (k.name() == v.name() && !k.schema().equals(v.schema())) {
-                    Some(KeyAndValueMismatch(k.name(), k.schema(), v.schema()))
-                  } else {
-                    None
-                  }
+              keyErrors += Bracket[F, Throwable].raiseError(IncompatibleSchemaException("Must include Fields in Key"))
+            }
+            val mismatches = keyFields.flatMap { k =>
+              valueFields.flatMap { v =>
+                if (k.name() == v.name() && !k.schema().equals(v.schema())) {
+                  Some(KeyAndValueMismatch(k.name(), k.schema(), v.schema()))
+                } else {
+                  None
                 }
               }
-              if (keyNullErrors.isEmpty) {
-                if (mismatches.isEmpty) ().pure else Bracket[F, Throwable].raiseError(IncompatibleKeyAndValueFieldNames(mismatches))
-              } else Bracket[F, Throwable].raiseError(KeyHasNullableFields(keyNullErrors))
             }
+            if (keyErrors.isEmpty) {
+              if (mismatches.isEmpty) ().pure else Bracket[F, Throwable].raiseError(IncompatibleKeyAndValueFieldNames(mismatches))
+            } else Bracket[F, Throwable].raiseError(KeyHasNullableFields(keyErrors))
+
+            val keyTransformationErrors: List[IllegalLogicalTypeChange] = List()
+            val valueTransformationErrors:  List[IllegalLogicalTypeChange] = List()
+
+            schemaRegistry.getLatestSchemaBySubject(subject + "-key").map{
+              case Some(keySchema) => validateSchemaEvolution(schemas.key, keySchema, keyTransformationErrors)
+            }
+            schemaRegistry.getLatestSchemaBySubject(subject + "-value").map{
+              case Some(valueSchema) => validateSchemaEvolution(schemas.value, valueSchema, valueTransformationErrors)
+            }
+            if(keyTransformationErrors.nonEmpty){
+              Bracket[F, Throwable].raiseError(IllegalLogicalTypeChangeErrors(keyTransformationErrors))
+            }
+            if(valueTransformationErrors.nonEmpty){
+              Bracket[F, Throwable].raiseError(IllegalLogicalTypeChangeErrors(valueTransformationErrors))
+            }
+
           }
           case _ => Bracket[F, Throwable].raiseError(IncompatibleSchemaException("Your key and value schemas must each be of type record. If you are adding metadata for a topic you created externally, you will need to register new key and value schemas"))
         }
@@ -205,5 +240,4 @@ object CreateTopicProgram {
     RuntimeException(
       (List("Fields with same names in key and value schemas must have same type:", "Field Name\tKey Schema\tValue Schema") ++ errors.map(e => s"${e.fieldName}\t${e.keyFieldSchema.toString}\t${e.valueFieldSchema}")).mkString("\n")
     )
-
 }
