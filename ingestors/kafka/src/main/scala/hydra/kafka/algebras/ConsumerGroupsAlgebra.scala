@@ -25,10 +25,10 @@ trait ConsumerGroupsAlgebra[F[_]] {
   def getDetailedConsumerInfo(consumerGroupName: String) : F[List[DetailedConsumerGroup]]
 }
 
-final case class TestConsumerGroupsAlgebra(consumerGroupMap: Map[TopicConsumerKey, (TopicConsumerValue, String)] = Map.empty) extends ConsumerGroupsAlgebra[IO] {
+final case class TestConsumerGroupsAlgebra(consumerGroupMap: Map[TopicConsumerKey, (TopicConsumerValue, String)]) extends ConsumerGroupsAlgebra[IO] {
 
   def addConsumerGroup(key: TopicConsumerKey, value: TopicConsumerValue, state: String): TestConsumerGroupsAlgebra = {
-    this.copy(this.consumerGroupMap ++ Map(key -> (value, state)))
+    this.copy(this.consumerGroupMap + (key -> (value, state)))
   }
 
   def removeConsumerGroup(key: TopicConsumerKey): TestConsumerGroupsAlgebra = {
@@ -62,6 +62,10 @@ final case class TestConsumerGroupsAlgebra(consumerGroupMap: Map[TopicConsumerKe
       }
     }
   }
+
+object TestConsumerGroupsAlgebra {
+  def empty: TestConsumerGroupsAlgebra = TestConsumerGroupsAlgebra(Map.empty[TopicConsumerKey, (TopicConsumerValue, String)])
+}
 
 object ConsumerGroupsAlgebra {
 

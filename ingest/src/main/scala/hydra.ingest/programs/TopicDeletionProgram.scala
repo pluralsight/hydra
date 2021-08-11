@@ -36,8 +36,8 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
     }.map(_.combineAll)
   }
 
-  def deleteTopic(topicNames: List[String], ignoreConsumerGroups: List[String]): F[ValidatedNel[DeleteTopicError, Unit]] = {
-    val eitherErrorOrTopic: F[List[Either[ConsumersStillExistError, String]]] = topicNames.traverse { topic =>
+  private def checkIfTopicStillHasConsumers(topicNames: List[String], ignoreConsumerGroups: List[String]): F[List[Either[ConsumersStillExistError, String]]] = {
+    topicNames.traverse { topic =>
       consumerGroupAlgebra.getConsumersForTopic(topic).flatMap { topicConsumers =>
         val fullIgnoreList = ignoreConsumerGroups ++ ignoreConsumers
 
@@ -62,7 +62,11 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
         }
       }
     }
-      eitherErrorOrTopic.flatMap{ cge =>
+  }
+
+  def deleteTopic(topicNames: List[String], ignoreConsumerGroups: List[String]): F[ValidatedNel[DeleteTopicError, Unit]] = {
+    val eitherErrorOrTopic = checkIfTopicStillHasConsumers(topicNames, ignoreConsumerGroups)
+    eitherErrorOrTopic.flatMap{ cge =>
       val goodTopics: List[String] = cge.map { e =>
         e match {
           case Right(value) => value
@@ -91,7 +95,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
               .combine{val b = guavaCache.removeAll().toEither.leftMap(e => CacheDeletionError(e.getMessage)).map(_ => ()).toValidatedNel
                 b}
             .combine(consumerErrors))))
-      }
+        }
     }
   }
 
