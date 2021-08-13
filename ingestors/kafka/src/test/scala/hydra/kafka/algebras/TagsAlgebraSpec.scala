@@ -56,7 +56,7 @@ class TagsAlgebraSpec extends AnyWordSpecLike with Matchers {
           .unsafeRunSync shouldBe Right(PublishResponse(0,2))
       }
       "Get Tags" in {
-        tagsAlgebra.getAllTags.retryIfFalse(_.size == 2).unsafeRunSync()
+        tagsAlgebra.getAllTags.retryIfFalse(_.size == 3).unsafeRunSync()
       }
       "return true when validating a good tag" in {
         tagsAlgebra.validateTags(List("Source: blah")).unsafeRunSync() shouldBe ()
