@@ -1,13 +1,12 @@
 package hydra.ingest.programs
 
 import java.time.Instant
-
 import cats.MonadError
 import cats.data.Validated.{Invalid, Valid}
 import cats.data.{NonEmptyList, ValidatedNel}
 import cats.effect.{Bracket, Concurrent, ContextShift, IO, Sync, Timer}
 import hydra.avro.registry.SchemaRegistry
-import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TestMetadataAlgebra}
+import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TestConsumerGroupsAlgebra, TestMetadataAlgebra}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.flatspec.AnyFlatSpec
@@ -32,6 +31,10 @@ import scalacache.guava.GuavaCache
 import scalacache.memoization._
 import scalacache.modes.try_._
 import cats.MonadError
+import cats.effect.concurrent.Ref
+import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
+import org.apache.kafka.clients.admin.ConsumerGroupDescription
+
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
 import java.io.IOException
@@ -42,7 +45,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
   private val v2MetadataTopicName = Subject.createValidated("_test.V2.MetadataTopic").get
   private val v1MetadataTopicName = Subject.createValidated("_test.V1.MetadataTopic").get
-  private val consumerGroup = "consumer groups"
+  private val consumerGroup = "consumergroups"
   implicit val timer: Timer[IO] = IO.timer(concurrent.ExecutionContext.global)
 
 
@@ -111,6 +114,8 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       override def deleteTopics(topicNames: List[String]): F[Either[KafkaDeleteTopicErrorList, Unit]] =
         Sync[F].pure(Left(new KafkaDeleteTopicErrorList( NonEmptyList.fromList(
           topicNames.map(topic => KafkaDeleteTopicError(topic, new Exception("Unable to delete topic")))).get)))
+
+      override def describeConsumerGroup(consumerGroupName: String): F[Option[ConsumerGroupDescription]] = ???
     }
   }
 
@@ -207,7 +212,10 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
                             registerKey: Boolean,
                             kafkaTopicNamesToFail: List[String] = List.empty,
                             upgradeTopic: Tuple2[String, Boolean] = ("", false),
-                            assertionError: ErrorChecker = _ => ()): Unit = {
+                            assertionError: ErrorChecker = _ => (),
+                            consumerGroupToAdd: Option[(TopicConsumerKey, TopicConsumerValue, String)] = None,
+                            ignoreConsumerGroupConfig: List[String] = List.empty,
+                            ignoreConsumerGroupSpecific: List[String] = List.empty): Unit = {
     (for {
       // For v2 topics we need to write the metadata to the v2MetadataTopic because the topic deletion attempts to lookup
       // the v2 metadata and uses the results to determine if we are deleting a v1 or v2 topic.
@@ -215,6 +223,14 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       schemaAlgebra <- schemaRegistry
       kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
       metadataAlgebra <- TestMetadataAlgebra()
+      testConsumerGroupAlgebra = {
+        if(consumerGroupToAdd.isEmpty) {
+          TestConsumerGroupsAlgebra.empty
+        }
+        else {
+          consumerGroupToAdd.map(kv => TestConsumerGroupsAlgebra.empty.addConsumerGroup(kv._1, kv._2, kv._3)).get
+        }
+      }
       expectedDeletedV1Topics <- IO.pure(getExpectedDeletedTopics(v1TopicNames, topicNamesToDelete, kafkaTopicNamesToFail))
       expectedDeletedV2Topics <- IO.pure(getExpectedDeletedTopics(v2TopicNames, topicNamesToDelete, kafkaTopicNamesToFail))
       _ <- writeV2TopicMetadata(v2TopicNames, metadataAlgebra)
@@ -234,8 +250,10 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
         v2MetadataTopicName,
         v1MetadataTopicName,
         schemaAlgebra,
-        metadataAlgebra
-      ).deleteTopic(topicNamesToDelete)
+        metadataAlgebra,
+        testConsumerGroupAlgebra,
+        ignoreConsumerGroupConfig
+      ).deleteTopic(topicNamesToDelete, ignoreConsumerGroupSpecific)
       // get all topic names
       allTopics <- kafkaAdmin.getTopicNames
       // get all versions of any given topic
@@ -267,10 +285,14 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
                                 topicNamesToDelete: List[String],
                                 registerKey: Boolean = false,
                                 upgradeTopic: Tuple2[String, Boolean] = ("", false),
-                                assertionError: ErrorChecker = _ => ()): Unit = {
+                                assertionError: ErrorChecker = _ => (),
+                                consumerGroupToAdd: Option[(TopicConsumerKey, TopicConsumerValue, String)] = None,
+                                ignoreConsumerGroupConfig: List[String] = List.empty,
+                                ignoreConsumerGroupSpecific: List[String] = List.empty): Unit = {
     applyTestcase(KafkaAdminAlgebra.test[IO], SchemaRegistry.test[IO],
       v1TopicNames, v2TopicNames, topicNamesToDelete, v1TopicNames++v2TopicNames, registerKey,
-      List.empty, upgradeTopic, assertionError)
+      List.empty, upgradeTopic, assertionError, consumerGroupToAdd, ignoreConsumerGroupConfig = ignoreConsumerGroupConfig,
+      ignoreConsumerGroupSpecific = ignoreConsumerGroupSpecific)
   }
 
 
@@ -325,6 +347,45 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
 
   it should "Delete multiple versions of a schema" in {
     applyGoodTestcase(twoTopics, List.empty, List("topic1"), registerKey = true, ("topic1", true))
+  }
+
+  it should "Not delete a topic with active consumers" in {
+    val topic = "dvs.test.topic"
+    val consumerGroup = "test-consumer-group"
+    val key = TopicConsumerKey(topic, consumerGroup)
+    val value = TopicConsumerValue(Instant.now())
+    val state = "Stable"
+    applyTestcase(KafkaAdminAlgebra.test[IO], SchemaRegistry.test[IO],
+      List(topic), List.empty, List(topic), registerKey = false, schemasToSucceed = List(topic),
+      assertionError = invalidErrorChecker, consumerGroupToAdd = Some((key,value,state)),kafkaTopicNamesToFail = List(topic))
+  }
+
+  it should "Delete a topic with no active consumers" in {
+    val topic = "dvs.test.topic"
+    val key = TopicConsumerKey(topic, "")
+    val value = TopicConsumerValue(Instant.now())
+    val state = "Empty"
+    applyGoodTestcase(List(topic), List.empty, List(topic), consumerGroupToAdd = Some((key,value,state)))
+  }
+
+  it should "Delete a consumer that is passed in as a config" in {
+    val topic = "dvs.test.topic"
+    val consumerGroup = "test-consumer-group"
+    val key = TopicConsumerKey(topic, consumerGroup)
+    val value = TopicConsumerValue(Instant.now())
+    val state = "Stable"
+    applyGoodTestcase(List(topic), List.empty, List(topic), consumerGroupToAdd = Some((key,value,state)),
+      ignoreConsumerGroupConfig = List(consumerGroup))
+  }
+
+  it should "Delete a consumer that is passed in as a parameter" in {
+    val topic = "dvs.test.topic"
+    val consumerGroup = "test-consumer-group"
+    val key = TopicConsumerKey(topic, consumerGroup)
+    val value = TopicConsumerValue(Instant.now())
+    val state = "Stable"
+    applyGoodTestcase(List(topic), List.empty, List(topic), consumerGroupToAdd = Some((key,value,state)),
+      ignoreConsumerGroupSpecific = List(consumerGroup))
   }
 
   // FAILURE CASES

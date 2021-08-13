@@ -53,7 +53,9 @@ final class Programs[F[_]: Logger: Sync: Timer: Mode] private(
     cfg.metadataTopicsConfig.topicNameV2,
     cfg.metadataTopicsConfig.topicNameV1,
     algebras.schemaRegistry,
-    algebras.metadata
+    algebras.metadata,
+    algebras.consumerGroups,
+    cfg.ignoreDeletionConsumerGroups.consumerGroupListToIgnore
   )
 
 }

@@ -49,6 +49,13 @@ object AppConfig {
   private implicit val subjectConfigDecoder: ConfigDecoder[String, Subject] =
     ConfigDecoder.identity[String].mapOption("Subject")(Subject.createValidated)
 
+  final case class IgnoreDeletionConsumerGroups(consumerGroupListToIgnore: List[String])
+
+  private val ignoreDeletionConsumerGroups: ConfigValue[IgnoreDeletionConsumerGroups] = (
+    env("HYDRA_IGNORE_DELETION_CONSUMER_GROUP").as[String].default("")
+  ).map(cfg => IgnoreDeletionConsumerGroups(cfg.split(",").toList))
+
+
   final case class MetadataTopicsConfig(
       topicNameV1: Subject,
       topicNameV2: Subject,
@@ -179,7 +186,8 @@ object AppConfig {
                               tagsConfig: TagsConfig,
                               dvsConsumersTopicConfig: DVSConsumersTopicConfig,
                               consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
-                              consumerGroupsAlgebraConfig: ConsumerGroupsAlgebraConfig
+                              consumerGroupsAlgebraConfig: ConsumerGroupsAlgebraConfig,
+                              ignoreDeletionConsumerGroups: IgnoreDeletionConsumerGroups
                             )
 
   val appConfig: ConfigValue[AppConfig] =
@@ -191,6 +199,7 @@ object AppConfig {
       tagsConfig,
       dvsConsumersTopicConfig,
       consumerOffsetsOffsetsTopicConfig,
-      consumerGroupAlgebraConfig
+      consumerGroupAlgebraConfig,
+      ignoreDeletionConsumerGroups
     ).parMapN(AppConfig)
 }

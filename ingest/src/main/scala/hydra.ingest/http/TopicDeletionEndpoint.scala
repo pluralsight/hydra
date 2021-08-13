@@ -1,31 +1,47 @@
 package hydra.ingest.http
 
 import java.time.Instant
-
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.Credentials
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
-import hydra.ingest.programs.{DeleteTopicError, KafkaDeletionErrors, SchemaDeletionErrors, TopicDeletionProgram}
+import hydra.ingest.programs.{ConsumersStillExistError, DeleteTopicError, KafkaDeletionErrors, SchemaDeletionErrors, TopicDeletionProgram}
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
-import spray.json.{DefaultJsonProtocol, RootJsonFormat}
+import spray.json._
 import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.ingest.programs.TopicDeletionProgram.SchemaDeleteTopicErrorList
+import hydra.kafka.marshallers.ConsumerGroupMarshallers
 
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
 object TopicDeletionEndpoint extends
   DefaultJsonProtocol with
-  SprayJsonSupport
+  SprayJsonSupport with ConsumerGroupMarshallers
 {
   private implicit val endpointFormat = jsonFormat2(DeletionEndpointResponse.apply)
   final case class DeletionEndpointResponse(topicOrSubject: String, message: String)
 
-  final case class DeletionRequest(topics: List[String])
-  implicit val deleteRequestFormat: RootJsonFormat[DeletionRequest] = jsonFormat1(DeletionRequest)
+  final case class DeletionRequest(topics: List[String], ignoreConsumerGroups: List[String])
+
+  implicit object DeletionRequest extends RootJsonFormat[DeletionRequest] {
+    override def read(json: JsValue): DeletionRequest = {
+      json.asJsObject.getFields("topics", "ignoreConsumerGroups") match {
+        case Seq(topics, ignoreConsumergroups) =>
+          DeletionRequest(topics.convertTo[List[String]], ignoreConsumergroups.convertTo[List[String]])
+        case Seq(topics) =>
+          DeletionRequest(topics.convertTo[List[String]], List.empty)
+        case _ =>
+          spray.json.deserializationError("Must provide a List of topics to delete")
+      }
+    }
+
+    override def write(obj: DeletionRequest): JsValue =
+      Map("topics" -> obj.topics, "ignoreConsumerGroups" -> obj.ignoreConsumerGroups).toJson
+  }
+
 }
 
 final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeletionProgram[F], deletionPassword: String)
@@ -35,8 +51,10 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
 
   import TopicDeletionEndpoint._
 
-  private def tupleErrorsToResponse(errorTuple: (List[SchemaDeletionErrors], List[KafkaDeletionErrors])): List[DeletionEndpointResponse] = {
-    schemaErrorsToResponse(errorTuple._1) ::: kafkaErrorsToResponse(errorTuple._2)
+  private def tupleErrorsToResponse(errorTuple: (List[SchemaDeletionErrors],
+                                                 List[KafkaDeletionErrors],
+                                                 List[ConsumersStillExistError])): List[DeletionEndpointResponse] = {
+    schemaErrorsToResponse(errorTuple._1) ::: kafkaErrorsToResponse(errorTuple._2) ::: consumerErrorsToResponse(errorTuple._3)
   }
 
   private def schemaErrorsToResponse(schemaResults: List[SchemaDeletionErrors]): List[DeletionEndpointResponse] = {
@@ -45,6 +63,10 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
 
   private def kafkaErrorsToResponse(kafkaResults: List[KafkaDeletionErrors]): List[DeletionEndpointResponse] = {
     kafkaResults.flatMap(_.kafkaDeleteTopicErrorList.errors.map(e => DeletionEndpointResponse(e.topicName, e.errorMessage)).toList)
+  }
+
+  private def consumerErrorsToResponse(consumerError: List[ConsumersStillExistError]): List[DeletionEndpointResponse] = {
+    consumerError.map(err => DeletionEndpointResponse(err.topic, s"The following consumers still exist for the topic: ${err.consumers.toJson.compactPrint}"))
   }
 
   private def validResponse(topics: List[String], userDeleting: String, path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
@@ -77,19 +99,21 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
 
   private def invalidResponse(topics: List[String], userDeleting: String, e: NonEmptyList[DeleteTopicError],
                               path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
-    val allErrors = e.foldLeft((List.empty[SchemaDeletionErrors], List.empty[KafkaDeletionErrors])) { (agg, i) =>
+    val allErrors = e.foldLeft((List.empty[SchemaDeletionErrors], List.empty[KafkaDeletionErrors], List.empty[ConsumersStillExistError])) { (agg, i) =>
       i match {
-        case sde: SchemaDeletionErrors => (agg._1 :+ sde, agg._2)
-        case kde: KafkaDeletionErrors => (agg._1, agg._2 :+ kde)
+        case sde: SchemaDeletionErrors => (agg._1 :+ sde, agg._2, agg._3)
+        case kde: KafkaDeletionErrors => (agg._1, agg._2 :+ kde, agg._3)
+        case cde: ConsumersStillExistError => (agg._1, agg._2, agg._3 :+ cde)
       }
     }
     val response = tupleErrorsToResponse(allErrors)
     returnResponse(topics, userDeleting, response, path, startTime)
   }
 
-  private def deleteTopics(topics: List[String], userDeleting: String, path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
+  private def deleteTopics(topics: List[String], ignoreConsumerGroups: List[String],
+                           userDeleting: String, path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
     onComplete(
-      Futurable[F].unsafeToFuture(deletionProgram.deleteTopic(topics))
+      Futurable[F].unsafeToFuture(deletionProgram.deleteTopic(topics, ignoreConsumerGroups))
     ) {
       case Success(maybeSuccess) => {
         maybeSuccess match {
@@ -150,11 +174,11 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
                 }
               } ~
                 pathPrefix(Segment) { topic =>
-                  deleteTopics(List(topic), userName, "/v2/topics", startTime)
+                  deleteTopics(List(topic), List.empty, userName, "/v2/topics", startTime)
                 } ~
                 pathEndOrSingleSlash {
                   entity(as[DeletionRequest]) { req =>
-                    deleteTopics(req.topics, userName, "/v2/topics", startTime)
+                    deleteTopics(req.topics, req.ignoreConsumerGroups, userName, "/v2/topics", startTime)
                   }
                 }
             }
