@@ -65,6 +65,16 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
   }
 
   def deleteTopic(topicNames: List[String], ignoreConsumerGroups: List[String]): F[ValidatedNel[DeleteTopicError, Unit]] = {
+    val lastOffsets = kafkaAdmin.getLatestOffsets(topicNames.last).flatMap{ tpo =>
+      tpo.map{ case (partition, offset) => {
+        val lastConsumed = kafkaClient.streamStringKeyFromGivenPartitionAndOffset(
+          topicNames.last, "dvs.deletion.consumer.group",false, partition, offset.value).take(1).compile.map{ record =>
+          record._3
+        }
+      }
+
+      }
+    }
     val eitherErrorOrTopic = checkIfTopicStillHasConsumers(topicNames, ignoreConsumerGroups)
     eitherErrorOrTopic.flatMap{ cge =>
       val goodTopics: List[String] = cge.map { e =>
