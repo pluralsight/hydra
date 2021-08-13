@@ -281,7 +281,7 @@ final class BootstrapEndpointV2Spec
         None,
         Some("dvs-teamName"),
         None,
-        List("Source: Something")
+        List("DVS")
       ).toJson.compactPrint
 
 
