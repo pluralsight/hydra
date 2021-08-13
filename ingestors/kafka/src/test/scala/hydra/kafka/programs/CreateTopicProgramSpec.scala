@@ -1,7 +1,6 @@
 package hydra.kafka.programs
 
 import java.time.Instant
-
 import cats.data.NonEmptyList
 import cats.effect.concurrent.Ref
 import cats.effect.{Bracket, Concurrent, ContextShift, IO, Resource, Sync, Timer}
@@ -29,7 +28,7 @@ import eu.timepit.refined._
 
 import scala.concurrent.ExecutionContext
 import hydra.kafka.model.TopicMetadataV2Request.NumPartitions
-import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyHasNullableFields}
+import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyHasNullableFields, ValidationErrors}
 import org.scalatest.compatible.Assertion
 
 class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
@@ -531,6 +530,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
     }
 
     "throw error on topic with key and value field named same but with different type" in {
+
       val mismatchedValueSchema =
         SchemaBuilder
         .record("name")
@@ -542,7 +542,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         .endRecord()
 
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      an [IncompatibleKeyAndValueFieldNames] shouldBe thrownBy {(for {
+      an [ValidationErrors] shouldBe thrownBy {(for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafka <- KafkaAdminAlgebra.test[IO]
         kafkaClient <- KafkaClientAlgebra.test[IO]
@@ -574,7 +574,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           .endRecord()
 
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      an [KeyHasNullableFields] shouldBe thrownBy {(for {
+      an [ValidationErrors] shouldBe thrownBy {(for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafka <- KafkaAdminAlgebra.test[IO]
         kafkaClient <- KafkaClientAlgebra.test[IO]
@@ -605,7 +605,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           .endRecord()
 
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      an [KeyHasNullableFields] shouldBe thrownBy {(for {
+      an [ValidationErrors] shouldBe thrownBy {(for {
         schemaRegistry <- SchemaRegistry.test[IO]
         kafka <- KafkaAdminAlgebra.test[IO]
         kafkaClient <- KafkaClientAlgebra.test[IO]
@@ -624,6 +624,208 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         )
       } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}
     }
+
+    "throw error on schema evolution with illegal key field logical type removal" in {
+      val firstKey =
+        """
+          |{
+          |  "type": "record",
+          |  "name": "Date",
+          |  "fields": [
+          |    {
+          |      "name": "keyThing",
+          |      "type":{
+          |        "type": "string",
+          |        "logicalType":"uuid"
+          |      }
+          |    }
+          |  ]
+          |}
+      """.stripMargin
+      val keyEvolution =
+        """
+          |{
+          |  "type": "record",
+          |  "name": "Date",
+          |  "fields": [
+          |    {
+          |      "name": "keyThing",
+          |      "type":{
+          |        "type": "string"
+          |      }
+          |    }
+          |  ]
+          |}
+      """.stripMargin
+      val firstKeySchema = new Schema.Parser().parse(firstKey)
+      val keySchemaEvolution = new Schema.Parser().parse(keyEvolution)
+
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      an [ValidationErrors] shouldBe thrownBy {(for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
+        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
+        _ <- new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafka,
+          kafkaClient,
+          policy,
+          Subject.createValidated("dvs.test-metadata-topic").get,
+          metadata
+        ).createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createTopicMetadataRequest(firstKeySchema, valueSchema),
+          TopicDetails(1, 1, 1)
+        )
+        _ <- new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafka,
+          kafkaClient,
+          policy,
+          Subject.createValidated("dvs.test-metadata-topic").get,
+          metadata
+        ).createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createTopicMetadataRequest(keySchemaEvolution, valueSchema),
+          TopicDetails(1, 1, 1)
+        )
+      } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
+
+    "throw error on schema evolution with illegal key field logical type change" in {
+      val firstKey =
+        """
+          |{
+          |  "type": "record",
+          |  "name": "Date",
+          |  "fields": [
+          |    {
+          |      "name": "keyThing",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
+          |  ]
+          |}
+      """.stripMargin
+      val keyEvolution =
+        """
+          |{
+          |  "type": "record",
+          |  "name": "Date",
+          |  "fields": [
+          |    {
+          |      "name": "keyThing",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-micros"
+          |      }
+          |    }
+          |  ]
+          |}
+      """.stripMargin
+      val firstKeySchema = new Schema.Parser().parse(firstKey)
+      val keySchemaEvolution = new Schema.Parser().parse(keyEvolution)
+
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      an [ValidationErrors] shouldBe thrownBy {(for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
+        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
+        _ <- new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafka,
+          kafkaClient,
+          policy,
+          Subject.createValidated("dvs.test-metadata-topic").get,
+          metadata
+        ).createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createTopicMetadataRequest(firstKeySchema, valueSchema),
+          TopicDetails(1, 1, 1)
+        )
+        _ <- new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafka,
+          kafkaClient,
+          policy,
+          Subject.createValidated("dvs.test-metadata-topic").get,
+          metadata
+        ).createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createTopicMetadataRequest(keySchemaEvolution, valueSchema),
+          TopicDetails(1, 1, 1)
+        )
+      } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
+
+    "throw error on schema evolution with illegal key field logical type addition" in {
+      val firstKey =
+        """
+          |{
+          |  "type": "record",
+          |  "name": "Date",
+          |  "fields": [
+          |    {
+          |      "name": "keyThing",
+          |      "type":{
+          |        "type": "long"
+          |      }
+          |    }
+          |  ]
+          |}
+      """.stripMargin
+      val keyEvolution =
+        """
+          |{
+          |  "type": "record",
+          |  "name": "Date",
+          |  "fields": [
+          |    {
+          |      "name": "keyThing",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-micros"
+          |      }
+          |    }
+          |  ]
+          |}
+      """.stripMargin
+      val firstKeySchema = new Schema.Parser().parse(firstKey)
+      val keySchemaEvolution = new Schema.Parser().parse(keyEvolution)
+
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      an [ValidationErrors] shouldBe thrownBy {(for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
+        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
+        _ <- new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafka,
+          kafkaClient,
+          policy,
+          Subject.createValidated("dvs.test-metadata-topic").get,
+          metadata
+        ).createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createTopicMetadataRequest(firstKeySchema, valueSchema),
+          TopicDetails(1, 1, 1)
+        )
+        _ <- new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafka,
+          kafkaClient,
+          policy,
+          Subject.createValidated("dvs.test-metadata-topic").get,
+          metadata
+        ).createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createTopicMetadataRequest(keySchemaEvolution, valueSchema),
+          TopicDetails(1, 1, 1)
+        )
+      } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
 
     "succesfully validate topic schema with value that has field of type union [null, ...]" in {
       val union = SchemaBuilder.unionOf().nullType().and().stringType().endUnion()
