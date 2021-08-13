@@ -10,7 +10,7 @@ import hydra.core.protocol._
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
-import org.apache.kafka.clients.admin.NewTopic
+import org.apache.kafka.clients.admin.{ConsumerGroupDescription, NewTopic}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
 import spray.json.RootJsonFormat
@@ -81,6 +81,8 @@ trait KafkaAdminAlgebra[F[_]] {
     * @return The latest and group offsets by topic and partition
     */
   def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]]
+
+  def describeConsumerGroup(consumerGroupName: String): F[Option[ConsumerGroupDescription]]
 
 }
 
@@ -213,6 +215,12 @@ object KafkaAdminAlgebra {
           if (useSsl) s.withProperty("security.protocol", "SSL") else s
         }
       }
+
+      override def describeConsumerGroup(consumerGroupName: String): F[Option[ConsumerGroupDescription]] = {
+        getAdminClientResource.use(_.describeConsumerGroups(List(consumerGroupName))).map{descriptionMaybe =>
+          descriptionMaybe.get(consumerGroupName)
+        }
+      }
     }
   }
 
@@ -261,7 +269,9 @@ object KafkaAdminAlgebra {
               ).toValidatedNel
             }
         }.map(_.combineAll.toEither.leftMap(errorList => KafkaDeleteTopicErrorList(errorList)))
-}
+
+      override def describeConsumerGroup(consumerGroupName: String): F[Option[ConsumerGroupDescription]] = ???
+    }
   }
 
 }
