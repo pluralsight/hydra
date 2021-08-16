@@ -1,24 +1,25 @@
 package hydra.ingest.programs
 
 import cats.MonadError
-import hydra.avro.registry.SchemaRegistry
-import hydra.avro.registry.SchemaRegistry.SchemaVersion
-import hydra.kafka.algebras.KafkaAdminAlgebra.KafkaDeleteTopicErrorList
-import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
-import cats.data.{NonEmptyList, Validated, ValidatedNel}
+import cats.data.{NonEmptyList, ValidatedNel}
+import cats.effect.{Concurrent}
 import cats.implicits._
+import cats.syntax.all._
+import fs2.kafka.{Headers, Timestamp}
+import hydra.avro.registry.SchemaRegistry
 import hydra.avro.util.SchemaWrapper
 import hydra.ingest.programs.TopicDeletionProgram._
-import hydra.ingest.services.IngestionFlowV2
 import hydra.kafka.algebras.ConsumerGroupsAlgebra.{Consumer, DetailedConsumerGroup}
-import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
-import hydra.kafka.model.{TopicMetadata, TopicMetadataV2, TopicMetadataV2Key}
+import hydra.kafka.algebras.KafkaAdminAlgebra.KafkaDeleteTopicErrorList
+import hydra.kafka.algebras.KafkaClientAlgebra.{Offset, Partition}
+import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key}
+import org.apache.avro.generic.GenericRecord
 import scalacache.Cache
-import scalacache.guava.GuavaCache
 import scalacache.modes.try_._
 
-final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: KafkaAdminAlgebra[F],
+final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](kafkaAdmin: KafkaAdminAlgebra[F],
                                                                     kafkaClient: KafkaClientAlgebra[F],
                                                                     v2MetadataTopicName: Subject,
                                                                     v1MetadataTopicName: Subject,
@@ -63,16 +64,17 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]](kafkaAdmin: 
       }
     }
   }
+  //consumer group should be pulled from prod, consumer group name will work for what you want it to work for
 
   def deleteTopic(topicNames: List[String], ignoreConsumerGroups: List[String]): F[ValidatedNel[DeleteTopicError, Unit]] = {
     val lastOffsets = kafkaAdmin.getLatestOffsets(topicNames.last).flatMap{ tpo =>
-      tpo.map{ case (partition, offset) => {
-        val lastConsumed = kafkaClient.streamStringKeyFromGivenPartitionAndOffset(
-          topicNames.last, "dvs.deletion.consumer.group",false, partition, offset.value).take(1).compile.map{ record =>
-          record._3
+      tpo.map{ case (partition, offset) => { //ref thread safe
+        val lastConsumed: fs2.Stream[F, ((Option[String], Option[GenericRecord], Option[Headers]), (Partition, Offset), Timestamp)] = kafkaClient.streamStringKeyFromGivenPartitionAndOffset( //should only do where offsets are greater than 0 && if all partitions are 0, topic is not being produced to
+          topicNames.last, "dvs.deletion.consumer.group",false, partition, offset.value-1)
+          lastConsumed.take(1).map{ record =>
+            record._3
+          }.compile.drain
         }
-      }
-
       }
     }
     val eitherErrorOrTopic = checkIfTopicStillHasConsumers(topicNames, ignoreConsumerGroups)
