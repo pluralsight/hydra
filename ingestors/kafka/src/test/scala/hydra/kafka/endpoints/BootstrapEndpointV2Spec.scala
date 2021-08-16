@@ -69,7 +69,7 @@ final class BootstrapEndpointV2Spec
       kc <- KafkaClientAlgebra.test[IO]
       m <- MetadataAlgebra.make(Subject.createValidated("_metadata.topic.name").get, "bootstrap.consumer.group", kc, s, true)
       t <- TagsAlgebra.make[IO]("_hydra.tags-topic","_hydra.tags-consumer", kc)
-      _ <- t.createOrUpdateTag(HydraTag("Source: Something", "something hydra tag"))
+      _ <- t.createOrUpdateTag(HydraTag("DVS tag", "DVS"))
     } yield getTestCreateTopicProgram(s, k, kc, m, t)
 
   "BootstrapEndpointV2" must {
@@ -115,7 +115,7 @@ final class BootstrapEndpointV2Spec
       List.empty
     ).toJson.compactPrint
 
-    val validRequest = TopicMetadataV2Request(
+    val validRequestWithoutDVSTag = TopicMetadataV2Request(
       Schemas(getTestSchema("key"), getTestSchema("value")),
       StreamTypeV2.Entity,
       deprecated = false,
@@ -130,10 +130,38 @@ final class BootstrapEndpointV2Spec
       List.empty
     ).toJson.compactPrint
 
-    "accept a valid request" in {
+    val validRequestWithDVSTag = TopicMetadataV2Request(
+      Schemas(getTestSchema("key"), getTestSchema("value")),
+      StreamTypeV2.Entity,
+      deprecated = false,
+      None,
+      Public,
+      NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
+      Instant.now,
+      List.empty,
+      None,
+      Some("dvs-teamName"),
+      None,
+      List("DVS")
+    ).toJson.compactPrint
+
+    "accept a valid request without a DVS tag" in {
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
-          Put("/v2/topics/dvs.testing", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> Route.seal(
+          Put("/v2/topics/dvs.testing", HttpEntity(ContentTypes.`application/json`, validRequestWithoutDVSTag)) ~> Route.seal(
+            bootstrapEndpoint.route
+          ) ~> check {
+            val responseReturned = responseAs[String]
+            response.status shouldBe StatusCodes.OK
+          }
+        }
+        .unsafeRunSync()
+    }
+
+    "accept a valid request with a DVS tag" in {
+      testCreateTopicProgram
+        .map { bootstrapEndpoint =>
+          Put("/v2/topics/dvs.testing", HttpEntity(ContentTypes.`application/json`, validRequestWithDVSTag)) ~> Route.seal(
             bootstrapEndpoint.route
           ) ~> check {
             val responseReturned = responseAs[String]
@@ -146,7 +174,7 @@ final class BootstrapEndpointV2Spec
     "reject a request with invalid name" in {
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
-          Put("/v2/topics/invalid%20name", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> Route.seal(
+          Put("/v2/topics/invalid%20name", HttpEntity(ContentTypes.`application/json`, validRequestWithoutDVSTag)) ~> Route.seal(
             bootstrapEndpoint.route
           ) ~> check {
             val r = responseAs[String]
@@ -230,7 +258,7 @@ final class BootstrapEndpointV2Spec
             .map { kafka =>
               val kca = KafkaClientAlgebra.test[IO].unsafeRunSync()
               val ta = TagsAlgebra.make[IO]("_hydra.tags.topic", "_hydra.client",kca).unsafeRunSync()
-              Put("/v2/topics/dvs.testing/", HttpEntity(MediaTypes.`application/json`, validRequest)) ~> Route.seal(
+              Put("/v2/topics/dvs.testing/", HttpEntity(MediaTypes.`application/json`, validRequestWithoutDVSTag)) ~> Route.seal(
                 getTestCreateTopicProgram(failingSchemaRegistry, kafka, client, m, ta).route
               ) ~> check {
                 response.status shouldBe StatusCodes.InternalServerError
@@ -253,7 +281,7 @@ final class BootstrapEndpointV2Spec
         None,
         Some("dvs-teamName"),
         None,
-        List("Source: Something")
+        List("DVS")
       ).toJson.compactPrint
 
 

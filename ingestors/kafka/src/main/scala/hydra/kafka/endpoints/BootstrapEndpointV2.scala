@@ -51,7 +51,8 @@ final class BootstrapEndpointV2[F[_]: Futurable](
           handleExceptions(exceptionHandler(topicName, startTime, method.value)) {
             pathEndOrSingleSlash {
               put {
-                entity(as[TopicMetadataV2Request]) { t =>
+                entity(as[TopicMetadataV2Request]) { p =>
+                  val t = p.copy(tags = if(p.tags.contains("DVS")) p.tags else p.tags ++ List("DVS")) //adding "DVS" tag
                   onComplete(Futurable[F].unsafeToFuture(tagsAlgebra.validateTags(t.tags))) {
                     case Failure(exception) =>
                       addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, method.value, error = Some(exception.getMessage))
