@@ -66,32 +66,88 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
   }
   //consumer group should be pulled from prod, consumer group name will work for what you want it to work for
 
-  def deleteTopic(topicNames: List[String], ignoreConsumerGroups: List[String]): F[ValidatedNel[DeleteTopicError, Unit]] = {
-    val lastOffsets = kafkaAdmin.getLatestOffsets(topicNames.last).flatMap{ tpo =>
-      tpo.map{ case (partition, offset) => { //ref thread safe
-        val lastConsumed: fs2.Stream[F, ((Option[String], Option[GenericRecord], Option[Headers]), (Partition, Offset), Timestamp)] = kafkaClient.streamStringKeyFromGivenPartitionAndOffset( //should only do where offsets are greater than 0 && if all partitions are 0, topic is not being produced to
-          topicNames.last, "dvs.deletion.consumer.group",false, partition, offset.value-1)
-          lastConsumed.take(1).map{ record =>
-            record._3
-          }.compile.drain
+  def hasTopicReceivedRecentRecords(topicName: String): F[(String, List[Boolean])] = {
+    kafkaAdmin.getLatestOffsets(topicName).flatMap {
+      offsetsMap => {
+        offsetsMap.toList.filterNot {
+          // remove partitions where offset == 0
+          _._2.value == 0
+        }.traverse {
+          case (partition, offset) => {
+            // get latest published message, compare timestamp to (NOW - configurable time window)
+            kafkaClient.streamStringKeyFromGivenPartitionAndOffset(topicName, "dvs.deletion.consumer.group", false,
+              partition, offset.value - 1).take(1).map { case (_, _, timestamp) =>
+              val someValue = 10 * 60 * 1000; // 10 mins * 60 seconds/minute * 1000 ms/s
+              timestamp.createTime.getOrElse(0) > System.currentTimeMillis() - someValue
+            }.compile.lastOrError
+          }
+        }
+      }
+    }.map {list => topicName -> list}
+  }
+
+  def checkForActivelyPublishedTopics(topicNames: List[String]): F[List[Either[ActivelyPublishedToError, String]]] = {
+    topicNames.traverse { name =>
+      val topicsResultsF = hasTopicReceivedRecentRecords(name)
+
+      for {
+        topicResults <- topicsResultsF
+      } yield {
+        if(topicResults._2.contains(true)){
+          Left(ActivelyPublishedToError(topicResults._1))
+        } else {
+          Right(topicResults._1)
         }
       }
     }
-    val eitherErrorOrTopic = checkIfTopicStillHasConsumers(topicNames, ignoreConsumerGroups)
-    eitherErrorOrTopic.flatMap{ cge =>
-      val goodTopics: List[String] = cge.map { e =>
-        e match {
-          case Right(value) => value
-          case Left(_) => ""
-        }
+  }
+
+  def findDeletableTopics(eitherErrorOrTopicAPTE: F[List[Either[ActivelyPublishedToError, String]]],
+                          eitherErrorOrTopicCSEE: F[List[Either[ConsumersStillExistError, String]]]): F[List[String]] = {
+    def getOnlyTopics(list: List[Either[DeleteTopicError, String]]): List[String] = {
+      list.map {
+        case Right(value) => value
+        case Left(_) => ""
       }.filterNot(_ == "")
-      val consumerErrors = cge.map { e =>
-        val vnel = e match {
+    }
+
+    for {
+      errorOrTopicAPTE <- eitherErrorOrTopicAPTE
+      errorOrTopicCSEE <- eitherErrorOrTopicCSEE
+    } yield {
+      // keep only the topic names that were in both "good" lists
+      val goodList1 = getOnlyTopics(errorOrTopicAPTE)
+      val goodList2 = getOnlyTopics(errorOrTopicCSEE)
+      goodList1.filterNot { goodList2.contains(_) }
+    }
+  }
+
+  def findNondeletableTopics(eitherErrorOrTopicAPTE: F[List[Either[ActivelyPublishedToError, String]]],
+                             eitherErrorOrTopicCSEE: F[List[Either[ConsumersStillExistError, String]]]): F[ValidatedNel[DeleteTopicError, Unit]] = {
+    for {
+      errorOrTopicAPTE <- eitherErrorOrTopicAPTE
+      errorOrTopicCSEE <- eitherErrorOrTopicCSEE
+    } yield {
+      val errorOrTopicCombined: List[Either[DeleteTopicError, String]] = List.concat(errorOrTopicAPTE, errorOrTopicCSEE)
+      errorOrTopicCombined.map { e =>
+        val vnel: Either[DeleteTopicError, Unit] = e match {
           case Right(_) => Right(())
           case Left(value) => Left(value)
         }
         vnel.toValidatedNel
-      }.combineAll
+      }
+    }
+  }
+
+  //consumer group should be pulled from prod, consumer group name will work for what you want it to work for
+  def deleteTopics(topicNames: List[String], ignoreConsumerGroups: List[String]): F[ValidatedNel[DeleteTopicError, Unit]] = {
+    val eitherErrorOrTopic2: F[List[Either[ActivelyPublishedToError, String]]] = checkForActivelyPublishedTopics(topicNames)
+    val eitherErrorOrTopic: F[List[Either[ConsumersStillExistError, String]]] = checkIfTopicStillHasConsumers(topicNames, ignoreConsumerGroups)
+
+    for {
+      goodTopics <- findDeletableTopics(eitherErrorOrTopic2, eitherErrorOrTopic)
+      consumerErrors <- findNondeletableTopics(eitherErrorOrTopic2, eitherErrorOrTopic)
+    } yield {
       kafkaAdmin.deleteTopics(goodTopics).flatMap { result =>
         val topicsToDeleteSchemaFor = result match {
           case Right(_) => goodTopics
@@ -104,10 +160,12 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
             metadataResult.toEither.leftMap(errors => TopicMetadataDeletionErrors(MetadataDeleteTopicErrorList(errors)))
               .toValidatedNel.combine(schemaResult.toEither.leftMap(a => SchemaDeletionErrors(SchemaDeleteTopicErrorList(a)))
               .toValidatedNel.combine(result.leftMap(KafkaDeletionErrors).toValidatedNel)
-              .combine{val b = guavaCache.removeAll().toEither.leftMap(e => CacheDeletionError(e.getMessage)).map(_ => ()).toValidatedNel
-                b}
-            .combine(consumerErrors))))
-        }
+              .combine {
+                val b = guavaCache.removeAll().toEither.leftMap(e => CacheDeletionError(e.getMessage)).map(_ => ()).toValidatedNel
+                b
+              }
+              .combine(consumerErrors))))
+      }
     }
   }
 
