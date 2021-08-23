@@ -1,8 +1,8 @@
 package hydra.ingest.programs
 
 import cats.MonadError
-import cats.data.{NonEmptyList, ValidatedNel}
-import cats.effect.{Concurrent}
+import cats.data.{NonEmptyList, Validated, ValidatedNel}
+import cats.effect.Concurrent
 import cats.implicits._
 //import cats.syntax.all._
 import fs2.kafka.{Headers, Timestamp}
@@ -26,7 +26,8 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
                                                                     schemaClient: SchemaRegistry[F],
                                                                     metadataAlgebra: MetadataAlgebra[F],
                                                                     consumerGroupAlgebra: ConsumerGroupsAlgebra[F],
-                                                                    ignoreConsumers: List[String])
+                                                                    ignoreConsumers: List[String],
+                                                                    allowableTopicDeletionTime: Long)
                                                                    (implicit guavaCache: Cache[SchemaWrapper]){
 
   def deleteFromSchemaRegistry(topicNames: List[String]): F[ValidatedNel[SchemaRegistryError, Unit]] = {
@@ -78,8 +79,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
             // get latest published message, compare timestamp to (NOW - configurable time window)
             kafkaClient.streamStringKeyFromGivenPartitionAndOffset(topicName, "dvs.deletion.consumer.group", false,
               partition, offset.value - 1).take(1).map { case (_, _, timestamp) =>
-                val someValue = 10 * 60 * 1000; // 10 mins * 60 seconds/minute * 1000 ms/s
-                timestamp.createTime.getOrElse(0: Long) > curTime - someValue
+                timestamp.createTime.getOrElse(0: Long) > curTime - allowableTopicDeletionTime
             }.compile.lastOrError
           }
         }
@@ -145,27 +145,26 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
     val eitherErrorOrTopic2: F[List[Either[ActivelyPublishedToError, String]]] = checkForActivelyPublishedTopics(topicNames)
     val eitherErrorOrTopic: F[List[Either[ConsumersStillExistError, String]]] = checkIfTopicStillHasConsumers(topicNames, ignoreConsumerGroups)
 
-    for {
-      goodTopics <- findDeletableTopics(eitherErrorOrTopic2, eitherErrorOrTopic)
-      topicErrors <- findNondeletableTopics(eitherErrorOrTopic2, eitherErrorOrTopic)
-    } yield {
-      kafkaAdmin.deleteTopics(goodTopics).flatMap { result =>
-        val topicsToDeleteSchemaFor = result match {
-          case Right(_) => goodTopics
-          case Left(error) =>
-            val failedTopicNames = error.errors.map(_.topicName).toList.toSet
-            goodTopics.toSet.diff(failedTopicNames).toList
+    findDeletableTopics(eitherErrorOrTopic2, eitherErrorOrTopic).flatMap { goodTopics =>
+      findNondeletableTopics(eitherErrorOrTopic2, eitherErrorOrTopic).flatMap { badTopics =>
+        kafkaAdmin.deleteTopics(goodTopics).flatMap { result =>
+          val topicsToDeleteSchemaFor = result match {
+            case Right(_) => goodTopics
+            case Left(error) =>
+              val failedTopicNames = error.errors.map(_.topicName).toList.toSet
+              goodTopics.toSet.diff(failedTopicNames).toList
+          }
+          deleteFromSchemaRegistry(topicsToDeleteSchemaFor).flatMap(schemaResult =>
+            lookupAndDeleteMetadataForTopics(topicsToDeleteSchemaFor).map(metadataResult =>
+              metadataResult.toEither.leftMap(errors => TopicMetadataDeletionErrors(MetadataDeleteTopicErrorList(errors)))
+                .toValidatedNel.combine(schemaResult.toEither.leftMap(a => SchemaDeletionErrors(SchemaDeleteTopicErrorList(a)))
+                .toValidatedNel.combine(result.leftMap(KafkaDeletionErrors).toValidatedNel)
+                .combine {
+                  val b = guavaCache.removeAll().toEither.leftMap(e => CacheDeletionError(e.getMessage)).map(_ => ()).toValidatedNel
+                  b
+                }
+                .combine(badTopics))))
         }
-        deleteFromSchemaRegistry(topicsToDeleteSchemaFor).flatMap(schemaResult =>
-          lookupAndDeleteMetadataForTopics(topicsToDeleteSchemaFor).map(metadataResult =>
-            metadataResult.toEither.leftMap(errors => TopicMetadataDeletionErrors(MetadataDeleteTopicErrorList(errors)))
-              .toValidatedNel.combine(schemaResult.toEither.leftMap(a => SchemaDeletionErrors(SchemaDeleteTopicErrorList(a)))
-              .toValidatedNel.combine(result.leftMap(KafkaDeletionErrors).toValidatedNel)
-              .combine {
-                val b = guavaCache.removeAll().toEither.leftMap(e => CacheDeletionError(e.getMessage)).map(_ => ()).toValidatedNel
-                b
-              }
-              .combine(topicErrors))))
       }
     }
   }

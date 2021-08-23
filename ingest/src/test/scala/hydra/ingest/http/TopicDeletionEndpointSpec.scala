@@ -168,7 +168,8 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             schemaAlgebra,
             metadataAlgebra,
             consumerGroupAlgebra,
-            List.empty
+            List.empty,
+            0
           ),
           "myPass").route
         Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
@@ -201,7 +202,8 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             schemaAlgebra,
             metadataAlgebra,
             consumerGroupAlgebra,
-            List.empty
+            List.empty,
+            0
           ), "myPass").route
         Delete("/v2/topics/schemas/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
@@ -231,7 +233,8 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             schemaAlgebra,
             metadataAlgebra,
             consumerGroupAlgebra,
-            List.empty
+            List.empty,
+            0
           ), "myPass").route
         Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah","exp.hello.world","exp.hi.there"]}""")) ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
@@ -261,7 +264,8 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             schemaAlgebra,
             metadataAlgebra,
             consumerGroupAlgebra,
-            List.empty
+            List.empty,
+            0
           ), "myPass").route
         Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
@@ -293,7 +297,8 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             schemaAlgebra,
             metadataAlgebra,
             consumerGroupAlgebra,
-            List.empty
+            List.empty,
+            0
           ), "myPass").route
         Delete("/v2/topics/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
@@ -325,7 +330,8 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             schemaAlgebra,
             metadataAlgebra,
             consumerGroupAlgebra,
-            List.empty
+            List.empty,
+            0
           ), "myPass").route
         Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
           addCredentials(BasicHttpCredentials("John", "badPass")) ~> Route.seal(route) ~> check {
@@ -357,7 +363,8 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             schemaAlgebra,
             metadataAlgebra,
             consumerGroupAlgebra,
-            List.empty
+            List.empty,
+            0
           ), "myPass").route
         Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
           Route.seal(route) ~> check {
@@ -389,7 +396,8 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             schemaAlgebra,
             metadataAlgebra,
             consumerGroupAlgebra,
-            List.empty
+            List.empty,
+            0
           ), "myPass").route
         Delete("/v2/topics/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
@@ -421,7 +429,8 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             schemaAlgebra,
             metadataAlgebra,
             consumerGroupAlgebra,
-            List.empty
+            List.empty,
+            0
           ), "myPass").route
         Delete("/v2/topics/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
@@ -453,7 +462,8 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             schemaAlgebra,
             metadataAlgebra,
             consumerGroupAlgebra,
-            List.empty
+            List.empty,
+            0
           ), "myPass").route
         Delete("/v2/topics/schemas/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
@@ -485,7 +495,8 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             schemaAlgebra,
             metadataAlgebra,
             consumerGroupAlgebra,
-            List.empty
+            List.empty,
+            0
           ), "myPass").route
         Delete("/v2/topics/schemas/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {

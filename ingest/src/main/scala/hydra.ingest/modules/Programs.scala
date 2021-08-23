@@ -55,7 +55,8 @@ final class Programs[F[_]: Logger: Sync: Timer: Mode: Concurrent] private(
     algebras.schemaRegistry,
     algebras.metadata,
     algebras.consumerGroups,
-    cfg.ignoreDeletionConsumerGroups.consumerGroupListToIgnore
+    cfg.ignoreDeletionConsumerGroups.consumerGroupListToIgnore,
+    cfg.allowableTopicDeletionTimeConfig.allowableTopicDeletionTime
   )
 
 }
