@@ -113,7 +113,7 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
   private def deleteTopics(topics: List[String], ignoreConsumerGroups: List[String],
                            userDeleting: String, path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
     onComplete(
-      Futurable[F].unsafeToFuture(deletionProgram.deleteTopic(topics, ignoreConsumerGroups))
+      Futurable[F].unsafeToFuture(deletionProgram.deleteTopics(topics, ignoreConsumerGroups))
     ) {
       case Success(maybeSuccess) => {
         maybeSuccess match {

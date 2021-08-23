@@ -4,7 +4,7 @@ import cats.MonadError
 import cats.data.{NonEmptyList, ValidatedNel}
 import cats.effect.{Concurrent}
 import cats.implicits._
-import cats.syntax.all._
+//import cats.syntax.all._
 import fs2.kafka.{Headers, Timestamp}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.util.SchemaWrapper
@@ -67,6 +67,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
   //consumer group should be pulled from prod, consumer group name will work for what you want it to work for
 
   def hasTopicReceivedRecentRecords(topicName: String): F[(String, List[Boolean])] = {
+    val curTime = System.currentTimeMillis();
     kafkaAdmin.getLatestOffsets(topicName).flatMap {
       offsetsMap => {
         offsetsMap.toList.filterNot {
@@ -77,8 +78,8 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
             // get latest published message, compare timestamp to (NOW - configurable time window)
             kafkaClient.streamStringKeyFromGivenPartitionAndOffset(topicName, "dvs.deletion.consumer.group", false,
               partition, offset.value - 1).take(1).map { case (_, _, timestamp) =>
-              val someValue = 10 * 60 * 1000; // 10 mins * 60 seconds/minute * 1000 ms/s
-              timestamp.createTime.getOrElse(0) > System.currentTimeMillis() - someValue
+                val someValue = 10 * 60 * 1000; // 10 mins * 60 seconds/minute * 1000 ms/s
+                timestamp.createTime.getOrElse(0: Long) > curTime - someValue
             }.compile.lastOrError
           }
         }
@@ -135,7 +136,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
           case Left(value) => Left(value)
         }
         vnel.toValidatedNel
-      }
+      }.combineAll
     }
   }
 
@@ -146,7 +147,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
 
     for {
       goodTopics <- findDeletableTopics(eitherErrorOrTopic2, eitherErrorOrTopic)
-      consumerErrors <- findNondeletableTopics(eitherErrorOrTopic2, eitherErrorOrTopic)
+      topicErrors <- findNondeletableTopics(eitherErrorOrTopic2, eitherErrorOrTopic)
     } yield {
       kafkaAdmin.deleteTopics(goodTopics).flatMap { result =>
         val topicsToDeleteSchemaFor = result match {
@@ -164,7 +165,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
                 val b = guavaCache.removeAll().toEither.leftMap(e => CacheDeletionError(e.getMessage)).map(_ => ()).toValidatedNel
                 b
               }
-              .combine(consumerErrors))))
+              .combine(topicErrors))))
       }
     }
   }

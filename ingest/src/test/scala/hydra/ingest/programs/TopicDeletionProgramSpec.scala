@@ -253,7 +253,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
         metadataAlgebra,
         testConsumerGroupAlgebra,
         ignoreConsumerGroupConfig
-      ).deleteTopic(topicNamesToDelete, ignoreConsumerGroupSpecific)
+      ).deleteTopics(topicNamesToDelete, ignoreConsumerGroupSpecific)
       // get all topic names
       allTopics <- kafkaAdmin.getTopicNames
       // get all versions of any given topic
