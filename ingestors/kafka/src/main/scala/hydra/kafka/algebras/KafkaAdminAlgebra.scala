@@ -159,7 +159,8 @@ object KafkaAdminAlgebra {
         getConsumerResource.use { consumerMaybe =>
           Option(consumerMaybe) match {
             case Some(consumer) =>
-              consumer.partitionsFor(topic).flatMap { partitionInfosMaybe =>
+              val part = Option(consumer.partitionsFor(topic))
+                part.map(_.flatMap { partitionInfosMaybe =>
                 Option(partitionInfosMaybe) match {
                   case Some(partitionInfos) =>
                     val p = partitionInfos.map(p => new TopicPartition(p.topic, p.partition))
@@ -182,7 +183,7 @@ object KafkaAdminAlgebra {
                   case None =>
                     Logger[F].warn(s"One PartitionInfo for topic $topic is null.") *> Sync[F].pure(Map.empty[KafkaAdminAlgebra.TopicAndPartition, Offset])
                 }
-              }
+              }).getOrElse(Sync[F].pure(Map.empty[KafkaAdminAlgebra.TopicAndPartition, Offset]))
             case None =>
               Logger[F].warn(s"Consumer for topic $topic is null.") *> Sync[F].pure(Map.empty[KafkaAdminAlgebra.TopicAndPartition, Offset])
           }

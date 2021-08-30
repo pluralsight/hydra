@@ -6,7 +6,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.Credentials
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
-import hydra.ingest.programs.{ConsumersStillExistError, DeleteTopicError, KafkaDeletionErrors, SchemaDeletionErrors, TopicDeletionProgram}
+import hydra.ingest.programs.{ActivelyPublishedToError, ConsumersStillExistError, DeleteTopicError, KafkaDeletionErrors, SchemaDeletionErrors, TopicDeletionProgram}
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
 import spray.json._
@@ -53,8 +53,9 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
 
   private def tupleErrorsToResponse(errorTuple: (List[SchemaDeletionErrors],
                                                  List[KafkaDeletionErrors],
-                                                 List[ConsumersStillExistError])): List[DeletionEndpointResponse] = {
-    schemaErrorsToResponse(errorTuple._1) ::: kafkaErrorsToResponse(errorTuple._2) ::: consumerErrorsToResponse(errorTuple._3)
+                                                 List[ConsumersStillExistError],
+                                                 List[ActivelyPublishedToError])): List[DeletionEndpointResponse] = {
+    schemaErrorsToResponse(errorTuple._1) ::: kafkaErrorsToResponse(errorTuple._2) ::: consumerErrorsToResponse(errorTuple._3) ::: activelyPublishedToErrorsToResponse(errorTuple._4)
   }
 
   private def schemaErrorsToResponse(schemaResults: List[SchemaDeletionErrors]): List[DeletionEndpointResponse] = {
@@ -67,6 +68,10 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
 
   private def consumerErrorsToResponse(consumerError: List[ConsumersStillExistError]): List[DeletionEndpointResponse] = {
     consumerError.map(err => DeletionEndpointResponse(err.topic, s"The following consumers still exist for the topic: ${err.consumers.toJson.compactPrint}"))
+  }
+
+  private def activelyPublishedToErrorsToResponse(publishedToError: List[ActivelyPublishedToError]): List[DeletionEndpointResponse] = {
+    publishedToError.map(err => DeletionEndpointResponse(err.topic, "Cannot delete the requested topic because it has been too recently published to."))
   }
 
   private def validResponse(topics: List[String], userDeleting: String, path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
@@ -99,11 +104,12 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
 
   private def invalidResponse(topics: List[String], userDeleting: String, e: NonEmptyList[DeleteTopicError],
                               path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
-    val allErrors = e.foldLeft((List.empty[SchemaDeletionErrors], List.empty[KafkaDeletionErrors], List.empty[ConsumersStillExistError])) { (agg, i) =>
+    val allErrors = e.foldLeft((List.empty[SchemaDeletionErrors], List.empty[KafkaDeletionErrors], List.empty[ConsumersStillExistError], List.empty[ActivelyPublishedToError])) { (agg, i) =>
       i match {
-        case sde: SchemaDeletionErrors => (agg._1 :+ sde, agg._2, agg._3)
-        case kde: KafkaDeletionErrors => (agg._1, agg._2 :+ kde, agg._3)
-        case cde: ConsumersStillExistError => (agg._1, agg._2, agg._3 :+ cde)
+        case sde: SchemaDeletionErrors => (agg._1 :+ sde, agg._2, agg._3, agg._4)
+        case kde: KafkaDeletionErrors => (agg._1, agg._2 :+ kde, agg._3, agg._4)
+        case cde: ConsumersStillExistError => (agg._1, agg._2, agg._3 :+ cde, agg._4)
+        case apte: ActivelyPublishedToError => (agg._1, agg._2, agg._3, agg._4 :+ apte)
       }
     }
     val response = tupleErrorsToResponse(allErrors)
@@ -126,7 +132,7 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
         }
       }
       case Failure(e) => {
-        topics.map(topicName => addHttpMetric(topicName, StatusCodes.InternalServerError, path, startTime,"DELETE", error = Some(e.getMessage)))
+        topics.map(topicName => addHttpMetric(topicName, StatusCodes.InternalServerError, path, startTime,"DELETE", error = Option(e.getMessage)))
         complete(StatusCodes.InternalServerError, e.getMessage)
       }
     }
@@ -192,7 +198,7 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
   private def exceptionHandler(startTime: Instant, method: String) = ExceptionHandler {
     case e =>
       extractExecutionContext{ implicit ec =>
-        addHttpMetric("", StatusCodes.InternalServerError,"/v2/topics", startTime, method, error = Some(e.getMessage))
+        addHttpMetric("", StatusCodes.InternalServerError,"/v2/topics", startTime, method, error = Option(e.getMessage))
         complete(StatusCodes.InternalServerError, e.getMessage)
       }
   }

@@ -6,6 +6,7 @@ import cats.effect.Concurrent
 import cats.implicits._
 //import cats.syntax.all._
 import fs2.kafka.{Headers, Timestamp}
+import org.apache.kafka.common.TopicPartition
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.util.SchemaWrapper
 import hydra.ingest.programs.TopicDeletionProgram._
@@ -18,6 +19,7 @@ import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key}
 import org.apache.avro.generic.GenericRecord
 import scalacache.Cache
 import scalacache.modes.try_._
+
 
 final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](kafkaAdmin: KafkaAdminAlgebra[F],
                                                                     kafkaClient: KafkaClientAlgebra[F],
@@ -76,12 +78,15 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
           _._2.value == 0
         }.traverse {
           case (partition, offset) => {
+            val tp = new TopicPartition(partition.topic, partition.partition)
             // get latest published message, compare timestamp to (NOW - configurable time window)
             kafkaClient.streamStringKeyFromGivenPartitionAndOffset(topicName, "dvs.deletion.consumer.group", false,
-              partition, offset.value - 1).take(1).map { case (_, _, timestamp) =>
+              List((tp, offset.value - 1))).take(1).map { case (_, _, timestamp) =>
                 timestamp.createTime.getOrElse(0: Long) > curTime - allowableTopicDeletionTime
             }.compile.lastOrError
           }
+          case _ =>
+            throw new Throwable("SOMETHING HAPPENED AND IT IS NOT GOOD")
         }
       }
     }.map {list => topicName -> list}
@@ -103,8 +108,8 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
     }
   }
 
-  def findDeletableTopics(eitherErrorOrTopicAPTE: F[List[Either[ActivelyPublishedToError, String]]],
-                          eitherErrorOrTopicCSEE: F[List[Either[ConsumersStillExistError, String]]]): F[List[String]] = {
+  def findDeletableTopics(eitherErrorOrTopicAPTE: List[Either[ActivelyPublishedToError, String]],
+                          eitherErrorOrTopicCSEE: List[Either[ConsumersStillExistError, String]]): List[String] = {
     def getOnlyTopics(list: List[Either[DeleteTopicError, String]]): List[String] = {
       list.map {
         case Right(value) => value
@@ -112,15 +117,9 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
       }.filterNot(_ == "")
     }
 
-    for {
-      errorOrTopicAPTE <- eitherErrorOrTopicAPTE
-      errorOrTopicCSEE <- eitherErrorOrTopicCSEE
-    } yield {
-      // keep only the topic names that were in both "good" lists
-      val goodList1 = getOnlyTopics(errorOrTopicAPTE)
-      val goodList2 = getOnlyTopics(errorOrTopicCSEE)
-      goodList1.filterNot { goodList2.contains(_) }
-    }
+    val goodList1 = getOnlyTopics(eitherErrorOrTopicAPTE)
+    val goodList2 = getOnlyTopics(eitherErrorOrTopicCSEE)
+    goodList1.filter { goodList2.contains(_) }
   }
 
   def findNondeletableTopics(eitherErrorOrTopicAPTE: F[List[Either[ActivelyPublishedToError, String]]],
@@ -140,32 +139,50 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
     }
   }
 
+  def checkIfTopicExists(topicName: String): F[(String, Boolean)] = {
+    kafkaAdmin.describeTopic(topicName).map(_.isDefined).map((topicName, _))
+  }
+
   //consumer group should be pulled from prod, consumer group name will work for what you want it to work for
   def deleteTopics(topicNames: List[String], ignoreConsumerGroups: List[String]): F[ValidatedNel[DeleteTopicError, Unit]] = {
-    val eitherErrorOrTopic2: F[List[Either[ActivelyPublishedToError, String]]] = checkForActivelyPublishedTopics(topicNames)
-    val eitherErrorOrTopic: F[List[Either[ConsumersStillExistError, String]]] = checkIfTopicStillHasConsumers(topicNames, ignoreConsumerGroups)
 
-    findDeletableTopics(eitherErrorOrTopic2, eitherErrorOrTopic).flatMap { goodTopics =>
-      findNondeletableTopics(eitherErrorOrTopic2, eitherErrorOrTopic).flatMap { badTopics =>
-        kafkaAdmin.deleteTopics(goodTopics).flatMap { result =>
-          val topicsToDeleteSchemaFor = result match {
-            case Right(_) => goodTopics
-            case Left(error) =>
-              val failedTopicNames = error.errors.map(_.topicName).toList.toSet
-              goodTopics.toSet.diff(failedTopicNames).toList
-          }
-          deleteFromSchemaRegistry(topicsToDeleteSchemaFor).flatMap(schemaResult =>
-            lookupAndDeleteMetadataForTopics(topicsToDeleteSchemaFor).map(metadataResult =>
-              metadataResult.toEither.leftMap(errors => TopicMetadataDeletionErrors(MetadataDeleteTopicErrorList(errors)))
-                .toValidatedNel.combine(schemaResult.toEither.leftMap(a => SchemaDeletionErrors(SchemaDeleteTopicErrorList(a)))
-                .toValidatedNel.combine(result.leftMap(KafkaDeletionErrors).toValidatedNel)
-                .combine {
-                  val b = guavaCache.removeAll().toEither.leftMap(e => CacheDeletionError(e.getMessage)).map(_ => ()).toValidatedNel
-                  b
-                }
-                .combine(badTopics))))
+    val topicsF = topicNames.traverse(checkIfTopicExists)
+
+    def eitherErrorOrTopic2(topicsThatExist: List[String]): F[List[Either[ActivelyPublishedToError, String]]] = checkForActivelyPublishedTopics(topicsThatExist)
+    def eitherErrorOrTopic(topicsThatExist: List[String]): F[List[Either[ConsumersStillExistError, String]]] = checkIfTopicStillHasConsumers(topicsThatExist, ignoreConsumerGroups)
+
+    for {
+      topics <- topicsF
+      (topicsThatExist, nonExistantTopics) = topics.partition(_._2 == true)
+      eeot2 <- eitherErrorOrTopic2(topicsThatExist.map(_._1))
+      eeot <- eitherErrorOrTopic(topicsThatExist.map(_._1))
+      goodTopics = findDeletableTopics(eeot2, eeot)
+      badTopics <- findNondeletableTopics(eitherErrorOrTopic2(topicsThatExist.map(_._1)), eitherErrorOrTopic(topicsThatExist.map(_._1)))
+      result <- kafkaAdmin.deleteTopics(goodTopics)
+      topicsToDeleteSchemaFor = result match {
+        case Right(_) => goodTopics
+        case Left(error) =>
+          val failedTopicNames = error.errors.map(_.topicName).toList.toSet
+          goodTopics.toSet.diff(failedTopicNames).toList
+      }
+      schemaResult <- deleteFromSchemaRegistry(topicsToDeleteSchemaFor)
+      metadataResult <- lookupAndDeleteMetadataForTopics(topicsToDeleteSchemaFor)
+    } yield {
+      val nonExistantTopicErrors = nonExistantTopics.map { fakeTopic =>
+        fakeTopic._2 match {
+            case false => Left(TopicDoesNotExistError(fakeTopic._1))
+            case true => Right(())
         }
       }
+      val endResult = metadataResult.toEither.leftMap(errors => TopicMetadataDeletionErrors(MetadataDeleteTopicErrorList(errors)))
+        .toValidatedNel.combine(schemaResult.toEither.leftMap(a => SchemaDeletionErrors(SchemaDeleteTopicErrorList(a)))
+        .toValidatedNel.combine(result.leftMap(KafkaDeletionErrors).toValidatedNel
+        .combine {
+          val b = guavaCache.removeAll().toEither.leftMap(e => CacheDeletionError(e.getMessage)).map(_ => ()).toValidatedNel
+          b
+        }
+        .combine(badTopics)
+        .combine(nonExistantTopicErrors.map(_.leftMap(_).toValidatedNel))
     }
   }
 
@@ -235,4 +252,5 @@ final case class SchemaDeletionErrors(schemaDeleteTopicErrorList: SchemaDeleteTo
 final case class TopicMetadataDeletionErrors(metadataDeleteTopicErrorList: MetadataDeleteTopicErrorList) extends DeleteTopicError
 final case class ConsumersStillExistError(topic: String, consumers: List[Consumer]) extends DeleteTopicError
 final case class ActivelyPublishedToError(topic: String) extends DeleteTopicError
+final case class TopicDoesNotExistError(topic: String) extends DeleteTopicError
 final case class CacheDeletionError(message: String) extends DeleteTopicError

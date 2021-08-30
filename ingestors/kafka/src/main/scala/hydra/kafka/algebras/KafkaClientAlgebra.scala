@@ -1,10 +1,9 @@
 package hydra.kafka.algebras
 
-import cats.{Applicative, Monad, MonadError}
+import cats.{Applicative, Monad, MonadError, Order, data}
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.syntax.all._
-import cats.{Monad, MonadError}
 import fs2.Pipe
 import fs2.concurrent.Queue
 import fs2.kafka._
@@ -77,16 +76,15 @@ trait KafkaClientAlgebra[F[_]] {
                                                   topicName: TopicName,
                                                   consumerGroup: ConsumerGroup,
                                                   commitOffsets: Boolean,
-                                                  topicPartition: TopicAndPartition,
-                                                  offset: Offset
+                                                  topicPartitionAndOffsets: List[(TopicPartition, Offset)]
                                                 ): fs2.Stream[F, (StringRecord, OffsetInfo, Timestamp)]
 
+  // FIX ME
   def streamAvroKeyFromGivenPartitionAndOffset(
                                                 topicName: TopicName,
                                                 consumerGroup: ConsumerGroup,
                                                 commitOffsets: Boolean,
-                                                topicPartition: TopicAndPartition,
-                                                offset: Offset
+                                                topicPartitionAndOffsets: List[(TopicPartition, Offset)]
                                               ): fs2.Stream[F, (Record, OffsetInfo, Timestamp)]
 
   /**
@@ -259,17 +257,17 @@ object KafkaClientAlgebra {
       override def withProducerRecordSizeLimit(sizeLimitBytes: Long): F[KafkaClientAlgebra[F]] =
         getLiveInstance[F](bootstrapServers)(queue, schemaRegistryClient, keySerializer, valSerializer, sizeLimitBytes.some, publishTimeoutDuration, publishMaxBlockMs)
 
-      override def streamStringKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicPartition: TopicAndPartition, offset: Offset):
+      override def streamStringKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicPartitionAndOffsets: List[(TopicPartition, Offset)]):
       fs2.Stream[F, ((StringRecord), (Partition, Offset), Timestamp)] = {
         streamFromOffsetPartition[Option[String]](getStringKeyDeserializer, consumerGroup,
-          topicName, commitOffsets, new TopicPartition(topicPartition.topic,topicPartition.partition), offset)
+          topicName, commitOffsets, topicPartitionAndOffsets)
           .map(c => ((c._1, c._2, c._3),(c._4,c._5), c._6))
       }
 
-      override def streamAvroKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicPartition: TopicAndPartition, offset: Offset)
+      override def streamAvroKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicPartitionAndOffsets: List[(TopicPartition, Offset)])
       : fs2.Stream[F, (Record, (Partition, Offset), Timestamp)] = {
         streamFromOffsetPartition[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup,
-          topicName, commitOffsets, new TopicPartition(topicPartition.topic,topicPartition.partition), offset)
+          topicName, commitOffsets, topicPartitionAndOffsets: List[(TopicPartition, Offset)])
           .map(c => ((c._1, c._2, c._3),(c._4,c._5), c._6))
       }
 
@@ -323,8 +321,7 @@ object KafkaClientAlgebra {
                                                 consumerGroup: ConsumerGroup,
                                                 topicName: TopicName,
                                                 commitOffsets: Boolean,
-                                                topicPartition: TopicPartition,
-                                                offset: Offset
+                                                topicPartitionAndOffsets: List[(TopicPartition, Offset)]
                                               ): fs2.Stream[F, (A, Option[GenericRecord], Option[Headers], Partition, Offset, Timestamp)] = {
         val consumerSettings: ConsumerSettings[F, A, Option[GenericRecord]] = ConsumerSettings(
           keyDeserializer = keyDeserializer,
@@ -333,14 +330,17 @@ object KafkaClientAlgebra {
           .withAutoOffsetReset(AutoOffsetReset.Earliest)
           .withBootstrapServers(bootstrapServers)
           .withGroupId(consumerGroup)
+        implicit val order: Order[TopicPartition] =
+          (x: TopicPartition, y: TopicPartition) => if (x.partition() > y.partition()) 1 else if (x.partition() < y.partition()) -1 else 0
+        val topicsPartitions = topicPartitionAndOffsets.map(_._1)
+        val tp = data.NonEmptySet.of[TopicPartition](topicsPartitions.head, topicsPartitions.tail:_*)
         consumerStream(consumerSettings)
-          .evalTap(_.subscribeTo(topicName))
-          .evalTap(_.seek(topicPartition, offset))
-          .flatMap(_.stream)
+          .evalTap(str => str.assign(tp))
+          .evalTap(kc => topicPartitionAndOffsets.traverse(tuple => kc.seek(tuple._1, tuple._2)))
+          .flatMap(kc => kc.stream)
           .evalTap{ committable =>
             if (commitOffsets) committable.offset.commit else Applicative[F].pure(())
-          }
-          .map { committable =>
+          }.map { committable =>
             val r = committable.record
             val headers = if (r.headers.isEmpty) None else Option(r.headers)
             (r.key, r.value, headers, r.partition, r.offset, r.timestamp)
@@ -451,9 +451,9 @@ object KafkaClientAlgebra {
       fs2.Stream.raiseError[F](OffsetInfoNotRetrievableInTest())
     }
 
-    override def streamStringKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicPartition: TopicAndPartition, offset: Offset): fs2.Stream[F, ((Option[String], Option[GenericRecord], Option[Headers]), (Partition, Offset), Timestamp)] = ???
+    override def streamStringKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicPartitionAndOffsets: List[(TopicPartition, Offset)]): fs2.Stream[F, ((Option[String], Option[GenericRecord], Option[Headers]), (Partition, Offset), Timestamp)] = ???
 
-    override def streamAvroKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicPartition: TopicAndPartition, offset: Offset): fs2.Stream[F, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset), Timestamp)] = ???
+    override def streamAvroKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicPartitionAndOffsets: List[(TopicPartition, Offset)]): fs2.Stream[F, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset), Timestamp)] = ???
   }
 
   def test[F[_]: Sync: Concurrent]: F[KafkaClientAlgebra[F]] = SchemaRegistry.test[F].flatMap { sr =>
