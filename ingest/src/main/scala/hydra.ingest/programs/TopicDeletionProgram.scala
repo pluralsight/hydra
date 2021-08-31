@@ -153,7 +153,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
 
     for {
       topics <- topicsF
-      (topicsThatExist, nonExistantTopics) = topics.partition(_._2 == true)
+      (topicsThatExist, nonExistentTopics) = topics.partition(_._2)
       eeot2 <- eitherErrorOrTopic2(topicsThatExist.map(_._1))
       eeot <- eitherErrorOrTopic(topicsThatExist.map(_._1))
       goodTopics = findDeletableTopics(eeot2, eeot)
@@ -168,13 +168,14 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
       schemaResult <- deleteFromSchemaRegistry(topicsToDeleteSchemaFor)
       metadataResult <- lookupAndDeleteMetadataForTopics(topicsToDeleteSchemaFor)
     } yield {
-      val nonExistantTopicErrors = nonExistantTopics.map { fakeTopic =>
-        fakeTopic._2 match {
+      val nonExistentTopicErrors: ValidatedNel[DeleteTopicError, Unit]  = nonExistentTopics.map { fakeTopic =>
+        val vnel: Either[DeleteTopicError, Unit] = fakeTopic._2 match {
             case false => Left(TopicDoesNotExistError(fakeTopic._1))
             case true => Right(())
         }
-      }
-      val endResult = metadataResult.toEither.leftMap(errors => TopicMetadataDeletionErrors(MetadataDeleteTopicErrorList(errors)))
+        vnel.toValidatedNel
+      }.combineAll
+      metadataResult.toEither.leftMap(errors => TopicMetadataDeletionErrors(MetadataDeleteTopicErrorList(errors)))
         .toValidatedNel.combine(schemaResult.toEither.leftMap(a => SchemaDeletionErrors(SchemaDeleteTopicErrorList(a)))
         .toValidatedNel.combine(result.leftMap(KafkaDeletionErrors).toValidatedNel
         .combine {
@@ -182,7 +183,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
           b
         }
         .combine(badTopics)
-        .combine(nonExistantTopicErrors.map(_.leftMap(_).toValidatedNel))
+        .combine(nonExistentTopicErrors)))
     }
   }
 
