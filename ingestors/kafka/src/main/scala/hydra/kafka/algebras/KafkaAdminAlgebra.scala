@@ -225,10 +225,10 @@ object KafkaAdminAlgebra {
     }
   }
 
-  def test[F[_]: Sync](mockedOffsets: Map[TopicAndPartition, Offset] = Map.empty[TopicAndPartition, Offset]): F[KafkaAdminAlgebra[F]] =
-    Ref[F].of(Map[TopicName, Topic]()).flatMap(getTestKafkaClient[F](mockedOffsets))
+  def test[F[_]: Sync]: F[KafkaAdminAlgebra[F]] =
+    Ref[F].of(Map[TopicName, Topic]()).flatMap(getTestKafkaClient[F])
 
-  private[this] def getTestKafkaClient[F[_]: Sync](mockedOffsets: Map[TopicAndPartition, Offset] = Map.empty[TopicAndPartition, Offset])(
+  private[this] def getTestKafkaClient[F[_]: Sync](
       ref: Ref[F, Map[TopicName, Topic]]
   ): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
     new KafkaAdminAlgebra[F] {
@@ -256,8 +256,8 @@ object KafkaAdminAlgebra {
 
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getConsumerGroupOffsets(consumerGroup: String): F[Map[TopicAndPartition, Offset]] = ???
-
-      override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] = Sync[F].pure(mockedOffsets)
+      // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
+      override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] = ???
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]] = ???
 

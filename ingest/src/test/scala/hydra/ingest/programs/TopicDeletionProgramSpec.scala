@@ -91,22 +91,13 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
         }
     }
 
-  def kafkabadTest[F[_]: Sync]: F[KafkaAdminAlgebra[F]] =
-    KafkaAdminAlgebra.test[F].flatMap(getBadTestKafkaClient[F])
+  def kafkabadTest[F[_]: Sync](mockedOffsets: Map[TopicAndPartition, Offset] = Map.empty[TopicAndPartition, Offset]): F[KafkaAdminAlgebra[F]] =
+    KafkaAdminAlgebra.test[F].flatMap(admin => getBadTestKafkaAdmin[F](admin, mockedOffsets))
 
-  def addToMockVersion(listOfTopicAndPartion: List[(TopicAndPartition, Offset)]): Unit = {
-    listOfTopicAndPartion.map { entry =>
-      mockedOffsets.map { e => e ++ (entry._1 -> entry._2) }
-    }
-  }
 
-  def resetMockedOffsets(): Unit = {
-    mockedOffsets = Map.empty[TopicAndPartition, Offset]
-  }
 
-  var mockedOffsets: Map[TopicAndPartition, Offset] = Map.empty[TopicAndPartition, Offset]
-
-  private[this] def getBadTestKafkaClient[F[_]: Sync](underlying: KafkaAdminAlgebra[F]): F[KafkaAdminAlgebra[F]] = Sync[F].delay  {
+  private[this] def getBadTestKafkaAdmin[F[_]: Sync](underlying: KafkaAdminAlgebra[F],
+                   mockedOffsets: Map[TopicAndPartition, Offset] = Map.empty[TopicAndPartition, Offset]): F[KafkaAdminAlgebra[F]] = Sync[F].delay  {
     new KafkaAdminAlgebra[F] {
       override def describeTopic(name: TopicName): F[Option[Topic]] = underlying.describeTopic(name)
 
@@ -121,7 +112,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       override def getConsumerGroupOffsets(consumerGroup: String): F[Map[TopicAndPartition, Offset]] = ???
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] = {
-        Sync[F].pure(mockedOffsets);
+        Sync[F].pure(mockedOffsets)
       }
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]] = ???
@@ -407,7 +398,8 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
 
   // FAILURE CASES
   it should "Return a KafkaDeletionError if the topic fails to delete" in {
-    applyTestcase(kafkabadTest[IO], SchemaRegistry.test[IO],
+    val offsetMap = Map.empty[TopicAndPartition, Offset]
+    applyTestcase(kafkabadTest[IO](offsetMap), SchemaRegistry.test[IO],
       v1TopicNames = twoTopics, v2TopicNames = List(), topicNamesToDelete = twoTopics,
       registerKey = true, kafkaTopicNamesToFail = twoTopics,
       schemasToSucceed = twoTopics, assertionError = invalidErrorChecker)
@@ -420,8 +412,14 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       schemasToSucceed = List("topic2"), assertionError = invalidErrorChecker)
   }
 
-  it should "Fail to delete topic that was recently publised to." in {
-    //applyTestcase(KafkaAdminAlgebra.test[IO])
+  it should "Fail to delete topic that was recently published to." in {
+
+    val offsetMap = Map.empty[TopicAndPartition, Offset]
+
+    applyTestcase(kafkabadTest[IO](offsetMap), SchemaRegistry.test[IO],
+      v1TopicNames = twoTopics, v2TopicNames = List(), topicNamesToDelete = twoTopics,
+      registerKey = true, kafkaTopicNamesToFail = List(),
+      schemasToSucceed = twoTopics, assertionError = invalidErrorChecker)
     // setup topicAndPartition map with now() time
     // call some good test case, but assert that it fails
   }
