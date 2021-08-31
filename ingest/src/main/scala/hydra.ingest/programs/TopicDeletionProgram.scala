@@ -86,7 +86,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
             }.compile.lastOrError
           }
           case _ =>
-            throw new Throwable("SOMETHING HAPPENED AND IT IS NOT GOOD")
+            throw new Throwable("Unexpected return type from TopicDeletionProgram")
         }
       }
     }.map {list => topicName -> list}

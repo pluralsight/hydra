@@ -39,6 +39,7 @@ import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
 import java.io.IOException
 import scalacache.Mode
+import shapeless.syntax.std.tuple.productTupleOps
 
 class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
   implicit private val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
@@ -93,6 +94,18 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
   def kafkabadTest[F[_]: Sync]: F[KafkaAdminAlgebra[F]] =
     KafkaAdminAlgebra.test[F].flatMap(getBadTestKafkaClient[F])
 
+  def addToMockVersion(listOfTopicAndPartion: List[(TopicAndPartition, Offset)]): Unit = {
+    listOfTopicAndPartion.map { entry =>
+      mockedOffsets.map { e => e ++ (entry._1 -> entry._2) }
+    }
+  }
+
+  def resetMockedOffsets(): Unit = {
+    mockedOffsets = Map.empty[TopicAndPartition, Offset]
+  }
+
+  var mockedOffsets: Map[TopicAndPartition, Offset] = Map.empty[TopicAndPartition, Offset]
+
   private[this] def getBadTestKafkaClient[F[_]: Sync](underlying: KafkaAdminAlgebra[F]): F[KafkaAdminAlgebra[F]] = Sync[F].delay  {
     new KafkaAdminAlgebra[F] {
       override def describeTopic(name: TopicName): F[Option[Topic]] = underlying.describeTopic(name)
@@ -107,7 +120,9 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getConsumerGroupOffsets(consumerGroup: String): F[Map[TopicAndPartition, Offset]] = ???
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
-      override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] = ???
+      override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] = {
+        Sync[F].pure(mockedOffsets);
+      }
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]] = ???
 
@@ -215,7 +230,8 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
                             assertionError: ErrorChecker = _ => (),
                             consumerGroupToAdd: Option[(TopicConsumerKey, TopicConsumerValue, String)] = None,
                             ignoreConsumerGroupConfig: List[String] = List.empty,
-                            ignoreConsumerGroupSpecific: List[String] = List.empty): Unit = {
+                            ignoreConsumerGroupSpecific: List[String] = List.empty,
+                            allowableTopicDeletionTimeMs: Long = 0): Unit = {
     (for {
       // For v2 topics we need to write the metadata to the v2MetadataTopic because the topic deletion attempts to lookup
       // the v2 metadata and uses the results to determine if we are deleting a v1 or v2 topic.
@@ -253,7 +269,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
         metadataAlgebra,
         testConsumerGroupAlgebra,
         ignoreConsumerGroupConfig,
-        0
+        allowableTopicDeletionTimeMs
       ).deleteTopics(topicNamesToDelete, ignoreConsumerGroupSpecific)
       // get all topic names
       allTopics <- kafkaAdmin.getTopicNames
@@ -404,4 +420,9 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       schemasToSucceed = List("topic2"), assertionError = invalidErrorChecker)
   }
 
+  it should "Fail to delete topic that was recently publised to." in {
+    //applyTestcase(KafkaAdminAlgebra.test[IO])
+    // setup topicAndPartition map with now() time
+    // call some good test case, but assert that it fails
+  }
 }

@@ -79,7 +79,6 @@ trait KafkaClientAlgebra[F[_]] {
                                                   topicPartitionAndOffsets: List[(TopicPartition, Offset)]
                                                 ): fs2.Stream[F, (StringRecord, OffsetInfo, Timestamp)]
 
-  // FIX ME
   def streamAvroKeyFromGivenPartitionAndOffset(
                                                 topicName: TopicName,
                                                 consumerGroup: ConsumerGroup,
