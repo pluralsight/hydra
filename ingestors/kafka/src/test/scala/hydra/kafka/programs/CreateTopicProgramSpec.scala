@@ -82,7 +82,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
       (for {
         schemaRegistry <- schemaRegistryIO
-        kafka <- KafkaAdminAlgebra.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
         kafkaClient <- KafkaClientAlgebra.test[IO]
         metadata <- metadataAlgebraF("dvs.v2Topic", schemaRegistry, kafkaClient)
         registerInternalMetadata = new CreateTopicProgram[IO](
@@ -149,7 +149,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           override def deleteSchemaSubject(subject: String): IO[Unit] = IO.pure(())
         }
       (for {
-        kafka <- KafkaAdminAlgebra.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
         kafkaClient <- KafkaClientAlgebra.test[IO]
         ref <- Ref[IO]
           .of(TestState(deleteSchemaWasCalled = false, 0))
@@ -203,7 +203,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         }
 
       (for {
-        kafka <- KafkaAdminAlgebra.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
         kafkaClient <- KafkaClientAlgebra.test[IO]
         ref <- Ref[IO].of(0)
         schemaRegistry = getSchemaRegistry(ref)
@@ -262,7 +262,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
       val schemaRegistryState = Map("subject-key" -> 1)
       (for {
-        kafka <- KafkaAdminAlgebra.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
         kafkaClient <- KafkaClientAlgebra.test[IO]
         ref <- Ref[IO]
           .of(TestState(schemaRegistryState))
@@ -290,7 +290,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val subject = "dvs.subject"
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
         kafkaClient <- KafkaClientAlgebra.test[IO]
         metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
@@ -318,7 +318,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val value = request.toValue
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]()
         publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(publishTo)
@@ -349,7 +349,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val updatedValue = updatedRequest.toValue
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]()
         publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(publishTo)
@@ -384,7 +384,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val request = createTopicMetadataRequest(keySchema, valueSchema)
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]()
         publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(
@@ -413,7 +413,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val request = createTopicMetadataRequest(keySchema, valueSchema)
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]()
         publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(
@@ -443,7 +443,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val updatedRequest = createTopicMetadataRequest(keySchema, valueSchema, "updated@email.com", deprecated = true)
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]()
         publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(publishTo)
@@ -478,7 +478,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val updatedRequest = createTopicMetadataRequest(keySchema, valueSchema, "updated@email.com", deprecated = true)
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]()
         publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(publishTo)
@@ -511,7 +511,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val subject = "dvs.subject"
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
         kafkaClient <- KafkaClientAlgebra.test[IO]
         metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
@@ -544,7 +544,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
       an [IncompatibleKeyAndValueFieldNames] shouldBe thrownBy {(for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
         kafkaClient <- KafkaClientAlgebra.test[IO]
         metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
@@ -576,7 +576,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
       an [KeyHasNullableFields] shouldBe thrownBy {(for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
         kafkaClient <- KafkaClientAlgebra.test[IO]
         metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
@@ -607,7 +607,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
       an [KeyHasNullableFields] shouldBe thrownBy {(for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
         kafkaClient <- KafkaClientAlgebra.test[IO]
         metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
@@ -641,7 +641,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val topicMetadataV2Request = createTopicMetadataRequest(keySchema, recordWithNullDefault)
       val resource: Resource[IO, Assertion] = (for {
         schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
-        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO]())
         kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
         metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
         ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
@@ -667,7 +667,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val topicMetadataV2Request = createTopicMetadataRequest(keySchema, recordWithNullType)
       val resource: Resource[IO, Assertion] = (for {
         schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
-        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO]())
         kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
         metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
         ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
@@ -694,7 +694,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val topicMetadataV2Request = createTopicMetadataRequest(recordWithNullDefault, valueSchema)
       val resource: Resource[IO, Assertion] = (for {
         schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
-        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO]())
         kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
         metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
         ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
@@ -714,7 +714,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val topicMetadataV2Request = createTopicMetadataRequest(keySchema, mismatchedValueSchema)
       val resource: Resource[IO, Assertion] = (for {
         schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
-        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO]())
         kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
         metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
         ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
@@ -740,7 +740,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val topicMetadataV2Request = createTopicMetadataRequest(incorrectKeySchema, valueSchema)
       val resource: Resource[IO, Assertion] = (for {
         schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
-        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO]())
         kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
         metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
         ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
@@ -759,7 +759,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val topicMetadataV2Request = createTopicMetadataRequest(keySchema, incorrectValueSchema)
       val resource: Resource[IO, Assertion] = (for {
         schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
-        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO]())
         kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
         metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
         ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
@@ -774,7 +774,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val topicMetadataV2Request = createTopicMetadataRequest(keySchema, valueSchema)
       val resource: Resource[IO, Assertion] = (for {
         schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
-        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO]())
         kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
         metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
         ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)

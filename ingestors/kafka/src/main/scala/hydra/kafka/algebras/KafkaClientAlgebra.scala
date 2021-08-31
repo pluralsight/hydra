@@ -371,12 +371,12 @@ object KafkaClientAlgebra {
                                                       sizeLimitBytes: Option[Long] = None): KafkaClientAlgebra[F] = new KafkaClientAlgebra[F] {
 
     override def publishMessage(record: Record, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
-      val cacheRecord = (GenericRecordFormat(record._1), record._2, Some(record._3.getOrElse(Headers.empty)))
+      val cacheRecord = (GenericRecordFormat(record._1), record._2, Some(record._3.getOrElse(Headers.empty)), (0, 0L), Timestamp.createTime(System.currentTimeMillis()))
       publishCacheMessage(cacheRecord, topicName)
     }
 
     override def publishStringKeyMessage(record: StringRecord, topicName: TopicName): F[Either[PublishError, PublishResponse]] = {
-      val cacheRecord = (StringFormat(record._1), record._2, record._3)
+      val cacheRecord = (StringFormat(record._1), record._2, record._3, (0, 0L), Timestamp.createTime(System.currentTimeMillis()))
       publishCacheMessage(cacheRecord, topicName)
     }
 
@@ -384,7 +384,7 @@ object KafkaClientAlgebra {
       if (commitOffsets) fs2.Stream.raiseError[F](OffsetsNotCommittableInTest)
       else {
         consumeCacheMessage(topicName, consumerGroup).evalMap {
-        case (r: GenericRecordFormat, v, h) => {
+        case (r: GenericRecordFormat, v, h, po, t) => {
           val headers = h match {
             case Some(value) => if (value.isEmpty) None else Some(value)
             case _ => None
@@ -400,7 +400,7 @@ object KafkaClientAlgebra {
       if (commitOffsets) fs2.Stream.raiseError[F](OffsetsNotCommittableInTest)
       else {
         consumeCacheMessage(topicName, consumerGroup).evalMap {
-          case (r: StringFormat, v, h) => {
+          case (r: StringFormat, v, h, po, t) => {
           val headers = h match {
             case Some(value) => if (value.isEmpty) None else Some(value)
             case _ => None
@@ -450,7 +450,21 @@ object KafkaClientAlgebra {
       fs2.Stream.raiseError[F](OffsetInfoNotRetrievableInTest())
     }
 
-    override def streamStringKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicPartitionAndOffsets: List[(TopicPartition, Offset)]): fs2.Stream[F, ((Option[String], Option[GenericRecord], Option[Headers]), (Partition, Offset), Timestamp)] = ???
+    override def streamStringKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicPartitionAndOffsets: List[(TopicPartition, Offset)]): fs2.Stream[F, ((Option[String], Option[GenericRecord], Option[Headers]), (Partition, Offset), Timestamp)] = {
+      if (commitOffsets) fs2.Stream.raiseError[F](OffsetsNotCommittableInTest)
+      else {
+        consumeCacheMessage(topicName, consumerGroup).evalMap {
+          case (r: StringFormat, v, h, po, t) => {
+            val headers = h match {
+              case Some(value) => if (value.isEmpty) None else Some(value)
+              case _ => None
+            }
+            Sync[F].pure((r.value, v, headers), po, t)
+          }
+          case _ => Sync[F].raiseError(ConsumeErrorException("Expected String, got GenericRecord"))
+        }
+      }
+    }
 
     override def streamAvroKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicPartitionAndOffsets: List[(TopicPartition, Offset)]): fs2.Stream[F, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset), Timestamp)] = ???
   }
@@ -518,7 +532,7 @@ object KafkaClientAlgebra {
       }
     }.suspend
 
-  private type CacheRecord = (RecordFormat, Option[GenericRecord], Option[Headers])
+  private type CacheRecord = (RecordFormat, Option[GenericRecord], Option[Headers], (Int, Long), Timestamp)
 
   private final case class MockFS2Kafka[F[_]](
                                                    private val topics: Map[TopicName, List[CacheRecord]],

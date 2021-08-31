@@ -32,8 +32,10 @@ import scalacache.memoization._
 import scalacache.modes.try_._
 import cats.MonadError
 import cats.effect.concurrent.Ref
+import hydra.avro.convert.StringToGenericRecord.ConvertToGenericRecord
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
 import org.apache.kafka.clients.admin.ConsumerGroupDescription
+import org.apache.kafka.common.TopicPartition
 
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
@@ -92,7 +94,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
     }
 
   def kafkabadTest[F[_]: Sync](mockedOffsets: Map[TopicAndPartition, Offset] = Map.empty[TopicAndPartition, Offset]): F[KafkaAdminAlgebra[F]] =
-    KafkaAdminAlgebra.test[F].flatMap(admin => getBadTestKafkaAdmin[F](admin, mockedOffsets))
+    KafkaAdminAlgebra.test[F]().flatMap(admin => getBadTestKafkaAdmin[F](admin, mockedOffsets))
 
 
 
@@ -250,6 +252,10 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       _ <- registerTopics(List(upgradeTopic._1), schemaAlgebra, registerKey, upgradeTopic._2)
       // add Schemas to Cache
       _ <- (v1TopicNames++v2TopicNames).traverse{topic => getSchemaWrapper(schemaAlgebra, topic)}
+      schema = SchemaBuilder.record("Test").fields()
+        .requiredString("testing").endRecord()
+      _ <- v1TopicNames.traverse { kafkaClientAlgebra.publishStringKeyMessage((None, """{"testing": "test"}""".toGenericRecord(schema, useStrictValidation = true).toOption, None)
+          , _)}
       // delete all given topics
       errors <-  new TopicDeletionProgram[IO](
         kafkaAdmin,
@@ -297,7 +303,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
                                 consumerGroupToAdd: Option[(TopicConsumerKey, TopicConsumerValue, String)] = None,
                                 ignoreConsumerGroupConfig: List[String] = List.empty,
                                 ignoreConsumerGroupSpecific: List[String] = List.empty): Unit = {
-    applyTestcase(KafkaAdminAlgebra.test[IO], SchemaRegistry.test[IO],
+    applyTestcase(KafkaAdminAlgebra.test[IO](), SchemaRegistry.test[IO],
       v1TopicNames, v2TopicNames, topicNamesToDelete, v1TopicNames++v2TopicNames, registerKey,
       List.empty, upgradeTopic, assertionError, consumerGroupToAdd, ignoreConsumerGroupConfig = ignoreConsumerGroupConfig,
       ignoreConsumerGroupSpecific = ignoreConsumerGroupSpecific)
@@ -363,7 +369,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
     val key = TopicConsumerKey(topic, consumerGroup)
     val value = TopicConsumerValue(Instant.now())
     val state = "Stable"
-    applyTestcase(KafkaAdminAlgebra.test[IO], SchemaRegistry.test[IO],
+    applyTestcase(KafkaAdminAlgebra.test[IO](), SchemaRegistry.test[IO],
       List(topic), List.empty, List(topic), registerKey = false, schemasToSucceed = List(topic),
       assertionError = invalidErrorChecker, consumerGroupToAdd = Some((key,value,state)),kafkaTopicNamesToFail = List(topic))
   }
@@ -406,7 +412,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "Return a SchemaDeletionError if deleting schemas fails" in {
-    applyTestcase(KafkaAdminAlgebra.test[IO], schemaBadTest[IO](true),
+    applyTestcase(KafkaAdminAlgebra.test[IO](), schemaBadTest[IO](true),
       v1TopicNames = twoTopics, v2TopicNames = List(), topicNamesToDelete = List("topic1"),
       registerKey = true, kafkaTopicNamesToFail = List.empty,
       schemasToSucceed = List("topic2"), assertionError = invalidErrorChecker)
@@ -414,13 +420,11 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
 
   it should "Fail to delete topic that was recently published to." in {
 
-    val offsetMap = Map.empty[TopicAndPartition, Offset]
+    val offsetMap: Map[TopicAndPartition, Offset] = Map(TopicAndPartition("topic1", 0) -> Offset(1))
 
-    applyTestcase(kafkabadTest[IO](offsetMap), SchemaRegistry.test[IO],
+    applyTestcase(KafkaAdminAlgebra.test[IO](offsetMap), SchemaRegistry.test[IO],
       v1TopicNames = twoTopics, v2TopicNames = List(), topicNamesToDelete = twoTopics,
       registerKey = true, kafkaTopicNamesToFail = List(),
-      schemasToSucceed = twoTopics, assertionError = invalidErrorChecker)
-    // setup topicAndPartition map with now() time
-    // call some good test case, but assert that it fails
+      schemasToSucceed = twoTopics)
   }
 }

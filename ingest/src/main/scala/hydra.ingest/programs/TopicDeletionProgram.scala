@@ -80,9 +80,15 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
           case (partition, offset) => {
             val tp = new TopicPartition(partition.topic, partition.partition)
             // get latest published message, compare timestamp to (NOW - configurable time window)
-            kafkaClient.streamStringKeyFromGivenPartitionAndOffset(topicName, "dvs.deletion.consumer.group", false,
-              List((tp, offset.value - 1))).take(1).map { case (_, _, timestamp) =>
+            val thingy = kafkaClient.streamStringKeyFromGivenPartitionAndOffset(topicName, "dvs.deletion.consumer.group", false,
+              List((tp, offset.value - 1)))
+
+              val thingyThing = thingy.take(1)
+
+
+            thingyThing.map { case (_, _, timestamp) =>
                 timestamp.createTime.getOrElse(0: Long) > curTime - allowableTopicDeletionTime
+            case _ => throw new Throwable("Ruh-roh Raggy");
             }.compile.lastOrError
           }
           case _ =>

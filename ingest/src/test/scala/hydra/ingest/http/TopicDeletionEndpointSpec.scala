@@ -86,7 +86,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
     }
 
   def kafkaBadTest[F[_] : Sync]: F[KafkaAdminAlgebra[F]] =
-    KafkaAdminAlgebra.test[F].flatMap( kaa => getBadTestKafkaClient[F](kaa))
+    KafkaAdminAlgebra.test[F]().flatMap( kaa => getBadTestKafkaClient[F](kaa))
 
   private[this] def getBadTestKafkaClient[F[_] : Sync](underlying: KafkaAdminAlgebra[F]): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
     new KafkaAdminAlgebra[F] {
@@ -149,7 +149,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
     "return 200 with single deletion in body" in {
       val topic = List("exp.blah.blah", v2MetadataTopicName.toString, v1MetadataTopicName.toString)
       (for {
-        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
+        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = false)
@@ -183,7 +183,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
     "return 200 with single schema deletion" in {
       val topic = List("exp.blah.blah", v2MetadataTopicName.toString, v1MetadataTopicName.toString)
       (for {
-        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
+        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
@@ -216,7 +216,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
     "return 200 with multiple deletions" in {
       val topic = List("exp.blah.blah","exp.hello.world","exp.hi.there")
       (for {
-        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
+        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
@@ -278,7 +278,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
     "return 200 with single deletion in url" in {
       val topic = List("exp.blah.blah")
       (for {
-        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
+        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
@@ -311,7 +311,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
     "return 401 with bad credentials" in {
       val topic = List("exp.blah.blah")
       (for {
-        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
+        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
@@ -344,7 +344,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
     "return 401 with no credentials" in {
       val topic = List("exp.blah.blah")
       (for {
-        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
+        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
@@ -377,7 +377,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
     "return 202 with a schema failure -value only" in {
       val topic = List("exp.blah.blah")
       (for {
-        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
+        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- schemaBadTest[IO](true, false)
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
@@ -410,7 +410,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
     "return 202 with a schema failure V2" in {
       val topic = List("exp.blah.blah")
       (for {
-        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
+        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- schemaBadTest[IO](false, true)
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
@@ -443,7 +443,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
     "return 202 with a schema failure schema endpoint -value only" in {
       val topic = List("exp.blah.blah")
       (for {
-        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
+        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- schemaBadTest[IO](true, false)
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
@@ -476,7 +476,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
     "return 500 with a schema failure schema endpoint V2" in {
       val topic = List("exp.blah.blah")
       (for {
-        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]
+        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- schemaBadTest[IO](false, true)
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
         metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)

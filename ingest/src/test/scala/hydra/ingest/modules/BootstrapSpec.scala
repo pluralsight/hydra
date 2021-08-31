@@ -46,7 +46,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
     val retry = RetryPolicies.alwaysGiveUp[IO]
     for {
       schemaRegistry <- SchemaRegistry.test[IO]
-      kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+      kafkaAdmin <- KafkaAdminAlgebra.test[IO]()
       ref <- Ref[IO].of(List.empty[(GenericRecord, Option[GenericRecord], Option[Headers])])
       kafkaClient = new TestKafkaClientAlgebraWithPublishTo(ref)
       metadata <- MetadataAlgebra.make(metadataSubjectV2, "consumer_group",kafkaClient, schemaRegistry, consumeMetadataEnabled = true)
