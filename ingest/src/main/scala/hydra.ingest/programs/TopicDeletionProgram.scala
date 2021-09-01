@@ -4,6 +4,8 @@ import cats.MonadError
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.effect.Concurrent
 import cats.implicits._
+
+import java.time.Instant
 //import cats.syntax.all._
 import fs2.kafka.{Headers, Timestamp}
 import org.apache.kafka.common.TopicPartition
@@ -70,7 +72,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
   //consumer group should be pulled from prod, consumer group name will work for what you want it to work for
 
   def hasTopicReceivedRecentRecords(topicName: String): F[(String, List[Boolean])] = {
-    val curTime = System.currentTimeMillis();
+    val curTime = Instant.now().toEpochMilli
     kafkaAdmin.getLatestOffsets(topicName).flatMap {
       offsetsMap => {
         offsetsMap.toList.filterNot {
@@ -87,7 +89,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
 
 
             thingyThing.map { case (_, _, timestamp) =>
-                timestamp.createTime.getOrElse(0: Long) > curTime - allowableTopicDeletionTime
+                timestamp.createTime.getOrElse(0: Long) < curTime - allowableTopicDeletionTime
             case _ => throw new Throwable("Ruh-roh Raggy");
             }.compile.lastOrError
           }
@@ -105,7 +107,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
       for {
         topicResults <- topicsResultsF
       } yield {
-        if(topicResults._2.contains(true)){
+        if(topicResults._2.contains(false)){
           Left(ActivelyPublishedToError(topicResults._1))
         } else {
           Right(topicResults._1)
@@ -128,13 +130,9 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
     goodList1.filter { goodList2.contains(_) }
   }
 
-  def findNondeletableTopics(eitherErrorOrTopicAPTE: F[List[Either[ActivelyPublishedToError, String]]],
-                             eitherErrorOrTopicCSEE: F[List[Either[ConsumersStillExistError, String]]]): F[ValidatedNel[DeleteTopicError, Unit]] = {
-    for {
-      errorOrTopicAPTE <- eitherErrorOrTopicAPTE
-      errorOrTopicCSEE <- eitherErrorOrTopicCSEE
-    } yield {
-      val errorOrTopicCombined: List[Either[DeleteTopicError, String]] = List.concat(errorOrTopicAPTE, errorOrTopicCSEE)
+  def findNondeletableTopics(eitherErrorOrTopicAPTE: List[Either[ActivelyPublishedToError, String]],
+                             eitherErrorOrTopicCSEE: List[Either[ConsumersStillExistError, String]]): ValidatedNel[DeleteTopicError, Unit] = {
+      val errorOrTopicCombined: List[Either[DeleteTopicError, String]] = List.concat(eitherErrorOrTopicAPTE, eitherErrorOrTopicCSEE)
       errorOrTopicCombined.map { e =>
         val vnel: Either[DeleteTopicError, Unit] = e match {
           case Right(_) => Right(())
@@ -142,7 +140,6 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
         }
         vnel.toValidatedNel
       }.combineAll
-    }
   }
 
   def checkIfTopicExists(topicName: String): F[(String, Boolean)] = {
@@ -154,16 +151,18 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
 
     val topicsF = topicNames.traverse(checkIfTopicExists)
 
-    def eitherErrorOrTopic2(topicsThatExist: List[String]): F[List[Either[ActivelyPublishedToError, String]]] = checkForActivelyPublishedTopics(topicsThatExist)
-    def eitherErrorOrTopic(topicsThatExist: List[String]): F[List[Either[ConsumersStillExistError, String]]] = checkIfTopicStillHasConsumers(topicsThatExist, ignoreConsumerGroups)
+    def topicHasConsumersCheck(topicsThatExist: List[String]): F[List[Either[ConsumersStillExistError, String]]] =
+      checkIfTopicStillHasConsumers(topicsThatExist, ignoreConsumerGroups)
+    def topicIsActivelyPublishingCheck(topicsThatExist: List[String]): F[List[Either[ActivelyPublishedToError, String]]] =
+      checkForActivelyPublishedTopics(topicsThatExist)
 
     for {
       topics <- topicsF
       (topicsThatExist, nonExistentTopics) = topics.partition(_._2)
-      eeot2 <- eitherErrorOrTopic2(topicsThatExist.map(_._1))
-      eeot <- eitherErrorOrTopic(topicsThatExist.map(_._1))
-      goodTopics = findDeletableTopics(eeot2, eeot)
-      badTopics <- findNondeletableTopics(eitherErrorOrTopic2(topicsThatExist.map(_._1)), eitherErrorOrTopic(topicsThatExist.map(_._1)))
+      topicHasConsumers <- topicHasConsumersCheck(topicsThatExist.map(_._1))
+      topicIsActivelyPublishing <- topicIsActivelyPublishingCheck(topicsThatExist.map(_._1))
+      goodTopics = findDeletableTopics(topicIsActivelyPublishing, topicHasConsumers)
+      badTopics = findNondeletableTopics(topicIsActivelyPublishing, topicHasConsumers)
       result <- kafkaAdmin.deleteTopics(goodTopics)
       topicsToDeleteSchemaFor = result match {
         case Right(_) => goodTopics
@@ -175,9 +174,10 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
       metadataResult <- lookupAndDeleteMetadataForTopics(topicsToDeleteSchemaFor)
     } yield {
       val nonExistentTopicErrors: ValidatedNel[DeleteTopicError, Unit]  = nonExistentTopics.map { fakeTopic =>
-        val vnel: Either[DeleteTopicError, Unit] = fakeTopic._2 match {
-            case false => Left(TopicDoesNotExistError(fakeTopic._1))
-            case true => Right(())
+        val vnel: Either[DeleteTopicError, Unit] = if (fakeTopic._2) {
+          Right(())
+        } else {
+          Left(TopicDoesNotExistError(fakeTopic._1))
         }
         vnel.toValidatedNel
       }.combineAll
