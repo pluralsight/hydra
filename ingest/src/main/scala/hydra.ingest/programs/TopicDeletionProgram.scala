@@ -252,6 +252,6 @@ final case class KafkaDeletionErrors(kafkaDeleteTopicErrorList: KafkaDeleteTopic
 final case class SchemaDeletionErrors(schemaDeleteTopicErrorList: SchemaDeleteTopicErrorList) extends DeleteTopicError
 final case class TopicMetadataDeletionErrors(metadataDeleteTopicErrorList: MetadataDeleteTopicErrorList) extends DeleteTopicError
 final case class ConsumersStillExistError(topic: String, consumers: List[Consumer]) extends DeleteTopicError
-final case class ActivelyPublishedToError(topic: String) extends DeleteTopicError
+final case class ActivelyPublishedToError(topic: String, deleteWindow: Long) extends DeleteTopicError
 final case class TopicDoesNotExistError(topic: String) extends DeleteTopicError
 final case class CacheDeletionError(message: String) extends DeleteTopicError

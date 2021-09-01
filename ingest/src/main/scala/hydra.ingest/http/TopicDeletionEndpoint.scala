@@ -73,7 +73,8 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
   }
 
   private def activelyPublishedToErrorsToResponse(publishedToError: List[ActivelyPublishedToError]): List[DeletionEndpointResponse] = {
-    publishedToError.map(err => DeletionEndpointResponse(err.topic, "Cannot delete the requested topic because it has been too recently published to."))
+    publishedToError.map(err => DeletionEndpointResponse(err.topic,
+      s"Cannot delete the requested topic because it has been published to within the last ${err.deleteWindow / 60000} minutes."))
   }
 
   private def topicDoesNotExistErrorsToResponse(topicDoesNotExistError: List[TopicDoesNotExistError]): List[DeletionEndpointResponse] = {
