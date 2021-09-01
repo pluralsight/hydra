@@ -6,7 +6,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.Credentials
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
-import hydra.ingest.programs.{ActivelyPublishedToError, ConsumersStillExistError, DeleteTopicError, KafkaDeletionErrors, SchemaDeletionErrors, TopicDeletionProgram}
+import hydra.ingest.programs.{TopicDoesNotExistError, ActivelyPublishedToError, ConsumersStillExistError, DeleteTopicError, KafkaDeletionErrors, SchemaDeletionErrors, TopicDeletionProgram}
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
 import spray.json._
@@ -54,8 +54,10 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
   private def tupleErrorsToResponse(errorTuple: (List[SchemaDeletionErrors],
                                                  List[KafkaDeletionErrors],
                                                  List[ConsumersStillExistError],
-                                                 List[ActivelyPublishedToError])): List[DeletionEndpointResponse] = {
-    schemaErrorsToResponse(errorTuple._1) ::: kafkaErrorsToResponse(errorTuple._2) ::: consumerErrorsToResponse(errorTuple._3) ::: activelyPublishedToErrorsToResponse(errorTuple._4)
+                                                 List[ActivelyPublishedToError],
+                                                 List[TopicDoesNotExistError])): List[DeletionEndpointResponse] = {
+    schemaErrorsToResponse(errorTuple._1) ::: kafkaErrorsToResponse(errorTuple._2) ::: consumerErrorsToResponse(errorTuple._3) :::
+        activelyPublishedToErrorsToResponse(errorTuple._4) ::: topicDoesNotExistErrorsToResponse(errorTuple._5)
   }
 
   private def schemaErrorsToResponse(schemaResults: List[SchemaDeletionErrors]): List[DeletionEndpointResponse] = {
@@ -72,6 +74,10 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
 
   private def activelyPublishedToErrorsToResponse(publishedToError: List[ActivelyPublishedToError]): List[DeletionEndpointResponse] = {
     publishedToError.map(err => DeletionEndpointResponse(err.topic, "Cannot delete the requested topic because it has been too recently published to."))
+  }
+
+  private def topicDoesNotExistErrorsToResponse(topicDoesNotExistError: List[TopicDoesNotExistError]): List[DeletionEndpointResponse] = {
+    topicDoesNotExistError.map(err => DeletionEndpointResponse(err.topic, "The requested topic does not exist."))
   }
 
   private def validResponse(topics: List[String], userDeleting: String, path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
@@ -98,18 +104,20 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
     }
     else {
       topics.map(topicName => addHttpMetric(topicName, StatusCodes.InternalServerError, path, startTime, "DELETE", error = Some(response.toString)))
-        complete(StatusCodes.InternalServerError, response)
+      complete(StatusCodes.InternalServerError, response)
     }
   }
 
   private def invalidResponse(topics: List[String], userDeleting: String, e: NonEmptyList[DeleteTopicError],
                               path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
-    val allErrors = e.foldLeft((List.empty[SchemaDeletionErrors], List.empty[KafkaDeletionErrors], List.empty[ConsumersStillExistError], List.empty[ActivelyPublishedToError])) { (agg, i) =>
+    val allErrors = e.foldLeft((List.empty[SchemaDeletionErrors], List.empty[KafkaDeletionErrors], List.empty[ConsumersStillExistError],
+      List.empty[ActivelyPublishedToError], List.empty[TopicDoesNotExistError])) { (agg, i) =>
       i match {
-        case sde: SchemaDeletionErrors => (agg._1 :+ sde, agg._2, agg._3, agg._4)
-        case kde: KafkaDeletionErrors => (agg._1, agg._2 :+ kde, agg._3, agg._4)
-        case cde: ConsumersStillExistError => (agg._1, agg._2, agg._3 :+ cde, agg._4)
-        case apte: ActivelyPublishedToError => (agg._1, agg._2, agg._3, agg._4 :+ apte)
+        case sde: SchemaDeletionErrors => (agg._1 :+ sde, agg._2, agg._3, agg._4, agg._5)
+        case kde: KafkaDeletionErrors => (agg._1, agg._2 :+ kde, agg._3, agg._4, agg._5)
+        case cde: ConsumersStillExistError => (agg._1, agg._2, agg._3 :+ cde, agg._4, agg._5)
+        case apte: ActivelyPublishedToError => (agg._1, agg._2, agg._3, agg._4 :+ apte, agg._5)
+        case tdne: TopicDoesNotExistError => (agg._1, agg._2, agg._3, agg._4, agg._5 :+ tdne)
       }
     }
     val response = tupleErrorsToResponse(allErrors)

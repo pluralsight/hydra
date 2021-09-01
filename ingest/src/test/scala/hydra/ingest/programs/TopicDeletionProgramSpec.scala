@@ -402,6 +402,16 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       ignoreConsumerGroupSpecific = List(consumerGroup))
   }
 
+  it should "Successfully delete topic where last published record is outside of unacceptable window." in {
+    val myTopicName = "topic1";
+    val offsetMap: Map[TopicAndPartition, Offset] = Map(TopicAndPartition(myTopicName, 0) -> Offset(1))
+
+    applyTestcase(KafkaAdminAlgebra.test[IO](offsetMap), SchemaRegistry.test[IO],
+      v1TopicNames = List(myTopicName), v2TopicNames = List(), topicNamesToDelete = List(myTopicName),
+      registerKey = true, kafkaTopicNamesToFail = List(),
+      schemasToSucceed = List(myTopicName), allowableTopicDeletionTimeMs = 0)
+  }
+
   // FAILURE CASES
   it should "Return a KafkaDeletionError if the topic fails to delete" in {
     val offsetMap = Map.empty[TopicAndPartition, Offset]
@@ -425,6 +435,15 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
     applyTestcase(KafkaAdminAlgebra.test[IO](offsetMap), SchemaRegistry.test[IO],
       v1TopicNames = List(myTopicName), v2TopicNames = List(), topicNamesToDelete = List(myTopicName),
       registerKey = true, kafkaTopicNamesToFail = List(myTopicName),
+      schemasToSucceed = List(myTopicName), allowableTopicDeletionTimeMs = 10000)
+  }
+
+  it should "Fail to delete topic that doesn't exist." in {
+    val myTopicName = "topic1";
+    val myFakeTopicName = "topic2";
+    applyTestcase(KafkaAdminAlgebra.test[IO](), SchemaRegistry.test[IO],
+      v1TopicNames = List(myTopicName), v2TopicNames = List(), topicNamesToDelete = List(myFakeTopicName),
+      registerKey = true, kafkaTopicNamesToFail = List(myFakeTopicName),
       schemasToSucceed = List(myTopicName), allowableTopicDeletionTimeMs = 10000)
   }
 }

@@ -506,6 +506,34 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
       }).unsafeRunSync()
     }
 
+    "return 500 when requested to delete topic that does not exist endpoint V2" in {
+      val topic = List("exp.blah.blah")
+      (for {
+        kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
+        schemaAlgebra <- SchemaRegistry.test[IO]
+        kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
+        metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
+      } yield {
+        val route = new TopicDeletionEndpoint[IO](
+          new TopicDeletionProgram[IO](
+            kafkaAlgebra,
+            kafkaClientAlgebra,
+            v2MetadataTopicName,
+            v1MetadataTopicName,
+            schemaAlgebra,
+            metadataAlgebra,
+            consumerGroupAlgebra,
+            List.empty,
+            0
+          ), "myPass").route
+        Delete("/v2/topics/exp.blah.blah") ~>
+          addCredentials(validCredentials) ~> Route.seal(route) ~> check {
+          responseAs[String] shouldBe """[{"message":"The requested topic does not exist.","topicOrSubject":"exp.blah.blah"}]"""
+          status shouldBe StatusCodes.InternalServerError
+        }
+      }).unsafeRunSync()
+    }
   }
 
 }
