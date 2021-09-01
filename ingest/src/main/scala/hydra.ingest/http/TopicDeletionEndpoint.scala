@@ -2,11 +2,11 @@ package hydra.ingest.http
 
 import java.time.Instant
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.http.scaladsl.server.directives.Credentials
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
-import hydra.ingest.programs.{TopicDoesNotExistError, ActivelyPublishedToError, ConsumersStillExistError, DeleteTopicError, KafkaDeletionErrors, SchemaDeletionErrors, TopicDeletionProgram}
+import hydra.ingest.programs.{ActivelyPublishedToError, ConsumersStillExistError, DeleteTopicError, KafkaDeletionErrors, SchemaDeletionErrors, TopicDeletionProgram, TopicDoesNotExistError}
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
 import spray.json._
@@ -89,23 +89,9 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
   }
 
   private def returnResponse(topics: List[String], userDeleting: String, response: List[DeletionEndpointResponse],
-                             path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
-    if(response.map(_.topicOrSubject.contains("-key")).contains(true) ||
-      response.map(_.topicOrSubject.contains("-value")).contains(true)) {
-      val failedTopicNames = response.map(der => der.topicOrSubject)
-      val successfulTopics = topics.toSet.diff(failedTopicNames.toSet).toList
-      failedTopicNames.map(topicName => addHttpMetric(topicName, StatusCodes.Accepted,
-        path, startTime,"DELETE", error = Some(response.toString)))
-      successfulTopics.foreach{ topicName =>
-        addHttpMetric(topicName, StatusCodes.OK, path, startTime, "DELETE")
-        log.info(s"User $userDeleting deleted topic $topicName")
-      }
-      complete(StatusCodes.Accepted, response)
-    }
-    else {
-      topics.map(topicName => addHttpMetric(topicName, StatusCodes.InternalServerError, path, startTime, "DELETE", error = Some(response.toString)))
-      complete(StatusCodes.InternalServerError, response)
-    }
+                             path: String, startTime: Instant, responseCode: StatusCode)(implicit ec: ExecutionContext) = {
+      topics.map(topicName => addHttpMetric(topicName, responseCode, path, startTime, "DELETE", error = Some(response.toString)))
+      complete(responseCode, response)
   }
 
   private def invalidResponse(topics: List[String], userDeleting: String, e: NonEmptyList[DeleteTopicError],
@@ -120,8 +106,17 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
         case tdne: TopicDoesNotExistError => (agg._1, agg._2, agg._3, agg._4, agg._5 :+ tdne)
       }
     }
+
+    val responseCode: StatusCode = {
+      if(topics.length != e.length || e.toList.exists(_.isInstanceOf[SchemaDeletionErrors])) StatusCodes.Accepted // we have something in topics that didn't throw an error, partial success
+      else if (e.toList.exists(_.isInstanceOf[KafkaDeletionErrors])) StatusCodes.InternalServerError
+      else if (e.toList.exists(_.isInstanceOf[TopicDoesNotExistError]) || e.toList.exists(_.isInstanceOf[ConsumersStillExistError]) ||
+        e.toList.exists(_.isInstanceOf[ActivelyPublishedToError])) StatusCodes.BadRequest
+      else StatusCodes.ImATeapot // Bill told me to do this
+    }
+
     val response = tupleErrorsToResponse(allErrors)
-    returnResponse(topics, userDeleting, response, path, startTime)
+    returnResponse(topics, userDeleting, response, path, startTime, responseCode)
   }
 
   private def deleteTopics(topics: List[String], ignoreConsumerGroups: List[String],
@@ -176,7 +171,7 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
                           addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/topics/schemas", startTime,"DELETE", error = Some(response.toString))
                           complete(StatusCodes.InternalServerError, response)
                         } else {
-                          returnResponse(List(topic), userName, response, "/v2/topics/schemas", startTime)
+                          returnResponse(List(topic), userName, response, "/v2/topics/schemas", startTime, StatusCodes.Accepted)
                         }
                       }
                     }

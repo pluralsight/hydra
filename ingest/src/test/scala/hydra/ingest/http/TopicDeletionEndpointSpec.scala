@@ -103,7 +103,9 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
       override def getConsumerGroupOffsets(consumerGroup: String): F[Map[TopicAndPartition, Offset]] = ???
 
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
-      override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] = ???
+      override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] = {
+        Sync[F].pure(Map.empty[TopicAndPartition, Offset])
+      }
 
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]] = ???
@@ -506,7 +508,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
       }).unsafeRunSync()
     }
 
-    "return 500 when requested to delete topic that does not exist endpoint V2" in {
+    "return 400 when requested to delete topic that does not exist endpoint V2" in {
       val topic = List("exp.blah.blah")
       (for {
         kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
@@ -530,7 +532,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         Delete("/v2/topics/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe """[{"message":"The requested topic does not exist.","topicOrSubject":"exp.blah.blah"}]"""
-          status shouldBe StatusCodes.InternalServerError
+          status shouldBe StatusCodes.BadRequest
         }
       }).unsafeRunSync()
     }
