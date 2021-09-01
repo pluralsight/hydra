@@ -1,24 +1,20 @@
 package hydra.ingest.programs
 
 import cats.MonadError
-import cats.data.{NonEmptyList, Validated, ValidatedNel}
+import cats.data.{NonEmptyList, ValidatedNel}
 import cats.effect.Concurrent
 import cats.implicits._
 
 import java.time.Instant
-//import cats.syntax.all._
-import fs2.kafka.{Headers, Timestamp}
-import org.apache.kafka.common.TopicPartition
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.util.SchemaWrapper
 import hydra.ingest.programs.TopicDeletionProgram._
 import hydra.kafka.algebras.ConsumerGroupsAlgebra.{Consumer, DetailedConsumerGroup}
 import hydra.kafka.algebras.KafkaAdminAlgebra.KafkaDeleteTopicErrorList
-import hydra.kafka.algebras.KafkaClientAlgebra.{Offset, Partition}
 import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key}
-import org.apache.avro.generic.GenericRecord
+import org.apache.kafka.common.TopicPartition
 import scalacache.Cache
 import scalacache.modes.try_._
 

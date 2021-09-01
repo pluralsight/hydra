@@ -1,21 +1,16 @@
 package hydra.kafka.algebras
 
-import akka.actor.Status.Success
-import cats.data.{NonEmptyChain, NonEmptyList, Validated, ValidatedNec, ValidatedNel}
+import cats.data.NonEmptyList
 import cats.effect.concurrent.Ref
-import cats.effect.{Async, Concurrent, ConcurrentEffect, ContextShift, Resource, Sync, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, Resource, Sync, Timer}
 import cats.syntax.all._
 import fs2.kafka._
-import hydra.core.protocol._
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
-import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.clients.admin.{ConsumerGroupDescription, NewTopic}
+import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
-import spray.json.RootJsonFormat
-
-import scala.util.control.NoStackTrace
 
 /**
   * Internal interface to interact with the KafkaAdminClient from FS2 Kafka.

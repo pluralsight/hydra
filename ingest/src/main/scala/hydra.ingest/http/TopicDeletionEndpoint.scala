@@ -1,27 +1,27 @@
 package hydra.ingest.http
 
-import java.time.Instant
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.http.scaladsl.server.directives.Credentials
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
-import cats.data.{NonEmptyList, Validated, ValidatedNel}
-import hydra.ingest.programs.{ActivelyPublishedToError, ConsumersStillExistError, DeleteTopicError, KafkaDeletionErrors, SchemaDeletionErrors, TopicDeletionProgram, TopicDoesNotExistError}
+import cats.data.{NonEmptyList, Validated}
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
-import spray.json._
 import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.ingest.programs.TopicDeletionProgram.SchemaDeleteTopicErrorList
+import hydra.ingest.programs._
 import hydra.kafka.marshallers.ConsumerGroupMarshallers
+import spray.json._
 
+import java.time.Instant
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
 object TopicDeletionEndpoint extends
   DefaultJsonProtocol with
-  SprayJsonSupport with ConsumerGroupMarshallers
-{
+  SprayJsonSupport with ConsumerGroupMarshallers {
   private implicit val endpointFormat = jsonFormat2(DeletionEndpointResponse.apply)
+
   final case class DeletionEndpointResponse(topicOrSubject: String, message: String)
 
   final case class DeletionRequest(topics: List[String], ignoreConsumerGroups: List[String])
@@ -44,7 +44,7 @@ object TopicDeletionEndpoint extends
 
 }
 
-final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeletionProgram[F], deletionPassword: String)
+final class TopicDeletionEndpoint[F[_] : Futurable](deletionProgram: TopicDeletionProgram[F], deletionPassword: String)
   extends RouteSupport with
     DefaultJsonProtocol with
     SprayJsonSupport {
@@ -52,12 +52,12 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
   import TopicDeletionEndpoint._
 
   private def tupleErrorsToResponse(errorTuple: (List[SchemaDeletionErrors],
-                                                 List[KafkaDeletionErrors],
-                                                 List[ConsumersStillExistError],
-                                                 List[ActivelyPublishedToError],
-                                                 List[TopicDoesNotExistError])): List[DeletionEndpointResponse] = {
+    List[KafkaDeletionErrors],
+    List[ConsumersStillExistError],
+    List[ActivelyPublishedToError],
+    List[TopicDoesNotExistError])): List[DeletionEndpointResponse] = {
     schemaErrorsToResponse(errorTuple._1) ::: kafkaErrorsToResponse(errorTuple._2) ::: consumerErrorsToResponse(errorTuple._3) :::
-        activelyPublishedToErrorsToResponse(errorTuple._4) ::: topicDoesNotExistErrorsToResponse(errorTuple._5)
+      activelyPublishedToErrorsToResponse(errorTuple._4) ::: topicDoesNotExistErrorsToResponse(errorTuple._5)
   }
 
   private def schemaErrorsToResponse(schemaResults: List[SchemaDeletionErrors]): List[DeletionEndpointResponse] = {
@@ -91,8 +91,8 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
 
   private def returnResponse(topics: List[String], userDeleting: String, response: List[DeletionEndpointResponse],
                              path: String, startTime: Instant, responseCode: StatusCode)(implicit ec: ExecutionContext) = {
-      topics.map(topicName => addHttpMetric(topicName, responseCode, path, startTime, "DELETE", error = Some(response.toString)))
-      complete(responseCode, response)
+    topics.map(topicName => addHttpMetric(topicName, responseCode, path, startTime, "DELETE", error = Some(response.toString)))
+    complete(responseCode, response)
   }
 
   private def invalidResponse(topics: List[String], userDeleting: String, e: NonEmptyList[DeleteTopicError],
@@ -109,11 +109,11 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
     }
 
     val responseCode: StatusCode = {
-      if(topics.length != e.length || e.toList.exists(_.isInstanceOf[SchemaDeletionErrors])) StatusCodes.Accepted // we have something in topics that didn't throw an error, partial success
+      if (topics.length != e.length || e.toList.exists(_.isInstanceOf[SchemaDeletionErrors])) StatusCodes.Accepted // we have something in topics that didn't throw an error, partial success
       else if (e.toList.exists(_.isInstanceOf[KafkaDeletionErrors])) StatusCodes.InternalServerError
       else if (e.toList.exists(_.isInstanceOf[TopicDoesNotExistError]) || e.toList.exists(_.isInstanceOf[ConsumersStillExistError]) ||
         e.toList.exists(_.isInstanceOf[ActivelyPublishedToError])) StatusCodes.BadRequest
-      else StatusCodes.ImATeapot // Bill told me to do this
+      else StatusCodes.InternalServerError
     }
 
     val response = tupleErrorsToResponse(allErrors)
@@ -136,7 +136,7 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
         }
       }
       case Failure(e) => {
-        topics.map(topicName => addHttpMetric(topicName, StatusCodes.InternalServerError, path, startTime,"DELETE", error = Option(e.getMessage)))
+        topics.map(topicName => addHttpMetric(topicName, StatusCodes.InternalServerError, path, startTime, "DELETE", error = Option(e.getMessage)))
         complete(StatusCodes.InternalServerError, e.getMessage)
       }
     }
@@ -150,59 +150,59 @@ final class TopicDeletionEndpoint[F[_]: Futurable] (deletionProgram: TopicDeleti
 
   override val route: Route = {
     extractMethod { method =>
-    handleExceptions(exceptionHandler(Instant.now, method.value)) {
-      extractExecutionContext { implicit ec =>
-        pathPrefix("v2" / "topics") {
-          val startTime = Instant.now
-          delete {
-            authenticateBasic(realm = "", myUserPassAuthenticator) { userName =>
-              pathPrefix("schemas" / Segment) { topic =>
-                onComplete(
-                  Futurable[F].unsafeToFuture(deletionProgram.deleteFromSchemaRegistry(List(topic)))
-                ) {
-                  case Success(maybeSuccess) => {
-                    maybeSuccess match {
-                      case Validated.Valid(a) => {
-                        validResponse(List(topic), userName, "/v2/topics/schemas", startTime)
-                      }
-                      case Validated.Invalid(e) => {
-                        val response = schemaErrorsToResponse(List(SchemaDeletionErrors(SchemaDeleteTopicErrorList(e))))
-                        if (response.length >= 2) {
-                          // With one topic coming in if we get anything >= to 2 there was at least a -key and a -value error
-                          addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/topics/schemas", startTime,"DELETE", error = Some(response.toString))
-                          complete(StatusCodes.InternalServerError, response)
-                        } else {
-                          returnResponse(List(topic), userName, response, "/v2/topics/schemas", startTime, StatusCodes.Accepted)
+      handleExceptions(exceptionHandler(Instant.now, method.value)) {
+        extractExecutionContext { implicit ec =>
+          pathPrefix("v2" / "topics") {
+            val startTime = Instant.now
+            delete {
+              authenticateBasic(realm = "", myUserPassAuthenticator) { userName =>
+                pathPrefix("schemas" / Segment) { topic =>
+                  onComplete(
+                    Futurable[F].unsafeToFuture(deletionProgram.deleteFromSchemaRegistry(List(topic)))
+                  ) {
+                    case Success(maybeSuccess) => {
+                      maybeSuccess match {
+                        case Validated.Valid(a) => {
+                          validResponse(List(topic), userName, "/v2/topics/schemas", startTime)
+                        }
+                        case Validated.Invalid(e) => {
+                          val response = schemaErrorsToResponse(List(SchemaDeletionErrors(SchemaDeleteTopicErrorList(e))))
+                          if (response.length >= 2) {
+                            // With one topic coming in if we get anything >= to 2 there was at least a -key and a -value error
+                            addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/topics/schemas", startTime, "DELETE", error = Some(response.toString))
+                            complete(StatusCodes.InternalServerError, response)
+                          } else {
+                            returnResponse(List(topic), userName, response, "/v2/topics/schemas", startTime, StatusCodes.Accepted)
+                          }
                         }
                       }
                     }
+                    case Failure(e) => {
+                      addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/topics/schemas", startTime, "DELETE", error = Some(e.getMessage))
+                      complete(StatusCodes.InternalServerError, e.getMessage)
+                    }
                   }
-                  case Failure(e) => {
-                    addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/topics/schemas", startTime,"DELETE", error = Some(e.getMessage))
-                    complete(StatusCodes.InternalServerError, e.getMessage)
-                  }
-                }
-              } ~
-                pathPrefix(Segment) { topic =>
-                  deleteTopics(List(topic), List.empty, userName, "/v2/topics", startTime)
                 } ~
-                pathEndOrSingleSlash {
-                  entity(as[DeletionRequest]) { req =>
-                    deleteTopics(req.topics, req.ignoreConsumerGroups, userName, "/v2/topics", startTime)
+                  pathPrefix(Segment) { topic =>
+                    deleteTopics(List(topic), List.empty, userName, "/v2/topics", startTime)
+                  } ~
+                  pathEndOrSingleSlash {
+                    entity(as[DeletionRequest]) { req =>
+                      deleteTopics(req.topics, req.ignoreConsumerGroups, userName, "/v2/topics", startTime)
+                    }
                   }
-                }
+              }
             }
           }
         }
       }
     }
-    }
   }
 
   private def exceptionHandler(startTime: Instant, method: String) = ExceptionHandler {
     case e =>
-      extractExecutionContext{ implicit ec =>
-        addHttpMetric("", StatusCodes.InternalServerError,"/v2/topics", startTime, method, error = Option(e.getMessage))
+      extractExecutionContext { implicit ec =>
+        addHttpMetric("", StatusCodes.InternalServerError, "/v2/topics", startTime, method, error = Option(e.getMessage))
         complete(StatusCodes.InternalServerError, e.getMessage)
       }
   }

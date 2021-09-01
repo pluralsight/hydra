@@ -1,27 +1,27 @@
 package hydra.ingest.http
 
-import cats.data.NonEmptyList
-import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
-import hydra.avro.registry.SchemaRegistry
-import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
-import hydra.kafka.util.KafkaUtils.TopicDetails
-import org.apache.avro.{Schema, SchemaBuilder}
-import org.scalatest.matchers.should.Matchers
-import cats.implicits._
-import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
-import hydra.ingest.programs.TopicDeletionProgram
-import hydra.kafka.algebras.KafkaAdminAlgebra.{KafkaDeleteTopicError, KafkaDeleteTopicErrorList, LagOffsets, Offset, Topic, TopicAndPartition, TopicName}
-import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
-import org.scalatest.wordspec.{AnyWordSpec, AnyWordSpecLike}
 import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit._
+import cats.data.NonEmptyList
+import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
+import cats.implicits._
+import hydra.avro.registry.SchemaRegistry
+import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.avro.util.SchemaWrapper
+import hydra.ingest.programs.TopicDeletionProgram
+import hydra.kafka.algebras.KafkaAdminAlgebra._
+import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
+import org.apache.avro.{Schema, SchemaBuilder}
 import org.apache.kafka.clients.admin.ConsumerGroupDescription
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
 import scalacache.Cache
 import scalacache.guava.GuavaCache
 
@@ -30,8 +30,6 @@ import scala.concurrent.ExecutionContext
 
 
 class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with ScalatestRouteTest{
-
-  import concurrent.ExecutionContext.Implicits.global
   implicit private val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
   private val v2MetadataTopicName = Subject.createValidated("_test.V2.MetadataTopic").get
