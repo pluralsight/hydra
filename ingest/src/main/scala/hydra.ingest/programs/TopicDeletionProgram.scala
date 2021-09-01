@@ -82,19 +82,13 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
           case (partition, offset) => {
             val tp = new TopicPartition(partition.topic, partition.partition)
             // get latest published message, compare timestamp to (NOW - configurable time window)
-            val thingy = kafkaClient.streamStringKeyFromGivenPartitionAndOffset(topicName, "dvs.deletion.consumer.group", false,
-              List((tp, offset.value - 1)))
-
-              val thingyThing = thingy.take(1)
-
-
-            thingyThing.map { case (_, _, timestamp) =>
+            kafkaClient.streamStringKeyFromGivenPartitionAndOffset(topicName, "dvs.deletion.consumer.group", false,
+              List((tp, offset.value - 1))).take(1).map { case (_, _, timestamp) =>
                 timestamp.createTime.getOrElse(0: Long) < curTime - allowableTopicDeletionTime
-            case _ => throw new Throwable("Ruh-roh Raggy");
             }.compile.lastOrError
           }
           case _ =>
-            throw new Throwable("Unexpected return type from TopicDeletionProgram")
+            throw new Throwable("Unexpected return type from KafkaAdminAlgebra#getLatestOffsets")
         }
       }
     }.map {list => topicName -> list}
