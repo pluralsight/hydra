@@ -419,12 +419,12 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "Fail to delete topic that was recently published to." in {
-
-    val offsetMap: Map[TopicAndPartition, Offset] = Map(TopicAndPartition("topic1", 0) -> Offset(1))
+    val myTopicName = "topic1";
+    val offsetMap: Map[TopicAndPartition, Offset] = Map(TopicAndPartition(myTopicName, 0) -> Offset(1))
 
     applyTestcase(KafkaAdminAlgebra.test[IO](offsetMap), SchemaRegistry.test[IO],
-      v1TopicNames = twoTopics, v2TopicNames = List(), topicNamesToDelete = twoTopics,
-      registerKey = true, kafkaTopicNamesToFail = List(),
-      schemasToSucceed = twoTopics)
+      v1TopicNames = List(myTopicName), v2TopicNames = List(), topicNamesToDelete = List(myTopicName),
+      registerKey = true, kafkaTopicNamesToFail = List(myTopicName),
+      schemasToSucceed = List(myTopicName), allowableTopicDeletionTimeMs = 10000)
   }
 }

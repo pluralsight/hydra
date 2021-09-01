@@ -405,9 +405,11 @@ object KafkaClientAlgebra {
             case Some(value) => if (value.isEmpty) None else Some(value)
             case _ => None
           }
-			Sync[F].pure((r.value, v, headers))
+			  Sync[F].pure((r.value, v, headers))
 		  }
-          case _ => Sync[F].raiseError[StringRecord](ConsumeErrorException("Expected String, got GenericRecord"))
+          case _ => {
+            Sync[F].raiseError[StringRecord](ConsumeErrorException("Expected String, got GenericRecord"))
+          }
         }
       }
     }
@@ -461,7 +463,8 @@ object KafkaClientAlgebra {
             }
             Sync[F].pure((r.value, v, headers), po, t)
           }
-          case _ => Sync[F].raiseError(ConsumeErrorException("Expected String, got GenericRecord"))
+          case _ => Sync[F].raiseError[CacheRecordReturned](ConsumeErrorException("Expected String, got GenericRecord"))
+
         }
       }
     }
@@ -533,6 +536,7 @@ object KafkaClientAlgebra {
     }.suspend
 
   private type CacheRecord = (RecordFormat, Option[GenericRecord], Option[Headers], (Int, Long), Timestamp)
+  private type CacheRecordReturned = ((Option[String], Option[GenericRecord], Option[Headers]), (Int, Long), Timestamp)
 
   private final case class MockFS2Kafka[F[_]](
                                                    private val topics: Map[TopicName, List[CacheRecord]],
