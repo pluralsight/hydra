@@ -15,6 +15,7 @@ import retry.{RetryDetails, RetryPolicy, _}
 import cats.implicits._
 import scala.jdk.CollectionConverters.collectionAsScalaIterableConverter
 
+
 final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
                                                                                schemaRegistry: SchemaRegistry[F],
                                                                                kafkaAdmin: KafkaAdminAlgebra[F],
@@ -122,7 +123,6 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
         .rethrow
     } yield ()
   }
-
   private def validateKeySchemaEvolution(schemas: Schemas, subject: Subject): F[Option[IllegalLogicalTypeChangeErrors]] = {
     val keyTransformationErrors: List[IllegalLogicalTypeChange] = List()
 
@@ -133,11 +133,10 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
         } else None
       case None => None
     }
-
   }
   private def validateValueSchemaEvolution(schemas: Schemas, subject: Subject): F[Option[IllegalLogicalTypeChangeErrors]] = {
     val valueTransformationErrors:  List[IllegalLogicalTypeChange] = List()
-
+40
     schemaRegistry.getLatestSchemaBySubject(subject + "-value").map{
       case Some(valueSchema) => checkForIllegalLogicalTypeEvolutions(valueSchema, schemas.value, valueTransformationErrors)
         if (valueTransformationErrors.nonEmpty){
@@ -156,12 +155,18 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
         }
       })
     })
-    existingSchema.getFields.asScala.toList.map(existingField => {
-      newSchema.getFields.asScala.toList.map(newField => {
-        if(existingField.schema().getFields.asScala.nonEmpty && newField.schema().getFields.asScala.nonEmpty) {
-          checkForIllegalLogicalTypeEvolutions(existingField.schema(), newField.schema(), collectedErrors)
-        }
-      })
+    existingSchema.getFields.asScala.toList.map(existingField => existingField.schema().getType match {
+      case Schema.Type.RECORD => {
+        newSchema.getFields.asScala.toList.map(newField => newField.schema().getType match {
+          case Schema.Type.RECORD => {
+            if(existingField.schema().getFields.asScala.nonEmpty && newField.schema().getFields.asScala.nonEmpty) {
+              checkForIllegalLogicalTypeEvolutions(existingField.schema(), newField.schema(), collectedErrors)
+            }
+          }
+          case _ =>
+        })
+      }
+      case _ =>
     })
   }
   private def checkForNullableKeyFields(keyFields: List[Schema.Field]): Option[KeyHasNullableFields] = {

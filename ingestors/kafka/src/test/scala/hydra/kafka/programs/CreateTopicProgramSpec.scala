@@ -907,7 +907,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()
     }
 
-    "successfully evolve schema which had mismatched types in past topic" in {
+    "successfully evolve schema which had mismatched types in past version" in {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
       val subject = Subject.createValidated("dvs.subject").get
       val mismatchedValueSchema = SchemaBuilder.record("name").fields().name("isTrue").`type`().booleanType().noDefault().endRecord()
