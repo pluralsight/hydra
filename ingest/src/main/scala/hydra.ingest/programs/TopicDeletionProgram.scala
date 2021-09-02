@@ -98,7 +98,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
         topicResults <- topicsResultsF
       } yield {
         if(topicResults._2.contains(false)){
-          Left(ActivelyPublishedToError(topicResults._1))
+          Left(ActivelyPublishedToError(topicResults._1, allowableTopicDeletionTime))
         } else {
           Right(topicResults._1)
         }
