@@ -20,7 +20,7 @@ lazy val defaultSettings = Seq(
   ),
   packageOptions in (Compile, packageBin) +=
     Package.ManifestAttributes("Implementation-Build" -> buildNumber),
-  logLevel := Level.Info,
+  logLevel := Level.Debug,
   scalacOptions ++= Seq(
     "-encoding",
     "UTF-8",
