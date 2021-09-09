@@ -666,31 +666,25 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         kafka <- KafkaAdminAlgebra.test[IO]
         kafkaClient <- KafkaClientAlgebra.test[IO]
         metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
-        _ <- new CreateTopicProgram[IO](
+        tcp = new CreateTopicProgram[IO](
           schemaRegistry,
           kafka,
           kafkaClient,
           policy,
           Subject.createValidated("dvs.test-metadata-topic").get,
           metadata
-        ).createTopic(
+        )
+        _ <- tcp.createTopic(
           Subject.createValidated("dvs.subject").get,
           createTopicMetadataRequest(firstKeySchema, valueSchema),
           TopicDetails(1, 1, 1)
         )
-        _ <- new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        ).createTopic(
+        _ <- tcp.createTopic(
           Subject.createValidated("dvs.subject").get,
           createTopicMetadataRequest(keySchemaEvolution, valueSchema),
           TopicDetails(1, 1, 1)
         )
-      } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
+      } yield  fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
 
     "throw error on schema evolution with illegal key field logical type change" in {
       val firstKey =
@@ -766,12 +760,11 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           |{
           |  "type": "record",
           |  "name": "Date",
+          |  "namespace": "dvs.data_platform.dvs_sandbox",
           |  "fields": [
           |    {
           |      "name": "keyThing",
-          |      "type":{
-          |        "type": "long"
-          |      }
+          |      "type": "string"
           |    }
           |  ]
           |}
@@ -781,12 +774,13 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           |{
           |  "type": "record",
           |  "name": "Date",
+          |  "namespace": "dvs.data_platform.dvs_sandbox",
           |  "fields": [
           |    {
           |      "name": "keyThing",
           |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-micros"
+          |        "type": "string",
+          |        "logicalType":"uuid"
           |      }
           |    }
           |  ]
