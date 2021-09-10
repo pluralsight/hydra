@@ -178,6 +178,12 @@ object AppConfig {
       env("HYDRA_TAGS_CONSUMER_GROUP").as[String].default("_hydra.tags-consumer-group")
     ).mapN(TagsConfig)
 
+  final case class AllowableTopicDeletionTimeConfig(allowableTopicDeletionTime: Long)
+
+  private val allowableTopicDeletionTimeConfig: ConfigValue[AllowableTopicDeletionTimeConfig] = (
+    env("HYDRA_ALLOWABLE_TOPIC_DELETION_TIME_MS").as[Long].default(14400000) // Default 4 hours
+  ).map(AllowableTopicDeletionTimeConfig)
+
   final case class AppConfig(
                               createTopicConfig: CreateTopicConfig,
                               metadataTopicsConfig: MetadataTopicsConfig,
@@ -187,7 +193,8 @@ object AppConfig {
                               dvsConsumersTopicConfig: DVSConsumersTopicConfig,
                               consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
                               consumerGroupsAlgebraConfig: ConsumerGroupsAlgebraConfig,
-                              ignoreDeletionConsumerGroups: IgnoreDeletionConsumerGroups
+                              ignoreDeletionConsumerGroups: IgnoreDeletionConsumerGroups,
+                              allowableTopicDeletionTimeConfig: AllowableTopicDeletionTimeConfig
                             )
 
   val appConfig: ConfigValue[AppConfig] =
@@ -200,6 +207,7 @@ object AppConfig {
       dvsConsumersTopicConfig,
       consumerOffsetsOffsetsTopicConfig,
       consumerGroupAlgebraConfig,
-      ignoreDeletionConsumerGroups
+      ignoreDeletionConsumerGroups,
+      allowableTopicDeletionTimeConfig
     ).parMapN(AppConfig)
 }

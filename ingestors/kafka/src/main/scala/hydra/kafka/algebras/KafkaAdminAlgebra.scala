@@ -1,21 +1,16 @@
 package hydra.kafka.algebras
 
-import akka.actor.Status.Success
-import cats.data.{NonEmptyChain, NonEmptyList, Validated, ValidatedNec, ValidatedNel}
+import cats.data.NonEmptyList
 import cats.effect.concurrent.Ref
-import cats.effect.{Async, Concurrent, ConcurrentEffect, ContextShift, Resource, Sync, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, Resource, Sync, Timer}
 import cats.syntax.all._
 import fs2.kafka._
-import hydra.core.protocol._
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
-import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.clients.admin.{ConsumerGroupDescription, NewTopic}
+import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
-import spray.json.RootJsonFormat
-
-import scala.util.control.NoStackTrace
 
 /**
   * Internal interface to interact with the KafkaAdminClient from FS2 Kafka.
@@ -159,7 +154,8 @@ object KafkaAdminAlgebra {
         getConsumerResource.use { consumerMaybe =>
           Option(consumerMaybe) match {
             case Some(consumer) =>
-              consumer.partitionsFor(topic).flatMap { partitionInfosMaybe =>
+              val part = Option(consumer.partitionsFor(topic))
+                part.map(_.flatMap { partitionInfosMaybe =>
                 Option(partitionInfosMaybe) match {
                   case Some(partitionInfos) =>
                     val p = partitionInfos.map(p => new TopicPartition(p.topic, p.partition))
@@ -182,7 +178,7 @@ object KafkaAdminAlgebra {
                   case None =>
                     Logger[F].warn(s"One PartitionInfo for topic $topic is null.") *> Sync[F].pure(Map.empty[KafkaAdminAlgebra.TopicAndPartition, Offset])
                 }
-              }
+              }).getOrElse(Sync[F].pure(Map.empty[KafkaAdminAlgebra.TopicAndPartition, Offset]))
             case None =>
               Logger[F].warn(s"Consumer for topic $topic is null.") *> Sync[F].pure(Map.empty[KafkaAdminAlgebra.TopicAndPartition, Offset])
           }
@@ -224,11 +220,12 @@ object KafkaAdminAlgebra {
     }
   }
 
-  def test[F[_]: Sync]: F[KafkaAdminAlgebra[F]] =
-    Ref[F].of(Map[TopicName, Topic]()).flatMap(getTestKafkaClient[F])
+  def test[F[_]: Sync](mockedOffsets: Map[TopicAndPartition, Offset] = Map.empty[TopicAndPartition, Offset]): F[KafkaAdminAlgebra[F]] =
+    Ref[F].of(Map[TopicName, Topic]()).flatMap(getTestKafkaClient[F](_, mockedOffsets))
 
   private[this] def getTestKafkaClient[F[_]: Sync](
-      ref: Ref[F, Map[TopicName, Topic]]
+      ref: Ref[F, Map[TopicName, Topic]],
+      mockedOffsets: Map[TopicAndPartition, Offset]
   ): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
     new KafkaAdminAlgebra[F] {
       override def describeTopic(name: TopicName): F[Option[Topic]] =
@@ -256,7 +253,9 @@ object KafkaAdminAlgebra {
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getConsumerGroupOffsets(consumerGroup: String): F[Map[TopicAndPartition, Offset]] = ???
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
-      override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] = ???
+      override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] = {
+        Sync[F].pure(mockedOffsets)
+      }
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]] = ???
 

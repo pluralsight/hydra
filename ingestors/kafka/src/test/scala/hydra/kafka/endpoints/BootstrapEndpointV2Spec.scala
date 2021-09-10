@@ -65,7 +65,7 @@ final class BootstrapEndpointV2Spec
   private val testCreateTopicProgram: IO[BootstrapEndpointV2[IO]] =
     for {
       s <- SchemaRegistry.test[IO]
-      k <- KafkaAdminAlgebra.test[IO]
+      k <- KafkaAdminAlgebra.test[IO]()
       kc <- KafkaClientAlgebra.test[IO]
       m <- MetadataAlgebra.make(Subject.createValidated("_metadata.topic.name").get, "bootstrap.consumer.group", kc, s, true)
       t <- TagsAlgebra.make[IO]("_hydra.tags-topic","_hydra.tags-consumer", kc)
@@ -254,7 +254,7 @@ final class BootstrapEndpointV2Spec
       KafkaClientAlgebra.test[IO].flatMap { client =>
         MetadataAlgebra.make(Subject.createValidated("_metadata.topic.123.name").get, "456", client, failingSchemaRegistry, true).flatMap { m =>
           KafkaAdminAlgebra
-            .test[IO]
+            .test[IO]()
             .map { kafka =>
               val kca = KafkaClientAlgebra.test[IO].unsafeRunSync()
               val ta = TagsAlgebra.make[IO]("_hydra.tags.topic", "_hydra.client",kca).unsafeRunSync()
