@@ -132,5 +132,5 @@ private case class TagsStorageFacade(tagsMap: Map[String, String]) {
 }
 
 private object TagsStorageFacade {
-  def empty: TagsStorageFacade = TagsStorageFacade(Map.empty)
+  def empty: TagsStorageFacade = TagsStorageFacade(Map("DVS" -> "Created by the DVS"))
 }

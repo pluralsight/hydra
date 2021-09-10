@@ -56,7 +56,7 @@ final class KafkaAdminAlgebraSpec
   (for {
     live <- KafkaAdminAlgebra
       .live[IO](bootstrapServers)
-    test <- KafkaAdminAlgebra.test[IO]
+    test <- KafkaAdminAlgebra.test[IO]()
   } yield {
     runTests(live)
     runTests(test, isTest = true)

@@ -59,17 +59,12 @@ trait BootstrapEndpointTestActors extends BootstrapEndpointActors {
     }
   }
 
-  private[kafka] val streamsManagerPropsTest = StreamsActorTest.props(
-    bootstrapKafkaConfig,
-    KafkaUtils.BootstrapServers,
-    ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient
-  )
-
   override val bootstrapActor: ActorRef = system.actorOf(
     TopicBootstrapActor.props(
       schemaRegistryActor,
       kafkaIngestor,
-      streamsManagerPropsTest,
+      system.actorOf(StreamsActorTest.props(bootstrapKafkaConfig, KafkaUtils.BootstrapServers,
+        ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient)),
       Some(bootstrapKafkaConfig)
     )
   )

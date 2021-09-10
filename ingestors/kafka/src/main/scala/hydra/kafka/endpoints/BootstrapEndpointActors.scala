@@ -1,6 +1,6 @@
 package hydra.kafka.endpoints
 
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.stream.{ActorMaterializer, Materializer}
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
@@ -13,6 +13,7 @@ import scala.concurrent.ExecutionContext
 trait BootstrapEndpointActors extends ConfigSupport {
 
   implicit val system: ActorSystem
+  implicit val streamsManagerActor: ActorRef
 
   private[kafka] val kafkaIngestor = system.actorSelection(path =
     applicationConfig.getString("kafka-ingestor-path")
@@ -24,17 +25,11 @@ trait BootstrapEndpointActors extends ConfigSupport {
   private[kafka] val bootstrapKafkaConfig =
     applicationConfig.getConfig("bootstrap-config")
 
-  private[kafka] val streamsManagerProps = StreamsManagerActor.props(
-    bootstrapKafkaConfig,
-    KafkaUtils.BootstrapServers,
-    ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient
-  )
-
   val bootstrapActor: ActorRef = system.actorOf(
     TopicBootstrapActor.props(
       schemaRegistryActor,
       kafkaIngestor,
-      streamsManagerProps,
+      streamsManagerActor,
       Some(bootstrapKafkaConfig)
     )
   )

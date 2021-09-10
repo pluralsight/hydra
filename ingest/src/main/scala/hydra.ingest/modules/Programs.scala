@@ -14,7 +14,7 @@ import retry.RetryPolicy
 import scalacache.{Cache, Mode}
 import scalacache.guava.GuavaCache
 
-final class Programs[F[_]: Logger: Sync: Timer: Mode] private(
+final class Programs[F[_]: Logger: Sync: Timer: Mode: Concurrent] private(
     cfg: AppConfig,
     algebras: Algebras[F]
 ) {
@@ -53,14 +53,17 @@ final class Programs[F[_]: Logger: Sync: Timer: Mode] private(
     cfg.metadataTopicsConfig.topicNameV2,
     cfg.metadataTopicsConfig.topicNameV1,
     algebras.schemaRegistry,
-    algebras.metadata
+    algebras.metadata,
+    algebras.consumerGroups,
+    cfg.ignoreDeletionConsumerGroups.consumerGroupListToIgnore,
+    cfg.allowableTopicDeletionTimeConfig.allowableTopicDeletionTime
   )
 
 }
 
 object Programs {
 
-  def make[F[_]: Logger: Sync: Timer: Mode](
+  def make[F[_]: Logger: Sync: Timer: Mode: Concurrent](
       appConfig: AppConfig,
       algebras: Algebras[F]
   ): F[Programs[F]] = Sync[F].delay {

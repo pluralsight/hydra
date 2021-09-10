@@ -49,6 +49,13 @@ object AppConfig {
   private implicit val subjectConfigDecoder: ConfigDecoder[String, Subject] =
     ConfigDecoder.identity[String].mapOption("Subject")(Subject.createValidated)
 
+  final case class IgnoreDeletionConsumerGroups(consumerGroupListToIgnore: List[String])
+
+  private val ignoreDeletionConsumerGroups: ConfigValue[IgnoreDeletionConsumerGroups] = (
+    env("HYDRA_IGNORE_DELETION_CONSUMER_GROUP").as[String].default("")
+  ).map(cfg => IgnoreDeletionConsumerGroups(cfg.split(",").toList))
+
+
   final case class MetadataTopicsConfig(
       topicNameV1: Subject,
       topicNameV2: Subject,
@@ -171,6 +178,12 @@ object AppConfig {
       env("HYDRA_TAGS_CONSUMER_GROUP").as[String].default("_hydra.tags-consumer-group")
     ).mapN(TagsConfig)
 
+  final case class AllowableTopicDeletionTimeConfig(allowableTopicDeletionTime: Long)
+
+  private val allowableTopicDeletionTimeConfig: ConfigValue[AllowableTopicDeletionTimeConfig] = (
+    env("HYDRA_ALLOWABLE_TOPIC_DELETION_TIME_MS").as[Long].default(14400000) // Default 4 hours
+  ).map(AllowableTopicDeletionTimeConfig)
+
   final case class AppConfig(
                               createTopicConfig: CreateTopicConfig,
                               metadataTopicsConfig: MetadataTopicsConfig,
@@ -179,7 +192,9 @@ object AppConfig {
                               tagsConfig: TagsConfig,
                               dvsConsumersTopicConfig: DVSConsumersTopicConfig,
                               consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
-                              consumerGroupsAlgebraConfig: ConsumerGroupsAlgebraConfig
+                              consumerGroupsAlgebraConfig: ConsumerGroupsAlgebraConfig,
+                              ignoreDeletionConsumerGroups: IgnoreDeletionConsumerGroups,
+                              allowableTopicDeletionTimeConfig: AllowableTopicDeletionTimeConfig
                             )
 
   val appConfig: ConfigValue[AppConfig] =
@@ -191,6 +206,8 @@ object AppConfig {
       tagsConfig,
       dvsConsumersTopicConfig,
       consumerOffsetsOffsetsTopicConfig,
-      consumerGroupAlgebraConfig
+      consumerGroupAlgebraConfig,
+      ignoreDeletionConsumerGroups,
+      allowableTopicDeletionTimeConfig
     ).parMapN(AppConfig)
 }

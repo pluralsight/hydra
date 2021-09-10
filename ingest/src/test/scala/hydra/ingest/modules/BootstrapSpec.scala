@@ -3,7 +3,7 @@ package hydra.ingest.modules
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Sync, Timer}
 import cats.syntax.all._
-import fs2.kafka.Headers
+import fs2.kafka.{Headers, Timestamp}
 import hydra.avro.registry.SchemaRegistry
 import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, MetadataTopicsConfig, TagsConfig}
 import hydra.kafka.algebras.KafkaAdminAlgebra.Topic
@@ -15,6 +15,7 @@ import hydra.kafka.programs.CreateTopicProgram
 import org.typelevel.log4cats.SelfAwareStructuredLogger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import org.apache.avro.generic.GenericRecord
+import org.apache.kafka.common.TopicPartition
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import retry.RetryPolicies
@@ -45,7 +46,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
     val retry = RetryPolicies.alwaysGiveUp[IO]
     for {
       schemaRegistry <- SchemaRegistry.test[IO]
-      kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+      kafkaAdmin <- KafkaAdminAlgebra.test[IO]()
       ref <- Ref[IO].of(List.empty[(GenericRecord, Option[GenericRecord], Option[Headers])])
       kafkaClient = new TestKafkaClientAlgebraWithPublishTo(ref)
       metadata <- MetadataAlgebra.make(metadataSubjectV2, "consumer_group",kafkaClient, schemaRegistry, consumeMetadataEnabled = true)
@@ -166,6 +167,12 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
     override def withProducerRecordSizeLimit(sizeLimitBytes: Long): IO[KafkaClientAlgebra[IO]] = ???
 
     override def consumeMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[IO, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset))] = fs2.Stream.empty
+
+    override def consumeStringKeyMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[IO, ((Option[String], Option[GenericRecord], Option[Headers]), (Partition, Offset))] = fs2.Stream.empty
+
+    override def streamStringKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicPartitionAndOffsets: List[(TopicPartition, Offset)]): fs2.Stream[IO, ((Option[String], Option[GenericRecord], Option[Headers]), (Partition, Offset), Timestamp)] = ???
+
+    override def streamAvroKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicPartitionAndOffsets: List[(TopicPartition, Offset)]): fs2.Stream[IO, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset), Timestamp)] = ???
   }
 
 }
