@@ -109,10 +109,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
   def findDeletableTopics(eitherErrorOrTopicAPTE: List[Either[ActivelyPublishedToError, String]],
                           eitherErrorOrTopicCSEE: List[Either[ConsumersStillExistError, String]]): List[String] = {
     def getOnlyTopics(list: List[Either[DeleteTopicError, String]]): List[String] = {
-      list.map {
-        case Right(value) => value
-        case Left(_) => ""
-      }.filterNot(_ == "")
+      list.map(_.toOption).flatten
     }
 
     val goodList1 = getOnlyTopics(eitherErrorOrTopicAPTE)
