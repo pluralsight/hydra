@@ -126,12 +126,12 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     } yield ()
   }
   private def validateKeySchemaEvolution(schemas: Schemas, subject: Subject): F[Option[IllegalLogicalTypeChangeErrors]] = {
-    val keyTransformationErrors: List[IllegalLogicalTypeChange] = List()
     for {
       sch <- schemaRegistry.getLatestSchemaBySubject(subject + "-key")
     } yield {
       sch match {
-        case Some(keySchema) => checkForIllegalLogicalTypeEvolutions(keySchema, schemas.key, keyTransformationErrors)
+        case Some(keySchema) =>
+          val keyTransformationErrors = checkForIllegalLogicalTypeEvolutions(keySchema, schemas.key)
           if (keyTransformationErrors.nonEmpty) {
             IllegalLogicalTypeChangeErrors(keyTransformationErrors).some
           } else None
@@ -140,12 +140,12 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     }
   }
   private def validateValueSchemaEvolution(schemas: Schemas, subject: Subject): F[Option[IllegalLogicalTypeChangeErrors]] = {
-    val valueTransformationErrors:  List[IllegalLogicalTypeChange] = List()
     for {
       sch <- schemaRegistry.getLatestSchemaBySubject(subject + "-value")
     } yield {
       sch match {
-        case Some(valueSchema) => checkForIllegalLogicalTypeEvolutions(valueSchema, schemas.value, valueTransformationErrors)
+        case Some(valueSchema) =>
+          val valueTransformationErrors = checkForIllegalLogicalTypeEvolutions(valueSchema, schemas.value)
           if (valueTransformationErrors.nonEmpty){
             IllegalLogicalTypeChangeErrors(valueTransformationErrors).some
           } else None
@@ -153,14 +153,14 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       }
     }
   }
-  private def checkForIllegalLogicalTypeEvolutions(existingSchema: Schema, newSchema: Schema, collectedErrors: List[IllegalLogicalTypeChange]) : List[IllegalLogicalTypeChange] = {
+  private def checkForIllegalLogicalTypeEvolutions(existingSchema: Schema, newSchema: Schema) : List[IllegalLogicalTypeChange] = {
     existingSchema.getType match {
       case Schema.Type.RECORD => {
         newSchema.getType match {
           case Schema.Type.RECORD => {
             existingSchema.getFields.asScala.toList.flatMap{ existingField =>
               newSchema.getFields.asScala.toList.filter(f => f.name() == existingField.name()).flatMap { newField =>
-                checkForIllegalLogicalTypeEvolutions(existingField.schema(), newField.schema(), collectedErrors)
+                checkForIllegalLogicalTypeEvolutions(existingField.schema(), newField.schema())
               }
             }
           }
@@ -171,7 +171,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
           case Schema.Type.ARRAY => {
             existingSchema.getFields.asScala.toList.flatMap(existingField => {
               newSchema.getFields.asScala.toList.filter(n => n.name() == existingField.name()).flatMap { newField =>
-                checkForIllegalLogicalTypeEvolutions(existingField.schema(), newField.schema(), collectedErrors)
+                checkForIllegalLogicalTypeEvolutions(existingField.schema(), newField.schema())
               }
             })
           }
