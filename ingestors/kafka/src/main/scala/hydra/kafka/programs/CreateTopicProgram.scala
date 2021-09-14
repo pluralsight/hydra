@@ -169,14 +169,28 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       case Schema.Type.ARRAY => {
         newSchema.getType match {
           case Schema.Type.ARRAY => {
-            existingSchema.getFields.asScala.toList.flatMap(existingField => {
-              newSchema.getFields.asScala.toList.filter(n => n.name() == existingField.name()).flatMap { newField =>
-                checkForIllegalLogicalTypeEvolutions(existingField.schema(), newField.schema())
-              }
-            })
+            checkForIllegalLogicalTypeEvolutions(existingSchema.getElementType, newSchema.getElementType)
           }
         }
       }
+      case Schema.Type.MAP => {
+        newSchema.getType match {
+          case Schema.Type.MAP => {
+            checkForIllegalLogicalTypeEvolutions(existingSchema.getValueType, newSchema.getValueType)
+          }
+        }
+      }
+      /*case Schema.Type.UNION => {
+        newSchema.getType match {
+          case Schema.Type.UNION => {
+            val existingSchemaTypes = existingSchema.getTypes.sort(null)
+            val newSchemaTypes = newSchema.getTypes.sort(null)
+            if(existingSchemaTypes != newSchemaTypes) {
+
+            }
+          }
+        }
+      }*/
       case _ => {
         if(existingSchema.getLogicalType != newSchema.getLogicalType)
           List(IllegalLogicalTypeChange(existingSchema.getLogicalType, newSchema.getLogicalType, existingSchema.getName))
@@ -184,8 +198,6 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       }
     }
   }
-
-
   private def checkForNullableKeyFields(keyFields: List[Schema.Field]): Option[KeyHasNullableFields] = {
     val nullableKeyFields = keyFields.flatMap(field => field.schema().getType match {
       case Schema.Type.UNION=> {
