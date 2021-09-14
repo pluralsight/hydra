@@ -233,7 +233,7 @@ sealed trait TopicMetadataV2Parser
       val t = schema.getType
       t match {
         case Schema.Type.RECORD =>
-          val currentNamespace = Option(schema.getNamespace).exists(f => f.matches("""^[A-Za-z0-9_\\.]+"""))
+          val currentNamespace = Option(schema.getNamespace).exists(f => !f.matches("""^[A-Za-z0-9_\\.]+"""))
           val allRecords = schema.getFields.asScala.toList.exists(f => isNamespaceInvalid(f.schema()))
           currentNamespace || allRecords
         case _ => false
