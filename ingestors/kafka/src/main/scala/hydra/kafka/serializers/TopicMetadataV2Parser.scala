@@ -250,7 +250,7 @@ sealed trait TopicMetadataV2Parser
 
       if(isNamespaceInvalid(schema)) {
         throw DeserializationException(InvalidSchema(json, isKey,
-          Some(InvalidNamespace(s"Invalid character "))).errorMessage)
+          Some(InvalidNamespace(s"""Invalid character in Namespace. Namespace must conform to the regex ^[A-Za-z0-9_\\.]+"""))).errorMessage)
       } else {
         schema
       }
