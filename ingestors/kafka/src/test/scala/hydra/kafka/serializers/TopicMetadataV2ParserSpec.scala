@@ -238,7 +238,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       the[DeserializationException] thrownBy {
         new SchemaFormat(isKey = false).read(invalidAvroSchemaNamespace).getName
       } should have message InvalidSchema(invalidAvroSchemaNamespace, isKey = false).errorMessage
-        .concat("\nError: One or more of the Namespaces provided are invalid due to: Invalid character dash (-)\n")
+        .concat("\nError: One or more of the Namespaces provided are invalid due to: Invalid character in Namespace. Namespace must conform to the regex ^[A-Za-z0-9_\\.]+\n")
     }
 
     "throw an error with '-' in the name of a schema" in {
@@ -252,7 +252,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       the[DeserializationException] thrownBy {
         new SchemaFormat(isKey = false).read(invalidAvroSchemaNestedNamespace).getName
       } should have message InvalidSchema(invalidAvroSchemaNestedNamespace, isKey = false).errorMessage
-        .concat("\nError: One or more of the Namespaces provided are invalid due to: Invalid character dash (-)\n")
+        .concat("\nError: One or more of the Namespaces provided are invalid due to: Invalid character in Namespace. Namespace must conform to the regex ^[A-Za-z0-9_\\.]+\n")
     }
 
     "throw an error with '-' in the name of a nested schema" in {
