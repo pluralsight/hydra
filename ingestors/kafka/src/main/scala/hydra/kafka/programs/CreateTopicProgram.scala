@@ -13,10 +13,7 @@ import org.apache.avro.{LogicalType, Schema}
 import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy, _}
 import cats.implicits._
-import org.apache.avro.Schema.Field
-
 import scala.jdk.CollectionConverters.collectionAsScalaIterableConverter
-
 
 final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
                                                                                schemaRegistry: SchemaRegistry[F],
@@ -125,6 +122,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
         .rethrow
     } yield ()
   }
+
   private def validateKeySchemaEvolution(schemas: Schemas, subject: Subject): F[Option[IllegalLogicalTypeChangeErrors]] = {
     for {
       sch <- schemaRegistry.getLatestSchemaBySubject(subject + "-key")
@@ -139,6 +137,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       }
     }
   }
+
   private def validateValueSchemaEvolution(schemas: Schemas, subject: Subject): F[Option[IllegalLogicalTypeChangeErrors]] = {
     for {
       sch <- schemaRegistry.getLatestSchemaBySubject(subject + "-value")
@@ -153,6 +152,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       }
     }
   }
+
   private def checkForIllegalLogicalTypeEvolutions(existingSchema: Schema, newSchema: Schema) : List[IllegalLogicalTypeChange] = {
     existingSchema.getType match {
       case Schema.Type.RECORD => {
@@ -180,17 +180,13 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
           }
         }
       }
-      /*case Schema.Type.UNION => {
-        newSchema.getType match {
-          case Schema.Type.UNION => {
-            val existingSchemaTypes = existingSchema.getTypes.sort(null)
-            val newSchemaTypes = newSchema.getTypes.sort(null)
-            if(existingSchemaTypes != newSchemaTypes) {
-
+      case _ if (existingSchema.isUnion) => {
+        if(newSchema.isUnion) {
+            existingSchema.getTypes.asScala.toList zip newSchema.getTypes.asScala.toList flatMap { t =>
+              checkForIllegalLogicalTypeEvolutions(t._1, t._2)
             }
-          }
-        }
-      }*/
+        } else List()
+      }
       case _ => {
         if(existingSchema.getLogicalType != newSchema.getLogicalType)
           List(IllegalLogicalTypeChange(existingSchema.getLogicalType, newSchema.getLogicalType, existingSchema.getName))
@@ -198,6 +194,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       }
     }
   }
+
   private def checkForNullableKeyFields(keyFields: List[Schema.Field]): Option[KeyHasNullableFields] = {
     val nullableKeyFields = keyFields.flatMap(field => field.schema().getType match {
       case Schema.Type.UNION=> {
@@ -212,6 +209,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       KeyHasNullableFields(nullableKeyFields).some
     } else None
   }
+
   private def checkForMismatches(keyFields: List[Schema.Field], valueFields: List[Schema.Field]): Option[IncompatibleKeyAndValueFieldNames] = {
     val mismatches = keyFields.flatMap { k =>
       valueFields.flatMap { v =>

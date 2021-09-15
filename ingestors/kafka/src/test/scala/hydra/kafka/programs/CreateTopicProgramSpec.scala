@@ -28,7 +28,7 @@ import eu.timepit.refined._
 
 import scala.concurrent.ExecutionContext
 import hydra.kafka.model.TopicMetadataV2Request.NumPartitions
-import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyHasNullableFields, ValidationErrors}
+import hydra.kafka.programs.CreateTopicProgram._
 import org.scalatest.compatible.Assertion
 
 class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
@@ -623,7 +623,71 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           TopicDetails(1, 1, 1)
         )
       } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}
+
     }
+
+    "throw error on schema evolution with illegal value map with union logical type removal" in {
+      val firstValue =
+        """
+          |{
+          |  "type": "record",
+          |  "name": "test",
+          |  "fields": [
+          |     {
+          |        "name":"context",
+          |        "type":[
+          |                 {
+          |                   "type": "string",
+          |                   "logicalType": "uuid"
+          |                 },
+          |                 "null"
+          |               ]
+          |     }
+          |  ]
+          |}
+  """.stripMargin
+      val valueEvolution =
+        """
+          |{
+          |  "type": "record",
+          |  "name": "test",
+          |  "fields": [
+          |     {
+          |       "name": "ArrayOfThings",
+          |       "type": ["string", "null" ]
+          |     }
+          |  ]
+          |}
+  """.stripMargin
+      val firstValueSchema = new Schema.Parser().parse(firstValue)
+      val valueSchemaEvolution = new Schema.Parser().parse(valueEvolution)
+
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      an [ValidationErrors] shouldBe thrownBy {(for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
+        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
+        tcp = new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafka,
+          kafkaClient,
+          policy,
+          Subject.createValidated("dvs.test-metadata-topic").get,
+          metadata
+        )
+        _ <- tcp.createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createTopicMetadataRequest(keySchema, firstValueSchema),
+          TopicDetails(1, 1, 1)
+        )
+        _ <- tcp.createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createTopicMetadataRequest(keySchema, valueSchemaEvolution),
+          TopicDetails(1, 1, 1)
+        )
+      } yield  fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
+
 
     "throw error on schema evolution with illegal key field logical type removal" in {
       val firstKey =
