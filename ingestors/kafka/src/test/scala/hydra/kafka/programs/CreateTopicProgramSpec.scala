@@ -626,7 +626,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
     }
 
-    "throw error on schema evolution with illegal value map with union logical type removal" in {
+    "throw error on schema evolution with illegal union logical type removal" in {
       val firstValue =
         """
           |{
@@ -635,6 +635,16 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           |  "fields": [
           |     {
           |        "name":"context",
+          |        "type":[
+          |                 {
+          |                   "type": "string",
+          |                   "logicalType": "uuid"
+          |                 },
+          |                 "null"
+          |               ]
+          |     },
+          |     {
+          |        "name":"context2",
           |        "type":[
           |                 {
           |                   "type": "string",
@@ -653,7 +663,11 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           |  "name": "test",
           |  "fields": [
           |     {
-          |       "name": "ArrayOfThings",
+          |       "name": "context",
+          |       "type": ["string", "null" ]
+          |     },
+          |     {
+          |       "name": "context2",
           |       "type": ["string", "null" ]
           |     }
           |  ]
@@ -688,8 +702,173 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         )
       } yield  fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
 
+    "throw error on schema evolution with illegal union logical type addition" in {
+      val firstValue =
+        """
+          |{
+          |  "type": "record",
+          |  "name": "test",
+          |  "fields": [
+          |     {
+          |       "name": "context",
+          |       "type": ["string", "null" ]
+          |     },
+          |     {
+          |       "name": "context2",
+          |       "type": ["string", "null" ]
+          |     }
+          |  ]
+          |}
+        """.stripMargin
+      val valueEvolution =
+        """
+          |{
+          |  "type": "record",
+          |  "name": "test",
+          |  "fields": [
+          |     {
+          |        "name":"context",
+          |        "type":[
+          |                 {
+          |                   "type": "string",
+          |                   "logicalType": "uuid"
+          |                 },
+          |                 "null"
+          |               ]
+          |     },
+          |     {
+          |        "name":"context2",
+          |        "type":[
+          |                 {
+          |                   "type": "string",
+          |                   "logicalType": "uuid"
+          |                 },
+          |                 "null"
+          |               ]
+          |     }
+          |  ]
+          |}
+        """.stripMargin
 
-    "throw error on schema evolution with illegal key field logical type removal" in {
+      val firstValueSchema = new Schema.Parser().parse(firstValue)
+      val valueSchemaEvolution = new Schema.Parser().parse(valueEvolution)
+
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      an [ValidationErrors] shouldBe thrownBy {(for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
+        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
+        tcp = new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafka,
+          kafkaClient,
+          policy,
+          Subject.createValidated("dvs.test-metadata-topic").get,
+          metadata
+        )
+        _ <- tcp.createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createTopicMetadataRequest(keySchema, firstValueSchema),
+          TopicDetails(1, 1, 1)
+        )
+        _ <- tcp.createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createTopicMetadataRequest(keySchema, valueSchemaEvolution),
+          TopicDetails(1, 1, 1)
+        )
+      } yield  fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
+
+    "throw error on schema evolution with illegal union logical type change" in {
+      val firstValue =
+        """
+          |{
+          |  "type": "record",
+          |  "name": "test",
+          |  "fields": [
+          |     {
+          |        "name":"context",
+          |        "type":[
+          |                 {
+          |                   "type": "string",
+          |                   "logicalType": "uuid"
+          |                 },
+          |                 "null"
+          |               ]
+          |     },
+          |     {
+          |        "name":"context2",
+          |        "type":[
+          |                 {
+          |                   "type": "string",
+          |                   "logicalType": "uuid"
+          |                 },
+          |                 "null"
+          |               ]
+          |     }
+          |  ]
+          |}
+        """.stripMargin
+      val valueEvolution =
+        """
+          |{
+          |  "type": "record",
+          |  "name": "test",
+          |  "fields": [
+          |     {
+          |        "name":"context",
+          |        "type":[
+          |                 {
+          |                   "type": "string",
+          |                   "logicalType": "date"
+          |                 },
+          |                 "null"
+          |               ]
+          |     },
+          |     {
+          |        "name":"context2",
+          |        "type":[
+          |                 {
+          |                   "type": "string",
+          |                   "logicalType": "date"
+          |                 },
+          |                 "null"
+          |               ]
+          |     }
+          |  ]
+          |}
+        """.stripMargin
+
+      val firstValueSchema = new Schema.Parser().parse(firstValue)
+      val valueSchemaEvolution = new Schema.Parser().parse(valueEvolution)
+
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      an [ValidationErrors] shouldBe thrownBy {(for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]
+        kafkaClient <- KafkaClientAlgebra.test[IO]
+        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
+        tcp = new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafka,
+          kafkaClient,
+          policy,
+          Subject.createValidated("dvs.test-metadata-topic").get,
+          metadata
+        )
+        _ <- tcp.createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createTopicMetadataRequest(keySchema, firstValueSchema),
+          TopicDetails(1, 1, 1)
+        )
+        _ <- tcp.createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createTopicMetadataRequest(keySchema, valueSchemaEvolution),
+          TopicDetails(1, 1, 1)
+        )
+      } yield  fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
+
+    "throw error on schema evolution with illegal key field logical type change string" in {
       val firstKey =
         """
           |{
@@ -715,7 +894,8 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           |    {
           |      "name": "keyThing",
           |      "type":{
-          |        "type": "string"
+          |        "type": "string",
+          |        "logicalType":"date"
           |      }
           |    }
           |  ]
@@ -948,7 +1128,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       } yield  fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
 
 
-    "do not throw error on schema evolution with legal change, array" in {
+    "do not throw logical type validation error on schema evolution with no change, array" in {
       val firstValue =
         """
           |{
@@ -1018,7 +1198,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         )
       } yield succeed).unsafeRunSync()}
 
-    "do not throw error on schema evolution with legal change, map" in {
+    "do not throw logical type validation error on schema evolution with no change, map" in {
       val firstValue =
         """
           |{
@@ -1088,7 +1268,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         )
       } yield succeed).unsafeRunSync()}
 
-    "do not throw error on schema evolution with legal change, nested record" in {
+    "do not throw logical type validation error on schema evolution with no change, nested record" in {
       val firstValue =
         """
           |{

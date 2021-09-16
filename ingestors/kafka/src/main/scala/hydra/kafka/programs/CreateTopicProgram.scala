@@ -164,6 +164,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
               }
             }
           }
+          case _ => List()
         }
       }
       case Schema.Type.ARRAY => {
@@ -171,6 +172,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
           case Schema.Type.ARRAY => {
             checkForIllegalLogicalTypeEvolutions(existingSchema.getElementType, newSchema.getElementType)
           }
+          case _ => List()
         }
       }
       case Schema.Type.MAP => {
@@ -178,7 +180,11 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
           case Schema.Type.MAP => {
             checkForIllegalLogicalTypeEvolutions(existingSchema.getValueType, newSchema.getValueType)
           }
+          case _ => List()
         }
+      }
+      case Schema.Type.ENUM | Schema.Type.FIXED => {
+        List()
       }
       case _ if (existingSchema.isUnion) => {
         if(newSchema.isUnion) {
