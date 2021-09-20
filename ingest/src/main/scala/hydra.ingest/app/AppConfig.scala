@@ -51,8 +51,9 @@ object AppConfig {
 
   final case class IgnoreDeletionConsumerGroups(consumerGroupListToIgnore: List[String])
 
-  private val ignoreDeletionConsumerGroups: ConfigValue[IgnoreDeletionConsumerGroups] = env("HYDRA_IGNORE_DELETION_CONSUMER_GROUP").as[String].default("").map(cfg => IgnoreDeletionConsumerGroups(cfg.split(",").toList))
-
+  private val ignoreDeletionConsumerGroups: ConfigValue[IgnoreDeletionConsumerGroups] = (
+    env("HYDRA_IGNORE_DELETION_CONSUMER_GROUP").as[String].default("")
+    ).map(cfg => IgnoreDeletionConsumerGroups(cfg.split(",").toList))
 
   final case class MetadataTopicsConfig(
       topicNameV1: Subject,
@@ -156,12 +157,16 @@ object AppConfig {
       .mapOption("Set[String]")(s => Some(if (s.isEmpty) Set.empty else s.split(",").toSet))
 
   private val ingestConfig: ConfigValue[IngestConfig] =
-    env("HYDRA_INGEST_RECORD_SIZE_LIMIT_BYTES").as[Long].option.map(IngestConfig)
+    (
+      env("HYDRA_INGEST_RECORD_SIZE_LIMIT_BYTES").as[Long].option
+      ).map(IngestConfig)
 
   final case class TopicDeletionConfig(deleteTopicPassword: String)
 
   private val topicDeletionConfig: ConfigValue[TopicDeletionConfig] =
-    env("HYDRA_INGEST_TOPIC_DELETION_PASSWORD").as[String].default("").map(TopicDeletionConfig)
+    (
+      env("HYDRA_INGEST_TOPIC_DELETION_PASSWORD").as[String].default("")
+      ).map(TopicDeletionConfig)
 
   final case class TagsConfig(tagsPassword: String, tagsTopic: String, tagsConsumerGroup: String)
 
@@ -174,7 +179,9 @@ object AppConfig {
 
   final case class AllowableTopicDeletionTimeConfig(allowableTopicDeletionTime: Long)
 
-  private val allowableTopicDeletionTimeConfig: ConfigValue[AllowableTopicDeletionTimeConfig] = env("HYDRA_ALLOWABLE_TOPIC_DELETION_TIME_MS").as[Long].default(14400000) // Default 4 hours.map(AllowableTopicDeletionTimeConfig)
+  private val allowableTopicDeletionTimeConfig: ConfigValue[AllowableTopicDeletionTimeConfig] = (
+    env("HYDRA_ALLOWABLE_TOPIC_DELETION_TIME_MS").as[Long].default(14400000)
+    ).map(AllowableTopicDeletionTimeConfig)
 
   final case class AppConfig(
                               createTopicConfig: CreateTopicConfig,
