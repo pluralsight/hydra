@@ -107,7 +107,7 @@ class TopicMetadataEndpointSpec
   val route: Route = (for {
     kafkaClient <- KafkaClientAlgebra.test[IO]
     schemaRegistry <- SchemaRegistry.test[IO]
-    ka <- KafkaAdminAlgebra.test[IO]
+    ka <- KafkaAdminAlgebra.test[IO]()
     schema <- getSchema("dvs.test.subject")
     _ <- schemaRegistry.registerSchema(subjectKey, schema)
     _ <- schemaRegistry.registerSchema(subjectValue, schema)

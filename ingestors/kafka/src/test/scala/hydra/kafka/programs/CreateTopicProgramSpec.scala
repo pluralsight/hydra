@@ -28,7 +28,8 @@ import eu.timepit.refined._
 
 import scala.concurrent.ExecutionContext
 import hydra.kafka.model.TopicMetadataV2Request.NumPartitions
-import hydra.kafka.programs.CreateTopicProgram._
+import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyHasNullableFields}
+import org.apache.kafka.common.TopicPartition
 import org.scalatest.compatible.Assertion
 
 class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
@@ -81,7 +82,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
       (for {
         schemaRegistry <- schemaRegistryIO
-        kafka <- KafkaAdminAlgebra.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
         kafkaClient <- KafkaClientAlgebra.test[IO]
         metadata <- metadataAlgebraF("dvs.v2Topic", schemaRegistry, kafkaClient)
         registerInternalMetadata = new CreateTopicProgram[IO](
@@ -148,7 +149,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           override def deleteSchemaSubject(subject: String): IO[Unit] = IO.pure(())
         }
       (for {
-        kafka <- KafkaAdminAlgebra.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
         kafkaClient <- KafkaClientAlgebra.test[IO]
         ref <- Ref[IO]
           .of(TestState(deleteSchemaWasCalled = false, 0))
@@ -202,7 +203,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         }
 
       (for {
-        kafka <- KafkaAdminAlgebra.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
         kafkaClient <- KafkaClientAlgebra.test[IO]
         ref <- Ref[IO].of(0)
         schemaRegistry = getSchemaRegistry(ref)
@@ -261,7 +262,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
       val schemaRegistryState = Map("subject-key" -> 1)
       (for {
-        kafka <- KafkaAdminAlgebra.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
         kafkaClient <- KafkaClientAlgebra.test[IO]
         ref <- Ref[IO]
           .of(TestState(schemaRegistryState))
@@ -289,7 +290,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val subject = "dvs.subject"
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
         kafkaClient <- KafkaClientAlgebra.test[IO]
         metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
@@ -317,7 +318,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val value = request.toValue
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]()
         publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(publishTo)
@@ -348,7 +349,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val updatedValue = updatedRequest.toValue
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]()
         publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(publishTo)
@@ -383,7 +384,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val request = createTopicMetadataRequest(keySchema, valueSchema)
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]()
         publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(
@@ -412,7 +413,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val request = createTopicMetadataRequest(keySchema, valueSchema)
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]()
         publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(
@@ -442,7 +443,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val updatedRequest = createTopicMetadataRequest(keySchema, valueSchema, "updated@email.com", deprecated = true)
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]()
         publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(publishTo)
@@ -477,7 +478,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val updatedRequest = createTopicMetadataRequest(keySchema, valueSchema, "updated@email.com", deprecated = true)
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafkaAdmin <- KafkaAdminAlgebra.test[IO]
+        kafkaAdmin <- KafkaAdminAlgebra.test[IO]()
         publishTo <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         kafkaClient <- IO(
           new TestKafkaClientAlgebraWithPublishTo(publishTo)
@@ -510,7 +511,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val subject = "dvs.subject"
       (for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
         kafkaClient <- KafkaClientAlgebra.test[IO]
         metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
@@ -530,7 +531,6 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
     }
 
     "throw error on topic with key and value field named same but with different type" in {
-
       val mismatchedValueSchema =
         SchemaBuilder
         .record("name")
@@ -542,9 +542,9 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         .endRecord()
 
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      an [ValidationErrors] shouldBe thrownBy {(for {
+      an [IncompatibleKeyAndValueFieldNames] shouldBe thrownBy {(for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
         kafkaClient <- KafkaClientAlgebra.test[IO]
         metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
@@ -574,9 +574,9 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           .endRecord()
 
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      an [ValidationErrors] shouldBe thrownBy {(for {
+      an [KeyHasNullableFields] shouldBe thrownBy {(for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
         kafkaClient <- KafkaClientAlgebra.test[IO]
         metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
@@ -605,9 +605,9 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           .endRecord()
 
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      an [ValidationErrors] shouldBe thrownBy {(for {
+      an [KeyHasNullableFields] shouldBe thrownBy {(for {
         schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
         kafkaClient <- KafkaClientAlgebra.test[IO]
         metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
         _ <- new CreateTopicProgram[IO](
@@ -623,1153 +623,9 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           TopicDetails(1, 1, 1)
         )
       } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}
-
     }
 
-    "throw error on schema evolution with illegal union logical type removal" in {
-      val firstValue =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "test",
-          |  "fields": [
-          |     {
-          |        "name":"context",
-          |        "type":[
-          |                 {
-          |                   "type": "string",
-          |                   "logicalType": "uuid"
-          |                 },
-          |                 "null"
-          |               ]
-          |     },
-          |     {
-          |        "name":"context2",
-          |        "type":[
-          |                 {
-          |                   "type": "string",
-          |                   "logicalType": "uuid"
-          |                 },
-          |                 "null"
-          |               ]
-          |     }
-          |  ]
-          |}
-  """.stripMargin
-      val valueEvolution =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "test",
-          |  "fields": [
-          |     {
-          |       "name": "context",
-          |       "type": ["string", "null" ]
-          |     },
-          |     {
-          |       "name": "context2",
-          |       "type": ["string", "null" ]
-          |     }
-          |  ]
-          |}
-  """.stripMargin
-      val firstValueSchema = new Schema.Parser().parse(firstValue)
-      val valueSchemaEvolution = new Schema.Parser().parse(valueEvolution)
-
-      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      an [ValidationErrors] shouldBe thrownBy {(for {
-        schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO]
-        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
-        tcp = new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        )
-        _ <- tcp.createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, firstValueSchema),
-          TopicDetails(1, 1, 1)
-        )
-        _ <- tcp.createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, valueSchemaEvolution),
-          TopicDetails(1, 1, 1)
-        )
-      } yield  fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
-
-    "throw error on schema evolution with illegal union logical type addition" in {
-      val firstValue =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "test",
-          |  "fields": [
-          |     {
-          |       "name": "context",
-          |       "type": ["string", "null" ]
-          |     },
-          |     {
-          |       "name": "context2",
-          |       "type": ["string", "null" ]
-          |     }
-          |  ]
-          |}
-        """.stripMargin
-      val valueEvolution =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "test",
-          |  "fields": [
-          |     {
-          |        "name":"context",
-          |        "type":[
-          |                 {
-          |                   "type": "string",
-          |                   "logicalType": "uuid"
-          |                 },
-          |                 "null"
-          |               ]
-          |     },
-          |     {
-          |        "name":"context2",
-          |        "type":[
-          |                 {
-          |                   "type": "string",
-          |                   "logicalType": "uuid"
-          |                 },
-          |                 "null"
-          |               ]
-          |     }
-          |  ]
-          |}
-        """.stripMargin
-
-      val firstValueSchema = new Schema.Parser().parse(firstValue)
-      val valueSchemaEvolution = new Schema.Parser().parse(valueEvolution)
-
-      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      an [ValidationErrors] shouldBe thrownBy {(for {
-        schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO]
-        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
-        tcp = new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        )
-        _ <- tcp.createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, firstValueSchema),
-          TopicDetails(1, 1, 1)
-        )
-        _ <- tcp.createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, valueSchemaEvolution),
-          TopicDetails(1, 1, 1)
-        )
-      } yield  fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
-
-    "throw error on schema evolution with illegal union logical type change" in {
-      val firstValue =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "test",
-          |  "fields": [
-          |     {
-          |        "name":"context",
-          |        "type":[
-          |                 {
-          |                   "type": "string",
-          |                   "logicalType": "uuid"
-          |                 },
-          |                 "null"
-          |               ]
-          |     },
-          |     {
-          |        "name":"context2",
-          |        "type":[
-          |                 {
-          |                   "type": "string",
-          |                   "logicalType": "uuid"
-          |                 },
-          |                 "null"
-          |               ]
-          |     }
-          |  ]
-          |}
-        """.stripMargin
-      val valueEvolution =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "test",
-          |  "fields": [
-          |     {
-          |        "name":"context",
-          |        "type":[
-          |                 {
-          |                   "type": "string",
-          |                   "logicalType": "date"
-          |                 },
-          |                 "null"
-          |               ]
-          |     },
-          |     {
-          |        "name":"context2",
-          |        "type":[
-          |                 {
-          |                   "type": "string",
-          |                   "logicalType": "date"
-          |                 },
-          |                 "null"
-          |               ]
-          |     }
-          |  ]
-          |}
-        """.stripMargin
-
-      val firstValueSchema = new Schema.Parser().parse(firstValue)
-      val valueSchemaEvolution = new Schema.Parser().parse(valueEvolution)
-
-      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      an [ValidationErrors] shouldBe thrownBy {(for {
-        schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO]
-        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
-        tcp = new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        )
-        _ <- tcp.createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, firstValueSchema),
-          TopicDetails(1, 1, 1)
-        )
-        _ <- tcp.createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, valueSchemaEvolution),
-          TopicDetails(1, 1, 1)
-        )
-      } yield  fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
-
-    "throw error on schema evolution with illegal key field logical type change string" in {
-      val firstKey =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "Date",
-          |  "fields": [
-          |    {
-          |      "name": "keyThing",
-          |      "type":{
-          |        "type": "string",
-          |        "logicalType":"uuid"
-          |      }
-          |    }
-          |  ]
-          |}
-      """.stripMargin
-      val keyEvolution =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "Date",
-          |  "fields": [
-          |    {
-          |      "name": "keyThing",
-          |      "type":{
-          |        "type": "string",
-          |        "logicalType":"date"
-          |      }
-          |    }
-          |  ]
-          |}
-      """.stripMargin
-      val firstKeySchema = new Schema.Parser().parse(firstKey)
-      val keySchemaEvolution = new Schema.Parser().parse(keyEvolution)
-
-      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      an [ValidationErrors] shouldBe thrownBy {(for {
-        schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO]
-        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
-        tcp = new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        )
-        _ <- tcp.createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(firstKeySchema, valueSchema),
-          TopicDetails(1, 1, 1)
-        )
-        _ <- tcp.createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchemaEvolution, valueSchema),
-          TopicDetails(1, 1, 1)
-        )
-      } yield  fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
-
-  "throw error on schema evolution with illegal value field logical type removal" in {
-    val firstValue =
-      """
-        |{
-        |  "type": "record",
-        |  "name": "Date",
-        |  "fields": [
-        |    {
-        |      "name": "valueThing",
-        |      "type":{
-        |        "type": "string",
-        |        "logicalType":"uuid"
-        |      }
-        |    }
-        |  ]
-        |}
-    """.stripMargin
-    val valueEvolution =
-      """
-        |{
-        |  "type": "record",
-        |  "name": "Date",
-        |  "fields": [
-        |    {
-        |      "name": "valueThing",
-        |      "type": "string"
-        |    }
-        |  ]
-        |}
-    """.stripMargin
-    val firstValueSchema = new Schema.Parser().parse(firstValue)
-    val valueSchemaEvolution = new Schema.Parser().parse(valueEvolution)
-
-    val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-    an [ValidationErrors] shouldBe thrownBy {(for {
-      schemaRegistry <- SchemaRegistry.test[IO]
-      kafka <- KafkaAdminAlgebra.test[IO]
-      kafkaClient <- KafkaClientAlgebra.test[IO]
-      metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
-      tcp = new CreateTopicProgram[IO](
-        schemaRegistry,
-        kafka,
-        kafkaClient,
-        policy,
-        Subject.createValidated("dvs.test-metadata-topic").get,
-        metadata
-      )
-      _ <- tcp.createTopic(
-        Subject.createValidated("dvs.subject").get,
-        createTopicMetadataRequest(keySchema, firstValueSchema),
-        TopicDetails(1, 1, 1)
-      )
-      _ <- tcp.createTopic(
-        Subject.createValidated("dvs.subject").get,
-        createTopicMetadataRequest(keySchema, valueSchemaEvolution),
-        TopicDetails(1, 1, 1)
-      )
-    } yield  fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
-
-  "throw error on schema evolution with illegal value array with field logical type removal" in {
-    val firstValue =
-      """
-        |{
-        |  "type": "record",
-        |  "name": "test",
-        |  "fields": [
-        |     {
-        |       "name": "ArrayOfThings",
-        |       "type": {
-        |         "type": "array",
-        |         "items":
-        |           {
-        |             "logicalType": "date",
-        |             "type": "int"
-        |           }
-        |       }
-        |     }
-        |  ]
-        |}
-  """.stripMargin
-    val valueEvolution =
-      """
-        |{
-        |  "type": "record",
-        |  "name": "test",
-        |  "fields": [
-        |     {
-        |       "name": "ArrayOfThings",
-        |       "type": {
-        |         "type": "array",
-        |         "items":
-        |           {
-        |             "type": "int"
-        |           }
-        |       }
-        |     }
-        |  ]
-        |}
-  """.stripMargin
-    val firstValueSchema = new Schema.Parser().parse(firstValue)
-    val valueSchemaEvolution = new Schema.Parser().parse(valueEvolution)
-
-    val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-    an [ValidationErrors] shouldBe thrownBy {(for {
-      schemaRegistry <- SchemaRegistry.test[IO]
-      kafka <- KafkaAdminAlgebra.test[IO]
-      kafkaClient <- KafkaClientAlgebra.test[IO]
-      metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
-      tcp = new CreateTopicProgram[IO](
-        schemaRegistry,
-        kafka,
-        kafkaClient,
-        policy,
-        Subject.createValidated("dvs.test-metadata-topic").get,
-        metadata
-      )
-      _ <- tcp.createTopic(
-        Subject.createValidated("dvs.subject").get,
-        createTopicMetadataRequest(keySchema, firstValueSchema),
-        TopicDetails(1, 1, 1)
-      )
-      _ <- tcp.createTopic(
-        Subject.createValidated("dvs.subject").get,
-        createTopicMetadataRequest(keySchema, valueSchemaEvolution),
-        TopicDetails(1, 1, 1)
-      )
-    } yield  fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
-
-    "throw error on schema evolution with illegal value map with field logical type removal" in {
-      val firstValue =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "test",
-          |  "fields": [
-          |     {
-          |       "name": "ArrayOfThings",
-          |       "type": {
-          |         "type": "map",
-          |         "values":
-          |           {
-          |             "logicalType": "date",
-          |             "type": "int"
-          |           }
-          |       }
-          |     }
-          |  ]
-          |}
-  """.stripMargin
-      val valueEvolution =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "test",
-          |  "fields": [
-          |     {
-          |       "name": "ArrayOfThings",
-          |       "type": {
-          |         "type": "map",
-          |         "values":
-          |           {
-          |             "type": "int"
-          |           }
-          |       }
-          |     }
-          |  ]
-          |}
-  """.stripMargin
-      val firstValueSchema = new Schema.Parser().parse(firstValue)
-      val valueSchemaEvolution = new Schema.Parser().parse(valueEvolution)
-
-      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      an [ValidationErrors] shouldBe thrownBy {(for {
-        schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO]
-        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
-        tcp = new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        )
-        _ <- tcp.createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, firstValueSchema),
-          TopicDetails(1, 1, 1)
-        )
-        _ <- tcp.createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, valueSchemaEvolution),
-          TopicDetails(1, 1, 1)
-        )
-      } yield  fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
-
-
-    "do not throw logical type validation error on schema evolution with no change, array" in {
-      val firstValue =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "test",
-          |  "fields": [
-          |     {
-          |       "name": "ArrayOfThings",
-          |       "type": {
-          |         "type": "array",
-          |         "items":
-          |           {
-          |             "logicalType": "date",
-          |             "type": "int"
-          |           }
-          |       }
-          |     }
-          |  ]
-          |}
-  """.stripMargin
-      val valueEvolution =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "test",
-          |  "fields": [
-          |     {
-          |       "name": "ArrayOfThings",
-          |       "type": {
-          |         "type": "array",
-          |         "items":
-          |           {
-          |             "logicalType": "date",
-          |             "type": "int"
-          |           }
-          |       }
-          |     }
-          |  ]
-          |}
-  """.stripMargin
-      val firstValueSchema = new Schema.Parser().parse(firstValue)
-      val valueSchemaEvolution = new Schema.Parser().parse(valueEvolution)
-
-      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      (for {
-        schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO]
-        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
-        tcp = new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        )
-        _ <- tcp.createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, firstValueSchema),
-          TopicDetails(1, 1, 1)
-        )
-        _ <- tcp.createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, valueSchemaEvolution),
-          TopicDetails(1, 1, 1)
-        )
-      } yield succeed).unsafeRunSync()}
-
-    "do not throw logical type validation error on schema evolution with no change, map" in {
-      val firstValue =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "test",
-          |  "fields": [
-          |     {
-          |       "name": "ArrayOfThings",
-          |       "type": {
-          |         "type": "map",
-          |         "values":
-          |           {
-          |             "logicalType": "date",
-          |             "type": "int"
-          |           }
-          |       }
-          |     }
-          |  ]
-          |}
-  """.stripMargin
-      val valueEvolution =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "test",
-          |  "fields": [
-          |     {
-          |       "name": "ArrayOfThings",
-          |       "type": {
-          |         "type": "map",
-          |         "values":
-          |           {
-          |             "logicalType": "date",
-          |             "type": "int"
-          |           }
-          |       }
-          |     }
-          |  ]
-          |}
-  """.stripMargin
-      val firstValueSchema = new Schema.Parser().parse(firstValue)
-      val valueSchemaEvolution = new Schema.Parser().parse(valueEvolution)
-
-      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      (for {
-        schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO]
-        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
-        tcp = new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        )
-        _ <- tcp.createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, firstValueSchema),
-          TopicDetails(1, 1, 1)
-        )
-        _ <- tcp.createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, valueSchemaEvolution),
-          TopicDetails(1, 1, 1)
-        )
-      } yield succeed).unsafeRunSync()}
-
-    "do not throw logical type validation error on schema evolution with no change, nested record" in {
-      val firstValue =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "test",
-          |  "fields": [
-          |     {
-          |       "name": "RecordOfThings",
-          |       "type": {
-          |         "type": "record",
-          |         "name": "NestedRecord",
-          |         "fields": [
-          |           {
-          |             "name": "address",
-          |             "type": "string"
-          |           }
-          |         ]
-          |       }
-          |     }
-          |  ]
-          |}
-  """.stripMargin
-      val valueEvolution =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "test",
-          |  "fields": [
-          |     {
-          |       "name": "RecordOfThings",
-          |       "type": {
-          |         "type": "record",
-          |         "name": "NestedRecord",
-          |         "fields": [
-          |           {
-          |             "name": "address",
-          |             "type": "string"
-          |           }
-          |         ]
-          |       }
-          |     }
-          |  ]
-          |}
-  """.stripMargin
-      val firstValueSchema = new Schema.Parser().parse(firstValue)
-      val valueSchemaEvolution = new Schema.Parser().parse(valueEvolution)
-
-      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      (for {
-        schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO]
-        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
-        tcp = new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        )
-        _ <- tcp.createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, firstValueSchema),
-          TopicDetails(1, 1, 1)
-        )
-        _ <- tcp.createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, valueSchemaEvolution),
-          TopicDetails(1, 1, 1)
-        )
-      } yield succeed).unsafeRunSync()}
-
-    "throw error on schema evolution with illegal key field logical type change within a nested record" in {
-      val firstKey =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "test",
-          |  "fields": [
-          |     {
-          |       "name": "RecordOfThings",
-          |       "type": {
-          |         "type": "record",
-          |         "name": "NestedRecord",
-          |         "fields": [
-          |           {
-          |             "name": "address",
-          |             "type": {
-          |               "type": "string",
-          |               "logicalType": "uuid"
-          |             }
-          |           }
-          |         ]
-          |       }
-          |     }
-          |  ]
-          |}
-      """.stripMargin
-      val keyEvolution =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "test",
-          |  "fields": [
-          |     {
-          |       "name": "RecordOfThings",
-          |       "type": {
-          |         "type": "record",
-          |         "name": "NestedRecord",
-          |         "fields": [
-          |           {
-          |             "name": "address",
-          |             "type": "string"
-          |           }
-          |         ]
-          |       }
-          |     }
-          |  ]
-          |}
-      """.stripMargin
-      val firstKeySchema = new Schema.Parser().parse(firstKey)
-      val keySchemaEvolution = new Schema.Parser().parse(keyEvolution)
-
-      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      an [ValidationErrors] shouldBe thrownBy {(for {
-        schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO]
-        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
-        _ <- new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        ).createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(firstKeySchema, valueSchema),
-          TopicDetails(1, 1, 1)
-        )
-        _ <- new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        ).createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchemaEvolution, valueSchema),
-          TopicDetails(1, 1, 1)
-        )
-      } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
-
-
-    "throw error on schema evolution with illegal key field logical type change" in {
-      val firstKey =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "Date",
-          |  "fields": [
-          |    {
-          |      "name": "keyThing",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
-          |      }
-          |    }
-          |  ]
-          |}
-      """.stripMargin
-      val keyEvolution =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "Date",
-          |  "fields": [
-          |    {
-          |      "name": "keyThing",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-micros"
-          |      }
-          |    }
-          |  ]
-          |}
-      """.stripMargin
-      val firstKeySchema = new Schema.Parser().parse(firstKey)
-      val keySchemaEvolution = new Schema.Parser().parse(keyEvolution)
-
-      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      an [ValidationErrors] shouldBe thrownBy {(for {
-        schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO]
-        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
-        _ <- new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        ).createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(firstKeySchema, valueSchema),
-          TopicDetails(1, 1, 1)
-        )
-        _ <- new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        ).createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchemaEvolution, valueSchema),
-          TopicDetails(1, 1, 1)
-        )
-      } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
-
-    "throw error on schema evolution with illegal value field logical type change" in {
-      val firstValue =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "Date",
-          |  "fields": [
-          |    {
-          |      "name": "valueThing",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
-          |      }
-          |    }
-          |  ]
-          |}
-      """.stripMargin
-      val valueEvolution =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "Date",
-          |  "fields": [
-          |    {
-          |      "name": "valueThing",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-micros"
-          |      }
-          |    }
-          |  ]
-          |}
-      """.stripMargin
-      val firstValueSchema = new Schema.Parser().parse(firstValue)
-      val valueSchemaEvolution = new Schema.Parser().parse(valueEvolution)
-
-      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      an [ValidationErrors] shouldBe thrownBy {(for {
-        schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO]
-        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
-        _ <- new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        ).createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, firstValueSchema),
-          TopicDetails(1, 1, 1)
-        )
-        _ <- new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        ).createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, valueSchemaEvolution),
-          TopicDetails(1, 1, 1)
-        )
-      } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
-
-    "throw error on schema evolution with illegal key field logical type addition" in {
-      val firstKey =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "Date",
-          |  "namespace": "dvs.data_platform.dvs_sandbox",
-          |  "fields": [
-          |    {
-          |      "name": "valueThing",
-          |      "type": "string"
-          |    }
-          |  ]
-          |}
-      """.stripMargin
-      val keyEvolution =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "Date",
-          |  "namespace": "dvs.data_platform.dvs_sandbox",
-          |  "fields": [
-          |    {
-          |      "name": "valueThing",
-          |      "type":{
-          |        "type": "string",
-          |        "logicalType":"uuid"
-          |      }
-          |    }
-          |  ]
-          |}
-      """.stripMargin
-      val firstKeySchema = new Schema.Parser().parse(firstKey)
-      val keySchemaEvolution = new Schema.Parser().parse(keyEvolution)
-
-      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      an [ValidationErrors] shouldBe thrownBy {(for {
-        schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO]
-        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
-        _ <- new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        ).createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(firstKeySchema, valueSchema),
-          TopicDetails(1, 1, 1)
-        )
-        _ <- new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        ).createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchemaEvolution, valueSchema),
-          TopicDetails(1, 1, 1)
-        )
-      } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
-
-    "throw error on schema evolution with illegal value field logical type addition" in {
-      val firstValue =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "Date",
-          |  "namespace": "dvs.data_platform.dvs_sandbox",
-          |  "fields": [
-          |    {
-          |      "name": "valueThing",
-          |      "type": "string"
-          |    }
-          |  ]
-          |}
-      """.stripMargin
-      val valueEvolution =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "Date",
-          |  "namespace": "dvs.data_platform.dvs_sandbox",
-          |  "fields": [
-          |    {
-          |      "name": "valueThing",
-          |      "type":{
-          |        "type": "string",
-          |        "logicalType":"uuid"
-          |      }
-          |    }
-          |  ]
-          |}
-      """.stripMargin
-      val firstValueSchema = new Schema.Parser().parse(firstValue)
-      val valueSchemaEvolution = new Schema.Parser().parse(valueEvolution)
-
-      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      an [ValidationErrors] shouldBe thrownBy {(for {
-        schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO]
-        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
-        _ <- new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        ).createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, firstValueSchema),
-          TopicDetails(1, 1, 1)
-        )
-        _ <- new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        ).createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, valueSchemaEvolution),
-          TopicDetails(1, 1, 1)
-        )
-      } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}}
-
-    "do not throw error on legal schema evolution with enum" in {
-      val firstValue =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "Date",
-          |  "namespace": "dvs.data_platform.dvs_sandbox",
-          |  "fields": [
-          |    {
-          |			"name": "testEnum",
-          |			"type": {
-          |            "type": "enum",
-          |            "name": "test_type",
-          |            "symbols": ["test1", "test2"]
-          |        }
-          |		}
-          |  ]
-          |}
-      """.stripMargin
-      val valueEvolution =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "Date",
-          |  "namespace": "dvs.data_platform.dvs_sandbox",
-          |  "fields": [
-          |    {
-          |			"name": "testEnum",
-          |			"type": {
-          |            "type": "enum",
-          |            "name": "test_type",
-          |            "symbols": ["test1", "test2"]
-          |        }
-          |		}
-          |  ]
-          |}
-      """.stripMargin
-      val firstValueSchema = new Schema.Parser().parse(firstValue)
-      val valueSchemaEvolution = new Schema.Parser().parse(valueEvolution)
-
-      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      (for {
-        schemaRegistry <- SchemaRegistry.test[IO]
-        kafka <- KafkaAdminAlgebra.test[IO]
-        kafkaClient <- KafkaClientAlgebra.test[IO]
-        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
-        _ <- new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        ).createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, firstValueSchema),
-          TopicDetails(1, 1, 1)
-        )
-        _ <- new CreateTopicProgram[IO](
-          schemaRegistry,
-          kafka,
-          kafkaClient,
-          policy,
-          Subject.createValidated("dvs.test-metadata-topic").get,
-          metadata
-        ).createTopic(
-          Subject.createValidated("dvs.subject").get,
-          createTopicMetadataRequest(keySchema, valueSchemaEvolution),
-          TopicDetails(1, 1, 1)
-        )
-      } yield succeed).unsafeRunSync()}
-
-
-    "successfully validate topic schema with value that has field of type union [null, ...]" in {
+    "succesfully validate topic schema with value that has field of type union [null, ...]" in {
       val union = SchemaBuilder.unionOf().nullType().and().stringType().endUnion()
       val recordWithNullDefault =
         SchemaBuilder
@@ -1783,16 +639,16 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
       val subject = Subject.createValidated("dvs.subject").get
       val topicMetadataV2Request = createTopicMetadataRequest(keySchema, recordWithNullDefault)
-      val resource: Resource[IO, Assertion] = (for {
+      val resource: Resource[IO, Assertion] = for {
         schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
-        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO]())
         kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
         metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
         ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
         _ <- ctProgram.registerSchemas(subject ,keySchema, recordWithNullDefault)
         _ <- ctProgram.createTopicResource(subject, TopicDetails(1,1,1))
         _ <- Resource.liftF(ctProgram.createTopicFromMetadataOnly(subject, topicMetadataV2Request))
-      } yield (succeed))
+      } yield succeed
       resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()
     }
 
@@ -1809,16 +665,16 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
       val subject = Subject.createValidated("dvs.subject").get
       val topicMetadataV2Request = createTopicMetadataRequest(keySchema, recordWithNullType)
-      val resource: Resource[IO, Assertion] = (for {
+      val resource: Resource[IO, Assertion] = for {
         schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
-        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO]())
         kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
         metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
         ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
         _ <- ctProgram.registerSchemas(subject ,keySchema, recordWithNullType)
         _ <- ctProgram.createTopicResource(subject, TopicDetails(1,1,1))
         _ <- Resource.liftF(ctProgram.createTopicFromMetadataOnly(subject, topicMetadataV2Request))
-      } yield (succeed))
+      } yield succeed
       resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()
     }
 
@@ -1836,29 +692,29 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
       val subject = Subject.createValidated("dvs.subject").get
       val topicMetadataV2Request = createTopicMetadataRequest(recordWithNullDefault, valueSchema)
-      val resource: Resource[IO, Assertion] = (for {
+      val resource: Resource[IO, Assertion] = for {
         schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
-        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO]())
         kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
         metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
         ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
         _ <- ctProgram.registerSchemas(subject, recordWithNullDefault, valueSchema)
         _ <- ctProgram.createTopicResource(subject, TopicDetails(1,1,1))
         _ <- Resource.liftF(ctProgram.createTopicFromMetadataOnly(subject, topicMetadataV2Request))
-      } yield (succeed))
+      } yield succeed
       resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()
     }
 
-    /*"successfully evolve schema which had mismatched types in past version" in {
+    "successfully evolve schema which had mismatched types in past topic" in {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
       val subject = Subject.createValidated("dvs.subject").get
       val mismatchedValueSchema = SchemaBuilder.record("name").fields().name("isTrue").`type`().booleanType().noDefault().endRecord()
       val mismatchedValueSchemaEvolution = SchemaBuilder.record("name").fields().name("isTrue").`type`().booleanType().noDefault().nullableInt("nullInt", 12).endRecord()
 
       val topicMetadataV2Request = createTopicMetadataRequest(keySchema, mismatchedValueSchema)
-      val resource: Resource[IO, Assertion] = (for {
+      val resource: Resource[IO, Assertion] = for {
         schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
-        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO]())
         kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
         metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
         ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
@@ -1870,9 +726,9 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           createTopicMetadataRequest(keySchema, mismatchedValueSchemaEvolution),
           TopicDetails(1, 1, 1)
         ))
-      } yield (succeed))
+      } yield succeed
       resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()
-    }*/
+    }
 
     "throw error if key schema is not registered as record type before creating topic from metadata only" in {
       val incorrectKeySchema = new Schema.Parser().parse("""
@@ -1882,16 +738,17 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
       val subject = Subject.createValidated("dvs.subject").get
       val topicMetadataV2Request = createTopicMetadataRequest(incorrectKeySchema, valueSchema)
-      val resource: Resource[IO, Assertion] = (for {
+      val resource: Resource[IO, Assertion] = for {
         schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
-        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO]())
         kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
         metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
         ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
         _ <- ctProgram.registerSchemas(subject ,incorrectKeySchema, valueSchema)
         _ <- ctProgram.createTopicResource(subject, TopicDetails(1,1,1))
         _ <- Resource.liftF(ctProgram.createTopicFromMetadataOnly(subject, topicMetadataV2Request))
-      } yield fail("Should Fail to add Metadata - this yield should not be hit."))}
+      } yield fail("Should Fail to add Metadata - this yield should not be hit.")
+    }
 
     "throw error if value schema is not registered as record type before creating topic from metadata only" in {
       val incorrectValueSchema = new Schema.Parser().parse("""
@@ -1901,31 +758,32 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
       val subject = Subject.createValidated("dvs.subject").get
       val topicMetadataV2Request = createTopicMetadataRequest(keySchema, incorrectValueSchema)
-      val resource: Resource[IO, Assertion] = (for {
+      val resource: Resource[IO, Assertion] = for {
         schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
-        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO]())
         kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
         metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
         ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
         _ <- ctProgram.registerSchemas(subject ,keySchema, incorrectValueSchema)
         _ <- ctProgram.createTopicResource(subject, TopicDetails(1,1,1))
         _ <- Resource.liftF(ctProgram.createTopicFromMetadataOnly(subject, topicMetadataV2Request))
-      } yield fail("Should Fail to add Metadata - this yield should not be hit."))}
+      } yield fail("Should Fail to add Metadata - this yield should not be hit.")
+    }
 
     "successfully creating topic from metadata only where key and value schemas are records" in {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
       val subject = Subject.createValidated("dvs.subject").get
       val topicMetadataV2Request = createTopicMetadataRequest(keySchema, valueSchema)
-      val resource: Resource[IO, Assertion] = (for {
+      val resource: Resource[IO, Assertion] = for {
         schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
-        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO]())
         kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
         metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
         ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
         _ <- ctProgram.registerSchemas(subject ,keySchema, valueSchema)
         _ <- ctProgram.createTopicResource(subject, TopicDetails(1,1,1))
         _ <- Resource.liftF(ctProgram.createTopicFromMetadataOnly(subject, topicMetadataV2Request))
-      } yield (succeed))
+      } yield succeed
       resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()}
   }
 
@@ -1949,10 +807,13 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
 
     override def withProducerRecordSizeLimit(sizeLimitBytes: Long): IO[KafkaClientAlgebra[IO]] = ???
 
-    override def consumeMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[IO, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset))] = fs2.Stream.empty
+    override def consumeMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[IO, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, hydra.kafka.algebras.KafkaClientAlgebra.Offset))] = fs2.Stream.empty
 
-    override def consumeStringKeyMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[IO, ((Option[String], Option[GenericRecord], Option[Headers]), (Partition, Offset))] = fs2.Stream.empty
+    override def consumeStringKeyMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[IO, ((Option[String], Option[GenericRecord], Option[Headers]), (Partition, hydra.kafka.algebras.KafkaClientAlgebra.Offset))] = fs2.Stream.empty
 
+    override def streamStringKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicAndPartition: List[(TopicPartition, Offset)]): fs2.Stream[IO, ((Option[String], Option[GenericRecord], Option[Headers]), (Partition, Offset), Timestamp)] = ???
+
+    override def streamAvroKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicAndPartition: List[(TopicPartition, Offset)]): fs2.Stream[IO, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset), Timestamp)] = ???
   }
   private final class TestMetadataAlgebraWithPublishTo(consumeFrom: Ref[IO, Map[Subject, TopicMetadataContainer]]) extends MetadataAlgebra[IO] {
     override def getMetadataFor(subject: Subject): IO[Option[MetadataAlgebra.TopicMetadataContainer]] = consumeFrom.get.map(_.get(subject))
