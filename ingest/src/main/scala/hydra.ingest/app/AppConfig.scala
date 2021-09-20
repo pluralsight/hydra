@@ -181,7 +181,7 @@ object AppConfig {
 
   private val allowableTopicDeletionTimeConfig: ConfigValue[AllowableTopicDeletionTimeConfig] = (
     env("HYDRA_ALLOWABLE_TOPIC_DELETION_TIME_MS").as[Long].default(14400000)
-    ).map(AllowableTopicDeletionTimeConfig)
+    ).map(AllowableTopicDeletionTimeConfig) // Default 4 hours
 
   final case class AppConfig(
                               createTopicConfig: CreateTopicConfig,
