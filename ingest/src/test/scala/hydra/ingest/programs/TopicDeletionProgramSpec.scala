@@ -182,7 +182,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
   }
 
   private def getExpectedDeletedTopics(topicNames: List[String], topicNamesToDelete: List[String], kafkaTopicNamesToFail: List[String]): List[String] = {
-    return topicNames.toSet.intersect(topicNamesToDelete.toSet).diff(kafkaTopicNamesToFail.toSet).toList
+    topicNames.toSet.intersect(topicNamesToDelete.toSet).diff(kafkaTopicNamesToFail.toSet).toList
   }
 
   implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
@@ -397,7 +397,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "Successfully delete topic where last published record is outside of unacceptable window." in {
-    val myTopicName = "topic1";
+    val myTopicName = "topic1"
     val offsetMap: Map[TopicAndPartition, Offset] = Map(TopicAndPartition(myTopicName, 0) -> Offset(1))
 
     applyTestcase(KafkaAdminAlgebra.test[IO](offsetMap), SchemaRegistry.test[IO],
@@ -423,7 +423,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "Fail to delete topic that was recently published to." in {
-    val myTopicName = "topic1";
+    val myTopicName = "topic1"
     val offsetMap: Map[TopicAndPartition, Offset] = Map(TopicAndPartition(myTopicName, 0) -> Offset(1))
 
     applyTestcase(KafkaAdminAlgebra.test[IO](offsetMap), SchemaRegistry.test[IO],
@@ -433,8 +433,8 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "Fail to delete topic that doesn't exist." in {
-    val myTopicName = "topic1";
-    val myFakeTopicName = "topic2";
+    val myTopicName = "topic1"
+    val myFakeTopicName = "topic2"
     applyTestcase(KafkaAdminAlgebra.test[IO](), SchemaRegistry.test[IO],
       v1TopicNames = List(myTopicName), v2TopicNames = List(), topicNamesToDelete = List(myFakeTopicName),
       registerKey = true, kafkaTopicNamesToFail = List(myFakeTopicName),

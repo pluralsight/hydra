@@ -69,17 +69,14 @@ object TagsAlgebra {
         case (key, value) =>
         fs2.Stream.eval {
           value match {
-            case Some(value) => {
+            case Some(value) =>
               ref.update(_.addMetadata(HydraTag(key.get("name").toString, value.get("description").toString)))
-            }
-            case None => {
+            case None =>
               ref.update(_.removeMetadata(key.toString))
-            }
           }
         }
-        case e => {
+        case e =>
           fs2.Stream.eval(Logger[F].error(s"Unexpected return from Kafka: ${e.toString()}"))
-        }
       }.recoverWith {
         case e =>
         fs2.Stream.eval(Logger[F].warn(s"Error in TagsAlgebra"))

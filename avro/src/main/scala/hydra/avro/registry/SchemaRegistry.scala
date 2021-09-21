@@ -128,6 +128,14 @@ object SchemaRegistry {
         s"baseType of '${e.baseType.getName}' and logicalType of '${e.logicalType.getName}'").mkString
     )
 
+  final case class IllegalLogicalTypeChange(originalType: LogicalType, proposedType: LogicalType, fieldName: String)
+  final case class IllegalLogicalTypeChangeErrors(errors: List[IllegalLogicalTypeChange]) extends
+    RuntimeException(
+      errors.map(e =>
+        s"Changing logical types is not allowed. Field named '${e.fieldName}'s logical type cannot be changed from " +
+        s"logicalType of '${if(e.originalType != null) e.originalType.getName else null}' to logicalType of '${if(e.proposedType != null) e.proposedType.getName else null}'").mkString("\n")
+    )
+
   type SchemaId = Int
   type SchemaVersion = Int
 

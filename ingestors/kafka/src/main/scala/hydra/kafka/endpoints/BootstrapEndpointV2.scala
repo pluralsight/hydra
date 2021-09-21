@@ -16,7 +16,6 @@
 package hydra.kafka.endpoints
 
 import java.time.Instant
-
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
@@ -30,6 +29,7 @@ import hydra.kafka.algebras.TagsAlgebra
 import hydra.kafka.model.TopicMetadataV2Request
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.CreateTopicProgram
+import hydra.kafka.programs.CreateTopicProgram.ValidationErrors
 import hydra.kafka.serializers.TopicMetadataV2Parser
 import hydra.kafka.util.KafkaUtils.TopicDetails
 
@@ -67,9 +67,12 @@ final class BootstrapEndpointV2[F[_]: Futurable](
                               case Success(_) =>
                                 addHttpMetric(topicName, StatusCodes.OK, "V2Bootstrap", startTime, "PUT")
                                 complete(StatusCodes.OK)
-                              case Failure(IncompatibleSchemaException(m)) =>
+                              case Failure(IncompatibleSchemaException(m))=>
                                 addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(s"$IncompatibleSchemaException"))
                                 complete(StatusCodes.BadRequest, m)
+                              case Failure(ValidationErrors(b))=>
+                                addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(s"$ValidationErrors"))
+                                complete(StatusCodes.BadRequest, b.map(err => err.getMessage).mkString(","))
                               case Failure(e) =>
                                 addHttpMetric(topicName, StatusCodes.InternalServerError, "V2Bootstrap", startTime, "PUT", error = Some(e.getMessage))
                                 complete(StatusCodes.InternalServerError, e)
