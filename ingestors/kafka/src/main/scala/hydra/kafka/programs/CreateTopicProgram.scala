@@ -5,7 +5,7 @@ import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{IllegalLogicalTypeChange, IllegalLogicalTypeChangeErrors, IncompatibleSchemaException, SchemaVersion}
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{Schemas, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
+import hydra.kafka.model.{Schemas, StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
 import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyAndValueMismatch, KeyHasNullableFields, NullableField, ValidationErrors}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
@@ -218,7 +218,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     } else None
   }
 
-  private def validateKeyAndValueSchemas(schemas: Schemas, subject: Subject): Resource[F, Unit] = {
+  private def validateKeyAndValueSchemas(request: TopicMetadataV2Request, subject: Subject): Resource[F, Unit] = {
+    val schemas = request.schemas
     val validate: F[Unit] =
       (schemas.key.getType, schemas.value.getType) match {
         case (Schema.Type.RECORD, Schema.Type.RECORD) =>
@@ -231,9 +232,10 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
             k <- validateKeySchemaEvolution(schemas, subject)
             v <- validateValueSchemaEvolution(schemas, subject)
           } yield {
+            val nullableKeyFields = if(request.streamType != StreamTypeV2.Event) checkForNullableKeyFields(keyFields) else None
             List[Option[RuntimeException]](keyFieldIsEmpty,
               checkForMismatches(keyFields, valueFields),
-              checkForNullableKeyFields(keyFields),
+              nullableKeyFields,
               k,
               v).flatten
           }
@@ -250,7 +252,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
                                    topicName: Subject,
                                    createTopicRequest: TopicMetadataV2Request): F[Unit] = {
     (for {
-      _ <- validateKeyAndValueSchemas(createTopicRequest.schemas, topicName)
+      _ <- validateKeyAndValueSchemas(createTopicRequest, topicName)
       _ <- Resource.liftF(publishMetadata(topicName, createTopicRequest))
     } yield()).use(_ => Bracket[F, Throwable].unit)
   }
@@ -263,7 +265,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     val td = createTopicRequest.numPartitions.map(numP =>
       defaultTopicDetails.copy(numPartitions = numP.value)).getOrElse(defaultTopicDetails)
     (for {
-      _ <- validateKeyAndValueSchemas(createTopicRequest.schemas, topicName)
+      _ <- validateKeyAndValueSchemas(createTopicRequest, topicName)
       _ <- registerSchemas(
         topicName,
         createTopicRequest.schemas.key,
