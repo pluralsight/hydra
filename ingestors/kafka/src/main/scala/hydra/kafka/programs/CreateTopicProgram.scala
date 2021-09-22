@@ -232,10 +232,10 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
             k <- validateKeySchemaEvolution(schemas, subject)
             v <- validateValueSchemaEvolution(schemas, subject)
           } yield {
-            val nullableKeyFields = if(request.streamType != StreamTypeV2.Event) checkForNullableKeyFields(keyFields) else None
+            val keyFieldsCheckedForNullIfNecessary = if(request.streamType != StreamTypeV2.Event) checkForNullableKeyFields(keyFields) else None
             List[Option[RuntimeException]](keyFieldIsEmpty,
               checkForMismatches(keyFields, valueFields),
-              nullableKeyFields,
+              keyFieldsCheckedForNullIfNecessary,
               k,
               v).flatten
           }
