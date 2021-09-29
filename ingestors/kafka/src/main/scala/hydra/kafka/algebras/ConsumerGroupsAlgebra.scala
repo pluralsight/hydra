@@ -136,7 +136,7 @@ object ConsumerGroupsAlgebra {
       }
 
       override def getAllConsumersByTopic: F[List[DetailedTopicConsumers]] =
-        consumerGroupsStorageFacade.get.map(_.getAllConsumersByTopic)
+        consumerGroupsStorageFacade.get.flatMap(a => a.getAllConsumersByTopic.traverse(b => topicConsumersToDetailed(b)))
 
       override def getDetailedConsumerInfo(consumerGroupName: String): F[List[DetailedConsumerGroup]] = {
         getTopicsForConsumer(consumerGroupName).flatMap { topicInfo =>
