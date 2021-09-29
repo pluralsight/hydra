@@ -25,7 +25,7 @@ trait ConsumerGroupMarshallers extends DefaultJsonProtocol with SprayJsonSupport
   implicit object detailedConsumerGroupFormat extends RootJsonFormat[DetailedConsumerGroup] {
     override def write(detailedConsumerGroup: DetailedConsumerGroup): JsValue = JsObject(List(
       Some("topicName" -> JsString(detailedConsumerGroup.topicName)),
-      Some("consumerGroupName" -> JsString(detailedConsumerGroup.consumergroupName)),
+      Some("consumerGroupName" -> JsString(detailedConsumerGroup.consumerGroupName)),
       Some("lastCommit" -> InstantFormat.write(detailedConsumerGroup.lastCommit)),
       if (detailedConsumerGroup.offsetInformation.isEmpty) None else Some("offsetInformation" ->
         JsArray(detailedConsumerGroup.offsetInformation.sortBy(_.partition).map(partitionOffset.write).toVector)),
