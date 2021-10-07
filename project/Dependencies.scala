@@ -23,7 +23,7 @@ object Dependencies {
   val kamonVersion = "2.1.10"
   val log4jVersion = "2.13.3"
   val refinedVersion = "0.9.20"
-  val reflectionsVersion = "0.9.12"
+  val reflectionsVersion = "0.10.1"
   val scalaCacheVersion = "0.28.0"
   val scalaMockVersion = "5.1.0"
   val scalaTestVersion = "3.2.3"
