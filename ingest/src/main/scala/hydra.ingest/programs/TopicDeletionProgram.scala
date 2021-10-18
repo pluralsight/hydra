@@ -57,7 +57,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
         } yield {
           if (filteredConsumers.nonEmpty) {
             Left(ConsumersStillExistError(topic, filteredConsumers.map(detailedConsumer =>
-              Consumer(detailedConsumer.consumergroupName, detailedConsumer.lastCommit, detailedConsumer.state))))
+              Consumer(detailedConsumer.consumerGroupName, detailedConsumer.lastCommit, detailedConsumer.state))))
           } else {
             Right(topic)
           }

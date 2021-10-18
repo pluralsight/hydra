@@ -6,7 +6,7 @@ import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
 import cats.implicits._
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
-import hydra.kafka.algebras.ConsumerGroupsAlgebra.{Consumer, ConsumerTopics, DetailedConsumerGroup, PartitionOffset, TopicConsumers}
+import hydra.kafka.algebras.ConsumerGroupsAlgebra.{Consumer, ConsumerTopics, DetailedConsumerGroup, DetailedTopicConsumers, PartitionOffset, TopicConsumers}
 import hydra.kafka.algebras.KafkaClientAlgebra.Record
 import hydra.kafka.model.TopicConsumer
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
@@ -23,6 +23,7 @@ trait ConsumerGroupsAlgebra[F[_]] {
   def getAllConsumersByTopic: F[List[TopicConsumers]]
   def startConsumer: F[Unit]
   def getDetailedConsumerInfo(consumerGroupName: String) : F[List[DetailedConsumerGroup]]
+  def getConsumerActiveState(consumerGroupName: String): F[String]
 }
 
 final case class TestConsumerGroupsAlgebra(consumerGroupMap: Map[TopicConsumerKey, (TopicConsumerValue, String)]) extends ConsumerGroupsAlgebra[IO] {
@@ -36,7 +37,8 @@ final case class TestConsumerGroupsAlgebra(consumerGroupMap: Map[TopicConsumerKe
   }
 
   override def getConsumersForTopic(topicName: String): IO[TopicConsumers] = {
-    val consumerGroups = consumerGroupMap.filterKeys(_.topicName == topicName).map(p => Consumer(p._1.consumerGroupName, p._2._1.lastCommit, Some(p._2._2))).toList
+    val consumerGroups = consumerGroupMap.filterKeys(_.topicName == topicName).map(p =>
+      Consumer(p._1.consumerGroupName, p._2._1.lastCommit, state = Some(p._2._2))).toList
     IO.pure(TopicConsumers(topicName, consumerGroups))
   }
 
@@ -56,12 +58,18 @@ final case class TestConsumerGroupsAlgebra(consumerGroupMap: Map[TopicConsumerKe
   override def getDetailedConsumerInfo(consumerGroupName: String): IO[List[DetailedConsumerGroup]] = {
     getTopicsForConsumer(consumerGroupName).flatMap { topicInfo =>
       topicInfo.topics.traverse { topic =>
-          IO.pure(DetailedConsumerGroup(topic.topicName, consumerGroupName, topic.lastCommit,
-            List(PartitionOffset(0, 0, 0, 0)), Some(0), Some(consumerGroupMap.get(TopicConsumerKey(topic.topicName, consumerGroupName))).get.map(_._2)))
-        }
+        IO.pure(DetailedConsumerGroup(topic.topicName, consumerGroupName, topic.lastCommit,
+          List(PartitionOffset(0, 0, 0, 0)), Some(0), Some(consumerGroupMap.get(TopicConsumerKey(topic.topicName, consumerGroupName))).get.map(_._2)))
       }
     }
   }
+
+  override def getConsumerActiveState(consumerGroupName: String): IO[String] = {
+    IO.pure(consumerGroupMap.keys.map { keys =>
+      if (keys.consumerGroupName == consumerGroupName) consumerGroupMap(keys)._2 else "Unknown"
+    }.head)
+  }
+}
 
 object TestConsumerGroupsAlgebra {
   def empty: TestConsumerGroupsAlgebra = TestConsumerGroupsAlgebra(Map.empty[TopicConsumerKey, (TopicConsumerValue, String)])
@@ -73,11 +81,12 @@ object ConsumerGroupsAlgebra {
   final case class PartitionOffset(partition: Int, groupOffset: Long, largestOffset: Long, partitionLag: Long)
 
   final case class TopicConsumers(topicName: String, consumers: List[Consumer])
+  final case class DetailedTopicConsumers(topicName: String, consumers: List[DetailedConsumerGroup])
   final case class Consumer(consumerGroupName: String, lastCommit: Instant, state: Option[String] = None)
 
   final case class ConsumerTopics(consumerGroupName: String, topics: List[DetailedConsumerGroup])
-  final case class DetailedConsumerGroup(topicName: String, consumergroupName: String, lastCommit: Instant,
-                        offsetInformation: List[PartitionOffset] = List.empty, totalLag: Option[Long] = None, state: Option[String] = None)
+  final case class DetailedConsumerGroup(topicName: String, consumerGroupName: String, lastCommit: Instant,
+                                         offsetInformation: List[PartitionOffset] = List.empty, totalLag: Option[Long] = None, state: Option[String] = None)
 
   def make[F[_]: ContextShift: ConcurrentEffect: Timer: Logger](
                                                                  kafkaInternalTopic: String,
@@ -97,7 +106,20 @@ object ConsumerGroupsAlgebra {
     } yield new ConsumerGroupsAlgebra[F] {
 
       override def getConsumersForTopic(topicName: String): F[TopicConsumers] =
-        consumerGroupsStorageFacade.get.map(_.getConsumersForTopicName(topicName))
+        consumerGroupsStorageFacade.get.flatMap(a => addStateToTopicConsumers(a.getConsumersForTopicName(topicName)))
+
+      private def addStateToTopicConsumers(topicConsumers: TopicConsumers): F[TopicConsumers] = {
+        val detailedF: F[List[Consumer]] = topicConsumers.consumers.traverse{ consumer =>
+          val fState = getConsumerActiveState(consumer.consumerGroupName)
+          fState.map { state =>
+            Consumer(consumer.consumerGroupName,
+              consumer.lastCommit, state = Some(state))
+          }
+        }
+        detailedF.map{detailed =>
+          TopicConsumers(topicConsumers.topicName, detailed)
+        }
+      }
 
       override def getTopicsForConsumer(consumerGroupName: String): F[ConsumerTopics] =
         consumerGroupsStorageFacade.get.map(_.getTopicsForConsumerGroupName(consumerGroupName))
@@ -115,7 +137,7 @@ object ConsumerGroupsAlgebra {
       }
 
       override def getAllConsumersByTopic: F[List[TopicConsumers]] =
-        consumerGroupsStorageFacade.get.map(_.getAllConsumersByTopic)
+        consumerGroupsStorageFacade.get.flatMap(a => a.getAllConsumersByTopic.traverse(b => addStateToTopicConsumers(b)))
 
       override def getDetailedConsumerInfo(consumerGroupName: String): F[List[DetailedConsumerGroup]] = {
         getTopicsForConsumer(consumerGroupName).flatMap { topicInfo =>
@@ -130,7 +152,7 @@ object ConsumerGroupsAlgebra {
         }
       }
 
-      private def getConsumerActiveState(consumerGroupName: String): F[String] = {
+      override def getConsumerActiveState(consumerGroupName: String): F[String] = {
         kAA.describeConsumerGroup(consumerGroupName).map { detailed =>
           detailed match {
             case Some(value) => value.state().toString
