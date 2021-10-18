@@ -13,10 +13,10 @@ import scala.collection.immutable
 
 trait CorsSupport extends ConfigSupport {
 
-  private val allowedMethodKeys = scala.collection.immutable.Seq("GET", "POST", "PUT", "HEAD", "OPTIONS", "DELETE")
+  private val allowedMethodKeys = scala.collection.immutable.Seq("GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS")
   private val allowedMethods =  allowedMethodKeys.map(k => HttpMethods.getForKey(k).getOrElse(HttpMethod.custom(k)))
 
-  private val dataExplorerWildcardString = "*.vnerd.com"
+  private val dataExplorerWildcardString = "https://*.vnerd.com"
 
   val settings = CorsSettings.defaultSettings
     .withAllowCredentials(false)
