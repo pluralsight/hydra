@@ -3,8 +3,8 @@ package hydra.core.http
 /**
   * Created by alexsilva on 3/28/17.
   */
-import akka.http.scaladsl.model.headers.{Host, HttpOrigin}
-import akka.http.scaladsl.model.{HttpMethod, HttpMethods, Uri}
+import akka.http.scaladsl.model.headers.HttpOrigin
+import akka.http.scaladsl.model.{HttpMethod, HttpMethods}
 import ch.megard.akka.http.cors.scaladsl.model.HttpOriginMatcher
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import hydra.common.config.ConfigSupport
