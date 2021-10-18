@@ -17,10 +17,10 @@ import io.chrisdavenport.log4cats.Logger
 import org.apache.avro.generic.GenericRecord
 
 trait ConsumerGroupsAlgebra[F[_]] {
-  def getConsumersForTopic(topicName: String): F[DetailedTopicConsumers]
+  def getConsumersForTopic(topicName: String): F[TopicConsumers]
   def getTopicsForConsumer(consumerGroupName: String): F[ConsumerTopics]
   def getAllConsumers: F[List[ConsumerTopics]]
-  def getAllConsumersByTopic: F[List[DetailedTopicConsumers]]
+  def getAllConsumersByTopic: F[List[TopicConsumers]]
   def startConsumer: F[Unit]
   def getDetailedConsumerInfo(consumerGroupName: String) : F[List[DetailedConsumerGroup]]
   def getConsumerActiveState(consumerGroupName: String): F[String]
@@ -36,10 +36,10 @@ final case class TestConsumerGroupsAlgebra(consumerGroupMap: Map[TopicConsumerKe
     this.copy(this.consumerGroupMap - key)
   }
 
-  override def getConsumersForTopic(topicName: String): IO[DetailedTopicConsumers] = {
+  override def getConsumersForTopic(topicName: String): IO[TopicConsumers] = {
     val consumerGroups = consumerGroupMap.filterKeys(_.topicName == topicName).map(p =>
-      DetailedConsumerGroup(topicName, p._1.consumerGroupName, p._2._1.lastCommit, state = Some(p._2._2))).toList
-    IO.pure(DetailedTopicConsumers(topicName, consumerGroups))
+      Consumer(p._1.consumerGroupName, p._2._1.lastCommit, state = Some(p._2._2))).toList
+    IO.pure(TopicConsumers(topicName, consumerGroups))
   }
 
   override def getTopicsForConsumer(consumerGroupName: String): IO[ConsumerTopics] = {
@@ -51,7 +51,7 @@ final case class TestConsumerGroupsAlgebra(consumerGroupMap: Map[TopicConsumerKe
   override def getAllConsumers: IO[List[ConsumerTopics]] =
     consumerGroupMap.keys.map(_.consumerGroupName).toList.traverse(getTopicsForConsumer)
 
-  override def getAllConsumersByTopic: IO[List[DetailedTopicConsumers]] = consumerGroupMap.keys.map(_.topicName).toList.traverse(getConsumersForTopic)
+  override def getAllConsumersByTopic: IO[List[TopicConsumers]] = consumerGroupMap.keys.map(_.topicName).toList.traverse(getConsumersForTopic)
 
   override def startConsumer: IO[Unit] = throw IntentionallyUnimplemented
 
@@ -105,18 +105,19 @@ object ConsumerGroupsAlgebra {
       consumerGroupsStorageFacade <- Ref[F].of(ConsumerGroupsStorageFacade.empty)
     } yield new ConsumerGroupsAlgebra[F] {
 
-      override def getConsumersForTopic(topicName: String): F[DetailedTopicConsumers] =
-        consumerGroupsStorageFacade.get.flatMap(a => topicConsumersToDetailed(a.getConsumersForTopicName(topicName)))
+      override def getConsumersForTopic(topicName: String): F[TopicConsumers] =
+        consumerGroupsStorageFacade.get.flatMap(a => addStateToTopicConsumers(a.getConsumersForTopicName(topicName)))
 
-      private def topicConsumersToDetailed(topicConsumers: TopicConsumers): F[DetailedTopicConsumers] = {
-        val detailedF: F[List[DetailedConsumerGroup]] = topicConsumers.consumers.traverse{ consumer =>
+      private def addStateToTopicConsumers(topicConsumers: TopicConsumers): F[TopicConsumers] = {
+        val detailedF: F[List[Consumer]] = topicConsumers.consumers.traverse{ consumer =>
           val fState = getConsumerActiveState(consumer.consumerGroupName)
           fState.map { state =>
-            DetailedConsumerGroup(topicConsumers.topicName, consumer.consumerGroupName,
-              consumer.lastCommit, state = Some(state))}
+            Consumer(consumer.consumerGroupName,
+              consumer.lastCommit, state = Some(state))
           }
+        }
         detailedF.map{detailed =>
-          DetailedTopicConsumers(topicConsumers.topicName, detailed)
+          TopicConsumers(topicConsumers.topicName, detailed)
         }
       }
 
@@ -135,8 +136,8 @@ object ConsumerGroupsAlgebra {
         } yield ()
       }
 
-      override def getAllConsumersByTopic: F[List[DetailedTopicConsumers]] =
-        consumerGroupsStorageFacade.get.flatMap(a => a.getAllConsumersByTopic.traverse(b => topicConsumersToDetailed(b)))
+      override def getAllConsumersByTopic: F[List[TopicConsumers]] =
+        consumerGroupsStorageFacade.get.flatMap(a => a.getAllConsumersByTopic.traverse(b => addStateToTopicConsumers(b)))
 
       override def getDetailedConsumerInfo(consumerGroupName: String): F[List[DetailedConsumerGroup]] = {
         getTopicsForConsumer(consumerGroupName).flatMap { topicInfo =>

@@ -39,7 +39,6 @@ trait ConsumerGroupMarshallers extends DefaultJsonProtocol with SprayJsonSupport
   implicit object detailedTopicConsumersFormat extends RootJsonFormat[DetailedTopicConsumers] {
     override def write(obj: DetailedTopicConsumers): JsValue = JsObject(
       List(
-        Some("topicName" -> JsString(obj.topicName)),
         Some("consumers" -> JsArray(obj.consumers.map(consumer => detailedConsumerGroupFormat.write(consumer))))
       ).flatten.toMap
     )
