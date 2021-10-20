@@ -34,7 +34,6 @@ class KafkaUtilsSpec
     "bootstrap.servers" -> "localhost:8042",
     "enable.auto.commit" -> "false",
     "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
-    "zookeeper.connect" -> "localhost:3141",
     "client.id" -> "string",
     "metadata.fetch.timeout.ms" -> "100000"
   )
@@ -109,7 +108,6 @@ class KafkaUtilsSpec
         "bootstrap.servers" -> "localhost:8012",
         "enable.auto.commit" -> "false",
         "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
-        "zookeeper.connect" -> "localhost:3111",
         "client.id" -> "string",
         "metadata.fetch.timeout.ms" -> "100000"
       )
@@ -126,7 +124,6 @@ class KafkaUtilsSpec
         "bootstrap.servers" -> "localhost:8012",
         "enable.auto.commit" -> "false",
         "value.deserializer" -> "io.confluent.kafka.serializers.KafkaAvroDeserializer",
-        "zookeeper.connect" -> "localhost:3111",
         "client.id" -> "avro",
         "metadata.fetch.timeout.ms" -> "100000",
         "schema.registry.url" -> "mock"
