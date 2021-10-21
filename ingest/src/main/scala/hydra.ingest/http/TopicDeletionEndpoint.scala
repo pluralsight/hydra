@@ -24,15 +24,21 @@ object TopicDeletionEndpoint extends
 
   final case class DeletionEndpointResponse(topicOrSubject: String, message: String)
 
-  final case class DeletionRequest(topics: List[String], ignoreConsumerGroups: List[String])
+  final case class DeletionRequest(topics: List[String], ignoreConsumerGroups: List[String], ignorePublishTime: Boolean)
 
   implicit object DeletionRequest extends RootJsonFormat[DeletionRequest] {
     override def read(json: JsValue): DeletionRequest = {
-      json.asJsObject.getFields("topics", "ignoreConsumerGroups") match {
-        case Seq(topics, ignoreConsumergroups) =>
-          DeletionRequest(topics.convertTo[List[String]], ignoreConsumergroups.convertTo[List[String]])
+      json.asJsObject.getFields("topics", "ignoreConsumerGroups", "ignorePublishTime") match {
+        case Seq(topics, ignoreConsumerGroups, ignorePublishTime) =>
+          DeletionRequest(topics.convertTo[List[String]], ignoreConsumerGroups.convertTo[List[String]], ignorePublishTime.convertTo[Boolean])
+        case Seq(topics, ignoreSomething) =>
+          try {
+            DeletionRequest(topics.convertTo[List[String]], ignoreSomething.convertTo[List[String]], false)
+          } catch {
+            case e: Exception => DeletionRequest(topics.convertTo[List[String]], List.empty, ignoreSomething.convertTo[Boolean])
+          }
         case Seq(topics) =>
-          DeletionRequest(topics.convertTo[List[String]], List.empty)
+          DeletionRequest(topics.convertTo[List[String]], List.empty, false)
         case _ =>
           spray.json.deserializationError("Must provide a List of topics to delete")
       }
@@ -121,9 +127,10 @@ final class TopicDeletionEndpoint[F[_] : Futurable](deletionProgram: TopicDeleti
   }
 
   private def deleteTopics(topics: List[String], ignoreConsumerGroups: List[String],
-                           userDeleting: String, path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
+                           userDeleting: String, ignorePublishTime: Boolean, path: String, startTime: Instant)
+                          (implicit ec: ExecutionContext) = {
     onComplete(
-      Futurable[F].unsafeToFuture(deletionProgram.deleteTopics(topics, ignoreConsumerGroups))
+      Futurable[F].unsafeToFuture(deletionProgram.deleteTopics(topics, ignoreConsumerGroups, ignorePublishTime))
     ) {
       case Success(maybeSuccess) => {
         maybeSuccess match {
@@ -184,11 +191,11 @@ final class TopicDeletionEndpoint[F[_] : Futurable](deletionProgram: TopicDeleti
                   }
                 } ~
                   pathPrefix(Segment) { topic =>
-                    deleteTopics(List(topic), List.empty, userName, "/v2/topics", startTime)
+                    deleteTopics(List(topic), List.empty, userName, false, "/v2/topics", startTime)
                   } ~
                   pathEndOrSingleSlash {
                     entity(as[DeletionRequest]) { req =>
-                      deleteTopics(req.topics, req.ignoreConsumerGroups, userName, "/v2/topics", startTime)
+                      deleteTopics(req.topics, req.ignoreConsumerGroups, userName, req.ignorePublishTime, "/v2/topics", startTime)
                     }
                   }
               }
