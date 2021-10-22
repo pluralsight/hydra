@@ -50,7 +50,7 @@ class BootstrapEndpointSpec
   override implicit val patienceConfig =
     PatienceConfig(timeout = scaled(5000 millis), interval = scaled(100 millis))
 
-  private implicit val corsSupport: CorsSupport = new CorsSupport("http://*")
+  private implicit val corsSupport: CorsSupport = new CorsSupport("*")
 
   class TestKafkaIngestor extends Actor {
 
