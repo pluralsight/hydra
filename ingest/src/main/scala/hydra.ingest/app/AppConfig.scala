@@ -186,7 +186,7 @@ object AppConfig {
   final case class CorsAllowedOriginConfig(corsAllowedOrigins: String)
 
   private val corsAllowedOrigin: ConfigValue[CorsAllowedOriginConfig] =
-    env("CORS_ALLOWED_ORIGIN").as[String].default("*://*").map(CorsAllowedOriginConfig)
+    env("CORS_ALLOWED_ORIGIN").as[String].default("*").map(CorsAllowedOriginConfig)
 
   final case class AppConfig(
 

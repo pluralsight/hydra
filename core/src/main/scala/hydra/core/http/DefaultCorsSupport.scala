@@ -29,5 +29,5 @@ class CorsSupport(origin: String) extends DefaultCorsSupport {
     .withAllowCredentials(false)
     .withExposedHeaders(immutable.Seq("Link"))
     .withAllowedMethods(allowedMethods)
-    .withAllowedOrigins(HttpOriginMatcher(HttpOrigin(origin)))
+    .withAllowedOrigins(if (origin == "*") HttpOriginMatcher.* else HttpOriginMatcher(HttpOrigin(origin)))
 }
