@@ -12,7 +12,7 @@ import hydra.common.config.ConfigSupport
 import scala.collection.immutable
 
 trait DefaultCorsSupport extends ConfigSupport {
-  private val allowedMethodKeys = scala.collection.immutable.Seq("GET", "POST", "PUT", "DELETE")
+  private val allowedMethodKeys = scala.collection.immutable.Seq("GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS")
   private val allowedMethods =  allowedMethodKeys.map(k => HttpMethods.getForKey(k).getOrElse(HttpMethod.custom(k)))
   val settings = CorsSettings.defaultSettings
     .withAllowCredentials(false)
