@@ -22,7 +22,7 @@ class CorsSupportSpec extends Matchers with AnyFunSpecLike with DefaultCorsSuppo
         HttpMethods.HEAD,
         HttpMethods.OPTIONS
       )
-      settings.allowedOrigins shouldBe HttpOriginMatcher(HttpOrigin("https://*.vnerd.com"))
+      settings.allowedOrigins shouldBe HttpOriginMatcher.*
       settings.maxAge shouldBe Some(1800)
       settings.allowGenericHttpRequests shouldBe true
     }
