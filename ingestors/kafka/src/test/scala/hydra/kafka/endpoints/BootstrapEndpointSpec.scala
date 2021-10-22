@@ -9,6 +9,7 @@ import akka.testkit.TestKit
 import com.pluralsight.hydra.avro.JsonConverter
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
+import hydra.core.http.CorsSupport
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadata
@@ -48,6 +49,8 @@ class BootstrapEndpointSpec
 
   override implicit val patienceConfig =
     PatienceConfig(timeout = scaled(5000 millis), interval = scaled(100 millis))
+
+  private implicit val corsSupport: CorsSupport = new CorsSupport("http://*")
 
   class TestKafkaIngestor extends Actor {
 

@@ -8,6 +8,7 @@ import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.avro.util.SchemaWrapper
 import hydra.common.config.ConfigSupport
 import hydra.common.util.{ActorUtils, Futurable}
+import hydra.core.http.CorsSupport
 import hydra.ingest.app.AppConfig.AppConfig
 import hydra.ingest.http._
 import hydra.kafka.consumer.KafkaConsumerProxy
@@ -21,7 +22,7 @@ import scalacache.guava.GuavaCache
 import scala.concurrent.ExecutionContext
 
 final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebras: Algebras[F], cfg: AppConfig)
-                                                 (implicit system: ActorSystem) extends RouteConcatenation with ConfigSupport {
+                                                 (implicit system: ActorSystem, corsSupport: CorsSupport) extends RouteConcatenation with ConfigSupport {
 
   private implicit val ec: ExecutionContext = system.dispatcher
   private val bootstrapEndpointV2 = if (cfg.metadataTopicsConfig.createV2TopicsEnabled) {
@@ -76,5 +77,5 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
 
 object Routes {
   def make[F[_]: Sync: Futurable](programs: Programs[F], algebras: Algebras[F], config: AppConfig)
-                           (implicit system: ActorSystem): F[Routes[F]] = Sync[F].delay(new Routes[F](programs, algebras, config))
+                           (implicit system: ActorSystem, corsSupport: CorsSupport): F[Routes[F]] = Sync[F].delay(new Routes[F](programs, algebras, config))
 }

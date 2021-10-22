@@ -7,7 +7,7 @@ import akka.http.scaladsl.server.Route
 import cats.effect.IO
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import hydra.common.util.Futurable
-import hydra.core.http.{CorsSupport, RouteSupport}
+import hydra.core.http.{CorsSupport, DefaultCorsSupport, RouteSupport}
 import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.kafka.algebras.KafkaAdminAlgebra.TopicAndPartition
 import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra}
@@ -17,9 +17,9 @@ import spray.json.JsString
 
 import scala.util.{Failure, Success}
 
-class ConsumerGroupsEndpoint[F[_]: Futurable](consumerGroupsAlgebra: ConsumerGroupsAlgebra[F]) extends RouteSupport with CorsSupport with ConsumerGroupMarshallers {
+class ConsumerGroupsEndpoint[F[_]: Futurable](consumerGroupsAlgebra: ConsumerGroupsAlgebra[F])(implicit corsSupport: CorsSupport) extends RouteSupport with DefaultCorsSupport with ConsumerGroupMarshallers {
 
-  override def route: Route = cors(settings) {
+  override def route: Route = cors(corsSupport.settings) {
     extractExecutionContext { implicit ec =>
       extractMethod { method =>
         get {

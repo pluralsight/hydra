@@ -8,7 +8,7 @@ import org.scalatest.funspec.AnyFunSpecLike
 
 import scala.collection.immutable
 
-class CorsSupportSpec extends Matchers with AnyFunSpecLike with CorsSupport {
+class CorsSupportSpec extends Matchers with AnyFunSpecLike with DefaultCorsSupport {
 
   describe("Cors Support") {
     it("is configured for vnerd") {

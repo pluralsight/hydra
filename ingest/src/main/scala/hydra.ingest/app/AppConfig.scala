@@ -183,7 +183,13 @@ object AppConfig {
     env("HYDRA_ALLOWABLE_TOPIC_DELETION_TIME_MS").as[Long].default(14400000)
     ).map(AllowableTopicDeletionTimeConfig) // Default 4 hours
 
+  final case class CorsAllowedOriginConfig(corsAllowedOrigins: String)
+
+  private val corsAllowedOrigin: ConfigValue[CorsAllowedOriginConfig] =
+    env("CORS_ALLOWED_ORIGIN").as[String].default("*://*").map(CorsAllowedOriginConfig)
+
   final case class AppConfig(
+
                               createTopicConfig: CreateTopicConfig,
                               metadataTopicsConfig: MetadataTopicsConfig,
                               ingestConfig: IngestConfig,
@@ -193,7 +199,8 @@ object AppConfig {
                               consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
                               consumerGroupsAlgebraConfig: ConsumerGroupsAlgebraConfig,
                               ignoreDeletionConsumerGroups: IgnoreDeletionConsumerGroups,
-                              allowableTopicDeletionTimeConfig: AllowableTopicDeletionTimeConfig
+                              allowableTopicDeletionTimeConfig: AllowableTopicDeletionTimeConfig,
+                              corsAllowedOriginConfig: CorsAllowedOriginConfig
                             )
 
   val appConfig: ConfigValue[AppConfig] =
@@ -207,6 +214,7 @@ object AppConfig {
       consumerOffsetsOffsetsTopicConfig,
       consumerGroupAlgebraConfig,
       ignoreDeletionConsumerGroups,
-      allowableTopicDeletionTimeConfig
+      allowableTopicDeletionTimeConfig,
+      corsAllowedOrigin
     ).parMapN(AppConfig)
 }
