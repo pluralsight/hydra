@@ -75,6 +75,31 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       List.empty
     )
 
+  private def createEventStreamTypeTopicMetadataRequest(
+                                          keySchema: Schema,
+                                          valueSchema: Schema,
+                                          email: String = "test@test.com",
+                                          createdDate: Instant = Instant.now(),
+                                          deprecated: Boolean = false,
+                                          deprecatedDate: Option[Instant] = None,
+                                          numPartitions: Option[NumPartitions] = None,
+                                          tags: Option[Map[String,String]] = None
+                                        ): TopicMetadataV2Request =
+    TopicMetadataV2Request(
+      Schemas(keySchema, valueSchema),
+      StreamTypeV2.Event,
+      deprecated = deprecated,
+      deprecatedDate,
+      Public,
+      NonEmptyList.of(Email.create(email).get),
+      createdDate,
+      List.empty,
+      None,
+      Some("dvs-teamName"),
+      numPartitions,
+      List.empty
+    )
+
   "CreateTopicSpec" must {
     "register the two avro schemas" in {
       val schemaRegistryIO = SchemaRegistry.test[IO]
@@ -595,6 +620,38 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}
     }
 
+    "do not throw error on topic with key that has field of type union [null, ...] if streamType is 'Event'" in {
+      val union = SchemaBuilder.unionOf().nullType().and().stringType().endUnion()
+      val recordWithNullDefault =
+        SchemaBuilder
+          .record("name")
+          .fields()
+          .name("nullableUnion")
+          .`type`(union)
+          .withDefault(null)
+          .endRecord()
+
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      (for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
+        kafkaClient <- KafkaClientAlgebra.test[IO]
+        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
+        _ <- new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafka,
+          kafkaClient,
+          policy,
+          Subject.createValidated("dvs.test-metadata-topic").get,
+          metadata
+        ).createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createEventStreamTypeTopicMetadataRequest(recordWithNullDefault, valueSchema),
+          TopicDetails(1, 1, 1)
+        )
+      } yield succeed).unsafeRunSync()
+    }
+
     "throw error on topic with key that has field of type null" in {
       val recordWithNullType =
         SchemaBuilder
@@ -624,7 +681,37 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           TopicDetails(1, 1, 1)
         )
       } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}
+    }
 
+    "do not throw error on topic with key that has field of type null if streamType is 'Event'" in {
+      val recordWithNullType =
+        SchemaBuilder
+          .record("name")
+          .fields()
+          .name("nullableField")
+          .`type`("null")
+          .noDefault()
+          .endRecord()
+
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      (for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
+        kafkaClient <- KafkaClientAlgebra.test[IO]
+        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
+        _ <- new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafka,
+          kafkaClient,
+          policy,
+          Subject.createValidated("dvs.test-metadata-topic").get,
+          metadata
+        ).createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createEventStreamTypeTopicMetadataRequest(recordWithNullType, valueSchema),
+          TopicDetails(1, 1, 1)
+        )
+      } yield succeed).unsafeRunSync()
     }
 
     "throw error on schema evolution with illegal union logical type removal" in {
