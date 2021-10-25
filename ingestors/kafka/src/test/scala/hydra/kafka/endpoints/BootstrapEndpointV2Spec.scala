@@ -1,7 +1,6 @@
 package hydra.kafka.endpoints
 
 import java.time.Instant
-
 import akka.http.javadsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, HttpHeader, MediaTypes, StatusCodes}
 import akka.http.scaladsl.server.Route
@@ -27,6 +26,7 @@ import org.scalatest.wordspec.AnyWordSpecLike
 import retry.{RetryPolicies, RetryPolicy}
 import spray.json._
 import TopicMetadataV2Parser._
+import hydra.core.http.CorsSupport
 
 import scala.concurrent.ExecutionContext
 
@@ -39,6 +39,7 @@ final class BootstrapEndpointV2Spec
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
   private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
+  private implicit val corsSupport: CorsSupport = new CorsSupport("http://*.vnerd.com")
 
   private def getTestCreateTopicProgram(
       s: SchemaRegistry[IO],

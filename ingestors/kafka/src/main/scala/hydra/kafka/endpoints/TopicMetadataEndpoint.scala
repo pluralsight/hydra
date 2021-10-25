@@ -10,7 +10,7 @@ import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import hydra.common.config.ConfigSupport._
 import hydra.common.util.Futurable
-import hydra.core.http.{CorsSupport, NotFoundException, RouteSupport}
+import hydra.core.http.{CorsSupport, DefaultCorsSupport, NotFoundException, RouteSupport}
 import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.kafka.algebras.{MetadataAlgebra, TagsAlgebra}
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
@@ -50,10 +50,10 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                                              defaultMinInsyncReplicas: Short,
                                              tagsAlgebra: TagsAlgebra[F]
                                             )
-                                            (implicit ec:ExecutionContext)
+                                            (implicit ec:ExecutionContext, corsSupport: CorsSupport)
   extends RouteSupport
     with HydraKafkaJsonSupport
-    with CorsSupport {
+    with DefaultCorsSupport {
 
   private implicit val cache = GuavaCache[Map[String, Seq[PartitionInfo]]]
 
@@ -72,7 +72,7 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
   private val filterSystemTopics = (t: String) =>
     (t.startsWith("_") && showSystemTopics) || !t.startsWith("_")
 
-  override val route = cors(settings) {
+  override val route = cors(corsSupport.settings) {
     extractMethod { method =>
       extractExecutionContext { implicit ec =>
         pathPrefix("transports" / "kafka") {

@@ -39,11 +39,11 @@ final class BootstrapEndpointV2[F[_]: Futurable](
     createTopicProgram: CreateTopicProgram[F],
     defaultTopicDetails: TopicDetails,
     tagsAlgebra: TagsAlgebra[F]
-) extends CorsSupport {
+)(implicit corsSupport: CorsSupport) {
 
   import TopicMetadataV2Parser._
 
-  val route: Route = cors(settings) {
+  val route: Route = cors(corsSupport.settings) {
     extractExecutionContext { implicit ec =>
       extractMethod { method =>
         pathPrefix("v2" / "topics" / Segment) { topicName =>

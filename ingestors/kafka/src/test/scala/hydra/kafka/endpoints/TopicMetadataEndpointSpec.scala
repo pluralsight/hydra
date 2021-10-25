@@ -10,6 +10,7 @@ import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
+import hydra.core.http.CorsSupport
 import hydra.kafka.algebras.{HydraTag, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TagsAlgebra}
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
@@ -53,7 +54,7 @@ class TopicMetadataEndpointSpec
   implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   implicit val concurrent: Concurrent[IO] = IO.ioConcurrentEffect
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
-
+  private implicit val corsSupport: CorsSupport = new CorsSupport("http://*")
   override def beforeAll(): Unit = {
     super.beforeAll()
     EmbeddedKafka.start()

@@ -28,7 +28,7 @@ import hydra.common.config.ConfigSupport
 import hydra.common.config.ConfigSupport._
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.akka.SchemaRegistryActor._
-import hydra.core.http.{CorsSupport, RouteSupport}
+import hydra.core.http.{CorsSupport, DefaultCorsSupport, RouteSupport}
 import hydra.core.marshallers.GenericServiceResponse
 import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.kafka.consumer.KafkaConsumerProxy.{ListTopics, ListTopicsResponse}
@@ -39,8 +39,10 @@ import scalacache.cachingF
 import scalacache.guava.GuavaCache
 import scalacache.modes.scalaFuture._
 import spray.json.RootJsonFormat
+
 import java.time.Instant
 import hydra.kafka.services.StreamsManagerActor.{GetMetadata, GetMetadataResponse}
+
 import scala.collection.immutable.Map
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
@@ -50,10 +52,10 @@ import scala.concurrent.duration._
   *
   * Created by alexsilva on 2/13/16.
   */
-class SchemasEndpoint(consumerProxy: ActorSelection, streamsManagerActor: ActorRef)(implicit system: ActorSystem)
+class SchemasEndpoint(consumerProxy: ActorSelection, streamsManagerActor: ActorRef)(implicit system: ActorSystem, corsSupport: CorsSupport)
     extends RouteSupport
     with ConfigSupport
-    with CorsSupport {
+    with DefaultCorsSupport {
   private implicit val cache = GuavaCache[Map[String, Seq[PartitionInfo]]]
 
 
@@ -76,7 +78,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection, streamsManagerActor: ActorR
     .getBooleanOpt("transports.kafka.show-system-topics")
     .getOrElse(false)
 
-  override def route: Route = cors(settings) {
+  override def route: Route = cors(corsSupport.settings) {
     extractMethod { method =>
       handleExceptions(excptHandler(Instant.now, method.value)) {
         extractExecutionContext { implicit ec =>
