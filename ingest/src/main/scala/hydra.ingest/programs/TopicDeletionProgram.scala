@@ -48,7 +48,9 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
             .filterNot(consumer => fullIgnoreList.contains(consumer.consumerGroupName))
             .traverse { consumer =>
               consumerGroupAlgebra.getDetailedConsumerInfo(consumer.consumerGroupName)
-                .map(listOfInfo => listOfInfo.filter(_.state.getOrElse("Unknown") != "Empty"))
+                .map(listOfInfo => listOfInfo.filter{detailedConsumer =>
+                  val state = detailedConsumer.state.getOrElse("Unknown")
+                  state != "Empty" && state != "Dead"})
             }.map(_.flatten)
 
 
