@@ -261,7 +261,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
         testConsumerGroupAlgebra,
         ignoreConsumerGroupConfig,
         allowableTopicDeletionTimeMs
-      ).deleteTopics(topicNamesToDelete, ignoreConsumerGroupSpecific, true)
+      ).deleteTopics(topicNamesToDelete, ignoreConsumerGroupSpecific, false)
       // get all topic names
       allTopics <- kafkaAdmin.getTopicNames
       // get all versions of any given topic
@@ -368,11 +368,19 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       assertionError = invalidErrorChecker, consumerGroupToAdd = Some((key, value, state)), kafkaTopicNamesToFail = List(topic))
   }
 
-  it should "Delete a topic with no active consumers" in {
+  it should "Delete a topic with no active empty consumers" in {
     val topic = "dvs.test.topic"
     val key = TopicConsumerKey(topic, "")
     val value = TopicConsumerValue(Instant.now())
     val state = "Empty"
+    applyGoodTestcase(List(topic), List.empty, List(topic), consumerGroupToAdd = Some((key, value, state)))
+  }
+
+  it should "Delete a topic with no active dead consumers" in {
+    val topic = "dvs.test.topic"
+    val key = TopicConsumerKey(topic, "")
+    val value = TopicConsumerValue(Instant.now())
+    val state = "Dead"
     applyGoodTestcase(List(topic), List.empty, List(topic), consumerGroupToAdd = Some((key, value, state)))
   }
 
