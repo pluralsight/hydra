@@ -2013,7 +2013,40 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
         _ <- ctProgram.createTopicResource(subject, TopicDetails(1,1,1))
         _ <- Resource.liftF(ctProgram.createTopicFromMetadataOnly(subject, topicMetadataV2Request))
       } yield (succeed))
-      resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()}
+      resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()
+    }
+
+    "throw error of schema nullable values don't have default value" in {
+      val union = SchemaBuilder.unionOf().nullType().and().stringType().endUnion()
+
+      val nullableValue = SchemaBuilder
+                          .record("val")
+                          .fields()
+                          .name("itsnullable")
+                          .`type`(union)
+                          .noDefault()
+                          .endRecord()
+
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      an [ValidationErrors] shouldBe thrownBy {(for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
+        kafkaClient <- KafkaClientAlgebra.test[IO]
+        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
+        _ <- new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafka,
+          kafkaClient,
+          policy,
+          Subject.createValidated("dvs.test-metadata-topic").get,
+          metadata
+        ).createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createTopicMetadataRequest(keySchema, nullableValue),
+          TopicDetails(1, 1, 1)
+        )
+      } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()}
+    }
   }
 
   private final class TestKafkaClientAlgebraWithPublishTo(
