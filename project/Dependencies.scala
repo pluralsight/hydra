@@ -11,7 +11,7 @@ object Dependencies {
   val catsLoggerVersion = "1.1.1"
   val catsRetryVersion = "2.1.0"
   val catsVersion = "2.2.0"
-  val cirisVersion = "1.2.1"
+  val cirisVersion = "2.2.1"
   val confluentVersion = "5.4.2"
   val fs2KafkaVersion = "1.0.0"
   val jacksonCoreVersion = "2.10.4"
