@@ -205,7 +205,9 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
 
   private def checkForDefaultNullableValueFields(valueFields: List[Schema.Field]): Option[NullableFieldsNeedDefaultValue] = {
     val errors = valueFields.flatMap { field => field.schema().getType match {
-        case Schema.Type.UNION => if (field.schema ().getTypes.asScala.toList.exists (_.isNullable) && Option (field.defaultVal () ).isEmpty) Some (NullableFieldWithoutDefaultValue (field.name (), field.schema () ) ) else None
+        case Schema.Type.UNION => if (field.schema().getTypes.asScala.toList.exists(_.isNullable) && Option(field.defaultVal()).isEmpty)
+                                    Some(NullableFieldWithoutDefaultValue(field.name(), field.schema()))
+                                  else None
         case _ => None
       }
     }
