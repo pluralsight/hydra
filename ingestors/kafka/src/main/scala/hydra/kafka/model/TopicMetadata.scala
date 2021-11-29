@@ -266,7 +266,7 @@ object TopicMetadataV2ValueOptionalTagList {
         field("contact", _.contact),
         field("createdDate", _.createdDate),
         field("parentSubjects", _.parentSubjects),
-        field("notes", _.notes),
+        field("notes", _.notes, default = Some(None)),
         field("teamName", _.teamName, default = Some(None)),
         field("tags", _.tags, default = Some(None))
         ).mapN(TopicMetadataV2ValueOptionalTagList.apply)
