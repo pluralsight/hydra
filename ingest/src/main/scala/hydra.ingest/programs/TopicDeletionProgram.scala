@@ -1,6 +1,6 @@
 package hydra.ingest.programs
 
-import cats.MonadError
+import cats.{Applicative, MonadError}
 import cats.data.{NonEmptyList, ValidatedNel}
 import cats.effect.{Concurrent, IO}
 import cats.implicits._
@@ -69,7 +69,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
   }
   //consumer group should be pulled from prod, consumer group name will work for what you want it to work for
 
-  def hasTopicReceivedRecentRecords(topicName: String, ignorePublishTime: Boolean): F[(String, List[Boolean])] = {
+  def hasTopicReceivedRecentRecords(topicName: String): F[(String, List[Boolean])] = {
     val curTime = Instant.now().toEpochMilli
     kafkaAdmin.getLatestOffsets(topicName).flatMap {
       offsetsMap => {
@@ -82,7 +82,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
             // get latest published message, compare timestamp to (NOW - configurable time window)
             kafkaClient.streamStringKeyFromGivenPartitionAndOffset(topicName, "dvs.deletion.consumer.group", false,
               List((tp, offset.value - 1))).take(1).map { case (_, _, timestamp) =>
-                timestamp.createTime.getOrElse(0: Long) < curTime - (if(ignorePublishTime) 0 else allowableTopicDeletionTime)
+                timestamp.createTime.getOrElse(0: Long) < curTime - allowableTopicDeletionTime
             }.compile.lastOrError
           }
           case _ =>
@@ -92,12 +92,10 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
     }.map {list => topicName -> list}
   }
 
-  def checkForActivelyPublishedTopics(topicNames: List[String], ignorePublishTime: Boolean): F[List[Either[ActivelyPublishedToError, String]]] = {
+  def checkForActivelyPublishedTopics(topicNames: List[String]): F[List[Either[ActivelyPublishedToError, String]]] = {
     topicNames.traverse { name =>
-      val topicsResultsF = hasTopicReceivedRecentRecords(name, ignorePublishTime)
-
       for {
-        topicResults <- topicsResultsF
+        topicResults <- hasTopicReceivedRecentRecords(name)
       } yield {
         if(topicResults._2.contains(false)){
           Left(ActivelyPublishedToError(topicResults._1, allowableTopicDeletionTime))
@@ -138,15 +136,16 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
   //consumer group should be pulled from prod, consumer group name will work for what you want it to work for
   def deleteTopics(topicNames: List[String], ignoreConsumerGroups: List[String], ignorePublishTime: Boolean): F[ValidatedNel[DeleteTopicError, Unit]] = {
 
-    val topicsF = topicNames.traverse(checkIfTopicExists)
-
     def topicHasConsumersCheck(topicsThatExist: List[String]): F[List[Either[ConsumersStillExistError, String]]] =
       checkIfTopicStillHasConsumers(topicsThatExist, ignoreConsumerGroups)
     def topicIsActivelyPublishingCheck(topicsThatExist: List[String]): F[List[Either[ActivelyPublishedToError, String]]] =
-      checkForActivelyPublishedTopics(topicsThatExist, ignorePublishTime)
+      if (ignorePublishTime)
+        Applicative[F].pure(topicsThatExist.map(_.asRight[ActivelyPublishedToError]))
+      else
+        checkForActivelyPublishedTopics(topicsThatExist)
 
     for {
-      topics <- topicsF
+      topics <- topicNames.traverse(checkIfTopicExists)
       (topicsThatExist, nonExistentTopics) = topics.partition(_._2)
       topicHasConsumers <- topicHasConsumersCheck(topicsThatExist.map(_._1))
       topicIsActivelyPublishing <- topicIsActivelyPublishingCheck(topicsThatExist.map(_._1))
