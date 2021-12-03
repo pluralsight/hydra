@@ -24,6 +24,7 @@ trait ConsumerGroupsAlgebra[F[_]] {
   def startConsumer: F[Unit]
   def getDetailedConsumerInfo(consumerGroupName: String) : F[List[DetailedConsumerGroup]]
   def getConsumerActiveState(consumerGroupName: String): F[String]
+  def consumerGroupIsActive(str: String = ""): F[(Boolean, String)]
 }
 
 final case class TestConsumerGroupsAlgebra(consumerGroupMap: Map[TopicConsumerKey, (TopicConsumerValue, String)]) extends ConsumerGroupsAlgebra[IO] {
@@ -69,6 +70,8 @@ final case class TestConsumerGroupsAlgebra(consumerGroupMap: Map[TopicConsumerKe
       if (keys.consumerGroupName == consumerGroupName) consumerGroupMap(keys)._2 else "Unknown"
     }.head)
   }
+
+  override def consumerGroupIsActive(str: String): IO[(Boolean, String)] = ???
 }
 
 object TestConsumerGroupsAlgebra {
@@ -159,6 +162,10 @@ object ConsumerGroupsAlgebra {
             case None => "Unknown"
           }
         }
+      }
+
+      override def consumerGroupIsActive(str: String = uniquePerNodeConsumerGroup): F[(Boolean, String)] = {
+        getConsumerActiveState(str).map(state => (state == "Stable", str))
       }
     }
   }

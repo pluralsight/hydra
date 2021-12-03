@@ -1,16 +1,24 @@
 package hydra.ingest.http
 
 import java.time.Instant
-
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
+import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
 import hydra.ingest.bootstrap.BuildInfo
 import spray.json.DefaultJsonProtocol
 import hydra.core.monitor.HydraMetrics.addHttpMetric
+import hydra.kafka.algebras.{ConsumerGroupsAlgebra, TagsAlgebra}
 
-object HealthEndpoint extends RouteSupport with DefaultJsonProtocol with SprayJsonSupport {
+import scala.util.{Failure, Success}
+
+class HealthEndpoint[F[_] : Futurable](cga: ConsumerGroupsAlgebra[F]) extends RouteSupport with DefaultJsonProtocol with SprayJsonSupport {
+
+  private def addConsumerGroupStateToBuild(str: String, consumerGroup: String, state: Boolean) ={
+    s"""{"BuildInfo": $str, "ConsumerGroupisActive": {"ConsumerGroupName": "$consumerGroup", "State": ${state}}}"""
+  }
+
   override val route: Route = {
     extractMethod { method =>
       handleExceptions(exceptionHandler(Instant.now, method.value)) {
@@ -20,7 +28,20 @@ object HealthEndpoint extends RouteSupport with DefaultJsonProtocol with SprayJs
             pathEndOrSingleSlash {
               get {
                 addHttpMetric("", StatusCodes.OK, "/health", startTime, "GET")
-                complete(BuildInfo.toJson)
+                onComplete(Futurable[F].unsafeToFuture(cga.consumerGroupIsActive())) {
+                  case Failure(exception) =>
+                    addHttpMetric("",StatusCodes.InternalServerError,"/v2/tags", startTime, method.value, error = Some(exception.getMessage))
+                    complete(StatusCodes.InternalServerError, BuildInfo.toJson + exception.getMessage)
+                  case Success(value) =>
+                    if(value._1) {
+                      addHttpMetric("", StatusCodes.OK, "/v2/tags", startTime, method.value)
+                      complete(StatusCodes.OK, addConsumerGroupStateToBuild(BuildInfo.toJson, value._2, value._1))
+                    } else {
+                      addHttpMetric("", StatusCodes.InternalServerError, "/v2/tags", startTime, method.value)
+                      complete(StatusCodes.InternalServerError, addConsumerGroupStateToBuild(BuildInfo.toJson, value._2, value._1))
+                    }
+
+                }
               }
             }
           }
