@@ -30,14 +30,14 @@ class HealthEndpoint[F[_] : Futurable](cga: ConsumerGroupsAlgebra[F]) extends Ro
                 addHttpMetric("", StatusCodes.OK, "/health", startTime, "GET")
                 onComplete(Futurable[F].unsafeToFuture(cga.consumerGroupIsActive())) {
                   case Failure(exception) =>
-                    addHttpMetric("",StatusCodes.InternalServerError,"/v2/tags", startTime, method.value, error = Some(exception.getMessage))
+                    addHttpMetric("",StatusCodes.InternalServerError,"/health", startTime, method.value, error = Some(exception.getMessage))
                     complete(StatusCodes.InternalServerError, BuildInfo.toJson + exception.getMessage)
                   case Success(value) =>
                     if(value._1) {
-                      addHttpMetric("", StatusCodes.OK, "/v2/tags", startTime, method.value)
+                      addHttpMetric("", StatusCodes.OK, "/health", startTime, method.value)
                       complete(StatusCodes.OK, addConsumerGroupStateToBuild(BuildInfo.toJson, value._2, value._1))
                     } else {
-                      addHttpMetric("", StatusCodes.InternalServerError, "/v2/tags", startTime, method.value)
+                      addHttpMetric("", StatusCodes.InternalServerError, "/health", startTime, method.value)
                       complete(StatusCodes.InternalServerError, addConsumerGroupStateToBuild(BuildInfo.toJson, value._2, value._1))
                     }
 
