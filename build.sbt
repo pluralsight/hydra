@@ -42,10 +42,8 @@ lazy val defaultSettings = Seq(
     "-Xlint:-options"
   ),
   resolvers += Resolver.mavenLocal,
-  resolvers += "Scalaz Bintray Repo" at "https://dl.bintray.com/scalaz/releases",
   resolvers += "Confluent Maven Repo" at "https://packages.confluent.io/maven/",
   resolvers += "jitpack" at "https://jitpack.io",
-  resolvers += Resolver.bintrayRepo("hseeberger", "maven"),
   ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet,
   parallelExecution in sbt.Test := false,
   javaOptions in Universal ++= Seq(
