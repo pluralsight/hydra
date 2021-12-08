@@ -96,6 +96,10 @@ object Dependencies {
       "org.apache.logging.log4j" % "log4j-1.2-api" % log4jVersion
     )
 
+    val snowflake = Seq(
+      "net.snowflake" % "snowflake-jdbc" % "3.13.11"
+    )
+
     val akka = Seq(
       "com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
@@ -177,10 +181,11 @@ object Dependencies {
   val integrationDeps: Seq[ModuleID] = testContainers ++ TestLibraries.getTestLibraries(module = "it")
 
   val baseDeps: Seq[ModuleID] =
-    akka ++ Seq(avro) ++ cats ++ logging ++ joda ++ testDeps
+    akka ++ Seq(avro) ++ cats ++ logging ++ joda ++ testDeps ++ snowflake
 
   val avroDeps: Seq[ModuleID] =
     baseDeps ++ confluent ++ jackson ++ guavacache ++ catsEffect
+
 
   val coreDeps: Seq[ModuleID] = akka ++ baseDeps ++
     Seq(
