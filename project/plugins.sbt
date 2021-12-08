@@ -1,7 +1,6 @@
 logLevel := Level.Warn
 
 resolvers += Classpaths.sbtPluginReleases
-resolvers += Resolver.bintrayRepo("kamon-io", "sbt-plugins")
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.2.2-RC2")
 addSbtPlugin("com.eed3si9n" % "sbt-buildinfo" % "0.9.0")
