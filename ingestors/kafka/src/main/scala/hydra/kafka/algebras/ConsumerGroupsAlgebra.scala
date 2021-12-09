@@ -1,5 +1,6 @@
 package hydra.kafka.algebras
 
+import cats.ApplicativeError
 import java.time.Instant
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
@@ -174,6 +175,12 @@ object ConsumerGroupsAlgebra {
                                                                                                       dvsConsumersStream: fs2.Stream[F, Record],
                                                                                                       consumerGroupsStorageFacade: Ref[F, ConsumerGroupsStorageFacade]
                                                                                                     ): F[Unit] = {
+    def recover(e: Throwable): F[Unit] = {
+      val errorMessage = s"Error in ConsumergroupsAlgebra. Error: ${e.getMessage}"
+      val throwable = new Throwable(errorMessage)
+      fs2.Stream.eval(Logger[F].error(errorMessage))
+      ApplicativeError[F, Throwable].raiseError(throwable)
+    }
     dvsConsumersStream.flatMap { case (key, value, _) =>
       fs2.Stream.eval(TopicConsumer.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
         topicValue match {
@@ -182,6 +189,9 @@ object ConsumerGroupsAlgebra {
           case None =>
             consumerGroupsStorageFacade.update(_.removeConsumerGroup(topicKey))
         }
+      }.recoverWith {
+        case e =>
+          recover(e)
       })
     }.compile.drain
   }
