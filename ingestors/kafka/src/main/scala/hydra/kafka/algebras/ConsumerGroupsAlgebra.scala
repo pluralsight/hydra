@@ -25,7 +25,8 @@ trait ConsumerGroupsAlgebra[F[_]] {
   def startConsumer: F[Unit]
   def getDetailedConsumerInfo(consumerGroupName: String) : F[List[DetailedConsumerGroup]]
   def getConsumerActiveState(consumerGroupName: String): F[String]
-  def consumerGroupIsActive(str: String = ""): F[(Boolean, String)]
+  def consumerGroupIsActive(str: String): F[(Boolean, String)]
+  def getUniquePerNodeConsumerGroup: String
 }
 
 final case class TestConsumerGroupsAlgebra(consumerGroupMap: Map[TopicConsumerKey, (TopicConsumerValue, String)]) extends ConsumerGroupsAlgebra[IO] {
@@ -72,7 +73,12 @@ final case class TestConsumerGroupsAlgebra(consumerGroupMap: Map[TopicConsumerKe
     }.head)
   }
 
-  override def consumerGroupIsActive(str: String): IO[(Boolean, String)] = ???
+  override def consumerGroupIsActive(str: String): IO[(Boolean, String)] = {
+    getConsumerActiveState(str).map(state => (state == "Stable", str))
+  }
+
+  override def getUniquePerNodeConsumerGroup: String = "uniquePerNodeConsumerGroup"
+
 }
 
 object TestConsumerGroupsAlgebra {
@@ -165,9 +171,11 @@ object ConsumerGroupsAlgebra {
         }
       }
 
-      override def consumerGroupIsActive(str: String = uniquePerNodeConsumerGroup): F[(Boolean, String)] = {
+      override def consumerGroupIsActive(str: String): F[(Boolean, String)] = {
         getConsumerActiveState(str).map(state => (state == "Stable", str))
       }
+
+      override def getUniquePerNodeConsumerGroup: String = uniquePerNodeConsumerGroup
     }
   }
 

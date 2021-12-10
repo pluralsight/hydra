@@ -28,7 +28,7 @@ class HealthEndpoint[F[_] : Futurable](cga: ConsumerGroupsAlgebra[F]) extends Ro
             pathEndOrSingleSlash {
               get {
                 addHttpMetric("", StatusCodes.OK, "/health", startTime, "GET")
-                onComplete(Futurable[F].unsafeToFuture(cga.consumerGroupIsActive())) {
+                onComplete(Futurable[F].unsafeToFuture(cga.consumerGroupIsActive(cga.getUniquePerNodeConsumerGroup))) {
                   case Failure(exception) =>
                     addHttpMetric("",StatusCodes.InternalServerError,"/health", startTime, method.value, error = Some(exception.getMessage))
                     complete(StatusCodes.InternalServerError, BuildInfo.toJson + exception.getMessage)
