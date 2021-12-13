@@ -1,7 +1,6 @@
 package hydra.kafka.endpoints
 
 import java.time.Instant
-
 import akka.http.javadsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, HttpHeader, MediaTypes, StatusCodes}
 import akka.http.scaladsl.server.Route
@@ -27,6 +26,7 @@ import org.scalatest.wordspec.AnyWordSpecLike
 import retry.{RetryPolicies, RetryPolicy}
 import spray.json._
 import TopicMetadataV2Parser._
+import hydra.core.http.CorsSupport
 
 import scala.concurrent.ExecutionContext
 
@@ -39,6 +39,7 @@ final class BootstrapEndpointV2Spec
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
   private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
+  private implicit val corsSupport: CorsSupport = new CorsSupport("http://*.vnerd.com")
 
   private def getTestCreateTopicProgram(
       s: SchemaRegistry[IO],
@@ -65,11 +66,11 @@ final class BootstrapEndpointV2Spec
   private val testCreateTopicProgram: IO[BootstrapEndpointV2[IO]] =
     for {
       s <- SchemaRegistry.test[IO]
-      k <- KafkaAdminAlgebra.test[IO]
+      k <- KafkaAdminAlgebra.test[IO]()
       kc <- KafkaClientAlgebra.test[IO]
       m <- MetadataAlgebra.make(Subject.createValidated("_metadata.topic.name").get, "bootstrap.consumer.group", kc, s, true)
       t <- TagsAlgebra.make[IO]("_hydra.tags-topic","_hydra.tags-consumer", kc)
-      _ <- t.createOrUpdateTag(HydraTag("Source: Something", "something hydra tag"))
+      _ <- t.createOrUpdateTag(HydraTag("DVS tag", "DVS"))
     } yield getTestCreateTopicProgram(s, k, kc, m, t)
 
   "BootstrapEndpointV2" must {
@@ -115,7 +116,7 @@ final class BootstrapEndpointV2Spec
       List.empty
     ).toJson.compactPrint
 
-    val validRequest = TopicMetadataV2Request(
+    val validRequestWithoutDVSTag = TopicMetadataV2Request(
       Schemas(getTestSchema("key"), getTestSchema("value")),
       StreamTypeV2.Entity,
       deprecated = false,
@@ -130,10 +131,38 @@ final class BootstrapEndpointV2Spec
       List.empty
     ).toJson.compactPrint
 
-    "accept a valid request" in {
+    val validRequestWithDVSTag = TopicMetadataV2Request(
+      Schemas(getTestSchema("key"), getTestSchema("value")),
+      StreamTypeV2.Entity,
+      deprecated = false,
+      None,
+      Public,
+      NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
+      Instant.now,
+      List.empty,
+      None,
+      Some("dvs-teamName"),
+      None,
+      List("DVS")
+    ).toJson.compactPrint
+
+    "accept a valid request without a DVS tag" in {
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
-          Put("/v2/topics/dvs.testing", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> Route.seal(
+          Put("/v2/topics/dvs.testing", HttpEntity(ContentTypes.`application/json`, validRequestWithoutDVSTag)) ~> Route.seal(
+            bootstrapEndpoint.route
+          ) ~> check {
+            val responseReturned = responseAs[String]
+            response.status shouldBe StatusCodes.OK
+          }
+        }
+        .unsafeRunSync()
+    }
+
+    "accept a valid request with a DVS tag" in {
+      testCreateTopicProgram
+        .map { bootstrapEndpoint =>
+          Put("/v2/topics/dvs.testing", HttpEntity(ContentTypes.`application/json`, validRequestWithDVSTag)) ~> Route.seal(
             bootstrapEndpoint.route
           ) ~> check {
             val responseReturned = responseAs[String]
@@ -146,7 +175,7 @@ final class BootstrapEndpointV2Spec
     "reject a request with invalid name" in {
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
-          Put("/v2/topics/invalid%20name", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> Route.seal(
+          Put("/v2/topics/invalid%20name", HttpEntity(ContentTypes.`application/json`, validRequestWithoutDVSTag)) ~> Route.seal(
             bootstrapEndpoint.route
           ) ~> check {
             val r = responseAs[String]
@@ -226,11 +255,11 @@ final class BootstrapEndpointV2Spec
       KafkaClientAlgebra.test[IO].flatMap { client =>
         MetadataAlgebra.make(Subject.createValidated("_metadata.topic.123.name").get, "456", client, failingSchemaRegistry, true).flatMap { m =>
           KafkaAdminAlgebra
-            .test[IO]
+            .test[IO]()
             .map { kafka =>
               val kca = KafkaClientAlgebra.test[IO].unsafeRunSync()
               val ta = TagsAlgebra.make[IO]("_hydra.tags.topic", "_hydra.client",kca).unsafeRunSync()
-              Put("/v2/topics/dvs.testing/", HttpEntity(MediaTypes.`application/json`, validRequest)) ~> Route.seal(
+              Put("/v2/topics/dvs.testing/", HttpEntity(MediaTypes.`application/json`, validRequestWithoutDVSTag)) ~> Route.seal(
                 getTestCreateTopicProgram(failingSchemaRegistry, kafka, client, m, ta).route
               ) ~> check {
                 response.status shouldBe StatusCodes.InternalServerError
@@ -253,7 +282,7 @@ final class BootstrapEndpointV2Spec
         None,
         Some("dvs-teamName"),
         None,
-        List("Source: Something")
+        List("DVS")
       ).toJson.compactPrint
 
 

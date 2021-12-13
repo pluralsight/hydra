@@ -146,7 +146,7 @@ final case class TopicMetadataV2ValueOptionalTagList(
                                          dataClassification: DataClassification,
                                          contact: NonEmptyList[ContactMethod],
                                          createdDate: Instant,
-                                         parentSubjects: List[Subject],
+                                         parentSubjects: List[String],
                                          notes: Option[String],
                                          teamName: Option[String],
                                          tags: Option[List[String]]
@@ -175,7 +175,7 @@ final case class TopicMetadataV2Value(
     dataClassification: DataClassification,
     contact: NonEmptyList[ContactMethod],
     createdDate: Instant,
-    parentSubjects: List[Subject],
+    parentSubjects: List[String],
     notes: Option[String],
     teamName: Option[String],
     tags: List[String]
@@ -266,7 +266,7 @@ object TopicMetadataV2ValueOptionalTagList {
         field("contact", _.contact),
         field("createdDate", _.createdDate),
         field("parentSubjects", _.parentSubjects),
-        field("notes", _.notes),
+        field("notes", _.notes, default = Some(None)),
         field("teamName", _.teamName, default = Some(None)),
         field("tags", _.tags, default = Some(None))
         ).mapN(TopicMetadataV2ValueOptionalTagList.apply)

@@ -49,6 +49,12 @@ object AppConfig {
   private implicit val subjectConfigDecoder: ConfigDecoder[String, Subject] =
     ConfigDecoder.identity[String].mapOption("Subject")(Subject.createValidated)
 
+  final case class IgnoreDeletionConsumerGroups(consumerGroupListToIgnore: List[String])
+
+  private val ignoreDeletionConsumerGroups: ConfigValue[IgnoreDeletionConsumerGroups] = (
+    env("HYDRA_IGNORE_DELETION_CONSUMER_GROUP").as[String].default("")
+    ).map(cfg => IgnoreDeletionConsumerGroups(cfg.split(",").toList))
+
   final case class MetadataTopicsConfig(
       topicNameV1: Subject,
       topicNameV2: Subject,
@@ -153,14 +159,14 @@ object AppConfig {
   private val ingestConfig: ConfigValue[IngestConfig] =
     (
       env("HYDRA_INGEST_RECORD_SIZE_LIMIT_BYTES").as[Long].option
-    ).map(IngestConfig)
+      ).map(IngestConfig)
 
   final case class TopicDeletionConfig(deleteTopicPassword: String)
 
   private val topicDeletionConfig: ConfigValue[TopicDeletionConfig] =
     (
       env("HYDRA_INGEST_TOPIC_DELETION_PASSWORD").as[String].default("")
-    ).map(TopicDeletionConfig)
+      ).map(TopicDeletionConfig)
 
   final case class TagsConfig(tagsPassword: String, tagsTopic: String, tagsConsumerGroup: String)
 
@@ -171,7 +177,19 @@ object AppConfig {
       env("HYDRA_TAGS_CONSUMER_GROUP").as[String].default("_hydra.tags-consumer-group")
     ).mapN(TagsConfig)
 
+  final case class AllowableTopicDeletionTimeConfig(allowableTopicDeletionTime: Long)
+
+  private val allowableTopicDeletionTimeConfig: ConfigValue[AllowableTopicDeletionTimeConfig] = (
+    env("HYDRA_ALLOWABLE_TOPIC_DELETION_TIME_MS").as[Long].default(14400000)
+    ).map(AllowableTopicDeletionTimeConfig) // Default 4 hours
+
+  final case class CorsAllowedOriginConfig(corsAllowedOrigins: String)
+
+  private val corsAllowedOrigin: ConfigValue[CorsAllowedOriginConfig] =
+    env("CORS_ALLOWED_ORIGIN").as[String].default("*").map(CorsAllowedOriginConfig)
+
   final case class AppConfig(
+
                               createTopicConfig: CreateTopicConfig,
                               metadataTopicsConfig: MetadataTopicsConfig,
                               ingestConfig: IngestConfig,
@@ -179,7 +197,10 @@ object AppConfig {
                               tagsConfig: TagsConfig,
                               dvsConsumersTopicConfig: DVSConsumersTopicConfig,
                               consumerOffsetsOffsetsTopicConfig: ConsumerOffsetsOffsetsTopicConfig,
-                              consumerGroupsAlgebraConfig: ConsumerGroupsAlgebraConfig
+                              consumerGroupsAlgebraConfig: ConsumerGroupsAlgebraConfig,
+                              ignoreDeletionConsumerGroups: IgnoreDeletionConsumerGroups,
+                              allowableTopicDeletionTimeConfig: AllowableTopicDeletionTimeConfig,
+                              corsAllowedOriginConfig: CorsAllowedOriginConfig
                             )
 
   val appConfig: ConfigValue[AppConfig] =
@@ -191,6 +212,9 @@ object AppConfig {
       tagsConfig,
       dvsConsumersTopicConfig,
       consumerOffsetsOffsetsTopicConfig,
-      consumerGroupAlgebraConfig
+      consumerGroupAlgebraConfig,
+      ignoreDeletionConsumerGroups,
+      allowableTopicDeletionTimeConfig,
+      corsAllowedOrigin
     ).parMapN(AppConfig)
 }

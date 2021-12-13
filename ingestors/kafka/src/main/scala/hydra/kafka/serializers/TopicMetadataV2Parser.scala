@@ -359,11 +359,10 @@ sealed trait TopicMetadataV2Parser
         )
         val createdDate = toResult(Instant.now())
         val parentSubjects = toResult(
-          j.getFields("parentSubjects")
-            .headOption
-            .map(_.convertTo[List[Subject]])
-            .getOrElse(List())
-        )
+          j.fields.get("parentSubjects") match {
+            case Some(t) => t.convertTo[Option[List[String]]].getOrElse(List.empty)
+            case None => List.empty[String]
+          })
         val notes = toResult(
           j.getFields("notes").headOption.map(_.convertTo[String])
         )

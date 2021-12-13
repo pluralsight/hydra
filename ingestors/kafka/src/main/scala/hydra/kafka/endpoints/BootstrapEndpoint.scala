@@ -17,7 +17,6 @@
 package hydra.kafka.endpoints
 
 import java.time.Instant
-
 import akka.actor._
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives.{complete, extractExecutionContext}
@@ -26,7 +25,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import hydra.common.logging.LoggingAdapter
-import hydra.core.http.{CorsSupport, HydraDirectives, RouteSupport}
+import hydra.core.http.{CorsSupport, DefaultCorsSupport, HydraDirectives, RouteSupport}
 import hydra.core.marshallers.TopicMetadataRequest
 import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.kafka.model.TopicMetadataAdapter
@@ -36,16 +35,16 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
-class BootstrapEndpoint(override val system:ActorSystem) extends RouteSupport
+class BootstrapEndpoint(override val system:ActorSystem, override val streamsManagerActor: ActorRef)(implicit val corsSupport: CorsSupport) extends RouteSupport
   with LoggingAdapter
   with TopicMetadataAdapter
   with HydraDirectives
-  with CorsSupport
+  with DefaultCorsSupport
   with BootstrapEndpointActors {
 
   private implicit val timeout = Timeout(10.seconds)
 
-  override val route: Route = cors(settings) {
+  override val route: Route = cors(corsSupport.settings) {
     extractMethod { method =>
       handleExceptions(exceptionHandler("Bootstrap", Instant.now, method.value)) {
         extractExecutionContext { implicit ec =>

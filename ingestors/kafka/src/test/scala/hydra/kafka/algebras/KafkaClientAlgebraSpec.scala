@@ -189,6 +189,18 @@ class KafkaClientAlgebraSpec
       records.head shouldBe (keyString, Some(value), None)
     }
 
+    "consume string key message with partition info from kafka" in {
+      if (shouldCommitOffsets) {
+        val records = kafkaClient.consumeStringKeyMessagesWithOffsetInfo(topic,"newConsumerGroup2WithPartitions", shouldCommitOffsets).take(1).compile.toList.unsafeRunSync()
+        records should have length 1
+        records.head shouldBe ((keyString, Some(value), None),(0,0))
+      } else {
+        a [OffsetInfoNotRetrievableInTest] should be thrownBy {
+          kafkaClient.consumeMessagesWithOffsetInfo(topic,"newConsumerGroup2WithPartitions", shouldCommitOffsets).take(1).compile.toList.unsafeRunSync()
+        }
+      }
+    }
+
     val (_, (keyString2, _), value2) = topicAndKeyAndValue("stringTopic1","key2","value2")
     "publish string key record to existing topic and consume only that value in existing consumer group" in {
       kafkaClient.publishStringKeyMessage((keyString2, Some(value2), None), topic).unsafeRunSync()

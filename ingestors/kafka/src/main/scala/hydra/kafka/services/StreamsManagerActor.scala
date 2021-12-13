@@ -183,12 +183,7 @@ object StreamsManagerActor {
       bootstrapKafkaConfig: Config,
       bootstrapServers: String,
       schemaRegistryClient: SchemaRegistryClient
-  ) = {
-    Props(
-      classOf[StreamsManagerActor],
-      bootstrapKafkaConfig,
-      bootstrapServers,
-      schemaRegistryClient
-    )
+  ): Props = {
+    Props(new StreamsManagerActor(bootstrapKafkaConfig, bootstrapServers, schemaRegistryClient))
   }
 }

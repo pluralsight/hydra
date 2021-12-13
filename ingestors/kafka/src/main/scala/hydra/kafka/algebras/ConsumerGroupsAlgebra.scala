@@ -2,16 +2,16 @@ package hydra.kafka.algebras
 
 import java.time.Instant
 import cats.effect.concurrent.Ref
-import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Timer}
+import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
 import cats.implicits._
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
-import hydra.kafka.algebras.ConsumerGroupsAlgebra.{Consumer, ConsumerTopics, Topic, TopicConsumers}
-import hydra.kafka.algebras.KafkaAdminAlgebra.{LagOffsets, Offset, TopicAndPartition}
+import hydra.kafka.algebras.ConsumerGroupsAlgebra.{Consumer, ConsumerTopics, DetailedConsumerGroup, DetailedTopicConsumers, PartitionOffset, TopicConsumers}
 import hydra.kafka.algebras.KafkaClientAlgebra.Record
 import hydra.kafka.model.TopicConsumer
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.serializers.TopicMetadataV2Parser.IntentionallyUnimplemented
 import hydra.kafka.util.ConsumerGroupsOffsetConsumer
 import io.chrisdavenport.log4cats.Logger
 import org.apache.avro.generic.GenericRecord
@@ -22,7 +22,57 @@ trait ConsumerGroupsAlgebra[F[_]] {
   def getAllConsumers: F[List[ConsumerTopics]]
   def getAllConsumersByTopic: F[List[TopicConsumers]]
   def startConsumer: F[Unit]
-  def getDetailedConsumerInfo(consumerGroupName: String) : F[List[Topic]]
+  def getDetailedConsumerInfo(consumerGroupName: String) : F[List[DetailedConsumerGroup]]
+  def getConsumerActiveState(consumerGroupName: String): F[String]
+}
+
+final case class TestConsumerGroupsAlgebra(consumerGroupMap: Map[TopicConsumerKey, (TopicConsumerValue, String)]) extends ConsumerGroupsAlgebra[IO] {
+
+  def addConsumerGroup(key: TopicConsumerKey, value: TopicConsumerValue, state: String): TestConsumerGroupsAlgebra = {
+    this.copy(this.consumerGroupMap + (key -> (value, state)))
+  }
+
+  def removeConsumerGroup(key: TopicConsumerKey): TestConsumerGroupsAlgebra = {
+    this.copy(this.consumerGroupMap - key)
+  }
+
+  override def getConsumersForTopic(topicName: String): IO[TopicConsumers] = {
+    val consumerGroups = consumerGroupMap.filterKeys(_.topicName == topicName).map(p =>
+      Consumer(p._1.consumerGroupName, p._2._1.lastCommit, state = Some(p._2._2))).toList
+    IO.pure(TopicConsumers(topicName, consumerGroups))
+  }
+
+  override def getTopicsForConsumer(consumerGroupName: String): IO[ConsumerTopics] = {
+    val topics = consumerGroupMap.filterKeys(_.consumerGroupName == consumerGroupName)
+      .map(p => DetailedConsumerGroup(p._1.topicName, p._1.consumerGroupName, p._2._1.lastCommit, state = Some(p._2._2))).toList
+    IO.pure(ConsumerTopics(consumerGroupName, topics))
+  }
+
+  override def getAllConsumers: IO[List[ConsumerTopics]] =
+    consumerGroupMap.keys.map(_.consumerGroupName).toList.traverse(getTopicsForConsumer)
+
+  override def getAllConsumersByTopic: IO[List[TopicConsumers]] = consumerGroupMap.keys.map(_.topicName).toList.traverse(getConsumersForTopic)
+
+  override def startConsumer: IO[Unit] = throw IntentionallyUnimplemented
+
+  override def getDetailedConsumerInfo(consumerGroupName: String): IO[List[DetailedConsumerGroup]] = {
+    getTopicsForConsumer(consumerGroupName).flatMap { topicInfo =>
+      topicInfo.topics.traverse { topic =>
+        IO.pure(DetailedConsumerGroup(topic.topicName, consumerGroupName, topic.lastCommit,
+          List(PartitionOffset(0, 0, 0, 0)), Some(0), Some(consumerGroupMap.get(TopicConsumerKey(topic.topicName, consumerGroupName))).get.map(_._2)))
+      }
+    }
+  }
+
+  override def getConsumerActiveState(consumerGroupName: String): IO[String] = {
+    IO.pure(consumerGroupMap.keys.map { keys =>
+      if (keys.consumerGroupName == consumerGroupName) consumerGroupMap(keys)._2 else "Unknown"
+    }.head)
+  }
+}
+
+object TestConsumerGroupsAlgebra {
+  def empty: TestConsumerGroupsAlgebra = TestConsumerGroupsAlgebra(Map.empty[TopicConsumerKey, (TopicConsumerValue, String)])
 }
 
 object ConsumerGroupsAlgebra {
@@ -31,10 +81,12 @@ object ConsumerGroupsAlgebra {
   final case class PartitionOffset(partition: Int, groupOffset: Long, largestOffset: Long, partitionLag: Long)
 
   final case class TopicConsumers(topicName: String, consumers: List[Consumer])
-  final case class Consumer(consumerGroupName: String, lastCommit: Instant)
+  final case class DetailedTopicConsumers(topicName: String, consumers: List[DetailedConsumerGroup])
+  final case class Consumer(consumerGroupName: String, lastCommit: Instant, state: Option[String] = None)
 
-  final case class ConsumerTopics(consumerGroupName: String, topics: List[Topic])
-  final case class Topic(topicName: String, lastCommit: Instant, offsetInformation: List[PartitionOffset] = List.empty, totalLag: Option[Long] = None)
+  final case class ConsumerTopics(consumerGroupName: String, topics: List[DetailedConsumerGroup])
+  final case class DetailedConsumerGroup(topicName: String, consumerGroupName: String, lastCommit: Instant,
+                                         offsetInformation: List[PartitionOffset] = List.empty, totalLag: Option[Long] = None, state: Option[String] = None)
 
   def make[F[_]: ContextShift: ConcurrentEffect: Timer: Logger](
                                                                  kafkaInternalTopic: String,
@@ -54,7 +106,20 @@ object ConsumerGroupsAlgebra {
     } yield new ConsumerGroupsAlgebra[F] {
 
       override def getConsumersForTopic(topicName: String): F[TopicConsumers] =
-        consumerGroupsStorageFacade.get.map(_.getConsumersForTopicName(topicName))
+        consumerGroupsStorageFacade.get.flatMap(a => addStateToTopicConsumers(a.getConsumersForTopicName(topicName)))
+
+      private def addStateToTopicConsumers(topicConsumers: TopicConsumers): F[TopicConsumers] = {
+        val detailedF: F[List[Consumer]] = topicConsumers.consumers.traverse{ consumer =>
+          val fState = getConsumerActiveState(consumer.consumerGroupName)
+          fState.map { state =>
+            Consumer(consumer.consumerGroupName,
+              consumer.lastCommit, state = Some(state))
+          }
+        }
+        detailedF.map{detailed =>
+          TopicConsumers(topicConsumers.topicName, detailed)
+        }
+      }
 
       override def getTopicsForConsumer(consumerGroupName: String): F[ConsumerTopics] =
         consumerGroupsStorageFacade.get.map(_.getTopicsForConsumerGroupName(consumerGroupName))
@@ -72,15 +137,26 @@ object ConsumerGroupsAlgebra {
       }
 
       override def getAllConsumersByTopic: F[List[TopicConsumers]] =
-        consumerGroupsStorageFacade.get.map(_.getAllConsumersByTopic)
+        consumerGroupsStorageFacade.get.flatMap(a => a.getAllConsumersByTopic.traverse(b => addStateToTopicConsumers(b)))
 
-      override def getDetailedConsumerInfo(consumerGroupName: String): F[List[Topic]] = {
-        getTopicsForConsumer(consumerGroupName).flatMap{topicInfo =>
-          topicInfo.topics.traverse{topic =>
-            kAA.getConsumerLag(topic.topicName, consumerGroupName).map { lag =>
-              Topic(topic.topicName, topic.lastCommit, lag.toList.map(a =>
-                PartitionOffset(a._1.partition, a._2.group.value, a._2.latest.value, a._2.latest.value - a._2.group.value)), lag.values.map(v => v.latest.value - v.group.value).sum.some)
+      override def getDetailedConsumerInfo(consumerGroupName: String): F[List[DetailedConsumerGroup]] = {
+        getTopicsForConsumer(consumerGroupName).flatMap { topicInfo =>
+          topicInfo.topics.traverse { topic =>
+            getConsumerActiveState(consumerGroupName).flatMap { state =>
+              kAA.getConsumerLag(topic.topicName, consumerGroupName).map { lag =>
+                DetailedConsumerGroup(topic.topicName, consumerGroupName, topic.lastCommit, lag.toList.map(a =>
+                  PartitionOffset(a._1.partition, a._2.group.value, a._2.latest.value, a._2.latest.value - a._2.group.value)), lag.values.map(v => v.latest.value - v.group.value).sum.some, Some(state))
+              }
             }
+          }
+        }
+      }
+
+      override def getConsumerActiveState(consumerGroupName: String): F[String] = {
+        kAA.describeConsumerGroup(consumerGroupName).map { detailed =>
+          detailed match {
+            case Some(value) => value.state().toString
+            case None => "Unknown"
           }
         }
       }
@@ -107,19 +183,25 @@ object ConsumerGroupsAlgebra {
 private case class ConsumerGroupsStorageFacade(consumerMap: Map[TopicConsumerKey, TopicConsumerValue]) {
   def addConsumerGroup(key: TopicConsumerKey, value: TopicConsumerValue): ConsumerGroupsStorageFacade =
     this.copy(this.consumerMap + (key -> value))
+
   def removeConsumerGroup(key: TopicConsumerKey): ConsumerGroupsStorageFacade =
     this.copy(this.consumerMap - key)
+
   def getConsumersForTopicName(topicName: String): TopicConsumers = {
     val consumerGroups = consumerMap.filterKeys(_.topicName == topicName).map(p => Consumer(p._1.consumerGroupName, p._2.lastCommit)).toList
     TopicConsumers(topicName, consumerGroups)
   }
+
   def getTopicsForConsumerGroupName(consumerGroupName: String): ConsumerTopics = {
-    val topics = consumerMap.filterKeys(_.consumerGroupName == consumerGroupName).map(p => Topic(p._1.topicName, p._2.lastCommit)).toList
+    val topics = consumerMap.filterKeys(_.consumerGroupName == consumerGroupName)
+      .map(p => DetailedConsumerGroup(p._1.topicName, p._1.consumerGroupName, p._2.lastCommit)).toList
     ConsumerTopics(consumerGroupName, topics)
   }
+
   def getAllConsumers: List[ConsumerTopics] = {
     consumerMap.keys.map(_.consumerGroupName).toSet.map(getTopicsForConsumerGroupName).toList
   }
+
   def getAllConsumersByTopic: List[TopicConsumers] = {
     consumerMap.keys.map(_.topicName).toSet.map(getConsumersForTopicName).toList
   }

@@ -9,6 +9,7 @@ import hydra.common.Settings
 import hydra.common.config.ConfigSupport
 import ConfigSupport._
 import hydra.common.logging.LoggingAdapter
+import hydra.core.http.CorsSupport
 import hydra.ingest.bootstrap.ActorFactory
 import hydra.ingest.modules.{Algebras, Bootstrap, Programs, Routes}
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
@@ -75,25 +76,27 @@ object Main extends IOApp with ConfigSupport with LoggingAdapter {
     import scalacache.Mode
     implicit val mode: Mode[IO] = scalacache.CatsEffect.modes.async
 
-    AppConfig.appConfig.load[IO].flatMap { config =>
-      for {
-        algebras <- Algebras
-          .make[IO](config)
-        programs <- Programs.make[IO](config, algebras)
-        bootstrap <- Bootstrap
-          .make[IO](programs.createTopic, config.metadataTopicsConfig,
-           config.dvsConsumersTopicConfig, config.consumerOffsetsOffsetsTopicConfig, algebras.kafkaAdmin, config.tagsConfig)
-        _ <- actorsIO()
-        _ <- bootstrap.bootstrapAll
-        routes <- Routes.make[IO](programs, algebras, config)
-        _ <- report
-        _ <- serverIO(routes, Settings.HydraSettings)
-        _ <- if (config.consumerGroupsAlgebraConfig.consumerGroupsConsumerEnabled) {
-          algebras.consumerGroups.startConsumer
-        } else {
-          IO.unit
-        }
-      } yield ()
+    AppConfig.appConfig.load[IO].flatMap { config => {
+        implicit val cors = new CorsSupport(config.corsAllowedOriginConfig.corsAllowedOrigins)
+        for {
+          algebras <- Algebras
+            .make[IO](config)
+          programs <- Programs.make[IO](config, algebras)
+          bootstrap <- Bootstrap
+            .make[IO](programs.createTopic, config.metadataTopicsConfig,
+              config.dvsConsumersTopicConfig, config.consumerOffsetsOffsetsTopicConfig, algebras.kafkaAdmin, config.tagsConfig)
+          _ <- actorsIO()
+          _ <- bootstrap.bootstrapAll
+          routes <- Routes.make[IO](programs, algebras, config)
+          _ <- report
+          _ <- serverIO(routes, Settings.HydraSettings)
+          _ <- if (config.consumerGroupsAlgebraConfig.consumerGroupsConsumerEnabled) {
+            algebras.consumerGroups.startConsumer
+          } else {
+            IO.unit
+          }
+        } yield ()
+      }
     }
   }
 

@@ -1,16 +1,20 @@
 package hydra.ingest.modules
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.server.directives.RouteDirectives
 import akka.http.scaladsl.server.{Route, RouteConcatenation}
 import cats.effect.Sync
+import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.avro.util.SchemaWrapper
 import hydra.common.config.ConfigSupport
 import hydra.common.util.{ActorUtils, Futurable}
+import hydra.core.http.CorsSupport
 import hydra.ingest.app.AppConfig.AppConfig
 import hydra.ingest.http._
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.endpoints.{BootstrapEndpoint, BootstrapEndpointV2, ConsumerGroupsEndpoint, TagsEndpoint, TopicMetadataEndpoint, TopicsEndpoint}
+import hydra.kafka.services.StreamsManagerActor
+import hydra.kafka.util.KafkaUtils
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import scalacache.Cache
 import scalacache.guava.GuavaCache
@@ -18,7 +22,7 @@ import scalacache.guava.GuavaCache
 import scala.concurrent.ExecutionContext
 
 final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebras: Algebras[F], cfg: AppConfig)
-                                                 (implicit system: ActorSystem) extends RouteConcatenation with ConfigSupport {
+                                                 (implicit system: ActorSystem, corsSupport: CorsSupport) extends RouteConcatenation with ConfigSupport {
 
   private implicit val ec: ExecutionContext = system.dispatcher
   private val bootstrapEndpointV2 = if (cfg.metadataTopicsConfig.createV2TopicsEnabled) {
@@ -45,8 +49,18 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
 
     val consumerProxy = system.actorSelection(consumerPath)
 
-    new SchemasEndpoint(consumerProxy).route ~
-      new BootstrapEndpoint(system).route ~
+     val bootstrapKafkaConfig =
+    applicationConfig.getConfig("bootstrap-config")
+
+     val streamsManagerProps = StreamsManagerActor.props(
+      bootstrapKafkaConfig,
+      KafkaUtils.BootstrapServers,
+      ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient
+    )
+     val streamsManagerActor: ActorRef = system.actorOf(streamsManagerProps, "streamsManagerActor")
+
+    new SchemasEndpoint(consumerProxy, streamsManagerActor).route ~
+      new BootstrapEndpoint(system, streamsManagerActor).route ~
       new TopicMetadataEndpoint(consumerProxy, algebras.metadata,
         algebras.schemaRegistry, programs.createTopic, cfg.createTopicConfig.defaultMinInsyncReplicas, algebras.tagsAlgebra).route ~
       new ConsumerGroupsEndpoint(algebras.consumerGroups).route ~
@@ -63,5 +77,5 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
 
 object Routes {
   def make[F[_]: Sync: Futurable](programs: Programs[F], algebras: Algebras[F], config: AppConfig)
-                           (implicit system: ActorSystem): F[Routes[F]] = Sync[F].delay(new Routes[F](programs, algebras, config))
+                           (implicit system: ActorSystem, corsSupport: CorsSupport): F[Routes[F]] = Sync[F].delay(new Routes[F](programs, algebras, config))
 }

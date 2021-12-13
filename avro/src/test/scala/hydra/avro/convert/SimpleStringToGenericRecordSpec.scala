@@ -300,4 +300,11 @@ final class SimpleStringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     record.get.get("bool1") shouldBe null
   }
 
+  it should "return default value for nullable field when default value is not null" in {
+    val schema = SchemaBuilder.record("SchemaWithAvroUnions").fields().requiredString("id").nullableString("nameOpt", "Its a default value").endRecord()
+    val json = """{"id":"123"}"""
+    val record = json.toGenericRecordSimple(schema, useStrictValidation = true)
+    record.get.get("nameOpt").toString shouldBe "Its a default value"
+  }
+
 }

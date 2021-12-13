@@ -10,6 +10,7 @@ import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
+import hydra.core.http.CorsSupport
 import hydra.kafka.algebras.{HydraTag, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TagsAlgebra}
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
@@ -53,7 +54,7 @@ class TopicMetadataEndpointSpec
   implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   implicit val concurrent: Concurrent[IO] = IO.ioConcurrentEffect
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
-
+  private implicit val corsSupport: CorsSupport = new CorsSupport("http://*")
   override def beforeAll(): Unit = {
     super.beforeAll()
     EmbeddedKafka.start()
@@ -107,7 +108,7 @@ class TopicMetadataEndpointSpec
   val route: Route = (for {
     kafkaClient <- KafkaClientAlgebra.test[IO]
     schemaRegistry <- SchemaRegistry.test[IO]
-    ka <- KafkaAdminAlgebra.test[IO]
+    ka <- KafkaAdminAlgebra.test[IO]()
     schema <- getSchema("dvs.test.subject")
     _ <- schemaRegistry.registerSchema(subjectKey, schema)
     _ <- schemaRegistry.registerSchema(subjectValue, schema)
@@ -280,6 +281,21 @@ class TopicMetadataEndpointSpec
         |    "teamName": "dvs-teamName"
         |}""".stripMargin
 
+    val invalidRequestWithEmptyTagList =
+    """{
+       |    "streamType": "Event",
+       |    "deprecated": true,
+       |    "dataClassification": "InternalUseOnly",
+       |    "contact": {
+       |        "email": "bob@myemail.com"
+       |    },
+       |    "createdDate": "2020-02-02T12:34:56Z",
+       |    "notes": "here are some notes",
+       |    "parentSubjects": [],
+       |    "teamName": "dvs-teamName",
+       |    "tags": []
+       |}""".stripMargin
+
     "return 200 with proper metadata" in {
       Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> route ~> check {
         response.status shouldBe StatusCodes.OK
@@ -288,6 +304,12 @@ class TopicMetadataEndpointSpec
 
     "return 400 with missing schemas" in {
       Put("/v2/metadata/dvs.subject.noschema", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> route ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
+
+    "return 400 with empty tag list" in {
+      Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, invalidRequestWithEmptyTagList)) ~> route ~> check {
         status shouldBe StatusCodes.BadRequest
       }
     }

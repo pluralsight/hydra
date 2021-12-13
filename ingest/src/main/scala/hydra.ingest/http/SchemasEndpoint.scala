@@ -16,13 +16,10 @@
 
 package hydra.ingest.http
 
-import java.time.Instant
-
-import akka.actor.{ActorSelection, ActorSystem}
-import akka.http.javadsl.server.PathMatcher1
+import akka.actor.{ActorRef, ActorSelection, ActorSystem}
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.Location
-import akka.http.scaladsl.server.{ExceptionHandler, PathMatcher, PathMatcher0, Route}
+import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.pattern.ask
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
@@ -31,23 +28,23 @@ import hydra.common.config.ConfigSupport
 import hydra.common.config.ConfigSupport._
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.akka.SchemaRegistryActor._
-import hydra.core.http.{CorsSupport, RouteSupport}
+import hydra.core.http.{CorsSupport, DefaultCorsSupport, RouteSupport}
 import hydra.core.marshallers.GenericServiceResponse
-import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
-import org.apache.avro.SchemaParseException
-import spray.json.{JsArray, JsObject, JsValue, RootJsonFormat}
 import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.kafka.consumer.KafkaConsumerProxy.{ListTopics, ListTopicsResponse}
+import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
+import org.apache.avro.SchemaParseException
 import org.apache.kafka.common.PartitionInfo
 import scalacache.cachingF
-import scalacache._
 import scalacache.guava.GuavaCache
 import scalacache.modes.scalaFuture._
-import akka.http.scaladsl.server.ExceptionHandler
+import spray.json.RootJsonFormat
 
-import scala.concurrent.{ExecutionContext, Future}
+import java.time.Instant
+import hydra.kafka.services.StreamsManagerActor.{GetMetadata, GetMetadataResponse}
+
 import scala.collection.immutable.Map
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 
 /**
@@ -55,11 +52,10 @@ import scala.concurrent.duration._
   *
   * Created by alexsilva on 2/13/16.
   */
-class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSystem)
+class SchemasEndpoint(consumerProxy: ActorSelection, streamsManagerActor: ActorRef)(implicit system: ActorSystem, corsSupport: CorsSupport)
     extends RouteSupport
     with ConfigSupport
-    with CorsSupport {
-
+    with DefaultCorsSupport {
   private implicit val cache = GuavaCache[Map[String, Seq[PartitionInfo]]]
 
 
@@ -82,7 +78,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
     .getBooleanOpt("transports.kafka.show-system-topics")
     .getOrElse(false)
 
-  override def route: Route = cors(settings) {
+  override def route: Route = cors(corsSupport.settings) {
     extractMethod { method =>
       handleExceptions(excptHandler(Instant.now, method.value)) {
         extractExecutionContext { implicit ec =>
@@ -137,8 +133,8 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
           val startTime = Instant.now
           pathEndOrSingleSlash {
             extractExecutionContext { implicit ec =>
-              onSuccess(topics) { topics =>
-                getSchemas(topics.keys.toList, startTime)
+              onSuccess((streamsManagerActor ? GetMetadata).mapTo[GetMetadataResponse].map(_.metadata.keys.toList))  { keyList =>
+                  getSchemas(keyList, startTime)
               }
             }
           }
@@ -176,10 +172,10 @@ class SchemasEndpoint(consumerProxy: ActorSelection)(implicit system: ActorSyste
   }
 
   def getSchemas(subjects: List[String], startTime: Instant): Route = {
-    onSuccess(
-      (schemaRegistryActor ? FetchSchemasRequest(subjects))
-        .mapTo[FetchSchemasResponse]
-    ) {
+    val filteredSubjects = subjects.filterNot(_.contains("cp-kafka-co"))
+    onSuccess {
+      (schemaRegistryActor ? FetchSchemasRequest(filteredSubjects)).mapTo[FetchSchemasResponse]
+    } {
       response => {
         extractExecutionContext { implicit ec =>
           addHttpMetric("", OK , "/schemas", startTime, "GET")
