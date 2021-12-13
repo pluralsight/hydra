@@ -107,6 +107,14 @@ object SimpleStringToGenericRecord {
          case _ => Failure(UnexpectedDefaultTypeFoundInGenericRecordConversion(field.schema.getType, defaultVal))
        }
     }
-    defaultToJsonLoop(field.defaultVal()).map(field.name -> _)
+    defaultToJsonLoop(field.defaultVal()).map{ fieldValue =>
+      field.schema().getType match {
+        case Schema.Type.UNION =>
+          import scala.collection.JavaConverters._
+          val fieldType = field.schema().getTypes.asScala.toList.head.getType.getName
+          field.name -> JsObject((fieldType, fieldValue))
+        case _ => field.name -> fieldValue
+      }
+    }
   }
 }
