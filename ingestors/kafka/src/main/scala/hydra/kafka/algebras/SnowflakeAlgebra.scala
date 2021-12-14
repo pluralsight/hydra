@@ -36,9 +36,13 @@ trait SnowflakeAlgebra[F[_]] {
 }
 
 object SnowflakeAlgebra {
-  def make[F[_]: Sync: Concurrent: Logger](tagsTopic: String,
-                                           tagsClient: String,
-                                           kafkaClientAlgebra: KafkaClientAlgebra[F]): F[TagsAlgebra[F]] = {
+  def make[F[_]: Sync: Concurrent: Logger](): F[SnowflakeAlgebra[F]] = {
+    val snowflakeConnectionUrl =
+    val connectionURL = "jdbc:snowflake://KAA65375.snowflakecomputing.com/?user=READONLY_SERVICE_USER&password=5Vzi6D$EcckJzP^e4Tqi&warehouse=READONLY&role=READONLY"
+    for {
+      ref <- Ref[F].of(SnowflakeStorageFacade.empty)
+
+    } yield algebra
 
     /*val tagsStream: fs2.Stream[F,(GenericRecord,Option[GenericRecord])] =
       kafkaClientAlgebra.consumeMessages(tagsTopic, tagsClient, commitOffsets = false).map(record => (record._1, record._2))
