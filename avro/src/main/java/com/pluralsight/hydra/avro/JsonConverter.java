@@ -150,7 +150,7 @@ public class JsonConverter<T extends GenericRecord> {
                 } catch (NumberFormatException e) {
                     throw new InvalidDataTypeException(name, rawValue, f.schema());
                 } catch (ClassCastException e) {
-                    throw new JsonToAvroConversionException(e.getMessage(), rawValue, name, schema);
+                    throw new InvalidDataTypeException(name, rawValue, f.schema());
                 }
                 usedFields.add(name);
             } else if (f.schema().getType() == Type.NULL) {
