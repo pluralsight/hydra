@@ -149,6 +149,8 @@ public class JsonConverter<T extends GenericRecord> {
                     result.put(f.pos(), typeConvert(rawValue, name, f.schema()));
                 } catch (NumberFormatException e) {
                     throw new InvalidDataTypeException(name, rawValue, f.schema());
+                } catch (ClassCastException e) {
+                    throw new JsonToAvroConversionException(e.getMessage(), rawValue, name, schema);
                 }
                 usedFields.add(name);
             } else if (f.schema().getType() == Type.NULL) {
