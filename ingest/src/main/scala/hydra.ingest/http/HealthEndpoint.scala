@@ -28,22 +28,7 @@ class HealthEndpoint[F[_] : Futurable](cga: ConsumerGroupsAlgebra[F]) extends Ro
             pathEndOrSingleSlash {
               get {
                 addHttpMetric("", StatusCodes.OK, "/health", startTime, "GET")
-                onComplete(Futurable[F].unsafeToFuture(cga.consumerGroupIsActive(cga.getUniquePerNodeConsumerGroup))) {
-                  case Failure(exception) =>
-                    addHttpMetric("",StatusCodes.InternalServerError,"/health", startTime, method.value, error = Some(exception.getMessage))
-                    complete(StatusCodes.InternalServerError, BuildInfo.toJson + exception.getMessage)
-                  case Success(value) =>
-
-                    if(value._1) {
-                      addHttpMetric("", StatusCodes.OK, "/health", startTime, method.value)
-                      complete(StatusCodes.OK, addConsumerGroupStateToBuild(BuildInfo.toJson, value._2, value._1))
-                    } else {
-
-                      addHttpMetric("", StatusCodes.InternalServerError, "/health", startTime, method.value)
-                      complete(StatusCodes.InternalServerError, addConsumerGroupStateToBuild(BuildInfo.toJson, value._2, value._1))
-                    }
-
-                }
+                complete(BuildInfo.toJson)
               }
             }
           }
@@ -51,6 +36,7 @@ class HealthEndpoint[F[_] : Futurable](cga: ConsumerGroupsAlgebra[F]) extends Ro
       }
     }
   }
+
 
   private def exceptionHandler(startTime: Instant, method: String) = ExceptionHandler {
     case e =>

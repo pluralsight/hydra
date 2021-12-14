@@ -27,12 +27,4 @@ class HealthEndpointSpec
       status shouldEqual StatusCodes.OK
     }
   }
-
-  "The HealthEndpoint" should "return a 500" in {
-    val testCGA = TestConsumerGroupsAlgebra.empty.addConsumerGroup(uNK, uNV, "Empty")
-
-    Get("/health") ~> new HealthEndpoint[IO](testCGA).route ~> check {
-      status shouldEqual StatusCodes.InternalServerError
-    }
-  }
 }
