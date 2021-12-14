@@ -28,9 +28,17 @@ object Algebras {
       kafkaClient <- KafkaClientAlgebra.live[F](config.createTopicConfig.bootstrapServers, schemaRegistry, config.ingestConfig.recordSizeLimitBytes)
       metadata <- MetadataAlgebra.make[F](config.metadataTopicsConfig.topicNameV2,
         config.metadataTopicsConfig.consumerGroup, kafkaClient, schemaRegistry, config.metadataTopicsConfig.createV2OnStartup)
-      consumerGroups <- ConsumerGroupsAlgebra.make[F](config.consumerGroupsAlgebraConfig.kafkaInternalConsumerGroupsTopic,
-        config.dvsConsumersTopicConfig.topicName, config.consumerOffsetsOffsetsTopicConfig.topicName, config.createTopicConfig.bootstrapServers,
-        config.metadataTopicsConfig.consumerGroup, config.consumerGroupsAlgebraConfig.commonConsumerGroup, kafkaClient, kafkaAdmin, schemaRegistry)
+      consumerGroups <- ConsumerGroupsAlgebra.make[F](
+        kafkaInternalTopic = config.consumerGroupsAlgebraConfig.kafkaInternalConsumerGroupsTopic,
+        dvsConsumersTopic = config.dvsConsumersTopicConfig.topicName,
+        consumerOffsetsOffsetsTopicConfig = config.consumerOffsetsOffsetsTopicConfig.topicName,
+        bootstrapServers = config.createTopicConfig.bootstrapServers,
+        uniquePerNodeConsumerGroup = config.metadataTopicsConfig.consumerGroup,
+        commonConsumerGroup = config.consumerGroupsAlgebraConfig.commonConsumerGroup,
+        kafkaClientAlgebra = kafkaClient,
+        kAA = kafkaAdmin,
+        sra = schemaRegistry
+        )
       tagsAlgebra <- TagsAlgebra.make(config.tagsConfig.tagsTopic,config.tagsConfig.tagsConsumerGroup,kafkaClient)
     } yield new Algebras[F](schemaRegistry, kafkaAdmin, kafkaClient, metadata, consumerGroups, tagsAlgebra)
 }
