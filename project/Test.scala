@@ -9,12 +9,12 @@ object Test {
 
   lazy val testSettings = Seq(
     // Don't run the tests in parallel
-    parallelExecution in sbt.Test := false,
-    logBuffered in sbt.Test := false,
+    (sbt.Test / parallelExecution) := false,
+    (sbt.Test / logBuffered) := false,
     coverageExcludedPackages := "hydra\\.ingest\\.HydraIngestApp.*",
     // Don't package test jars since it does not handle resources properly
-    exportJars in sbt.Test := false,
-    coverageEnabled in sbt.Test := true,
+    (sbt.Test / exportJars) := false,
+    (sbt.Test / coverageEnabled) := true,
     // Include the code coverage settings
     coverageExcludedPackages := "<empty>;akka.contrib.*",
     coverageMinimum := 70,
