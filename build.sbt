@@ -18,7 +18,7 @@ lazy val defaultSettings = Seq(
   addCompilerPlugin(
     "org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full
   ),
-  (Compile / packageBin / packageOptions) +=
+  packageOptions in (Compile, packageBin) +=
     Package.ManifestAttributes("Implementation-Build" -> buildNumber),
   logLevel := Level.Info,
   scalacOptions ++= Seq(
@@ -30,7 +30,7 @@ lazy val defaultSettings = Seq(
     "-unchecked",
     "-Ypartial-unification"
   ),
-  (Compile / javacOptions) ++= Seq(
+  javacOptions in Compile ++= Seq(
     "-encoding",
     "UTF-8",
     "-source",
@@ -44,16 +44,16 @@ lazy val defaultSettings = Seq(
   resolvers += Resolver.mavenLocal,
   resolvers += "Confluent Maven Repo" at "https://packages.confluent.io/maven/",
   resolvers += "jitpack" at "https://jitpack.io",
-  (ThisBuild / ivyLoggingLevel) := UpdateLogging.Quiet,
-  (sbt.Test / parallelExecution) := false,
-  (Universal / javaOptions) ++= Seq(
+  ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet,
+  parallelExecution in sbt.Test := false,
+  javaOptions in Universal ++= Seq(
     "-Dorg.aspectj.tracing.factory=default",
     "-J" + jvmMaxMemoryFlag
   )
 )
 
 lazy val restartSettings = Seq(
-  (reStart / javaOptions) += jvmMaxMemoryFlag
+  javaOptions in reStart += jvmMaxMemoryFlag
 )
 
 val noPublishSettings = Seq(
@@ -148,15 +148,15 @@ lazy val ingest = Project(
 
 //scala style
 lazy val testScalastyle = taskKey[Unit]("testScalastyle")
-testScalastyle := (sbt.Test / scalastyle).toTask("").value
+testScalastyle := scalastyle.in(sbt.Test).toTask("").value
 
 lazy val dockerSettings = Seq(
-  (docker / buildOptions) := BuildOptions(
+  buildOptions in docker := BuildOptions(
     cache = false,
     removeIntermediateContainers = BuildOptions.Remove.Always,
     pullBaseImage = BuildOptions.Pull.IfMissing
   ),
-  (docker / dockerfile) := {
+  dockerfile in docker := {
     val appDir: File = stage.value
     val targetDir = "/app"
 
@@ -172,7 +172,7 @@ lazy val dockerSettings = Seq(
       copy(appDir, targetDir)
     }
   },
-  (docker / imageNames) := Seq(
+  imageNames in docker := Seq(
     // Sets the latest tag
     ImageName(s"${organization.value}/hydra:latest"),
     // Sets a name with a tag that contains the project version

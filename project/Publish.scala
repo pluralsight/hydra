@@ -14,7 +14,7 @@ object Publish {
     // Publishing settings
     publishMavenStyle := true,
     // Don't publish any of the test stuff
-    (sbt.Test / publishArtifact) := false,
+    publishArtifact in sbt.Test := false,
     // Maven central cannot allow other repos.
     pomIncludeRepository := { _ => false },
     /**
