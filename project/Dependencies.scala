@@ -16,7 +16,7 @@ object Dependencies {
   val fs2KafkaVersion = "1.0.0"
   val jacksonCoreVersion = "2.10.4"
   val jacksonDatabindVersion = "2.10.4"
-  val jodaConvertVersion = "2.2.1"
+  val jodaConvertVersion = "2.2.2"
   val jodaTimeVersion = "2.10.9"
   val kafkaVersion = "2.4.1"
   val kamonPVersion = "2.1.10"
