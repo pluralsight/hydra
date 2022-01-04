@@ -9,10 +9,11 @@ import hydra.kafka.model.{Schemas, StreamTypeV2, TopicMetadataV2, TopicMetadataV
 import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyAndValueMismatch, KeyHasNullableFields, NullableField, NullableFieldWithoutDefaultValue, NullableFieldsNeedDefaultValue, ValidationErrors}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
-import org.apache.avro.{LogicalType, Schema}
+import org.apache.avro.{LogicalType, Schema, SchemaBuilder}
 import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy, _}
 import cats.implicits._
+
 import scala.jdk.CollectionConverters.collectionAsScalaIterableConverter
 
 final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
@@ -234,7 +235,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
 
   private def validateKeyAndValueSchemas(request: TopicMetadataV2Request, subject: Subject): Resource[F, Unit] = {
     val schemas = request.schemas
-    val validate: F[Unit] =
+    val isEventStreamType = request.streamType == StreamTypeV2.Event
+    def nonEventStreamTypeValidation: F[Unit] =
       (schemas.key.getType, schemas.value.getType) match {
         case (Schema.Type.RECORD, Schema.Type.RECORD) =>
           val keyFields = schemas.key.getFields.asScala.toList
@@ -246,11 +248,11 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
             k <- validateKeySchemaEvolution(schemas, subject)
             v <- validateValueSchemaEvolution(schemas, subject)
           } yield {
-            val keyFieldsCheckedForNullIfNecessary = if(request.streamType != StreamTypeV2.Event) checkForNullableKeyFields(keyFields) else None
-            val valueNullableFieldCheckedForDefault = if(request.streamType != StreamTypeV2.Event) checkForDefaultNullableValueFields(valueFields) else None
+            val keyFieldsCheckedForNull = checkForNullableKeyFields(keyFields)
+            val valueNullableFieldCheckedForDefault = checkForDefaultNullableValueFields(valueFields)
             List[Option[RuntimeException]](keyFieldIsEmpty,
               checkForMismatches(keyFields, valueFields),
-              keyFieldsCheckedForNullIfNecessary,
+              keyFieldsCheckedForNull,
               valueNullableFieldCheckedForDefault,
               k,
               v).flatten
@@ -261,6 +263,56 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
           }
         case _ => Bracket[F, Throwable].raiseError(IncompatibleSchemaException("Your key and value schemas must each be of type record. If you are adding metadata for a topic you created externally, you will need to register new key and value schemas"))
       }
+    def eventStreamTypeValidation: F[Unit] =
+      (schemas.key.getType, schemas.value.getType) match {
+        case (Schema.Type.RECORD, Schema.Type.RECORD) =>
+          val keyFields = schemas.key.getFields.asScala.toList
+          val valueFields = schemas.value.getFields.asScala.toList
+          val keyFieldIsEmpty: Option[IncompatibleSchemaException] = if (keyFields.isEmpty) {
+            IncompatibleSchemaException("Must include Fields in Key").some
+          } else None
+          val validationErrorsF: F[List[RuntimeException]] = for {
+            k <- validateKeySchemaEvolution(schemas, subject)
+            v <- validateValueSchemaEvolution(schemas, subject)
+          } yield {
+            List[Option[RuntimeException]](keyFieldIsEmpty,
+              checkForMismatches(keyFields, valueFields),
+              k,
+              v).flatten
+          }
+          validationErrorsF.flatMap { validationErrors =>
+            if (validationErrors.nonEmpty) Bracket[F, Throwable].raiseError(ValidationErrors(validationErrors))
+            else Bracket[F, Throwable].pure(())
+          }
+        case (Schema.Type.STRING, Schema.Type.RECORD) =>
+          val keyInfo = SchemaBuilder
+            .record("")
+            .fields()
+            .name(schemas.key.na)
+            .`type`()
+            .booleanType()
+            .noDefault()
+            .endRecord()
+          val valueFields = schemas.value.getFields.asScala.toList
+          val validationErrorsF: F[List[RuntimeException]] = for {
+            k <- validateKeySchemaEvolution(schemas, subject)
+            v <- validateValueSchemaEvolution(schemas, subject)
+          } yield {
+            val keyFieldsCheckedForNullIfNecessary = None
+            val valueNullableFieldCheckedForDefault = None
+            List[Option[RuntimeException]](
+              checkForMismatches(keyInfo, valueFields),
+              keyFieldsCheckedForNullIfNecessary,
+              valueNullableFieldCheckedForDefault,
+              k,
+              v).flatten
+          }
+
+        case _ => Bracket[F, Throwable].raiseError(IncompatibleSchemaException("Your key and value schemas must each be of type record. If you are adding metadata for a topic you created externally, you will need to register new key and value schemas"))
+      }
+
+    val validate: F[Unit] = if(request.streamType == StreamTypeV2.Event) eventStreamTypeValidation else nonEventStreamTypeValidation
+
     Resource.liftF(validate)
   }
 

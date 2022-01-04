@@ -7,7 +7,7 @@ import cats.effect.{Bracket, Concurrent, ContextShift, IO, Resource, Sync, Timer
 import cats.syntax.all._
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
-import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
+import hydra.avro.registry.SchemaRegistry.{IncompatibleSchemaException, SchemaId, SchemaVersion}
 import hydra.kafka.algebras.KafkaAdminAlgebra.{Topic, TopicName}
 import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, Offset, Partition, PublishError, PublishResponse, TopicName}
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
@@ -712,6 +712,68 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           TopicDetails(1, 1, 1)
         )
       } yield succeed).unsafeRunSync()
+    }
+
+    "do not throw error on topic with key that has field with non-record type if streamType is 'Event'" in {
+      val stringType =
+        """
+          |{
+          |  "type": "string",
+          |  "name": "test"
+          |}
+        """.stripMargin
+      val stringTypeKeySchema = new Schema.Parser().parse(stringType)
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      (for {
+        schemaRegistry <- SchemaRegistry.test[IO]
+        kafka <- KafkaAdminAlgebra.test[IO]()
+        kafkaClient <- KafkaClientAlgebra.test[IO]
+        metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
+        _ <- new CreateTopicProgram[IO](
+          schemaRegistry,
+          kafka,
+          kafkaClient,
+          policy,
+          Subject.createValidated("dvs.test-metadata-topic").get,
+          metadata
+        ).createTopic(
+          Subject.createValidated("dvs.subject").get,
+          createEventStreamTypeTopicMetadataRequest(stringTypeKeySchema, valueSchema),
+          TopicDetails(1, 1, 1)
+        )
+      } yield succeed).unsafeRunSync()
+    }
+
+    "throw error on topic with key that has field with non-record type if streamType is NOT 'Event'" in {
+      val stringType =
+        """
+          |{
+          |  "type": "string",
+          |  "name": "test"
+          |}
+        """.stripMargin
+      val stringTypeKeySchema = new Schema.Parser().parse(stringType)
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      an[IncompatibleSchemaException] shouldBe thrownBy {
+        (for {
+          schemaRegistry <- SchemaRegistry.test[IO]
+          kafka <- KafkaAdminAlgebra.test[IO]()
+          kafkaClient <- KafkaClientAlgebra.test[IO]
+          metadata <- metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient)
+          _ <- new CreateTopicProgram[IO](
+            schemaRegistry,
+            kafka,
+            kafkaClient,
+            policy,
+            Subject.createValidated("dvs.test-metadata-topic").get,
+            metadata
+          ).createTopic(
+            Subject.createValidated("dvs.subject").get,
+            createTopicMetadataRequest(stringTypeKeySchema, valueSchema),
+            TopicDetails(1, 1, 1)
+          )
+        } yield fail("Should Fail to Create Topic - this yield should not be hit.")).unsafeRunSync()
+      }
     }
 
     "throw error on schema evolution with illegal union logical type removal" in {
