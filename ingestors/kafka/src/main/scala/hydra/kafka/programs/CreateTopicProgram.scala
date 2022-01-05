@@ -242,7 +242,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   private def validateKeyAndValueSchemas(request: TopicMetadataV2Request, subject: Subject): Resource[F, Unit] = {
     val schemas = request.schemas
     val isEventStream = request.streamType == StreamTypeV2.Event
-    val allValidationErrors: F[Unit] = (schemas.key.getType, schemas.value.getType) match {
+    val completedValidations: F[Unit] = (schemas.key.getType, schemas.value.getType) match {
       case (Schema.Type.RECORD, Schema.Type.RECORD) =>
         val keyFields = schemas.key.getFields.asScala.toList
         val valueFields = schemas.value.getFields.asScala.toList
@@ -291,7 +291,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
         } else Bracket[F, Throwable].raiseError(KeyAndValueNotRecordType)
       case _ => Bracket[F, Throwable].raiseError(KeyAndValueNotRecordType)
     }
-    Resource.liftF(allValidationErrors)
+    Resource.liftF(completedValidations)
   }
 
   def createTopicFromMetadataOnly(
