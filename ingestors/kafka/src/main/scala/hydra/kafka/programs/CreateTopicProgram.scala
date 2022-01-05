@@ -291,7 +291,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
         } else Bracket[F, Throwable].raiseError(KeyAndValueNotRecordType)
       case _ => Bracket[F, Throwable].raiseError(KeyAndValueNotRecordType)
     }
-    Resource.liftF(consolidatedValidationErrors)
+    Resource.liftF(allValidationErrors)
   }
 
   def createTopicFromMetadataOnly(
