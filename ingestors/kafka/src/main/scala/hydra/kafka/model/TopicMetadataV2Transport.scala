@@ -113,7 +113,7 @@ object TopicMetadataV2Request {
 
   val AllowedOrganizations: String = "cloud|skills|flow|tech|fin|dvs|_[a-zA-Z0-9]+"
 
-  val regex: String = s"^(?=^.{0,255}$$)(?:$AllowedOrganizations)(\\.[a-zA-Z0-9]+(\\-[a-zA-Z0-9]+)*)+"
+  val regex: String = s"^(?=^.{0,249}$$)(?:$AllowedOrganizations)(\\.[a-zA-Z0-9]+(\\-[a-zA-Z0-9]+)*)+"
   val regexWitness = Witness(regex)
 
   type SubjectRegex = MatchesRegex[regexWitness.T]
