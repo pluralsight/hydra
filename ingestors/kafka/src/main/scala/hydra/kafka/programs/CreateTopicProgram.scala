@@ -267,7 +267,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       case (Schema.Type.STRING, Schema.Type.RECORD) =>
         if (isEventStream) {
           val concoctedKeyFields = SchemaBuilder
-            .record("fakeName")
+            .record("uselessRecord") //This is a useless record whose only purpose is to transform the string key into a list of fields.
             .fields()
             .name(schemas.key.getName)
             .`type`()
