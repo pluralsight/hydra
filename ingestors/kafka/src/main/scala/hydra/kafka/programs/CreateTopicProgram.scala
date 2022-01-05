@@ -233,34 +233,15 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     } else None
   }
 
-  private def nonEventStreamTypeValidation(schemas: Schemas, subject: Subject): F[Unit] =
-    (schemas.key.getType, schemas.value.getType) match {
-      case (Schema.Type.RECORD, Schema.Type.RECORD) =>
-        val keyFields = schemas.key.getFields.asScala.toList
-        val valueFields = schemas.value.getFields.asScala.toList
-        val keyFieldIsEmpty: Option[IncompatibleSchemaException] = if (keyFields.isEmpty) {
-          IncompatibleSchemaException("Must include Fields in Key").some
-        } else None
-        val validationErrorsF: F[List[RuntimeException]] = for {
-          k <- validateKeySchemaEvolution(schemas, subject)
-          v <- validateValueSchemaEvolution(schemas, subject)
-        } yield {
-          val keyFieldsCheckedForNull = checkForNullableKeyFields(keyFields)
-          val valueNullableFieldCheckedForDefault = checkForDefaultNullableValueFields(valueFields)
-          List[Option[RuntimeException]](keyFieldIsEmpty,
-            checkForMismatches(keyFields, valueFields),
-            keyFieldsCheckedForNull,
-            valueNullableFieldCheckedForDefault,
-            k,
-            v).flatten
-        }
-        validationErrorsF.flatMap { validationErrors =>
-          if (validationErrors.nonEmpty) Bracket[F, Throwable].raiseError(ValidationErrors(validationErrors)) else Bracket[F, Throwable].pure(())
-        }
-      case _ => Bracket[F, Throwable].raiseError(KeyAndValueNotRecordType)
-    }
+  private def validateSchemaEvolutions(schemas: Schemas, subject: Subject): F[(Option[IllegalLogicalTypeChangeErrors], Option[IllegalLogicalTypeChangeErrors])] =
+    for {
+      k <- validateKeySchemaEvolution(schemas, subject)
+      v <- validateValueSchemaEvolution(schemas, subject)
+    } yield (k,v)
 
-  private def eventStreamTypeValidation(schemas: Schemas, subject: Subject): F[Unit] = {
+  private def validateKeyAndValueSchemas(request: TopicMetadataV2Request, subject: Subject): Resource[F, Unit] = {
+    val schemas = request.schemas
+    val isEventStream = request.streamType == StreamTypeV2.Event
     val validationErrors = (schemas.key.getType, schemas.value.getType) match {
       case (Schema.Type.RECORD, Schema.Type.RECORD) =>
         val keyFields = schemas.key.getFields.asScala.toList
@@ -269,47 +250,44 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
           IncompatibleSchemaException("Must include Fields in Key").some
         } else None
         for {
-          k <- validateKeySchemaEvolution(schemas, subject)
-          v <- validateValueSchemaEvolution(schemas, subject)
+          kv <- validateSchemaEvolutions(schemas, subject)
         } yield {
+          val keyFieldsCheckedForNull = if (!isEventStream) checkForNullableKeyFields(keyFields) else none
           val valueNullableFieldCheckedForDefault = checkForDefaultNullableValueFields(valueFields)
           List[Option[RuntimeException]](valueNullableFieldCheckedForDefault,
             keyFieldIsEmpty,
+            keyFieldsCheckedForNull,
             checkForMismatches(keyFields, valueFields),
-            k,
-            v).flatten
+            kv._1,
+            kv._2).flatten
         }
       case (Schema.Type.STRING, Schema.Type.RECORD) =>
-        val keyInfo = SchemaBuilder
-          .record("fakeName")
-          .fields()
-          .name(schemas.key.getName)
-          .`type`()
-          .stringType()
-          .noDefault()
-          .endRecord().getFields.asScala.toList
-        val valueFields = schemas.value.getFields.asScala.toList
-        for {
-          k <- validateKeySchemaEvolution(schemas, subject)
-          v <- validateValueSchemaEvolution(schemas, subject)
-        } yield {
-          val valueNullableFieldCheckedForDefault = checkForDefaultNullableValueFields(valueFields)
-          List[Option[RuntimeException]](
-            checkForMismatches(keyInfo, valueFields),
-            valueNullableFieldCheckedForDefault,
-            k,
-            v).flatten
-        }
+        if (isEventStream) {
+          val concoctedKeyFields = SchemaBuilder
+            .record("fakeName")
+            .fields()
+            .name(schemas.key.getName)
+            .`type`()
+            .stringType()
+            .noDefault()
+            .endRecord().getFields.asScala.toList
+          val valueFields = schemas.value.getFields.asScala.toList
+          for {
+            kv <- validateSchemaEvolutions(schemas, subject)
+          } yield {
+            val valueNullableFieldCheckedForDefault = checkForDefaultNullableValueFields(valueFields)
+            List[Option[RuntimeException]](
+              checkForMismatches(concoctedKeyFields, valueFields),
+              valueNullableFieldCheckedForDefault,
+              kv._1,
+              kv._2).flatten
+          }
+        } else Bracket[F, Throwable].raiseError(KeyAndValueNotRecordType)
       case _ => Bracket[F, Throwable].raiseError(KeyAndValueNotRecordType)
     }
-    validationErrors.flatMap { validationErrors =>
+    Resource.liftF(validationErrors.flatMap { validationErrors =>
       if (validationErrors.nonEmpty) Bracket[F, Throwable].raiseError(ValidationErrors(validationErrors)) else Bracket[F, Throwable].pure(())
-    }
-  }
-
-  private def validateKeyAndValueSchemas(request: TopicMetadataV2Request, subject: Subject): Resource[F, Unit] = {
-    val validate: F[Unit] = if(request.streamType == StreamTypeV2.Event) eventStreamTypeValidation(request.schemas, subject) else nonEventStreamTypeValidation(request.schemas, subject)
-    Resource.liftF(validate)
+    })
   }
 
   def createTopicFromMetadataOnly(
