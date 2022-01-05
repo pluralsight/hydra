@@ -7,10 +7,10 @@ import eu.timepit.refined.boolean._
 import eu.timepit.refined.numeric._
 import eu.timepit.refined.string._
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
-import hydra.kafka.config.TopicMetadataV2ConfigSupport.AllowedOrganizations
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.Schema
 import shapeless.Witness
+import shapeless.Witness.Lt
 
 import java.time.Instant
 
@@ -111,8 +111,10 @@ object TopicMetadataV2Request {
 
   object NumPartitions extends RefinedTypeOps[NumPartitions, Int]
 
-  val regex = s"^(?=^.{0,255}$$)(?:$AllowedOrganizations)(\\.[a-zA-Z0-9]+(\\-[a-zA-Z0-9]+)*)+"
-  val regexWitness = Witness(regex)
+  val AllowedOrganizations: String = "cloud|skills|flow|tech|fin|dvs|_[a-zA-Z0-9]+"
+
+  val regex: String = s"^(?=^.{0,255}$$)(?:$AllowedOrganizations)(\\.[a-zA-Z0-9]+(\\-[a-zA-Z0-9]+)*)+"
+  val regexWitness: Lt[String] = Witness(regex)
 
   type SubjectRegex = MatchesRegex[regexWitness.T]
   type Subject = String Refined SubjectRegex
@@ -123,7 +125,7 @@ object TopicMetadataV2Request {
       refineV[SubjectRegex](value).toOption
     }
 
-    val invalidFormat = s"Invalid Topic Name. Topic Name must start with prefix that matches `$AllowedOrganizations`. " +
+    val invalidFormat: String = s"Invalid Topic Name. Topic Name must start with prefix that matches `$AllowedOrganizations`. " +
       " It may contain only alphanumeric characters, hyphens(-) and periods(.)" +
       " and must not contain consecutive special characters anywhere within the topic name."
   }
