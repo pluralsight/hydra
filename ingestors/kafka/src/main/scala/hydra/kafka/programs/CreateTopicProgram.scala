@@ -242,14 +242,14 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   private def validateKeyAndValueSchemas(request: TopicMetadataV2Request, subject: Subject): Resource[F, Unit] = {
     val schemas = request.schemas
     val isEventStream = request.streamType == StreamTypeV2.Event
-    val validationErrors = (schemas.key.getType, schemas.value.getType) match {
+    val allValidationErrors: F[Unit] = (schemas.key.getType, schemas.value.getType) match {
       case (Schema.Type.RECORD, Schema.Type.RECORD) =>
         val keyFields = schemas.key.getFields.asScala.toList
         val valueFields = schemas.value.getFields.asScala.toList
         val keyFieldIsEmpty: Option[IncompatibleSchemaException] = if (keyFields.isEmpty) {
           IncompatibleSchemaException("Must include Fields in Key").some
         } else None
-        for {
+        val validationErrors = for {
           kv <- validateSchemaEvolutions(schemas, subject)
         } yield {
           val keyFieldsCheckedForNull = if (!isEventStream) checkForNullableKeyFields(keyFields) else none
@@ -260,6 +260,9 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
             checkForMismatches(keyFields, valueFields),
             kv._1,
             kv._2).flatten
+        }
+        validationErrors.flatMap { validationErrors =>
+          if (validationErrors.nonEmpty) Bracket[F, Throwable].raiseError(ValidationErrors(validationErrors)) else Bracket[F, Throwable].pure(())
         }
       case (Schema.Type.STRING, Schema.Type.RECORD) =>
         if (isEventStream) {
@@ -272,7 +275,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
             .noDefault()
             .endRecord().getFields.asScala.toList
           val valueFields = schemas.value.getFields.asScala.toList
-          for {
+          val validationErrors = for {
             kv <- validateSchemaEvolutions(schemas, subject)
           } yield {
             val valueNullableFieldCheckedForDefault = checkForDefaultNullableValueFields(valueFields)
@@ -282,12 +285,13 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
               kv._1,
               kv._2).flatten
           }
+          validationErrors.flatMap { validationErrors =>
+            if (validationErrors.nonEmpty) Bracket[F, Throwable].raiseError(ValidationErrors(validationErrors)) else Bracket[F, Throwable].pure(())
+          }
         } else Bracket[F, Throwable].raiseError(KeyAndValueNotRecordType)
       case _ => Bracket[F, Throwable].raiseError(KeyAndValueNotRecordType)
     }
-    Resource.liftF(validationErrors.flatMap { validationErrors =>
-      if (validationErrors.nonEmpty) Bracket[F, Throwable].raiseError(ValidationErrors(validationErrors)) else Bracket[F, Throwable].pure(())
-    })
+    Resource.liftF(consolidatedValidationErrors)
   }
 
   def createTopicFromMetadataOnly(
