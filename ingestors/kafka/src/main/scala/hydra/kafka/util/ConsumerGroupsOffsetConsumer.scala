@@ -2,8 +2,7 @@ package hydra.kafka.util
 
 import java.nio.ByteBuffer
 import java.time.Instant
-
-import cats.{Applicative, Order, data}
+import cats.{Applicative, ApplicativeError, Order, data}
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.implicits._
@@ -169,6 +168,11 @@ object ConsumerGroupsOffsetConsumer {
         )
       }
       .through(produce(producerSettings))
+      .recoverWith{
+        case e =>
+          logStreamError(e) *>
+            fs2.Stream.empty
+      }
       .compile.drain
   }
 
@@ -200,7 +204,13 @@ object ConsumerGroupsOffsetConsumer {
     }
   }
 
-  private[kafka] def getOffsetsToSeekTo[F[_]: ConcurrentEffect](
+
+  private def logStreamError[F[_]: Logger](e: Throwable): fs2.Stream[F, Unit] = {
+    val errorMessage = s"Error in ConsumerGroupsOffsetConsumer Error: ${e.getMessage}"
+    fs2.Stream.eval(Logger[F].error(errorMessage))
+  }
+
+  private[kafka] def getOffsetsToSeekTo[F[_]: ConcurrentEffect: Logger](
                                                                  consumerOffsetsCache: Ref[F, PartitionOffsetMap],
                                                                  deferred: Deferred[F, PartitionOffsetMap],
                                                                  dvsConsumerOffsetStream: fs2.Stream[F, (Record, OffsetInfo)],
@@ -226,6 +236,9 @@ object ConsumerGroupsOffsetConsumer {
       }).flatTap { _ =>
         fs2.Stream.eval(isComplete)
       }
+    }.recoverWith {
+      case e =>
+        logStreamError(e) *> fs2.Stream.empty
     }.compile.drain
   }
 }
