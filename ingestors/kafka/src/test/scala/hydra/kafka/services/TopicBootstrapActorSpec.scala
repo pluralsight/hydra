@@ -404,6 +404,80 @@ class TopicBootstrapActorSpec
     consumeFirstStringMessageFrom(subject) shouldEqual expectedMessage
   }
 
+  it should "create the kafka topic with custom logical types" in {
+    val subject = "exp.dataplatform.testsubject51"
+
+    val mdRequest = s"""{
+                       |	"streamType": "Notification",
+                       | "derived": false,
+                       |	"dataClassification": "Public",
+                       |	"dataSourceOwner": "BARTON",
+                       |	"contact": "slackity slack dont talk back",
+                       |	"psDataLake": false,
+                       |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+                       |	"notes": "here are some notes topkek",
+                       |	"schema": {
+                       |	  "namespace": "exp.dataplatform",
+                       |	  "name": "testsubject51",
+                       |	  "type": "record",
+                       |	  "version": 1,
+                       |	  "fields": [
+                       |      {
+                       |        "name": "timestamp",
+                       |        "type":{
+                       |          "type": "string",
+                       |          "logicalType": "iso-datetime"
+                       |        }
+                       |      }
+                       |	  ]
+                       |	}
+                       |}""".stripMargin.parseJson
+      .convertTo[TopicMetadataRequest]
+
+    val (probe, schemaRegistryActor, _) = fixture("test51")
+
+    val bootstrapActor = system.actorOf(
+      TopicBootstrapActor.props(
+        schemaRegistryActor,
+        system.actorSelection("/user/kafka_ingestor_test51"),
+        system.actorOf(Props(new MockStreamsManagerActor()))
+      )
+    )
+
+    probe.expectMsgType[RegisterSchemaRequest]
+
+    val senderProbe = TestProbe()
+
+    bootstrapActor.tell(InitiateTopicBootstrap(mdRequest), senderProbe.ref)
+
+    probe.receiveWhile(messages = 2) {
+      case RegisterSchemaRequest(schemaJson) =>
+        schemaJson should
+          include("testsubject51")
+      case FetchSchemaRequest(schemaName) =>
+        schemaName shouldEqual "_hydra.metadata.topic"
+    }
+
+    probe.expectMsgPF() {
+      case Ingest(msg: AvroRecord, ack) =>
+        msg.payload.getSchema.getName shouldBe "topic"
+        ack shouldBe AckStrategy.Replicated
+    }
+
+    senderProbe.expectMsgPF() {
+      case BootstrapSuccess(tm) =>
+        tm.schemaId should be > 0
+        tm.derived shouldBe false
+        tm.subject shouldBe subject
+    }
+
+    val expectedMessage = "I'm expected!"
+
+    publishStringMessageToKafka(subject, expectedMessage)
+
+    consumeFirstStringMessageFrom(subject) shouldEqual expectedMessage
+  }
+
   it should "return a BootstrapFailure for failures while creating the kafka topic" in {
     val subject = "exp.dataplatform.testsubject6"
 
