@@ -13,6 +13,8 @@ import org.apache.avro.{LogicalType, Schema}
 import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy, _}
 import cats.implicits._
+import hydra.avro.convert.IsoDate
+
 import scala.jdk.CollectionConverters.collectionAsScalaIterableConverter
 
 final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
@@ -154,16 +156,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   }
 
   private def checkForUnsupportedLogicalType(fields: List[Schema.Field]): Option[UnsupportedLogicalType] = {
-    val unsupportedLogicalTypes = Map("iso-datetime" -> Schema.Type.STRING)
-
-    unsupportedLogicalTypes.toList.flatMap {
-      case (key, value) =>
-        fields.filter(field =>
-          field.schema().getType == value && getLogicalType(field).contains(key))
-    } match {
-      case list if list.nonEmpty => UnsupportedLogicalType(list).some
-      case _ => None
-    }
+    val fieldsWithUnsupportedTypes = fields.filter(getLogicalType(_).contains(IsoDate.IsoDateLogicalTypeName))
+    Option(fieldsWithUnsupportedTypes).filter(_.nonEmpty).map(UnsupportedLogicalType)
   }
 
   private def checkForIllegalLogicalTypeEvolutions(existingSchema: Schema, newSchema: Schema, name: String) : List[IllegalLogicalTypeChange] = existingSchema.getType match {
