@@ -11,7 +11,7 @@ import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, Offset, Partition
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.{ContactMethod, TopicMetadataV2, TopicMetadataV2Key}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.programs.CreateTopicProgram
+import hydra.kafka.programs.{CreateTopicProgram, KeyAndValueSchemaV2Validator}
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import org.apache.avro.generic.GenericRecord
@@ -56,7 +56,8 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
         kafkaClient,
         retry,
         metadataSubjectV2,
-        metadata
+        metadata,
+        KeyAndValueSchemaV2Validator.make(schemaRegistry)
       )
       boot <- Bootstrap.make[IO](c, metadataConfig, consumersTopicConfig, consumerOffsetsOffsetsTopicConfig, kafkaAdmin, tagsTopicConfig)
       _ <- boot.bootstrapAll
