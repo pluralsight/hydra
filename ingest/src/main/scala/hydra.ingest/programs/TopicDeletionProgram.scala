@@ -30,6 +30,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
                                                                     allowableTopicDeletionTime: Long)
                                                                    (implicit guavaCache: Cache[SchemaWrapper]){
 
+
   def deleteFromSchemaRegistry(topicNames: List[String]): F[ValidatedNel[SchemaRegistryError, Unit]] = {
     topicNames.flatMap(topic => List(topic + "-key", topic + "-value")).traverse { subject =>
       schemaClient.deleteSchemaSubject(subject).attempt.map {
@@ -37,6 +38,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
       }
     }.map(_.combineAll)
   }
+
 
   private def checkIfTopicStillHasConsumers(topicNames: List[String], ignoreConsumerGroups: List[String]): F[List[Either[ConsumersStillExistError, String]]] = {
     topicNames.traverse { topic =>
@@ -69,6 +71,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
   }
   //consumer group should be pulled from prod, consumer group name will work for what you want it to work for
 
+
   def hasTopicReceivedRecentRecords(topicName: String): F[(String, List[Boolean])] = {
     val curTime = Instant.now().toEpochMilli
     kafkaAdmin.getLatestOffsets(topicName).flatMap {
@@ -92,6 +95,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
     }.map {list => topicName -> list}
   }
 
+
   def checkForActivelyPublishedTopics(topicNames: List[String]): F[List[Either[ActivelyPublishedToError, String]]] = {
     topicNames.traverse { name =>
       for {
@@ -106,6 +110,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
     }
   }
 
+
   def findDeletableTopics(eitherErrorOrTopicAPTE: List[Either[ActivelyPublishedToError, String]],
                           eitherErrorOrTopicCSEE: List[Either[ConsumersStillExistError, String]]): List[String] = {
     def getOnlyTopics(list: List[Either[DeleteTopicError, String]]): List[String] = {
@@ -116,6 +121,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
     val goodList2 = getOnlyTopics(eitherErrorOrTopicCSEE)
     goodList1.filter { goodList2.contains(_) }
   }
+
 
   def findNondeletableTopics(eitherErrorOrTopicAPTE: List[Either[ActivelyPublishedToError, String]],
                              eitherErrorOrTopicCSEE: List[Either[ConsumersStillExistError, String]]): ValidatedNel[DeleteTopicError, Unit] = {
@@ -129,9 +135,11 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
       }.combineAll
   }
 
+
   def checkIfTopicExists(topicName: String): F[(String, Boolean)] = {
     kafkaAdmin.describeTopic(topicName).map(_.isDefined).map((topicName, _))
   }
+
 
   //consumer group should be pulled from prod, consumer group name will work for what you want it to work for
   def deleteTopics(topicNames: List[String], ignoreConsumerGroups: List[String], ignorePublishTime: Boolean): F[ValidatedNel[DeleteTopicError, Unit]] = {
