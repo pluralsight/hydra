@@ -1,0 +1,29 @@
+name: Continuous Integration
+
+on:
+  pull_request:
+    branches: ['*']
+  push:
+    branches: ['*']
+
+jobs:
+  build:
+    name: Build and Test
+    # strategy:
+    #   matrix:
+    #     os: [ubuntu-latest]
+    #     scala: [2.12.11]
+    #     java: [adopt@1.8]
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout current branch (full)
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Build sbt docker image
+        run: docker build -t scala-sbt-openjdk:2.12.11-1.5.8-1.8 .
+
+      - name: Build project
+        #run: sbt ++${{ matrix.scala }} test
+        run: docker run --rm -w /hydra -v $(pwd):/hydra scala-sbt-openjdk:2.12.11-1.5.8-1.8 sbt test
