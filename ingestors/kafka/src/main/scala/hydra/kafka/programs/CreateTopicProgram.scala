@@ -6,7 +6,7 @@ import hydra.avro.registry.SchemaRegistry.{IllegalLogicalTypeChange, IllegalLogi
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{Schemas, StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
-import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyAndValueMismatch, KeyHasNullableFields, NullableField, ValidationErrors}
+import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyAndValueMismatch, KeyHasNullableFields, NullableField, NullableFieldWithoutDefaultValue, NullableFieldsNeedDefaultValue, ValidationErrors}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
 import org.apache.avro.{LogicalType, Schema}
@@ -193,7 +193,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
 
   private def checkForNullableKeyFields(keyFields: List[Schema.Field]): Option[KeyHasNullableFields] = {
     val nullableKeyFields = keyFields.flatMap(field => field.schema().getType match {
-      case Schema.Type.UNION=>
+      case Schema.Type.UNION =>
         if (field.schema.getTypes.asScala.toList.exists(_.isNullable)) Some(NullableField(field.name(), field.schema())) else None
       case Schema.Type.NULL => Some(NullableField(field.name(), field.schema()))
       case _ => None
@@ -201,6 +201,20 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     if (nullableKeyFields.nonEmpty) {
       KeyHasNullableFields(nullableKeyFields).some
     } else None
+  }
+
+  private def checkForDefaultNullableValueFields(valueFields: List[Schema.Field]): Option[NullableFieldsNeedDefaultValue] = {
+    val errors = valueFields.flatMap { field => field.schema().getType match {
+        case Schema.Type.UNION => if (field.schema().getTypes.asScala.toList.exists(_.isNullable) && Option(field.defaultVal()).isEmpty)
+                                    Some(NullableFieldWithoutDefaultValue(field.name(), field.schema()))
+                                  else None
+        case _ => None
+      }
+    }
+
+    if (errors.nonEmpty) {
+      NullableFieldsNeedDefaultValue(errors).some
+    } else  None
   }
 
   private def checkForMismatches(keyFields: List[Schema.Field], valueFields: List[Schema.Field]): Option[IncompatibleKeyAndValueFieldNames] = {
@@ -233,9 +247,11 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
             v <- validateValueSchemaEvolution(schemas, subject)
           } yield {
             val keyFieldsCheckedForNullIfNecessary = if(request.streamType != StreamTypeV2.Event) checkForNullableKeyFields(keyFields) else None
+            val valueNullableFieldCheckedForDefault = if(request.streamType != StreamTypeV2.Event) checkForDefaultNullableValueFields(valueFields) else None
             List[Option[RuntimeException]](keyFieldIsEmpty,
               checkForMismatches(keyFields, valueFields),
               keyFieldsCheckedForNullIfNecessary,
+              valueNullableFieldCheckedForDefault,
               k,
               v).flatten
           }
@@ -280,10 +296,14 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
 object CreateTopicProgram {
   final case class KeyAndValueMismatch(fieldName: String, keyFieldSchema: Schema, valueFieldSchema: Schema)
   final case class NullableField(fieldName: String, keyFieldSchema: Schema)
+  final case class NullableFieldWithoutDefaultValue(fieldName: String, valueFieldSchema: Schema)
   final case class KeyHasNullableFields(errors: List[NullableField]) extends
     RuntimeException(
       (List("Fields within the key object cannot be nullable:", "Field Name\tKey Schema") ++ errors.map(e => s"${e.fieldName}\t${e.keyFieldSchema.toString}")).mkString("\n")
     )
+  final case class NullableFieldsNeedDefaultValue(error: List[NullableFieldWithoutDefaultValue]) extends RuntimeException(
+    (List("Nullable fields should have default value:", "Field Name\tValue Schema") ++ error.map(e => s"${e.fieldName}\t${e.valueFieldSchema.toString}")).mkString("\n")
+  )
   final case class IncompatibleKeyAndValueFieldNames(errors: List[KeyAndValueMismatch]) extends
     RuntimeException(
       (List("Fields with same names in key and value schemas must have same type:", "Field Name\tKey Schema\tValue Schema") ++ errors.map(e => s"${e.fieldName}\t${e.keyFieldSchema.toString}\t${e.valueFieldSchema}")).mkString("\n")
