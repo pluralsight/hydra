@@ -124,7 +124,8 @@ You should see something like:
 ### Topics Endpoints
 | Path       | HTTP Method | Description                                                                          |
 |------------|-------------|--------------------------------------------------------------------------------------|
-| /v2/topics | GET         | A list of all the registered topics currently managed by Hydra.                   |
+| /v2/topics | GET         | A list of all the registered topics currently managed by Hydra.  
+| /v2/topics/[NAME] | GET  | Get the current schema for requested topic.
 | /v2/topics/[NAME] | POST        | Create or update custom topics. Also registers key and value schemas in Schema Registry if applicable. |
 | /v2/topics/[NAME] | DELETE      | Delete topics. Requires authentication.
 
@@ -133,11 +134,11 @@ You should see something like:
 |---------------------------|---------------|------------------------------
 | /v2/topics/[NAME]/records | POST          | Creates a new record in the specified topic.
 
-# Taking the Beast for a Walk
+# Taking your Hydra for a Walk
 
-The first step to ingest messages is to create a topic.
+*"If you want to make a Kafka topic from scratch, you must first invent the universe."* -Carl Sagan
 
-## Create/Register a Topic
+## Create & Register a Topic
 
 We are using this topic to test:
 
@@ -234,7 +235,7 @@ You should see something like this:
 ```
 OK
 ```
-### Sending a message through HTTP
+### Feeding Your Hydra (with HTTP)
 
 ```bash
  curl -X POST -d '{"key": {"id":"7db11b7a-4560-4a86-b00b-6f380bfb1564"}, "value":{"myValue":"someValue"}}' -H 'Content-Type: application/json'  'http://localhost:8088/v2/topics/tech.my-first-topic/records'
@@ -261,10 +262,20 @@ Expected UUID but received 123
 [http://schema-registry:8081/subjects/tech.my-first-topic-key/versions/latest/schema]
 ```
 
-### TODO: V1 Info with Goofy Hydra
+##But what about v1?
+<img src="https://i.imgflip.com/62t69n.jpg"/>
+
+You may have noticed that the JSON above uses "/v2" endpoints. 
+Those of you capable of extrapolating from incomplete data sets may have questions about "/v1" endpoints. 
+They exist, but are deprecated. 
+If you prefer to use "/v1" endpoints, simply remove the "/v2" segment.
 
 # Online Documentation
-We highly recommend checking out the project documentation [here.](https://hydra-ps.atlassian.net/wiki/spaces/DES/overview)  There you can find the latest documentation about the ingestion protocol, Akka actors, including examples, API endpoints, and a lot more info on how to get started.
+We used to highly recommend checking out the project documentation [here](https://hydra-ps.atlassian.net/wiki/spaces/DES/overview), but then we forgot about it for two years. 
+We might get around to updating it in the future. 
+
+There you can find the "latest"
+<a href='https://c.tenor.com/0yi68Ri2JS4AAAAC/jameson-laugh.gif'><img id='jjonahjameson' style='height:30px; width: 30px' src='https://c.tenor.com/0yi68Ri2JS4AAAAC/jameson-laugh.gif' /></a> documentation about the Hydra project, including examples, API endpoints, and a lot more info on how to get started.
 
 This README file only contains basic definitions and set up instructions.
 
