@@ -134,7 +134,7 @@ You should see something like:
 |---------------------------|---------------|------------------------------
 | /v2/topics/[NAME]/records | POST          | Creates a new record in the specified topic.
 
-# Taking your Hydra for a Walk
+# How to Train Your Hydra
 
 *"If you want to make a Kafka topic from scratch, you must first invent the universe."* -Carl Sagan
 
