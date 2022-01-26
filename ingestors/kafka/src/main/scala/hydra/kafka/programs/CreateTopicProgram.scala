@@ -6,13 +6,15 @@ import hydra.avro.registry.SchemaRegistry.{IllegalLogicalTypeChange, IllegalLogi
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{Schemas, StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
-import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyAndValueMismatch, KeyHasNullableFields, NullableField, NullableFieldWithoutDefaultValue, NullableFieldsNeedDefaultValue, ValidationErrors}
+import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyAndValueMismatch, KeyHasNullableFields, NullableField, NullableFieldWithoutDefaultValue, NullableFieldsNeedDefaultValue, UnsupportedLogicalType, ValidationErrors, getLogicalType}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
 import org.apache.avro.{LogicalType, Schema}
 import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy, _}
 import cats.implicits._
+import hydra.avro.convert.IsoDate
+
 import scala.jdk.CollectionConverters.collectionAsScalaIterableConverter
 
 final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
@@ -153,6 +155,11 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     }
   }
 
+  private def checkForUnsupportedLogicalType(fields: List[Schema.Field]): Option[UnsupportedLogicalType] = {
+    val fieldsWithUnsupportedTypes = fields.filter(getLogicalType(_).contains(IsoDate.IsoDateLogicalTypeName))
+    Option(fieldsWithUnsupportedTypes).filter(_.nonEmpty).map(UnsupportedLogicalType)
+  }
+
   private def checkForIllegalLogicalTypeEvolutions(existingSchema: Schema, newSchema: Schema, name: String) : List[IllegalLogicalTypeChange] = existingSchema.getType match {
     case Schema.Type.RECORD =>
       newSchema.getType match {
@@ -248,10 +255,14 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
           } yield {
             val keyFieldsCheckedForNullIfNecessary = if(request.streamType != StreamTypeV2.Event) checkForNullableKeyFields(keyFields) else None
             val valueNullableFieldCheckedForDefault = if(request.streamType != StreamTypeV2.Event) checkForDefaultNullableValueFields(valueFields) else None
+            val keyFieldsCheckedUnsupportedLogicalType = if(request.streamType != StreamTypeV2.Event) checkForUnsupportedLogicalType(keyFields) else None
+            val valueFieldsCheckedUnsupportedLogicalType = if(request.streamType != StreamTypeV2.Event) checkForUnsupportedLogicalType(valueFields) else None
             List[Option[RuntimeException]](keyFieldIsEmpty,
               checkForMismatches(keyFields, valueFields),
               keyFieldsCheckedForNullIfNecessary,
               valueNullableFieldCheckedForDefault,
+              keyFieldsCheckedUnsupportedLogicalType,
+              valueFieldsCheckedUnsupportedLogicalType,
               k,
               v).flatten
           }
@@ -310,4 +321,13 @@ object CreateTopicProgram {
     )
   final case class ValidationErrors(listOfRuntimeException: List[RuntimeException]) extends
     RuntimeException(listOfRuntimeException.map(_.getMessage).mkString("\n"))
+
+  final case class UnsupportedLogicalType(unsupportedFields: List[Schema.Field]) extends
+    RuntimeException(
+      unsupportedFields.map(f => s"Field named '${f.name()}' has unsupported logical type '${getLogicalType(f)}'").mkString("\n")
+    )
+
+  protected def getLogicalType(field: Schema.Field): Option[String] =
+    Option(field.schema().getLogicalType)
+      .fold(Option(field.schema().getProp("logicalType")))(_.getName.some)
 }
