@@ -5,28 +5,7 @@
 [![Join the chat at https://gitter.im/pluralsight/hydra](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/pluralsight/hydra?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 
-Hydra is a real-time streaming and data replication platform that "unbundles" the receiving, transforming, 
-and production of data streams.
-
-It does so by abstracting these phases independently from each other while providing a unifying API across them.
-
-## Why Replication?
-The goal behind Hydra's replication protocol is to separate the ingestion of events from any transformation and storage.
-
-This replication paradigm allows a single event to be ingested, transformed, and then replicated in real-time to several different data systems (Kafka, Postgres, etc.)
-
-
-## Replication Phases
-
-### Receive
-The Receive phase receives "raw" data, converts it to a Hydra request containing a payload and metadata, and broadcasts the request to the underlying Hydra Ingestors.
-
-### Ingestion
-This phase involves matching the request with one or more ingestors, performing any data transformation and sending the request to a Transport.  Complex streaming operations, such as joins, cross-stream aggregations are outside the scope of the ingestion phase.
-
-### Transport
-The transport phase of the protocol the step at which the events are actually sent (produced) to the underlying data system.
-
+The Hydra platform provides a streamlined data streaming experience by abstracting away the underlying implementation, instead providing users a simple REST API.
 ## Hydra Modules
 
 ### Common
@@ -79,7 +58,7 @@ docker network create hydra
 
 ### Start Zookeeper
 
-Hydra uses Zookeeper as a coordination service to automate bootstrapping or joining a cluster.
+Hydra uses Zookeeper as a coordination service to automate bootstrapping and joining a cluster.
 
 It is also used by Kafka and the Schema Registry.
 
@@ -109,34 +88,18 @@ You can test Hydra has started by going to this resource:
 You should see something like:
 ```json
 {
-	"host": "40f4ccc69ad4",
-	"applicationName": "Container Service",
-	"applicationVersion": "1.0.0.N/A",
-	"containerVersion": "2.0.5.000",
-	"time": "2017-04-03T15:18:48Z",
-	"state": "OK",
-	"details": "All sub-systems report perfect health",
-	"checks": [{
-		"name": "services",
-		"state": "OK",
-		"details": "Currently managing 8 services",
-		"checks": []
-	}, {
-		"name": "Kafka",
-		"state": "OK",
-		"details": "",
-		"checks": []
-	}, {
-		"name": "metrics-reporting",
-		"state": "OK",
-		"details": "The system is currently not managing any metrics reporters",
-		"checks": []
-	}, {
-		"name": "http",
-		"state": "OK",
-		"details": "Currently connected on /0:0:0:0:0:0:0:0:8088",
-		"checks": []
-	}]
+  "BuildInfo": {
+    "builtAtMillis": "1639518050466",
+    "name": "hydra-ingest",
+    "scalaVersion": "2.12.11",
+    "version": "0.11.3.979",
+    "sbtVersion": "1.3.13",
+    "builtAtString": "2021-12-14 21:40:50.466"
+  },
+  "ConsumerGroupisActive": {
+    "ConsumerGroupName": "v2MetadataConsumer",
+    "State": true
+  }
 }
 ```
 
@@ -148,14 +111,6 @@ You should see something like:
 | /health  | GET         | A summary overview of the overall health of the system.  Includes health checks for Kafka.                                         |
 | /metrics | GET         | A collection of JVM-related memory and thread management metrics, including deadlocked threads, garbage collection run times, etc. |
 
-
-### Ingestion Endpoints
-| Path       | HTTP Method | Description                                                                          |
-|------------|-------------|--------------------------------------------------------------------------------------|
-| /ingestors | GET         | A list of all the registered ingestors currently managed by Hydra.                   |
-| /ingestors | POST        | Allows creation of custom (stateful ingestors.) Not yet available; version 0.8 only. |
-| /ingest    | POST        | Real-time ingestion and stream replication endpoint.  More info below.               |
-
 ### Schema Endpoints
 | Path | HTTP Method | Description |
 |------------------------------------|-------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -166,86 +121,129 @@ You should see something like:
 | /schemas/[NAME\/versions/[VERSION] | GET | Returns metadata for a specific version of a schema |
 | /schemas | POST | Registers a new schema with the registry. Use this for both new and existing schemas; for existing schemas, compatibility will be checked prior to registration. |
 
-### Transport Endpoints
-| Path                                     | HTTP Method | Description                                                                                                                                                                                                                                                                                                                                                    |
-|------------------------------------------|-------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| /transports/kafka/topics                 | GET         | Returns a list of all Kafka topics, including leader and ISR information.                                                                                                                                                                                                                                                                                      |
-| /transports/kafka/topics?names           | GET         | Returns a list of all topic names in Kafka.                                                                                                                                                                                                                                                                                                                    |
-| /transports/kafka/streaming/[TOPIC_NAME] | GET         | Creates an HTTP streaming response for a given Kafka topic, streaming from the latest offset. **Experimental.**  **Request Parameters:** - _group_ -  the group id for the request ('hydra' used by default.) - _format_ -  the topic format (defaults to 'avro'). - _ttl_ - The time to keep the stream alive if no records are received. (Defaults to 60 s.) |
-| /transports/kafka/consumers              | POST        | Creates a new consumer. **Not available yet; will be part of Hydra 0.9.0.**                                                                                                                                                                                                                                                                                    |
+### Topics Endpoints
+| Path       | HTTP Method | Description                                                                          |
+|------------|-------------|--------------------------------------------------------------------------------------|
+| /v2/topics | GET         | A list of all the registered topics currently managed by Hydra.                   |
+| /v2/topics/[NAME] | POST        | Create or update custom topics. Also registers key and value schemas in Schema Registry if applicable. |
+| /v2/topics/[NAME] | DELETE      | Delete topics. Requires authentication.
 
+### Records Endpoints
+| Path                      | HTTP Method   | Description
+|---------------------------|---------------|------------------------------
+| /v2/topics/[NAME]/records | POST          | Creates a new record in the specified topic.
 
-# Taking the beast to a test run
+# Taking the Beast for a Walk
 
-The first step to ingest messages is to create and register an Avro schema.
+The first step to ingest messages is to create a topic.
 
-## Create/Register a schema
+## Create/Register a Topic
 
-We are using this schema to test:
+We are using this topic to test:
 
 ```json
 {
-	"type": "record",
-	"namespace": "HydraTest",
-	"name": "exp.eng.docker",
-	"fields": [{
-		"name": "name",
-		"type": "string"
-	}, {
-		"name": "age",
-		"type": "int"
-	}]
+  "streamType": "Entity",
+  "deprecated": false,
+  "dataClassification": "InternalUseOnly",
+  "contact": {
+    "email": "john.doe@email.com"
+  },
+  "createdDate": "2022-01-25T12:00:00Z",
+  "notes": "Here are some notes.",
+  "parentSubjects": [],
+  "teamName": "team-john-doe",
+  "schemas": {
+    "key": {
+      "type": "record",
+      "name": "key",
+      "namespace": "",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "type":"string",
+            "logicalType":"uuid"
+          },
+          "doc":"This is a doc field."
+        }
+      ]
+    },
+    "value": {
+      "type": "record",
+      "name": "val",
+      "namespace": "dvs.data_platform.dvs_sandbox",
+      "fields": [
+        {
+          "name": "myValue",
+          "type": "string",
+          "doc":"It is my value."
+        }
+      ]
+    }
+  }
 }
 ```
 
 ### Post it to Hydra
 ```bash
-curl -X POST localhost:8088/schemas -d '{ "type": "record", "name": "HydraTest", "namespace": "exp.eng.docker", "fields": [{ "name": "name", "type": "string" }, { "name": "age", "type": "int" }] }'
+curl -X POST localhost:8088/topics/tech.my-first-topic -d '{
+  "streamType": "Entity",
+  "deprecated": false,
+  "dataClassification": "InternalUseOnly",
+  "contact": {
+    "email": "john.doe@email.com"
+  },
+  "createdDate": "2022-01-25T12:00:00Z",
+  "notes": "Here are some notes.",
+  "parentSubjects": [],
+  "teamName": "team-john-doe",
+  "schemas": {
+    "key": {
+      "type": "record",
+      "name": "Test2",
+      "namespace": "",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "type":"string",
+            "logicalType":"uuid"
+          },
+          "doc":"This is a doc field."
+        }
+      ]
+    },
+    "value": {
+      "type": "record",
+      "name": "Test2",
+      "namespace": "dvs.data_platform.dvs_sandbox",
+      "fields": [
+        {
+          "name": "myValue",
+          "type": "string",
+          "doc":"It is my value."
+        }
+      ]
+    }
+  }
+}'
 ```
 You should see something like this:
 
 ```
-{
-	"id": 1,
-	"version": 1,
-	"schema": "{ \"type\": \"record\", \"name\": \"HydraTest\", \"namespace\": \"exp.eng.docker\", \"fields\": [{ \"name\": \"name\", \"type\": \"string\" }, { \"name\": \"age\", \"type\": \"int\" }] }"
-}
+OK
 ```
-
-> You can also use any of the schemas endpoints above to interact with the schema registry.
-
-
 ### Sending a message through HTTP
 
 ```bash
- curl -X POST -H "Hydra-Kafka-Topic: exp.eng.docker.HydraTest"  -d  '{"name":"test","age":10}' "http://localhost:8088/ingest"
-```
+ curl -X POST -d '{"key": {"id":"7db11b7a-4560-4a86-b00b-6f380bfb1564"}, "value":{"myValue":"someValue"}}' -H 'Content-Type: application/json'  'http://localhost:8088/v2/topics/tech.my-first-topic/records'
+ ```
 
-> The schema is looked up from the schema registry using the Kafka topic name.  For topics with high throughout, it is best to provide the schema by using the "hydra-schema" header, as below:
-
-```bash
- curl -X POST -H "Hydra-Kafka-Topic: exp.eng.docker.HydraTest" -H "Hydra-Schema: exp.eng.docker.HydraTest#1"  -d  '{"name":"test","age":10}' "http://localhost:8088/ingest"
-```
-
-
-> The format of the hydra-schema header is ```[schema_name]#[schema_version]```.
-
-A sample ingestion response is:
+A sample Hydra response is:
 
 ```
-{
-	"requestId": "CawatHr1",
-	"status": {
-		"code": 200,
-		"message": "OK"
-	},
-	"ingestors": {
-		"kafka_ingestor": {
-			"code": 200,
-			"message": "OK"
-		}
-	}
-}
+{"offset":0,"partition":6}
 ```
 
 
@@ -253,40 +251,17 @@ A sample ingestion response is:
 Hydra validates payloads against the underlying schema.  For instance:
 
 ```bash
- curl -X POST -H "Hydra-Kafka-Topic: exp.eng.docker.HydraTest"  -d  '{"name":"test"}' "http://localhost:8088/ingest"
+curl -X POST -d '{"key": {"id":"123"}, "value":{"myValue":"someValue"}}' -H 'Content-Type: application/json'  'http://localhost:8088/v2/topics/tech.my-first-topic/records'
 ```
 
 Should return:
 ```
-{
-	"requestId": "mpTwYTsG",
-	"status": {
-		"code": 400,
-		"message": "Bad Request"
-	},
-	"ingestors": {
-		"kafka_ingestor": {
-			"code": 400,
-			"message": "com.pluralsight.hydra.avro.RequiredFieldMissingException: Field age (Type INT) is required, but it was not provided. [http://schema-registry:8081/ids/1]"
-		}
-	}
-}
+hydra.avro.convert.StringToGenericRecord$InvalidLogicalTypeError: Invalid logical type. 
+Expected UUID but received 123 
+[http://schema-registry:8081/subjects/tech.my-first-topic-key/versions/latest/schema]
 ```
 
-
-
-## Streaming (HTTP) from the Kafka Topic
-
-The `streaming` resource allows consumption of Kafka in real-time. 
-
-Example:
-
-```bash
-http://localhost:8088/transports/kafka/streaming/exp.eng.docker.HydraTest
-```
-
-You can leave a window/tab open in your browser and messages sent to that topic will stream through Hydra automatically.
-
+### TODO: V1 Info with Goofy Hydra
 
 # Online Documentation
 We highly recommend checking out the project documentation [here.](https://hydra-ps.atlassian.net/wiki/spaces/DES/overview)  There you can find the latest documentation about the ingestion protocol, Akka actors, including examples, API endpoints, and a lot more info on how to get started.
