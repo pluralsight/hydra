@@ -6,7 +6,7 @@ import hydra.avro.registry.SchemaRegistry.{IllegalLogicalTypeChange, IllegalLogi
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{Schemas, StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
-import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyAndValueMismatch, KeyHasNullableFields, NullableField, NullableFieldWithoutDefaultValue, NullableFieldsNeedDefaultValue, UnsupportedLogicalType, ValidationErrors, getLogicalType}
+import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyAndValueMismatch, KeyHasNullableFields, MetadataOnlyTopicDoesNotExist, NullableField, NullableFieldWithoutDefaultValue, NullableFieldsNeedDefaultValue, UnsupportedLogicalType, ValidationErrors, getLogicalType}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
 import org.apache.avro.{LogicalType, Schema}
@@ -278,10 +278,18 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   def createTopicFromMetadataOnly(
                                    topicName: Subject,
                                    createTopicRequest: TopicMetadataV2Request): F[Unit] = {
-    (for {
-      _ <- validateKeyAndValueSchemas(createTopicRequest, topicName)
-      _ <- Resource.liftF(publishMetadata(topicName, createTopicRequest))
-    } yield()).use(_ => Bracket[F, Throwable].unit)
+    for {
+      result <- kafkaAdmin.describeTopic(topicName.value)
+    } yield {
+      result match {
+        case Some(_) =>
+          (for {
+            _ <- validateKeyAndValueSchemas(createTopicRequest, topicName)
+            _ <- Resource.liftF(publishMetadata(topicName, createTopicRequest))
+          } yield()).use(_ => Bracket[F, Throwable].unit)
+        case None => Bracket[F, Throwable].raiseError(MetadataOnlyTopicDoesNotExist(topicName.value))
+      }
+    }
   }
 
   def createTopic(
@@ -326,6 +334,8 @@ object CreateTopicProgram {
     RuntimeException(
       unsupportedFields.map(f => s"Field named '${f.name()}' has unsupported logical type '${getLogicalType(f)}'").mkString("\n")
     )
+  final case class MetadataOnlyTopicDoesNotExist(topicName: String) extends
+    RuntimeException(s"You cannot add metadata for topic '${topicName}' if it does not exist in the cluster. Please create your topic first.")
 
   protected def getLogicalType(field: Schema.Field): Option[String] =
     Option(field.schema().getLogicalType)
