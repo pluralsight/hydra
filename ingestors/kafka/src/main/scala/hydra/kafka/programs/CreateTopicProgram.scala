@@ -275,21 +275,26 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     Resource.liftF(validate)
   }
 
-  def createTopicFromMetadataOnly(
-                                   topicName: Subject,
-                                   createTopicRequest: TopicMetadataV2Request): F[Unit] = {
-    for {
-      result <- kafkaAdmin.describeTopic(topicName.value)
+  def checkThatTopicExists(topicName: String): Resource[F, Unit] = {
+    val errors: F[Unit] =(for {
+      result <- kafkaAdmin.describeTopic(topicName)
     } yield {
       result match {
-        case Some(_) =>
-          (for {
-            _ <- validateKeyAndValueSchemas(createTopicRequest, topicName)
-            _ <- Resource.liftF(publishMetadata(topicName, createTopicRequest))
-          } yield()).use(_ => Bracket[F, Throwable].unit)
-        case None => Bracket[F, Throwable].raiseError(MetadataOnlyTopicDoesNotExist(topicName.value))
+        case Some(_) => Bracket[F, Throwable].pure(())
+        case None => Bracket[F, Throwable].raiseError(MetadataOnlyTopicDoesNotExist(topicName))
       }
-    }
+    })
+    Resource.liftF(errors)
+  }
+
+  def createTopicFromMetadataOnly(
+                                   topicName: Subject,
+                                   createTopicRequest: TopicMetadataV2Request) : F[Unit] = {
+    (for {
+      _ <- checkThatTopicExists(topicName.value)
+      _ <- validateKeyAndValueSchemas(createTopicRequest, topicName)
+      _ <- Resource.liftF(publishMetadata(topicName, createTopicRequest))
+    } yield()).use(_ => Bracket[F, Throwable].unit)
   }
 
   def createTopic(

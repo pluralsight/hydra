@@ -2016,6 +2016,23 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()
     }
 
+    "throw error creating topic from metadata only where topic doesn't exist" in {
+      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
+      val subject = Subject.createValidated("dvs.subject").get
+      val topicMetadataV2Request = createTopicMetadataRequest(keySchema, valueSchema)
+      val resource: Resource[IO, Assertion] = (for {
+        schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
+        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO]())
+        kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
+        metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
+        ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
+        _ <- ctProgram.registerSchemas(subject ,keySchema, valueSchema)
+        name <- Resource.liftF(ctProgram.createTopicFromMetadataOnly(subject, topicMetadataV2Request))
+      } yield fail("Should Fail to add Metadata - this yield should not be hit."))
+      resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()
+    }
+
+
     "throw error of schema nullable values don't have default value" in {
       val union = SchemaBuilder.unionOf().nullType().and().stringType().endUnion()
 
