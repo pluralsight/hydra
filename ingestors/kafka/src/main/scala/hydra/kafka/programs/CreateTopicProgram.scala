@@ -276,15 +276,14 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
   }
 
   def checkThatTopicExists(topicName: String): Resource[F, Unit] = {
-    val errors: F[Unit] =(for {
-      result <- kafkaAdmin.describeTopic(topicName)
-    } yield {
-      result match {
+    val topicExists = for (result <- kafkaAdmin.describeTopic(topicName)) yield result
+    val validated: F[Unit] = topicExists.flatMap { topic =>
+      topic match {
         case Some(_) => Bracket[F, Throwable].pure(())
         case None => Bracket[F, Throwable].raiseError(MetadataOnlyTopicDoesNotExist(topicName))
       }
-    })
-    Resource.liftF(errors)
+    }
+    Resource.liftF(validated)
   }
 
   def createTopicFromMetadataOnly(

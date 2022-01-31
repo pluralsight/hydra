@@ -2020,16 +2020,18 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
       val subject = Subject.createValidated("dvs.subject").get
       val topicMetadataV2Request = createTopicMetadataRequest(keySchema, valueSchema)
-      val resource: Resource[IO, Assertion] = (for {
+      an [MetadataOnlyTopicDoesNotExist] shouldBe thrownBy {
+        val resource: Resource[IO, Assertion] =(for {
         schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
         kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO]())
         kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
         metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
         ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
         _ <- ctProgram.registerSchemas(subject ,keySchema, valueSchema)
-        name <- Resource.liftF(ctProgram.createTopicFromMetadataOnly(subject, topicMetadataV2Request))
+        _ <- Resource.liftF(ctProgram.createTopicFromMetadataOnly(subject, topicMetadataV2Request))
       } yield fail("Should Fail to add Metadata - this yield should not be hit."))
-      resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()
+        resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()
+      }
     }
 
 
