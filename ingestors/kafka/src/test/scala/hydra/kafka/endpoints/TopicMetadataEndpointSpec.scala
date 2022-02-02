@@ -26,6 +26,7 @@ import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.ExecutionContext
 import hydra.kafka.programs.CreateTopicProgram
+import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.avro.{Schema, SchemaBuilder}
 import retry.{RetryPolicies, RetryPolicy}
 
@@ -112,6 +113,7 @@ class TopicMetadataEndpointSpec
     schema <- getSchema("dvs.test.subject")
     _ <- schemaRegistry.registerSchema(subjectKey, schema)
     _ <- schemaRegistry.registerSchema(subjectValue, schema)
+    _ <- ka.createTopic("dvs.test.subject", TopicDetails(1,1,1))
     metadataAlgebra <- MetadataAlgebra.make[IO](Subject.createValidated("_topicName.Bill").get, "I'm_A_Jerk", kafkaClient, schemaRegistry, consumeMetadataEnabled = false)
     tagsAlgebra <- TagsAlgebra.make[IO]("_hydra.tags-topic", "_hydra.tags-consumer",kafkaClient)
     _ <- tagsAlgebra.createOrUpdateTag(HydraTag("Source: DVS", "A valid source"))
@@ -297,6 +299,7 @@ class TopicMetadataEndpointSpec
        |}""".stripMargin
 
     "return 200 with proper metadata" in {
+      implicit val timeout = RouteTestTimeout(5.seconds)
       Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> route ~> check {
         response.status shouldBe StatusCodes.OK
       }
