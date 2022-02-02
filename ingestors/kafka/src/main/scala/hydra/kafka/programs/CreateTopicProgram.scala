@@ -255,13 +255,12 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
         .stringType()
         .noDefault()
         .endRecord().getFields.asScala.toList
-      val keyFields = schemas.key.getFields.asScala.toList
       val valueFields = schemas.value.getFields.asScala.toList
       val validationErrors = for {
         kv <- validateSchemaEvolutions(schemas, subject)
       } yield {
         val valueNullableFieldCheckedForDefault = checkForDefaultNullableValueFields(valueFields)
-        val keyFieldsCheckedUnsupportedLogicalType = checkForUnsupportedLogicalType(keyFields)
+        val keyFieldsCheckedUnsupportedLogicalType = checkForUnsupportedLogicalType(concoctedKeyFields)
         val valueFieldsCheckedUnsupportedLogicalType =  checkForUnsupportedLogicalType(valueFields)
         List[Option[RuntimeException]](
           checkForMismatches(concoctedKeyFields, valueFields),
@@ -288,8 +287,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     } yield {
       val keyFieldsCheckedForNull = if(isEventStream) none else checkForNullableKeyFields(keyFields)
       val valueNullableFieldCheckedForDefault = checkForDefaultNullableValueFields(valueFields)
-      val keyFieldsCheckedUnsupportedLogicalType = if(isEventStream) checkForUnsupportedLogicalType(keyFields) else None
-      val valueFieldsCheckedUnsupportedLogicalType = if(isEventStream) checkForUnsupportedLogicalType(valueFields) else None
+      val keyFieldsCheckedUnsupportedLogicalType = checkForUnsupportedLogicalType(keyFields)
+      val valueFieldsCheckedUnsupportedLogicalType = checkForUnsupportedLogicalType(valueFields)
       List[Option[RuntimeException]](
         checkForMismatches(keyFields, valueFields),
         keyFieldIsEmpty,
