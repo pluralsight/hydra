@@ -1,20 +1,16 @@
 package hydra.avro.registry
 
 import javax.security.auth.Subject
-
 import scala.collection.JavaConverters._
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-
 import cats.Eval
 import cats.effect.Sync
 import cats.kernel.Monoid
 import cats.syntax.all._
 import io.confluent.kafka.schemaregistry.avro.AvroCompatibilityChecker
-import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
-import io.confluent.kafka.schemaregistry.client.MockSchemaRegistryClient
-import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
+import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, MockSchemaRegistryClient, SchemaMetadata, SchemaRegistryClient}
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.LogicalType
 import org.apache.avro.LogicalTypes
@@ -203,12 +199,32 @@ object SchemaRegistry {
           schemas <- versions.traverse(getSchemaFor(subject, _)).map(_.flatten).checkKeyEvolution(subject, schema)
           validated <- Sync[F].pure(validate(schema, schemas.reverse))
           _ <- checkLogicalTypesCompat(schema)
+          latest <- getLatestSchemaBySubject(subject)
           schemaVersion <- if (validated) {
+            if(checkForOnlyDocFieldUpdate(schema, latest)) {
+              schemaRegistryClient.reset()
+            }
             Sync[F].delay(schemaRegistryClient.register(subject, schema))
           } else {
             Sync[F].raiseError[SchemaVersion](IncompatibleSchemaException("Incompatible Schema Evolution. You may add fields with default fields, or remove fields with default fields."))
           }
         } yield schemaVersion
+      }
+
+      def checkForOnlyDocFieldUpdate(schema: Schema, latest: Option[Schema]): Boolean = {
+        if(latest.isEmpty) {
+          false
+        } else {
+          val realLatest = latest.get
+          if (schema != null && schema.equals(realLatest)) {
+            val fieldDoc = schema.getFields.asScala.toList.map {field => field.doc()}
+            val latestDoc = realLatest.getFields.asScala.toList.map {field => field.doc()}
+            if(fieldDoc.diff(latestDoc).nonEmpty) {
+              return true
+            }
+          }
+          false
+        }
       }
 
       override def deleteSchemaOfVersion(

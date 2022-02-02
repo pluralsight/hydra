@@ -1,6 +1,7 @@
 {
-   "version":1,
+   "version":2,
    "team":"exp_data_platform",
-   "slack-channel":"#dev-data-platform",
+   "team-type":"okta",
+   "slack-channel":"#ask_adapt",
    "in-use":true
 }
