@@ -6,7 +6,7 @@ import hydra.avro.registry.SchemaRegistry.{IllegalLogicalTypeChange, IllegalLogi
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{Schemas, StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
-import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyAndValueMismatch, KeyAndValueNotRecordType, KeyHasNullableFields, NullableField, NullableFieldWithoutDefaultValue, NullableFieldsNeedDefaultValue, ValidationErrors}
+import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyAndValueMismatch, KeyAndValueNotRecordType, KeyHasNullableFields, NullableField, NullableFieldWithoutDefaultValue, NullableFieldsNeedDefaultValue, UnsupportedLogicalType, ValidationErrors, getLogicalType}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
 import org.apache.avro.{LogicalType, Schema, SchemaBuilder}
@@ -260,10 +260,15 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
         } yield {
           val keyFieldsCheckedForNull = if (!isEventStream) checkForNullableKeyFields(keyFields) else none
           val valueNullableFieldCheckedForDefault = checkForDefaultNullableValueFields(valueFields)
-          List[Option[RuntimeException]](valueNullableFieldCheckedForDefault,
+          val keyFieldsCheckedUnsupportedLogicalType = if(request.streamType != StreamTypeV2.Event) checkForUnsupportedLogicalType(keyFields) else None
+          val valueFieldsCheckedUnsupportedLogicalType = if(request.streamType != StreamTypeV2.Event) checkForUnsupportedLogicalType(valueFields) else None
+          List[Option[RuntimeException]](
+            checkForMismatches(keyFields, valueFields),
             keyFieldIsEmpty,
             keyFieldsCheckedForNull,
-            checkForMismatches(keyFields, valueFields),
+            keyFieldsCheckedUnsupportedLogicalType,
+            valueNullableFieldCheckedForDefault,
+            valueFieldsCheckedUnsupportedLogicalType,
             kv._1,
             kv._2).flatten
         }
@@ -280,6 +285,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
             .stringType()
             .noDefault()
             .endRecord().getFields.asScala.toList
+          val keyFields = schemas.key.getFields.asScala.toList
           val valueFields = schemas.value.getFields.asScala.toList
           val validationErrors = for {
             kv <- validateSchemaEvolutions(schemas, subject)
