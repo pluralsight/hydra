@@ -6,10 +6,10 @@ import hydra.avro.registry.SchemaRegistry.{IllegalLogicalTypeChange, IllegalLogi
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{Schemas, StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
-import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyAndValueMismatch, KeyHasNullableFields, MetadataOnlyTopicDoesNotExist, NullableField, NullableFieldWithoutDefaultValue, NullableFieldsNeedDefaultValue, UnsupportedLogicalType, ValidationErrors, getLogicalType}
+import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyAndValueMismatch, KeyAndValueNotRecordType, KeyHasNullableFields, MetadataOnlyTopicDoesNotExist, NullableField, NullableFieldWithoutDefaultValue, NullableFieldsNeedDefaultValue, UnsupportedLogicalType, ValidationErrors, getLogicalType}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
-import org.apache.avro.{LogicalType, Schema}
+import org.apache.avro.{LogicalType, Schema, SchemaBuilder}
 import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy, _}
 import cats.implicits._
@@ -239,40 +239,82 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     } else None
   }
 
+  private def validateSchemaEvolutions(schemas: Schemas, subject: Subject): F[(Option[IllegalLogicalTypeChangeErrors], Option[IllegalLogicalTypeChangeErrors])] =
+    for {
+      k <- validateKeySchemaEvolution(schemas, subject)
+      v <- validateValueSchemaEvolution(schemas, subject)
+    } yield (k,v)
+
+  private def validateKeyAndValueSchemasForStringRecordTypes(schemas: Schemas, subject: Subject, isEventStream: Boolean): F[Unit] = {
+    if (isEventStream) {
+      val concoctedKeyFields = SchemaBuilder
+        .record("uselessRecord") //This is a useless record whose only purpose is to transform the string key into a list of fields.
+        .fields()
+        .name(schemas.key.getName)
+        .`type`()
+        .stringType()
+        .noDefault()
+        .endRecord().getFields.asScala.toList
+      val valueFields = schemas.value.getFields.asScala.toList
+      val validationErrors = for {
+        kv <- validateSchemaEvolutions(schemas, subject)
+      } yield {
+        val valueNullableFieldCheckedForDefault = checkForDefaultNullableValueFields(valueFields)
+        val keyFieldsCheckedUnsupportedLogicalType = checkForUnsupportedLogicalType(concoctedKeyFields)
+        val valueFieldsCheckedUnsupportedLogicalType =  checkForUnsupportedLogicalType(valueFields)
+        List[Option[RuntimeException]](
+          checkForMismatches(concoctedKeyFields, valueFields),
+          keyFieldsCheckedUnsupportedLogicalType,
+          valueNullableFieldCheckedForDefault,
+          valueFieldsCheckedUnsupportedLogicalType,
+          kv._1,
+          kv._2).flatten
+      }
+      validationErrors.flatMap { validationErrors =>
+        if (validationErrors.nonEmpty) Bracket[F, Throwable].raiseError(ValidationErrors(validationErrors)) else Bracket[F, Throwable].pure(())
+      }
+    } else Bracket[F, Throwable].raiseError(KeyAndValueNotRecordType)
+  }
+
+  private def validateKeyAndValueSchemasForRecordRecordTypes(schemas: Schemas, subject: Subject, isEventStream: Boolean): F[Unit] = {
+    val keyFields = schemas.key.getFields.asScala.toList
+    val valueFields = schemas.value.getFields.asScala.toList
+    val keyFieldIsEmpty: Option[IncompatibleSchemaException] = if (keyFields.isEmpty) {
+      IncompatibleSchemaException("Must include Fields in Key").some
+    } else None
+    val validationErrors = for {
+      kv <- validateSchemaEvolutions(schemas, subject)
+    } yield {
+      val keyFieldsCheckedForNull = if(isEventStream) none else checkForNullableKeyFields(keyFields)
+      val valueNullableFieldCheckedForDefault = checkForDefaultNullableValueFields(valueFields)
+      val keyFieldsCheckedUnsupportedLogicalType = checkForUnsupportedLogicalType(keyFields)
+      val valueFieldsCheckedUnsupportedLogicalType = checkForUnsupportedLogicalType(valueFields)
+      List[Option[RuntimeException]](
+        checkForMismatches(keyFields, valueFields),
+        keyFieldIsEmpty,
+        keyFieldsCheckedForNull,
+        keyFieldsCheckedUnsupportedLogicalType,
+        valueNullableFieldCheckedForDefault,
+        valueFieldsCheckedUnsupportedLogicalType,
+        kv._1,
+        kv._2).flatten
+    }
+    validationErrors.flatMap { validationErrors =>
+      if (validationErrors.nonEmpty) Bracket[F, Throwable].raiseError(ValidationErrors(validationErrors)) else Bracket[F, Throwable].pure(())
+    }
+  }
+
   private def validateKeyAndValueSchemas(request: TopicMetadataV2Request, subject: Subject): Resource[F, Unit] = {
     val schemas = request.schemas
-    val validate: F[Unit] =
-      (schemas.key.getType, schemas.value.getType) match {
-        case (Schema.Type.RECORD, Schema.Type.RECORD) =>
-          val keyFields = schemas.key.getFields.asScala.toList
-          val valueFields = schemas.value.getFields.asScala.toList
-          val keyFieldIsEmpty: Option[IncompatibleSchemaException] = if (keyFields.isEmpty) {
-            IncompatibleSchemaException("Must include Fields in Key").some
-          } else None
-          val validationErrorsF: F[List[RuntimeException]] = for {
-            k <- validateKeySchemaEvolution(schemas, subject)
-            v <- validateValueSchemaEvolution(schemas, subject)
-          } yield {
-            val keyFieldsCheckedForNullIfNecessary = if(request.streamType != StreamTypeV2.Event) checkForNullableKeyFields(keyFields) else None
-            val valueNullableFieldCheckedForDefault = if(request.streamType != StreamTypeV2.Event) checkForDefaultNullableValueFields(valueFields) else None
-            val keyFieldsCheckedUnsupportedLogicalType = if(request.streamType != StreamTypeV2.Event) checkForUnsupportedLogicalType(keyFields) else None
-            val valueFieldsCheckedUnsupportedLogicalType = if(request.streamType != StreamTypeV2.Event) checkForUnsupportedLogicalType(valueFields) else None
-            List[Option[RuntimeException]](keyFieldIsEmpty,
-              checkForMismatches(keyFields, valueFields),
-              keyFieldsCheckedForNullIfNecessary,
-              valueNullableFieldCheckedForDefault,
-              keyFieldsCheckedUnsupportedLogicalType,
-              valueFieldsCheckedUnsupportedLogicalType,
-              k,
-              v).flatten
-          }
-          validationErrorsF.flatMap { validationErrors =>
-            if (validationErrors.nonEmpty) Bracket[F, Throwable].raiseError(ValidationErrors(validationErrors))
-            else Bracket[F, Throwable].pure(())
-          }
-        case _ => Bracket[F, Throwable].raiseError(IncompatibleSchemaException("Your key and value schemas must each be of type record. If you are adding metadata for a topic you created externally, you will need to register new key and value schemas"))
-      }
-    Resource.liftF(validate)
+    val isEventStream = request.streamType == StreamTypeV2.Event
+    val completedValidations: F[Unit] = (schemas.key.getType, schemas.value.getType) match {
+      case (Schema.Type.RECORD, Schema.Type.RECORD) =>
+        validateKeyAndValueSchemasForRecordRecordTypes(schemas, subject, isEventStream)
+      case (Schema.Type.STRING, Schema.Type.RECORD) =>
+        validateKeyAndValueSchemasForStringRecordTypes(schemas, subject, isEventStream)
+      case _ => Bracket[F, Throwable].raiseError(KeyAndValueNotRecordType)
+    }
+    Resource.liftF(completedValidations)
   }
 
   def checkThatTopicExists(topicName: String): Resource[F, Unit] = {
@@ -333,13 +375,15 @@ object CreateTopicProgram {
     )
   final case class ValidationErrors(listOfRuntimeException: List[RuntimeException]) extends
     RuntimeException(listOfRuntimeException.map(_.getMessage).mkString("\n"))
-
   final case class UnsupportedLogicalType(unsupportedFields: List[Schema.Field]) extends
     RuntimeException(
       unsupportedFields.map(f => s"Field named '${f.name()}' has unsupported logical type '${getLogicalType(f)}'").mkString("\n")
     )
   final case class MetadataOnlyTopicDoesNotExist(topicName: String) extends
     RuntimeException(s"You cannot add metadata for topic '${topicName}' if it does not exist in the cluster. Please create your topic first.")
+
+  val KeyAndValueNotRecordType =
+    IncompatibleSchemaException("Your key and value schemas must each be of type record. If you are adding metadata for a topic you created externally, you will need to register new key and value schemas")
 
   protected def getLogicalType(field: Schema.Field): Option[String] =
     Option(field.schema().getLogicalType)

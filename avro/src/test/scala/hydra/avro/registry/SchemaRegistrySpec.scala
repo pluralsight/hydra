@@ -57,7 +57,6 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
 
     val schema = recordBuilder(name).endRecord()
     val evolvedSchema = recordBuilder(name).nullableBoolean("nullBool", false).endRecord()
-
     for {
       _ <- schemaRegistry.registerSchema(subject, schema)
       _ <- schemaRegistry.registerSchema(subject, evolvedSchema)
@@ -65,6 +64,39 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
     } yield {
       it must "add a schema with an evolved schema" in {
         allVersions shouldBe List(1, 2)
+      }
+    }
+  }
+
+  private def testAddEvolutionForDocFieldChangeOnly[F[_]: Monad](
+                                             schemaRegistry: SchemaRegistry[F]
+                                           ): F[Unit] = {
+    val subject = "testSubjectAdd-value"
+    val name = "testSubjectAdd"
+
+    val schema = SchemaBuilder.record(name)
+      .fields()
+      .name("myField")
+      .doc("The ships hung in the sky in much the same way that bricks don't.")
+      .`type`().stringType()
+      .noDefault()
+      .endRecord()
+    val evolvedSchema = SchemaBuilder.record(name)
+      .fields()
+      .name("myField")
+      .doc("It is a mistake to think you can solve any major problems just with potatoes.")
+      .`type`().stringType()
+      .noDefault()
+      .endRecord()
+    for {
+      _ <- schemaRegistry.registerSchema(subject, schema)
+      _ <- schemaRegistry.registerSchema(subject, evolvedSchema)
+      allVersions <- schemaRegistry.getAllVersions(subject)
+      resultingSchema <- schemaRegistry.getLatestSchemaBySubject(subject)
+    } yield {
+      it must "add a schema with an evolved schema after only updating the doc field" in {
+        allVersions shouldBe List(1)
+        resultingSchema.orNull shouldBe evolvedSchema
       }
     }
   }
@@ -333,6 +365,7 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
     for {
       _ <- schemaRegistry.flatMap(testAddSubject[F])
       _ <- schemaRegistry.flatMap(testAddEvolution[F])
+      _ <- schemaRegistry.flatMap(testAddEvolutionForDocFieldChangeOnly[F])
       _ <- schemaRegistry.flatMap(testNoAddKeyNoEvolution[F])
       _ <- schemaRegistry.flatMap(testErrorKeyEvolution[F])
       _ <- schemaRegistry.flatMap(testDeleteSchemaVersion[F])
