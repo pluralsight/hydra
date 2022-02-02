@@ -245,8 +245,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       v <- validateValueSchemaEvolution(schemas, subject)
     } yield (k,v)
 
-  private def validateKeyAndValueSchemasForStringRecordTypes(schemas: Schemas, subject: Subject, isEventStream: Boolean): F[Unit] = {
-    if (isEventStream) {
+  private def validateKeyAndValueSchemasForStringRecordTypes(schemas: Schemas, subject: Subject, isKSQLTopic: Boolean): F[Unit] = {
+    if (isKSQLTopic) {
       val concoctedKeyFields = SchemaBuilder
         .record("uselessRecord") //This is a useless record whose only purpose is to transform the string key into a list of fields.
         .fields()
@@ -276,7 +276,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     } else Bracket[F, Throwable].raiseError(KeyAndValueNotRecordType)
   }
 
-  private def validateKeyAndValueSchemasForRecordRecordTypes(schemas: Schemas, subject: Subject, isEventStream: Boolean): F[Unit] = {
+  private def validateKeyAndValueSchemasForRecordRecordTypes(schemas: Schemas, subject: Subject, isKSQLTopic: Boolean): F[Unit] = {
     val keyFields = schemas.key.getFields.asScala.toList
     val valueFields = schemas.value.getFields.asScala.toList
     val keyFieldIsEmpty: Option[IncompatibleSchemaException] = if (keyFields.isEmpty) {
@@ -285,7 +285,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
     val validationErrors = for {
       kv <- validateSchemaEvolutions(schemas, subject)
     } yield {
-      val keyFieldsCheckedForNull = if(isEventStream) none else checkForNullableKeyFields(keyFields)
+      val keyFieldsCheckedForNull = if(isKSQLTopic) none else checkForNullableKeyFields(keyFields)
       val valueNullableFieldCheckedForDefault = checkForDefaultNullableValueFields(valueFields)
       val keyFieldsCheckedUnsupportedLogicalType = checkForUnsupportedLogicalType(keyFields)
       val valueFieldsCheckedUnsupportedLogicalType = checkForUnsupportedLogicalType(valueFields)
@@ -306,12 +306,12 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
 
   private def validateKeyAndValueSchemas(request: TopicMetadataV2Request, subject: Subject): Resource[F, Unit] = {
     val schemas = request.schemas
-    val isEventStream = request.streamType == StreamTypeV2.Event
+    val isKSQLTopic = request.tags.contains("KSQL")
     val completedValidations: F[Unit] = (schemas.key.getType, schemas.value.getType) match {
       case (Schema.Type.RECORD, Schema.Type.RECORD) =>
-        validateKeyAndValueSchemasForRecordRecordTypes(schemas, subject, isEventStream)
+        validateKeyAndValueSchemasForRecordRecordTypes(schemas, subject, isKSQLTopic)
       case (Schema.Type.STRING, Schema.Type.RECORD) =>
-        validateKeyAndValueSchemasForStringRecordTypes(schemas, subject, isEventStream)
+        validateKeyAndValueSchemasForStringRecordTypes(schemas, subject, isKSQLTopic)
       case _ => Bracket[F, Throwable].raiseError(KeyAndValueNotRecordType)
     }
     Resource.liftF(completedValidations)

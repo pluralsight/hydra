@@ -75,7 +75,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       List.empty
     )
 
-  private def createEventStreamTypeTopicMetadataRequest(
+  private def createEventStreamTypeKSQLTopicMetadataRequest(
                                           keySchema: Schema,
                                           valueSchema: Schema,
                                           email: String = "test@test.com",
@@ -83,7 +83,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
                                           deprecated: Boolean = false,
                                           deprecatedDate: Option[Instant] = None,
                                           numPartitions: Option[NumPartitions] = None,
-                                          tags: Option[Map[String,String]] = None
+                                          tags: Option[Map[String,String]] = None,
                                         ): TopicMetadataV2Request =
     TopicMetadataV2Request(
       Schemas(keySchema, valueSchema),
@@ -97,7 +97,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
       None,
       Some("dvs-teamName"),
       numPartitions,
-      List.empty
+      List("KSQL")
     )
 
   "CreateTopicSpec" must {
@@ -646,7 +646,7 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           metadata
         ).createTopic(
           Subject.createValidated("dvs.subject").get,
-          createEventStreamTypeTopicMetadataRequest(recordWithNullDefault, valueSchema),
+          createEventStreamTypeKSQLTopicMetadataRequest(recordWithNullDefault, valueSchema),
           TopicDetails(1, 1, 1)
         )
       } yield succeed).unsafeRunSync()
@@ -708,13 +708,13 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           metadata
         ).createTopic(
           Subject.createValidated("dvs.subject").get,
-          createEventStreamTypeTopicMetadataRequest(recordWithNullType, valueSchema),
+          createEventStreamTypeKSQLTopicMetadataRequest(recordWithNullType, valueSchema),
           TopicDetails(1, 1, 1)
         )
       } yield succeed).unsafeRunSync()
     }
 
-    "do not throw error on topic with key that has field with non-record type if streamType is 'Event'" in {
+    "do not throw error on topic with key that has field with non-record type if topic contains KSQL tag" in {
       val stringType =
         """
           |{
@@ -738,13 +738,13 @@ class CreateTopicProgramSpec extends AnyWordSpecLike with Matchers {
           metadata
         ).createTopic(
           Subject.createValidated("dvs.subject").get,
-          createEventStreamTypeTopicMetadataRequest(stringTypeKeySchema, valueSchema),
+          createEventStreamTypeKSQLTopicMetadataRequest(stringTypeKeySchema, valueSchema),
           TopicDetails(1, 1, 1)
         )
       } yield succeed).unsafeRunSync()
     }
 
-    "throw error on topic with key that has field with non-record type if streamType is NOT 'Event'" in {
+    "throw error on topic with key that has field with non-record type if topic doesn't contain KSQL tag" in {
       val stringType =
         """
           |{
