@@ -75,7 +75,7 @@ object KafkaUtils extends ConfigSupport {
       numPartitions: Int,
       replicationFactor: Short,
       minInsyncReplicas: Short,
-      private val partialConfig: Map[String, String] = Map.empty
+      private[kafka] val partialConfig: Map[String, String] = Map.empty
   ) {
     val configs: Map[String, String] = partialConfig + ("min.insync.replicas" -> minInsyncReplicas.toString)
   }

@@ -331,6 +331,10 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
                    createTopicRequest: TopicMetadataV2Request,
                    defaultTopicDetails: TopicDetails
                  ): F[Unit] = {
+
+    if(createTopicRequest.streamType == StreamTypeV2.Entity) {
+      defaultTopicDetails.copy(partialConfig = defaultTopicDetails.partialConfig + ("cleanup.policy" -> "compact"))
+    }
     val td = createTopicRequest.numPartitions.map(numP =>
       defaultTopicDetails.copy(numPartitions = numP.value)).getOrElse(defaultTopicDetails)
     (for {
