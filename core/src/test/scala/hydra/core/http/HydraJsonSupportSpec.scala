@@ -91,16 +91,16 @@ class HydraJsonSupportSpec
     it("converts StreamType objects") {
 
       val hist = JsString("History")
-      hist.convertTo[StreamType] shouldBe History
+      hist.convertTo[StreamType] shouldBe StreamType.History
       val curr = JsString("CurrentState")
-      curr.convertTo[StreamType] shouldBe CurrentState
+      curr.convertTo[StreamType] shouldBe StreamType.CurrentState
       val notf = JsString("Notification")
-      notf.convertTo[StreamType] shouldBe Notification
+      notf.convertTo[StreamType] shouldBe StreamType.Notification
       val tel = JsString("Telemetry")
-      tel.convertTo[StreamType] shouldBe Telemetry
+      tel.convertTo[StreamType] shouldBe StreamType.Telemetry
 
       intercept[DeserializationException] {
-        JsString("dummy").convertTo[StreamType] shouldBe History
+        JsString("dummy").convertTo[StreamType] shouldBe StreamType.History
       }
 
     }
