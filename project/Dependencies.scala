@@ -66,7 +66,7 @@ object Dependencies {
 
     val sprayJson = "io.spray" %% "spray-json" % sprayJsonVersion
 
-    val retry = "com.softwaremill.retry" %% "retry" % "0.3.3"
+    val retry = "com.softwaremill.retry" %% "retry" % "0.3.4"
 
     val embeddedKafka = "io.github.embeddedkafka" %% "embedded-kafka" % "2.4.1.1" % "test"
 
