@@ -233,7 +233,7 @@ sealed trait TopicMetadataV2Parser
       val t = schema.getType
       t match {
         case Schema.Type.RECORD =>
-          val currentNamespace = Option(schema.getNamespace).exists(f => f.contains("-"))
+          val currentNamespace = Option(schema.getNamespace).exists(f => !f.matches("^[A-Za-z0-9_\\.]*"))
           val allRecords = schema.getFields.asScala.toList.exists(f => isNamespaceInvalid(f.schema()))
           currentNamespace || allRecords
         case _ => false
@@ -250,7 +250,7 @@ sealed trait TopicMetadataV2Parser
 
       if(isNamespaceInvalid(schema)) {
         throw DeserializationException(InvalidSchema(json, isKey,
-          Some(InvalidNamespace("Invalid character dash (-)"))).errorMessage)
+          Some(InvalidNamespace("Invalid character. Namespace must conform to regex ^[A-Za-z0-9_\\.]*"))).errorMessage)
       } else {
         schema
       }

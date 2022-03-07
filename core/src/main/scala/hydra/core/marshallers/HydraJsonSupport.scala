@@ -137,10 +137,10 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
   implicit object StreamTypeFormat extends RootJsonFormat[StreamType] {
 
     def read(json: JsValue): StreamType = json match {
-      case JsString("Notification") => Notification
-      case JsString("History")      => History
-      case JsString("CurrentState") => CurrentState
-      case JsString("Telemetry")    => Telemetry
+      case JsString("Notification") => StreamType.Notification
+      case JsString("History")      => StreamType.History
+      case JsString("CurrentState") => StreamType.CurrentState
+      case JsString("Telemetry")    => StreamType.Telemetry
       case _ => {
         import scala.reflect.runtime.{universe => ru}
         val tpe = ru.typeOf[StreamType]
@@ -182,7 +182,10 @@ case class GenericSchema(name: String, namespace: String) {
 }
 
 sealed trait StreamType
-case object Notification extends StreamType
-case object CurrentState extends StreamType
-case object History extends StreamType
-case object Telemetry extends StreamType
+
+object StreamType {
+  case object Notification extends StreamType
+  case object CurrentState extends StreamType
+  case object History      extends StreamType
+  case object Telemetry    extends StreamType
+}

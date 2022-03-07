@@ -133,8 +133,15 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
                    createTopicRequest: TopicMetadataV2Request,
                    defaultTopicDetails: TopicDetails
                  ): F[Unit] = {
-    val td = createTopicRequest.numPartitions.map(numP =>
-      defaultTopicDetails.copy(numPartitions = numP.value)).getOrElse(defaultTopicDetails)
+    def getCleanupPolicyConfig: Map[String, String] =
+      createTopicRequest.streamType match {
+        case StreamTypeV2.Entity => Map("cleanup.policy" -> "compact")
+        case _ => Map.empty
+      }
+
+    val td = createTopicRequest.numPartitions.fold(defaultTopicDetails)(numP =>
+      defaultTopicDetails.copy(numPartitions = numP.value))
+      .copy(partialConfig = defaultTopicDetails.configs ++ getCleanupPolicyConfig)
     (for {
       _ <- Resource.liftF(keyAndValueSchemaV2Validator.validate(createTopicRequest, topicName))
       _ <- registerSchemas(
