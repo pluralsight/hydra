@@ -25,7 +25,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.ExecutionContext
-import hydra.kafka.programs.CreateTopicProgram
+import hydra.kafka.programs.{CreateTopicProgram, KeyAndValueSchemaV2Validator}
 import org.apache.avro.{Schema, SchemaBuilder}
 import retry.{RetryPolicies, RetryPolicy}
 
@@ -86,7 +86,8 @@ class TopicMetadataEndpointSpec
         kc,
         retryPolicy,
         Subject.createValidated("dvs.hello-world").get,
-        m
+        m,
+        KeyAndValueSchemaV2Validator.make(s)
       )
   }
 

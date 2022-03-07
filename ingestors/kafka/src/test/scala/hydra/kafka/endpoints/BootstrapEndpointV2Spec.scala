@@ -12,7 +12,7 @@ import hydra.kafka.algebras.{HydraTag, KafkaAdminAlgebra, KafkaClientAlgebra, Me
 import hydra.kafka.model.ContactMethod.{Email, Slack}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
-import hydra.kafka.programs.CreateTopicProgram
+import hydra.kafka.programs.{CreateTopicProgram, KeyAndValueSchemaV2Validator}
 import hydra.kafka.serializers.TopicMetadataV2Parser
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
@@ -54,7 +54,8 @@ final class BootstrapEndpointV2Spec
         kc,
         retryPolicy,
         Subject.createValidated("dvs.hello-world").get,
-        m
+        m,
+        KeyAndValueSchemaV2Validator.make(s)
       ),
       TopicDetails(1, 1, 1),
       t

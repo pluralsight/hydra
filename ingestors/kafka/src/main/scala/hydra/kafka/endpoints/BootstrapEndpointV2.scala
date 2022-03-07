@@ -23,13 +23,12 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
 import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
 import hydra.common.util.Futurable
 import hydra.core.http.CorsSupport
-import hydra.core.marshallers.GenericError
 import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.kafka.algebras.TagsAlgebra
 import hydra.kafka.model.TopicMetadataV2Request
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.programs.CreateTopicProgram
-import hydra.kafka.programs.CreateTopicProgram.ValidationErrors
+import hydra.kafka.programs.{CreateTopicProgram, ValidationError}
+import hydra.kafka.programs.ValidationError.ValidationCombinedErrors
 import hydra.kafka.serializers.TopicMetadataV2Parser
 import hydra.kafka.util.KafkaUtils.TopicDetails
 
@@ -70,9 +69,9 @@ final class BootstrapEndpointV2[F[_]: Futurable](
                               case Failure(IncompatibleSchemaException(m))=>
                                 addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(s"$IncompatibleSchemaException"))
                                 complete(StatusCodes.BadRequest, m)
-                              case Failure(ValidationErrors(b))=>
-                                addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(s"$ValidationErrors"))
-                                complete(StatusCodes.BadRequest, b.map(err => err.getMessage).mkString(","))
+                              case Failure(error: ValidationError)=>
+                                addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(s"$ValidationCombinedErrors"))
+                                complete(StatusCodes.BadRequest, error.message)
                               case Failure(e) =>
                                 addHttpMetric(topicName, StatusCodes.InternalServerError, "V2Bootstrap", startTime, "PUT", error = Some(e.getMessage))
                                 complete(StatusCodes.InternalServerError, e)
