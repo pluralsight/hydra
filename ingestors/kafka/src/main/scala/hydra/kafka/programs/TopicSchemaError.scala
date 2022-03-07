@@ -29,4 +29,8 @@ object TopicSchemaError {
   case class IncompatibleKeyAndValueFieldNamesError(fieldName: String, keyFieldSchema: Schema, valueFieldSchema: Schema) extends TopicSchemaError {
     override val message: String = s"Fields with same names in key and value schemas must have same type: field name = $fieldName, key schema = $keyFieldSchema, value schema = $valueFieldSchema."
   }
+
+  case class UnsupportedLogicalType(unsupportedField: Schema.Field, unsupportedLogicalType: String) extends TopicSchemaError {
+    override val message: String =  s"Field named '${unsupportedField.name()}' has unsupported logical type '$unsupportedLogicalType'"
+  }
 }

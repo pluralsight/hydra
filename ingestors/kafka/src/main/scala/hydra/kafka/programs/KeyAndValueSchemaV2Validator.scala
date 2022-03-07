@@ -3,12 +3,13 @@ package hydra.kafka.programs
 import cats.MonadThrow
 import cats.data.{NonEmptyChain, Validated}
 import cats.syntax.all._
+import hydra.avro.convert.IsoDate
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.model.{Schemas, StreamTypeV2, TopicMetadataV2Request}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.TopicSchemaError._
 import hydra.kafka.programs.Validator.ValidationChain
-import org.apache.avro.Schema
+import org.apache.avro.{Schema, SchemaBuilder}
 
 import scala.jdk.CollectionConverters.collectionAsScalaIterableConverter
 
@@ -17,32 +18,72 @@ class KeyAndValueSchemaV2Validator[F[_]: MonadThrow] private (schemaRegistry: Sc
     val schemas = request.schemas
 
     (schemas.key.getType, schemas.value.getType) match {
-      case (Schema.Type.RECORD, Schema.Type.RECORD) => validateRecordTypeSchemas(schemas, subject, request.streamType)
+      case (Schema.Type.RECORD, Schema.Type.RECORD) => validateRecordRecordTypeSchemas(schemas, subject, request.streamType)
+      case (Schema.Type.STRING, Schema.Type.RECORD) if request.tags.contains("KSQL") => validateKSQLSchemas(schemas, subject, request.streamType)
       case _                                        => resultOf(Validated.Invalid(NonEmptyChain.one(InvalidSchemaTypeError)))
     }
   }
 
-  private def validateRecordTypeSchemas(schemas: Schemas, subject: Subject, streamType: StreamTypeV2): F[Unit] = {
+  private def validateKSQLSchemas(schemas: Schemas, subject: Subject, streamType: StreamTypeV2): F[Unit] = {
+    val concoctedKeyFields = SchemaBuilder
+      .record("uselessRecord") //This is a useless record whose only purpose is to transform the string key into a list of fields.
+      .fields()
+      .name(schemas.key.getName)
+      .`type`()
+      .stringType()
+      .noDefault()
+      .endRecord().getFields.asScala.toList
+
+    val valueFields = schemas.value.getFields.asScala.toList
+    val validators = for {
+        keySchemaEvolutionValidationResult         <- validateKeySchemaEvolution(schemas, subject)
+        valueSchemaEvolutionValidationResult       <- validateValueSchemaEvolution(schemas, subject)
+        defaultNullableValueFieldsValidationResult <- checkForDefaultNullableValueFields(valueFields, streamType)
+        unsupportedLogicalTypesKey                 <- checkForUnsupportedLogicalType(concoctedKeyFields)
+        unsupportedLogicalTypesValues              <- checkForUnsupportedLogicalType(valueFields)
+        mismatchesValidationResult                 <- checkForMismatches(concoctedKeyFields, valueFields)
+      } yield {
+        keySchemaEvolutionValidationResult ++
+          valueSchemaEvolutionValidationResult ++
+          defaultNullableValueFieldsValidationResult ++
+          unsupportedLogicalTypesKey ++
+          unsupportedLogicalTypesValues ++
+          mismatchesValidationResult
+      }
+
+    resultOf(validators)
+  }
+
+  private def validateRecordRecordTypeSchemas(schemas: Schemas, subject: Subject, streamType: StreamTypeV2): F[Unit] = {
     val keyFields   = schemas.key.getFields.asScala.toList
     val valueFields = schemas.value.getFields.asScala.toList
 
     val validators = for {
       keyFieldsValidationResult                  <- validateKeyFields(keyFields)
-      keySchemaEvolutionValidationResult         <- validateKeySchemaEvolution(schemas, subject: Subject)
-      valueSchemaEvolutionValidationResult       <- validateValueSchemaEvolution(schemas, subject: Subject)
+      keySchemaEvolutionValidationResult         <- validateKeySchemaEvolution(schemas, subject)
+      valueSchemaEvolutionValidationResult       <- validateValueSchemaEvolution(schemas, subject)
       mismatchesValidationResult                 <- checkForMismatches(keyFields, valueFields)
       nullableKeyFieldsValidationResult          <- checkForNullableKeyFields(keyFields, streamType)
       defaultNullableValueFieldsValidationResult <- checkForDefaultNullableValueFields(valueFields, streamType)
+      unsupportedLogicalTypesKey                 <- checkForUnsupportedLogicalType(keyFields)
+      unsupportedLogicalTypesValues              <- checkForUnsupportedLogicalType(valueFields)
     } yield {
         (keyFieldsValidationResult +: keySchemaEvolutionValidationResult) ++
         valueSchemaEvolutionValidationResult ++
         mismatchesValidationResult ++
         nullableKeyFieldsValidationResult ++
-        defaultNullableValueFieldsValidationResult
+        defaultNullableValueFieldsValidationResult ++
+        unsupportedLogicalTypesKey ++
+        unsupportedLogicalTypesValues
     }
 
     resultOf(validators)
   }
+
+  private def checkForUnsupportedLogicalType(fields: List[Schema.Field]): F[List[ValidationChain]] =
+    fields.map { field =>
+      validate(!getLogicalType(field.schema()).contains(IsoDate.IsoDateLogicalTypeName), UnsupportedLogicalType(field, getLogicalType(field.schema()).getOrElse("")))
+    }.pure
 
   private def validateKeyFields(keyFields: List[Schema.Field]): F[ValidationChain] =
     validate(keyFields.nonEmpty, TopicSchemaError.KeyIsEmptyError).pure
@@ -114,7 +155,7 @@ class KeyAndValueSchemaV2Validator[F[_]: MonadThrow] private (schemaRegistry: Sc
       }
 
     valueFields.map(field =>
-      validate(streamType == StreamTypeV2.Event || validateIfFieldIsNullable(field), NullableFieldWithoutDefaultValueError(field.name(), field.schema()))
+      validate(validateIfFieldIsNullable(field), NullableFieldWithoutDefaultValueError(field.name(), field.schema()))
     ).pure
   }
 

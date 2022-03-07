@@ -2,6 +2,7 @@ package hydra.kafka.programs
 
 import cats.effect._
 import cats.syntax.all._
+
 import java.time.Instant
 import cats.data.NonEmptyList
 import cats.effect.concurrent.Ref
@@ -26,8 +27,10 @@ import org.scalatest.matchers.should.Matchers
 import retry.{RetryPolicies, RetryPolicy}
 import eu.timepit.refined._
 import hydra.kafka.IOSuite
+
 import scala.concurrent.ExecutionContext
 import hydra.kafka.model.TopicMetadataV2Request.NumPartitions
+import hydra.kafka.programs.CreateTopicProgramSpec.valueSchema
 import hydra.kafka.programs.TopicSchemaError._
 import org.apache.kafka.common.TopicPartition
 import org.scalatest.freespec.AsyncFreeSpec
@@ -1270,6 +1273,104 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       result.attempt.map(_ shouldBe NullableFieldWithoutDefaultValueError("itsnullable", nullableValue.getFields.asScala.head.schema()).asLeft)
     }
+
+    "do not throw error on topic with key that has field with non-record type if topic contains KSQL tag" in {
+      val stringType =
+        """
+          |{
+          |  "type": "string",
+          |  "name": "test"
+          |}
+        """.stripMargin
+      val stringTypeKeySchema = new Schema.Parser().parse(stringType)
+      for {
+        ts <- initTestServices()
+        _  <- ts.program.createTopic(subject,
+          createEventStreamTypeTopicMetadataRequest(stringTypeKeySchema, valueSchema, tags = List("KSQL")),
+          topicDetails)
+      } yield succeed
+    }
+
+    "throw error on topic with key that has field with non-record type if topic doesn't contain KSQL tag" in {
+      val stringType =
+        """
+          |{
+          |  "type": "string",
+          |  "name": "test"
+          |}
+        """.stripMargin
+      val stringTypeKeySchema = new Schema.Parser().parse(stringType)
+      val result = for {
+        ts <- initTestServices()
+        _  <- ts.program.createTopic(subject,
+          createEventStreamTypeTopicMetadataRequest(stringTypeKeySchema, valueSchema),
+          topicDetails)
+      } yield ()
+
+      result.attempt.map(_ shouldBe InvalidSchemaTypeError.asLeft)
+    }
+
+    "throw error if schema with key that has field of logical type iso-datetime" in {
+      val key =
+        """
+          |{
+          |  "type": "record",
+          |  "name": "Date",
+          |  "fields": [
+          |    {
+          |      "name": "timestamp",
+          |      "type":{
+          |        "type": "string",
+          |        "logicalType": "iso-datetime"
+          |      }
+          |    }
+          |  ]
+          |}
+      """.stripMargin
+      val keySchema = new Schema.Parser().parse(key)
+
+      val result = for {
+        ts <- initTestServices()
+        _ <- ts.program.createTopic(
+          subject,
+          createTopicMetadataRequest(keySchema, valueSchema),
+          topicDetails
+        )
+      } yield ()
+
+      result.attempt.map(_ shouldBe UnsupportedLogicalType(keySchema.getField("timestamp"), "iso-datetime").asLeft)
+    }
+
+    "throw error if schema with value that has field of logical type iso-datetime" in {
+      val value =
+        """
+          |{
+          |  "type": "record",
+          |  "name": "Date",
+          |  "fields": [
+          |    {
+          |      "name": "timestamp",
+          |      "type":{
+          |        "type": "string",
+          |        "logicalType": "iso-datetime"
+          |      }
+          |    }
+          |  ]
+          |}
+      """.stripMargin
+      val valueSchema = new Schema.Parser().parse(value)
+
+      val result = for {
+        ts <- initTestServices()
+        _ <- ts.program.createTopic(
+          subject,
+          createTopicMetadataRequest(keySchema, valueSchema),
+          topicDetails
+        )
+      } yield ()
+
+      result.attempt.map(_ shouldBe UnsupportedLogicalType(valueSchema.getField("timestamp"), "iso-datetime").asLeft)
+    }
   }
 
   type Record = (GenericRecord, Option[GenericRecord], Option[Headers])
@@ -1393,6 +1494,7 @@ object CreateTopicProgramSpec {
                                                  deprecated: Boolean = false,
                                                  deprecatedDate: Option[Instant] = None,
                                                  numPartitions: Option[NumPartitions] = None,
+                                                 tags: List[String] = List.empty
                                                ): TopicMetadataV2Request =
     TopicMetadataV2Request(
       Schemas(keySchema, valueSchema),
@@ -1406,7 +1508,7 @@ object CreateTopicProgramSpec {
       None,
       Some("dvs-teamName"),
       numPartitions,
-      List.empty
+      tags
     )
 
   def getSchema(name: String): Schema =
