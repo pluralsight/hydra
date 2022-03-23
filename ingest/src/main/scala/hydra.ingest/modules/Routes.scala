@@ -5,19 +5,16 @@ import akka.http.scaladsl.server.directives.RouteDirectives
 import akka.http.scaladsl.server.{Route, RouteConcatenation}
 import cats.effect.Sync
 import hydra.avro.registry.ConfluentSchemaRegistry
-import hydra.avro.util.SchemaWrapper
 import hydra.common.config.ConfigSupport
 import hydra.common.util.{ActorUtils, Futurable}
 import hydra.core.http.CorsSupport
 import hydra.ingest.app.AppConfig.AppConfig
 import hydra.ingest.http._
 import hydra.kafka.consumer.KafkaConsumerProxy
-import hydra.kafka.endpoints.{BootstrapEndpoint, BootstrapEndpointV2, ConsumerGroupsEndpoint, TagsEndpoint, TopicMetadataEndpoint, TopicsEndpoint}
+import hydra.kafka.endpoints._
 import hydra.kafka.services.StreamsManagerActor
 import hydra.kafka.util.KafkaUtils
 import hydra.kafka.util.KafkaUtils.TopicDetails
-import scalacache.Cache
-import scalacache.guava.GuavaCache
 
 import scala.concurrent.ExecutionContext
 
