@@ -26,8 +26,10 @@ import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.ExecutionContext
 import hydra.kafka.programs.{CreateTopicProgram, KeyAndValueSchemaV2Validator}
-import org.apache.avro.{Schema, SchemaBuilder}
+import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import retry.{RetryPolicies, RetryPolicy}
+
+import java.time.Instant
 
 
 class TopicMetadataEndpointSpec
@@ -99,6 +101,16 @@ class TopicMetadataEndpointSpec
         .`type`()
         .stringType()
         .noDefault()
+        .name("doc")
+        .`type`()
+        .stringType()
+        .stringDefault("some text")
+        .name("createdAt")
+        .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+        .withDefault(Instant.now().toEpochMilli)
+        .name("updatedAt")
+        .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+        .withDefault(Instant.now().toEpochMilli)
         .endRecord()
     }
 
