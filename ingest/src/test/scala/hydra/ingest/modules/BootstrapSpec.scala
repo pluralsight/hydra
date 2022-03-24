@@ -56,8 +56,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
         kafkaClient,
         retry,
         metadataSubjectV2,
-        metadata,
-        KeyAndValueSchemaV2Validator.make(schemaRegistry)
+        metadata
       )
       boot <- Bootstrap.make[IO](c, metadataConfig, consumersTopicConfig, consumerOffsetsOffsetsTopicConfig, kafkaAdmin, tagsTopicConfig)
       _ <- boot.bootstrapAll

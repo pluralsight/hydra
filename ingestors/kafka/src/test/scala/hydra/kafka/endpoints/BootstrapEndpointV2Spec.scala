@@ -54,8 +54,7 @@ final class BootstrapEndpointV2Spec
         kc,
         retryPolicy,
         Subject.createValidated("dvs.hello-world").get,
-        m,
-        KeyAndValueSchemaV2Validator.make(s)
+        m
       ),
       TopicDetails(1, 1, 1),
       t

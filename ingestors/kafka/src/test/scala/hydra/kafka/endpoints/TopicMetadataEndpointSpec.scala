@@ -86,8 +86,7 @@ class TopicMetadataEndpointSpec
         kc,
         retryPolicy,
         Subject.createValidated("dvs.hello-world").get,
-        m,
-        KeyAndValueSchemaV2Validator.make(s)
+        m
       )
   }
 

@@ -1,6 +1,6 @@
 package hydra.kafka.programs
 import java.time.Instant
-import cats.effect.{Bracket, ExitCase, Resource}
+import cats.effect.{Bracket, ExitCase, Resource, Sync}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
@@ -20,8 +20,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
                                                                                retryPolicy: RetryPolicy[F],
                                                                                v2MetadataTopicName: Subject,
                                                                                metadataAlgebra: MetadataAlgebra[F],
-                                                                               keyAndValueSchemaV2Validator: KeyAndValueSchemaV2Validator[F]
-                                                                             ) {
+                                                                             ) (implicit eff: Sync[F]){
 
   private def onFailure(resourceTried: String): (Throwable, RetryDetails) => F[Unit] = {
     (error, retryDetails) =>
@@ -124,7 +123,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
 
   def createTopicFromMetadataOnly(topicName: Subject, createTopicRequest: TopicMetadataV2Request): F[Unit] =
     for {
-      _ <- keyAndValueSchemaV2Validator.validate(createTopicRequest, topicName)
+      validator <- eff.delay(KeyAndValueSchemaV2Validator.make(schemaRegistry))
+      _ <- validator.validate(createTopicRequest, topicName)
       _ <- publishMetadata(topicName, createTopicRequest)
     } yield ()
 
@@ -143,7 +143,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       defaultTopicDetails.copy(numPartitions = numP.value))
       .copy(partialConfig = defaultTopicDetails.configs ++ getCleanupPolicyConfig)
     (for {
-      _ <- Resource.liftF(keyAndValueSchemaV2Validator.validate(createTopicRequest, topicName))
+      validator <- Resource.liftF(eff.delay(KeyAndValueSchemaV2Validator.make(schemaRegistry)))
+      _ <- Resource.liftF(validator.validate(createTopicRequest, topicName))
       _ <- registerSchemas(
         topicName,
         createTopicRequest.schemas.key,
