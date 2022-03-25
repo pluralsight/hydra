@@ -48,7 +48,7 @@ final class BootstrapEndpointV2Spec
   ): BootstrapEndpointV2[IO] = {
     val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
     new BootstrapEndpointV2(
-      new CreateTopicProgram[IO](
+      CreateTopicProgram.make[IO](
         s,
         ka,
         kc,

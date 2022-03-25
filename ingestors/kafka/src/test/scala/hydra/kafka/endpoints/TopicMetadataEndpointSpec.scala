@@ -80,7 +80,7 @@ class TopicMetadataEndpointSpec
                                          m: MetadataAlgebra[IO]
                                        ): CreateTopicProgram[IO] = {
     val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      new CreateTopicProgram[IO](
+      CreateTopicProgram.make[IO](
         s,
         ka,
         kc,

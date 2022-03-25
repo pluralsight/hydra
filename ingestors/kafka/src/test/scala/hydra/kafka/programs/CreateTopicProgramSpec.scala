@@ -1442,7 +1442,7 @@ object CreateTopicProgramSpec {
       defaultMetadata       <- metadataAlgebraF(metadataTopic, defaultSchemaRegistry, kafkaClient)
     } yield {
       val createTopicProgram =
-        new CreateTopicProgram[IO](
+        CreateTopicProgram.make[IO](
           schemaRegistry.getOrElse(defaultSchemaRegistry),
           kafka,
           kafkaClient,

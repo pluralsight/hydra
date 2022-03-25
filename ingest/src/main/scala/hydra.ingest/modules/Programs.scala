@@ -23,7 +23,7 @@ final class Programs[F[_]: Logger: Sync: Timer: Mode: Concurrent] private(
       cfg.createTopicConfig.baseBackoffDelay
     )
 
-  val createTopic: CreateTopicProgram[F] = new CreateTopicProgram[F](
+  val createTopic: CreateTopicProgram[F] = CreateTopicProgram.make(
     algebras.schemaRegistry,
     algebras.kafkaAdmin,
     algebras.kafkaClient,

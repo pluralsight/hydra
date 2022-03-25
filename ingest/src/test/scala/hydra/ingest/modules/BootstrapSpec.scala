@@ -50,7 +50,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
       ref <- Ref[IO].of(List.empty[(GenericRecord, Option[GenericRecord], Option[Headers])])
       kafkaClient = new TestKafkaClientAlgebraWithPublishTo(ref)
       metadata <- MetadataAlgebra.make(metadataSubjectV2, "consumer_group",kafkaClient, schemaRegistry, consumeMetadataEnabled = true)
-      c = new CreateTopicProgram[IO](
+      c = CreateTopicProgram.make[IO](
         schemaRegistry,
         kafkaAdmin,
         kafkaClient,

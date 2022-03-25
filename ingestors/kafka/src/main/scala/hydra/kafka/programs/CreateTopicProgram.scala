@@ -13,13 +13,14 @@ import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy, _}
 import cats.implicits._
 
-final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
+final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] private (
                                                                                schemaRegistry: SchemaRegistry[F],
                                                                                kafkaAdmin: KafkaAdminAlgebra[F],
                                                                                kafkaClient: KafkaClientAlgebra[F],
                                                                                retryPolicy: RetryPolicy[F],
                                                                                v2MetadataTopicName: Subject,
                                                                                metadataAlgebra: MetadataAlgebra[F],
+                                                                               validator: KeyAndValueSchemaV2Validator[F]
                                                                              ) (implicit eff: Sync[F]){
 
   private def onFailure(resourceTried: String): (Throwable, RetryDetails) => F[Unit] = {
@@ -123,7 +124,6 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
 
   def createTopicFromMetadataOnly(topicName: Subject, createTopicRequest: TopicMetadataV2Request): F[Unit] =
     for {
-      validator <- eff.delay(KeyAndValueSchemaV2Validator.make(schemaRegistry))
       _ <- validator.validate(createTopicRequest, topicName)
       _ <- publishMetadata(topicName, createTopicRequest)
     } yield ()
@@ -143,7 +143,6 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       defaultTopicDetails.copy(numPartitions = numP.value))
       .copy(partialConfig = defaultTopicDetails.configs ++ getCleanupPolicyConfig)
     (for {
-      validator <- Resource.liftF(eff.delay(KeyAndValueSchemaV2Validator.make(schemaRegistry)))
       _ <- Resource.liftF(validator.validate(createTopicRequest, topicName))
       _ <- registerSchemas(
         topicName,
@@ -153,5 +152,26 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       _ <- createTopicResource(topicName, td)
       _ <- Resource.liftF(publishMetadata(topicName, createTopicRequest))
     } yield ()).use(_ => Bracket[F, Throwable].unit)
+  }
+}
+
+object CreateTopicProgram {
+  def make[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
+                                                           schemaRegistry: SchemaRegistry[F],
+                                                           kafkaAdmin: KafkaAdminAlgebra[F],
+                                                           kafkaClient: KafkaClientAlgebra[F],
+                                                           retryPolicy: RetryPolicy[F],
+                                                           v2MetadataTopicName: Subject,
+                                                           metadataAlgebra: MetadataAlgebra[F],
+                                                         ) (implicit eff: Sync[F]): CreateTopicProgram[F] ={
+    new CreateTopicProgram(
+      schemaRegistry,
+      kafkaAdmin,
+      kafkaClient,
+      retryPolicy,
+      v2MetadataTopicName,
+      metadataAlgebra,
+      KeyAndValueSchemaV2Validator.make(schemaRegistry)
+    )
   }
 }
