@@ -23,16 +23,13 @@ final class Programs[F[_]: Logger: Sync: Timer: Mode: Concurrent] private(
       cfg.createTopicConfig.baseBackoffDelay
     )
 
-  val keyAndValueSchemaV2Validator: KeyAndValueSchemaV2Validator[F] = KeyAndValueSchemaV2Validator.make(algebras.schemaRegistry)
-
-  val createTopic: CreateTopicProgram[F] = new CreateTopicProgram[F](
+  val createTopic: CreateTopicProgram[F] = CreateTopicProgram.make(
     algebras.schemaRegistry,
     algebras.kafkaAdmin,
     algebras.kafkaClient,
     retryPolicy,
     cfg.metadataTopicsConfig.topicNameV2,
-    algebras.metadata,
-    keyAndValueSchemaV2Validator
+    algebras.metadata
   )
 
   val ingestionFlow: IngestionFlow[F] = new IngestionFlow[F](

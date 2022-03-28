@@ -1,6 +1,6 @@
 package hydra.kafka.programs
 import java.time.Instant
-import cats.effect.{Bracket, ExitCase, Resource}
+import cats.effect.{Bracket, ExitCase, Resource, Sync}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
@@ -13,15 +13,15 @@ import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy, _}
 import cats.implicits._
 
-final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
+final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] private (
                                                                                schemaRegistry: SchemaRegistry[F],
                                                                                kafkaAdmin: KafkaAdminAlgebra[F],
                                                                                kafkaClient: KafkaClientAlgebra[F],
                                                                                retryPolicy: RetryPolicy[F],
                                                                                v2MetadataTopicName: Subject,
                                                                                metadataAlgebra: MetadataAlgebra[F],
-                                                                               keyAndValueSchemaV2Validator: KeyAndValueSchemaV2Validator[F]
-                                                                             ) {
+                                                                               validator: KeyAndValueSchemaV2Validator[F]
+                                                                             ) (implicit eff: Sync[F]){
 
   private def onFailure(resourceTried: String): (Throwable, RetryDetails) => F[Unit] = {
     (error, retryDetails) =>
@@ -124,7 +124,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
 
   def createTopicFromMetadataOnly(topicName: Subject, createTopicRequest: TopicMetadataV2Request): F[Unit] =
     for {
-      _ <- keyAndValueSchemaV2Validator.validate(createTopicRequest, topicName)
+      _ <- validator.validate(createTopicRequest, topicName)
       _ <- publishMetadata(topicName, createTopicRequest)
     } yield ()
 
@@ -143,7 +143,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       defaultTopicDetails.copy(numPartitions = numP.value))
       .copy(partialConfig = defaultTopicDetails.configs ++ getCleanupPolicyConfig)
     (for {
-      _ <- Resource.liftF(keyAndValueSchemaV2Validator.validate(createTopicRequest, topicName))
+      _ <- Resource.liftF(validator.validate(createTopicRequest, topicName))
       _ <- registerSchemas(
         topicName,
         createTopicRequest.schemas.key,
@@ -152,5 +152,26 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
       _ <- createTopicResource(topicName, td)
       _ <- Resource.liftF(publishMetadata(topicName, createTopicRequest))
     } yield ()).use(_ => Bracket[F, Throwable].unit)
+  }
+}
+
+object CreateTopicProgram {
+  def make[F[_]: Bracket[*[_], Throwable]: Sleep: Logger](
+                                                           schemaRegistry: SchemaRegistry[F],
+                                                           kafkaAdmin: KafkaAdminAlgebra[F],
+                                                           kafkaClient: KafkaClientAlgebra[F],
+                                                           retryPolicy: RetryPolicy[F],
+                                                           v2MetadataTopicName: Subject,
+                                                           metadataAlgebra: MetadataAlgebra[F],
+                                                         ) (implicit eff: Sync[F]): CreateTopicProgram[F] ={
+    new CreateTopicProgram(
+      schemaRegistry,
+      kafkaAdmin,
+      kafkaClient,
+      retryPolicy,
+      v2MetadataTopicName,
+      metadataAlgebra,
+      KeyAndValueSchemaV2Validator.make(schemaRegistry)
+    )
   }
 }

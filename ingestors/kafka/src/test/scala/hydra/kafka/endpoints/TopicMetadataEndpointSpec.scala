@@ -80,14 +80,13 @@ class TopicMetadataEndpointSpec
                                          m: MetadataAlgebra[IO]
                                        ): CreateTopicProgram[IO] = {
     val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      new CreateTopicProgram[IO](
+      CreateTopicProgram.make[IO](
         s,
         ka,
         kc,
         retryPolicy,
         Subject.createValidated("dvs.hello-world").get,
-        m,
-        KeyAndValueSchemaV2Validator.make(s)
+        m
       )
   }
 

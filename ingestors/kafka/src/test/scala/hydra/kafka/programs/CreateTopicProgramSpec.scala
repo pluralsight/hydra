@@ -9,9 +9,9 @@ import cats.effect.concurrent.Ref
 import fs2.kafka.Headers
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
-import hydra.avro.registry.SchemaRegistry.{IncompatibleSchemaException, SchemaId, SchemaVersion}
+import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.kafka.algebras.KafkaAdminAlgebra.{Topic, TopicName}
-import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, Offset, Partition, PublishError, PublishResponse, TopicName}
+import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, Offset, Partition, PublishError, PublishResponse}
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.ContactMethod.Email
@@ -30,7 +30,6 @@ import hydra.kafka.IOSuite
 
 import scala.concurrent.ExecutionContext
 import hydra.kafka.model.TopicMetadataV2Request.NumPartitions
-import hydra.kafka.programs.CreateTopicProgramSpec.valueSchema
 import hydra.kafka.programs.TopicSchemaError._
 import org.apache.kafka.common.TopicPartition
 import org.scalatest.freespec.AsyncFreeSpec
@@ -1443,14 +1442,13 @@ object CreateTopicProgramSpec {
       defaultMetadata       <- metadataAlgebraF(metadataTopic, defaultSchemaRegistry, kafkaClient)
     } yield {
       val createTopicProgram =
-        new CreateTopicProgram[IO](
+        CreateTopicProgram.make[IO](
           schemaRegistry.getOrElse(defaultSchemaRegistry),
           kafka,
           kafkaClient,
           retryPolicy,
           Subject.createValidated(metadataTopic).get,
-          metadataAlgebraOpt.getOrElse(defaultMetadata),
-          KeyAndValueSchemaV2Validator.make(defaultSchemaRegistry)
+          metadataAlgebraOpt.getOrElse(defaultMetadata)
         )
 
       TestServices(createTopicProgram, defaultSchemaRegistry, kafka)

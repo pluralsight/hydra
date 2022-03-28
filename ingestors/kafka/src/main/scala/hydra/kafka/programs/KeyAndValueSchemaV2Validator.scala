@@ -1,7 +1,7 @@
 package hydra.kafka.programs
 
-import cats.MonadThrow
 import cats.data.{NonEmptyChain, Validated}
+import cats.effect.Sync
 import cats.syntax.all._
 import hydra.avro.convert.IsoDate
 import hydra.avro.registry.SchemaRegistry
@@ -13,7 +13,7 @@ import org.apache.avro.{Schema, SchemaBuilder}
 
 import scala.jdk.CollectionConverters.collectionAsScalaIterableConverter
 
-class KeyAndValueSchemaV2Validator[F[_]: MonadThrow] private (schemaRegistry: SchemaRegistry[F]) extends Validator {
+class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRegistry[F]) extends Validator {
   def validate(request: TopicMetadataV2Request, subject: Subject): F[Unit] = {
     val schemas = request.schemas
 
@@ -169,6 +169,6 @@ class KeyAndValueSchemaV2Validator[F[_]: MonadThrow] private (schemaRegistry: Sc
 }
 
 object KeyAndValueSchemaV2Validator {
-  def make[F[_]: MonadThrow](schemaRegistry: SchemaRegistry[F]): KeyAndValueSchemaV2Validator[F] =
+  def make[F[_]: Sync](schemaRegistry: SchemaRegistry[F]): KeyAndValueSchemaV2Validator[F] =
     new KeyAndValueSchemaV2Validator(schemaRegistry)
 }
