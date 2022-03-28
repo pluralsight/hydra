@@ -21,6 +21,7 @@ import scala.concurrent.ExecutionContext
 final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebras: Algebras[F], cfg: AppConfig)
                                                  (implicit system: ActorSystem, corsSupport: CorsSupport) extends RouteConcatenation with ConfigSupport {
 
+
   private implicit val ec: ExecutionContext = system.dispatcher
   private val bootstrapEndpointV2 = if (cfg.metadataTopicsConfig.createV2TopicsEnabled) {
     val topicDetails =
