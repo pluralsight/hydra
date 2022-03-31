@@ -15,6 +15,7 @@ import hydra.kafka.algebras.{HydraTag, KafkaAdminAlgebra, KafkaClientAlgebra, Me
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
+import hydra.kafka.model.RequiredField
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
@@ -101,14 +102,14 @@ class TopicMetadataEndpointSpec
         .`type`()
         .stringType()
         .noDefault()
-        .name("doc")
+        .name(RequiredField.DOC)
         .`type`()
         .stringType()
         .stringDefault("some text")
-        .name("createdAt")
+        .name(RequiredField.CREATED_AT)
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
         .withDefault(Instant.now().toEpochMilli)
-        .name("updatedAt")
+        .name(RequiredField.UPDATED_AT)
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
         .withDefault(Instant.now().toEpochMilli)
         .endRecord()

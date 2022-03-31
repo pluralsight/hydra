@@ -5,7 +5,7 @@ import cats.effect.Sync
 import cats.syntax.all._
 import hydra.avro.convert.IsoDate
 import hydra.avro.registry.SchemaRegistry
-import hydra.kafka.model.{Schemas, StreamTypeV2, TopicMetadataV2Request}
+import hydra.kafka.model.{RequiredField, Schemas, StreamTypeV2, TopicMetadataV2Request}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.TopicSchemaError._
 import hydra.kafka.programs.Validator.ValidationChain
@@ -109,21 +109,21 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
     }
 
   private def validateRequiredKeyFields(keySchema: Schema, streamType: StreamTypeV2): F[List[ValidationChain]] =
-    validateRequiredKeyFields(isKey = true, keySchema, streamType)
+    validateRequiredFields(isKey = true, keySchema, streamType)
 
   private def validateRequiredValueFields(valueSchema: Schema, streamType: StreamTypeV2): F[List[ValidationChain]] =
-    validateRequiredKeyFields(isKey = false, valueSchema, streamType)
+    validateRequiredFields(isKey = false, valueSchema, streamType)
 
-  private def validateRequiredKeyFields(isKey: Boolean, schema: Schema, streamType: StreamTypeV2): F[List[ValidationChain]] =
+  private def validateRequiredFields(isKey: Boolean, schema: Schema, streamType: StreamTypeV2): F[List[ValidationChain]] =
     streamType match {
       case (StreamTypeV2.Entity | StreamTypeV2.Event) =>
         List(
-          validate(docFieldValidator(schema), getFieldMissingError(isKey, "doc", schema, streamType.toString)),
-          validate(createdAtFieldValidator(schema), getFieldMissingError(isKey, "createdAt", schema, streamType.toString)),
-          validate(updatedAtFieldValidator(schema), getFieldMissingError(isKey, "updatedAt", schema, streamType.toString))
+          validate(docFieldValidator(schema), getFieldMissingError(isKey, RequiredField.DOC, schema, streamType.toString)),
+          validate(createdAtFieldValidator(schema), getFieldMissingError(isKey, RequiredField.CREATED_AT, schema, streamType.toString)),
+          validate(updatedAtFieldValidator(schema), getFieldMissingError(isKey, RequiredField.UPDATED_AT, schema, streamType.toString))
         ).pure
       case _ =>
-        List(validate(docFieldValidator(schema), getFieldMissingError(isKey, "doc", schema, streamType.toString))).pure
+        List(validate(docFieldValidator(schema), getFieldMissingError(isKey, RequiredField.DOC, schema, streamType.toString))).pure
     }
 
   private def checkForIllegalLogicalTypeEvolutions(existingSchema: Schema, newSchema: Schema, fieldName: String): List[ValidationChain] = {
