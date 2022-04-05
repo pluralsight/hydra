@@ -31,28 +31,45 @@ object TopicDeletionEndpoint extends
 
   final case class DeletionEndpointResponse(success:List[SuccessfulResponse], clientError: List[ErroredResponse], serverError: List[ErroredResponse])
 
-  final case class DeletionRequest(topics: List[String], ignoreConsumerGroups: List[String], ignorePublishTime: Boolean)
+  final case class DeletionRequest(topics: List[String], ignoreConsumerGroups: List[String], ignorePublishTime: Boolean, ignoreAllConsumerGroups: Boolean)
 
   implicit object DeletionRequest extends RootJsonFormat[DeletionRequest] {
     override def read(json: JsValue): DeletionRequest = {
-      json.asJsObject.getFields("topics", "ignoreConsumerGroups", "ignorePublishTime") match {
-        case Seq(topics, ignoreConsumerGroups, ignorePublishTime) =>
-          DeletionRequest(topics.convertTo[List[String]], ignoreConsumerGroups.convertTo[List[String]], ignorePublishTime.convertTo[Boolean])
-        case Seq(topics, ignoreSomething) =>
-          try {
-            DeletionRequest(topics.convertTo[List[String]], ignoreSomething.convertTo[List[String]], false)
-          } catch {
-            case e: Exception => DeletionRequest(topics.convertTo[List[String]], List.empty, ignoreSomething.convertTo[Boolean])
-          }
-        case Seq(topics) =>
-          DeletionRequest(topics.convertTo[List[String]], List.empty, false)
-        case _ =>
-          spray.json.deserializationError("Must provide a List of topics to delete")
+      def convertFromArrayToList(valueOpt: Option[JsValue]): List[String] =
+        valueOpt match {
+          case Some(JsArray(value)) => value.map(_.convertTo[String]).toList
+          case _ => List.empty
+        }
+
+      def parseBooleanOpt(valueOpt: Option[JsValue]): Boolean =
+        valueOpt match {
+          case Some(JsBoolean(value)) => value
+          case _ => false
+        }
+
+      val allFields = json.asJsObject.fields
+
+      val topics = convertFromArrayToList(allFields.get("topics"))
+      val ignoreConsumerGroups = convertFromArrayToList(allFields.get("ignoreConsumerGroups"))
+      val ignorePublishTime = parseBooleanOpt(allFields.get("ignorePublishTime"))
+      val ignoreAllConsumerGroups = parseBooleanOpt(allFields.get("ignoreAllConsumerGroups"))
+
+      if (topics.isEmpty) {
+        spray.json.deserializationError("Must provide a List of topics to delete")
+      } else {
+        DeletionRequest(topics, ignoreConsumerGroups, ignorePublishTime, ignoreAllConsumerGroups)
       }
     }
 
     override def write(obj: DeletionRequest): JsValue =
-      Map("topics" -> obj.topics, "ignoreConsumerGroups" -> obj.ignoreConsumerGroups).toJson
+      JsObject(
+        "topics" -> JsArray(obj.topics.toVector.map(JsString(_))),
+        if (obj.ignoreAllConsumerGroups) {
+          "ignoreAllConsumerGroups" -> JsBoolean(true)
+        } else {
+          "ignoreConsumerGroups" -> JsArray(obj.ignoreConsumerGroups.toVector.map(JsString(_)))
+        }
+      )
   }
 
 }
@@ -144,10 +161,10 @@ final class TopicDeletionEndpoint[F[_] : Futurable](deletionProgram: TopicDeleti
   }
 
   private def deleteTopics(topics: List[String], ignoreConsumerGroups: List[String],
-                           userDeleting: String, ignorePublishTime: Boolean, path: String, startTime: Instant)
+                           userDeleting: String, ignorePublishTime: Boolean, ignoreAllConsumerGroups: Boolean, path: String, startTime: Instant)
                           (implicit ec: ExecutionContext) = {
     onComplete(
-      Futurable[F].unsafeToFuture(deletionProgram.deleteTopics(topics, ignoreConsumerGroups, ignorePublishTime))
+      Futurable[F].unsafeToFuture(deletionProgram.deleteTopics(topics, ignoreConsumerGroups, ignorePublishTime, ignoreAllConsumerGroups))
     ) {
       case Success(maybeSuccess) => {
         maybeSuccess match {
@@ -209,11 +226,11 @@ final class TopicDeletionEndpoint[F[_] : Futurable](deletionProgram: TopicDeleti
                   }
                 } ~
                   pathPrefix(Segment) { topic =>
-                    deleteTopics(List(topic), List.empty, userName, false, "/v2/topics", startTime)
+                    deleteTopics(List(topic), List.empty, userName, ignorePublishTime = false, ignoreAllConsumerGroups = false, "/v2/topics", startTime)
                   } ~
                   pathEndOrSingleSlash {
                     entity(as[DeletionRequest]) { req =>
-                      deleteTopics(req.topics, req.ignoreConsumerGroups, userName, req.ignorePublishTime, "/v2/topics", startTime)
+                      deleteTopics(req.topics, req.ignoreConsumerGroups, userName, req.ignorePublishTime, req.ignoreAllConsumerGroups, "/v2/topics", startTime)
                     }
                   }
               }
