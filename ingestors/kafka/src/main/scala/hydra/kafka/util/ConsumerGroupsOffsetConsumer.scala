@@ -207,7 +207,7 @@ object ConsumerGroupsOffsetConsumer {
 
   private def logStreamError[F[_]: Logger](e: Throwable): fs2.Stream[F, Unit] = {
     val errorMessage = s"Error in ConsumerGroupsOffsetConsumer Error: ${e.getMessage}"
-    fs2.Stream.eval(Logger[F].error(errorMessage))
+    fs2.Stream.eval(Logger[F].error(e)(errorMessage))
   }
 
   private[kafka] def getOffsetsToSeekTo[F[_]: ConcurrentEffect: Logger](

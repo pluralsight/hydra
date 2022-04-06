@@ -79,7 +79,7 @@ object TagsAlgebra {
           fs2.Stream.eval(Logger[F].error(s"Unexpected return from Kafka: ${e.toString()}"))
       }.recoverWith {
         case e =>
-        fs2.Stream.eval(Logger[F].warn(s"Error in TagsAlgebra"))
+        fs2.Stream.eval(Logger[F].warn(e)(s"Error in TagsAlgebra"))
       }.compile.drain)
       algebra <- getTagsAlgebra(ref, tagsTopic, kafkaClientAlgebra)
     } yield algebra

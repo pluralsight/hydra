@@ -66,6 +66,9 @@ object MetadataAlgebra {
           case e: MetadataAvroSchemaFailure =>
             fs2.Stream.eval(Logger[F].warn(s"Error in metadata consumer $e"))
         }
+      }.onError{
+        case error =>
+          fs2.Stream.eval(Logger[F].warn(error)(s"Metadata consumer failed."))
       }.compile.drain)
       algebra <- getMetadataAlgebra[F](ref, schemaRegistryAlgebra)
     } yield algebra
