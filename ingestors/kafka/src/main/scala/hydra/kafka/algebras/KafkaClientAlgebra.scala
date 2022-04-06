@@ -63,6 +63,20 @@ trait KafkaClientAlgebra[F[_]] {
                        commitOffsets: Boolean
                      ): fs2.Stream[F, Record]
 
+
+  def consumeSafelyMessages(
+                             topicName: TopicName,
+                             consumerGroup: ConsumerGroup,
+                             commitOffsets: Boolean
+                           ): fs2.Stream[F, Either[Throwable, Record]]
+
+  def consumeSafelyWithOffsetInfo(
+                                   topicName: TopicName,
+                                   consumerGroup:
+                                   ConsumerGroup,
+                                   commitOffsets: Boolean)
+  : fs2.Stream[F, Either[Throwable, (Record, (Partition, Offset))]]
+
   /**
    * Consume the Hydra record from Kafka with Partition and Offset Info.
    * Conditionally commits offsets. Each time function is called will return
@@ -259,19 +273,23 @@ object KafkaClientAlgebra {
       }
 
       override def consumeMessages(topicName: TopicName, consumerGroup: String, commitOffsets: Boolean): fs2.Stream[F, Record] = {
-        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets).map(c => (c._1, c._2, c._3))
+        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets)
+          .map(_.map(c => (c._1, c._2, c._3))).evalMap(Sync[F].fromEither(_))
       }
 
       override def consumeMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, (Record, (Partition, Offset))] = {
-        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets).map(c => ((c._1, c._2, c._3), (c._4, c._5)))
+        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets)
+          .map(_.map(c => ((c._1, c._2, c._3), (c._4, c._5)))).evalMap(Sync[F].fromEither(_))
       }
 
       override def consumeStringKeyMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, (StringRecord, (Partition, Offset))] = {
-        consumeMessages[Option[String]](getStringKeyDeserializer, consumerGroup, topicName, commitOffsets).map(c => ((c._1, c._2, c._3), (c._4, c._5)))
+        consumeMessages[Option[String]](getStringKeyDeserializer, consumerGroup, topicName, commitOffsets)
+          .map(_.map(c => ((c._1, c._2, c._3), (c._4, c._5)))).evalMap(Sync[F].fromEither(_))
       }
 
       override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, StringRecord] = {
-        consumeMessages[Option[String]](getStringKeyDeserializer, consumerGroup, topicName, commitOffsets).map(c => (c._1, c._2, c._3))
+        consumeMessages[Option[String]](getStringKeyDeserializer, consumerGroup, topicName, commitOffsets)
+          .map(_.map(c => (c._1, c._2, c._3))).evalMap(Sync[F].fromEither(_))
       }
 
       override def withProducerRecordSizeLimit(sizeLimitBytes: Long): F[KafkaClientAlgebra[F]] =
@@ -281,14 +299,24 @@ object KafkaClientAlgebra {
       fs2.Stream[F, ((StringRecord), (Partition, Offset), Timestamp)] = {
         streamFromOffsetPartition[Option[String]](getStringKeyDeserializer, consumerGroup,
           topicName, commitOffsets, topicPartitionAndOffsets)
-          .map(c => ((c._1, c._2, c._3),(c._4,c._5), c._6))
+          .map(c => ((c._1, c._2, c._3), (c._4, c._5), c._6))
       }
 
       override def streamAvroKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicPartitionAndOffsets: List[(TopicPartition, Offset)])
       : fs2.Stream[F, (Record, (Partition, Offset), Timestamp)] = {
         streamFromOffsetPartition[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup,
           topicName, commitOffsets, topicPartitionAndOffsets: List[(TopicPartition, Offset)])
-          .map(c => ((c._1, c._2, c._3),(c._4,c._5), c._6))
+          .map(c => ((c._1, c._2, c._3), (c._4, c._5), c._6))
+      }
+
+      override def consumeSafelyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, Either[Throwable, (GenericRecord, Option[GenericRecord], Option[Headers])]] = {
+        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets)
+          .map(_.map(c => (c._1, c._2, c._3)))
+      }
+
+      override def consumeSafelyWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, Either[Throwable, (Record, (Partition, Offset))]] = {
+        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets)
+          .map(_.map(c => ((c._1, c._2, c._3),(c._4, c._5))))
       }
 
       private def produceMessage[A](
@@ -315,7 +343,7 @@ object KafkaClientAlgebra {
                                       consumerGroup: ConsumerGroup,
                                       topicName: TopicName,
                                       commitOffsets: Boolean
-                                    ): fs2.Stream[F, (A, Option[GenericRecord], Option[Headers], Partition, Offset)] = {
+                                    ): fs2.Stream[F, Either[Throwable, (A, Option[GenericRecord], Option[Headers], Partition, Offset)]] = {
         val consumerSettings: ConsumerSettings[F, Either[Throwable, A], Either[Throwable, Option[GenericRecord]]] = ConsumerSettings(
           keyDeserializer = keyDeserializer,
           valueDeserializer = getOptionalGenericRecordDeserializer(schemaRegistryClient)()
@@ -326,7 +354,7 @@ object KafkaClientAlgebra {
         consumerStream(consumerSettings)
           .evalTap(_.subscribeTo(topicName))
           .flatMap(_.stream)
-          // TODO: Commit before action? do we need at least once delivery or at most once?
+          // TODO: Commit before action?
           .evalTap { committable =>
             if (commitOffsets) committable.offset.commit else Applicative[F].pure(())
           }
@@ -334,13 +362,15 @@ object KafkaClientAlgebra {
             val r = committable.record
             val headers = if (r.headers.isEmpty) None else Option(r.headers)
 
-            for {
-              key <- eitherToOption(r.key, deserializationErrorMessage(r, topicName))
-              value <- eitherToOption(r.value, deserializationErrorMessage(r, topicName))
+            val response = for {
+              key <- r.key
+              value <- r.value
             } yield (key, value, headers, r.partition, r.offset)
-          }.collect {
-          case Some(value) => value
-        }
+
+            response.left.map(logger.warn(deserializationErrorMessage(r, topicName), _))
+
+            response
+          }
       }
 
       private def eitherToOption[T](either: Either[Throwable, T], errorMessage: String): Option[T] = either match {
@@ -350,8 +380,8 @@ object KafkaClientAlgebra {
           None
       }
 
-      def deserializationErrorMessage[K, V](consumerRecord: ConsumerRecord[K, V], topicName: String): String =
-        s"Failed to deserialize kafka record. It shoud be meant that topic has incorrect record and Hydra skips it. " +
+      private def deserializationErrorMessage[K, V](consumerRecord: ConsumerRecord[K, V], topicName: String): String =
+        s"Failed to deserialize kafka record. It shoud be meant that topic has incorrect record. " +
           s"Topic: $topicName , partition: ${consumerRecord.partition}, offset: ${consumerRecord.offset}"
 
       private def streamFromOffsetPartition[A](
@@ -376,20 +406,23 @@ object KafkaClientAlgebra {
           .evalTap(str => str.assign(tp))
           .evalTap(kc => topicPartitionAndOffsets.traverse(tuple => kc.seek(tuple._1, tuple._2)))
           .flatMap(kc => kc.stream)
-          // TODO: Commit before action? do we need at least once delivery or at most once?
+          // TODO: Commit before action?
           .evalTap { committable =>
             if (commitOffsets) committable.offset.commit else Applicative[F].pure(())
           }.filter(committable => {
           committable.record.value.isRight && committable.record.key.isRight
-        }).map { committable =>
+        }).evalMap { committable =>
           val r = committable.record
           val headers = if (r.headers.isEmpty) None else Option(r.headers)
-          for {
-            key <- eitherToOption(r.key, deserializationErrorMessage(r, topicName))
-            value <- eitherToOption(r.value, deserializationErrorMessage(r, topicName))
+
+          val response = for {
+            key <- r.key
+            value <- r.value
           } yield (key, value, headers, r.partition, r.offset, r.timestamp)
-        }.collect {
-          case Some(value) => value
+
+          response.left.map(logger.warn(deserializationErrorMessage(r, topicName), _))
+
+          Sync[F].fromEither(response)
         }
       }
     }
@@ -431,14 +464,15 @@ object KafkaClientAlgebra {
     override def consumeMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, Record] = {
       if (commitOffsets) fs2.Stream.raiseError[F](OffsetsNotCommittableInTest)
       else {
-        consumeCacheMessage(topicName, consumerGroup).collect {
+        consumeCacheMessage(topicName, consumerGroup).evalMap {
           case (r: GenericRecordFormat, v, h, po, t) => {
             val headers = h match {
               case Some(value) => if (value.isEmpty) None else Some(value)
               case _ => None
             }
-            (r.value, v, headers)
+            Sync[F].pure((r.value, v, headers))
           }
+          case _ => Sync[F].raiseError[Record](ConsumeErrorException("Expected GenericRecord, got String"))
         }
       }
     }
@@ -460,6 +494,12 @@ object KafkaClientAlgebra {
         }
       }
     }
+
+    override def consumeSafelyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean)
+    : fs2.Stream[F, Either[Throwable, (GenericRecord, Option[GenericRecord], Option[Headers])]] = ???
+
+    override def consumeSafelyWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean)
+    : fs2.Stream[F, Either[Throwable, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset))]] = ???
 
     override def withProducerRecordSizeLimit(sizeLimitBytes: Long): F[KafkaClientAlgebra[F]] = Sync[F].delay {
       getTestInstance(cache, schemaRegistry, sizeLimitBytes.some)

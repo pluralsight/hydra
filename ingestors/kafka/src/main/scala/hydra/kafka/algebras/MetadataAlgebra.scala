@@ -3,6 +3,7 @@ package hydra.kafka.algebras
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, Sync}
 import cats.syntax.all._
+import fs2.kafka.ConsumerRecord
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, TopicName}
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
@@ -36,14 +37,17 @@ object MetadataAlgebra {
                                             consumeMetadataEnabled: Boolean
                                           ): F[MetadataAlgebra[F]] = {
     val metadataStream: fs2.Stream[F, (GenericRecord, Option[GenericRecord])] = if (consumeMetadataEnabled) {
-      kafkaClientAlgebra.consumeMessages(metadataTopicName.value, consumerGroup, commitOffsets = false).map(record => (record._1, record._2))
+      kafkaClientAlgebra.consumeSafelyMessages(metadataTopicName.value, consumerGroup, commitOffsets = false)
+        //Ignore records with errors
+        .collect { case Right(record) => (record._1, record._2) }
     } else {
       fs2.Stream.empty
     }
     for {
       ref <- Ref[F].of(MetadataStorageFacade.empty)
-      _ <- Concurrent[F].start(metadataStream.flatMap { case (key, value) =>
-        fs2.Stream.eval {
+      _ <- Concurrent[F].start(metadataStream
+        .evalMap { case (key, value) =>
+
           TopicMetadataV2.decode[F](key, value).flatMap { case (topicMetadataKey, topicMetadataValueOpt) =>
             topicMetadataValueOpt match {
               case Some(topicMetadataValue) =>
@@ -61,14 +65,13 @@ object MetadataAlgebra {
               case None =>
                 ref.update(_.removeMetadata(topicMetadataKey))
             }
-          }
-        }.recoverWith {
+          }.recoverWith {
           case e: MetadataAvroSchemaFailure =>
-            fs2.Stream.eval(Logger[F].warn(s"Error in metadata consumer $e"))
+            Logger[F].warn(s"Error in metadata consumer $e")
         }
       }.onError{
         case error =>
-          fs2.Stream.eval(Logger[F].warn(error)(s"Metadata consumer failed."))
+          fs2.Stream.eval(Logger[F].error(error)(s"Metadata consumer failed."))
       }.compile.drain)
       algebra <- getMetadataAlgebra[F](ref, schemaRegistryAlgebra)
     } yield algebra

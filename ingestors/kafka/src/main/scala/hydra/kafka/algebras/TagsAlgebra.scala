@@ -62,7 +62,9 @@ object TagsAlgebra {
                                            tagsClient: String,
                                            kafkaClientAlgebra: KafkaClientAlgebra[F]): F[TagsAlgebra[F]] = {
     val tagsStream: fs2.Stream[F,(GenericRecord,Option[GenericRecord])] =
-                    kafkaClientAlgebra.consumeMessages(tagsTopic, tagsClient, commitOffsets = false).map(record => (record._1, record._2))
+                    kafkaClientAlgebra.consumeSafelyMessages(tagsTopic, tagsClient, commitOffsets = false)
+                      //Ignore records with errors
+                      .collect{ case Right(record) => (record._1, record._2)}
     for {
       ref <- Ref[F].of(TagsStorageFacade.empty)
       _ <- Concurrent[F].start(tagsStream.flatMap{
@@ -79,7 +81,7 @@ object TagsAlgebra {
           fs2.Stream.eval(Logger[F].error(s"Unexpected return from Kafka: ${e.toString()}"))
       }.recoverWith {
         case e =>
-        fs2.Stream.eval(Logger[F].warn(e)(s"Error in TagsAlgebra"))
+        fs2.Stream.eval(Logger[F].error(e)(s"Error in TagsAlgebra"))
       }.compile.drain)
       algebra <- getTagsAlgebra(ref, tagsTopic, kafkaClientAlgebra)
     } yield algebra

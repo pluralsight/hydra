@@ -43,7 +43,8 @@ object ConsumerGroupsOffsetConsumer {
                                                                   bootstrapServers: String,
                                                                   commonConsumerGroup: String
                                                                 ): F[Unit] = {
-    val dvsConsumerOffsetStream = kafkaClientAlgebra.consumeMessagesWithOffsetInfo(consumerOffsetsOffsetsTopicConfig.value, uniquePerNodeConsumerGroup, commitOffsets = false)
+    val dvsConsumerOffsetStream = kafkaClientAlgebra.consumeSafelyWithOffsetInfo(consumerOffsetsOffsetsTopicConfig.value, uniquePerNodeConsumerGroup, commitOffsets = false)
+      .collect({case Right(value) => value})
 
     for {
       schemaRegistryClient <- schemaRegistryAlgebra.getSchemaRegistryClient
@@ -184,8 +185,7 @@ object ConsumerGroupsOffsetConsumer {
                                                                   ): fs2.Stream[F, KafkaConsumer[F, Option[BaseKey], Option[OffsetAndMetadata]]] = {
     implicit val order: Order[TopicPartition] =
       (x: TopicPartition, y: TopicPartition) => if (x.partition() > y.partition()) 1 else if (x.partition() < y.partition()) -1 else 0
-    stream.flatTap { b =>
-      fs2.Stream.eval(
+    stream.evalTap { b =>
         if (p.nonEmpty) {
           val topicPartitionList = p.iterator.map(_._1).map(new TopicPartition(sourceTopic, _)).toList
           val topicPartitions = data.NonEmptySet.of[TopicPartition](topicPartitionList.head, topicPartitionList.tail:_*)
@@ -200,7 +200,6 @@ object ConsumerGroupsOffsetConsumer {
         } else {
           b.subscribeTo(sourceTopic)
         }
-      )
     }
   }
 
@@ -229,14 +228,15 @@ object ConsumerGroupsOffsetConsumer {
       }
     } yield ()
 
-    onStart *> dvsConsumerOffsetStream.flatMap { case ((key, value, _), (partition, offset)) =>
-      fs2.Stream.eval(TopicConsumerOffset.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
-        consumerOffsetsCache.update(_ + (topicKey.partition -> topicValue.get.offset)) *>
-          hydraConsumerOffsetsOffsetsCache.update(_ + (partition -> (offset + 1L)))
-      }).flatTap { _ =>
-        fs2.Stream.eval(isComplete)
-      }
-    }.recoverWith {
+    onStart *> dvsConsumerOffsetStream
+      .attempt.collect { case Right(value) => value }
+      .evalMap {
+        case ((key, value, _), (partition, offset)) =>
+          TopicConsumerOffset.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
+            consumerOffsetsCache.update(_ + (topicKey.partition -> topicValue.get.offset)) *>
+              hydraConsumerOffsetsOffsetsCache.update(_ + (partition -> (offset + 1L)))
+          }.flatTap { _ => isComplete }
+      }.recoverWith {
       case e =>
         logStreamError(e) *> fs2.Stream.empty
     }.compile.drain
