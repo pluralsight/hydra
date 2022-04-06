@@ -16,6 +16,7 @@ import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
 import org.slf4j.LoggerFactory
+import scala.util.{Left, Right, Either}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -496,7 +497,25 @@ object KafkaClientAlgebra {
     }
 
     override def consumeSafelyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean)
-    : fs2.Stream[F, Either[Throwable, (GenericRecord, Option[GenericRecord], Option[Headers])]] = ???
+    : fs2.Stream[F, Either[Throwable, (GenericRecord, Option[GenericRecord], Option[Headers])]] = {
+      if (commitOffsets) fs2.Stream.raiseError[F](OffsetsNotCommittableInTest)
+      else {
+        consumeCacheMessage(topicName, consumerGroup).evalMap {
+          case (r: GenericRecordFormat, v, h, po, t) => {
+            val headers = h match {
+              case Some(value) => if (value.isEmpty) None else Some(value)
+              case _ => None
+            }
+            Sync[F].pure(
+              Right((r.value, v, headers))
+              .asInstanceOf[Either[Throwable, (GenericRecord, Option[GenericRecord], Option[Headers])]])
+          }
+          case _ => Sync[F].pure(
+            Left[Throwable, Record](ConsumeErrorException("Expected GenericRecord, got String"))
+            .asInstanceOf[Either[Throwable, (GenericRecord, Option[GenericRecord], Option[Headers])]])
+        }
+      }
+    }
 
     override def consumeSafelyWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean)
     : fs2.Stream[F, Either[Throwable, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset))]] = ???
