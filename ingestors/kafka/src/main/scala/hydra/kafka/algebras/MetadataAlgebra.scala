@@ -3,16 +3,15 @@ package hydra.kafka.algebras
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, Sync}
 import cats.syntax.all._
-import fs2.kafka.ConsumerRecord
 import hydra.avro.registry.SchemaRegistry
-import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, TopicName}
+import hydra.kafka.algebras.KafkaClientAlgebra.ConsumerGroup
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.model.TopicMetadataV2.MetadataAvroSchemaFailure
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request, TopicMetadataV2Value}
-import org.apache.avro.generic.GenericRecord
+import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Value}
 import io.chrisdavenport.log4cats.Logger
 import org.apache.avro.Schema
+import org.apache.avro.generic.GenericRecord
 
 
 trait MetadataAlgebra[F[_]] {
@@ -116,7 +115,6 @@ object MetadataAlgebra {
 }
 
 trait TestMetadataAlgebra[F[_]] extends MetadataAlgebra[F] {
-  import TestMetadataAlgebra._
   def addMetadata(topicMetadataContainer: TopicMetadataContainer): F[Unit]
 }
 
