@@ -431,15 +431,14 @@ object KafkaClientAlgebra {
     override def consumeMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, Record] = {
       if (commitOffsets) fs2.Stream.raiseError[F](OffsetsNotCommittableInTest)
       else {
-        consumeCacheMessage(topicName, consumerGroup).evalMap {
+        consumeCacheMessage(topicName, consumerGroup).collect {
           case (r: GenericRecordFormat, v, h, po, t) => {
             val headers = h match {
               case Some(value) => if (value.isEmpty) None else Some(value)
               case _ => None
             }
-            Sync[F].pure((r.value, v, headers))
+            (r.value, v, headers)
           }
-          case _ => Sync[F].raiseError[Record](ConsumeErrorException("Expected GenericRecord, got String"))
         }
       }
     }
