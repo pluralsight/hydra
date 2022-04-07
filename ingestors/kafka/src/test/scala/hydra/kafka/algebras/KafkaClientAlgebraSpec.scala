@@ -103,6 +103,21 @@ class KafkaClientAlgebraSpec
       records.head shouldBe (key, Some(value), None)
     }
 
+    val (topic11, (_, key1), value1) = topicAndKeyAndValue("topic-inc-data","key1","value1")
+    "consume avro messages from kafka and skip incorrect message" in {
+      kafkaClient.publishMessage((key1, Some(value), None), topic11).map{ r =>
+        r shouldBe PublishResponse(0, 0).asRight}.unsafeRunSync()
+      kafkaClient.publishStringKeyMessage((Some("Hohoho"), Some(value), None), topic11).map{ r =>
+        r shouldBe PublishResponse(0, 1).asRight}.unsafeRunSync()
+      kafkaClient.publishMessage((key, Some(value), None), topic11).map{ r =>
+        r shouldBe PublishResponse(0, 2).asRight}.unsafeRunSync()
+      val records = kafkaClient.consumeSafelyMessages(topic11,"newConsumerGroup", shouldCommitOffsets).take(3).compile.toList.unsafeRunSync()
+      records should have length 3
+      records.head shouldBe Right((key1, Some(value1), None))
+      records(1).isLeft shouldBe true
+      records(2) shouldBe Right((key, Some(value), None))
+    }
+
     "consume avro message with partition info from kafka" in {
       if (shouldCommitOffsets) {
         val records = kafkaClient.consumeMessagesWithOffsetInfo(topic,"partitionInfoConsumer", shouldCommitOffsets).take(1).compile.toList.unsafeRunSync()

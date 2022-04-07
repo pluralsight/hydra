@@ -275,22 +275,22 @@ object KafkaClientAlgebra {
 
       override def consumeMessages(topicName: TopicName, consumerGroup: String, commitOffsets: Boolean): fs2.Stream[F, Record] = {
         consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets)
-          .map(_.map(c => (c._1, c._2, c._3))).evalMap(Sync[F].fromEither(_))
+          .map(_.map(_._1)).evalMap(Sync[F].fromEither(_))
       }
 
       override def consumeMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, (Record, (Partition, Offset))] = {
         consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets)
-          .map(_.map(c => ((c._1, c._2, c._3), (c._4, c._5)))).evalMap(Sync[F].fromEither(_))
+          .evalMap(Sync[F].fromEither(_))
       }
 
       override def consumeStringKeyMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, (StringRecord, (Partition, Offset))] = {
         consumeMessages[Option[String]](getStringKeyDeserializer, consumerGroup, topicName, commitOffsets)
-          .map(_.map(c => ((c._1, c._2, c._3), (c._4, c._5)))).evalMap(Sync[F].fromEither(_))
+          .evalMap(Sync[F].fromEither(_))
       }
 
       override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, StringRecord] = {
         consumeMessages[Option[String]](getStringKeyDeserializer, consumerGroup, topicName, commitOffsets)
-          .map(_.map(c => (c._1, c._2, c._3))).evalMap(Sync[F].fromEither(_))
+          .map(_.map(_._1)).evalMap(Sync[F].fromEither(_))
       }
 
       override def withProducerRecordSizeLimit(sizeLimitBytes: Long): F[KafkaClientAlgebra[F]] =
@@ -300,24 +300,23 @@ object KafkaClientAlgebra {
       fs2.Stream[F, ((StringRecord), (Partition, Offset), Timestamp)] = {
         streamFromOffsetPartition[Option[String]](getStringKeyDeserializer, consumerGroup,
           topicName, commitOffsets, topicPartitionAndOffsets)
-          .map(c => ((c._1, c._2, c._3), (c._4, c._5), c._6))
+          .evalMap(Sync[F].fromEither(_))
       }
 
       override def streamAvroKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicPartitionAndOffsets: List[(TopicPartition, Offset)])
       : fs2.Stream[F, (Record, (Partition, Offset), Timestamp)] = {
         streamFromOffsetPartition[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup,
           topicName, commitOffsets, topicPartitionAndOffsets: List[(TopicPartition, Offset)])
-          .map(c => ((c._1, c._2, c._3), (c._4, c._5), c._6))
+          .evalMap(Sync[F].fromEither(_))
       }
 
       override def consumeSafelyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, Either[Throwable, (GenericRecord, Option[GenericRecord], Option[Headers])]] = {
         consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets)
-          .map(_.map(c => (c._1, c._2, c._3)))
+          .map(_.map(_._1))
       }
 
       override def consumeSafelyWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, Either[Throwable, (Record, (Partition, Offset))]] = {
         consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets)
-          .map(_.map(c => ((c._1, c._2, c._3),(c._4, c._5))))
       }
 
       private def produceMessage[A](
@@ -344,7 +343,7 @@ object KafkaClientAlgebra {
                                       consumerGroup: ConsumerGroup,
                                       topicName: TopicName,
                                       commitOffsets: Boolean
-                                    ): fs2.Stream[F, Either[Throwable, (A, Option[GenericRecord], Option[Headers], Partition, Offset)]] = {
+                                    ): fs2.Stream[F, Either[Throwable, ((A, Option[GenericRecord], Option[Headers]), (Partition, Offset))]] = {
         val consumerSettings: ConsumerSettings[F, Either[Throwable, A], Either[Throwable, Option[GenericRecord]]] = ConsumerSettings(
           keyDeserializer = keyDeserializer,
           valueDeserializer = getOptionalGenericRecordDeserializer(schemaRegistryClient)()
@@ -359,27 +358,28 @@ object KafkaClientAlgebra {
           .evalTap { committable =>
             if (commitOffsets) committable.offset.commit else Applicative[F].pure(())
           }
-          .map { committable =>
-            val r = committable.record
-            val headers = if (r.headers.isEmpty) None else Option(r.headers)
-
-            val response = for {
-              key <- r.key
-              value <- r.value
-            } yield (key, value, headers, r.partition, r.offset)
-
-            response.left.map(logger.warn(deserializationErrorMessage(r, topicName), _))
-
-            response
-          }
+          .map(
+            handleCommitableRecord(_)((key, value, headers, r) => ((key, value, headers), (r.partition, r.offset)))
+          )
       }
 
-      private def eitherToOption[T](either: Either[Throwable, T], errorMessage: String): Option[T] = either match {
-        case Right(value) => Some(value)
-        case Left(error) =>
-          logger.warn(errorMessage, error)
-          None
+      private def handleCommitableRecord[A, V, R](committable: CommittableConsumerRecord[F, Either[Throwable, A], Either[Throwable, V]])
+                                                 (
+                                                   resultTransform: (A, V, Option[Headers], ConsumerRecord[Either[Throwable, A], Either[Throwable, V]]) => R
+                                                 ): Either[Throwable, R] = {
+        val r = committable.record
+        val headers = if (r.headers.isEmpty) None else Option(r.headers)
+
+        val response = for {
+          key <- r.key
+          value <- r.value
+        } yield resultTransform(key, value, headers, r)
+
+        response.left.map(logger.warn(deserializationErrorMessage(r, r.topic), _))
+
+        response
       }
+
 
       private def deserializationErrorMessage[K, V](consumerRecord: ConsumerRecord[K, V], topicName: String): String =
         s"Failed to deserialize kafka record. It shoud be meant that topic has incorrect record. " +
@@ -391,7 +391,7 @@ object KafkaClientAlgebra {
                                                 topicName: TopicName,
                                                 commitOffsets: Boolean,
                                                 topicPartitionAndOffsets: List[(TopicPartition, Offset)]
-                                              ): fs2.Stream[F, (A, Option[GenericRecord], Option[Headers], Partition, Offset, Timestamp)] = {
+                                              ): fs2.Stream[F, Either[Throwable, ((A, Option[GenericRecord], Option[Headers]), (Partition, Offset), Timestamp)]] = {
         val consumerSettings: ConsumerSettings[F, Either[Throwable, A], Either[Throwable, Option[GenericRecord]]] = ConsumerSettings(
           keyDeserializer = keyDeserializer,
           valueDeserializer = getOptionalGenericRecordDeserializer(schemaRegistryClient)()
@@ -412,18 +412,8 @@ object KafkaClientAlgebra {
             if (commitOffsets) committable.offset.commit else Applicative[F].pure(())
           }.filter(committable => {
           committable.record.value.isRight && committable.record.key.isRight
-        }).evalMap { committable =>
-          val r = committable.record
-          val headers = if (r.headers.isEmpty) None else Option(r.headers)
-
-          val response = for {
-            key <- r.key
-            value <- r.value
-          } yield (key, value, headers, r.partition, r.offset, r.timestamp)
-
-          response.left.map(logger.warn(deserializationErrorMessage(r, topicName), _))
-
-          Sync[F].fromEither(response)
+        }).map {
+          handleCommitableRecord(_)((key, value, headers, r) => ((key, value, headers), (r.partition, r.offset), r.timestamp))
         }
       }
     }
@@ -508,11 +498,11 @@ object KafkaClientAlgebra {
             }
             Sync[F].pure(
               Right((r.value, v, headers))
-              .asInstanceOf[Either[Throwable, (GenericRecord, Option[GenericRecord], Option[Headers])]])
+                .asInstanceOf[Either[Throwable, (GenericRecord, Option[GenericRecord], Option[Headers])]])
           }
           case _ => Sync[F].pure(
             Left[Throwable, Record](ConsumeErrorException("Expected GenericRecord, got String"))
-            .asInstanceOf[Either[Throwable, (GenericRecord, Option[GenericRecord], Option[Headers])]])
+              .asInstanceOf[Either[Throwable, (GenericRecord, Option[GenericRecord], Option[Headers])]])
         }
       }
     }
