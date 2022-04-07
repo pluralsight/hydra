@@ -65,7 +65,6 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
       valueSchemaEvolutionValidationResult       <- validateValueSchemaEvolution(schemas, subject)
       validateRequiredKeyFieldsResult            <- if(withRequiredFields) validateRequiredKeyFields(schemas.key, streamType) else Nil.pure
       validateRequiredValueFieldsResult          <- if(withRequiredFields) validateRequiredValueFields(schemas.value, streamType) else Nil.pure
-      valueSchemaEvolutionValidationResult       <- validateValueSchemaEvolution(schemas, subject)
       mismatchesValidationResult                 <- checkForMismatches(keyFields, valueFields)
       nullableKeyFieldsValidationResult          <- checkForNullableKeyFields(keyFields, streamType)
       defaultNullableValueFieldsValidationResult <- checkForDefaultNullableValueFields(valueFields, streamType)

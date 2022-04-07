@@ -255,17 +255,16 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .record("name")
           .fields()
           .name("isTrue")
+          .doc("text")
           .`type`()
           .booleanType()
           .noDefault()
-          .name(RequiredField.DOC)
-          .`type`()
-          .stringType()
-          .stringDefault("some text")
           .name(RequiredField.CREATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .name(RequiredField.UPDATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .endRecord()
@@ -287,16 +286,15 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .record("name")
           .fields()
           .name("nullableUnion")
+          .doc("text")
           .`type`(union)
           .withDefault(null)
-          .name(RequiredField.DOC)
-          .`type`()
-          .stringType()
-          .stringDefault("some text")
           .name(RequiredField.CREATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .name(RequiredField.UPDATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .endRecord()
@@ -317,16 +315,15 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .record("name")
           .fields()
           .name("nullableUnion")
+          .doc("text")
           .`type`(union)
           .withDefault(null)
-          .name(RequiredField.DOC)
-          .`type`()
-          .stringType()
-          .stringDefault("some text")
           .name(RequiredField.CREATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .name(RequiredField.UPDATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .endRecord()
@@ -343,16 +340,15 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .record("name")
           .fields()
           .name("nullableField")
+          .doc("text")
           .`type`("null")
           .noDefault()
-          .name(RequiredField.DOC)
-          .`type`()
-          .stringType()
-          .stringDefault("some text")
           .name(RequiredField.CREATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .name(RequiredField.UPDATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .endRecord()
@@ -373,16 +369,15 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .record("name")
           .fields()
           .name("nullableField")
+          .doc("text")
           .`type`("null")
           .noDefault()
-          .name(RequiredField.DOC)
-          .`type`()
-          .stringType()
-          .stringDefault("some text")
           .name(RequiredField.CREATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .name(RequiredField.UPDATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .endRecord()
@@ -403,6 +398,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     {
           |        "name":"context",
           |        "default": "abc",
+          |        "doc": "text",
           |        "type":[
           |                 {
           |                   "type": "string",
@@ -413,6 +409,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -420,14 +417,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -440,11 +434,13 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "context",
+          |       "doc": "text",
           |       "default": "abc",
           |       "type": ["string", "null" ]
           |     },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -452,14 +448,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -486,25 +479,24 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     {
           |       "name": "context",
           |       "default": "abc",
-          |       "type": ["string", "null" ]
+          |       "type": ["string", "null" ],
+          |       "doc": "text"
           |     },
           |    {
           |      "name": "createdAt",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
-          |      }
+          |      },
+          |      "doc": "text"
           |    },
           |    {
           |      "name": "updatedAt",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
-          |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
+          |      },
+          |      "doc": "text"
           |    }
           |  ]
           |}
@@ -518,6 +510,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     {
           |        "name":"context",
           |        "default": "abc",
+          |        "doc": "text",
           |        "type":[
           |                 {
           |                   "type": "string",
@@ -528,6 +521,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -535,14 +529,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -570,6 +561,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     {
           |        "name":"context",
           |        "default": "abc",
+          |        "doc": "text",
           |        "type":[
           |                 {
           |                   "type": "string",
@@ -580,6 +572,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -587,14 +580,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -608,6 +598,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     {
           |        "name":"context",
           |        "default": "abc",
+          |        "doc": "text",
           |        "type":[
           |                 {
           |                   "type": "string",
@@ -618,6 +609,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -625,14 +617,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -659,6 +648,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "keyThing",
+          |      "doc": "text",
           |      "type":{
           |        "type": "string",
           |        "logicalType":"uuid"
@@ -666,6 +656,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -673,14 +664,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -693,6 +681,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "keyThing",
+          |      "doc": "text",
           |      "type":{
           |        "type": "string",
           |        "logicalType":"date"
@@ -700,6 +689,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -707,14 +697,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -741,6 +728,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "valueThing",
+          |      "doc": "text",
           |      "type":{
           |        "type": "string",
           |        "logicalType":"uuid"
@@ -748,6 +736,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -755,14 +744,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -775,10 +761,12 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "valueThing",
+          |      "doc": "text",
           |      "type": "string"
           |    },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -786,14 +774,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -820,6 +805,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "ArrayOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "array",
           |         "items":
@@ -831,6 +817,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -838,14 +825,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -858,6 +842,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "ArrayOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "array",
           |         "items":
@@ -868,6 +853,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -875,14 +861,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -909,6 +892,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "MapOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "map",
           |         "values":
@@ -920,6 +904,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -927,14 +912,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -947,6 +929,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "MapOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "map",
           |         "values":
@@ -957,6 +940,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -964,14 +948,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -998,6 +979,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "ArrayOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "array",
           |         "items":
@@ -1009,6 +991,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1016,14 +999,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1036,6 +1016,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "ArrayOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "array",
           |         "items":
@@ -1047,6 +1028,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1054,14 +1036,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1086,6 +1065,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "ArrayOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "map",
           |         "values":
@@ -1097,6 +1077,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1104,14 +1085,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1124,6 +1102,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "ArrayOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "map",
           |         "values":
@@ -1135,6 +1114,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1142,14 +1122,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1174,6 +1151,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "RecordOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "record",
           |         "name": "NestedRecord",
@@ -1187,6 +1165,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1194,14 +1173,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1214,6 +1190,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "RecordOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "record",
           |         "name": "NestedRecord",
@@ -1227,6 +1204,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1234,14 +1212,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1266,6 +1241,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "RecordOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "record",
           |         "name": "NestedRecord",
@@ -1282,6 +1258,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1289,14 +1266,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1309,6 +1283,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "RecordOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "record",
           |         "name": "NestedRecord",
@@ -1322,6 +1297,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1329,14 +1305,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1363,6 +1336,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "keyThing",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1370,6 +1344,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1377,14 +1352,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1397,6 +1369,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "keyThing",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-micros"
@@ -1404,6 +1377,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1411,14 +1385,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1445,6 +1416,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "valueThing",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1452,6 +1424,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1459,14 +1432,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1479,6 +1449,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "valueThing",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-micros"
@@ -1486,6 +1457,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1493,14 +1465,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1528,10 +1497,12 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "valueThing",
+          |      "doc": "text",
           |      "type": "string"
           |    },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1539,14 +1510,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1560,6 +1528,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "valueThing",
+          |      "doc": "text",
           |      "type":{
           |        "type": "string",
           |        "logicalType":"uuid"
@@ -1567,6 +1536,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1574,14 +1544,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1609,10 +1576,12 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "valueThing",
+          |      "doc": "text",
           |      "type": "string"
           |    },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1620,14 +1589,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1641,6 +1607,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "valueThing",
+          |      "doc": "text",
           |      "type":{
           |        "type": "string",
           |        "logicalType":"uuid"
@@ -1648,6 +1615,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1655,14 +1623,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1690,6 +1655,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |			"name": "testEnum",
+          |     "doc": "text",
           |			"type": {
           |            "type": "enum",
           |            "name": "test_type",
@@ -1698,6 +1664,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |		},
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1705,14 +1672,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1726,6 +1690,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |			"name": "testEnum",
+          |     "doc": "text",
           |			"type": {
           |            "type": "enum",
           |            "name": "test_type",
@@ -1734,6 +1699,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |		},
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -1741,14 +1707,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1773,14 +1736,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |      {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1796,7 +1756,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
       result.attempt.map(_ shouldBe RequiredSchemaKeyFieldMissingError(RequiredField.CREATED_AT, keySchema, "Entity").asLeft)
     }
 
-    "throw error on value schema evolution with missing required fields doc" in {
+    "throw error on value schema evolution with missing required field doc" in {
       val value =
         """
           |{
@@ -1805,12 +1765,13 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |      {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
           |    },
-          |      {
+          |    {
           |      "name": "createdAt",
           |      "type":{
           |        "type": "long",
@@ -1840,14 +1801,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |      {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -1870,16 +1828,15 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .record("name")
           .fields()
           .name("nullableUnion")
+          .doc("text")
           .`type`(union)
           .withDefault(null)
-          .name(RequiredField.DOC)
-          .`type`()
-          .stringType()
-          .stringDefault("some text")
           .name(RequiredField.CREATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .name(RequiredField.UPDATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .endRecord()
@@ -1898,16 +1855,15 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .record("name")
           .fields()
           .name("nullableField")
+          .doc("text")
           .`type`("null")
           .noDefault()
-          .name(RequiredField.DOC)
-          .`type`()
-          .stringType()
-          .stringDefault("some text")
           .name(RequiredField.CREATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .name(RequiredField.UPDATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .endRecord()
@@ -1927,16 +1883,15 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .record("name")
           .fields()
           .name("nullableUnion")
+          .doc("text")
           .`type`(union)
           .withDefault(5)
-          .name(RequiredField.DOC)
-          .`type`()
-          .stringType()
-          .stringDefault("some text")
           .name(RequiredField.CREATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .name(RequiredField.UPDATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .endRecord()
@@ -1955,15 +1910,14 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .record("name")
           .fields()
           .name("isTrue")
+          .doc("text")
           .`type`().booleanType().noDefault()
-          .name(RequiredField.DOC)
-          .`type`()
-          .stringType()
-          .stringDefault("some text")
           .name(RequiredField.CREATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .name(RequiredField.UPDATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .endRecord()
@@ -1972,15 +1926,14 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .record("name")
           .fields()
           .name("isTrue")
+          .doc("text")
           .`type`().booleanType().noDefault().nullableInt("nullInt", 12)
-          .name(RequiredField.DOC)
-          .`type`()
-          .stringType()
-          .stringDefault("some text")
           .name(RequiredField.CREATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .name(RequiredField.UPDATED_AT)
+          .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
           .withDefault(Instant.now().toEpochMilli)
           .endRecord()
@@ -2039,16 +1992,15 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
                           .record("val")
                           .fields()
                           .name("itsnullable")
+                          .doc("text")
                           .`type`(union)
                           .noDefault()
-                          .name(RequiredField.DOC)
-                          .`type`()
-                          .stringType()
-                          .stringDefault("some text")
                           .name(RequiredField.CREATED_AT)
+                          .doc("text")
                           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
                           .withDefault(Instant.now().toEpochMilli)
                           .name(RequiredField.UPDATED_AT)
+                          .doc("text")
                           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
                           .withDefault(Instant.now().toEpochMilli)
                           .endRecord()
@@ -2066,6 +2018,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         """
           |{
           |  "type": "string",
+          |  "doc": "text",
           |  "name": "test"
           |}
         """.stripMargin
@@ -2083,6 +2036,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         """
           |{
           |  "type": "string",
+          |  "doc": "text",
           |  "name": "test"
           |}
         """.stripMargin
@@ -2106,6 +2060,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "timestamp",
+          |      "doc": "text",
           |      "type":{
           |        "type": "string",
           |        "logicalType": "iso-datetime"
@@ -2113,6 +2068,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "createdAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -2120,14 +2076,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |    },
           |    {
           |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
           |    }
           |  ]
           |}
@@ -2159,25 +2112,24 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |      "type":{
           |        "type": "string",
           |        "logicalType": "iso-datetime"
-          |      }
+          |      },
+          |      "doc": "text"
           |    },
           |    {
           |      "name": "createdAt",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
-          |      }
+          |      },
+          |      "doc": "text"
           |    },
           |    {
           |      "name": "updatedAt",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
-          |      }
-          |    },
-          |    {
-          |      "name": "doc",
-          |      "type": "string"
+          |      },
+          |      "doc": "text"
           |    }
           |  ]
           |}
@@ -2340,17 +2292,16 @@ object CreateTopicProgramSpec {
       .record(name)
       .fields()
       .name("isTrue")
+      .doc("text")
       .`type`()
       .stringType()
       .noDefault()
-      .name(RequiredField.DOC)
-      .`type`()
-      .stringType()
-      .stringDefault("some text")
       .name(RequiredField.CREATED_AT)
+      .doc("text")
       .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
       .withDefault(Instant.now().toEpochMilli)
       .name(RequiredField.UPDATED_AT)
+      .doc("text")
       .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
       .withDefault(Instant.now().toEpochMilli)
       .endRecord()

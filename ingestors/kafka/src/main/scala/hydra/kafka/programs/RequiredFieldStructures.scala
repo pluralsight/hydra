@@ -9,7 +9,7 @@ import scala.jdk.CollectionConverters.collectionAsScalaIterableConverter
 object RequiredFieldStructures {
 
   def docFieldValidator(schema: Schema): Boolean =
-    schema.getFields.asScala.toList.find(_.name == RequiredField.DOC).exists(_.schema.getType == Type.STRING)
+    schema.getFields.asScala.toList.forall(d => Option(d.doc()).nonEmpty)
 
   def createdAtFieldValidator(schema: Schema): Boolean =
     schema.getFields.asScala.toList.find(_.name == RequiredField.CREATED_AT).exists{

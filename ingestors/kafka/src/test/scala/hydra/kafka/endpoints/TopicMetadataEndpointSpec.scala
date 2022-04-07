@@ -99,17 +99,16 @@ class TopicMetadataEndpointSpec
         .record(name)
         .fields()
         .name("isTrue")
+        .doc("text")
         .`type`()
         .stringType()
         .noDefault()
-        .name(RequiredField.DOC)
-        .`type`()
-        .stringType()
-        .stringDefault("some text")
         .name(RequiredField.CREATED_AT)
+        .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
         .withDefault(Instant.now().toEpochMilli)
         .name(RequiredField.UPDATED_AT)
+        .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
         .withDefault(Instant.now().toEpochMilli)
         .endRecord()
@@ -310,6 +309,7 @@ class TopicMetadataEndpointSpec
        |}""".stripMargin
 
     "return 200 with proper metadata" in {
+
       Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, validRequest)) ~> route ~> check {
         response.status shouldBe StatusCodes.OK
       }

@@ -61,7 +61,7 @@ final class BootstrapEndpointV2[F[_]: Futurable](
                           case Some(validatedTopic) =>
                             onComplete(
                               Futurable[F].unsafeToFuture(createTopicProgram
-                                .createTopic(validatedTopic, t, defaultTopicDetails, true))
+                                .createTopic(validatedTopic, t, defaultTopicDetails, withRequiredFields = true))
                             ) {
                               case Success(_) =>
                                 addHttpMetric(topicName, StatusCodes.OK, "V2Bootstrap", startTime, "PUT")

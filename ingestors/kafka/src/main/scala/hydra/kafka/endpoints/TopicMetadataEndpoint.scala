@@ -169,7 +169,7 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                       val req = TopicMetadataV2Request.fromMetadataOnlyRequest(schemas, mor)
                       onComplete(
                         Futurable[F].unsafeToFuture(createTopicProgram
-                          .createTopicFromMetadataOnly(t, req, true))
+                          .createTopicFromMetadataOnly(t, req, withRequiredFields = true))
                       ) {
                         case Failure(exception) => exception match {
                           case e @ (_:IncompatibleSchemaException | _:ValidationError) =>
