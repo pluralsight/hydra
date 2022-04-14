@@ -39,7 +39,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent :
     }.map(_.combineAll)
   }
 
-  private def checkIfTopicStillHasConsumers(topicNames: List[String], ignoreConsumerGroups: List[String], ignoreAllConsumerGroups: Boolean): F[List[Either[ConsumersStillExistError, String]]] = {
+  private def checkIfTopicStillHasConsumers(topicNames: List[String], ignoreConsumerGroups: List[String]): F[List[Either[ConsumersStillExistError, String]]] = {
     topicNames.traverse { topic =>
       Logger[F].info(s"Checking if '$topic' topic still has consumers.") *>
       consumerGroupAlgebra.getConsumersForTopic(topic).flatMap { topicConsumers =>
@@ -61,7 +61,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent :
 
 
         for {
-          filteredConsumers <- if(ignoreAllConsumerGroups) Sync[F].pure(List.empty) else filteredConsumersF
+          filteredConsumers <- filteredConsumersF
         } yield {
           if (filteredConsumers.nonEmpty) {
             Left(ConsumersStillExistError(topic, filteredConsumers.map(detailedConsumer =>
@@ -151,7 +151,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent :
     for {
       topics <- topicNames.traverse(checkIfTopicExists)
       (topicsThatExist, nonExistentTopics) = topics.partition(_._2)
-      topicHasConsumers <- checkIfTopicStillHasConsumers(topicsThatExist.map(_._1), ignoreConsumerGroups, ignoreAllConsumerGroups)
+      topicHasConsumers <- if(ignoreAllConsumerGroups) Sync[F].pure(List.empty) else checkIfTopicStillHasConsumers(topicsThatExist.map(_._1), ignoreConsumerGroups)
       topicIsActivelyPublishing <- topicIsActivelyPublishingCheck(topicsThatExist.map(_._1))
       goodTopics = findDeletableTopics(topicIsActivelyPublishing, topicHasConsumers)
       badTopics = findNondeletableTopics(topicIsActivelyPublishing, topicHasConsumers)
@@ -253,3 +253,4 @@ final case class ConsumersStillExistError(topic: String, consumers: List[Consume
 final case class ActivelyPublishedToError(topic: String, deleteWindow: Long) extends DeleteTopicError
 final case class TopicDoesNotExistError(topic: String) extends DeleteTopicError
 final case class CacheDeletionError(message: String) extends DeleteTopicError
+final case object MustProvideListOfTopics extends DeleteTopicError
