@@ -122,16 +122,19 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
     } yield ()
   }
 
-  def createTopicFromMetadataOnly(topicName: Subject, createTopicRequest: TopicMetadataV2Request): F[Unit] =
+  //todo: workaround for https://pluralsight.atlassian.net/browse/ADAPT-929, should be removed in the future
+  def createTopicFromMetadataOnly(topicName: Subject, createTopicRequest: TopicMetadataV2Request, withRequiredFields: Boolean = false): F[Unit] =
     for {
-      _ <- validator.validate(createTopicRequest, topicName)
+      _ <- validator.validate(createTopicRequest, topicName, withRequiredFields)
       _ <- publishMetadata(topicName, createTopicRequest)
     } yield ()
 
+  //todo: workaround for https://pluralsight.atlassian.net/browse/ADAPT-929, should be removed in the future
   def createTopic(
                    topicName: Subject,
                    createTopicRequest: TopicMetadataV2Request,
-                   defaultTopicDetails: TopicDetails
+                   defaultTopicDetails: TopicDetails,
+                   withRequiredFields: Boolean = false
                  ): F[Unit] = {
     def getCleanupPolicyConfig: Map[String, String] =
       createTopicRequest.streamType match {
@@ -143,7 +146,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
       defaultTopicDetails.copy(numPartitions = numP.value))
       .copy(partialConfig = defaultTopicDetails.configs ++ getCleanupPolicyConfig)
     (for {
-      _ <- Resource.liftF(validator.validate(createTopicRequest, topicName))
+      _ <- Resource.liftF(validator.validate(createTopicRequest, topicName, withRequiredFields))
       _ <- registerSchemas(
         topicName,
         createTopicRequest.schemas.key,
