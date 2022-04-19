@@ -9,7 +9,7 @@ import spray.json._
   */
 trait TopicMetadataAdapter extends HydraJsonSupport {
 
-  implicit val topicMetadataFormat = jsonFormat11(TopicMetadata)
+  implicit val topicMetadataFormat = jsonFormat12(TopicMetadata)
 
   def streamLink(rel: String, id: String) = rel -> Link(href = s"/streams/$id")
 

@@ -85,7 +85,8 @@ final case class TopicMetadataV2Request(
                                          notes: Option[String],
                                          teamName: Option[String],
                                          numPartitions: Option[TopicMetadataV2Request.NumPartitions],
-                                         tags: List[String]
+                                         tags: List[String],
+                                         notificationUrl: Option[String]
                                        ) {
 
   def toValue: TopicMetadataV2Value = {
@@ -99,7 +100,8 @@ final case class TopicMetadataV2Request(
       parentSubjects,
       notes,
       teamName,
-      tags
+      tags,
+      notificationUrl
     )
   }
 }
@@ -143,7 +145,8 @@ object TopicMetadataV2Request {
       mor.notes,
       mor.teamName,
       mor.numPartitions,
-      mor.tags
+      mor.tags,
+      mor.notificationUrl
     )
   }
 }
@@ -163,7 +166,8 @@ final case class TopicMetadataV2Response(
                                           parentSubjects: List[String],
                                           notes: Option[String],
                                           teamName: Option[String],
-                                          tags: List[String]
+                                          tags: List[String],
+                                          notificationUrl: Option[String]
                                         )
 
 object TopicMetadataV2Response {
@@ -181,7 +185,8 @@ object TopicMetadataV2Response {
       v.parentSubjects,
       v.notes,
       v.teamName,
-      v.tags
+      v.tags,
+      v.notificationUrl
     )
   }
 }
@@ -196,7 +201,8 @@ final case class MetadataOnlyRequest(streamType: StreamTypeV2,
                                      notes: Option[String],
                                      teamName: Option[String],
                                      numPartitions: Option[TopicMetadataV2Request.NumPartitions],
-                                     tags: List[String]) {
+                                     tags: List[String],
+                                     notificationUrl: Option[String]) {
 }
 
 

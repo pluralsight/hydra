@@ -790,7 +790,8 @@ class MockStreamsManagerActor extends Actor {
     None,
     None,
     UUID.randomUUID(),
-    DateTime.now()
+    DateTime.now(),
+    Some("notification.url")
   )
 
   override def receive: Receive = {

@@ -54,7 +54,8 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
       List.empty,
       None,
       Some("dvs-teamName"),
-      List.empty
+      List.empty,
+      None
     )
 
     val (encodedKey, encodedValue, headers) =
@@ -82,6 +83,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
          |"createdDate":"${createdDate.toString}",
          |"parentSubjects": [],
          |"notes": null,
+         |"notificationUrl": null,
          |"tags": null
          |}""".stripMargin
 
@@ -105,7 +107,8 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
       List.empty,
       None,
       Some("dvs-teamName"),
-      List.empty
+      List.empty,
+      Some("notificationUrl")
     )
 
     val (encodedKey, encodedValue, headers) =
