@@ -29,4 +29,4 @@ jobs:
         run: docker build -t scala-sbt-openjdk:2.12.11-1.5.8-1.8 .
 
       - name: Run SBT Tests
-        run: docker run --rm -w /hydra -v $(pwd):/hydra scala-sbt-openjdk:2.12.11-1.5.8-1.8 sbt test && exit
+        run: docker run --rm -w /hydra -v $(pwd):/hydra scala-sbt-openjdk:2.12.11-1.5.8-1.8 sbt test
