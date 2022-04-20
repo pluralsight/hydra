@@ -48,7 +48,7 @@ class KafkaClientAlgebraSpec
   }
 
   private def createTopics: IO[Unit] = {
-    val topicsToCreate: List[String] = List("topic1", "topic2", "stringTopic1", "stringTopic2", "nullTopic1")
+    val topicsToCreate: List[String] = List("topic1", "topic2" , "topic-inc-data", "stringTopic1", "stringTopic2", "nullTopic1")
     KafkaAdminAlgebra.live[IO](s"localhost:$port")
       .flatMap(adminClient => topicsToCreate.traverse(adminClient.createTopic(_, TopicDetails(1, 1, 1)))).void
   }
@@ -101,6 +101,21 @@ class KafkaClientAlgebraSpec
       val records = kafkaClient.consumeMessages(topic,"newConsumerGroup", shouldCommitOffsets).take(1).compile.toList.unsafeRunSync()
       records should have length 1
       records.head shouldBe (key, Some(value), None)
+    }
+
+    val (topic11, (_, key1), value1) = topicAndKeyAndValue("topic-inc-data","key1","value1")
+    "consume avro messages from kafka and skip incorrect message" in {
+      kafkaClient.publishMessage((key1, Some(value), None), topic11).map{ r =>
+        r shouldBe PublishResponse(0, 0).asRight}.unsafeRunSync()
+      kafkaClient.publishStringKeyMessage((Some("Hohoho"), Some(value), None), topic11).map{ r =>
+        r shouldBe PublishResponse(0, 1).asRight}.unsafeRunSync()
+      kafkaClient.publishMessage((key, Some(value), None), topic11).map{ r =>
+        r shouldBe PublishResponse(0, 2).asRight}.unsafeRunSync()
+      val records = kafkaClient.consumeSafelyMessages(topic11,"newConsumerGroup", shouldCommitOffsets).take(3).compile.toList.unsafeRunSync()
+      records should have length 3
+      records.head shouldBe Right((key1, Some(value1), None))
+      records(1).isLeft shouldBe true
+      records(2) shouldBe Right((key, Some(value), None))
     }
 
     "consume avro message with partition info from kafka" in {

@@ -18,7 +18,7 @@ import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
-import org.apache.avro.{Schema, SchemaBuilder}
+import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import retry.{RetryPolicies, RetryPolicy}
@@ -88,9 +88,18 @@ final class BootstrapEndpointV2Spec
         .record(schemaName)
         .fields()
         .name("test")
+        .doc("text")
         .`type`()
         .stringType()
         .noDefault()
+        .name(RequiredField.CREATED_AT)
+        .doc("text")
+        .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+        .withDefault(Instant.now().toEpochMilli)
+        .name(RequiredField.UPDATED_AT)
+        .doc("text")
+        .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+        .withDefault(Instant.now().toEpochMilli)
         .endRecord()
 
     val badKeySchema: Schema =

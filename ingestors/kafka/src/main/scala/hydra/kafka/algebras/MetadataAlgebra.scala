@@ -4,14 +4,14 @@ import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, Sync}
 import cats.syntax.all._
 import hydra.avro.registry.SchemaRegistry
-import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, TopicName}
+import hydra.kafka.algebras.KafkaClientAlgebra.ConsumerGroup
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.model.TopicMetadataV2.MetadataAvroSchemaFailure
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request, TopicMetadataV2Value}
-import org.apache.avro.generic.GenericRecord
+import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Value}
 import io.chrisdavenport.log4cats.Logger
 import org.apache.avro.Schema
+import org.apache.avro.generic.GenericRecord
 
 
 trait MetadataAlgebra[F[_]] {
@@ -36,14 +36,17 @@ object MetadataAlgebra {
                                             consumeMetadataEnabled: Boolean
                                           ): F[MetadataAlgebra[F]] = {
     val metadataStream: fs2.Stream[F, (GenericRecord, Option[GenericRecord])] = if (consumeMetadataEnabled) {
-      kafkaClientAlgebra.consumeMessages(metadataTopicName.value, consumerGroup, commitOffsets = false).map(record => (record._1, record._2))
+      kafkaClientAlgebra.consumeSafelyMessages(metadataTopicName.value, consumerGroup, commitOffsets = false)
+        //Ignore records with errors
+        .collect { case Right(record) => (record._1, record._2) }
     } else {
       fs2.Stream.empty
     }
     for {
       ref <- Ref[F].of(MetadataStorageFacade.empty)
-      _ <- Concurrent[F].start(metadataStream.flatMap { case (key, value) =>
-        fs2.Stream.eval {
+      _ <- Concurrent[F].start(metadataStream
+        .evalMap { case (key, value) =>
+
           TopicMetadataV2.decode[F](key, value).flatMap { case (topicMetadataKey, topicMetadataValueOpt) =>
             topicMetadataValueOpt match {
               case Some(topicMetadataValue) =>
@@ -61,11 +64,13 @@ object MetadataAlgebra {
               case None =>
                 ref.update(_.removeMetadata(topicMetadataKey))
             }
-          }
-        }.recoverWith {
+          }.recoverWith {
           case e: MetadataAvroSchemaFailure =>
-            fs2.Stream.eval(Logger[F].warn(s"Error in metadata consumer $e"))
+            Logger[F].warn(s"Error in metadata consumer $e")
         }
+      }.onError{
+        case error =>
+          fs2.Stream.eval(Logger[F].error(error)(s"Metadata consumer failed."))
       }.compile.drain)
       algebra <- getMetadataAlgebra[F](ref, schemaRegistryAlgebra)
     } yield algebra
@@ -110,7 +115,6 @@ object MetadataAlgebra {
 }
 
 trait TestMetadataAlgebra[F[_]] extends MetadataAlgebra[F] {
-  import TestMetadataAlgebra._
   def addMetadata(topicMetadataContainer: TopicMetadataContainer): F[Unit]
 }
 

@@ -22,7 +22,7 @@ import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.apache.avro.generic.GenericRecord
-import org.apache.avro.{Schema, SchemaBuilder}
+import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import org.scalatest.matchers.should.Matchers
 import retry.{RetryPolicies, RetryPolicy}
 import eu.timepit.refined._
@@ -43,7 +43,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     "register the two avro schemas" in {
       for {
         ts          <- initTestServices()
-        _           <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails)
+        _           <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails, true)
         allSubjects <- ts.schemaRegistry.getAllSubjects
       } yield allSubjects.size shouldBe 2
     }
@@ -78,7 +78,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
       for {
         ref    <- Ref[IO].of(TestState(deleteSchemaWasCalled = false, 0))
         ts     <- initTestServices(schemaRegistry = getSchemaRegistry(ref).some)
-        _      <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchema), topicDetails).attempt
+        _      <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchema), topicDetails, true).attempt
         result <- ref.get
       } yield result.deleteSchemaWasCalled shouldBe true
     }
@@ -136,7 +136,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
       for {
         ref    <- Ref[IO].of(TestState(schemaRegistryState))
         ts     <- initTestServices(schemaRegistry = getSchemaRegistry(ref).some)
-        _      <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchema), topicDetails).attempt
+        _      <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchema), topicDetails, true).attempt
         result <- ref.get
       } yield result.schemas shouldBe schemaRegistryState
     }
@@ -144,7 +144,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     "create the topic in Kafka" in {
       for {
         ts    <- initTestServices()
-        _     <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails)
+        _     <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails, true)
         topic <- ts.kafka.describeTopic(subject.value)
       } yield topic.get shouldBe Topic(subject.value, 1)
     }
@@ -154,7 +154,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         publishTo     <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         topicMetadata <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue))
         ts            <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some)
-        _             <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails)
+        _             <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails, true)
         published     <- publishTo.get
       } yield published shouldBe Map(metadataTopic -> (topicMetadata._1, topicMetadata._2, None))
     }
@@ -169,10 +169,10 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         m           <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue))
         updatedM    <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(updatedValue.copy(createdDate = topicMetadataValue.createdDate)))
         ts          <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
-        _           <- ts.program.createTopic(subject, topicMetadataRequest, TopicDetails(1, 1, 1))
+        _           <- ts.program.createTopic(subject, topicMetadataRequest, TopicDetails(1, 1, 1), true)
         _           <- metadata.addToMetadata(subject, topicMetadataRequest)
         metadataMap <- publishTo.get
-        _           <- ts.program.createTopic(subject, updatedRequest, TopicDetails(1, 1, 1))
+        _           <- ts.program.createTopic(subject, updatedRequest, TopicDetails(1, 1, 1), true)
         updatedMap  <- publishTo.get
       } yield {
         metadataMap shouldBe Map(metadataTopic -> (m._1, m._2, None))
@@ -185,7 +185,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         publishTo   <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         kafkaClient = new TestKafkaClientAlgebraWithPublishTo(publishTo, failOnPublish = true)
         ts          <- initTestServices(kafkaClient.some)
-        _           <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails).attempt
+        _           <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails, true).attempt
         topic       <- ts.kafka.describeTopic(subject.value)
       } yield topic.isDefined shouldBe false
     }
@@ -196,7 +196,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         kafkaClient = new TestKafkaClientAlgebraWithPublishTo(publishTo, failOnPublish = true)
         ts          <- initTestServices(kafkaClient.some)
         _           <- ts.kafka.createTopic(subject.value, topicDetails)
-        _           <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails).attempt
+        _           <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails, true).attempt
         topic       <- ts.kafka.describeTopic(subject.value)
       } yield topic.isDefined shouldBe true
     }
@@ -209,10 +209,10 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         consumeFrom <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
         metadata    <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
         ts          <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
-        _           <- ts.program.createTopic(subject, request, topicDetails)
+        _           <- ts.program.createTopic(subject, request, topicDetails, true)
         _           <- metadata.addToMetadata(subject, request)
         metadataMap <- publishTo.get
-        _           <- ts.program.createTopic(subject, updatedRequest, topicDetails)
+        _           <- ts.program.createTopic(subject, updatedRequest, topicDetails, true)
         updatedMap  <- publishTo.get
       } yield {
         updatedMap(metadataTopic)._2.get.get("deprecatedDate") shouldBe metadataMap(metadataTopic)._2.get.get("deprecatedDate")
@@ -227,10 +227,10 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         consumeFrom <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
         metadata    <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
         ts          <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
-        _           <- ts.program.createTopic(subject, request, topicDetails)
+        _           <- ts.program.createTopic(subject, request, topicDetails, true)
         _           <- metadata.addToMetadata(subject, request)
         metadataMap <- publishTo.get
-        _           <- ts.program.createTopic(subject, updatedRequest, topicDetails)
+        _           <- ts.program.createTopic(subject, updatedRequest, topicDetails, true)
         updatedMap  <- publishTo.get
       } yield {
         val ud = metadataMap(metadataTopic)._2.get.get("deprecatedDate")
@@ -255,14 +255,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .record("name")
           .fields()
           .name("isTrue")
+          .doc("text")
           .`type`()
           .booleanType()
           .noDefault()
+          .name(RequiredField.CREATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
+          .name(RequiredField.UPDATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
           .endRecord()
 
       val result = for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, mismatchedValueSchema), topicDetails)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, mismatchedValueSchema), topicDetails, true)
       } yield ()
 
       val keyFieldSchema   = keySchema.getField("isTrue").schema()
@@ -277,13 +286,22 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .record("name")
           .fields()
           .name("nullableUnion")
+          .doc("text")
           .`type`(union)
           .withDefault(null)
+          .name(RequiredField.CREATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
+          .name(RequiredField.UPDATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
           .endRecord()
 
       val result = for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(recordWithNullDefault, recordWithNullDefault), topicDetails)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(recordWithNullDefault, recordWithNullDefault), topicDetails, true)
       } yield ()
 
       val fieldSchema = recordWithNullDefault.getField("nullableUnion").schema()
@@ -297,13 +315,22 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .record("name")
           .fields()
           .name("nullableUnion")
+          .doc("text")
           .`type`(union)
           .withDefault(null)
+          .name(RequiredField.CREATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
+          .name(RequiredField.UPDATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
           .endRecord()
 
       for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createEventStreamTypeTopicMetadataRequest(recordWithNullDefault, recordWithNullDefault), topicDetails)
+        _  <- ts.program.createTopic(subject, createEventStreamTypeTopicMetadataRequest(recordWithNullDefault, recordWithNullDefault), topicDetails, true)
       } yield succeed
     }
 
@@ -313,13 +340,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .record("name")
           .fields()
           .name("nullableField")
+          .doc("text")
           .`type`("null")
           .noDefault()
+          .name(RequiredField.CREATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
+          .name(RequiredField.UPDATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
           .endRecord()
+
 
       val result = for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(recordWithNullType, recordWithNullType), topicDetails)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(recordWithNullType, recordWithNullType), topicDetails, true)
       } yield ()
 
       val fieldSchema = recordWithNullType.getField("nullableField").schema()
@@ -332,13 +369,22 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .record("name")
           .fields()
           .name("nullableField")
+          .doc("text")
           .`type`("null")
           .noDefault()
+          .name(RequiredField.CREATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
+          .name(RequiredField.UPDATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
           .endRecord()
 
       for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createEventStreamTypeTopicMetadataRequest(recordWithNullType, recordWithNullType), topicDetails)
+        _  <- ts.program.createTopic(subject, createEventStreamTypeTopicMetadataRequest(recordWithNullType, recordWithNullType), topicDetails, true)
       } yield succeed
     }
 
@@ -352,6 +398,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     {
           |        "name":"context",
           |        "default": "abc",
+          |        "doc": "text",
           |        "type":[
           |                 {
           |                   "type": "string",
@@ -359,7 +406,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |                 },
           |                 "null"
           |               ]
-          |     }
+          |     },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
           |  ]
           |}
       """.stripMargin
@@ -371,9 +434,26 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "context",
+          |       "doc": "text",
           |       "default": "abc",
           |       "type": ["string", "null" ]
-          |     }
+          |     },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
           |  ]
           |}
       """.stripMargin
@@ -382,8 +462,8 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       val result = for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails)
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails, true)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails, true)
       } yield ()
 
       result.attempt.map(_ shouldBe IllegalLogicalTypeChangeError("uuid", "null", "context").asLeft)
@@ -399,8 +479,25 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     {
           |       "name": "context",
           |       "default": "abc",
-          |       "type": ["string", "null" ]
-          |     }
+          |       "type": ["string", "null" ],
+          |       "doc": "text"
+          |     },
+          |    {
+          |      "name": "createdAt",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      },
+          |      "doc": "text"
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      },
+          |      "doc": "text"
+          |    }
           |  ]
           |}
         """.stripMargin
@@ -413,6 +510,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     {
           |        "name":"context",
           |        "default": "abc",
+          |        "doc": "text",
           |        "type":[
           |                 {
           |                   "type": "string",
@@ -420,7 +518,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |                 },
           |                 "null"
           |               ]
-          |     }
+          |     },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
           |  ]
           |}
         """.stripMargin
@@ -430,8 +544,8 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       val result = for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails)
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails, true)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails, true)
       } yield ()
 
       result.attempt.map(_ shouldBe IllegalLogicalTypeChangeError("null", "uuid", "context").asLeft)
@@ -447,6 +561,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     {
           |        "name":"context",
           |        "default": "abc",
+          |        "doc": "text",
           |        "type":[
           |                 {
           |                   "type": "string",
@@ -454,7 +569,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |                 },
           |                 "null"
           |               ]
-          |     }
+          |     },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
           |  ]
           |}
         """.stripMargin
@@ -467,6 +598,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |     {
           |        "name":"context",
           |        "default": "abc",
+          |        "doc": "text",
           |        "type":[
           |                 {
           |                   "type": "string",
@@ -474,7 +606,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |                 },
           |                 "null"
           |               ]
-          |     }
+          |     },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
           |  ]
           |}
         """.stripMargin
@@ -484,8 +632,8 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       val result = for {
         ts <- initTestServices()
-        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails)
-        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails)
+        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails, true)
+        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails, true)
       } yield ()
 
       result.attempt.map(_ shouldBe IllegalLogicalTypeChangeError("uuid", "date", "context").asLeft)
@@ -500,9 +648,26 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "keyThing",
+          |      "doc": "text",
           |      "type":{
           |        "type": "string",
           |        "logicalType":"uuid"
+          |      }
+          |    },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
           |      }
           |    }
           |  ]
@@ -516,9 +681,26 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "keyThing",
+          |      "doc": "text",
           |      "type":{
           |        "type": "string",
           |        "logicalType":"date"
+          |      }
+          |    },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
           |      }
           |    }
           |  ]
@@ -530,8 +712,8 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       val result = for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(firstKeySchema, valueSchema), topicDetails)
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchemaEvolution, valueSchema), topicDetails)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(firstKeySchema, valueSchema), topicDetails, true)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchemaEvolution, valueSchema), topicDetails, true)
       } yield ()
 
       result.attempt.map(_ shouldBe IllegalLogicalTypeChangeError("uuid", "date", "keyThing").asLeft)
@@ -546,9 +728,26 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "valueThing",
+          |      "doc": "text",
           |      "type":{
           |        "type": "string",
           |        "logicalType":"uuid"
+          |      }
+          |    },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
           |      }
           |    }
           |  ]
@@ -562,7 +761,24 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "valueThing",
+          |      "doc": "text",
           |      "type": "string"
+          |    },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
           |    }
           |  ]
           |}
@@ -573,8 +789,8 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       val result = for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails)
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails, true)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails, true)
       } yield ()
 
       result.attempt.map(_ shouldBe IllegalLogicalTypeChangeError("uuid", "null", "valueThing").asLeft)
@@ -589,6 +805,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "ArrayOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "array",
           |         "items":
@@ -597,7 +814,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |             "type": "int"
           |           }
           |       }
-          |     }
+          |     },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
           |  ]
           |}
       """.stripMargin
@@ -609,6 +842,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "ArrayOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "array",
           |         "items":
@@ -616,7 +850,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |             "type": "int"
           |           }
           |       }
-          |     }
+          |     },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
           |  ]
           |}
       """.stripMargin
@@ -626,8 +876,8 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       val result = for {
         ts <- initTestServices()
-        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails)
-        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails)
+        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails, true)
+        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails, true)
       } yield ()
 
       result.attempt.map(_ shouldBe IllegalLogicalTypeChangeError("date", "null", "ArrayOfThings").asLeft)
@@ -642,6 +892,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "MapOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "map",
           |         "values":
@@ -650,7 +901,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |             "type": "int"
           |           }
           |       }
-          |     }
+          |     },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
           |  ]
           |}
       """.stripMargin
@@ -662,6 +929,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "MapOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "map",
           |         "values":
@@ -669,7 +937,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |             "type": "int"
           |           }
           |       }
-          |     }
+          |     },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
           |  ]
           |}
       """.stripMargin
@@ -679,8 +963,8 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       val result = for {
         ts <- initTestServices()
-        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails)
-        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails)
+        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails, true)
+        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails, true)
       } yield ()
 
       result.attempt.map(_ shouldBe IllegalLogicalTypeChangeError("date", "null", "MapOfThings").asLeft)
@@ -695,6 +979,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "ArrayOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "array",
           |         "items":
@@ -703,7 +988,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |             "type": "int"
           |           }
           |       }
-          |     }
+          |     },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
           |  ]
           |}
       """.stripMargin
@@ -715,6 +1016,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "ArrayOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "array",
           |         "items":
@@ -723,7 +1025,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |             "type": "int"
           |           }
           |       }
-          |     }
+          |     },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
           |  ]
           |}
       """.stripMargin
@@ -733,8 +1051,8 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails)
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails, true)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails, true)
       } yield succeed
     }
 
@@ -747,6 +1065,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "ArrayOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "map",
           |         "values":
@@ -755,7 +1074,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |             "type": "int"
           |           }
           |       }
-          |     }
+          |     },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
           |  ]
           |}
       """.stripMargin
@@ -767,6 +1102,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "ArrayOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "map",
           |         "values":
@@ -775,7 +1111,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |             "type": "int"
           |           }
           |       }
-          |     }
+          |     },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
           |  ]
           |}
       """.stripMargin
@@ -785,8 +1137,8 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails)
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails, true)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails, true)
       } yield succeed
     }
 
@@ -799,6 +1151,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "RecordOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "record",
           |         "name": "NestedRecord",
@@ -809,7 +1162,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |           }
           |         ]
           |       }
-          |     }
+          |     },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
           |  ]
           |}
       """.stripMargin
@@ -821,6 +1190,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "RecordOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "record",
           |         "name": "NestedRecord",
@@ -831,7 +1201,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |           }
           |         ]
           |       }
-          |     }
+          |     },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
           |  ]
           |}
       """.stripMargin
@@ -841,8 +1227,8 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails)
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails, true)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails, true)
       } yield succeed
     }
 
@@ -855,6 +1241,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "RecordOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "record",
           |         "name": "NestedRecord",
@@ -868,7 +1255,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |           }
           |         ]
           |       }
-          |     }
+          |     },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
           |  ]
           |}
       """.stripMargin
@@ -880,6 +1283,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |     {
           |       "name": "RecordOfThings",
+          |       "doc": "text",
           |       "type": {
           |         "type": "record",
           |         "name": "NestedRecord",
@@ -890,7 +1294,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |           }
           |         ]
           |       }
-          |     }
+          |     },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
           |  ]
           |}
       """.stripMargin
@@ -900,8 +1320,8 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       val result = for {
         ts <- initTestServices()
-        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(firstKeySchema, valueSchema), topicDetails)
-        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchemaEvolution, valueSchema), topicDetails)
+        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(firstKeySchema, valueSchema), topicDetails, true)
+        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchemaEvolution, valueSchema), topicDetails, true)
       } yield ()
 
       result.attempt.map(_ shouldBe IllegalLogicalTypeChangeError("uuid", "null", "address").asLeft)
@@ -916,6 +1336,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "keyThing",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -932,9 +1369,26 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "keyThing",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-micros"
+          |      }
+          |    },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
           |      }
           |    }
           |  ]
@@ -946,8 +1400,8 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       val result = for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(firstKeySchema, valueSchema), topicDetails)
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchemaEvolution, valueSchema), topicDetails)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(firstKeySchema, valueSchema), topicDetails, true)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchemaEvolution, valueSchema), topicDetails, true)
       } yield ()
 
       result.attempt.map(_ shouldBe IllegalLogicalTypeChangeError("timestamp-millis", "timestamp-micros", "keyThing").asLeft)
@@ -962,6 +1416,23 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "valueThing",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
@@ -978,9 +1449,26 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "valueThing",
+          |      "doc": "text",
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-micros"
+          |      }
+          |    },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
           |      }
           |    }
           |  ]
@@ -992,8 +1480,8 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       val result = for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails)
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails, true)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails, true)
       } yield ()
 
       result.attempt.map(_ shouldBe IllegalLogicalTypeChangeError("timestamp-millis", "timestamp-micros", "valueThing").asLeft)
@@ -1009,7 +1497,24 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "valueThing",
+          |      "doc": "text",
           |      "type": "string"
+          |    },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
           |    }
           |  ]
           |}
@@ -1023,9 +1528,26 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "valueThing",
+          |      "doc": "text",
           |      "type":{
           |        "type": "string",
           |        "logicalType":"uuid"
+          |      }
+          |    },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
           |      }
           |    }
           |  ]
@@ -1037,8 +1559,8 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       val result = for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(firstKeySchema, valueSchema), topicDetails)
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchemaEvolution, valueSchema), topicDetails)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(firstKeySchema, valueSchema), topicDetails, true)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchemaEvolution, valueSchema), topicDetails, true)
       } yield ()
 
       result.attempt.map(_ shouldBe IllegalLogicalTypeChangeError("null", "uuid", "valueThing").asLeft)
@@ -1054,7 +1576,24 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "valueThing",
+          |      "doc": "text",
           |      "type": "string"
+          |    },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
           |    }
           |  ]
           |}
@@ -1068,9 +1607,26 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "valueThing",
+          |      "doc": "text",
           |      "type":{
           |        "type": "string",
           |        "logicalType":"uuid"
+          |      }
+          |    },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
           |      }
           |    }
           |  ]
@@ -1082,8 +1638,8 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       val result = for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails)
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails, true)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails, true)
       } yield ()
 
       result.attempt.map(_ shouldBe IllegalLogicalTypeChangeError("null", "uuid", "valueThing").asLeft)
@@ -1099,12 +1655,29 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |			"name": "testEnum",
+          |     "doc": "text",
           |			"type": {
           |            "type": "enum",
           |            "name": "test_type",
           |            "symbols": ["test1", "test2"]
           |        }
-          |		}
+          |		},
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
           |  ]
           |}
       """.stripMargin
@@ -1117,12 +1690,29 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |			"name": "testEnum",
+          |     "doc": "text",
           |			"type": {
           |            "type": "enum",
           |            "name": "test_type",
           |            "symbols": ["test1", "test2"]
           |        }
-          |		}
+          |		},
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
           |  ]
           |}
       """.stripMargin
@@ -1132,9 +1722,103 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails)
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, firstValueSchema), topicDetails, true)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, valueSchemaEvolution), topicDetails, true)
       } yield succeed
+    }
+
+    "throw error on key schema evolution with missing required fields createdAt" in {
+      val key =
+        """
+          |{
+          |  "type": "record",
+          |  "name": "Date",
+          |  "fields": [
+          |      {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
+          |  ]
+          |}
+      """.stripMargin
+
+      val keySchema = new Schema.Parser().parse(key)
+
+      val result = for {
+        ts <- initTestServices()
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, getSchema("value")), topicDetails, true)
+      } yield ()
+
+      result.attempt.map(_ shouldBe RequiredSchemaKeyFieldMissingError(RequiredField.CREATED_AT, keySchema, "Entity").asLeft)
+    }
+
+    "throw error on value schema evolution with missing required field doc" in {
+      val value =
+        """
+          |{
+          |  "type": "record",
+          |  "name": "Date",
+          |  "fields": [
+          |      {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "createdAt",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
+          |  ]
+          |}
+      """.stripMargin
+
+      val valueSchema = new Schema.Parser().parse(value)
+
+      val result = for {
+        ts <- initTestServices()
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(getSchema("key"), valueSchema), topicDetails, true)
+      } yield ()
+
+      result.attempt.map(_ shouldBe RequiredSchemaValueFieldMissingError(RequiredField.DOC, valueSchema, "Entity").asLeft)
+    }
+
+    "throw error on value schema evolution with missing required fields updatedAt" in {
+      val value =
+        """
+          |{
+          |  "type": "record",
+          |  "name": "Date",
+          |  "fields": [
+          |      {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    }
+          |  ]
+          |}
+      """.stripMargin
+
+      val valueSchema = new Schema.Parser().parse(value)
+
+      val result = for {
+        ts <- initTestServices()
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(getSchema("key"), valueSchema), topicDetails, true)
+      } yield ()
+
+      result.attempt.map(_ shouldBe RequiredSchemaValueFieldMissingError(RequiredField.UPDATED_AT, valueSchema, "Entity").asLeft)
     }
 
     "successfully validate topic schema with value that has field of type union [null, ...]" in {
@@ -1144,15 +1828,24 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .record("name")
           .fields()
           .name("nullableUnion")
+          .doc("text")
           .`type`(union)
           .withDefault(null)
+          .name(RequiredField.CREATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
+          .name(RequiredField.UPDATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
           .endRecord()
 
       for {
         ts <- Resource.liftF(initTestServices())
         _  <- ts.program.registerSchemas(subject ,keySchema, recordWithNullDefault)
         _  <- ts.program.createTopicResource(subject, topicDetails)
-        _  <- Resource.liftF(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(keySchema, recordWithNullDefault)))
+        _  <- Resource.liftF(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(keySchema, recordWithNullDefault), true))
       } yield succeed
     }
 
@@ -1162,15 +1855,24 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .record("name")
           .fields()
           .name("nullableField")
+          .doc("text")
           .`type`("null")
           .noDefault()
+          .name(RequiredField.CREATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
+          .name(RequiredField.UPDATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
           .endRecord()
 
       for {
         ts <- Resource.liftF(initTestServices())
         _  <- ts.program.registerSchemas(subject, keySchema, recordWithNullType)
         _  <- ts.program.createTopicResource(subject, topicDetails)
-        _  <- Resource.liftF(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(keySchema, recordWithNullType)))
+        _  <- Resource.liftF(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(keySchema, recordWithNullType), true))
       } yield succeed
     }
 
@@ -1181,15 +1883,24 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .record("name")
           .fields()
           .name("nullableUnion")
+          .doc("text")
           .`type`(union)
           .withDefault(5)
+          .name(RequiredField.CREATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
+          .name(RequiredField.UPDATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
           .endRecord()
 
       for {
         ts <- Resource.liftF(initTestServices())
         _  <- ts.program.registerSchemas(subject, recordWithNullDefault, valueSchema)
         _  <- ts.program.createTopicResource(subject, topicDetails)
-        _  <- Resource.liftF(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(recordWithNullDefault, valueSchema)))
+        _  <- Resource.liftF(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(recordWithNullDefault, valueSchema), true))
       } yield succeed
     }
 
@@ -1199,20 +1910,40 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .record("name")
           .fields()
           .name("isTrue")
-          .`type`().booleanType().noDefault().endRecord()
+          .doc("text")
+          .`type`().booleanType().noDefault()
+          .name(RequiredField.CREATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
+          .name(RequiredField.UPDATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
+          .endRecord()
       val mismatchedValueSchemaEvolution =
         SchemaBuilder
           .record("name")
           .fields()
           .name("isTrue")
-          .`type`().booleanType().noDefault().nullableInt("nullInt", 12).endRecord()
+          .doc("text")
+          .`type`().booleanType().noDefault().nullableInt("nullInt", 12)
+          .name(RequiredField.CREATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
+          .name(RequiredField.UPDATED_AT)
+          .doc("text")
+          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+          .withDefault(Instant.now().toEpochMilli)
+          .endRecord()
 
       for {
         ts <- Resource.liftF(initTestServices())
         _ <- ts.program.registerSchemas(subject ,keySchema, mismatchedValueSchema)
         _ <- ts.program.createTopicResource(subject, topicDetails)
-        _ <- Resource.liftF(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(keySchema, mismatchedValueSchema)))
-        _ <- Resource.liftF(ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, mismatchedValueSchemaEvolution), topicDetails))
+        _ <- Resource.liftF(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(keySchema, mismatchedValueSchema), true))
+        _ <- Resource.liftF(ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, mismatchedValueSchemaEvolution), topicDetails, true))
       } yield succeed
     }
 
@@ -1261,13 +1992,22 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
                           .record("val")
                           .fields()
                           .name("itsnullable")
+                          .doc("text")
                           .`type`(union)
                           .noDefault()
+                          .name(RequiredField.CREATED_AT)
+                          .doc("text")
+                          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+                          .withDefault(Instant.now().toEpochMilli)
+                          .name(RequiredField.UPDATED_AT)
+                          .doc("text")
+                          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+                          .withDefault(Instant.now().toEpochMilli)
                           .endRecord()
 
       val result = for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, nullableValue), topicDetails)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, nullableValue), topicDetails, true)
       } yield ()
 
       result.attempt.map(_ shouldBe NullableFieldWithoutDefaultValueError("itsnullable", nullableValue.getFields.asScala.head.schema()).asLeft)
@@ -1278,6 +2018,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         """
           |{
           |  "type": "string",
+          |  "doc": "text",
           |  "name": "test"
           |}
         """.stripMargin
@@ -1295,6 +2036,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         """
           |{
           |  "type": "string",
+          |  "doc": "text",
           |  "name": "test"
           |}
         """.stripMargin
@@ -1318,9 +2060,26 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |  "fields": [
           |    {
           |      "name": "timestamp",
+          |      "doc": "text",
           |      "type":{
           |        "type": "string",
           |        "logicalType": "iso-datetime"
+          |      }
+          |    },
+          |    {
+          |      "name": "createdAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      }
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "doc": "text",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
           |      }
           |    }
           |  ]
@@ -1333,7 +2092,8 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         _ <- ts.program.createTopic(
           subject,
           createTopicMetadataRequest(keySchema, valueSchema),
-          topicDetails
+          topicDetails,
+          true
         )
       } yield ()
 
@@ -1352,7 +2112,24 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |      "type":{
           |        "type": "string",
           |        "logicalType": "iso-datetime"
-          |      }
+          |      },
+          |      "doc": "text"
+          |    },
+          |    {
+          |      "name": "createdAt",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      },
+          |      "doc": "text"
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      },
+          |      "doc": "text"
           |    }
           |  ]
           |}
@@ -1364,7 +2141,8 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         _ <- ts.program.createTopic(
           subject,
           createTopicMetadataRequest(keySchema, valueSchema),
-          topicDetails
+          topicDetails,
+          true
         )
       } yield ()
 
@@ -1391,6 +2169,10 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     override def consumeStringKeyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[IO, (Option[String], Option[GenericRecord], Option[Headers])] = ???
 
     override def withProducerRecordSizeLimit(sizeLimitBytes: Long): IO[KafkaClientAlgebra[IO]] = ???
+
+    override def consumeSafelyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[IO, Either[Throwable, (GenericRecord, Option[GenericRecord], Option[Headers])]] = fs2.Stream.empty
+
+    override def consumeSafelyWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[IO, Either[Throwable, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset))]] = ???
 
     override def consumeMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[IO, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, hydra.kafka.algebras.KafkaClientAlgebra.Offset))] = fs2.Stream.empty
 
@@ -1516,8 +2298,17 @@ object CreateTopicProgramSpec {
       .record(name)
       .fields()
       .name("isTrue")
+      .doc("text")
       .`type`()
       .stringType()
       .noDefault()
+      .name(RequiredField.CREATED_AT)
+      .doc("text")
+      .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+      .withDefault(Instant.now().toEpochMilli)
+      .name(RequiredField.UPDATED_AT)
+      .doc("text")
+      .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+      .withDefault(Instant.now().toEpochMilli)
       .endRecord()
 }
