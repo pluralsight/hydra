@@ -26,7 +26,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
   private def onFailure(resourceTried: String): (Throwable, RetryDetails) => F[Unit] = {
     (error, retryDetails) =>
       Logger[F].info(
-        s"Retrying due to failure in $resourceTried: $error. RetryDetails: $retryDetails"
+        s"Retrying due to failure in $resourceTried: $error. RetryDetails: $retryDetails."
       )
   }
 
