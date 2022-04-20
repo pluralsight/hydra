@@ -109,7 +109,11 @@ object ConsumerGroupsAlgebra {
                                                                  kAA: KafkaAdminAlgebra[F],
                                                                  sra: SchemaRegistry[F]): F[ConsumerGroupsAlgebra[F]] = {
 
-    val dvsConsumersStream: fs2.Stream[F, (GenericRecord, Option[GenericRecord], Option[Headers])] = kafkaClientAlgebra.consumeMessages(dvsConsumersTopic.value, uniquePerNodeConsumerGroup, commitOffsets = false)
+    val dvsConsumersStream: fs2.Stream[F, (GenericRecord, Option[GenericRecord], Option[Headers])] = {
+      kafkaClientAlgebra.consumeSafelyMessages(dvsConsumersTopic.value, uniquePerNodeConsumerGroup, commitOffsets = false)
+        //Ignore records with errors
+        .collect { case Right(value) => value }
+    }
 
     for {
       consumerGroupsStorageFacade <- Ref[F].of(ConsumerGroupsStorageFacade.empty)
@@ -186,11 +190,11 @@ object ConsumerGroupsAlgebra {
     def recover(e: Throwable): F[Unit] = {
       val errorMessage = s"Error in ConsumergroupsAlgebra. Error: ${e.getMessage}"
       val throwable = new Throwable(errorMessage)
-      fs2.Stream.eval(Logger[F].error(errorMessage))
+      Logger[F].error(e)(errorMessage) *>
       ApplicativeError[F, Throwable].raiseError(throwable)
     }
-    dvsConsumersStream.flatMap { case (key, value, _) =>
-      fs2.Stream.eval(TopicConsumer.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
+    dvsConsumersStream.evalMap { case (key, value, _) =>
+      TopicConsumer.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
         topicValue match {
           case Some(tV) =>
             consumerGroupsStorageFacade.update(_.addConsumerGroup(topicKey, tV))
@@ -200,7 +204,7 @@ object ConsumerGroupsAlgebra {
       }.recoverWith {
         case e =>
           recover(e)
-      })
+      }
     }.compile.drain
   }
 }
