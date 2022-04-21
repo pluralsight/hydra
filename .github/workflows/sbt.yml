@@ -13,7 +13,6 @@ on:
       - 'build.sbt'
       - 'project/**'
       - '**.java'
-  workflow_dispatch:
 
 jobs:
   tests:
@@ -31,3 +30,4 @@ jobs:
 
       - name: Run SBT Tests
         run: docker run -w /hydra -v $(pwd):/hydra scala-sbt-openjdk:2.12.11-1.5.8-1.8 sbt test
+        timeout_minutes: 10
