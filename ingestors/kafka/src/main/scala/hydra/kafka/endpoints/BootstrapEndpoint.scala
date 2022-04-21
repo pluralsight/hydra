@@ -104,7 +104,7 @@ class BootstrapEndpoint(override val system:ActorSystem, override val streamsMan
           addHttpMetric("", StatusCodes.OK, "getAllStreams", startTime, "GET", error = Some(ex.getMessage))
           throw ex
         case x =>
-          log.error("Unexpected error in BootstrapEndpoint", x)
+          log.error("Unexpected error in BootstrapEndpoint.", x)
           addHttpMetric("", StatusCodes.InternalServerError, "getAllStreams", startTime, "GET", error = Some(x.toString))
           complete(StatusCodes.InternalServerError, "Unknown error")
       }
