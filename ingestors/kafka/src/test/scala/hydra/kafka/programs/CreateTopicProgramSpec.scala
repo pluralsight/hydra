@@ -281,7 +281,17 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
     "throw error on topic with key that has field of type union [null, ...]" in {
       val union = SchemaBuilder.unionOf().nullType().and().stringType().endUnion()
-      val recordWithNullDefault =
+      val recordWithNullDefaultKey =
+        SchemaBuilder
+          .record("name")
+          .fields()
+          .name("nullableUnion")
+          .doc("text")
+          .`type`(union)
+          .withDefault(null)
+          .endRecord()
+
+      val recordWithNullDefaultVal =
         SchemaBuilder
           .record("name")
           .fields()
@@ -301,16 +311,26 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       val result = for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(recordWithNullDefault, recordWithNullDefault), topicDetails, true)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(recordWithNullDefaultKey, recordWithNullDefaultVal), topicDetails, true)
       } yield ()
 
-      val fieldSchema = recordWithNullDefault.getField("nullableUnion").schema()
+      val fieldSchema = recordWithNullDefaultVal.getField("nullableUnion").schema()
       result.attempt.map(_ shouldBe KeyHasNullableFieldError("nullableUnion", fieldSchema).asLeft)
     }
 
     "do not throw error on topic with key that has field of type union [null, ...] if streamType is 'Event'" in {
       val union = SchemaBuilder.unionOf().nullType().and().stringType().endUnion()
-      val recordWithNullDefault =
+      val recordWithNullDefaultKey =
+        SchemaBuilder
+          .record("name")
+          .fields()
+          .name("nullableUnion")
+          .doc("text")
+          .`type`(union)
+          .withDefault(null)
+          .endRecord()
+
+      val recordWithNullDefaultVal =
         SchemaBuilder
           .record("name")
           .fields()
@@ -330,12 +350,22 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createEventStreamTypeTopicMetadataRequest(recordWithNullDefault, recordWithNullDefault), topicDetails, true)
+        _  <- ts.program.createTopic(subject, createEventStreamTypeTopicMetadataRequest(recordWithNullDefaultKey, recordWithNullDefaultVal), topicDetails, true)
       } yield succeed
     }
 
     "throw error on topic with key that has field of type null" in {
-      val recordWithNullType =
+      val recordWithNullTypeKey =
+        SchemaBuilder
+          .record("name")
+          .fields()
+          .name("nullableField")
+          .doc("text")
+          .`type`("null")
+          .noDefault()
+          .endRecord()
+
+      val recordWithNullTypeVal =
         SchemaBuilder
           .record("name")
           .fields()
@@ -353,18 +383,27 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .withDefault(Instant.now().toEpochMilli)
           .endRecord()
 
-
       val result = for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(recordWithNullType, recordWithNullType), topicDetails, true)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(recordWithNullTypeKey, recordWithNullTypeVal), topicDetails, true)
       } yield ()
 
-      val fieldSchema = recordWithNullType.getField("nullableField").schema()
+      val fieldSchema = recordWithNullTypeKey.getField("nullableField").schema()
       result.attempt.map(_ shouldBe KeyHasNullableFieldError("nullableField", fieldSchema).asLeft)
     }
 
     "do not throw error on topic with key that has field of type null if streamType is 'Event'" in {
-      val recordWithNullType =
+      val recordWithNullTypeKey =
+        SchemaBuilder
+          .record("name")
+          .fields()
+          .name("nullableField")
+          .doc("text")
+          .`type`("null")
+          .noDefault()
+          .endRecord()
+
+      val recordWithNullTypeVal =
         SchemaBuilder
           .record("name")
           .fields()
@@ -384,7 +423,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
       for {
         ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createEventStreamTypeTopicMetadataRequest(recordWithNullType, recordWithNullType), topicDetails, true)
+        _  <- ts.program.createTopic(subject, createEventStreamTypeTopicMetadataRequest(recordWithNullTypeKey, recordWithNullTypeVal), topicDetails, true)
       } yield succeed
     }
 
@@ -653,22 +692,6 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |        "type": "string",
           |        "logicalType":"uuid"
           |      }
-          |    },
-          |    {
-          |      "name": "createdAt",
-          |      "doc": "text",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
-          |      }
-          |    },
-          |    {
-          |      "name": "updatedAt",
-          |      "doc": "text",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
-          |      }
           |    }
           |  ]
           |}
@@ -685,22 +708,6 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |      "type":{
           |        "type": "string",
           |        "logicalType":"date"
-          |      }
-          |    },
-          |    {
-          |      "name": "createdAt",
-          |      "doc": "text",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
-          |      }
-          |    },
-          |    {
-          |      "name": "updatedAt",
-          |      "doc": "text",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
           |      }
           |    }
           |  ]
@@ -1255,23 +1262,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |           }
           |         ]
           |       }
-          |     },
-          |    {
-          |      "name": "createdAt",
-          |      "doc": "text",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
-          |      }
-          |    },
-          |    {
-          |      "name": "updatedAt",
-          |      "doc": "text",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
-          |      }
-          |    }
+          |     }
           |  ]
           |}
       """.stripMargin
@@ -1294,23 +1285,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |           }
           |         ]
           |       }
-          |     },
-          |    {
-          |      "name": "createdAt",
-          |      "doc": "text",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
-          |      }
-          |    },
-          |    {
-          |      "name": "updatedAt",
-          |      "doc": "text",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
-          |      }
-          |    }
+          |     }
           |  ]
           |}
       """.stripMargin
@@ -1341,22 +1316,6 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |        "type": "long",
           |        "logicalType":"timestamp-millis"
           |      }
-          |    },
-          |    {
-          |      "name": "createdAt",
-          |      "doc": "text",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
-          |      }
-          |    },
-          |    {
-          |      "name": "updatedAt",
-          |      "doc": "text",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
-          |      }
           |    }
           |  ]
           |}
@@ -1373,22 +1332,6 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |      "type":{
           |        "type": "long",
           |        "logicalType":"timestamp-micros"
-          |      }
-          |    },
-          |    {
-          |      "name": "createdAt",
-          |      "doc": "text",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
-          |      }
-          |    },
-          |    {
-          |      "name": "updatedAt",
-          |      "doc": "text",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
           |      }
           |    }
           |  ]
@@ -1499,22 +1442,6 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |      "name": "valueThing",
           |      "doc": "text",
           |      "type": "string"
-          |    },
-          |    {
-          |      "name": "createdAt",
-          |      "doc": "text",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
-          |      }
-          |    },
-          |    {
-          |      "name": "updatedAt",
-          |      "doc": "text",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
-          |      }
           |    }
           |  ]
           |}
@@ -1532,22 +1459,6 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |      "type":{
           |        "type": "string",
           |        "logicalType":"uuid"
-          |      }
-          |    },
-          |    {
-          |      "name": "createdAt",
-          |      "doc": "text",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
-          |      }
-          |    },
-          |    {
-          |      "name": "updatedAt",
-          |      "doc": "text",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
           |      }
           |    }
           |  ]
@@ -1727,35 +1638,6 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
       } yield succeed
     }
 
-    "throw error on key schema evolution with missing required fields createdAt" in {
-      val key =
-        """
-          |{
-          |  "type": "record",
-          |  "name": "Date",
-          |  "fields": [
-          |      {
-          |      "name": "updatedAt",
-          |      "doc": "text",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
-          |      }
-          |    }
-          |  ]
-          |}
-      """.stripMargin
-
-      val keySchema = new Schema.Parser().parse(key)
-
-      val result = for {
-        ts <- initTestServices()
-        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, getSchema("value")), topicDetails, true)
-      } yield ()
-
-      result.attempt.map(_ shouldBe RequiredSchemaKeyFieldMissingError(RequiredField.CREATED_AT, keySchema, "Entity").asLeft)
-    }
-
     "throw error on value schema evolution with missing required field doc" in {
       val value =
         """
@@ -1886,14 +1768,6 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           .doc("text")
           .`type`(union)
           .withDefault(5)
-          .name(RequiredField.CREATED_AT)
-          .doc("text")
-          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
-          .name(RequiredField.UPDATED_AT)
-          .doc("text")
-          .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
           .endRecord()
 
       for {
@@ -2064,22 +1938,6 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
           |      "type":{
           |        "type": "string",
           |        "logicalType": "iso-datetime"
-          |      }
-          |    },
-          |    {
-          |      "name": "createdAt",
-          |      "doc": "text",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
-          |      }
-          |    },
-          |    {
-          |      "name": "updatedAt",
-          |      "doc": "text",
-          |      "type":{
-          |        "type": "long",
-          |        "logicalType":"timestamp-millis"
           |      }
           |    }
           |  ]
@@ -2291,8 +2149,8 @@ object CreateTopicProgramSpec {
       tags
     )
 
-  def getSchema(name: String): Schema =
-    SchemaBuilder
+  def getSchema(name: String): Schema = {
+    val tempSchema = SchemaBuilder
       .record(name)
       .fields()
       .name("isTrue")
@@ -2300,13 +2158,21 @@ object CreateTopicProgramSpec {
       .`type`()
       .stringType()
       .noDefault()
-      .name(RequiredField.CREATED_AT)
-      .doc("text")
-      .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-      .withDefault(Instant.now().toEpochMilli)
-      .name(RequiredField.UPDATED_AT)
-      .doc("text")
-      .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-      .withDefault(Instant.now().toEpochMilli)
-      .endRecord()
+
+    if (name == "key") {
+      tempSchema.endRecord()
+    } else {
+      tempSchema
+        .name(RequiredField.CREATED_AT)
+        .doc("text")
+        .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+        .withDefault(Instant.now().toEpochMilli)
+        .name(RequiredField.UPDATED_AT)
+        .doc("text")
+        .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+        .withDefault(Instant.now().toEpochMilli)
+        .endRecord()
+    }
+  }
+
 }

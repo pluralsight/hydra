@@ -116,11 +116,15 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
   private def validateRequiredFields(isKey: Boolean, schema: Schema, streamType: StreamTypeV2): F[List[ValidationChain]] =
     streamType match {
       case (StreamTypeV2.Entity | StreamTypeV2.Event) =>
-        List(
-          validate(docFieldValidator(schema), getFieldMissingError(isKey, RequiredField.DOC, schema, streamType.toString)),
-          validate(createdAtFieldValidator(schema), getFieldMissingError(isKey, RequiredField.CREATED_AT, schema, streamType.toString)),
-          validate(updatedAtFieldValidator(schema), getFieldMissingError(isKey, RequiredField.UPDATED_AT, schema, streamType.toString))
-        ).pure
+        if (isKey) {
+          List(validate(docFieldValidator(schema), getFieldMissingError(isKey, RequiredField.DOC, schema, streamType.toString))).pure
+        } else {
+          List(
+            validate(docFieldValidator(schema), getFieldMissingError(isKey, RequiredField.DOC, schema, streamType.toString)),
+            validate(createdAtFieldValidator(schema), getFieldMissingError(isKey, RequiredField.CREATED_AT, schema, streamType.toString)),
+            validate(updatedAtFieldValidator(schema), getFieldMissingError(isKey, RequiredField.UPDATED_AT, schema, streamType.toString))
+          ).pure
+        }
       case _ =>
         List(validate(docFieldValidator(schema), getFieldMissingError(isKey, RequiredField.DOC, schema, streamType.toString))).pure
     }
