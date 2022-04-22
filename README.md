@@ -266,9 +266,8 @@ Expected UUID but received 123
 <img src="https://i.imgflip.com/62t69n.jpg"/>
 
 You may have noticed that the JSON above uses "/v2" endpoints. 
-Those of you capable of extrapolating from incomplete data sets may have questions about "/v1" endpoints. 
-They exist, but are deprecated. 
-If you prefer to use "/v1" endpoints, simply remove the "/v2" segment.
+Most /v2 endpoints have /v1 counterparts, but we highly recommend using /v2 as /v1 endpoints are deprecated.
+If you need to use "/v1" endpoints, simply remove the "/v2" segment.
 
 # Online Documentation
 We used to highly recommend checking out the project documentation [here](https://hydra-ps.atlassian.net/wiki/spaces/DES/overview), but then we forgot about it for two years. 
