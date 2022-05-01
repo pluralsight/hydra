@@ -414,7 +414,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
     applyTestcase(KafkaAdminAlgebra.test[IO](offsetMap), SchemaRegistry.test[IO],
       v1TopicNames = List(myTopicName), v2TopicNames = List(), topicNamesToDelete = List(myTopicName),
       registerKey = true, kafkaTopicNamesToFail = List(),
-      schemasToSucceed = List(myTopicName), allowableTopicDeletionTimeMs = 0)
+      schemasToSucceed = List(myTopicName), allowableTopicDeletionTimeMs = -10)
   }
 
   it should "Delete topic with ignoring all consumer groups" in {

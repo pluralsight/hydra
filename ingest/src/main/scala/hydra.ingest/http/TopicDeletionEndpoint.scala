@@ -24,7 +24,6 @@ object TopicDeletionEndpoint extends
   private implicit val erroredResponse = jsonFormat3(ErroredResponse.apply)
   private implicit val successResponse = jsonFormat2(SuccessfulResponse.apply)
   private implicit val endpointFormat = jsonFormat3(DeletionEndpointResponse.apply)
-  private implicit val deletionRequestFormat = jsonFormat4(DeletionRequest.apply)
 
   final case class ErroredResponse(topicOrSubject: String, message: String, responseCode: Int)
 
@@ -33,6 +32,45 @@ object TopicDeletionEndpoint extends
   final case class DeletionEndpointResponse(success:List[SuccessfulResponse], clientError: List[ErroredResponse], serverError: List[ErroredResponse])
 
   final case class DeletionRequest(topics: List[String], ignoreConsumerGroups: List[String], ignorePublishTime: Boolean, ignoreAllConsumerGroups: Boolean)
+
+  implicit object DeletionRequest extends RootJsonFormat[DeletionRequest] {
+    override def read(json: JsValue): DeletionRequest = {
+      def convertFromArrayToList(valueOpt: Option[JsValue]): List[String] =
+        valueOpt match {
+          case Some(JsArray(value)) => value.map(_.convertTo[String]).toList
+          case _ => List.empty
+        }
+
+      def parseBooleanOpt(valueOpt: Option[JsValue]): Boolean =
+        valueOpt match {
+          case Some(JsBoolean(value)) => value
+          case _ => false
+        }
+
+      val allFields = json.asJsObject.fields
+
+      val topics = convertFromArrayToList(allFields.get("topics"))
+      val ignoreConsumerGroups = convertFromArrayToList(allFields.get("ignoreConsumerGroups"))
+      val ignorePublishTime = parseBooleanOpt(allFields.get("ignorePublishTime"))
+      val ignoreAllConsumerGroups = parseBooleanOpt(allFields.get("ignoreAllConsumerGroups"))
+
+      if (topics.isEmpty) {
+        spray.json.deserializationError("Must provide a List of topics to delete")
+      } else {
+        DeletionRequest(topics, ignoreConsumerGroups, ignorePublishTime, ignoreAllConsumerGroups)
+      }
+    }
+
+    override def write(obj: DeletionRequest): JsValue =
+      JsObject(
+        "topics" -> JsArray(obj.topics.toVector.map(JsString(_))),
+        if (obj.ignoreAllConsumerGroups) {
+          "ignoreAllConsumerGroups" -> JsBoolean(true)
+        } else {
+          "ignoreConsumerGroups" -> JsArray(obj.ignoreConsumerGroups.toVector.map(JsString(_)))
+        }
+      )
+  }
 }
 
 final class TopicDeletionEndpoint[F[_] : Futurable](deletionProgram: TopicDeletionProgram[F], deletionPassword: String)

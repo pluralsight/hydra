@@ -151,7 +151,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent :
     for {
       topics <- topicNames.traverse(checkIfTopicExists)
       (topicsThatExist, nonExistentTopics) = topics.partition(_._2)
-      topicHasConsumers <- if(ignoreAllConsumerGroups) Sync[F].pure(List.empty) else checkIfTopicStillHasConsumers(topicsThatExist.map(_._1), ignoreConsumerGroups)
+      topicHasConsumers <- if(ignoreAllConsumerGroups) Sync[F].pure(topicsThatExist.map(_._1).map(_.asRight[ConsumersStillExistError])) else checkIfTopicStillHasConsumers(topicsThatExist.map(_._1), ignoreConsumerGroups)
       topicIsActivelyPublishing <- topicIsActivelyPublishingCheck(topicsThatExist.map(_._1))
       goodTopics = findDeletableTopics(topicIsActivelyPublishing, topicHasConsumers)
       badTopics = findNondeletableTopics(topicIsActivelyPublishing, topicHasConsumers)
