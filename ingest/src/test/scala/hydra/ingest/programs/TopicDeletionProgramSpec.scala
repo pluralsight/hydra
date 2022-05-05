@@ -144,7 +144,8 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       None,
       Some("dvs-teamName"),
       None,
-      List.empty
+      List.empty,
+      Some("notificationUrl")
     )
 
   private def buildSchema(topic: String, upgrade: Boolean): Schema = {
@@ -411,7 +412,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
     applyTestcase(KafkaAdminAlgebra.test[IO](offsetMap), SchemaRegistry.test[IO],
       v1TopicNames = List(myTopicName), v2TopicNames = List(), topicNamesToDelete = List(myTopicName),
       registerKey = true, kafkaTopicNamesToFail = List(),
-      schemasToSucceed = List(myTopicName), allowableTopicDeletionTimeMs = 0)
+      schemasToSucceed = List(myTopicName), allowableTopicDeletionTimeMs = -10)
   }
 
   // FAILURE CASES

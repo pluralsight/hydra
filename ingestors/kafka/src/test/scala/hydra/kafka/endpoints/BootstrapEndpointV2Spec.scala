@@ -120,7 +120,8 @@ final class BootstrapEndpointV2Spec
       None,
       Some("dvs-teamName"),
       None,
-      List.empty
+      List.empty,
+      Some("notificationUrl")
     ).toJson.compactPrint
 
     val validRequestWithoutDVSTag = TopicMetadataV2Request(
@@ -135,7 +136,8 @@ final class BootstrapEndpointV2Spec
       None,
       Some("dvs-teamName"),
       None,
-      List.empty
+      List.empty,
+      Some("notificationUrl")
     ).toJson.compactPrint
 
     val validRequestWithDVSTag = TopicMetadataV2Request(
@@ -150,7 +152,8 @@ final class BootstrapEndpointV2Spec
       None,
       Some("dvs-teamName"),
       None,
-      List("DVS")
+      List("DVS"),
+      Some("notificationUrl")
     ).toJson.compactPrint
 
     "accept a valid request without a DVS tag" in {
@@ -219,7 +222,8 @@ final class BootstrapEndpointV2Spec
         None,
         None,
         None,
-        List.empty
+        List.empty,
+        Some("notificationUrl")
       ).toJson.compactPrint
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
@@ -289,7 +293,8 @@ final class BootstrapEndpointV2Spec
         None,
         Some("dvs-teamName"),
         None,
-        List("DVS")
+        List("DVS"),
+        Some("notificationUrl")
       ).toJson.compactPrint
 
 
@@ -316,7 +321,8 @@ final class BootstrapEndpointV2Spec
         None,
         Some("dvs-teamName"),
         None,
-        List("Source: NotValid")
+        List("Source: NotValid"),
+        Some("notificationUrl")
       ).toJson.compactPrint
 
       val kca = KafkaClientAlgebra.test[IO].unsafeRunSync()

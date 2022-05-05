@@ -41,7 +41,7 @@ class TopicBootstrapActor(
   import TopicBootstrapActor._
   import spray.json._
 
-  implicit val metadataFormat = jsonFormat11(TopicMetadata)
+  implicit val metadataFormat = jsonFormat12(TopicMetadata)
 
   implicit val ec = context.dispatcher
 
@@ -195,7 +195,8 @@ class TopicBootstrapActor(
       UUID.randomUUID(),
       existingTopicMetadata
         .map(_.createdDate)
-        .getOrElse(org.joda.time.DateTime.now())
+        .getOrElse(org.joda.time.DateTime.now()),
+      topicMetadataRequest.notificationUrl
     )
 
     buildAvroRecord(topicMetadata)

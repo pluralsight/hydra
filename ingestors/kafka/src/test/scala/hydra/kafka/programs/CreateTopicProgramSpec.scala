@@ -2121,7 +2121,8 @@ object CreateTopicProgramSpec {
       None,
       Some("dvs-teamName"),
       numPartitions,
-      List.empty
+      List.empty,
+      Some("notification.url")
     )
 
   def createEventStreamTypeTopicMetadataRequest(
@@ -2146,7 +2147,8 @@ object CreateTopicProgramSpec {
       None,
       Some("dvs-teamName"),
       numPartitions,
-      tags
+      tags,
+      Some("notification.url")
     )
 
   def getSchema(name: String): Schema = {

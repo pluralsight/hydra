@@ -276,7 +276,8 @@ class TopicMetadataEndpointSpec
                          |    "notes": "here are some notes",
                          |    "parentSubjects": [],
                          |    "teamName": "dvs-teamName",
-                         |    "tags": ["Source: DVS"]
+                         |    "tags": ["Source: DVS"],
+                         |    "notificationUrl": "testnotification.url"
                          |}""".stripMargin
 
     val invalidRequest =
