@@ -35,7 +35,8 @@ case class TopicMetadata(
     additionalDocumentation: Option[String],
     notes: Option[String],
     id: UUID,
-    createdDate: org.joda.time.DateTime
+    createdDate: org.joda.time.DateTime,
+    notificationUrl: Option[String]
 )
 
 object TopicMetadataV2 {
@@ -149,7 +150,8 @@ final case class TopicMetadataV2ValueOptionalTagList(
                                          parentSubjects: List[String],
                                          notes: Option[String],
                                          teamName: Option[String],
-                                         tags: Option[List[String]]
+                                         tags: Option[List[String]],
+                                         notificationUrl: Option[String]
                                        ) {
   def toTopicMetadataV2Value: TopicMetadataV2Value = {
     TopicMetadataV2Value(
@@ -162,7 +164,8 @@ final case class TopicMetadataV2ValueOptionalTagList(
       parentSubjects,
       notes,
       teamName,
-      tags.getOrElse(List.empty)
+      tags.getOrElse(List.empty),
+      notificationUrl
     )
   }
 }
@@ -178,7 +181,8 @@ final case class TopicMetadataV2Value(
     parentSubjects: List[String],
     notes: Option[String],
     teamName: Option[String],
-    tags: List[String]
+    tags: List[String],
+    notificationUrl: Option[String]
 ) {
   def toTopicMetadataV2ValueOptionalTagList: TopicMetadataV2ValueOptionalTagList = {
     TopicMetadataV2ValueOptionalTagList(
@@ -191,7 +195,8 @@ final case class TopicMetadataV2Value(
       parentSubjects,
       notes,
       teamName,
-      tags.some
+      tags.some,
+      notificationUrl
     )
   }
 }
@@ -266,9 +271,10 @@ object TopicMetadataV2ValueOptionalTagList {
         field("contact", _.contact),
         field("createdDate", _.createdDate),
         field("parentSubjects", _.parentSubjects),
-        field("notes", _.notes),
+        field("notes", _.notes, default = Some(None)),
         field("teamName", _.teamName, default = Some(None)),
-        field("tags", _.tags, default = Some(None))
+        field("tags", _.tags, default = Some(None)),
+        field("notificationUrl", _.notificationUrl, default = Some(None))
         ).mapN(TopicMetadataV2ValueOptionalTagList.apply)
   }
 }

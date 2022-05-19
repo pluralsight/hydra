@@ -1,44 +1,22 @@
 package hydra.kafka.services
 
-import java.util
 import java.util.UUID
 import java.util.concurrent.TimeUnit
-
 import akka.actor.Status.{Failure => AkkaFailure}
-import akka.actor.{
-  Actor,
-  ActorLogging,
-  ActorRef,
-  ActorSelection,
-  Props,
-  Stash,
-  Timers
-}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSelection, Props, Stash, Timers}
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import ConfigSupport._
-import hydra.core.akka.SchemaRegistryActor.{
-  RegisterSchemaRequest,
-  RegisterSchemaResponse
-}
+import hydra.core.akka.SchemaRegistryActor.{RegisterSchemaRequest, RegisterSchemaResponse}
 import hydra.core.ingest.{HydraRequest, RequestParams}
-import hydra.core.marshallers.{
-  GenericSchema,
-  History,
-  HydraJsonSupport,
-  TopicMetadataRequest
-}
+import hydra.core.marshallers.{GenericSchema, HydraJsonSupport, StreamType, TopicMetadataRequest}
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.core.transport.{AckStrategy, ValidationStrategy}
 import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.{AvroRecord, AvroRecordFactory}
-import hydra.kafka.services.StreamsManagerActor.{
-  GetMetadata,
-  GetMetadataResponse,
-  StopStream
-}
+import hydra.kafka.services.StreamsManagerActor.{GetMetadata, GetMetadataResponse, StopStream}
 import hydra.kafka.util.KafkaUtils
 import hydra.kafka.util.KafkaUtils.TopicDetails
 
@@ -63,7 +41,7 @@ class TopicBootstrapActor(
   import TopicBootstrapActor._
   import spray.json._
 
-  implicit val metadataFormat = jsonFormat11(TopicMetadata)
+  implicit val metadataFormat = jsonFormat12(TopicMetadata)
 
   implicit val ec = context.dispatcher
 
@@ -76,7 +54,7 @@ class TopicBootstrapActor(
   val bootstrapKafkaConfig: Config = bootstrapConfig getOrElse
     applicationConfig.getConfig("bootstrap-config")
 
-  val topicDetails = new TopicDetails(
+  val topicDetails = TopicDetails(
     bootstrapKafkaConfig.getInt("partitions"),
     bootstrapKafkaConfig.getInt("replication-factor").toShort,
     bootstrapKafkaConfig.getInt("min-insync-replicas").toShort
@@ -217,7 +195,8 @@ class TopicBootstrapActor(
       UUID.randomUUID(),
       existingTopicMetadata
         .map(_.createdDate)
-        .getOrElse(org.joda.time.DateTime.now())
+        .getOrElse(org.joda.time.DateTime.now()),
+      topicMetadataRequest.notificationUrl
     )
 
     buildAvroRecord(topicMetadata)
@@ -265,6 +244,12 @@ class TopicBootstrapActor(
   private[kafka] def createKafkaTopics(
       topicMetadataRequest: TopicMetadataRequest
   ): Future[BootstrapResult] = {
+    def getCleanupPolicyConfig: Map[String, String] =
+      topicMetadataRequest.streamType match {
+        case StreamType.History | StreamType.CurrentState => Map("cleanup.policy" -> "compact")
+        case _ => Map.empty
+      }
+
     val timeoutMillis = bootstrapKafkaConfig.getInt("timeout")
 
     val schema = getGenericSchema(topicMetadataRequest)
@@ -272,7 +257,7 @@ class TopicBootstrapActor(
       .map(_.subject)
       .getOrElse("Schema does not conform to GenericSchema")
 
-    var topicMap: Map[String, TopicDetails] = Map(topicName -> topicDetails)
+    val topicMap = Map(topicName -> topicDetails.copy(partialConfig = topicDetails.configs ++ getCleanupPolicyConfig))
 
     kafkaUtils
       .createTopics(topicMap, timeout = timeoutMillis)
@@ -285,7 +270,6 @@ class TopicBootstrapActor(
         }
         case e: Exception => throw e
       }
-
   }
 
   private[kafka] def getGenericSchema(

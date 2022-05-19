@@ -1,7 +1,6 @@
 package hydra.ingest.http.mock
 
 import java.time.Instant
-
 import akka.actor.{ActorSelection, ActorSystem}
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
@@ -9,6 +8,7 @@ import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
+import hydra.core.http.CorsSupport
 import hydra.ingest.http.SchemasEndpoint
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.services.StreamsManagerActor
@@ -50,6 +50,7 @@ class MockEndpoint(
     throw new RestClientException(errorMessage, statusCode, errorCode)
   }
 
+  private implicit val corsSupport: CorsSupport = new CorsSupport("http://*")
   val schemaRouteExceptionHandler: ExceptionHandler = {
     new SchemasEndpoint(consumerProxy, streamsManagerActor).excptHandler(Instant.now, "MockEndpoint")
   }

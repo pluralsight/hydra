@@ -1,7 +1,6 @@
 package hydra.ingest.http
 
 import java.util.UUID
-
 import akka.actor.{Actor, ActorRef, ActorSelection, ActorSystem, Props}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
@@ -9,6 +8,7 @@ import akka.testkit.TestKit
 import hydra.avro.registry.{ConfluentSchemaRegistry, SchemaRegistry}
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
+import hydra.core.http.CorsSupport
 import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
 import hydra.ingest.http.mock.MockEndpoint
 import hydra.kafka.consumer.KafkaConsumerProxy
@@ -23,7 +23,6 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import spray.json.{JsArray, JsObject, JsValue, RootJsonFormat}
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
-
 
 import scala.collection.immutable.Map
 import scala.concurrent.duration._
@@ -47,19 +46,22 @@ class SchemasEndpointSpec
   implicit val kafkaConfig: EmbeddedKafkaConfig =
     EmbeddedKafkaConfig(kafkaPort = 8062, zooKeeperPort = 3161)
 
+  private implicit val corsSupport: CorsSupport = new CorsSupport("http://*")
+
   def getTopicMetadata(topicName: String): TopicMetadata = {
     TopicMetadata(
         topicName,
         1234,
         "History",
         false,
-        Option(false),
+        Some(false),
         "Public",
         "test_contact",
-        Option("test_additionalDocumentation"),
-        Option("test_notes"),
+        Some("test_additionalDocumentation"),
+        Some("test_notes"),
         UUID.randomUUID(),
-        org.joda.time.DateTime.now
+        org.joda.time.DateTime.now,
+        Some("notification.url")
       )
   }
 
@@ -95,6 +97,7 @@ class SchemasEndpointSpec
   implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
   implicit val endpointV2Format = jsonFormat2(SchemasWithKeyEndpointResponse.apply)
   implicit val schemasWithTopicFormat: RootJsonFormat[SchemasWithTopicResponse] = jsonFormat2(SchemasWithTopicResponse.apply)
+
   implicit val batchSchemasFormat: RootJsonFormat[BatchSchemasResponse] = {
     val make: List[SchemasWithTopicResponse] => BatchSchemasResponse = BatchSchemasResponse.apply
     jsonFormat1(make)

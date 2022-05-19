@@ -3,6 +3,7 @@ package hydra.kafka.algebras
 import cats.data.NonEmptyList
 import cats.effect.concurrent.Ref
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Sync, Timer}
+import cats.implicits.catsSyntaxApplicativeError
 import cats.syntax.all._
 import fs2.kafka._
 import hydra.kafka.util.KafkaUtils.TopicDetails
@@ -13,68 +14,78 @@ import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
 
 /**
-  * Internal interface to interact with the KafkaAdminClient from FS2 Kafka.
-  * Provides a live version for production usage and a test version for integration testing.
-  * @tparam F - higher kinded type - polymorphic effect type
-  */
+ * Internal interface to interact with the KafkaAdminClient from FS2 Kafka.
+ * Provides a live version for production usage and a test version for integration testing.
+ *
+ * @tparam F - higher kinded type - polymorphic effect type
+ */
 trait KafkaAdminAlgebra[F[_]] {
+
   import KafkaAdminAlgebra._
 
   /**
-    * Retrieves Topic if found in Kafka. Provides minimal detail about the topic.
-    * @param name - name of the topic in Kafka
-    * @return Option[Topic]
-    */
+   * Retrieves Topic if found in Kafka. Provides minimal detail about the topic.
+   *
+   * @param name - name of the topic in Kafka
+   * @return Option[Topic]
+   */
   def describeTopic(name: TopicName): F[Option[Topic]]
 
   /**
-    * Retrieves a list of all TopicName(s) found in Kafka
-    * @return List[TopicName]
-    */
+   * Retrieves a list of all TopicName(s) found in Kafka
+   *
+   * @return List[TopicName]
+   */
   def getTopicNames: F[List[TopicName]]
 
   /**
-    * Creates the Topic in Kafka
-    * @param name - name of the topic to be created in Kafka
-    * @param details - config and settings for the topic
-    * @return
-    */
+   * Creates the Topic in Kafka
+   *
+   * @param name    - name of the topic to be created in Kafka
+   * @param details - config and settings for the topic
+   * @return
+   */
   def createTopic(name: TopicName, details: TopicDetails): F[Unit]
 
   /**
-    * Deletes the topic in Kafka
-    * @param name - name of the topic in Kafka
-    * @return
-    */
+   * Deletes the topic in Kafka
+   *
+   * @param name - name of the topic in Kafka
+   * @return
+   */
   def deleteTopic(name: String): F[Unit]
 
   /**
-    * Deletes the topic(s) in Kafka
-    * @param topicNames - a list of topic names in Kafka
-    * @return
-    */
+   * Deletes the topic(s) in Kafka
+   *
+   * @param topicNames - a list of topic names in Kafka
+   * @return
+   */
   def deleteTopics(topicNames: List[String]): F[Either[KafkaDeleteTopicErrorList, Unit]]
 
   /**
-    * Fetch the offsets by topic and partition for a given consumer group
-    * @param consumerGroup The name of the consumer group you are fetching the offsets for
-    * @return Offsets keyed by topic and partition
-    */
+   * Fetch the offsets by topic and partition for a given consumer group
+   *
+   * @param consumerGroup The name of the consumer group you are fetching the offsets for
+   * @return Offsets keyed by topic and partition
+   */
   def getConsumerGroupOffsets(consumerGroup: String): F[Map[TopicAndPartition, Offset]]
 
   /**
-    * Fetch the latest offsets for a given topic
-    * @param topic name of the topic to get the last offsets for
-    * @return offsets by partition and topic
-    */
+   * Fetch the latest offsets for a given topic
+   *
+   * @param topic name of the topic to get the last offsets for
+   * @return offsets by partition and topic
+   */
   def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]]
 
   /**
-    * Returns the lag for a given consumer on a given topic
-    * @param topic Name of the topic you want the lag for
-    * @param consumerGroup Name of the consumer group you want the lag for
-    * @return The latest and group offsets by topic and partition
-    */
+   * Returns the lag for a given consumer on a given topic
+   *
+   * @param topic         Name of the topic you want the lag for
+   * @param consumerGroup Name of the consumer group you want the lag for
+   * @return The latest and group offsets by topic and partition
+   */
   def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]]
 
   def describeConsumerGroup(consumerGroupName: String): F[Option[ConsumerGroupDescription]]
@@ -84,32 +95,37 @@ trait KafkaAdminAlgebra[F[_]] {
 object KafkaAdminAlgebra {
 
   type TopicName = String
+
   final case class Topic(name: TopicName, numberPartitions: Int)
 
   final case class TopicAndPartition(topic: String, partition: Int)
+
   object TopicAndPartition {
     def apply(t: TopicPartition): TopicAndPartition =
       new TopicAndPartition(t.topic, t.partition)
   }
+
   final case class Offset(value: Long)
+
   object Offset {
     def fromOffsetAndMetadata(o: OffsetAndMetadata): Offset =
       new Offset(o.offset)
   }
+
   final case class LagOffsets(latest: Offset, group: Offset)
 
   final case class KafkaDeleteTopicError(topicName: String, cause: Throwable)
-    extends Exception (s"Unable to delete $topicName", cause){
+    extends Exception(s"Unable to delete $topicName", cause) {
     def errorMessage: String = s"$topicName ${cause.getMessage}"
   }
 
   final case class KafkaDeleteTopicErrorList(errors: NonEmptyList[KafkaDeleteTopicError])
-    extends Exception (s"Topic(s) failed to delete:\n${errors.map(_.errorMessage).toList.mkString("\n")}")
+    extends Exception(s"Topic(s) failed to delete:\n${errors.map(_.errorMessage).toList.mkString("\n")}")
 
-  def live[F[_]: Sync: ConcurrentEffect: ContextShift: Timer: Logger](
-      bootstrapServers: String,
-      useSsl: Boolean = false
-  ): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
+  def live[F[_] : Sync : ConcurrentEffect : ContextShift : Timer : Logger](
+                                                                            bootstrapServers: String,
+                                                                            useSsl: Boolean = false
+                                                                          ): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
     new KafkaAdminAlgebra[F] {
 
       override def describeTopic(name: TopicName): F[Option[Topic]] = {
@@ -137,9 +153,9 @@ object KafkaAdminAlgebra {
         getAdminClientResource.use(_.deleteTopic(name))
 
       override def deleteTopics(topicNames: List[String]): F[Either[KafkaDeleteTopicErrorList, Unit]] =
-        topicNames.traverse{topicName =>
+        topicNames.traverse { topicName =>
           deleteTopic(topicName).attempt
-            .map{
+            .map {
               _.leftMap(
                 KafkaDeleteTopicError(topicName, _)
               ).toValidatedNel
@@ -154,31 +170,32 @@ object KafkaAdminAlgebra {
         getConsumerResource.use { consumerMaybe =>
           Option(consumerMaybe) match {
             case Some(consumer) =>
-              val part = Option(consumer.partitionsFor(topic))
-                part.map(_.flatMap { partitionInfosMaybe =>
-                Option(partitionInfosMaybe) match {
-                  case Some(partitionInfos) =>
-                    val p = partitionInfos.map(p => new TopicPartition(p.topic, p.partition))
-                    Sync[F].delay(p)
-                  case None =>
-                    Logger[F].warn(s"PartitionInfoList for topic $topic is null.") *> Sync[F].pure(List[TopicPartition]())
-                }
-              }.flatMap { topicPartitionMaybe =>
-                Option(topicPartitionMaybe) match {
-                  case Some(topicPartition) =>
-                    consumer.endOffsets(topicPartition.toSet).flatMap { endOffsetsMaybe =>
-                      Option(endOffsetsMaybe) match {
-                        case Some(endOffsets) =>
-                          val endOffsetMap = endOffsets.map(in => TopicAndPartition(in._1) -> Offset(in._2))
-                          Sync[F].delay(endOffsetMap)
-                        case None =>
-                          Logger[F].warn(s"EndOffsets for topic $topic and topicPartition ${topicPartition} is null.") *> Sync[F].pure(Map.empty[KafkaAdminAlgebra.TopicAndPartition, Offset])
-                      }
-                    }
-                  case None =>
-                    Logger[F].warn(s"One PartitionInfo for topic $topic is null.") *> Sync[F].pure(Map.empty[KafkaAdminAlgebra.TopicAndPartition, Offset])
-                }
-              }).getOrElse(Sync[F].pure(Map.empty[KafkaAdminAlgebra.TopicAndPartition, Offset]))
+              Option(consumer.partitionsFor(topic).recoverWith(handleUnexpectedError))
+                .map(_.flatMap { partitionInfosMaybe =>
+                  Option(partitionInfosMaybe) match {
+                    case Some(partitionInfos) =>
+                      val p = partitionInfos.map(p => new TopicPartition(p.topic, p.partition))
+                      Sync[F].delay(p)
+                    case None =>
+                      Logger[F].warn(s"PartitionInfoList for topic $topic is null.") *> Sync[F].pure(List[TopicPartition]())
+                  }
+                }.flatMap { topicPartitionMaybe =>
+                  Option(topicPartitionMaybe) match {
+                    case Some(topicPartition) =>
+                      consumer.endOffsets(topicPartition.toSet).recoverWith(handleUnexpectedError)
+                        .flatMap { endOffsetsMaybe =>
+                          Option(endOffsetsMaybe) match {
+                            case Some(endOffsets) =>
+                              val endOffsetMap = endOffsets.map(in => TopicAndPartition(in._1) -> Offset(in._2))
+                              Sync[F].delay(endOffsetMap)
+                            case None =>
+                              Logger[F].warn(s"EndOffsets for topic $topic and topicPartition ${topicPartition} is null.") *> Sync[F].pure(Map.empty[KafkaAdminAlgebra.TopicAndPartition, Offset])
+                          }
+                        }
+                    case None =>
+                      Logger[F].warn(s"One PartitionInfo for topic $topic is null.") *> Sync[F].pure(Map.empty[KafkaAdminAlgebra.TopicAndPartition, Offset])
+                  }
+                }).getOrElse(Sync[F].pure(Map.empty[KafkaAdminAlgebra.TopicAndPartition, Offset]))
             case None =>
               Logger[F].warn(s"Consumer for topic $topic is null.") *> Sync[F].pure(Map.empty[KafkaAdminAlgebra.TopicAndPartition, Offset])
           }
@@ -201,6 +218,7 @@ object KafkaAdminAlgebra {
         val des = Deserializer[F, String]
         consumerResource[F, String, String] {
           val s = ConsumerSettings.apply(des, des).withBootstrapServers(bootstrapServers)
+            .withAllowAutoCreateTopics(false)
           if (useSsl) s.withProperty("security.protocol", "SSL") else s
         }
       }
@@ -213,20 +231,20 @@ object KafkaAdminAlgebra {
       }
 
       override def describeConsumerGroup(consumerGroupName: String): F[Option[ConsumerGroupDescription]] = {
-        getAdminClientResource.use(_.describeConsumerGroups(List(consumerGroupName))).map{descriptionMaybe =>
+        getAdminClientResource.use(_.describeConsumerGroups(List(consumerGroupName))).map { descriptionMaybe =>
           descriptionMaybe.get(consumerGroupName)
         }
       }
     }
   }
 
-  def test[F[_]: Sync](mockedOffsets: Map[TopicAndPartition, Offset] = Map.empty[TopicAndPartition, Offset]): F[KafkaAdminAlgebra[F]] =
+  def test[F[_] : Sync](mockedOffsets: Map[TopicAndPartition, Offset] = Map.empty[TopicAndPartition, Offset]): F[KafkaAdminAlgebra[F]] =
     Ref[F].of(Map[TopicName, Topic]()).flatMap(getTestKafkaClient[F](_, mockedOffsets))
 
-  private[this] def getTestKafkaClient[F[_]: Sync](
-      ref: Ref[F, Map[TopicName, Topic]],
-      mockedOffsets: Map[TopicAndPartition, Offset]
-  ): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
+  private[this] def getTestKafkaClient[F[_] : Sync](
+                                                     ref: Ref[F, Map[TopicName, Topic]],
+                                                     mockedOffsets: Map[TopicAndPartition, Offset]
+                                                   ): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
     new KafkaAdminAlgebra[F] {
       override def describeTopic(name: TopicName): F[Option[Topic]] =
         ref.get.map(_.get(name))
@@ -235,34 +253,36 @@ object KafkaAdminAlgebra {
         ref.get.map(_.keys.toList)
 
       override def createTopic(
-          name: TopicName,
-          details: TopicDetails
-      ): F[Unit] = {
+                                name: TopicName,
+                                details: TopicDetails
+                              ): F[Unit] = {
         val entry = name -> Topic(name, details.numPartitions)
         ref.update(old => old + entry)
       }
 
       override def deleteTopic(name: String): F[Unit] =
-        ref.modify(topicMap => if(topicMap.contains(name)) (topicMap - name, None)
+        ref.modify(topicMap => if (topicMap.contains(name)) (topicMap - name, None)
         else (topicMap, Some(new UnknownTopicOrPartitionException("Topic does not exist"))))
-          .flatMap{
-          case Some(e) => Sync[F].raiseError(e)
-          case None => Sync[F].unit
-        }
+          .flatMap {
+            case Some(e) => Sync[F].raiseError(e)
+            case None => Sync[F].unit
+          }
 
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getConsumerGroupOffsets(consumerGroup: String): F[Map[TopicAndPartition, Offset]] = ???
+
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getLatestOffsets(topic: TopicName): F[Map[TopicAndPartition, Offset]] = {
         Sync[F].pure(mockedOffsets)
       }
+
       // This is intentionally unimplemented. This test class has no way of obtaining this offset information.
       override def getConsumerLag(topic: TopicName, consumerGroup: String): F[Map[TopicAndPartition, LagOffsets]] = ???
 
       override def deleteTopics(topicNames: List[String]): F[Either[KafkaDeleteTopicErrorList, Unit]] =
-        topicNames.traverse{topicName =>
+        topicNames.traverse { topicName =>
           deleteTopic(topicName).attempt
-            .map{ deleteAttempt =>
+            .map { deleteAttempt =>
               deleteAttempt.leftMap(
                 KafkaDeleteTopicError(topicName, _)
               ).toValidatedNel
@@ -271,6 +291,13 @@ object KafkaAdminAlgebra {
 
       override def describeConsumerGroup(consumerGroupName: String): F[Option[ConsumerGroupDescription]] = ???
     }
+  }
+
+  private def handleUnexpectedError[T, F[_] : Logger : Sync]: PartialFunction[Throwable, F[T]] = {
+    // Received NullPointerException when trying to get consumer info from kafka.
+    // This could mean that consumer is running on topic that doesn't exist or is empty
+    case error: NullPointerException =>
+      Logger[F].warn(s"Received Null in handling of KafkaAdminAlgebra request. Error message: ${error.getMessage}") *> Sync[F].delay(null.asInstanceOf[T])
   }
 
 }

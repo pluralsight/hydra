@@ -64,7 +64,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
             ),
             Some("Data-Platform"),
             None,
-            List.empty
+            List.empty,
+            None
           ),
           TopicDetails(cfg.numPartitions, cfg.replicationFactor, cfg.minInsyncReplicas, Map("cleanup.policy" -> "compact"))
         )
@@ -91,7 +92,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
           ),
           Some("Data-Platform"),
           None,
-          List.empty
+          List.empty,
+          None
         ),
         TopicDetails(
           dvsConsumersTopicConfig.numPartitions,
@@ -121,7 +123,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
           ),
           Some("Data-Platform"),
           None,
-          List.empty
+          List.empty,
+          None
         ),
         TopicDetails(
           cooTopicConfig.numPartitions,
@@ -148,7 +151,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
         Some("This is the topic that Hydra uses to keep track of the tags that are created for topics"),
         Some("Data-Platform"),
         None,
-        List.empty
+        List.empty,
+        None
       ),
       TopicDetails(cfg.numPartitions, cfg.replicationFactor, cfg.minInsyncReplicas, Map("cleanup.policy" -> "compact")))
   }

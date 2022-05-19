@@ -5,7 +5,7 @@ import spray.json.{RootJsonFormat, _}
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import hydra.core.transport.AckStrategy
 import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra}
-import hydra.kafka.algebras.ConsumerGroupsAlgebra.{ConsumerTopics, DetailedConsumerGroup, PartitionOffset, TopicConsumers}
+import hydra.kafka.algebras.ConsumerGroupsAlgebra.{ConsumerTopics, DetailedConsumerGroup, DetailedTopicConsumers, PartitionOffset, TopicConsumers}
 import hydra.kafka.algebras.KafkaAdminAlgebra.{LagOffsets, Offset, TopicAndPartition}
 import hydra.kafka.serializers.TopicMetadataV2Parser.IntentionallyUnimplemented
 
@@ -25,7 +25,7 @@ trait ConsumerGroupMarshallers extends DefaultJsonProtocol with SprayJsonSupport
   implicit object detailedConsumerGroupFormat extends RootJsonFormat[DetailedConsumerGroup] {
     override def write(detailedConsumerGroup: DetailedConsumerGroup): JsValue = JsObject(List(
       Some("topicName" -> JsString(detailedConsumerGroup.topicName)),
-      Some("consumerGroupName" -> JsString(detailedConsumerGroup.consumergroupName)),
+      Some("consumerGroupName" -> JsString(detailedConsumerGroup.consumerGroupName)),
       Some("lastCommit" -> InstantFormat.write(detailedConsumerGroup.lastCommit)),
       if (detailedConsumerGroup.offsetInformation.isEmpty) None else Some("offsetInformation" ->
         JsArray(detailedConsumerGroup.offsetInformation.sortBy(_.partition).map(partitionOffset.write).toVector)),
@@ -34,6 +34,16 @@ trait ConsumerGroupMarshallers extends DefaultJsonProtocol with SprayJsonSupport
     ).flatten.toMap)
 
     override def read(json: JsValue): DetailedConsumerGroup = jsonFormat6(DetailedConsumerGroup.apply).read(json)
+  }
+
+  implicit object detailedTopicConsumersFormat extends RootJsonFormat[DetailedTopicConsumers] {
+    override def write(obj: DetailedTopicConsumers): JsValue = JsObject(
+      List(
+        Some("consumers" -> JsArray(obj.consumers.map(consumer => detailedConsumerGroupFormat.write(consumer))))
+      ).flatten.toMap
+    )
+
+    override def read(json: JsValue): DetailedTopicConsumers = jsonFormat2(DetailedTopicConsumers.apply).read(json)
   }
 
   implicit object consumerFormat extends RootJsonFormat[ConsumerGroupsAlgebra.Consumer] {

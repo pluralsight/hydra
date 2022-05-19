@@ -7,6 +7,7 @@ import org.scalatest.wordspec.AnyWordSpecLike
 
 class TopicMetadataV2TransportSpec extends AnyWordSpecLike with Matchers {
 
+
   "TopicMetadataV2Request" must {
 
     "Parse correct emails" in {
@@ -50,8 +51,8 @@ class TopicMetadataV2TransportSpec extends AnyWordSpecLike with Matchers {
     }
 
     "Ensure correct topic prefixes are allowed" in {
-      val correctPrefixList = List("skills.","flow.","tech.","fin.","dvs.")
-      val listOfValidatedSubjects = correctPrefixList.map(pre => Subject.createValidated(pre + "blah.blah-blah-blah"))
+      val correctPrefixList = List("cloud", "skills","flow","tech","fin","dvs")
+      val listOfValidatedSubjects = correctPrefixList.map(pre => Subject.createValidated(pre + ".blah.blah-blah-blah"))
       listOfValidatedSubjects.map(sub => sub.get shouldBe a[Subject])
     }
 
@@ -62,8 +63,8 @@ class TopicMetadataV2TransportSpec extends AnyWordSpecLike with Matchers {
     }
 
     "Ensure underscores are not allowed" in {
-      val correctPrefixList = List("skills.","flow.","tech.","fin.","dvs.")
-      val listOfInvalidatedSubjects = correctPrefixList.map(pre => Subject.createValidated(pre + "blah.blah-blah_blah"))
+      val correctPrefixList = List("skills","flow","tech","fin","dvs")
+      val listOfInvalidatedSubjects = correctPrefixList.map(pre => Subject.createValidated(pre + ".blah.blah-blah_blah"))
       listOfInvalidatedSubjects.map(sub => sub.getOrElse(None) shouldBe None)
     }
 
@@ -73,11 +74,23 @@ class TopicMetadataV2TransportSpec extends AnyWordSpecLike with Matchers {
     }
 
     "return invalid subject containing .-" in {
-      Subject.createValidated("dvs.-hello").getOrElse(None) shouldBe None
+      Subject.createValidated("dvs.goodbye.-hello").getOrElse(None) shouldBe None
+    }
+
+    "return invalid subject if it starts not from allowed values but contains it inside" in {
+      Subject.createValidated("hello.dvs").getOrElse(None) shouldBe None
     }
 
     "return invalid subject containing -." in {
       Subject.createValidated("dvs.hello-.goodbye").getOrElse(None) shouldBe None
+    }
+
+    "return invalid subject containing .." in {
+      Subject.createValidated("dvs.hello..goodbye").getOrElse(None) shouldBe None
+    }
+
+    "return invalid subject containing --" in {
+      Subject.createValidated("dvs.hello.hello--goodbye").getOrElse(None) shouldBe None
     }
 
     "Allow internal topics" in {

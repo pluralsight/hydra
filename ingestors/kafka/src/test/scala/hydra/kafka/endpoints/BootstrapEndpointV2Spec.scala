@@ -1,32 +1,30 @@
 package hydra.kafka.endpoints
 
 import java.time.Instant
-
-import akka.http.javadsl.model.headers.RawHeader
-import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, HttpHeader, MediaTypes, StatusCodes}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, MediaTypes, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import cats.data.NonEmptyList
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
-import hydra.core.marshallers.{History, StreamType}
 import hydra.kafka.algebras.{HydraTag, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TagsAlgebra}
 import hydra.kafka.model.ContactMethod.{Email, Slack}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
-import hydra.kafka.programs.CreateTopicProgram
+import hydra.kafka.programs.{CreateTopicProgram, KeyAndValueSchemaV2Validator}
 import hydra.kafka.serializers.TopicMetadataV2Parser
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
-import org.apache.avro.{Schema, SchemaBuilder}
+import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import retry.{RetryPolicies, RetryPolicy}
 import spray.json._
 import TopicMetadataV2Parser._
+import hydra.core.http.CorsSupport
 
 import scala.concurrent.ExecutionContext
 
@@ -39,6 +37,7 @@ final class BootstrapEndpointV2Spec
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
   private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
+  private implicit val corsSupport: CorsSupport = new CorsSupport("http://*.vnerd.com")
 
   private def getTestCreateTopicProgram(
       s: SchemaRegistry[IO],
@@ -49,7 +48,7 @@ final class BootstrapEndpointV2Spec
   ): BootstrapEndpointV2[IO] = {
     val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
     new BootstrapEndpointV2(
-      new CreateTopicProgram[IO](
+      CreateTopicProgram.make[IO](
         s,
         ka,
         kc,
@@ -89,9 +88,18 @@ final class BootstrapEndpointV2Spec
         .record(schemaName)
         .fields()
         .name("test")
+        .doc("text")
         .`type`()
         .stringType()
         .noDefault()
+        .name(RequiredField.CREATED_AT)
+        .doc("text")
+        .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+        .withDefault(Instant.now().toEpochMilli)
+        .name(RequiredField.UPDATED_AT)
+        .doc("text")
+        .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+        .withDefault(Instant.now().toEpochMilli)
         .endRecord()
 
     val badKeySchema: Schema =
@@ -112,7 +120,8 @@ final class BootstrapEndpointV2Spec
       None,
       Some("dvs-teamName"),
       None,
-      List.empty
+      List.empty,
+      Some("notificationUrl")
     ).toJson.compactPrint
 
     val validRequestWithoutDVSTag = TopicMetadataV2Request(
@@ -127,7 +136,8 @@ final class BootstrapEndpointV2Spec
       None,
       Some("dvs-teamName"),
       None,
-      List.empty
+      List.empty,
+      Some("notificationUrl")
     ).toJson.compactPrint
 
     val validRequestWithDVSTag = TopicMetadataV2Request(
@@ -142,7 +152,8 @@ final class BootstrapEndpointV2Spec
       None,
       Some("dvs-teamName"),
       None,
-      List("DVS")
+      List("DVS"),
+      Some("notificationUrl")
     ).toJson.compactPrint
 
     "accept a valid request without a DVS tag" in {
@@ -211,7 +222,8 @@ final class BootstrapEndpointV2Spec
         None,
         None,
         None,
-        List.empty
+        List.empty,
+        Some("notificationUrl")
       ).toJson.compactPrint
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
@@ -281,7 +293,8 @@ final class BootstrapEndpointV2Spec
         None,
         Some("dvs-teamName"),
         None,
-        List("DVS")
+        List("DVS"),
+        Some("notificationUrl")
       ).toJson.compactPrint
 
 
@@ -308,7 +321,8 @@ final class BootstrapEndpointV2Spec
         None,
         Some("dvs-teamName"),
         None,
-        List("Source: NotValid")
+        List("Source: NotValid"),
+        Some("notificationUrl")
       ).toJson.compactPrint
 
       val kca = KafkaClientAlgebra.test[IO].unsafeRunSync()

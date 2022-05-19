@@ -20,19 +20,32 @@ import scala.util.{Failure, Success}
 object TopicDeletionEndpoint extends
   DefaultJsonProtocol with
   SprayJsonSupport with ConsumerGroupMarshallers {
-  private implicit val endpointFormat = jsonFormat2(DeletionEndpointResponse.apply)
 
-  final case class DeletionEndpointResponse(topicOrSubject: String, message: String)
+  private implicit val erroredResponse = jsonFormat3(ErroredResponse.apply)
+  private implicit val successResponse = jsonFormat2(SuccessfulResponse.apply)
+  private implicit val endpointFormat = jsonFormat3(DeletionEndpointResponse.apply)
 
-  final case class DeletionRequest(topics: List[String], ignoreConsumerGroups: List[String])
+  final case class ErroredResponse(topicOrSubject: String, message: String, responseCode: Int)
+
+  final case class SuccessfulResponse(topicOrSubject: String, responseCode: Int)
+
+  final case class DeletionEndpointResponse(success:List[SuccessfulResponse], clientError: List[ErroredResponse], serverError: List[ErroredResponse])
+
+  final case class DeletionRequest(topics: List[String], ignoreConsumerGroups: List[String], ignorePublishTime: Boolean)
 
   implicit object DeletionRequest extends RootJsonFormat[DeletionRequest] {
     override def read(json: JsValue): DeletionRequest = {
-      json.asJsObject.getFields("topics", "ignoreConsumerGroups") match {
-        case Seq(topics, ignoreConsumergroups) =>
-          DeletionRequest(topics.convertTo[List[String]], ignoreConsumergroups.convertTo[List[String]])
+      json.asJsObject.getFields("topics", "ignoreConsumerGroups", "ignorePublishTime") match {
+        case Seq(topics, ignoreConsumerGroups, ignorePublishTime) =>
+          DeletionRequest(topics.convertTo[List[String]], ignoreConsumerGroups.convertTo[List[String]], ignorePublishTime.convertTo[Boolean])
+        case Seq(topics, ignoreSomething) =>
+          try {
+            DeletionRequest(topics.convertTo[List[String]], ignoreSomething.convertTo[List[String]], false)
+          } catch {
+            case e: Exception => DeletionRequest(topics.convertTo[List[String]], List.empty, ignoreSomething.convertTo[Boolean])
+          }
         case Seq(topics) =>
-          DeletionRequest(topics.convertTo[List[String]], List.empty)
+          DeletionRequest(topics.convertTo[List[String]], List.empty, false)
         case _ =>
           spray.json.deserializationError("Must provide a List of topics to delete")
       }
@@ -55,30 +68,35 @@ final class TopicDeletionEndpoint[F[_] : Futurable](deletionProgram: TopicDeleti
     List[KafkaDeletionErrors],
     List[ConsumersStillExistError],
     List[ActivelyPublishedToError],
-    List[TopicDoesNotExistError])): List[DeletionEndpointResponse] = {
+    List[TopicDoesNotExistError])): List[ErroredResponse] = {
     schemaErrorsToResponse(errorTuple._1) ::: kafkaErrorsToResponse(errorTuple._2) ::: consumerErrorsToResponse(errorTuple._3) :::
       activelyPublishedToErrorsToResponse(errorTuple._4) ::: topicDoesNotExistErrorsToResponse(errorTuple._5)
   }
 
-  private def schemaErrorsToResponse(schemaResults: List[SchemaDeletionErrors]): List[DeletionEndpointResponse] = {
-    schemaResults.flatMap(_.schemaDeleteTopicErrorList.errors.map(e => DeletionEndpointResponse(e.getSubject, e.errorMessage)).toList)
+  private def schemaErrorsToResponse(schemaResults: List[SchemaDeletionErrors]): List[ErroredResponse] = {
+    schemaResults.flatMap(_.schemaDeleteTopicErrorList.errors.map(e =>
+      ErroredResponse(e.getSubject, e.errorMessage, StatusCodes.InternalServerError.intValue)).toList)
   }
 
-  private def kafkaErrorsToResponse(kafkaResults: List[KafkaDeletionErrors]): List[DeletionEndpointResponse] = {
-    kafkaResults.flatMap(_.kafkaDeleteTopicErrorList.errors.map(e => DeletionEndpointResponse(e.topicName, e.errorMessage)).toList)
+  private def kafkaErrorsToResponse(kafkaResults: List[KafkaDeletionErrors]): List[ErroredResponse] = {
+    kafkaResults.flatMap(_.kafkaDeleteTopicErrorList.errors.map(e =>
+      ErroredResponse(e.topicName, e.errorMessage, StatusCodes.InternalServerError.intValue)).toList)
   }
 
-  private def consumerErrorsToResponse(consumerError: List[ConsumersStillExistError]): List[DeletionEndpointResponse] = {
-    consumerError.map(err => DeletionEndpointResponse(err.topic, s"The following consumers still exist for the topic: ${err.consumers.toJson.compactPrint}"))
+  private def consumerErrorsToResponse(consumerError: List[ConsumersStillExistError]): List[ErroredResponse] = {
+    consumerError.map(err =>
+      ErroredResponse(err.topic, s"The following consumers still exist for the topic: ${err.consumers.toJson.compactPrint}",
+        StatusCodes.InternalServerError.intValue))
   }
 
-  private def activelyPublishedToErrorsToResponse(publishedToError: List[ActivelyPublishedToError]): List[DeletionEndpointResponse] = {
-    publishedToError.map(err => DeletionEndpointResponse(err.topic,
-      s"Cannot delete the requested topic because it has been published to within the last ${err.deleteWindow / 60000} minutes."))
+  private def activelyPublishedToErrorsToResponse(publishedToError: List[ActivelyPublishedToError]): List[ErroredResponse] = {
+    publishedToError.map(err => ErroredResponse(err.topic,
+      s"Cannot delete the requested topic because it has been published to within the last ${err.deleteWindow / 60000} minutes.",
+      StatusCodes.InternalServerError.intValue))
   }
 
-  private def topicDoesNotExistErrorsToResponse(topicDoesNotExistError: List[TopicDoesNotExistError]): List[DeletionEndpointResponse] = {
-    topicDoesNotExistError.map(err => DeletionEndpointResponse(err.topic, "The requested topic does not exist."))
+  private def topicDoesNotExistErrorsToResponse(topicDoesNotExistError: List[TopicDoesNotExistError]): List[ErroredResponse] = {
+    topicDoesNotExistError.map(err => ErroredResponse(err.topic, "The requested topic does not exist.", StatusCodes.NotFound.intValue))
   }
 
   private def validResponse(topics: List[String], userDeleting: String, path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
@@ -89,7 +107,7 @@ final class TopicDeletionEndpoint[F[_] : Futurable](deletionProgram: TopicDeleti
     complete(StatusCodes.OK, topics)
   }
 
-  private def returnResponse(topics: List[String], userDeleting: String, response: List[DeletionEndpointResponse],
+  private def returnResponse(topics: List[String], userDeleting: String, response: DeletionEndpointResponse,
                              path: String, startTime: Instant, responseCode: StatusCode)(implicit ec: ExecutionContext) = {
     topics.map(topicName => addHttpMetric(topicName, responseCode, path, startTime, "DELETE", error = Some(response.toString)))
     complete(responseCode, response)
@@ -109,21 +127,27 @@ final class TopicDeletionEndpoint[F[_] : Futurable](deletionProgram: TopicDeleti
     }
 
     val responseCode: StatusCode = {
-      if (topics.length != e.length || e.toList.exists(_.isInstanceOf[SchemaDeletionErrors])) StatusCodes.Accepted // we have something in topics that didn't throw an error, partial success
+      if (topics.length != e.length || e.toList.exists(_.isInstanceOf[SchemaDeletionErrors])) StatusCodes.MultiStatus // we have something in topics that didn't throw an error, partial success
       else if (e.toList.exists(_.isInstanceOf[KafkaDeletionErrors])) StatusCodes.InternalServerError
       else if (e.toList.exists(_.isInstanceOf[TopicDoesNotExistError]) || e.toList.exists(_.isInstanceOf[ConsumersStillExistError]) ||
         e.toList.exists(_.isInstanceOf[ActivelyPublishedToError])) StatusCodes.BadRequest
       else StatusCodes.InternalServerError
     }
 
-    val response = tupleErrorsToResponse(allErrors)
+    val erroredResponse = tupleErrorsToResponse(allErrors)
+    val clientErrors = erroredResponse.filter(er => 400 to 499 contains(er.responseCode))
+    val serverErrors = erroredResponse.filter(er => 500 to 599 contains(er.responseCode))
+    val successfulTopics: List[SuccessfulResponse] = topics.filterNot(a => erroredResponse.map(er => er.topicOrSubject).contains(a))
+      .map(topic => SuccessfulResponse(topic, StatusCodes.OK.intValue))
+    val response = DeletionEndpointResponse(successfulTopics,clientErrors,serverErrors)
     returnResponse(topics, userDeleting, response, path, startTime, responseCode)
   }
 
   private def deleteTopics(topics: List[String], ignoreConsumerGroups: List[String],
-                           userDeleting: String, path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
+                           userDeleting: String, ignorePublishTime: Boolean, path: String, startTime: Instant)
+                          (implicit ec: ExecutionContext) = {
     onComplete(
-      Futurable[F].unsafeToFuture(deletionProgram.deleteTopics(topics, ignoreConsumerGroups))
+      Futurable[F].unsafeToFuture(deletionProgram.deleteTopics(topics, ignoreConsumerGroups, ignorePublishTime))
     ) {
       case Success(maybeSuccess) => {
         maybeSuccess match {
@@ -166,13 +190,14 @@ final class TopicDeletionEndpoint[F[_] : Futurable](deletionProgram: TopicDeleti
                           validResponse(List(topic), userName, "/v2/topics/schemas", startTime)
                         }
                         case Validated.Invalid(e) => {
-                          val response = schemaErrorsToResponse(List(SchemaDeletionErrors(SchemaDeleteTopicErrorList(e))))
-                          if (response.length >= 2) {
+                          val erroredResponse = schemaErrorsToResponse(List(SchemaDeletionErrors(SchemaDeleteTopicErrorList(e))))
+                          val response = DeletionEndpointResponse(List.empty, erroredResponse, List.empty)
+                          if (erroredResponse.length >= 2) {
                             // With one topic coming in if we get anything >= to 2 there was at least a -key and a -value error
                             addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/topics/schemas", startTime, "DELETE", error = Some(response.toString))
                             complete(StatusCodes.InternalServerError, response)
                           } else {
-                            returnResponse(List(topic), userName, response, "/v2/topics/schemas", startTime, StatusCodes.Accepted)
+                            returnResponse(List(topic), userName, response, "/v2/topics/schemas", startTime, StatusCodes.MultiStatus)
                           }
                         }
                       }
@@ -184,11 +209,11 @@ final class TopicDeletionEndpoint[F[_] : Futurable](deletionProgram: TopicDeleti
                   }
                 } ~
                   pathPrefix(Segment) { topic =>
-                    deleteTopics(List(topic), List.empty, userName, "/v2/topics", startTime)
+                    deleteTopics(List(topic), List.empty, userName, false, "/v2/topics", startTime)
                   } ~
                   pathEndOrSingleSlash {
                     entity(as[DeletionRequest]) { req =>
-                      deleteTopics(req.topics, req.ignoreConsumerGroups, userName, "/v2/topics", startTime)
+                      deleteTopics(req.topics, req.ignoreConsumerGroups, userName, req.ignorePublishTime, "/v2/topics", startTime)
                     }
                   }
               }

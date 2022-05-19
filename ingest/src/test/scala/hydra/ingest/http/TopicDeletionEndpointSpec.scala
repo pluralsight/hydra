@@ -269,7 +269,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           ), "myPass").route
         Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
-          responseAs[String] shouldBe "[{\"message\":\"exp.blah.blah Unable to delete topic\",\"topicOrSubject\":\"exp.blah.blah\"}]"
+          responseAs[String] shouldBe """{"clientError":[],"serverError":[{"message":"exp.blah.blah Unable to delete topic","responseCode":500,"topicOrSubject":"exp.blah.blah"}],"success":[]}"""
           status shouldBe StatusCodes.InternalServerError
         }
       }).unsafeRunSync()
@@ -374,7 +374,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
       }).unsafeRunSync()
     }
 
-    "return 202 with a schema failure -value only" in {
+    "return 207 with a schema failure -value only" in {
       val topic = List("exp.blah.blah")
       (for {
         kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
@@ -401,13 +401,13 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           ), "myPass").route
         Delete("/v2/topics/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
-          responseAs[String] shouldBe """[{"message":"Unable to delete schemas for exp.blah.blah-value java.lang.Exception: Unable to delete schema","topicOrSubject":"exp.blah.blah-value"}]"""
-          status shouldBe StatusCodes.Accepted
+          responseAs[String] shouldBe """{"clientError":[],"serverError":[{"message":"Unable to delete schemas for exp.blah.blah-value java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-value"}],"success":[{"responseCode":200,"topicOrSubject":"exp.blah.blah"}]}"""
+          status shouldBe StatusCodes.MultiStatus
         }
       }).unsafeRunSync()
     }
 
-    "return 202 with a schema failure V2" in {
+    "return 207 with a schema failure V2" in {
       val topic = List("exp.blah.blah")
       (for {
         kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
@@ -434,13 +434,13 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           ), "myPass").route
         Delete("/v2/topics/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
-          responseAs[String] shouldBe """[{"message":"Unable to delete schemas for exp.blah.blah-key java.lang.Exception: Unable to delete schema","topicOrSubject":"exp.blah.blah-key"},{"message":"Unable to delete schemas for exp.blah.blah-value java.lang.Exception: Unable to delete schema","topicOrSubject":"exp.blah.blah-value"}]"""
-          status shouldBe StatusCodes.Accepted
+          responseAs[String] shouldBe """{"clientError":[],"serverError":[{"message":"Unable to delete schemas for exp.blah.blah-key java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-key"},{"message":"Unable to delete schemas for exp.blah.blah-value java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-value"}],"success":[{"responseCode":200,"topicOrSubject":"exp.blah.blah"}]}"""
+          status shouldBe StatusCodes.MultiStatus
         }
       }).unsafeRunSync()
     }
 
-    "return 202 with a schema failure schema endpoint -value only" in {
+    "return 207 with a schema failure schema endpoint -value only" in {
       val topic = List("exp.blah.blah")
       (for {
         kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
@@ -467,8 +467,8 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           ), "myPass").route
         Delete("/v2/topics/schemas/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
-          responseAs[String] shouldBe """[{"message":"Unable to delete schemas for exp.blah.blah-value java.lang.Exception: Unable to delete schema","topicOrSubject":"exp.blah.blah-value"}]"""
-          status shouldBe StatusCodes.Accepted
+          responseAs[String] shouldBe """{"clientError":[{"message":"Unable to delete schemas for exp.blah.blah-value java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-value"}],"serverError":[],"success":[]}"""
+          status shouldBe StatusCodes.MultiStatus
         }
       }).unsafeRunSync()
     }
@@ -500,7 +500,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           ), "myPass").route
         Delete("/v2/topics/schemas/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
-          responseAs[String] shouldBe """[{"message":"Unable to delete schemas for exp.blah.blah-key java.lang.Exception: Unable to delete schema","topicOrSubject":"exp.blah.blah-key"},{"message":"Unable to delete schemas for exp.blah.blah-value java.lang.Exception: Unable to delete schema","topicOrSubject":"exp.blah.blah-value"}]"""
+          responseAs[String] shouldBe """{"clientError":[{"message":"Unable to delete schemas for exp.blah.blah-key java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-key"},{"message":"Unable to delete schemas for exp.blah.blah-value java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-value"}],"serverError":[],"success":[]}"""
           status shouldBe StatusCodes.InternalServerError
         }
       }).unsafeRunSync()
@@ -529,7 +529,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           ), "myPass").route
         Delete("/v2/topics/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
-          responseAs[String] shouldBe """[{"message":"The requested topic does not exist.","topicOrSubject":"exp.blah.blah"}]"""
+          responseAs[String] shouldBe """{"clientError":[{"message":"The requested topic does not exist.","responseCode":404,"topicOrSubject":"exp.blah.blah"}],"serverError":[],"success":[]}"""
           status shouldBe StatusCodes.BadRequest
         }
       }).unsafeRunSync()

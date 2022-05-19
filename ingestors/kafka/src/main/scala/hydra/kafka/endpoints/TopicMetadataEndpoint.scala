@@ -10,7 +10,7 @@ import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import hydra.common.config.ConfigSupport._
 import hydra.common.util.Futurable
-import hydra.core.http.{CorsSupport, NotFoundException, RouteSupport}
+import hydra.core.http.{CorsSupport, DefaultCorsSupport, NotFoundException, RouteSupport}
 import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.kafka.algebras.{MetadataAlgebra, TagsAlgebra}
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
@@ -34,7 +34,7 @@ import akka.http.scaladsl.server.directives.Credentials
 import cats.data.NonEmptyList
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
-import hydra.kafka.programs.CreateTopicProgram
+import hydra.kafka.programs.{CreateTopicProgram, ValidationError}
 import org.apache.avro.{Schema, SchemaParseException}
 import spray.json.DeserializationException
 
@@ -50,10 +50,10 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                                              defaultMinInsyncReplicas: Short,
                                              tagsAlgebra: TagsAlgebra[F]
                                             )
-                                            (implicit ec:ExecutionContext)
+                                            (implicit ec:ExecutionContext, corsSupport: CorsSupport)
   extends RouteSupport
     with HydraKafkaJsonSupport
-    with CorsSupport {
+    with DefaultCorsSupport {
 
   private implicit val cache = GuavaCache[Map[String, Seq[PartitionInfo]]]
 
@@ -72,7 +72,7 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
   private val filterSystemTopics = (t: String) =>
     (t.startsWith("_") && showSystemTopics) || !t.startsWith("_")
 
-  override val route = cors(settings) {
+  override val route = cors(corsSupport.settings) {
     extractMethod { method =>
       extractExecutionContext { implicit ec =>
         pathPrefix("transports" / "kafka") {
@@ -169,10 +169,10 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                       val req = TopicMetadataV2Request.fromMetadataOnlyRequest(schemas, mor)
                       onComplete(
                         Futurable[F].unsafeToFuture(createTopicProgram
-                          .createTopicFromMetadataOnly(t, req))
+                          .createTopicFromMetadataOnly(t, req, withRequiredFields = true))
                       ) {
                         case Failure(exception) => exception match {
-                          case e:IncompatibleSchemaException =>
+                          case e @ (_:IncompatibleSchemaException | _:ValidationError) =>
                             addHttpMetric(topic, StatusCodes.BadRequest, "/v2/metadata", startTime, method.value, error=Some(e.getMessage))
                             complete(StatusCodes.BadRequest, s"Unable to create Metadata for topic $topic : ${exception.getMessage}")
                           case _ =>

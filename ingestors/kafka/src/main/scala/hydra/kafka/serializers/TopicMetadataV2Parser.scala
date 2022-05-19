@@ -233,7 +233,7 @@ sealed trait TopicMetadataV2Parser
       val t = schema.getType
       t match {
         case Schema.Type.RECORD =>
-          val currentNamespace = Option(schema.getNamespace).exists(f => f.contains("-"))
+          val currentNamespace = Option(schema.getNamespace).exists(f => !f.matches("^[A-Za-z0-9_\\.]*"))
           val allRecords = schema.getFields.asScala.toList.exists(f => isNamespaceInvalid(f.schema()))
           currentNamespace || allRecords
         case _ => false
@@ -250,7 +250,7 @@ sealed trait TopicMetadataV2Parser
 
       if(isNamespaceInvalid(schema)) {
         throw DeserializationException(InvalidSchema(json, isKey,
-          Some(InvalidNamespace("Invalid character dash (-)"))).errorMessage)
+          Some(InvalidNamespace("Invalid character. Namespace must conform to regex ^[A-Za-z0-9_\\.]*"))).errorMessage)
       } else {
         schema
       }
@@ -274,7 +274,7 @@ sealed trait TopicMetadataV2Parser
       extends RootJsonFormat[TopicMetadataV2Request] {
 
     override def write(obj: TopicMetadataV2Request): JsValue =
-      jsonFormat12(TopicMetadataV2Request.apply).write(obj)
+      jsonFormat13(TopicMetadataV2Request.apply).write(obj)
 
     override def read(json: JsValue): TopicMetadataV2Request = json match {
       case j: JsObject =>
@@ -386,6 +386,9 @@ sealed trait TopicMetadataV2Parser
             case None => List.empty[String]
           }
         )
+        val notificationUrl = toResult(
+          j.getFields("notificationUrl").headOption.map(_.convertTo[String])
+        )
         (
           streamType,
           deprecated,
@@ -397,7 +400,8 @@ sealed trait TopicMetadataV2Parser
           notes,
           teamName,
           numPartitions,
-          tags
+          tags,
+          notificationUrl
           ).mapN(MetadataOnlyRequest.apply)
     }
   }
@@ -418,7 +422,7 @@ sealed trait TopicMetadataV2Parser
   implicit object TopicMetadataResponseV2Format extends RootJsonFormat[TopicMetadataV2Response] {
     override def read(json: JsValue): TopicMetadataV2Response = throw IntentionallyUnimplemented
 
-    override def write(obj: TopicMetadataV2Response): JsValue = jsonFormat12(TopicMetadataV2Response.apply).write(obj)
+    override def write(obj: TopicMetadataV2Response): JsValue = jsonFormat13(TopicMetadataV2Response.apply).write(obj)
   }
 
   private def throwDeserializationError(key: String, `type`: String) =

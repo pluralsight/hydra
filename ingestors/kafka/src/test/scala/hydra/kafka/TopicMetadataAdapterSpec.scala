@@ -27,7 +27,8 @@ class TopicMetadataAdapterSpec
       contact = "alex",
       additionalDocumentation = None,
       notes = None,
-      createdDate = DateTime.now
+      createdDate = DateTime.now,
+      notificationUrl = Some("notification.url")
     )
 
     val resource = toResource(tm)

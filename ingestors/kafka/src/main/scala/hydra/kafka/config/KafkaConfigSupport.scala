@@ -24,8 +24,6 @@ object KafkaConfigSupport extends ConfigSupport {
 
   val kafkaConfig = applicationConfig.withOnlyPath("kafka")
 
-  val zkString = kafkaConfig.getString("kafka.consumer.zookeeper.connect")
-
   val bootstrapServers =
     kafkaConfig.getString("kafka.producer.bootstrap.servers")
 
