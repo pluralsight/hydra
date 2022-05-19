@@ -233,7 +233,7 @@ object TopicDeletionProgram {
   }
 
   final case class SchemaFailToDelete(subject: String, cause: Throwable)
-    extends SchemaRegistryError(subject, s"Unable to delete schemas for $subject", cause)
+    extends SchemaRegistryError(subject, s"Unable to delete schemas for $subject. If this is a V1 topic, a key schema deletion error is normal.", cause)
 
   final case class SchemaDeleteTopicErrorList(errors: NonEmptyList[SchemaRegistryError])
     extends Exception (s"Topic(s) failed to delete:\n${errors.map(_.errorMessage).toList.mkString("\n")}")
