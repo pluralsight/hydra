@@ -15,6 +15,7 @@ import hydra.kafka.algebras.{HydraTag, KafkaAdminAlgebra, KafkaClientAlgebra, Me
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
+import hydra.kafka.model.RequiredField
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
@@ -25,10 +26,12 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.ExecutionContext
-import hydra.kafka.programs.CreateTopicProgram
+import hydra.kafka.programs.{CreateTopicProgram, KeyAndValueSchemaV2Validator}
 import hydra.kafka.util.KafkaUtils.TopicDetails
-import org.apache.avro.{Schema, SchemaBuilder}
+import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import retry.{RetryPolicies, RetryPolicy}
+
+import java.time.Instant
 
 
 class TopicMetadataEndpointSpec
@@ -81,7 +84,7 @@ class TopicMetadataEndpointSpec
                                          m: MetadataAlgebra[IO]
                                        ): CreateTopicProgram[IO] = {
     val retryPolicy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      new CreateTopicProgram[IO](
+      CreateTopicProgram.make[IO](
         s,
         ka,
         kc,
@@ -97,9 +100,18 @@ class TopicMetadataEndpointSpec
         .record(name)
         .fields()
         .name("isTrue")
+        .doc("text")
         .`type`()
         .stringType()
         .noDefault()
+        .name(RequiredField.CREATED_AT)
+        .doc("text")
+        .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+        .withDefault(Instant.now().toEpochMilli)
+        .name(RequiredField.UPDATED_AT)
+        .doc("text")
+        .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+        .withDefault(Instant.now().toEpochMilli)
         .endRecord()
     }
 
@@ -266,7 +278,8 @@ class TopicMetadataEndpointSpec
                          |    "notes": "here are some notes",
                          |    "parentSubjects": [],
                          |    "teamName": "dvs-teamName",
-                         |    "tags": ["Source: DVS"]
+                         |    "tags": ["Source: DVS"],
+                         |    "notificationUrl": "testnotification.url"
                          |}""".stripMargin
 
     val invalidRequest =

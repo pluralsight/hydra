@@ -34,8 +34,7 @@ import akka.http.scaladsl.server.directives.Credentials
 import cats.data.NonEmptyList
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
-import hydra.kafka.programs.CreateTopicProgram
-import hydra.kafka.programs.CreateTopicProgram.MetadataOnlyTopicDoesNotExist
+import hydra.kafka.programs.{CreateTopicProgram, ValidationError}
 import org.apache.avro.{Schema, SchemaParseException}
 import spray.json.DeserializationException
 
@@ -170,10 +169,10 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                       val req = TopicMetadataV2Request.fromMetadataOnlyRequest(schemas, mor)
                       onComplete(
                         Futurable[F].unsafeToFuture(createTopicProgram
-                          .createTopicFromMetadataOnly(t, req))
+                          .createTopicFromMetadataOnly(t, req, withRequiredFields = true))
                       ) {
                         case Failure(exception) => exception match {
-                          case e:IncompatibleSchemaException =>
+                          case e @ (_:IncompatibleSchemaException | _:ValidationError) =>
                             addHttpMetric(topic, StatusCodes.BadRequest, "/v2/metadata", startTime, method.value, error=Some(e.getMessage))
                             complete(StatusCodes.BadRequest, s"Unable to create Metadata for topic $topic : ${exception.getMessage}")
                           case e:MetadataOnlyTopicDoesNotExist =>

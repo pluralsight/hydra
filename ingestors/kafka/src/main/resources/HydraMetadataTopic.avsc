@@ -62,6 +62,11 @@
     {
       "name": "schemaId",
       "type": "int"
+    },
+    {
+      "name": "notificationUrl",
+      "type": ["null", "string"],
+      "default": null
     }
   ]
 }

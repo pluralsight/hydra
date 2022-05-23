@@ -1,11 +1,9 @@
 package hydra.ingest.programs
 
-import cats.{Applicative, MonadError}
 import cats.data.{NonEmptyList, ValidatedNel}
-import cats.effect.{Concurrent, IO}
+import cats.effect.{Concurrent, Sync}
 import cats.implicits._
-
-import java.time.Instant
+import cats.{Applicative, MonadError}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.util.SchemaWrapper
 import hydra.ingest.programs.TopicDeletionProgram._
@@ -14,21 +12,24 @@ import hydra.kafka.algebras.KafkaAdminAlgebra.KafkaDeleteTopicErrorList
 import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key}
+import io.chrisdavenport.log4cats.Logger
 import org.apache.kafka.common.TopicPartition
 import scalacache.Cache
 import scalacache.modes.try_._
 
+import java.time.Instant
 
-final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](kafkaAdmin: KafkaAdminAlgebra[F],
-                                                                    kafkaClient: KafkaClientAlgebra[F],
-                                                                    v2MetadataTopicName: Subject,
-                                                                    v1MetadataTopicName: Subject,
-                                                                    schemaClient: SchemaRegistry[F],
-                                                                    metadataAlgebra: MetadataAlgebra[F],
-                                                                    consumerGroupAlgebra: ConsumerGroupsAlgebra[F],
-                                                                    ignoreConsumers: List[String],
-                                                                    allowableTopicDeletionTime: Long)
-                                                                   (implicit guavaCache: Cache[SchemaWrapper]){
+
+final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent : Logger](kafkaAdmin: KafkaAdminAlgebra[F],
+                                                                                         kafkaClient: KafkaClientAlgebra[F],
+                                                                                         v2MetadataTopicName: Subject,
+                                                                                         v1MetadataTopicName: Subject,
+                                                                                         schemaClient: SchemaRegistry[F],
+                                                                                         metadataAlgebra: MetadataAlgebra[F],
+                                                                                         consumerGroupAlgebra: ConsumerGroupsAlgebra[F],
+                                                                                         ignoreConsumers: List[String],
+                                                                                         allowableTopicDeletionTime: Long)
+                                                                                        (implicit guavaCache: Cache[SchemaWrapper]){
 
   def deleteFromSchemaRegistry(topicNames: List[String]): F[ValidatedNel[SchemaRegistryError, Unit]] = {
     topicNames.flatMap(topic => List(topic + "-key", topic + "-value")).traverse { subject =>
@@ -40,6 +41,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
 
   private def checkIfTopicStillHasConsumers(topicNames: List[String], ignoreConsumerGroups: List[String]): F[List[Either[ConsumersStillExistError, String]]] = {
     topicNames.traverse { topic =>
+      Logger[F].info(s"Checking if '$topic' topic still has consumers.") *>
       consumerGroupAlgebra.getConsumersForTopic(topic).flatMap { topicConsumers =>
         val fullIgnoreList = ignoreConsumerGroups ++ ignoreConsumers
 
@@ -50,7 +52,11 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
               consumerGroupAlgebra.getDetailedConsumerInfo(consumer.consumerGroupName)
                 .map(listOfInfo => listOfInfo.filter{detailedConsumer =>
                   val state = detailedConsumer.state.getOrElse("Unknown")
-                  state != "Empty" && state != "Dead"})
+                  state != "Empty" && state != "Dead"}).onError({
+                case error =>
+                  Logger[F].error(s"Received error while trying to get detailed info for '${consumer.consumerGroupName}'" +
+                    s" consumer. Error message: ${error.getMessage}") *> Sync[F].unit
+              })
             }.map(_.flatten)
 
 
@@ -136,8 +142,6 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
   //consumer group should be pulled from prod, consumer group name will work for what you want it to work for
   def deleteTopics(topicNames: List[String], ignoreConsumerGroups: List[String], ignorePublishTime: Boolean): F[ValidatedNel[DeleteTopicError, Unit]] = {
 
-    def topicHasConsumersCheck(topicsThatExist: List[String]): F[List[Either[ConsumersStillExistError, String]]] =
-      checkIfTopicStillHasConsumers(topicsThatExist, ignoreConsumerGroups)
     def topicIsActivelyPublishingCheck(topicsThatExist: List[String]): F[List[Either[ActivelyPublishedToError, String]]] =
       if (ignorePublishTime)
         Applicative[F].pure(topicsThatExist.map(_.asRight[ActivelyPublishedToError]))
@@ -147,7 +151,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent](
     for {
       topics <- topicNames.traverse(checkIfTopicExists)
       (topicsThatExist, nonExistentTopics) = topics.partition(_._2)
-      topicHasConsumers <- topicHasConsumersCheck(topicsThatExist.map(_._1))
+      topicHasConsumers <- checkIfTopicStillHasConsumers(topicsThatExist.map(_._1), ignoreConsumerGroups)
       topicIsActivelyPublishing <- topicIsActivelyPublishingCheck(topicsThatExist.map(_._1))
       goodTopics = findDeletableTopics(topicIsActivelyPublishing, topicHasConsumers)
       badTopics = findNondeletableTopics(topicIsActivelyPublishing, topicHasConsumers)
@@ -229,7 +233,7 @@ object TopicDeletionProgram {
   }
 
   final case class SchemaFailToDelete(subject: String, cause: Throwable)
-    extends SchemaRegistryError(subject, s"Unable to delete schemas for $subject", cause)
+    extends SchemaRegistryError(subject, s"Unable to delete schemas for $subject. If this is a V1 topic, a key schema deletion error is normal.", cause)
 
   final case class SchemaDeleteTopicErrorList(errors: NonEmptyList[SchemaRegistryError])
     extends Exception (s"Topic(s) failed to delete:\n${errors.map(_.errorMessage).toList.mkString("\n")}")

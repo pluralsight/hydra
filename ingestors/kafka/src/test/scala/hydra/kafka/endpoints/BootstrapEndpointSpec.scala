@@ -91,7 +91,7 @@ class BootstrapEndpointSpec
 
   private val bootstrapRoute = new BootstrapEndpoint(system, streamsManagerActor).route
 
-  implicit val f = jsonFormat11(TopicMetadata)
+  implicit val f = jsonFormat12(TopicMetadata)
 
   override def beforeAll: Unit = {
     EmbeddedKafka.start()
@@ -124,7 +124,8 @@ class BootstrapEndpointSpec
            |	"contact": "slackity slack dont talk back",
            |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
            |	"notes": "here are some notes topkek",
-           |	"schemaId": 2
+           |	"schemaId": 2,
+           |  "notificationUrl": "notification.url"
            |}""".stripMargin.parseJson
           .convertTo[TopicMetadata]
 
@@ -164,7 +165,8 @@ class BootstrapEndpointSpec
            |	"contact": "slackity slack dont talk back",
            |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
            |	"notes": "here are some notes topkek",
-           |	"schemaId": 2
+           |	"schemaId": 2,
+           |  "notificationUrl": "notification.url"
            |}""".stripMargin.parseJson
           .convertTo[TopicMetadata]
 
@@ -218,7 +220,8 @@ class BootstrapEndpointSpec
           |	      "type": "string"
           |	    }
           |	  ]
-          |	}
+          |	},
+          | "notificationUrl": "notification.url"
           |}""".stripMargin
       )
 
@@ -252,7 +255,8 @@ class BootstrapEndpointSpec
           |	      "type": "string"
           |	    }
           |	  ]
-          |	}
+          |	},
+          | "notificationUrl": "notification.url"
           |}""".stripMargin
       )
 
@@ -284,7 +288,8 @@ class BootstrapEndpointSpec
           |	      "type": "string"
           |	    }
           |	  ]
-          |	}
+          |	},
+          | "notificationUrl": "notification.url"
           |}""".stripMargin
       )
 
@@ -315,7 +320,8 @@ class BootstrapEndpointSpec
           |	      "type": "string"
           |	    }
           |	  ]
-          |	}
+          |	},
+          | "notificationUrl": "notification.url"
           |}""".stripMargin
       )
 
@@ -346,7 +352,8 @@ class BootstrapEndpointSpec
           |	      "type": "string"
           |	    }
           |	  ]
-          |	}
+          |	},
+          | "notificationUrl": "notification.url"
           |}""".stripMargin
       )
 
@@ -378,7 +385,8 @@ class BootstrapEndpointSpec
           |	      "type": "string"
           |	    }
           |	  ]
-          |	}
+          |	},
+          | "notificationUrl": "notification.url"
           |}""".stripMargin
       )
 
@@ -412,7 +420,8 @@ class BootstrapEndpointSpec
           |	      "type": "string"
           |	    }
           |	  ]
-          |	}
+          |	},
+          | "notificationUrl": "notification.url"
           |}""".stripMargin
       )
 

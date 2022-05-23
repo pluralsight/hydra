@@ -37,7 +37,8 @@ trait BootstrapEndpointTestActors extends BootstrapEndpointActors {
           None,
           None,
           UUID.randomUUID(),
-          DateTime.now().minusSeconds(10)
+          DateTime.now().minusSeconds(10),
+          Some("notification.url")
         )
       }
   }

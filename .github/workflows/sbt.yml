@@ -25,10 +25,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build SBT Docker Image
-        run: docker build -t scala-sbt-openjdk:2.12.11-1.5.8-1.8 .
+      - name: Set up OpenJDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: 1.8
 
-      - name: Run SBT Tests
-        run: docker run --rm -w /hydra -v $(pwd):/hydra scala-sbt-openjdk:2.12.11-1.5.8-1.8 sbt test
+      - name: Run tests
+        run: sbt test
 
-        
+      # - name: Build SBT Docker Image
+      #   run: docker build -t scala-sbt-openjdk:2.12.11-1.5.8-1.8 .
+
+      # - name: Run SBT Tests
+      #   run: docker run -w /hydra -v $(pwd):/hydra scala-sbt-openjdk:2.12.11-1.5.8-1.8 sbt test
+      #   timeout_minutes: 10

@@ -11,7 +11,7 @@ import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, Offset, Partition
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.{ContactMethod, TopicMetadataV2, TopicMetadataV2Key}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.programs.CreateTopicProgram
+import hydra.kafka.programs.{CreateTopicProgram, KeyAndValueSchemaV2Validator}
 import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import org.apache.avro.generic.GenericRecord
@@ -50,7 +50,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
       ref <- Ref[IO].of(List.empty[(GenericRecord, Option[GenericRecord], Option[Headers])])
       kafkaClient = new TestKafkaClientAlgebraWithPublishTo(ref)
       metadata <- MetadataAlgebra.make(metadataSubjectV2, "consumer_group",kafkaClient, schemaRegistry, consumeMetadataEnabled = true)
-      c = new CreateTopicProgram[IO](
+      c = CreateTopicProgram.make[IO](
         schemaRegistry,
         kafkaAdmin,
         kafkaClient,
@@ -173,6 +173,11 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
     override def streamStringKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicPartitionAndOffsets: List[(TopicPartition, Offset)]): fs2.Stream[IO, ((Option[String], Option[GenericRecord], Option[Headers]), (Partition, Offset), Timestamp)] = ???
 
     override def streamAvroKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicPartitionAndOffsets: List[(TopicPartition, Offset)]): fs2.Stream[IO, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset), Timestamp)] = ???
+
+    override def consumeSafelyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[IO, Either[Throwable, (GenericRecord, Option[GenericRecord], Option[Headers])]] = fs2.Stream.empty
+
+    override def consumeSafelyWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[IO, Either[Throwable, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset))]] = fs2.Stream.empty
+
   }
 
 }

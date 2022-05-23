@@ -6,8 +6,7 @@ import hydra.avro.util.SchemaWrapper
 import hydra.ingest.app.AppConfig.AppConfig
 import hydra.ingest.programs.TopicDeletionProgram
 import hydra.ingest.services.{IngestionFlow, IngestionFlowV2}
-import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.programs.CreateTopicProgram
+import hydra.kafka.programs.{CreateTopicProgram, KeyAndValueSchemaV2Validator}
 import io.chrisdavenport.log4cats.Logger
 import retry.RetryPolicies._
 import retry.RetryPolicy
@@ -24,7 +23,7 @@ final class Programs[F[_]: Logger: Sync: Timer: Mode: Concurrent] private(
       cfg.createTopicConfig.baseBackoffDelay
     )
 
-  val createTopic: CreateTopicProgram[F] = new CreateTopicProgram[F](
+  val createTopic: CreateTopicProgram[F] = CreateTopicProgram.make(
     algebras.schemaRegistry,
     algebras.kafkaAdmin,
     algebras.kafkaClient,
