@@ -34,6 +34,7 @@ import akka.http.scaladsl.server.directives.Credentials
 import cats.data.NonEmptyList
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
+import hydra.kafka.programs.CreateTopicProgram.MetadataOnlyTopicDoesNotExist
 import hydra.kafka.programs.{CreateTopicProgram, ValidationError}
 import org.apache.avro.{Schema, SchemaParseException}
 import spray.json.DeserializationException

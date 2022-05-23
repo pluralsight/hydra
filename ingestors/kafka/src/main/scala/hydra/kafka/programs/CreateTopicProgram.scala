@@ -4,15 +4,17 @@ import cats.effect.{Bracket, ExitCase, Resource, Sync}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
-import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{Schemas, StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
-import hydra.kafka.programs.CreateTopicProgram.{IncompatibleKeyAndValueFieldNames, KeyAndValueMismatch, KeyAndValueNotRecordType, KeyHasNullableFields, MetadataOnlyTopicDoesNotExist, NullableField, NullableFieldWithoutDefaultValue, NullableFieldsNeedDefaultValue, UnsupportedLogicalType, ValidationErrors, getLogicalType}
+import hydra.kafka.model.{StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
+import hydra.kafka.programs.CreateTopicProgram._
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.chrisdavenport.log4cats.Logger
 import org.apache.avro.Schema
 import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy, _}
 import cats.implicits._
+import hydra.kafka.model.TopicMetadataV2Request.Subject
+
+import scala.util.control.NoStackTrace
 
 final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] private (
                                                                                schemaRegistry: SchemaRegistry[F],
@@ -123,16 +125,11 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
     } yield ()
   }
 
-  def checkThatTopicExists(topicName: String): Resource[F, Unit] = {
-    val topicExists = for (result <- kafkaAdmin.describeTopic(topicName)) yield result
-    val validated: F[Unit] = topicExists.flatMap { topic =>
-      topic match {
-        case Some(_) => Bracket[F, Throwable].pure(())
-        case None => Bracket[F, Throwable].raiseError(MetadataOnlyTopicDoesNotExist(topicName))
-      }
-    }
-    Resource.liftF(validated)
-  }
+  def checkThatTopicExists(topicName: String): F[Unit] =
+    for {
+      result <- kafkaAdmin.describeTopic(topicName)
+      _ <- eff.fromOption(result, MetadataOnlyTopicDoesNotExist(topicName))
+    } yield ()
 
   //todo: workaround for https://pluralsight.atlassian.net/browse/ADAPT-929, should be removed in the future
   def createTopicFromMetadataOnly(topicName: Subject, createTopicRequest: TopicMetadataV2Request, withRequiredFields: Boolean = false): F[Unit] =
@@ -190,7 +187,8 @@ object CreateTopicProgram {
       KeyAndValueSchemaV2Validator.make(schemaRegistry)
     )
   }
-}
 
-//final case class MetadataOnlyTopicDoesNotExist(topicName: String) extends
-//    RuntimeException(s"You cannot add metadata for topic '${topicName}' if it does not exist in the cluster. Please create your topic first.")
+  final case class MetadataOnlyTopicDoesNotExist(topicName: String) extends NoStackTrace {
+    override def getMessage: String = s"You cannot add metadata for topic '$topicName' if it does not exist in the cluster. Please create your topic first."
+  }
+}

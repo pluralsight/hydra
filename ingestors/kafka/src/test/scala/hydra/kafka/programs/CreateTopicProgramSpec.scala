@@ -30,6 +30,7 @@ import hydra.kafka.IOSuite
 
 import scala.concurrent.ExecutionContext
 import hydra.kafka.model.TopicMetadataV2Request.NumPartitions
+import hydra.kafka.programs.CreateTopicProgram.MetadataOnlyTopicDoesNotExist
 import hydra.kafka.programs.TopicSchemaError._
 import org.apache.kafka.common.TopicPartition
 import org.scalatest.freespec.AsyncFreeSpec
@@ -1861,21 +1862,12 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     }
 
     "throw error creating topic from metadata only where topic doesn't exist" in {
-      val policy: RetryPolicy[IO] = RetryPolicies.alwaysGiveUp
-      val subject = Subject.createValidated("dvs.subject").get
-      val topicMetadataV2Request = createTopicMetadataRequest(keySchema, valueSchema)
-      an [MetadataOnlyTopicDoesNotExist] shouldBe thrownBy {
-        val resource: Resource[IO, Assertion] =(for {
-        schemaRegistry <- Resource.liftF(SchemaRegistry.test[IO])
-        kafka <- Resource.liftF(KafkaAdminAlgebra.test[IO]())
-        kafkaClient <- Resource.liftF(KafkaClientAlgebra.test[IO])
-        metadata <- Resource.liftF(metadataAlgebraF("dvs.test-metadata-topic", schemaRegistry, kafkaClient))
-        ctProgram = new CreateTopicProgram[IO](schemaRegistry, kafka, kafkaClient, policy, Subject.createValidated("dvs.test-metadata-topic").get, metadata)
-        _ <- ctProgram.registerSchemas(subject ,keySchema, valueSchema)
-        _ <- Resource.liftF(ctProgram.createTopicFromMetadataOnly(subject, topicMetadataV2Request))
-      } yield fail("Should Fail to add Metadata - this yield should not be hit."))
-        resource.use(_ => Bracket[IO, Throwable].unit).unsafeRunSync()
-      }
+      val result = for {
+        ts <- initTestServices()
+        _  <- ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(keySchema, valueSchema))
+      } yield ()
+
+      result.attempt.map(_ shouldBe MetadataOnlyTopicDoesNotExist(subject.value).asLeft)
     }
 
 
