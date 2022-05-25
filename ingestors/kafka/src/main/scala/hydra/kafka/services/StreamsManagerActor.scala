@@ -146,6 +146,10 @@ object StreamsManagerActor {
       .withGroupId(s"metadata-consumer-actor-$maybeHost")
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
       .withProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false")
+      .withProperty("security.protocol", "SASL_SSL")
+      .withProperty("sasl.jaas.config","org.apache.kafka.common.security.plain.PlainLoginModule  required username='I2TGTNT5E3SI6NX2'   password='5KI8zsJ47L0RZyE7fadOWTdwXS7s0VCHpAW2IJfd5cbJJxrLFAJz+SnJJhf4Vcjs';")
+      .withProperty("sasl.mechanism","PLAIN")
+      .withProperty("client.dns.lookup","use_all_dns_ips")
 
     Consumer
       .plainSource(settings, Subscriptions.topics(metadataTopicName))

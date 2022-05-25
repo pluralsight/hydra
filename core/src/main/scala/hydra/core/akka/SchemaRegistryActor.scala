@@ -189,7 +189,7 @@ class CircuitBreakerSettings(config: Config) {
 
   val callTimeout = config
     .getDurationOpt("schema-fetcher.call-timeout")
-    .getOrElse(5 seconds)
+    .getOrElse(60 seconds)
 
   val resetTimeout = config
     .getDurationOpt("schema-fetcher.reset-timeout")

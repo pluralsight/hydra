@@ -60,7 +60,10 @@ object ConfluentSchemaRegistry extends LoggingAdapter {
           } else {
             new CachedSchemaRegistryClient(
               info.url,
-              info.schemaRegistryMaxCapacity
+              info.schemaRegistryMaxCapacity,
+              Map(
+                "basic.auth.credentials.source" -> "USER_INFO",
+                "basic.auth.user.info" -> "PTGHGC2VS2HZEMJX:OLGqr67k2CY6/MO8lOnDdkqRkAJMFwpWu49t74f9yuJFHc/Ld+Kley6aWVhRm4Od").asJava
             )
           }
           ConfluentSchemaRegistry(client, info.url)

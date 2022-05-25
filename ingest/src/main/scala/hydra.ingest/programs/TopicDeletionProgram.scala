@@ -12,7 +12,7 @@ import hydra.kafka.algebras.KafkaAdminAlgebra.KafkaDeleteTopicErrorList
 import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.apache.kafka.common.TopicPartition
 import scalacache.Cache
 import scalacache.modes.try_._

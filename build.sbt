@@ -4,7 +4,7 @@ val JDK = "1.8"
 
 val buildNumber =
   scala.util.Properties.envOrNone("version").map(v => "." + v).getOrElse("")
-val hydraVersion = "0.11.3" + buildNumber
+val hydraVersion = "0.11.3" + buildNumber + "-SNAPSHOT"
 val jvmMaxMemoryFlag = sys.env.getOrElse("MAX_JVM_MEMORY_FLAG", "-Xmx2g")
 
 lazy val defaultSettings = Seq(
@@ -13,8 +13,8 @@ lazy val defaultSettings = Seq(
   scalaVersion := "2.12.11",
   description := "Hydra",
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
-  excludeDependencies += "org.slf4j" % "slf4j-log4j12",
-  excludeDependencies += "log4j" % "log4j",
+//  excludeDependencies += "org.slf4j" % "slf4j-log4j12",
+//  excludeDependencies += "log4j" % "log4j",
   addCompilerPlugin(
     "org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full
   ),

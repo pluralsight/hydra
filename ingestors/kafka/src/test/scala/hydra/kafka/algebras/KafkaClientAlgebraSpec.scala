@@ -13,8 +13,8 @@ import cats.syntax.all._
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError.{RecordTooLarge, TopicNotFoundInMetadata}
 import hydra.kafka.algebras.KafkaClientAlgebra.{OffsetInfoNotRetrievableInTest, PublishResponse}
 import hydra.kafka.util.KafkaUtils.TopicDetails
-import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
-import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.SelfAwareStructuredLogger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import scala.concurrent.ExecutionContext
 

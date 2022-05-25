@@ -66,7 +66,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection, streamsManagerActor: ActorR
     val make: List[SchemasWithTopicResponse] => BatchSchemasResponse = BatchSchemasResponse.apply
     jsonFormat1(make)
   }
-  implicit val timeout: Timeout = Timeout(3.seconds)
+  implicit val timeout: Timeout = Timeout(60.seconds)
 
   private val schemaRegistryActor =
     system.actorOf(SchemaRegistryActor.props(applicationConfig))

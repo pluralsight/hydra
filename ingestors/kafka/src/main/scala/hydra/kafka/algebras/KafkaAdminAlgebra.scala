@@ -7,11 +7,11 @@ import cats.implicits.catsSyntaxApplicativeError
 import cats.syntax.all._
 import fs2.kafka._
 import hydra.kafka.util.KafkaUtils.TopicDetails
-import io.chrisdavenport.log4cats.Logger
 import org.apache.kafka.clients.admin.{ConsumerGroupDescription, NewTopic}
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
+import org.typelevel.log4cats.Logger
 
 /**
  * Internal interface to interact with the KafkaAdminClient from FS2 Kafka.
@@ -218,7 +218,12 @@ object KafkaAdminAlgebra {
         val des = Deserializer[F, String]
         consumerResource[F, String, String] {
           val s = ConsumerSettings.apply(des, des).withBootstrapServers(bootstrapServers)
-            .withAllowAutoCreateTopics(false)
+            .withProperty("security.protocol", "SASL_SSL")
+            .withProperty("sasl.jaas.config","org.apache.kafka.common.security.plain.PlainLoginModule  required username='I2TGTNT5E3SI6NX2'   password='5KI8zsJ47L0RZyE7fadOWTdwXS7s0VCHpAW2IJfd5cbJJxrLFAJz+SnJJhf4Vcjs';")
+            .withProperty("sasl.mechanism","PLAIN")
+            .withProperty("client.dns.lookup","use_all_dns_ips")
+            .withProperty("session.timeout.ms","45000")
+//            .withAllowAutoCreateTopics(false)
           if (useSsl) s.withProperty("security.protocol", "SSL") else s
         }
       }
@@ -226,6 +231,11 @@ object KafkaAdminAlgebra {
       private def getAdminClientResource: Resource[F, KafkaAdminClient[F]] = {
         adminClientResource {
           val s = AdminClientSettings.apply.withBootstrapServers(bootstrapServers)
+            .withProperty("security.protocol", "SASL_SSL")
+            .withProperty("sasl.jaas.config","org.apache.kafka.common.security.plain.PlainLoginModule  required username='I2TGTNT5E3SI6NX2'   password='5KI8zsJ47L0RZyE7fadOWTdwXS7s0VCHpAW2IJfd5cbJJxrLFAJz+SnJJhf4Vcjs';")
+            .withProperty("sasl.mechanism","PLAIN")
+            .withProperty("client.dns.lookup","use_all_dns_ips")
+            .withProperty("session.timeout.ms","45000")
           if (useSsl) s.withProperty("security.protocol", "SSL") else s
         }
       }

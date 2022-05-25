@@ -12,6 +12,7 @@ import cats.data.Validated.{Invalid, Valid}
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, Sync}
 import cats.implicits._
+import org.typelevel.log4cats.Logger
 import hydra.kafka.algebras.RetryableFs2Stream.ReRunnableStreamAdder
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Infinite
 import hydra.kafka.util.ConsumerGroupsOffsetConsumer.getErrorMessage

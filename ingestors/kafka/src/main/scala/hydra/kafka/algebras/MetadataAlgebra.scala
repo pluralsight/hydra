@@ -11,7 +11,7 @@ import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Infinite
 import hydra.kafka.model.TopicMetadataV2.MetadataAvroSchemaFailure
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Value}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
 

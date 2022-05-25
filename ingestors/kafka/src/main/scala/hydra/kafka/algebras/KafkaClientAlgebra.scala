@@ -9,7 +9,7 @@ import fs2.concurrent.Queue
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError.RecordTooLarge
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import io.confluent.kafka.serializers.{AbstractKafkaAvroSerDeConfig, KafkaAvroDeserializer, KafkaAvroSerializer}
 import org.apache.avro.generic.GenericRecord
@@ -235,8 +235,15 @@ object KafkaClientAlgebra {
       ProducerSettings[F, Array[Byte], Array[Byte]]
         .withBootstrapServers(bootstrapServers)
         .withAcks(Acks.All)
+        .withDeliveryTimeout(5 minutes)
+        .withRequestTimeout(5 minutes)
         .withProperty("max.block.ms", publishMaxBlockMs.toMillis.toString)
-        .withRetries(retries = 0)
+        .withProperty("security.protocol", "SASL_SSL")
+        .withProperty("sasl.jaas.config","org.apache.kafka.common.security.plain.PlainLoginModule  required username='I2TGTNT5E3SI6NX2'   password='5KI8zsJ47L0RZyE7fadOWTdwXS7s0VCHpAW2IJfd5cbJJxrLFAJz+SnJJhf4Vcjs';")
+        .withProperty("sasl.mechanism","PLAIN")
+        .withProperty("client.dns.lookup","use_all_dns_ips")
+//        .withProperty("session.timeout.ms","45000")
+        .withRetries(retries = 2)
     for {
       queue <- fs2.concurrent.Queue.unbounded[F, ProduceRecordInfo[F]]
       _ <- Concurrent[F].start {
@@ -360,7 +367,11 @@ object KafkaClientAlgebra {
           .withAutoOffsetReset(AutoOffsetReset.Earliest)
           .withBootstrapServers(bootstrapServers)
           .withGroupId(consumerGroup)
-
+          .withProperty("security.protocol", "SASL_SSL")
+          .withProperty("sasl.jaas.config","org.apache.kafka.common.security.plain.PlainLoginModule  required username='I2TGTNT5E3SI6NX2'   password='5KI8zsJ47L0RZyE7fadOWTdwXS7s0VCHpAW2IJfd5cbJJxrLFAJz+SnJJhf4Vcjs';")
+          .withProperty("sasl.mechanism","PLAIN")
+          .withProperty("client.dns.lookup","use_all_dns_ips")
+          .withProperty("session.timeout.ms","45000")
         consumerStream(consumerSettings)
           .evalTap(_.subscribeTo(topicName))
           .flatMap(_.stream)
@@ -408,6 +419,11 @@ object KafkaClientAlgebra {
         )
           .withAutoOffsetReset(AutoOffsetReset.Earliest)
           .withBootstrapServers(bootstrapServers)
+          .withProperty("security.protocol", "SASL_SSL")
+          .withProperty("sasl.jaas.config","org.apache.kafka.common.security.plain.PlainLoginModule  required username='I2TGTNT5E3SI6NX2'   password='5KI8zsJ47L0RZyE7fadOWTdwXS7s0VCHpAW2IJfd5cbJJxrLFAJz+SnJJhf4Vcjs';")
+          .withProperty("sasl.mechanism","PLAIN")
+          .withProperty("client.dns.lookup","use_all_dns_ips")
+          .withProperty("session.timeout.ms","45000")
           .withGroupId(consumerGroup)
         implicit val order: Order[TopicPartition] =
           (x: TopicPartition, y: TopicPartition) => if (x.partition() > y.partition()) 1 else if (x.partition() < y.partition()) -1 else 0
@@ -433,8 +449,8 @@ object KafkaClientAlgebra {
                                                                      bootstrapServers: String,
                                                                      schemaRegistryAlgebra: SchemaRegistry[F],
                                                                      recordSizeLimit: Option[Long] = None,
-                                                                     publishTimeoutDuration: FiniteDuration = 5.seconds,
-                                                                     publishMaxBlockMs: FiniteDuration = 4.5.seconds
+                                                                     publishTimeoutDuration: FiniteDuration = 20.seconds,
+                                                                     publishMaxBlockMs: FiniteDuration = 20.seconds
                                                                    ): F[KafkaClientAlgebra[F]] =
     for {
       schemaRegistryClient <- schemaRegistryAlgebra.getSchemaRegistryClient
@@ -620,7 +636,7 @@ object KafkaClientAlgebra {
     Deserializer.delegate[F, GenericRecord] {
       val deserializer = {
         val de = new KafkaAvroDeserializer(schemaRegistryClient)
-        de.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "").asJava, isKey)
+        de.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "https://psrc-vn38j.us-east-2.aws.confluent.cloud").asJava, isKey)
         de
       }
       (topic: TopicName, data: Array[Byte]) => {
@@ -632,7 +648,7 @@ object KafkaClientAlgebra {
     Deserializer.delegate[F, Option[GenericRecord]] {
       val deserializer = {
         val de = new KafkaAvroDeserializer(schemaRegistryClient)
-        de.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "").asJava, isKey)
+        de.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "https://psrc-vn38j.us-east-2.aws.confluent.cloud").asJava, isKey)
         de
       }
       (topic: TopicName, data: Array[Byte]) => {
@@ -646,7 +662,7 @@ object KafkaClientAlgebra {
     Serializer.delegate[F, RecordFormat] {
       val serializer = {
         val se = new KafkaAvroSerializer(schemaRegistryClient)
-        se.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "").asJava, isKey)
+        se.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "https://psrc-vn38j.us-east-2.aws.confluent.cloud").asJava, isKey)
         se
       }
       val stringSerializer = new StringSerializer

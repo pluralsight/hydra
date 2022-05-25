@@ -56,7 +56,7 @@ class TopicBootstrapActor(
 
   val topicDetails = TopicDetails(
     bootstrapKafkaConfig.getInt("partitions"),
-    bootstrapKafkaConfig.getInt("replication-factor").toShort,
+    3.toShort,
     bootstrapKafkaConfig.getInt("min-insync-replicas").toShort
   )
 
@@ -260,8 +260,8 @@ class TopicBootstrapActor(
     val topicMap = Map(topicName -> topicDetails.copy(partialConfig = topicDetails.configs ++ getCleanupPolicyConfig))
 
     kafkaUtils
-      .createTopics(topicMap, timeout = timeoutMillis)
-      .map { r => r.all.get(timeoutMillis, TimeUnit.MILLISECONDS) }
+      .createTopics(topicMap, timeout = 60000)
+      .map { r => r.all.get(60000, TimeUnit.MILLISECONDS) }
       .map { _ => BootstrapSuccess }
       .recover {
         case illegalArg: IllegalArgumentException => {

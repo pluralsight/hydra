@@ -87,11 +87,22 @@ object KafkaUtils extends ConfigSupport {
 
   val stringConsumerSettings: ConsumerSettings[String, String] =
     consumerSettings[String, String]("string", rootConfig)
+      .withProperty("security.protocol", "SASL_SSL")
+      .withProperty("sasl.jaas.config","org.apache.kafka.common.security.plain.PlainLoginModule  required username='I2TGTNT5E3SI6NX2'   password='5KI8zsJ47L0RZyE7fadOWTdwXS7s0VCHpAW2IJfd5cbJJxrLFAJz+SnJJhf4Vcjs';")
+      .withProperty("sasl.mechanism","PLAIN")
+      .withProperty("client.dns.lookup","use_all_dns_ips")
+//      .withProperty("session.timeout.ms","45000")
 
   def consumerForClientId[K, V](
       clientId: String
   ): Option[ConsumerSettings[K, V]] =
     _consumerSettings.get(clientId).asInstanceOf[Option[ConsumerSettings[K, V]]]
+      .map(_.withProperty("security.protocol", "SASL_SSL")
+        .withProperty("sasl.jaas.config","org.apache.kafka.common.security.plain.PlainLoginModule  required username='I2TGTNT5E3SI6NX2'   password='5KI8zsJ47L0RZyE7fadOWTdwXS7s0VCHpAW2IJfd5cbJJxrLFAJz+SnJJhf4Vcjs';")
+        .withProperty("sasl.mechanism","PLAIN")
+        .withProperty("client.dns.lookup","use_all_dns_ips")
+        .withProperty("session.timeout.ms","45000")
+          )
 
   def loadConsumerSettings[K, V](
       clientId: String,
@@ -103,6 +114,11 @@ object KafkaUtils extends ConfigSupport {
       .map(
         _.withGroupId(groupId)
           .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, offsetReset)
+          .withProperty("security.protocol", "SASL_SSL")
+          .withProperty("sasl.jaas.config","org.apache.kafka.common.security.plain.PlainLoginModule  required username='I2TGTNT5E3SI6NX2'   password='5KI8zsJ47L0RZyE7fadOWTdwXS7s0VCHpAW2IJfd5cbJJxrLFAJz+SnJJhf4Vcjs';")
+          .withProperty("sasl.mechanism","PLAIN")
+          .withProperty("client.dns.lookup","use_all_dns_ips")
+          .withProperty("session.timeout.ms","45000")
           .asInstanceOf[ConsumerSettings[K, V]]
       )
       .getOrElse(
@@ -126,6 +142,11 @@ object KafkaUtils extends ConfigSupport {
     ).withGroupId(groupId)
       .withBootstrapServers(KafkaConfigSupport.bootstrapServers)
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest")
+      .withProperty("security.protocol", "SASL_SSL")
+      .withProperty("sasl.jaas.config","org.apache.kafka.common.security.plain.PlainLoginModule  required username='I2TGTNT5E3SI6NX2'   password='5KI8zsJ47L0RZyE7fadOWTdwXS7s0VCHpAW2IJfd5cbJJxrLFAJz+SnJJhf4Vcjs';")
+      .withProperty("sasl.mechanism","PLAIN")
+      .withProperty("client.dns.lookup","use_all_dns_ips")
+      .withProperty("session.timeout.ms","45000")
   }
 
   def producerSettings[K, V](
@@ -134,13 +155,24 @@ object KafkaUtils extends ConfigSupport {
   ): ProducerSettings[K, V] = {
     ProducerSettings[K, V](settingsConfig("producer", id, cfg), None, None)
       .withProperty("client.id", id)
+      .withProperty("security.protocol", "SASL_SSL")
+      .withProperty("sasl.jaas.config","org.apache.kafka.common.security.plain.PlainLoginModule  required username='I2TGTNT5E3SI6NX2'   password='5KI8zsJ47L0RZyE7fadOWTdwXS7s0VCHpAW2IJfd5cbJJxrLFAJz+SnJJhf4Vcjs';")
+      .withProperty("sasl.mechanism","PLAIN")
+      .withProperty("client.dns.lookup","use_all_dns_ips")
+      .withProperty("session.timeout.ms","45000")
   }
 
   def producerSettings(cfg: Config): Map[String, ProducerSettings[Any, Any]] = {
     val clientsConfig = cfg.getConfig(s"$applicationName.kafka.clients")
     val clients = clientsConfig.root().entrySet().asScala.map(_.getKey)
     clients
-      .map(client => client -> producerSettings[Any, Any](client, cfg))
+      .map(client => client -> producerSettings[Any, Any](client, cfg)
+        .withProperty("security.protocol", "SASL_SSL")
+        .withProperty("sasl.jaas.config","org.apache.kafka.common.security.plain.PlainLoginModule  required username='I2TGTNT5E3SI6NX2'   password='5KI8zsJ47L0RZyE7fadOWTdwXS7s0VCHpAW2IJfd5cbJJxrLFAJz+SnJJhf4Vcjs';")
+        .withProperty("sasl.mechanism","PLAIN")
+        .withProperty("client.dns.lookup","use_all_dns_ips")
+        .withProperty("session.timeout.ms","45000")
+                )
       .toMap
   }
 
@@ -150,13 +182,24 @@ object KafkaUtils extends ConfigSupport {
   ): ConsumerSettings[K, V] = {
     ConsumerSettings[K, V](settingsConfig("consumer", id, cfg), None, None)
       .withProperty("client.id", id)
+      .withProperty("security.protocol", "SASL_SSL")
+      .withProperty("sasl.jaas.config","org.apache.kafka.common.security.plain.PlainLoginModule  required username='I2TGTNT5E3SI6NX2'   password='5KI8zsJ47L0RZyE7fadOWTdwXS7s0VCHpAW2IJfd5cbJJxrLFAJz+SnJJhf4Vcjs';")
+      .withProperty("sasl.mechanism","PLAIN")
+      .withProperty("client.dns.lookup","use_all_dns_ips")
+      .withProperty("session.timeout.ms","45000")
   }
 
   def consumerSettings(cfg: Config): Map[String, ConsumerSettings[Any, Any]] = {
     val clientsConfig = cfg.getConfig(s"$applicationName.kafka.clients")
     val clients = clientsConfig.root().entrySet().asScala.map(_.getKey)
     clients
-      .map(client => client -> consumerSettings[Any, Any](client, cfg))
+      .map(client => client -> consumerSettings[Any, Any](client, cfg)
+        .withProperty("security.protocol", "SASL_SSL")
+        .withProperty("sasl.jaas.config","org.apache.kafka.common.security.plain.PlainLoginModule  required username='I2TGTNT5E3SI6NX2'   password='5KI8zsJ47L0RZyE7fadOWTdwXS7s0VCHpAW2IJfd5cbJJxrLFAJz+SnJJhf4Vcjs';")
+        .withProperty("sasl.mechanism","PLAIN")
+        .withProperty("client.dns.lookup","use_all_dns_ips")
+        .withProperty("session.timeout.ms","45000")
+      )
       .toMap
   }
 

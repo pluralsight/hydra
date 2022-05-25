@@ -42,7 +42,7 @@ class BootstrapEndpoint(override val system:ActorSystem, override val streamsMan
   with DefaultCorsSupport
   with BootstrapEndpointActors {
 
-  private implicit val timeout = Timeout(10.seconds)
+  private implicit val timeout = Timeout(60.seconds)
 
   override val route: Route = cors(corsSupport.settings) {
     extractMethod { method =>

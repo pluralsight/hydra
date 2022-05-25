@@ -1,5 +1,8 @@
 package hydra.kafka.algebras
 
+import cats.ApplicativeError
+
+import java.time.Instant
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
 import cats.implicits._
@@ -13,9 +16,8 @@ import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.serializers.TopicMetadataV2Parser.IntentionallyUnimplemented
 import hydra.kafka.util.ConsumerGroupsOffsetConsumer
-import io.chrisdavenport.log4cats.Logger
-
-import java.time.Instant
+import org.apache.avro.generic.GenericRecord
+import org.typelevel.log4cats.Logger
 
 trait ConsumerGroupsAlgebra[F[_]] {
   def getConsumersForTopic(topicName: String): F[TopicConsumers]

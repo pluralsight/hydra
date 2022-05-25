@@ -66,7 +66,7 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
 
   private implicit val errorFormat = jsonFormat1(CreateTopicResponseError)
 
-  implicit val timeout = Timeout(5 seconds)
+  implicit val timeout = Timeout(60 seconds)
 
   private lazy val kafkaUtils = KafkaUtils()
 

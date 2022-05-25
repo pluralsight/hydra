@@ -46,7 +46,7 @@ class TopicsEndpoint(consumerProxy:ActorSelection)(implicit ec:ExecutionContext)
                 val offsets = latestOffsets(topicName)
                 val source = Consumer
                   .plainSource(settings, Subscriptions.topics(topicName))
-                  .initialTimeout(5.seconds)
+                  .initialTimeout(60.seconds)
                   .zipWithIndex
                   .takeWhile(rec =>
                     rec._2 <= n && !shouldCancel(offsets, rec._1)
@@ -86,7 +86,7 @@ class TopicsEndpoint(consumerProxy:ActorSelection)(implicit ec:ExecutionContext)
   private def latestOffsets(
       topic: String
   ): Future[Map[TopicPartition, Long]] = {
-    implicit val timeout = Timeout(5 seconds)
+    implicit val timeout = Timeout(60 seconds)
     (consumerProxy ? GetLatestOffsets(topic))
       .mapTo[LatestOffsetsResponse]
       .map(_.offsets)
