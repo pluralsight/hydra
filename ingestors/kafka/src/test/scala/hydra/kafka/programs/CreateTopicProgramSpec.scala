@@ -2013,6 +2013,8 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
   private final class TestKafkaClientAlgebraWithPublishTo(publishTo: Ref[IO, Map[TopicName, Record]], failOnPublish: Boolean = false)
     extends KafkaClientAlgebra[IO] {
 
+    override def consumeSafelyStringKeyMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[IO, Either[Throwable, ((Option[String], Option[GenericRecord], Option[Headers]), (Partition, Offset))]] = ???
+
     override def publishMessage(record: Record, topicName: TopicName): IO[Either[PublishError, PublishResponse]] =
       if (failOnPublish) {
         IO.pure(Left(PublishError.Timeout))
