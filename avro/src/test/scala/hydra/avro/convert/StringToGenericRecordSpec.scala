@@ -2,8 +2,7 @@ package hydra.avro.convert
 
 import java.time.Instant
 import java.util.UUID
-
-import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
+import org.apache.avro.{AvroTypeException, LogicalTypes, Schema, SchemaBuilder}
 import org.apache.avro.util.Utf8
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -211,5 +210,33 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     val record = json.toGenericRecord(schema, useStrictValidation = true)
     import collection.JavaConverters._
     record.get.get("testing") shouldBe Map("one" -> 1, "two" -> 2, "three" -> 3).map(kv => new Utf8(kv._1) -> kv._2).asJava
+  }
+
+  it should "throw an AvroTypeException for field testInner with unexpected value" in {
+    val inner = SchemaBuilder.record("Test").fields()
+      .requiredInt("testInner").endRecord()
+    val schema = SchemaBuilder.record("Test").fields()
+      .requiredString("testing").name("nested").`type`(inner).noDefault.endRecord()
+
+    the[AvroTypeException] thrownBy """{"testing": "test", "nested": {"testInner": "10"}}""".
+      toGenericRecord(schema, useStrictValidation = true).get should have message "nested -> testInner -> Expected int. Got VALUE_STRING"
+  }
+
+  it should "throw an AvroTypeException for union field with unexpected value" in {
+    val schema = SchemaBuilder.record("Test").namespace("my.namespace").fields().name("testing").`type`()
+      .unionOf().nullType().and().record("TestingInner").fields()
+      .requiredInt("testInner").endRecord().endUnion().nullDefault().endRecord()
+
+    the[AvroTypeException] thrownBy """{"testing": {"my.namespace.TestingInner": 10}}""".
+      toGenericRecord(schema, useStrictValidation = true).get should have message "testInner -> Expected record-start. Got VALUE_NUMBER_INT"
+  }
+
+  it should "not throw an AvroTypeException for union field with null value" in {
+    val schema = SchemaBuilder.record("Test").namespace("my.namespace").fields().name("testing").`type`()
+      .unionOf().nullType().and().record("TestingInner").fields()
+      .requiredInt("testInner").endRecord().endUnion().nullDefault().endRecord()
+
+    val record = """{"testing": {"my.namespace.TestingInner": {"testInner": 2020}}}""".toGenericRecord(schema, useStrictValidation = true)
+    record shouldBe a[Success[_]]
   }
 }
