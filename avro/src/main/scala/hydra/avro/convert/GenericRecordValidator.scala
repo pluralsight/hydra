@@ -22,7 +22,3 @@ class GenericRecordValidator[T](schema: Schema) extends GenericDatumReader[T](sc
     }
   }
 }
-
-object GenericRecordValidator {
-  def apply[T](schema: Schema): GenericRecordValidator[T] = new GenericRecordValidator[T](schema)
-}

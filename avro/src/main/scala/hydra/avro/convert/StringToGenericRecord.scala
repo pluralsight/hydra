@@ -1,7 +1,7 @@
 package hydra.avro.convert
 
 import java.util.UUID
-import org.apache.avro.{AvroTypeException, LogicalTypes, Schema}
+import org.apache.avro.{LogicalTypes, Schema}
 import org.apache.avro.generic.{GenericDatumReader, GenericRecord}
 import org.apache.avro.io.DecoderFactory
 import cats.syntax.all._
@@ -67,13 +67,8 @@ object StringToGenericRecord {
     private[convert] def toGenericRecordPostValidation(schema: Schema): Try[GenericRecord] = Try {
       val decoderFactory = new DecoderFactory
       val decoder = decoderFactory.jsonDecoder(schema, s)
-      val reader = new GenericDatumReader[GenericRecord](schema)
+      val reader = new GenericRecordValidator[GenericRecord](schema)
       reader.read(null, decoder)
-    }.recover {
-      case _: AvroTypeException =>
-        val decoderFactory = new DecoderFactory
-        val decoder = decoderFactory.jsonDecoder(schema, s)
-        GenericRecordValidator(schema).read(null, decoder)
     }.flatTap(checkLogicalTypes)
 
     def toGenericRecord(schema: Schema, useStrictValidation: Boolean): Try[GenericRecord] = {
