@@ -239,4 +239,17 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     val record = """{"testing": {"my.namespace.TestingInner": {"testInner": 2020}}}""".toGenericRecord(schema, useStrictValidation = true)
     record shouldBe a[Success[_]]
   }
+
+  it should "throw an AvroTypeException for field with logical type and unexpected value" in {
+    val ts = Instant.now
+    val schema = SchemaBuilder.record("testVal")
+      .fields()
+      .name("testTs")
+      .`type`(LogicalTypes.timestampMillis.addToSchema(Schema.create(Schema.Type.LONG)))
+      .noDefault
+      .endRecord
+
+    the[AvroTypeException] thrownBy s"""{"testTs": "hi"}""".
+      toGenericRecord(schema, useStrictValidation = true).get should have message "testTs -> Expected long. Got VALUE_STRING"
+  }
 }
