@@ -25,7 +25,7 @@ object RetryableFs2Stream {
       override val count: Int = -1
     }
 
-    case class GivenCount(override val count: Int) extends AnyVal with  RetryPolicy
+    case class GivenCount(override val count: Int) extends AnyVal with RetryPolicy
 
     def apply(retryCount: Int): RetryPolicy = {
       if (retryCount < 0) Infinite
@@ -46,7 +46,11 @@ object RetryableFs2Stream {
     def makeRetryable(retryPolicy: RetryPolicy = Zero, onReRunAction: F[Unit] = Sync[F].unit)(onErrorMessage: String): fs2.Stream[F, O] = {
       stream.onComplete(
         fs2.Stream.eval(
-          onReRunAction
+          if (retryPolicy.count != 0) {
+            onReRunAction
+          } else {
+            Sync[F].unit
+          }
         ) *> fs2.Stream.empty
       ).onError {
         case error => fs2.Stream.eval(Logger[F].error(error)(s"$onErrorMessage. Stream will be restarted due to RetryPolicy: $retryPolicy"))
