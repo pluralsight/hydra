@@ -4,7 +4,7 @@ import org.apache.avro.generic.{GenericData, GenericDatumReader}
 import org.apache.avro.io.ResolvingDecoder
 import org.apache.avro.{AvroTypeException, Schema}
 
-class GenericRecordValidator[T](schema: Schema) extends GenericDatumReader[T](schema) {
+class GenericRecordExceptionConverter[T](schema: Schema) extends GenericDatumReader[T](schema) {
   override def readField(r: scala.Any,
                          f: Schema.Field,
                          oldDatum: scala.Any,

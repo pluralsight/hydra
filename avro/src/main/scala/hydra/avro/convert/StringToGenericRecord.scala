@@ -67,7 +67,7 @@ object StringToGenericRecord {
     private[convert] def toGenericRecordPostValidation(schema: Schema): Try[GenericRecord] = Try {
       val decoderFactory = new DecoderFactory
       val decoder = decoderFactory.jsonDecoder(schema, s)
-      val reader = new GenericRecordValidator[GenericRecord](schema)
+      val reader = new GenericRecordExceptionConverter[GenericRecord](schema)
       reader.read(null, decoder)
     }.flatTap(checkLogicalTypes)
 
