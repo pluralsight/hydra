@@ -236,6 +236,9 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
 
     the[AvroTypeException] thrownBy json.
       toGenericRecord(schema, useStrictValidation = true).get should have message "nested -> testInner -> Expected int. Got VALUE_STRING"
+
+    the[AvroTypeException] thrownBy """{"testing": {"my.namespace.TestingInner": {"testInner": "2020"}}}""".
+      toGenericRecord(innerSchema, useStrictValidation = true).get should have message "testInner -> Expected int. Got VALUE_STRING"
   }
 
   it should "not throw an AvroTypeException for union field with null value" in {
