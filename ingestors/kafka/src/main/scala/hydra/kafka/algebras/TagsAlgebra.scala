@@ -12,6 +12,9 @@ import cats.data.Validated.{Invalid, Valid}
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, Sync}
 import cats.implicits._
+import hydra.kafka.algebras.RetryableFs2Stream.ReRunnableStreamAdder
+import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Infinite
+import hydra.kafka.util.ConsumerGroupsOffsetConsumer.getErrorMessage
 import io.chrisdavenport.log4cats.Logger
 import org.apache.avro.generic.GenericRecord
 import spray.json._
@@ -79,10 +82,9 @@ object TagsAlgebra {
         }
         case e =>
           fs2.Stream.eval(Logger[F].error(s"Unexpected return from Kafka: ${e.toString()}"))
-      }.recoverWith {
-        case e =>
-        fs2.Stream.eval(Logger[F].error(e)(s"Error in TagsAlgebra"))
-      }.compile.drain)
+      }
+        .makeRetryable(Infinite, ref.update(_ => TagsStorageFacade.empty))("Error in TagsAlgebra")
+        .compile.drain)
       algebra <- getTagsAlgebra(ref, tagsTopic, kafkaClientAlgebra)
     } yield algebra
   }
