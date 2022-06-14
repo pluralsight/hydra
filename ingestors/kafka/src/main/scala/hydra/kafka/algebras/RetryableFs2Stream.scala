@@ -13,19 +13,19 @@ object RetryableFs2Stream {
   }
 
   object RetryPolicy {
-    case object Once extends AnyVal with RetryPolicy {
-      val count: Int = 1
+    case object Once extends RetryPolicy {
+      override val count: Int = 1
     }
 
-    case object Zero extends AnyVal with  RetryPolicy {
-      val count: Int = 0
+    case object Zero extends RetryPolicy {
+      override val count: Int = 0
     }
 
-    case object Infinite extends AnyVal with RetryPolicy {
-      val count: Int = -1
+    case object Infinite extends RetryPolicy {
+      override val count: Int = -1
     }
 
-    case class GivenCount(count: Int) extends AnyVal with  RetryPolicy
+    case class GivenCount(override val count: Int) extends AnyVal with  RetryPolicy
 
     def apply(retryCount: Int): RetryPolicy = {
       if (retryCount < 0) Infinite
