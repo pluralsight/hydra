@@ -214,21 +214,28 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
 
   it should "throw an AvroTypeException for field testInner with unexpected value" in {
     val inner = SchemaBuilder.record("Test").fields()
-      .requiredInt("testInner").endRecord()
+      .requiredInt("testInner2").endRecord()
+    val inner2 = SchemaBuilder.record("Test").fields()
+      .name("testInner").`type`(inner).noDefault.endRecord()
     val schema = SchemaBuilder.record("Test").fields()
-      .requiredString("testing").name("nested").`type`(inner).noDefault.endRecord()
+      .requiredString("testing").name("nested").`type`(inner2).noDefault.endRecord()
 
-    the[AvroTypeException] thrownBy """{"testing": "test", "nested": {"testInner": "10"}}""".
-      toGenericRecord(schema, useStrictValidation = true).get should have message "nested -> testInner -> Expected int. Got VALUE_STRING"
+    the[AvroTypeException] thrownBy """{"testing": "test", "nested": {"testInner": {"testInner2" : "10"}}}""".
+      toGenericRecord(schema, useStrictValidation = true).get should have message "nested -> testInner -> testInner2 -> Expected int. Got VALUE_STRING"
   }
 
   it should "throw an AvroTypeException for union field with unexpected value" in {
-    val schema = SchemaBuilder.record("Test").namespace("my.namespace").fields().name("testing").`type`()
+    val innerSchema = SchemaBuilder.record("Test").namespace("my.namespace").fields().name("testing").`type`()
       .unionOf().nullType().and().record("TestingInner").fields()
       .requiredInt("testInner").endRecord().endUnion().nullDefault().endRecord()
 
-    the[AvroTypeException] thrownBy """{"testing": {"my.namespace.TestingInner": 10}}""".
-      toGenericRecord(schema, useStrictValidation = true).get should have message "testInner -> Expected record-start. Got VALUE_NUMBER_INT"
+    val schema = SchemaBuilder.record("nested").fields()
+      .requiredString("testing2").name("nested").`type`(innerSchema).noDefault.endRecord()
+
+    val json = """{"testing2": "test", "nested": {"testing": {"my.namespace.TestingInner": {"testInner": "2020"}}}}"""
+
+    the[AvroTypeException] thrownBy json.
+      toGenericRecord(schema, useStrictValidation = true).get should have message "nested -> testInner -> Expected int. Got VALUE_STRING"
   }
 
   it should "not throw an AvroTypeException for union field with null value" in {
