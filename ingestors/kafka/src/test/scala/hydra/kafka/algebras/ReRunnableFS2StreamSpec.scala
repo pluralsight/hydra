@@ -58,4 +58,6 @@ object ReRunnableFS2StreamSpec {
   private val erroredStream = fs2.Stream.repeatEval(
     IO.raiseError(new RuntimeException("Expected error!"))
   )
+
+
 }
