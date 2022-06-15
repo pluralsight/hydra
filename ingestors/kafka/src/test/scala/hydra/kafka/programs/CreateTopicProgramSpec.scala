@@ -30,6 +30,7 @@ import hydra.kafka.IOSuite
 
 import scala.concurrent.ExecutionContext
 import hydra.kafka.model.TopicMetadataV2Request.NumPartitions
+import hydra.kafka.programs.CreateTopicProgram.MetadataOnlyTopicDoesNotExist
 import hydra.kafka.programs.TopicSchemaError._
 import org.apache.kafka.common.TopicPartition
 import org.scalatest.freespec.AsyncFreeSpec
@@ -1859,6 +1860,16 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         _  <- Resource.liftF(ts.program.createTopicFromMetadataOnly(subject, topicMetadataRequest))
       } yield succeed
     }
+
+    "throw error creating topic from metadata only where topic doesn't exist" in {
+      val result = for {
+        ts <- initTestServices()
+        _  <- ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(keySchema, valueSchema))
+      } yield ()
+
+      result.attempt.map(_ shouldBe MetadataOnlyTopicDoesNotExist(subject.value).asLeft)
+    }
+
 
     "throw error of schema nullable values don't have default value" in {
       val union = SchemaBuilder.unionOf().nullType().and().stringType().endUnion()
