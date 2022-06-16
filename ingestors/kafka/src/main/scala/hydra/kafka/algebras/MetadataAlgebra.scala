@@ -46,8 +46,8 @@ object MetadataAlgebra {
     }
     for {
       ref <- Ref[F].of(MetadataStorageFacade.empty)
-      _ <- Concurrent[F].start(metadataStream
-        .evalMap { case (key, value) =>
+      _ <- Concurrent[F].start(
+        metadataStream.evalMap { case (key, value) =>
           TopicMetadataV2.decode[F](key, value).flatMap { case (topicMetadataKey, topicMetadataValueOpt) =>
             topicMetadataValueOpt match {
               case Some(topicMetadataValue) =>
