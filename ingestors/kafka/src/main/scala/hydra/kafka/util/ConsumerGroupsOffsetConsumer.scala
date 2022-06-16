@@ -181,7 +181,7 @@ object ConsumerGroupsOffsetConsumer {
         )
       }
       .through(produce(producerSettings))
-      .makeRetryable(Infinite)(getErrorMessage)
+//      .makeRetryable(Infinite)(getErrorMessage)
       .compile.drain
   }
 
@@ -238,7 +238,7 @@ object ConsumerGroupsOffsetConsumer {
               hydraConsumerOffsetsOffsetsCache.update(_ + (partition -> (offset + 1L)))
           }.flatTap { _ => isComplete }
       }
-      .makeRetryable(Infinite)(getErrorMessage)
+//      .makeRetryable(Infinite)(getErrorMessage)
       .compile.drain
   }
 }
