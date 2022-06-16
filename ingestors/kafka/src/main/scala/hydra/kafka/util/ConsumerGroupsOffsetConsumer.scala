@@ -175,7 +175,7 @@ object ConsumerGroupsOffsetConsumer {
         )
       }
       .through(produce(producerSettings))
-      .makeRetryable(Infinite)(getErrorMessage)
+//      .makeRetryable(Infinite)(getErrorMessage)
       .compile.drain
   }
 
@@ -225,13 +225,15 @@ object ConsumerGroupsOffsetConsumer {
     } yield ()
 
     onStart *> dvsConsumerOffsetStream
+//      .attempt.collect { case Right(value) => value }
       .evalMap {
         case ((key, value, _), (partition, offset)) =>
           TopicConsumerOffset.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
             consumerOffsetsCache.update(_ + (topicKey.partition -> topicValue.get.offset)) *>
               hydraConsumerOffsetsOffsetsCache.update(_ + (partition -> (offset + 1L)))
           }.flatTap { _ => isComplete }
-      }.makeRetryable(Infinite)(getErrorMessage)
+      }
+//      .makeRetryable(Infinite)(getErrorMessage)
       .compile.drain
   }
 }

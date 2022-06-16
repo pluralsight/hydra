@@ -83,7 +83,7 @@ object TagsAlgebra {
         case e =>
           fs2.Stream.eval(Logger[F].error(s"Unexpected return from Kafka: ${e.toString()}"))
       }
-        .makeRetryable(Infinite, ref.update(_ => TagsStorageFacade.empty))("Error in TagsAlgebra")
+        .makeRetryable(Infinite)("Error in TagsAlgebra")
         .compile.drain)
       algebra <- getTagsAlgebra(ref, tagsTopic, kafkaClientAlgebra)
     } yield algebra

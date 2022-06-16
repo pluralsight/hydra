@@ -41,7 +41,7 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
   }
 
   //ttl was changed from 2 to 3 minutes in test purpose
-  private def getSchemaWrapper(subject: Subject, isKey: Boolean): F[SchemaWrapper] = memoizeF[F, SchemaWrapper](Some(2.minutes)) {
+  private def getSchemaWrapper(subject: Subject, isKey: Boolean): F[SchemaWrapper] = memoizeF[F, SchemaWrapper](Some(3.minutes)) {
     val suffix = if (isKey) "-key" else "-value"
     getSchema(subject.value + suffix).map { sch =>
       SchemaWrapper.from(sch)
