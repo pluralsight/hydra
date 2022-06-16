@@ -213,7 +213,7 @@ object ConsumerGroupsAlgebra {
         case e => Logger[F].error(e)(errorMessage)
       }
     }
-//      .makeRetryable(Infinite)(errorMessage)
+      .makeRetryable(Infinite)(errorMessage)
       .compile.drain
   }
 }
