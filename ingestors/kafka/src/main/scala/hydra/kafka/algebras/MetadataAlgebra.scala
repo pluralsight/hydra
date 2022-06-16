@@ -70,7 +70,7 @@ object MetadataAlgebra {
               Logger[F].warn(s"Error in metadata consumer $e")
           }
         }
-        .makeRetryable(Infinite)("Metadata consumer failed.")
+//        .makeRetryable(Infinite)("Metadata consumer failed.")
         .compile.drain)
       algebra <- getMetadataAlgebra[F](ref, schemaRegistryAlgebra)
     } yield algebra
