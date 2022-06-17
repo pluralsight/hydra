@@ -16,8 +16,6 @@
 
 package hydra.ingest.http
 
-import java.time.Instant
-
 import akka.actor._
 import akka.http.scaladsl.model.{HttpRequest, StatusCode, StatusCodes}
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
@@ -32,13 +30,13 @@ import hydra.core.marshallers.GenericError
 import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.core.protocol._
 import hydra.ingest.services.IngestionFlow.{AvroConversionAugmentedException, MissingTopicNameException, SchemaNotFoundAugmentedException}
-import hydra.ingest.services.IngestionFlowV2.V2IngestRequest
+import hydra.ingest.services.IngestionFlowV2.{KeyAndValueMismatchedValuesException, V2IngestRequest}
 import hydra.ingest.services.{IngestionFlow, IngestionFlowV2}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.AvroTypeException
 
-import scala.collection.immutable.Map
+import java.time.Instant
 import scala.util.{Failure, Success, Try}
 
 class IngestionEndpoint[F[_]: Futurable](
@@ -88,7 +86,7 @@ class IngestionEndpoint[F[_]: Futurable](
     case e: PublishError.RecordTooLarge => (StatusCodes.PayloadTooLarge, e.getMessage.some)
     case r: IngestionFlowV2.AvroConversionAugmentedException => (StatusCodes.BadRequest, r.message.some)
     case r: IngestionFlowV2.SchemaNotFoundAugmentedException => (StatusCodes.BadRequest, Try(r.schemaNotFoundException.getMessage).toOption)
-    case t: AvroTypeException => (StatusCodes.BadRequest, t.getMessage.some)
+    case t@(_: AvroTypeException | _: KeyAndValueMismatchedValuesException) => (StatusCodes.BadRequest, t.getMessage.some)
     case e => (StatusCodes.InternalServerError, Try(e.getMessage).toOption)
   }
 
