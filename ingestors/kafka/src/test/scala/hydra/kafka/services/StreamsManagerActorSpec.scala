@@ -67,7 +67,7 @@ class StreamsManagerActorSpec
 
   val schema = new Schema.Parser().parse(topicMetadataJson)
 
-  implicit val format = jsonFormat11(TopicMetadata)
+  implicit val format = jsonFormat12(TopicMetadata)
 
   val formatter = ISODateTimeFormat.basicDateTimeNoMillis()
 
@@ -101,7 +101,8 @@ class StreamsManagerActorSpec
        |	"contact": "slackity slack dont talk back",
        |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
        |	"notes": "here are some notes topkek",
-       |	"schemaId": $testSchemaId
+       |	"schemaId": $testSchemaId,
+       |  "notificationUrl": "notification.url"
        |}""".stripMargin.parseJson
       .convertTo[TopicMetadata]
       TopicMetadataMessage("exp.assessment.SkillAssessmentTopicsScored", Some(tm))
@@ -223,7 +224,8 @@ class StreamsManagerActorSpec
          |	"contact": "slackity slack dont talk back",
          |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
          |	"notes": "here are some notes topkek",
-         |	"schemaId": $schemaWKeyId
+         |	"schemaId": $schemaWKeyId,
+         |  "notificationUrl": "notification.url"
          |}""".stripMargin.parseJson
         .convertTo[TopicMetadata]
 
@@ -279,7 +281,8 @@ class StreamsManagerActorSpec
          |	"contact": "slackity slack dont talk back",
          |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
          |	"notes": "here are some notes topkek",
-         |	"schemaId": $schemaWKeyId
+         |	"schemaId": $schemaWKeyId,
+         |  "notificationUrl": "notification.url"
          |}""".stripMargin.parseJson
         .convertTo[TopicMetadata]
 
@@ -316,7 +319,8 @@ class StreamsManagerActorSpec
          |	"contact": "slackity slack dont talk back",
          |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
          |	"notes": "here are some notes topkek",
-         |	"schemaId": 1
+         |	"schemaId": 1,
+         |  "notificationUrl": "notification.url"
          |}""".stripMargin.parseJson
       .convertTo[TopicMetadata]
     val probe = TestProbe()
@@ -339,7 +343,8 @@ class StreamsManagerActorSpec
          |	"contact": "slackity slack dont talk back",
          |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
          |	"notes": "here are some notes topkek",
-         |	"schemaId": 1
+         |	"schemaId": 1,
+         |  "notificationUrl": "notification.url"
          |}""".stripMargin.parseJson
       .convertTo[TopicMetadata]
     val probe = TestProbe()
@@ -372,7 +377,8 @@ class StreamsManagerActorSpec
                            |	"contact": "slackity slack dont talk back",
                            |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
                            |	"notes": "here are some notes topkek",
-                           |	"schemaId": 1
+                           |	"schemaId": 1,
+                           |  "notificationUrl": "notification.url"
                            |}""".stripMargin.parseJson
       .convertTo[TopicMetadata]
     val probe = TestProbe()

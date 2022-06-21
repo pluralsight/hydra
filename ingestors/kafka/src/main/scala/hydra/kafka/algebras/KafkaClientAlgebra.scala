@@ -16,8 +16,8 @@ import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
 import org.slf4j.LoggerFactory
-import scala.util.{Left, Right, Either}
 
+import scala.util.{Either, Left, Right}
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
@@ -77,6 +77,11 @@ trait KafkaClientAlgebra[F[_]] {
                                    ConsumerGroup,
                                    commitOffsets: Boolean)
   : fs2.Stream[F, Either[Throwable, (Record, (Partition, Offset))]]
+
+  def consumeSafelyStringKeyMessagesWithOffsetInfo(
+                                                    topicName: TopicName,
+                                                    consumerGroup: ConsumerGroup,
+                                                    commitOffsets: Boolean): fs2.Stream[F, Either[Throwable, (StringRecord, (Partition, Offset))]]
 
   /**
    * Consume the Hydra record from Kafka with Partition and Offset Info.
@@ -310,6 +315,10 @@ object KafkaClientAlgebra {
           .evalMap(Sync[F].fromEither(_))
       }
 
+      override def consumeSafelyStringKeyMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, Either[Throwable, (StringRecord, (Partition, Offset))]] = {
+        consumeMessages[Option[String]](getStringKeyDeserializer, consumerGroup, topicName, commitOffsets)
+      }
+
       override def consumeSafelyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, Either[Throwable, (GenericRecord, Option[GenericRecord], Option[Headers])]] = {
         consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets)
           .map(_.map(_._1))
@@ -506,6 +515,9 @@ object KafkaClientAlgebra {
         }
       }
     }
+
+    override def consumeSafelyStringKeyMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean)
+    : fs2.Stream[F, Either[Throwable, (StringRecord, (Partition, Offset))]] = ???
 
     override def consumeSafelyWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean)
     : fs2.Stream[F, Either[Throwable, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset))]] = ???

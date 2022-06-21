@@ -163,7 +163,8 @@ object StreamsManagerActor {
             Try(Option(record.get("additionalDocumentation"))).toOption.flatten.map(_.toString),
             Try(Option(record.get("notes"))).toOption.flatten.map(_.toString),
             UUID.fromString(record.get("id").toString),
-            formatter.parseDateTime(record.get("createdDate").toString)
+            formatter.parseDateTime(record.get("createdDate").toString),
+            Try(Option(record.get("notificationUrl"))).toOption.flatten.map(_.toString)
           )
         }
         TopicMetadataMessage(msg.key, topicMetadata)

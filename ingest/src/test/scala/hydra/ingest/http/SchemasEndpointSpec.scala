@@ -54,13 +54,14 @@ class SchemasEndpointSpec
         1234,
         "History",
         false,
-        Option(false),
+        Some(false),
         "Public",
         "test_contact",
-        Option("test_additionalDocumentation"),
-        Option("test_notes"),
+        Some("test_additionalDocumentation"),
+        Some("test_notes"),
         UUID.randomUUID(),
-        org.joda.time.DateTime.now
+        org.joda.time.DateTime.now,
+        Some("notification.url")
       )
   }
 

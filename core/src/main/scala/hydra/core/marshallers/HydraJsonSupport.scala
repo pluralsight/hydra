@@ -158,7 +158,7 @@ trait HydraJsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
   implicit val genericErrorFormat = jsonFormat2(GenericError)
 
-  implicit val topicCreationMetadataFormat = jsonFormat8(TopicMetadataRequest)
+  implicit val topicCreationMetadataFormat = jsonFormat9(TopicMetadataRequest)
 
   implicit val genericSchemaFormat = jsonFormat2(GenericSchema)
 
@@ -174,7 +174,8 @@ case class TopicMetadataRequest(
     dataClassification: String,
     contact: String,
     additionalDocumentation: Option[String],
-    notes: Option[String]
+    notes: Option[String],
+    notificationUrl: Option[String]
 )
 
 case class GenericSchema(name: String, namespace: String) {

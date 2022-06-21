@@ -401,7 +401,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           ), "myPass").route
         Delete("/v2/topics/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
-          responseAs[String] shouldBe """{"clientError":[],"serverError":[{"message":"Unable to delete schemas for exp.blah.blah-value java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-value"}],"success":[{"responseCode":200,"topicOrSubject":"exp.blah.blah"}]}"""
+          responseAs[String] shouldBe """{"clientError":[],"serverError":[{"message":"Unable to delete schemas for exp.blah.blah-value. If this is a V1 topic, a key schema deletion error is normal. java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-value"}],"success":[{"responseCode":200,"topicOrSubject":"exp.blah.blah"}]}"""
           status shouldBe StatusCodes.MultiStatus
         }
       }).unsafeRunSync()
@@ -434,7 +434,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           ), "myPass").route
         Delete("/v2/topics/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
-          responseAs[String] shouldBe """{"clientError":[],"serverError":[{"message":"Unable to delete schemas for exp.blah.blah-key java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-key"},{"message":"Unable to delete schemas for exp.blah.blah-value java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-value"}],"success":[{"responseCode":200,"topicOrSubject":"exp.blah.blah"}]}"""
+          responseAs[String] shouldBe """{"clientError":[],"serverError":[{"message":"Unable to delete schemas for exp.blah.blah-key. If this is a V1 topic, a key schema deletion error is normal. java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-key"},{"message":"Unable to delete schemas for exp.blah.blah-value. If this is a V1 topic, a key schema deletion error is normal. java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-value"}],"success":[{"responseCode":200,"topicOrSubject":"exp.blah.blah"}]}"""
           status shouldBe StatusCodes.MultiStatus
         }
       }).unsafeRunSync()
@@ -467,7 +467,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           ), "myPass").route
         Delete("/v2/topics/schemas/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
-          responseAs[String] shouldBe """{"clientError":[{"message":"Unable to delete schemas for exp.blah.blah-value java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-value"}],"serverError":[],"success":[]}"""
+          responseAs[String] shouldBe """{"clientError":[{"message":"Unable to delete schemas for exp.blah.blah-value. If this is a V1 topic, a key schema deletion error is normal. java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-value"}],"serverError":[],"success":[]}"""
           status shouldBe StatusCodes.MultiStatus
         }
       }).unsafeRunSync()
@@ -500,7 +500,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
           ), "myPass").route
         Delete("/v2/topics/schemas/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
-          responseAs[String] shouldBe """{"clientError":[{"message":"Unable to delete schemas for exp.blah.blah-key java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-key"},{"message":"Unable to delete schemas for exp.blah.blah-value java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-value"}],"serverError":[],"success":[]}"""
+          responseAs[String] shouldBe """{"clientError":[{"message":"Unable to delete schemas for exp.blah.blah-key. If this is a V1 topic, a key schema deletion error is normal. java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-key"},{"message":"Unable to delete schemas for exp.blah.blah-value. If this is a V1 topic, a key schema deletion error is normal. java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-value"}],"serverError":[],"success":[]}"""
           status shouldBe StatusCodes.InternalServerError
         }
       }).unsafeRunSync()
