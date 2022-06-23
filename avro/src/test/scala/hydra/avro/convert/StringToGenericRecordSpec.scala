@@ -2,8 +2,7 @@ package hydra.avro.convert
 
 import java.time.Instant
 import java.util.UUID
-
-import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
+import org.apache.avro.{AvroTypeException, LogicalTypes, Schema, SchemaBuilder}
 import org.apache.avro.util.Utf8
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -211,5 +210,56 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     val record = json.toGenericRecord(schema, useStrictValidation = true)
     import collection.JavaConverters._
     record.get.get("testing") shouldBe Map("one" -> 1, "two" -> 2, "three" -> 3).map(kv => new Utf8(kv._1) -> kv._2).asJava
+  }
+
+  it should "throw an AvroTypeException for field testInner with unexpected value" in {
+    val inner = SchemaBuilder.record("Test").fields()
+      .requiredInt("testInner2").endRecord()
+    val inner2 = SchemaBuilder.record("Test").fields()
+      .name("testInner").`type`(inner).noDefault.endRecord()
+    val schema = SchemaBuilder.record("Test").fields()
+      .requiredString("testing").name("nested").`type`(inner2).noDefault.endRecord()
+
+    the[AvroTypeException] thrownBy """{"testing": "test", "nested": {"testInner": {"testInner2" : "10"}}}""".
+      toGenericRecord(schema, useStrictValidation = true).get should have message "nested -> testInner -> testInner2 -> Expected int. Got VALUE_STRING"
+  }
+
+  it should "throw an AvroTypeException for union field with unexpected value" in {
+    val innerSchema = SchemaBuilder.record("Test").namespace("my.namespace").fields().name("testing").`type`()
+      .unionOf().nullType().and().record("TestingInner").fields()
+      .requiredInt("testInner").endRecord().endUnion().nullDefault().endRecord()
+
+    val schema = SchemaBuilder.record("nested").fields()
+      .requiredString("testing2").name("nested").`type`(innerSchema).noDefault.endRecord()
+
+    val json = """{"testing2": "test", "nested": {"testing": {"my.namespace.TestingInner": {"testInner": "2020"}}}}"""
+
+    the[AvroTypeException] thrownBy json.
+      toGenericRecord(schema, useStrictValidation = true).get should have message "nested -> testInner -> Expected int. Got VALUE_STRING"
+
+    the[AvroTypeException] thrownBy """{"testing": {"my.namespace.TestingInner": {"testInner": "2020"}}}""".
+      toGenericRecord(innerSchema, useStrictValidation = true).get should have message "testInner -> Expected int. Got VALUE_STRING"
+  }
+
+  it should "not throw an AvroTypeException for union field with null value" in {
+    val schema = SchemaBuilder.record("Test").namespace("my.namespace").fields().name("testing").`type`()
+      .unionOf().nullType().and().record("TestingInner").fields()
+      .requiredInt("testInner").endRecord().endUnion().nullDefault().endRecord()
+
+    val record = """{"testing": {"my.namespace.TestingInner": {"testInner": 2020}}}""".toGenericRecord(schema, useStrictValidation = true)
+    record shouldBe a[Success[_]]
+  }
+
+  it should "throw an AvroTypeException for field with logical type and unexpected value" in {
+    val ts = Instant.now
+    val schema = SchemaBuilder.record("testVal")
+      .fields()
+      .name("testTs")
+      .`type`(LogicalTypes.timestampMillis.addToSchema(Schema.create(Schema.Type.LONG)))
+      .noDefault
+      .endRecord
+
+    the[AvroTypeException] thrownBy s"""{"testTs": "hi"}""".
+      toGenericRecord(schema, useStrictValidation = true).get should have message "testTs -> Expected long. Got VALUE_STRING"
   }
 }
