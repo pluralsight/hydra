@@ -11,7 +11,9 @@ import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.algebras.ConsumerGroupsAlgebra.PartitionOffsetMap
 import hydra.kafka.algebras.KafkaClientAlgebra.{OffsetInfo, Record}
-import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
+import hydra.kafka.algebras.RetryableFs2Stream.ReRunnableStreamAdder
+import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Infinite
+import hydra.kafka.algebras.{ConsumerGroupsStorageFacade, KafkaAdminAlgebra, KafkaClientAlgebra}
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
 import hydra.kafka.model.TopicConsumerOffset.{TopicConsumerOffsetKey, TopicConsumerOffsetValue}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -31,6 +33,10 @@ import scala.util.Try
 object ConsumerGroupsOffsetConsumer {
 
   var myMap = (0 to 50).map((_, 0L)).toMap
+
+  private val getErrorMessage: String =
+    "Error in ConsumerGroupsOffsetConsumer"
+
 
   def start[F[_]: ContextShift: ConcurrentEffect: Timer: Logger](
                                                                   kafkaClientAlgebra: KafkaClientAlgebra[F],
@@ -169,11 +175,7 @@ object ConsumerGroupsOffsetConsumer {
         )
       }
       .through(produce(producerSettings))
-      .recoverWith{
-        case e =>
-          logStreamError(e) *>
-            fs2.Stream.empty
-      }
+      .makeRetryable(Infinite)(getErrorMessage)
       .compile.drain
   }
 
@@ -203,12 +205,6 @@ object ConsumerGroupsOffsetConsumer {
     }
   }
 
-
-  private def logStreamError[F[_]: Logger](e: Throwable): fs2.Stream[F, Unit] = {
-    val errorMessage = s"Error in ConsumerGroupsOffsetConsumer Error: ${e.getMessage}"
-    fs2.Stream.eval(Logger[F].error(e)(errorMessage))
-  }
-
   private[kafka] def getOffsetsToSeekTo[F[_]: ConcurrentEffect: Logger](
                                                                  consumerOffsetsCache: Ref[F, PartitionOffsetMap],
                                                                  deferred: Deferred[F, PartitionOffsetMap],
@@ -229,16 +225,14 @@ object ConsumerGroupsOffsetConsumer {
     } yield ()
 
     onStart *> dvsConsumerOffsetStream
-      .attempt.collect { case Right(value) => value }
       .evalMap {
         case ((key, value, _), (partition, offset)) =>
           TopicConsumerOffset.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
             consumerOffsetsCache.update(_ + (topicKey.partition -> topicValue.get.offset)) *>
               hydraConsumerOffsetsOffsetsCache.update(_ + (partition -> (offset + 1L)))
           }.flatTap { _ => isComplete }
-      }.recoverWith {
-      case e =>
-        logStreamError(e) *> fs2.Stream.empty
-    }.compile.drain
+      }
+      .makeRetryable(Infinite)(getErrorMessage)
+      .compile.drain
   }
 }

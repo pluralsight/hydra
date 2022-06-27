@@ -6,6 +6,8 @@ import cats.syntax.all._
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.algebras.KafkaClientAlgebra.ConsumerGroup
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
+import hydra.kafka.algebras.RetryableFs2Stream.ReRunnableStreamAdder
+import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Infinite
 import hydra.kafka.model.TopicMetadataV2.MetadataAvroSchemaFailure
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Value}
@@ -44,9 +46,8 @@ object MetadataAlgebra {
     }
     for {
       ref <- Ref[F].of(MetadataStorageFacade.empty)
-      _ <- Concurrent[F].start(metadataStream
-        .evalMap { case (key, value) =>
-
+      _ <- Concurrent[F].start(
+        metadataStream.evalMap { case (key, value) =>
           TopicMetadataV2.decode[F](key, value).flatMap { case (topicMetadataKey, topicMetadataValueOpt) =>
             topicMetadataValueOpt match {
               case Some(topicMetadataValue) =>
@@ -65,13 +66,12 @@ object MetadataAlgebra {
                 ref.update(_.removeMetadata(topicMetadataKey))
             }
           }.recoverWith {
-          case e: MetadataAvroSchemaFailure =>
-            Logger[F].warn(s"Error in metadata consumer $e")
+            case e: MetadataAvroSchemaFailure =>
+              Logger[F].warn(s"Error in metadata consumer $e")
+          }
         }
-      }.onError{
-        case error =>
-          fs2.Stream.eval(Logger[F].error(error)(s"Metadata consumer failed."))
-      }.compile.drain)
+//        .makeRetryable(Infinite)("Metadata consumer failed.")
+        .compile.drain)
       algebra <- getMetadataAlgebra[F](ref, schemaRegistryAlgebra)
     } yield algebra
   }

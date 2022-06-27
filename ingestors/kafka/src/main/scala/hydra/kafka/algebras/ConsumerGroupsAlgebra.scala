@@ -1,31 +1,39 @@
 package hydra.kafka.algebras
 
-import cats.ApplicativeError
-import java.time.Instant
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
 import cats.implicits._
-import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
-import hydra.kafka.algebras.ConsumerGroupsAlgebra.{Consumer, ConsumerTopics, DetailedConsumerGroup, DetailedTopicConsumers, PartitionOffset, TopicConsumers}
+import hydra.kafka.algebras.ConsumerGroupsAlgebra._
 import hydra.kafka.algebras.KafkaClientAlgebra.Record
+import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Infinite
+import hydra.kafka.algebras.RetryableFs2Stream._
 import hydra.kafka.model.TopicConsumer
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.serializers.TopicMetadataV2Parser.IntentionallyUnimplemented
 import hydra.kafka.util.ConsumerGroupsOffsetConsumer
 import io.chrisdavenport.log4cats.Logger
-import org.apache.avro.generic.GenericRecord
+
+import java.time.Instant
 
 trait ConsumerGroupsAlgebra[F[_]] {
   def getConsumersForTopic(topicName: String): F[TopicConsumers]
+
   def getTopicsForConsumer(consumerGroupName: String): F[ConsumerTopics]
+
   def getAllConsumers: F[List[ConsumerTopics]]
+
   def getAllConsumersByTopic: F[List[TopicConsumers]]
+
   def startConsumer: F[Unit]
-  def getDetailedConsumerInfo(consumerGroupName: String) : F[List[DetailedConsumerGroup]]
+
+  def getDetailedConsumerInfo(consumerGroupName: String): F[List[DetailedConsumerGroup]]
+
   def getConsumerActiveState(consumerGroupName: String): F[String]
+
   def consumerGroupIsActive(str: String): F[(Boolean, String)]
+
   def getUniquePerNodeConsumerGroup: String
 }
 
@@ -88,28 +96,32 @@ object TestConsumerGroupsAlgebra {
 object ConsumerGroupsAlgebra {
 
   type PartitionOffsetMap = Map[Int, Long]
+
   final case class PartitionOffset(partition: Int, groupOffset: Long, largestOffset: Long, partitionLag: Long)
 
   final case class TopicConsumers(topicName: String, consumers: List[Consumer])
+
   final case class DetailedTopicConsumers(topicName: String, consumers: List[DetailedConsumerGroup])
+
   final case class Consumer(consumerGroupName: String, lastCommit: Instant, state: Option[String] = None)
 
   final case class ConsumerTopics(consumerGroupName: String, topics: List[DetailedConsumerGroup])
+
   final case class DetailedConsumerGroup(topicName: String, consumerGroupName: String, lastCommit: Instant,
                                          offsetInformation: List[PartitionOffset] = List.empty, totalLag: Option[Long] = None, state: Option[String] = None)
 
-  def make[F[_]: ContextShift: ConcurrentEffect: Timer: Logger](
-                                                                 kafkaInternalTopic: String,
-                                                                 dvsConsumersTopic: Subject,
-                                                                 consumerOffsetsOffsetsTopicConfig: Subject, // __consumer_offsets is the internal kafka topic we're reading off of
-                                                                 bootstrapServers: String,
-                                                                 uniquePerNodeConsumerGroup: String,
-                                                                 commonConsumerGroup: String,
-                                                                 kafkaClientAlgebra: KafkaClientAlgebra[F],
-                                                                 kAA: KafkaAdminAlgebra[F],
-                                                                 sra: SchemaRegistry[F]): F[ConsumerGroupsAlgebra[F]] = {
+  def make[F[_] : ContextShift : ConcurrentEffect : Timer : Logger](
+                                                                     kafkaInternalTopic: String,
+                                                                     dvsConsumersTopic: Subject,
+                                                                     consumerOffsetsOffsetsTopicConfig: Subject, // __consumer_offsets is the internal kafka topic we're reading off of
+                                                                     bootstrapServers: String,
+                                                                     uniquePerNodeConsumerGroup: String,
+                                                                     commonConsumerGroup: String,
+                                                                     kafkaClientAlgebra: KafkaClientAlgebra[F],
+                                                                     kAA: KafkaAdminAlgebra[F],
+                                                                     sra: SchemaRegistry[F]): F[ConsumerGroupsAlgebra[F]] = {
 
-    val dvsConsumersStream: fs2.Stream[F, (GenericRecord, Option[GenericRecord], Option[Headers])] = {
+    val dvsConsumersStream: fs2.Stream[F, Record] = {
       kafkaClientAlgebra.consumeSafelyMessages(dvsConsumersTopic.value, uniquePerNodeConsumerGroup, commitOffsets = false)
         //Ignore records with errors
         .collect { case Right(value) => value }
@@ -123,14 +135,14 @@ object ConsumerGroupsAlgebra {
         consumerGroupsStorageFacade.get.flatMap(a => addStateToTopicConsumers(a.getConsumersForTopicName(topicName)))
 
       private def addStateToTopicConsumers(topicConsumers: TopicConsumers): F[TopicConsumers] = {
-        val detailedF: F[List[Consumer]] = topicConsumers.consumers.traverse{ consumer =>
+        val detailedF: F[List[Consumer]] = topicConsumers.consumers.traverse { consumer =>
           val fState = getConsumerActiveState(consumer.consumerGroupName)
           fState.map { state =>
             Consumer(consumer.consumerGroupName,
               consumer.lastCommit, state = Some(state))
           }
         }
-        detailedF.map{detailed =>
+        detailedF.map { detailed =>
           TopicConsumers(topicConsumers.topicName, detailed)
         }
       }
@@ -145,7 +157,8 @@ object ConsumerGroupsAlgebra {
         for {
           _ <- Concurrent[F].start(consumeDVSConsumersTopicIntoCache(dvsConsumersStream, consumerGroupsStorageFacade))
           _ <- Concurrent[F].start {
-            ConsumerGroupsOffsetConsumer.start(kafkaClientAlgebra, kAA, sra, uniquePerNodeConsumerGroup, consumerOffsetsOffsetsTopicConfig, kafkaInternalTopic, dvsConsumersTopic, bootstrapServers, commonConsumerGroup)
+            ConsumerGroupsOffsetConsumer.start(kafkaClientAlgebra, kAA, sra, uniquePerNodeConsumerGroup,
+              consumerOffsetsOffsetsTopicConfig, kafkaInternalTopic, dvsConsumersTopic, bootstrapServers, commonConsumerGroup)
           }
         } yield ()
       }
@@ -167,11 +180,9 @@ object ConsumerGroupsAlgebra {
       }
 
       override def getConsumerActiveState(consumerGroupName: String): F[String] = {
-        kAA.describeConsumerGroup(consumerGroupName).map { detailed =>
-          detailed match {
-            case Some(value) => value.state().toString
-            case None => "Unknown"
-          }
+        kAA.describeConsumerGroup(consumerGroupName).map {
+          case Some(value) => value.state().toString
+          case None => "Unknown"
         }
       }
 
@@ -183,29 +194,27 @@ object ConsumerGroupsAlgebra {
     }
   }
 
-  private def consumeDVSConsumersTopicIntoCache[F[_]: ContextShift: ConcurrentEffect: Timer: Logger](
-                                                                                                      dvsConsumersStream: fs2.Stream[F, Record],
-                                                                                                      consumerGroupsStorageFacade: Ref[F, ConsumerGroupsStorageFacade]
-                                                                                                    ): F[Unit] = {
-    def recover(e: Throwable): F[Unit] = {
-      val errorMessage = s"Error in ConsumergroupsAlgebra. Error: ${e.getMessage}"
-      val throwable = new Throwable(errorMessage)
-      Logger[F].error(e)(errorMessage) *>
-      ApplicativeError[F, Throwable].raiseError(throwable)
-    }
-    dvsConsumersStream.evalMap { case (key, value, _) =>
-      TopicConsumer.decode[F](key, value).flatMap { case (topicKey, topicValue) =>
-        topicValue match {
-          case Some(tV) =>
-            consumerGroupsStorageFacade.update(_.addConsumerGroup(topicKey, tV))
-          case None =>
-            consumerGroupsStorageFacade.update(_.removeConsumerGroup(topicKey))
-        }
+  private def consumeDVSConsumersTopicIntoCache[F[_] : ContextShift : ConcurrentEffect : Timer : Logger](
+                                                                                                          dvsConsumersStream: fs2.Stream[F, Record],
+                                                                                                          consumerGroupsStorageFacade: Ref[F, ConsumerGroupsStorageFacade]
+                                                                                                        ): F[Unit] = {
+    val errorMessage = "Error in ConsumergroupsAlgebra consumer"
+
+    dvsConsumersStream.evalTap { case (key, value, _) =>
+      TopicConsumer.decode[F](key, value).flatMap {
+        case (topicKey, topicValue) =>
+          topicValue match {
+            case Some(tV) =>
+              consumerGroupsStorageFacade.update(_.addConsumerGroup(topicKey, tV))
+            case None =>
+              consumerGroupsStorageFacade.update(_.removeConsumerGroup(topicKey))
+          }
       }.recoverWith {
-        case e =>
-          recover(e)
+        case e => Logger[F].error(e)(errorMessage)
       }
-    }.compile.drain
+    }
+      .makeRetryable(Infinite)(errorMessage)
+      .compile.drain
   }
 }
 
