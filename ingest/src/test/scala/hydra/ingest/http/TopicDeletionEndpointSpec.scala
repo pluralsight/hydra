@@ -10,6 +10,8 @@ import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.avro.util.SchemaWrapper
+import hydra.common.NotificationsTestSuite
+import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.common.config.KafkaConfigUtils.{KafkaClientSecurityConfig, kafkaSecurityEmptyConfig}
 import hydra.ingest.programs.TopicDeletionProgram
 import hydra.kafka.algebras.KafkaAdminAlgebra._
@@ -30,7 +32,7 @@ import scala.concurrent.ExecutionContext
 
 
 
-class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with ScalatestRouteTest{
+class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with ScalatestRouteTest with NotificationsTestSuite{
   implicit private val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
   private val v2MetadataTopicName = Subject.createValidated("_test.V2.MetadataTopic").get
@@ -138,6 +140,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
   def getConsumerAlgebra(kafkaClientAlgebra: KafkaClientAlgebra[IO],
                          kafkaAdminAlgebra: KafkaAdminAlgebra[IO],
                          schemaAlgebra: SchemaRegistry[IO]): IO[ConsumerGroupsAlgebra[IO]] = {
+    implicit val notificationSenderMock: InternalNotificationSender[IO] = getInternalNotificationSenderMock[IO]
     ConsumerGroupsAlgebra.make("",Subject.createValidated("dvs.blah.blah").get,
       Subject.createValidated("dvs.heyo.blah").get,"","","",
       kafkaClientAlgebra,kafkaAdminAlgebra,schemaAlgebra, kafkaSecurityEmptyConfig)
@@ -153,7 +156,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
-        metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = false)
+        metadataAlgebra <- makeMetadataAlgebra(kafkaClientAlgebra, schemaAlgebra, false)
         consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t.toString,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
@@ -187,7 +190,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
-        metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        metadataAlgebra <- makeMetadataAlgebra(kafkaClientAlgebra, schemaAlgebra)
         consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
@@ -220,7 +223,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
-        metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        metadataAlgebra <- makeMetadataAlgebra(kafkaClientAlgebra, schemaAlgebra)
         consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
@@ -251,7 +254,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         kafkaAlgebra <- kafkaBadTest[IO]
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
-        metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        metadataAlgebra <- makeMetadataAlgebra(kafkaClientAlgebra, schemaAlgebra)
         consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
@@ -282,7 +285,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
-        metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        metadataAlgebra <- makeMetadataAlgebra(kafkaClientAlgebra, schemaAlgebra)
         consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
@@ -315,7 +318,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
-        metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        metadataAlgebra <- makeMetadataAlgebra(kafkaClientAlgebra, schemaAlgebra)
         consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
@@ -348,7 +351,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
-        metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        metadataAlgebra <- makeMetadataAlgebra(kafkaClientAlgebra, schemaAlgebra)
         consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
@@ -381,7 +384,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- schemaBadTest[IO](true, false)
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
-        metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        metadataAlgebra <- makeMetadataAlgebra(kafkaClientAlgebra, schemaAlgebra)
         consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
@@ -414,7 +417,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- schemaBadTest[IO](false, true)
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
-        metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        metadataAlgebra <- makeMetadataAlgebra(kafkaClientAlgebra, schemaAlgebra)
         consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
@@ -447,7 +450,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- schemaBadTest[IO](true, false)
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
-        metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        metadataAlgebra <- makeMetadataAlgebra(kafkaClientAlgebra, schemaAlgebra)
         consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
@@ -480,7 +483,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- schemaBadTest[IO](false, true)
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
-        metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        metadataAlgebra <- makeMetadataAlgebra(kafkaClientAlgebra, schemaAlgebra)
         consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
         _ <- topic.traverse(t => kafkaAlgebra.createTopic(t,TopicDetails(1,1,1)))
         _ <- registerTopics(topic, schemaAlgebra, registerKey = false, upgrade = false)
@@ -513,7 +516,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         kafkaAlgebra <- KafkaAdminAlgebra.test[IO]()
         schemaAlgebra <- SchemaRegistry.test[IO]
         kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
-        metadataAlgebra <- MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaAlgebra, consumeMetadataEnabled = true)
+        metadataAlgebra <- makeMetadataAlgebra(kafkaClientAlgebra, schemaAlgebra)
         consumerGroupAlgebra <- getConsumerAlgebra(kafkaClientAlgebra,kafkaAlgebra,schemaAlgebra)
       } yield {
         val route = new TopicDeletionEndpoint[IO](
@@ -535,6 +538,11 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
         }
       }).unsafeRunSync()
     }
+  }
+
+  def makeMetadataAlgebra(kafkaClientAlgebra: KafkaClientAlgebra[IO], schemaRegistry: SchemaRegistry[IO], consumerMetadataEnabled: Boolean = true): IO[MetadataAlgebra[IO]] = {
+    implicit val notificationSenderMock: InternalNotificationSender[IO] = getInternalNotificationSenderMock[IO]
+    MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaRegistry, consumerMetadataEnabled)
   }
 
 }

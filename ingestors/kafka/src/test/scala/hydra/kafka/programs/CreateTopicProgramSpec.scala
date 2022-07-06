@@ -39,7 +39,7 @@ import org.scalatest.freespec.AsyncFreeSpec
 
 import scala.jdk.CollectionConverters.collectionAsScalaIterableConverter
 
-class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
+class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite with NotificationsTestSuite {
   import CreateTopicProgramSpec._
 
   "CreateTopicSpec" - {

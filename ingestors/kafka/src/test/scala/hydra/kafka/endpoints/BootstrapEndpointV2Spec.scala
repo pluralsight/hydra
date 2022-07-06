@@ -1,6 +1,5 @@
 package hydra.kafka.endpoints
 
-import java.time.Instant
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, MediaTypes, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
@@ -8,12 +7,16 @@ import cats.data.NonEmptyList
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
-import hydra.kafka.algebras.{HydraTag, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TagsAlgebra}
+import hydra.common.NotificationsTestSuite
+import hydra.common.alerting.sender.InternalNotificationSender
+import hydra.core.http.CorsSupport
+import hydra.kafka.algebras._
 import hydra.kafka.model.ContactMethod.{Email, Slack}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
-import hydra.kafka.programs.{CreateTopicProgram, KeyAndValueSchemaV2Validator}
+import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.serializers.TopicMetadataV2Parser
+import hydra.kafka.serializers.TopicMetadataV2Parser._
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -23,11 +26,8 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import retry.{RetryPolicies, RetryPolicy}
 import spray.json._
-import TopicMetadataV2Parser._
-import hydra.common.NotificationsTestSuite
-import hydra.common.alerting.sender.InternalNotificationSender
-import hydra.core.http.CorsSupport
 
+import java.time.Instant
 import scala.concurrent.ExecutionContext
 
 final class BootstrapEndpointV2Spec
