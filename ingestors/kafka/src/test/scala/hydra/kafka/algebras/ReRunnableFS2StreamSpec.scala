@@ -44,7 +44,7 @@ class ReRunnableFS2StreamSpec
     def retryableStreamForTest[O](stream: fs2.Stream[IO, O], retryPolicy: RetryPolicy): IO[Ref[IO, Int]] =
       for {
         retryRef <- Ref.of[IO, Int](0)
-        _ <- stream.makeRetryable(retryPolicy, _ => retryRef.update(_ + 1))
+        _ <- stream.makeRetryable(retryPolicy, "Test Consumer Name", _ => retryRef.update(_ + 1))
           .compile.drain
       } yield retryRef
 

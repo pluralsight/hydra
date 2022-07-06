@@ -49,7 +49,9 @@ object RetryableFs2Stream {
     /**
       * Reruns fs2 Streams when it accidentally or successfully stops
       */
-    def makeRetryable(retryPolicy: RetryPolicy = Zero, onReRunAction: Option[Throwable] => F[Unit] = (_) => Sync[F].unit): fs2.Stream[F, O] = {
+    def makeRetryable(retryPolicy: RetryPolicy = Zero,
+                      streamName: String,
+                      onReRunAction: Option[Throwable] => F[Unit] = (_) => Sync[F].unit): fs2.Stream[F, O] = {
       def doOnRerun(error: Option[Throwable]) =
         if (retryPolicy.count != 0) {
           onReRunAction(error)
@@ -59,10 +61,10 @@ object RetryableFs2Stream {
 
       stream.onFinalizeCase {
         case Completed | Canceled =>
-          Logger[F].error(s"Consumer Stream finished unexpectedly. Stream will be restarted due to RetryPolicy: $retryPolicy") *>
+          Logger[F].error(s"`$streamName` Stream finished unexpectedly. Stream will be restarted due to RetryPolicy: $retryPolicy") *>
             doOnRerun(None)
         case Error(error) =>
-          Logger[F].error(error)(s"Stream will be restarted due to RetryPolicy: $retryPolicy") *>
+          Logger[F].error(error)(s"`$streamName` Stream will be restarted due to RetryPolicy: $retryPolicy") *>
             doOnRerun(error.some)
       }
         .attempt
@@ -79,7 +81,7 @@ object RetryableFs2Stream {
 
     def makeRetryableWithNotification(retryPolicy: RetryPolicy = Zero, streamName: String)
                                      (implicit internalNotificationSender: InternalNotificationSender[F], monad: Monad[F]): fs2.Stream[F, O] =
-      makeRetryable(retryPolicy, sendNotificationOnRetry[F](streamName))
+      makeRetryable(retryPolicy, streamName, sendNotificationOnRetry[F](streamName))
   }
 
   private def sendNotificationOnRetry[F[_] : Monad](streamName: String)
