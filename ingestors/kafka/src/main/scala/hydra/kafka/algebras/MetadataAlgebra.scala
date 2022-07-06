@@ -4,6 +4,10 @@ import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, Sync}
 import cats.syntax.all._
 import hydra.avro.registry.SchemaRegistry
+import hydra.common.alerting.AlertProtocol.NotificationMessage
+import hydra.common.alerting.NotificationLevel
+import hydra.common.alerting.sender.InternalNotificationSender
+import hydra.kafka.algebras.HydraTag.StringJsonFormat
 import hydra.kafka.algebras.KafkaClientAlgebra.ConsumerGroup
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.algebras.RetryableFs2Stream.ReRunnableStreamAdder
@@ -14,6 +18,8 @@ import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Va
 import org.typelevel.log4cats.Logger
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
+
+import scala.language.higherKinds
 
 
 trait MetadataAlgebra[F[_]] {
@@ -36,7 +42,7 @@ object MetadataAlgebra {
                                             kafkaClientAlgebra: KafkaClientAlgebra[F],
                                             schemaRegistryAlgebra: SchemaRegistry[F],
                                             consumeMetadataEnabled: Boolean
-                                          ): F[MetadataAlgebra[F]] = {
+                                          )(implicit notificationsService: InternalNotificationSender[F]): F[MetadataAlgebra[F]] = {
     val metadataStream: fs2.Stream[F, (GenericRecord, Option[GenericRecord])] = if (consumeMetadataEnabled) {
       kafkaClientAlgebra.consumeSafelyMessages(metadataTopicName.value, consumerGroup, commitOffsets = false)
         //Ignore records with errors
@@ -70,7 +76,7 @@ object MetadataAlgebra {
               Logger[F].warn(s"Error in metadata consumer $e")
           }
         }
-//        .makeRetryable(Infinite)("Metadata consumer failed.")
+        .makeRetryableWithNotification(Infinite, "Metadata consumer")
         .compile.drain)
       algebra <- getMetadataAlgebra[F](ref, schemaRegistryAlgebra)
     } yield algebra

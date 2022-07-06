@@ -1,12 +1,13 @@
 package hydra.kafka.algebras
 
 import java.time.Instant
-
 import cats.data.NonEmptyList
 import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.syntax.all._
 import fs2.kafka.Headers
 import hydra.avro.registry.SchemaRegistry
+import hydra.common.NotificationsTestSuite
+import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.model.ContactMethod.Slack
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -19,12 +20,12 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import retry.RetryPolicies._
 import retry.syntax.all._
-import retry.{RetryPolicy, _}
+import retry._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
-class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
+class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers with NotificationsTestSuite {
 
   implicit private val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
@@ -45,13 +46,15 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers {
   private val metadataTopicName = "_internal.metadataTopic"
   private val consumerGroup = "Consumer Group"
 
-  (for {
+  {
+    implicit val notificationSenderMock: InternalNotificationSender[IO] = getInternalNotificationSenderMock[IO]
+    for {
     kafkaClient <- KafkaClientAlgebra.test[IO]
     schemaRegistry <- SchemaRegistry.test[IO]
     metadata <- MetadataAlgebra.make(Subject.createValidated(metadataTopicName).get, consumerGroup, kafkaClient, schemaRegistry, consumeMetadataEnabled = true)
   } yield {
     runTests(metadata, kafkaClient)
-  }).unsafeRunSync()
+  }}.unsafeRunSync()
 
   private def runTests(metadataAlgebra: MetadataAlgebra[IO], kafkaClientAlgebra: KafkaClientAlgebra[IO]): Unit = {
     "MetadataAlgebraSpec" should {

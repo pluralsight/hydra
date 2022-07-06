@@ -179,7 +179,7 @@ object Dependencies {
   val integrationDeps: Seq[ModuleID] = testContainers ++ TestLibraries.getTestLibraries(module = "it")
 
   val baseDeps: Seq[ModuleID] =
-    akka ++ Seq(avro, ciris) ++ cats ++ logging ++ joda ++ testDeps ++ kafkaClients
+    akka ++ Seq(avro, ciris, refined) ++ cats ++ logging ++ joda ++ testDeps ++ kafkaClients
 
   val avroDeps: Seq[ModuleID] =
     baseDeps ++ confluent ++ jackson ++ guavacache ++ catsEffect

@@ -26,6 +26,8 @@ import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import org.scalatest.matchers.should.Matchers
 import retry.{RetryPolicies, RetryPolicy}
 import eu.timepit.refined._
+import hydra.common.NotificationsTestSuite
+import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.kafka.IOSuite
 
 import scala.concurrent.ExecutionContext
@@ -2064,7 +2066,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
   }
 }
 
-object CreateTopicProgramSpec {
+object CreateTopicProgramSpec extends NotificationsTestSuite {
   val keySchema     = getSchema("key")
   val valueSchema   = getSchema("val")
   val metadataTopic = "dvs.test-metadata-topic"
@@ -2110,8 +2112,12 @@ object CreateTopicProgramSpec {
 
   def metadataAlgebraF(metadataTopic: String,
                        schemaRegistry: SchemaRegistry[IO],
-                       kafkaClient: KafkaClientAlgebra[IO]): IO[MetadataAlgebra[IO]] =
-    MetadataAlgebra.make(Subject.createValidated(metadataTopic).get, "consumerGroup", kafkaClient, schemaRegistry, consumeMetadataEnabled = true)
+                       kafkaClient: KafkaClientAlgebra[IO]): IO[MetadataAlgebra[IO]] = {
+    implicit val notificationSenderMock: InternalNotificationSender[IO] = getInternalNotificationSenderMock[IO]
+    MetadataAlgebra.make(Subject.createValidated(metadataTopic).get, "consumerGroup", kafkaClient, schemaRegistry, consumeMetadataEnabled = true
+    )
+  }
+
 
   def createTopicMetadataRequest(
                                   keySchema: Schema,

@@ -1,20 +1,23 @@
 package hydra.kafka.util
 
-import java.nio.ByteBuffer
-import java.time.Instant
-import cats.{Applicative, ApplicativeError, Order, data}
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.implicits._
+import cats.{Applicative, Order, data}
 import fs2.Chunk.Bytes
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
+import hydra.common.alerting.AlertProtocol.NotificationMessage
+import hydra.common.alerting.NotificationLevel
+import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.common.config.KafkaConfigUtils._
+import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.kafka.algebras.ConsumerGroupsAlgebra.PartitionOffsetMap
+import hydra.kafka.algebras.HydraTag.StringJsonFormat
 import hydra.kafka.algebras.KafkaClientAlgebra.{OffsetInfo, Record}
 import hydra.kafka.algebras.RetryableFs2Stream.ReRunnableStreamAdder
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Infinite
-import hydra.kafka.algebras.{ConsumerGroupsStorageFacade, KafkaAdminAlgebra, KafkaClientAlgebra}
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra}
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
 import hydra.kafka.model.TopicConsumerOffset.{TopicConsumerOffsetKey, TopicConsumerOffsetValue}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -27,8 +30,10 @@ import kafka.coordinator.group.{BaseKey, GroupMetadataManager, OffsetKey}
 import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.common.TopicPartition
 
+import java.nio.ByteBuffer
+import java.time.Instant
 import scala.collection.JavaConverters._
-import scala.collection.SortedSet
+import scala.language.higherKinds
 import scala.util.Try
 
 object ConsumerGroupsOffsetConsumer {
@@ -50,7 +55,7 @@ object ConsumerGroupsOffsetConsumer {
                                                                   bootstrapServers: String,
                                                                   commonConsumerGroup: String,
                                                                   kafkaClientSecurityConfig: KafkaClientSecurityConfig
-                                                                ): F[Unit] = {
+                                                                )(implicit notificationsService: InternalNotificationSender[F]): F[Unit] = {
     val dvsConsumerOffsetStream = kafkaClientAlgebra.consumeSafelyWithOffsetInfo(consumerOffsetsOffsetsTopicConfig.value, uniquePerNodeConsumerGroup, commitOffsets = false)
       .collect({case Right(value) => value})
 
@@ -150,7 +155,7 @@ object ConsumerGroupsOffsetConsumer {
     partitionMap: PartitionOffsetMap,
     dvsInternalKafkaOffsetTopic: String,
     kafkaClientSecurityConfig: KafkaClientSecurityConfig
-  ) = {
+  )(implicit notificationsService: InternalNotificationSender[F]) = {
     val settings: ConsumerSettings[F, Option[BaseKey], Option[OffsetAndMetadata]] = ConsumerSettings(
       getConsumerGroupDeserializer[F, BaseKey](GroupMetadataManager.readMessageKey),
       getConsumerGroupDeserializer[F, OffsetAndMetadata](GroupMetadataManager.readOffsetMessageValue)
@@ -181,7 +186,7 @@ object ConsumerGroupsOffsetConsumer {
         )
       }
       .through(produce(producerSettings))
-      .makeRetryable(Infinite)(getErrorMessage)
+      .makeRetryableWithNotification(Infinite, "ConsumersGroups offset consumer")
       .compile.drain
   }
 
@@ -217,7 +222,7 @@ object ConsumerGroupsOffsetConsumer {
                                                                  dvsConsumerOffsetStream: fs2.Stream[F, (Record, OffsetInfo)],
                                                                  hydraConsumerOffsetsOffsetsLatestOffsets: PartitionOffsetMap,
                                                                  hydraConsumerOffsetsOffsetsCache: Ref[F, PartitionOffsetMap]
-                                                               ): F[Unit] = {
+                                                               )(implicit notificationsService: InternalNotificationSender[F]): F[Unit] = {
     def onStart = if (hydraConsumerOffsetsOffsetsLatestOffsets.values.forall(_ == 0L)) deferred.complete(Map()) else ConcurrentEffect[F].unit
     def isComplete: F[Unit] = for {
       consumerOffsets <- consumerOffsetsCache.get
@@ -238,7 +243,7 @@ object ConsumerGroupsOffsetConsumer {
               hydraConsumerOffsetsOffsetsCache.update(_ + (partition -> (offset + 1L)))
           }.flatTap { _ => isComplete }
       }
-      .makeRetryable(Infinite)(getErrorMessage)
+      .makeRetryableWithNotification(Infinite, "ConsumersGroups offset consumer")
       .compile.drain
   }
 }

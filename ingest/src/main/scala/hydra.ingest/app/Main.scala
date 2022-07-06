@@ -8,6 +8,11 @@ import cats.effect.{ExitCode, IO, IOApp, Resource}
 import hydra.common.Settings
 import hydra.common.config.ConfigSupport
 import ConfigSupport._
+import cats.effect.concurrent.Ref
+import eu.timepit.refined.types.string.NonEmptyString
+import hydra.common.alerting.sender.{InternalNotificationSender, NotificationSender}
+import hydra.common.alerting.NotificationsClient
+import hydra.common.http.HttpRequestorImpl
 import hydra.common.config.KafkaConfigUtils.KafkaClientSecurityConfig
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.CorsSupport
@@ -19,6 +24,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import kamon.Kamon
 import kamon.prometheus.PrometheusReporter
 
+import java.time.Instant
 import scala.concurrent.ExecutionContext.Implicits.global
 
 // $COVERAGE-OFF$Disabling highlighting by default until a workaround for https://issues.scala-lang.org/browse/SI-8596 is found
@@ -33,6 +39,12 @@ object Main extends IOApp with ConfigSupport with LoggingAdapter {
     val system = IO(ActorSystem("hydra", rootConfig))
     Resource.make(system)(registerCoordinatedShutdown)
   }
+
+  private def getInternalNotificationSender(notificationURI: Option[NonEmptyString])(implicit actorRef: ActorSystem)
+  : IO[InternalNotificationSender[IO]] = for {
+    streamsNotificationsClient <- NotificationsClient.make(new HttpRequestorImpl())
+    streamsNotificationsService <- NotificationSender(streamsNotificationsClient)
+  } yield(new InternalNotificationSender(notificationURI, streamsNotificationsService))
 
   private def report =
     IO({
@@ -81,8 +93,9 @@ object Main extends IOApp with ConfigSupport with LoggingAdapter {
     AppConfig.appConfig.load[IO].flatMap { config => {
         implicit val cors = new CorsSupport(config.corsAllowedOriginConfig.corsAllowedOrigins)
         for {
+          notificationSender <- getInternalNotificationSender(config.notificationsConfig.internalSlackNotificationUrl)
           algebras <- Algebras
-            .make[IO](config)
+            .make[IO](config, notificationSender)
           programs <- Programs.make[IO](config, algebras)
           bootstrap <- Bootstrap
             .make[IO](programs.createTopic, config.metadataTopicsConfig,

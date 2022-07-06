@@ -3,8 +3,9 @@ package hydra.ingest.modules
 import cats.effect.{Async, ConcurrentEffect, ContextShift, Timer}
 import cats.syntax.all._
 import hydra.avro.registry.SchemaRegistry
+import hydra.common.alerting.sender.{InternalNotificationSender, NotificationSender}
 import hydra.ingest.app.AppConfig.AppConfig
-import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TagsAlgebra}
+import hydra.kafka.algebras._
 import org.typelevel.log4cats.Logger
 
 final class Algebras[F[_]] private (
@@ -18,7 +19,8 @@ final class Algebras[F[_]] private (
 
 object Algebras {
 
-  def make[F[_]: Async: ConcurrentEffect: ContextShift: Timer: Logger](config: AppConfig): F[Algebras[F]] = {
+  def make[F[_]: Async: ConcurrentEffect: ContextShift: Timer: Logger](config: AppConfig, internalNotificationsService: InternalNotificationSender[F]): F[Algebras[F]] = {
+    implicit val internalNotificationsServiceImpl: InternalNotificationSender[F] = internalNotificationsService
     val schemaRegistryUrl = config.createTopicConfig.schemaRegistryConfig.fullUrl
     for {
       schemaRegistry <- SchemaRegistry.live[F](
