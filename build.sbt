@@ -133,7 +133,7 @@ lazy val ingest = Project(
   id = "ingest",
   base = file("ingest")
 )
-  .dependsOn(core, kafka)
+  .dependsOn(core, kafka, common % "compile->compile;test->test")
   .settings(
     moduleSettings ++ dockerSettings,
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
