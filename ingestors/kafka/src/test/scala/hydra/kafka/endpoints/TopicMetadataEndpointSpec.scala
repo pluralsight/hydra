@@ -13,6 +13,7 @@ import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
 import hydra.core.http.CorsSupport
+import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
 import hydra.kafka.algebras.{HydraTag, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TagsAlgebra}
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
@@ -131,7 +132,7 @@ class TopicMetadataEndpointSpec
     _ <- schemaRegistry.registerSchema(subjectKey, schema)
     _ <- schemaRegistry.registerSchema(subjectValue, schema)
     _ <- ka.createTopic("dvs.test.subject", TopicDetails(1,1,1))
-    metadataAlgebra <- MetadataAlgebra.make[IO](Subject.createValidated("_topicName.Bill").get, "I'm_A_Jerk", kafkaClient, schemaRegistry, consumeMetadataEnabled = false)
+    metadataAlgebra <- MetadataAlgebra.make[IO](Subject.createValidated("_topicName.Bill").get, "I'm_A_Jerk", kafkaClient, schemaRegistry, consumeMetadataEnabled = false, Once)
     tagsAlgebra <- TagsAlgebra.make[IO]("_hydra.tags-topic", "_hydra.tags-consumer",kafkaClient)
     _ <- tagsAlgebra.createOrUpdateTag(HydraTag("Source: DVS", "A valid source"))
     createTopicProgram = getTestCreateTopicProgram(schemaRegistry, ka, kafkaClient, metadataAlgebra)

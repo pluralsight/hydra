@@ -15,6 +15,7 @@ import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.common.config.KafkaConfigUtils.{KafkaClientSecurityConfig, kafkaSecurityEmptyConfig}
 import hydra.ingest.programs.TopicDeletionProgram
 import hydra.kafka.algebras.KafkaAdminAlgebra._
+import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
 import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.util.KafkaUtils.TopicDetails
@@ -542,7 +543,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
 
   def makeMetadataAlgebra(kafkaClientAlgebra: KafkaClientAlgebra[IO], schemaRegistry: SchemaRegistry[IO], consumerMetadataEnabled: Boolean = true): IO[MetadataAlgebra[IO]] = {
     implicit val notificationSenderMock: InternalNotificationSender[IO] = getInternalNotificationSenderMock[IO]
-    MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaRegistry, consumerMetadataEnabled)
+    MetadataAlgebra.make(v2MetadataTopicName, consumerGroup, kafkaClientAlgebra, schemaRegistry, consumerMetadataEnabled, Once)
   }
 
 }

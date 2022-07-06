@@ -29,6 +29,7 @@ import eu.timepit.refined._
 import hydra.common.NotificationsTestSuite
 import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.kafka.IOSuite
+import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
 
 import scala.concurrent.ExecutionContext
 import hydra.kafka.model.TopicMetadataV2Request.NumPartitions
@@ -2114,7 +2115,7 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
                        schemaRegistry: SchemaRegistry[IO],
                        kafkaClient: KafkaClientAlgebra[IO]): IO[MetadataAlgebra[IO]] = {
     implicit val notificationSenderMock: InternalNotificationSender[IO] = getInternalNotificationSenderMock[IO]
-    MetadataAlgebra.make(Subject.createValidated(metadataTopic).get, "consumerGroup", kafkaClient, schemaRegistry, consumeMetadataEnabled = true
+    MetadataAlgebra.make(Subject.createValidated(metadataTopic).get, "consumerGroup", kafkaClient, schemaRegistry, consumeMetadataEnabled = true, Once
     )
   }
 

@@ -10,7 +10,7 @@ import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.kafka.algebras.HydraTag.StringJsonFormat
 import hydra.kafka.algebras.KafkaClientAlgebra.ConsumerGroup
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
-import hydra.kafka.algebras.RetryableFs2Stream.ReRunnableStreamAdder
+import hydra.kafka.algebras.RetryableFs2Stream.{ReRunnableStreamAdder, RetryPolicy}
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Infinite
 import hydra.kafka.model.TopicMetadataV2.MetadataAvroSchemaFailure
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -41,7 +41,8 @@ object MetadataAlgebra {
                                             consumerGroup: ConsumerGroup,
                                             kafkaClientAlgebra: KafkaClientAlgebra[F],
                                             schemaRegistryAlgebra: SchemaRegistry[F],
-                                            consumeMetadataEnabled: Boolean
+                                            consumeMetadataEnabled: Boolean,
+                                            metadataStreamRestartPolicy: RetryPolicy = Infinite
                                           )(implicit notificationsService: InternalNotificationSender[F]): F[MetadataAlgebra[F]] = {
     val metadataStream: fs2.Stream[F, (GenericRecord, Option[GenericRecord])] = if (consumeMetadataEnabled) {
       kafkaClientAlgebra.consumeSafelyMessages(metadataTopicName.value, consumerGroup, commitOffsets = false)
@@ -76,7 +77,7 @@ object MetadataAlgebra {
               Logger[F].warn(s"Error in metadata consumer $e")
           }
         }
-        .makeRetryableWithNotification(Infinite, "Metadata consumer")
+        .makeRetryableWithNotification(metadataStreamRestartPolicy, "Metadata consumer")
         .compile.drain)
       algebra <- getMetadataAlgebra[F](ref, schemaRegistryAlgebra)
     } yield algebra

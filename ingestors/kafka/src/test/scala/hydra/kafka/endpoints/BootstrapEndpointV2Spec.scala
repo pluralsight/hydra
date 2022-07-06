@@ -10,6 +10,7 @@ import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.common.NotificationsTestSuite
 import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.core.http.CorsSupport
+import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
 import hydra.kafka.algebras._
 import hydra.kafka.model.ContactMethod.{Email, Slack}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -70,7 +71,7 @@ final class BootstrapEndpointV2Spec
       s <- SchemaRegistry.test[IO]
       k <- KafkaAdminAlgebra.test[IO]()
       kc <- KafkaClientAlgebra.test[IO]
-      m <- MetadataAlgebra.make(Subject.createValidated("_metadata.topic.name").get, "bootstrap.consumer.group", kc, s, true)
+      m <- MetadataAlgebra.make(Subject.createValidated("_metadata.topic.name").get, "bootstrap.consumer.group", kc, s, true, Once)
       t <- TagsAlgebra.make[IO]("_hydra.tags-topic","_hydra.tags-consumer", kc)
       _ <- t.createOrUpdateTag(HydraTag("DVS tag", "DVS"))
     } yield getTestCreateTopicProgram(s, k, kc, m, t)
@@ -271,7 +272,7 @@ final class BootstrapEndpointV2Spec
 
       implicit val notificationSenderMock: InternalNotificationSender[IO] = getInternalNotificationSenderMock[IO]
       KafkaClientAlgebra.test[IO].flatMap { client =>
-        MetadataAlgebra.make(Subject.createValidated("_metadata.topic.123.name").get, "456", client, failingSchemaRegistry, true).flatMap { m =>
+        MetadataAlgebra.make(Subject.createValidated("_metadata.topic.123.name").get, "456", client, failingSchemaRegistry, true, Once).flatMap { m =>
           KafkaAdminAlgebra
             .test[IO]()
             .map { kafka =>

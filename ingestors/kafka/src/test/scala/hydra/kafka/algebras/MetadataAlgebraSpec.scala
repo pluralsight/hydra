@@ -8,6 +8,7 @@ import hydra.avro.registry.SchemaRegistry
 import hydra.common.NotificationsTestSuite
 import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
+import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
 import hydra.kafka.model.ContactMethod.Slack
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
@@ -51,7 +52,7 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers with Notificatio
     for {
     kafkaClient <- KafkaClientAlgebra.test[IO]
     schemaRegistry <- SchemaRegistry.test[IO]
-    metadata <- MetadataAlgebra.make(Subject.createValidated(metadataTopicName).get, consumerGroup, kafkaClient, schemaRegistry, consumeMetadataEnabled = true)
+    metadata <- MetadataAlgebra.make(Subject.createValidated(metadataTopicName).get, consumerGroup, kafkaClient, schemaRegistry, consumeMetadataEnabled = true, Once)
   } yield {
     runTests(metadata, kafkaClient)
   }}.unsafeRunSync()
