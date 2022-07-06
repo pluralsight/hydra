@@ -1,6 +1,5 @@
 package hydra.kafka.algebras
 
-import java.time.Instant
 import cats.data.NonEmptyList
 import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.syntax.all._
@@ -11,7 +10,7 @@ import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.model.ContactMethod.Slack
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{Public, StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request, TopicMetadataV2Value}
+import hydra.kafka.model._
 import org.typelevel.log4cats.SelfAwareStructuredLogger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import org.apache.avro.generic.GenericRecord
@@ -19,9 +18,10 @@ import org.scalatest.Assertion
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import retry.RetryPolicies._
-import retry.syntax.all._
 import retry._
+import retry.syntax.all._
 
+import java.time.Instant
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 

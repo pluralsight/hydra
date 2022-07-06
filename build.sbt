@@ -108,7 +108,7 @@ lazy val core = Project(
 lazy val kafka = Project(
   id = "kafka",
   base = file("ingestors/kafka")
-).dependsOn(core)
+).dependsOn(core, common % "compile->compile;test->test")
   .configs(IntegrationTest)
   .settings(
     moduleSettings ++ Defaults.itSettings,
