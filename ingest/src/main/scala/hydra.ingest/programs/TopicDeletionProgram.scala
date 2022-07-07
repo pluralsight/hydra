@@ -140,7 +140,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent :
   }
 
   //consumer group should be pulled from prod, consumer group name will work for what you want it to work for
-  def deleteTopics(topicNames: List[String], ignoreConsumerGroups: List[String], ignorePublishTime: Boolean): F[ValidatedNel[DeleteTopicError, Unit]] = {
+  def deleteTopics(topicNames: List[String], ignoreConsumerGroups: List[String], ignorePublishTime: Boolean, ignoreAllConsumerGroups: Boolean): F[ValidatedNel[DeleteTopicError, Unit]] = {
 
     def topicIsActivelyPublishingCheck(topicsThatExist: List[String]): F[List[Either[ActivelyPublishedToError, String]]] =
       if (ignorePublishTime)
@@ -151,7 +151,7 @@ final class TopicDeletionProgram[F[_]: MonadError[*[_], Throwable]: Concurrent :
     for {
       topics <- topicNames.traverse(checkIfTopicExists)
       (topicsThatExist, nonExistentTopics) = topics.partition(_._2)
-      topicHasConsumers <- checkIfTopicStillHasConsumers(topicsThatExist.map(_._1), ignoreConsumerGroups)
+      topicHasConsumers <- if(ignoreAllConsumerGroups) Sync[F].pure(topicsThatExist.map(_._1).map(_.asRight[ConsumersStillExistError])) else checkIfTopicStillHasConsumers(topicsThatExist.map(_._1), ignoreConsumerGroups)
       topicIsActivelyPublishing <- topicIsActivelyPublishingCheck(topicsThatExist.map(_._1))
       goodTopics = findDeletableTopics(topicIsActivelyPublishing, topicHasConsumers)
       badTopics = findNondeletableTopics(topicIsActivelyPublishing, topicHasConsumers)
@@ -253,3 +253,4 @@ final case class ConsumersStillExistError(topic: String, consumers: List[Consume
 final case class ActivelyPublishedToError(topic: String, deleteWindow: Long) extends DeleteTopicError
 final case class TopicDoesNotExistError(topic: String) extends DeleteTopicError
 final case class CacheDeletionError(message: String) extends DeleteTopicError
+final case object MustProvideListOfTopics extends DeleteTopicError

@@ -217,6 +217,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
                             consumerGroupToAdd: Option[(TopicConsumerKey, TopicConsumerValue, String)] = None,
                             ignoreConsumerGroupConfig: List[String] = List.empty,
                             ignoreConsumerGroupSpecific: List[String] = List.empty,
+                            ignoreAllConsumerGroups: Boolean = false,
                             allowableTopicDeletionTimeMs: Long = 0): Unit = {
     (for {
       // For v2 topics we need to write the metadata to the v2MetadataTopic because the topic deletion attempts to lookup
@@ -262,7 +263,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
         testConsumerGroupAlgebra,
         ignoreConsumerGroupConfig,
         allowableTopicDeletionTimeMs
-      ).deleteTopics(topicNamesToDelete, ignoreConsumerGroupSpecific, false)
+      ).deleteTopics(topicNamesToDelete, ignoreConsumerGroupSpecific, false, ignoreAllConsumerGroups)
       // get all topic names
       allTopics <- kafkaAdmin.getTopicNames
       // get all versions of any given topic
@@ -297,11 +298,13 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
                                 assertionError: ErrorChecker = _ => (),
                                 consumerGroupToAdd: Option[(TopicConsumerKey, TopicConsumerValue, String)] = None,
                                 ignoreConsumerGroupConfig: List[String] = List.empty,
-                                ignoreConsumerGroupSpecific: List[String] = List.empty): Unit = {
+                                ignoreConsumerGroupSpecific: List[String] = List.empty,
+                                ignoreAllConsumerGroups: Boolean = false
+                               ): Unit = {
     applyTestcase(KafkaAdminAlgebra.test[IO](), SchemaRegistry.test[IO],
       v1TopicNames, v2TopicNames, topicNamesToDelete, v1TopicNames ++ v2TopicNames, registerKey,
       List.empty, upgradeTopic, assertionError, consumerGroupToAdd, ignoreConsumerGroupConfig = ignoreConsumerGroupConfig,
-      ignoreConsumerGroupSpecific = ignoreConsumerGroupSpecific)
+      ignoreConsumerGroupSpecific = ignoreConsumerGroupSpecific, ignoreAllConsumerGroups = ignoreAllConsumerGroups)
   }
 
 
@@ -413,6 +416,16 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       v1TopicNames = List(myTopicName), v2TopicNames = List(), topicNamesToDelete = List(myTopicName),
       registerKey = true, kafkaTopicNamesToFail = List(),
       schemasToSucceed = List(myTopicName), allowableTopicDeletionTimeMs = -10)
+  }
+
+  it should "Delete topic with ignoring all consumer groups" in {
+    val topic = "dvs.test.topic"
+    val consumerGroup = "test-consumer-group"
+    val key = TopicConsumerKey(topic, consumerGroup)
+    val value = TopicConsumerValue(Instant.now())
+    val state = "Stable"
+    applyGoodTestcase(List(topic), List.empty, List(topic), consumerGroupToAdd = Some((key, value, state)),
+      ignoreAllConsumerGroups = true)
   }
 
   // FAILURE CASES
