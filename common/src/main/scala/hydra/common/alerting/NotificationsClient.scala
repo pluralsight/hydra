@@ -35,7 +35,7 @@ object NotificationsClient {
             }
 
           Async.fromFuture(eff.delay(requestFuture)).adaptError { case _: IllegalUriException =>
-            val error = StreamsNotificationsError.InvalidUriProvided(uri.toString())
+            val error = NotificationsError.InvalidUriProvided(uri.toString())
             log.warn(error.getMessage)
             error
           }

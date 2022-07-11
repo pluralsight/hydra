@@ -2,7 +2,7 @@ package hydra.common.alerting
 
 import eu.timepit.refined.types.string
 import hydra.common.util.TimeUtils
-import spray.json.{DefaultJsonProtocol, JsValue, JsonFormat, RootJsonFormat, enrichAny}
+import spray.json.{DefaultJsonProtocol, JsString, JsValue, JsonWriter, RootJsonFormat, enrichAny}
 
 object AlertProtocol  extends DefaultJsonProtocol {
 
@@ -20,10 +20,10 @@ object AlertProtocol  extends DefaultJsonProtocol {
                                  properties: Map[String, String], timestamp: String)
 
   object StreamsNotification {
-    def make[T: JsonFormat](notificationMessage: NotificationMessage[T],
+    def make[T: JsonWriter](notificationMessage: NotificationMessage[T],
                             notificationInfo: NotificationScope,
                             properties: Map[String, String] = Map()): StreamsNotification = {
-      def doCreateStreamNotification[D: JsonFormat](details: D): StreamsNotification = {
+      def doCreateStreamNotification[D: JsonWriter](details: D): StreamsNotification = {
         new StreamsNotification(
           notificationMessage.message,
           notificationInfo.notificationLevel.toString,
@@ -40,12 +40,16 @@ object AlertProtocol  extends DefaultJsonProtocol {
     }
   }
 
-  case class NotificationMessage[T](message: String, notificationDetails: Option[T])
+  case class NotificationMessage[T](message: String, notificationDetails: Option[T] = None)
 
   object NotificationMessage {
 
-    def apply(message: String): NotificationMessage[String] =
-      NotificationMessage[String](message, None)
+    implicit object NothingJsonWriterStub extends JsonWriter[Nothing] {
+      def write(x: Nothing) = {
+        JsString("")
+      }
+    }
+
   }
 
   case class NotificationRequest(notificationScope: NotificationScope, streamsNotification: StreamsNotification, url: Option[string.NonEmptyString])

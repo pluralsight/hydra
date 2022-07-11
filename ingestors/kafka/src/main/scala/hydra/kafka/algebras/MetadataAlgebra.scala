@@ -4,14 +4,11 @@ import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, Sync}
 import cats.syntax.all._
 import hydra.avro.registry.SchemaRegistry
-import hydra.common.alerting.AlertProtocol.NotificationMessage
-import hydra.common.alerting.NotificationLevel
 import hydra.common.alerting.sender.InternalNotificationSender
-import hydra.kafka.algebras.HydraTag.StringJsonFormat
 import hydra.kafka.algebras.KafkaClientAlgebra.ConsumerGroup
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
-import hydra.kafka.algebras.RetryableFs2Stream.{ReRunnableStreamAdder, RetryPolicy}
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Infinite
+import hydra.kafka.algebras.RetryableFs2Stream.{ReRunnableStreamAdder, RetryPolicy}
 import hydra.kafka.model.TopicMetadataV2.MetadataAvroSchemaFailure
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model.{TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Value}

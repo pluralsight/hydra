@@ -61,10 +61,10 @@ object RetryableFs2Stream {
 
       stream.onFinalizeCase {
         case Completed | Canceled =>
-          Logger[F].error(s"`$streamName` Stream finished unexpectedly. Stream will be restarted due to RetryPolicy: $retryPolicy") *>
+          Logger[F].error(getStreamFinishedUnexpectedlyMessage(streamName, retryPolicy)) *>
             doOnRerun(None)
         case Error(error) =>
-          Logger[F].error(error)(s"`$streamName` Stream will be restarted due to RetryPolicy: $retryPolicy") *>
+          Logger[F].error(error)(getStreamFailedMessage(streamName, retryPolicy)) *>
             doOnRerun(error.some)
       }
         .attempt
@@ -81,15 +81,21 @@ object RetryableFs2Stream {
 
     def makeRetryableWithNotification(retryPolicy: RetryPolicy = Zero, streamName: String)
                                      (implicit internalNotificationSender: InternalNotificationSender[F], monad: Monad[F]): fs2.Stream[F, O] =
-      makeRetryable(retryPolicy, streamName, sendNotificationOnRetry[F](streamName))
+      makeRetryable(retryPolicy, streamName, sendNotificationOnRetry[F](streamName, retryPolicy))
   }
 
-  private def sendNotificationOnRetry[F[_] : Monad](streamName: String)
+  private def sendNotificationOnRetry[F[_] : Monad](streamName: String, retryPolicy: RetryPolicy)
                                                    (implicit internalNotificationSender: InternalNotificationSender[F]): Option[Throwable] => F[Unit] = {
     case Some(error: Throwable) => InternalNotificationSender(NotificationLevel.Error)
-      .send(NotificationMessage(s"$streamName finished with error", error.getMessage.some))
+      .send(NotificationMessage(getStreamFailedMessage(streamName, retryPolicy), error.getMessage.some))
     case None => InternalNotificationSender(NotificationLevel.Error)
-      .send(NotificationMessage(s"$streamName finished without errors"))
+      .send(NotificationMessage(getStreamFinishedUnexpectedlyMessage(streamName, retryPolicy)))
   }
+
+  private def getStreamFinishedUnexpectedlyMessage(streamName: String, retryPolicy: RetryPolicy) =
+    s"`$streamName` Stream finished unexpectedly. It will be restarted due to RetryPolicy: $retryPolicy"
+
+  private def getStreamFailedMessage(streamName: String, retryPolicy: RetryPolicy) =
+    s"`$streamName` Stream failed. It will be restarted due to RetryPolicy: $retryPolicy"
 
 }
