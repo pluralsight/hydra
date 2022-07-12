@@ -40,16 +40,11 @@ object AlertProtocol  extends DefaultJsonProtocol {
     }
   }
 
-  case class NotificationMessage[T](message: String, notificationDetails: Option[T] = None)
+  case class NotificationMessage[T] private (message: String, notificationDetails: Option[T])
 
   object NotificationMessage {
-
-    implicit object NothingJsonWriterStub extends JsonWriter[Nothing] {
-      def write(x: Nothing) = {
-        JsString("")
-      }
-    }
-
+    def apply(message: String): NotificationMessage[String] = NotificationMessage[String](message, None)
+    def apply[T](message: String, details: T): NotificationMessage[T] =  NotificationMessage[T](message, Option(details))
   }
 
   case class NotificationRequest(notificationScope: NotificationScope, streamsNotification: StreamsNotification, url: Option[string.NonEmptyString])

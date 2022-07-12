@@ -7,7 +7,6 @@ import cats.effect.IO
 import cats.implicits._
 import eu.timepit.refined.types.string.NonEmptyString
 import hydra.common.IOSuite
-import hydra.common.alerting.AlertProtocol.NotificationMessage.NothingJsonWriterStub
 import hydra.common.alerting.AlertProtocol.{NotificationMessage, NotificationScope, StreamsNotification}
 import hydra.common.alerting.NotificationLevel._
 import hydra.common.alerting.NotificationType.InternalNotification
@@ -59,7 +58,8 @@ class NotificationSenderSpec extends AsyncFreeSpec with AsyncMockFactory with Ma
       val client = mock[NotificationsClient[IO]]
       (client.postNotification(_: Uri, _: StreamsNotification)).expects(*, *).never()
 
-      testNotificationSender[Nothing](client, NotificationType.InternalNotification, None, NotificationLevel.Error)
+      testNotificationSender(client, NotificationType.InternalNotification, None, NotificationLevel.Error,
+        NotificationMessage(messageText))
         .attempt
         .map(_.isRight shouldBe true)
     }
@@ -68,7 +68,8 @@ class NotificationSenderSpec extends AsyncFreeSpec with AsyncMockFactory with Ma
       val client = mock[NotificationsClient[IO]]
       (client.postNotification(_: Uri, _: StreamsNotification)).expects(*, *).never()
 
-      testNotificationSender[Nothing](client, NotificationType.InternalNotification, NonEmptyString.from(notValidUri).toOption, NotificationLevel.Error)
+      testNotificationSender(client, NotificationType.InternalNotification, NonEmptyString.from(notValidUri).toOption,
+        NotificationLevel.Error, NotificationMessage(messageText))
         .attempt
         .map(_.isRight shouldBe true)
     }
@@ -77,7 +78,7 @@ class NotificationSenderSpec extends AsyncFreeSpec with AsyncMockFactory with Ma
       val client = mock[NotificationsClient[IO]]
       (client.postNotification(_: Uri, _: StreamsNotification)).expects(*, *).never()
 
-      testNotificationSender[Nothing](client, NotificationType.InternalNotification, NonEmptyString.from(notValidUriProperty).toOption, NotificationLevel.Error)
+      testNotificationSender(client, NotificationType.InternalNotification, NonEmptyString.from(notValidUriProperty).toOption, NotificationLevel.Error, NotificationMessage(messageText))
         .attempt
         .map(_.isRight shouldBe true)
     }
@@ -86,7 +87,7 @@ class NotificationSenderSpec extends AsyncFreeSpec with AsyncMockFactory with Ma
       val client = mock[NotificationsClient[IO]]
       (client.postNotification(_: Uri, _: StreamsNotification)).expects(*, *).throws(NotificationsError.InvalidUriProvided(uri))
 
-      testNotificationSender[Nothing](client, NotificationType.InternalNotification, NonEmptyString.from(uri).toOption, NotificationLevel.Error)
+      testNotificationSender(client, NotificationType.InternalNotification, NonEmptyString.from(uri).toOption, NotificationLevel.Error, NotificationMessage(messageText))
         .attempt
         .map(_.isRight shouldBe true)
     }
@@ -132,7 +133,7 @@ class NotificationSenderSpec extends AsyncFreeSpec with AsyncMockFactory with Ma
     def testAllNotificationsLevels(client: NotificationsClient[IO]): IO[Assertion] = {
       val result = for {
         level <- NotificationLevel.values
-      } yield testNotificationSender[Nothing](client, NotificationType.InternalNotification, NonEmptyString.from(uri).toOption, level)
+      } yield testNotificationSender(client, NotificationType.InternalNotification, NonEmptyString.from(uri).toOption, level, NotificationMessage(messageText))
 
       result.toList.sequence.attempt.map(_.isRight shouldBe true)
     }
@@ -141,7 +142,7 @@ class NotificationSenderSpec extends AsyncFreeSpec with AsyncMockFactory with Ma
                                notificationType: NotificationType,
                                destination: Option[NonEmptyString],
                                level: NotificationLevel,
-                               notificationMessage: NotificationMessage[T] = NotificationMessage(messageText, None)
+                               notificationMessage: NotificationMessage[T]
                               ): IO[Unit] = {
       for {
         service <- NotificationSender[IO](client)
