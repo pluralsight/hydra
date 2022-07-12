@@ -6,7 +6,7 @@ import hydra.common.alerting.AlertProtocol.{NotificationMessage, NotificationReq
 import hydra.common.alerting._
 import io.chrisdavenport.log4cats.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
-import spray.json.{JsonFormat, JsonWriter}
+import spray.json.JsonWriter
 
 import scala.language.higherKinds
 
@@ -58,7 +58,7 @@ object NotificationSender {
 
   final class ScopedNotificationSenderWrapper[A <: NotificationLevel, B <: NotificationType] private[NotificationSender](implicit level: A, notificationType: B) {
 
-    def send[F[_], T, K: JsonFormat](notificationMessage: NotificationMessage[K],
+    def send[F[_], T, K: JsonWriter](notificationMessage: NotificationMessage[K],
                                      source: T
                                     )(implicit notificationSender: NotificationSender[F],
                                       notificationRequestBaker: NotificationRequestBaker[F, T]
