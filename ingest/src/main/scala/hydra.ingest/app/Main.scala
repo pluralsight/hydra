@@ -12,7 +12,7 @@ import cats.effect.concurrent.Ref
 import eu.timepit.refined.types.string.NonEmptyString
 import hydra.common.alerting.sender.{InternalNotificationSender, NotificationSender}
 import hydra.common.alerting.NotificationsClient
-import hydra.common.http.HttpRequestorImpl
+import hydra.common.http.BasicHttpRequestor
 import hydra.common.config.KafkaConfigUtils.KafkaClientSecurityConfig
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.CorsSupport
@@ -42,7 +42,7 @@ object Main extends IOApp with ConfigSupport with LoggingAdapter {
 
   private def getInternalNotificationSender(notificationURI: Option[NonEmptyString])(implicit actorRef: ActorSystem)
   : IO[InternalNotificationSender[IO]] = for {
-    streamsNotificationsClient <- NotificationsClient.make(new HttpRequestorImpl())
+    streamsNotificationsClient <- NotificationsClient.make(new BasicHttpRequestor())
     streamsNotificationsService <- NotificationSender(streamsNotificationsClient)
   } yield(new InternalNotificationSender(notificationURI, streamsNotificationsService))
 

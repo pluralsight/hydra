@@ -4,6 +4,7 @@ import cats.effect.Sync
 import cats.syntax.all._
 import hydra.common.alerting.AlertProtocol.{NotificationMessage, NotificationRequest, NotificationScope}
 import hydra.common.alerting._
+import hydra.common.util.UriUtils.convertUrl
 import io.chrisdavenport.log4cats.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import spray.json.JsonWriter
@@ -12,21 +13,19 @@ import scala.language.higherKinds
 
 trait NotificationSender[F[_]] {
 
-  def send[T, K: JsonWriter](notificationInfo: NotificationScope, notificationMessage: NotificationMessage[K])
-                            (source: T)
-                            (implicit notificationRequestBaker: NotificationRequestBaker[F, T]): F[Unit]
+  def send[T, K: JsonWriter](notificationInfo: NotificationScope, notificationMessage: NotificationMessage[K], source: T)
+                            (implicit notificationRequestBaker: NotificationRequestBuilder[F, T]): F[Unit]
 
 }
 
 object NotificationSender {
 
-  class NotificationSenderImpl[F[_] : Sync](client: NotificationsClient[F], logger: Logger[F]) extends NotificationSender[F] {
+  class BasicNotificationSender[F[_] : Sync](client: NotificationsClient[F], logger: Logger[F]) extends NotificationSender[F] {
 
-    def send[T, K: JsonWriter](notificationInfo: NotificationScope, notificationMessage: NotificationMessage[K])
-                              (source: T)
-                              (implicit notificationRequestBaker: NotificationRequestBaker[F, T]): F[Unit] = {
+    def send[T, K: JsonWriter](notificationInfo: NotificationScope, notificationMessage: NotificationMessage[K], source: T)
+                              (implicit notificationRequestBaker: NotificationRequestBuilder[F, T]): F[Unit] = {
 
-      notificationRequestBaker.bake(notificationInfo, notificationMessage)(source)
+      notificationRequestBaker.build(notificationInfo, notificationMessage, source)
         .flatMap {
           case Some(request) =>
             sendNotification(request)
@@ -50,7 +49,7 @@ object NotificationSender {
   }
 
   def apply[F[_] : Sync](client: NotificationsClient[F]): F[NotificationSender[F]] = {
-    Slf4jLogger.fromClass(getClass).map { logger => new NotificationSenderImpl[F](client, logger) }
+    Slf4jLogger.fromClass(getClass).map { logger => new BasicNotificationSender[F](client, logger) }
   }
 
   def apply[A <: NotificationLevel, B <: NotificationType](implicit level: A, notificationType: B): ScopedNotificationSenderWrapper[A, B] =
@@ -61,9 +60,9 @@ object NotificationSender {
     def send[F[_], T, K: JsonWriter](notificationMessage: NotificationMessage[K],
                                      source: T
                                     )(implicit notificationSender: NotificationSender[F],
-                                      notificationRequestBaker: NotificationRequestBaker[F, T]
+                                      notificationRequestBaker: NotificationRequestBuilder[F, T]
                                     ): F[Unit] =
-      notificationSender.send(NotificationScope[A, B], notificationMessage)(source)
+      notificationSender.send(NotificationScope(level, Option(notificationType)), notificationMessage, source)
 
   }
 

@@ -1,11 +1,11 @@
-package hydra.common
+package hydra.common.util
 
 import akka.http.scaladsl.model.Uri
-import spray.json.{JsString, JsValue, JsonFormat, JsonWriter, deserializationError}
+import hydra.common.alerting.NotificationsError
 
 import scala.util.{Failure, Try}
 
-package object alerting {
+object UriUtils {
 
   def convertUrl(uriStr: String): Either[Throwable, Uri] =
     Try(Uri(uriStr))

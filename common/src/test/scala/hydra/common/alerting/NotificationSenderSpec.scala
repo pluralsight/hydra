@@ -146,8 +146,7 @@ class NotificationSenderSpec extends AsyncFreeSpec with AsyncMockFactory with Ma
                               ): IO[Unit] = {
       for {
         service <- NotificationSender[IO](client)
-        _ <- service.send(NotificationScope(level, notificationType),
-          notificationMessage)(destination)
+        _ <- service.send(NotificationScope(level, notificationType.some), notificationMessage, destination)
       } yield ()
     }
   }

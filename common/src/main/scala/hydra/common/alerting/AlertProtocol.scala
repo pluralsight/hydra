@@ -6,23 +6,15 @@ import spray.json.{DefaultJsonProtocol, JsString, JsValue, JsonWriter, RootJsonF
 
 object AlertProtocol  extends DefaultJsonProtocol {
 
-
   case class NotificationScope(notificationLevel: NotificationLevel, notificationType: Option[NotificationType] = None)
-
-  object NotificationScope {
-
-    def apply[T <: NotificationLevel, K <: NotificationType](implicit level: T, notificationType: K): NotificationScope =
-      NotificationScope(level, Some(notificationType))
-
-  }
 
   case class StreamsNotification(message: String, level: String, stackTrace: JsValue,
                                  properties: Map[String, String], timestamp: String)
 
   object StreamsNotification {
-    def make[T: JsonWriter](notificationMessage: NotificationMessage[T],
-                            notificationInfo: NotificationScope,
-                            properties: Map[String, String] = Map()): StreamsNotification = {
+    def apply[T: JsonWriter](notificationMessage: NotificationMessage[T],
+                             notificationInfo: NotificationScope,
+                             properties: Map[String, String] = Map()): StreamsNotification = {
       def doCreateStreamNotification[D: JsonWriter](details: D): StreamsNotification = {
         new StreamsNotification(
           notificationMessage.message,

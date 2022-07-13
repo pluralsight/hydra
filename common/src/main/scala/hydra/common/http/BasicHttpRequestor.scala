@@ -6,7 +6,7 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 
 import scala.concurrent.Future
 
-class HttpRequestorImpl(implicit sys: ActorSystem) extends HttpRequestor {
+class BasicHttpRequestor(implicit sys: ActorSystem) extends HttpRequestor {
   override def makeRequest(request: HttpRequest): Future[HttpResponse] =
     Http().singleRequest(request)
 }
