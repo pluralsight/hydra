@@ -18,7 +18,7 @@ trait NotificationRequestBuilder[F[_], T] {
 
 object NotificationRequestBuilder {
 
-  implicit def basicNotificationBacker[F[_]: Monad]: NotificationRequestBuilder[F, Option[NonEmptyString]] =
+  implicit def basicNotificationBuilder[F[_]: Monad]: NotificationRequestBuilder[F, Option[NonEmptyString]] =
     new NotificationRequestBuilder[F, Option[NonEmptyString]] {
       override def build[T: JsonWriter](notificationInfo: NotificationScope,
                                         notificationMessage: NotificationMessage[T],
@@ -29,7 +29,6 @@ object NotificationRequestBuilder {
           notificationUrl
         ).some.pure
     }
-
 
   lazy val DefaultNotificationProperties: Map[String, String] =
     Map(

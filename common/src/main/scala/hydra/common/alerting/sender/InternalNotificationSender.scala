@@ -18,7 +18,7 @@ final class InternalNotificationSender[F[_]](internalSource: Option[NonEmptyStri
 
 object InternalNotificationSender {
 
-  final class ScopedInternalNotificationSenderWrapper[A <: NotificationLevel] private[InternalNotificationSender](implicit level: A) {
+  final class ScopedInternalNotificationSenderWrapper[A <: NotificationLevel] private[InternalNotificationSender](level: A) {
 
     def send[F[_], K: JsonWriter](notificationMessage: NotificationMessage[K])
                                  (implicit internalNotificationSender: InternalNotificationSender[F],
@@ -26,5 +26,5 @@ object InternalNotificationSender {
       internalNotificationSender.send(NotificationScope(level, NotificationType.InternalNotification.some), notificationMessage)
   }
 
-  def apply[A <: NotificationLevel](implicit level: A) = new ScopedInternalNotificationSenderWrapper[A]
+  def apply[A <: NotificationLevel](level: A) = new ScopedInternalNotificationSenderWrapper(level)
 }

@@ -52,10 +52,11 @@ object NotificationSender {
     Slf4jLogger.fromClass(getClass).map { logger => new BasicNotificationSender[F](client, logger) }
   }
 
-  def apply[A <: NotificationLevel, B <: NotificationType](implicit level: A, notificationType: B): ScopedNotificationSenderWrapper[A, B] =
-    new ScopedNotificationSenderWrapper[A, B]()
+  def apply[A <: NotificationLevel, B <: NotificationType](level: A, notificationType: B): ScopedNotificationSenderWrapper[A, B] =
+    new ScopedNotificationSenderWrapper(level, notificationType)
 
-  final class ScopedNotificationSenderWrapper[A <: NotificationLevel, B <: NotificationType] private[NotificationSender](implicit level: A, notificationType: B) {
+
+  final class ScopedNotificationSenderWrapper[A <: NotificationLevel, B <: NotificationType] private[NotificationSender](level: A, notificationType: B) {
 
     def send[F[_], T, K: JsonWriter](notificationMessage: NotificationMessage[K],
                                      source: T
