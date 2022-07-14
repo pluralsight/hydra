@@ -16,7 +16,7 @@ object AlertProtocol  extends DefaultJsonProtocol {
                              notificationInfo: NotificationScope,
                              properties: Map[String, String] = Map()): StreamsNotification = {
       def doCreateStreamNotification[D: JsonWriter](details: D): StreamsNotification = {
-        new StreamsNotification(
+        StreamsNotification(
           notificationMessage.message,
           notificationInfo.notificationLevel.toString,
           details.toJson,
