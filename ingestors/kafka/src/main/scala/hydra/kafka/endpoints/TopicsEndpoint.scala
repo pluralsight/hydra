@@ -41,7 +41,6 @@ class TopicsEndpoint(consumerProxy:ActorSelection, kafkaSecurityConfig: KafkaCli
                 val settings = loadConsumerSettings[Any, Any](
                   format.getOrElse("avro"),
                   groupId.getOrElse("hydra"),
-                  kafkaSecurityConfig,
                   startOffset
                 )
                 val offsets = latestOffsets(topicName)

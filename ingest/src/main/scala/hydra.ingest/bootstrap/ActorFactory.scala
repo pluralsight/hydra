@@ -4,7 +4,6 @@ import java.lang.reflect.Modifier
 import akka.actor.Props
 import com.pluralsight.hydra.reflect.DoNotScan
 import hydra.common.config.ConfigSupport
-import hydra.common.config.KafkaConfigUtils.KafkaClientSecurityConfig
 import hydra.common.reflect.ReflectionUtils
 import hydra.core.bootstrap.{ReflectionsWrapper, ServiceProvider}
 

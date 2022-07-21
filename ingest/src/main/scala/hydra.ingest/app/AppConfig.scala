@@ -94,7 +94,7 @@ object AppConfig {
       ).as[ContactMethod],
       env("HYDRA_DEFAULT_PARTITIONS").as[Int].default(10),
       env("HYDRA_REPLICATION_FACTOR").as[Short].default(3),
-      env("HYDRA_MIN_INSYNC_REPLICAS").as[Short].default(1),
+      env("HYDRA_MIN_INSYNC_REPLICAS").as[Short].default(2),
       env("HYDRA_V2_METADATA_CONSUMER_GROUP")
     ).parMapN(MetadataTopicsConfig)
 
@@ -114,7 +114,7 @@ object AppConfig {
       env("HYDRA_V2_METADATA_CONTACT").as[ContactMethod],
       env("HYDRA_DEFAULT_PARTITIONS").as[Int].default(10),
       env("HYDRA_REPLICATION_FACTOR").as[Short].default(3),
-      env("HYDRA_MIN_INSYNC_REPLICAS").as[Short].default(1),
+      env("HYDRA_MIN_INSYNC_REPLICAS").as[Short].default(2),
       ).parMapN(DVSConsumersTopicConfig)
 
   final case class ConsumerOffsetsOffsetsTopicConfig(
@@ -133,7 +133,7 @@ object AppConfig {
       env("HYDRA_V2_METADATA_CONTACT").as[ContactMethod],
       env("HYDRA_DEFAULT_PARTITIONS").as[Int].default(10),
       env("HYDRA_REPLICATION_FACTOR").as[Short].default(3),
-      env("HYDRA_MIN_INSYNC_REPLICAS").as[Short].default(1),
+      env("HYDRA_MIN_INSYNC_REPLICAS").as[Short].default(2),
 
       ).parMapN(ConsumerOffsetsOffsetsTopicConfig)
 
@@ -177,10 +177,8 @@ object AppConfig {
   private val tagsConfig: ConfigValue[TagsConfig] =
     (
       env("HYDRA_TAGS_ENDPOINT_PASSWORD").as[String].default(""),
-      env("HYDRA_TAGS_TOPIC").as[String].
-        default("_hydra.tags-topic"),
-      env("HYDRA_TAGS_CONSUMER_GROUP")
-      .as[String].default("_hydra.tags-consumer-group")
+      env("HYDRA_TAGS_TOPIC").as[String].default("_hydra.tags-topic"),
+      env("HYDRA_TAGS_CONSUMER_GROUP").as[String].default("_hydra.tags-consumer-group")
     ).mapN(TagsConfig)
 
   final case class AllowableTopicDeletionTimeConfig(allowableTopicDeletionTime: Long)

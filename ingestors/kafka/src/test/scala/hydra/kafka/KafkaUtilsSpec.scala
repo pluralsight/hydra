@@ -118,13 +118,10 @@ class KafkaUtilsSpec
     }
 
     "has settings for consumers by client id" in {
-      val d = KafkaUtils.loadConsumerSettings("avro", "hydrag", kafkaClientSecurityConfig = kafkaClientSecurityConfig)
+      val d = KafkaUtils.loadConsumerSettings("avro", "hydrag")
       val props = Map(
         "key.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
         "auto.offset.reset" -> "latest",
-        "sasl.mechanism" -> "sasl-mechanism",
-        "sasl.jaas.config" -> "sasl-jaas-config",
-        "security.protocol" -> "security-protocol",
         "group.id" -> "hydrag",
         "bootstrap.servers" -> "localhost:8012",
         "enable.auto.commit" -> "false",

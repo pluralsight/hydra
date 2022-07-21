@@ -92,10 +92,9 @@ object KafkaUtils extends ConfigSupport {
   def loadConsumerSettings[K, V](
       clientId: String,
       groupId: String,
-      kafkaClientSecurityConfig: KafkaClientSecurityConfig,
       offsetReset: String = "latest"
   ): ConsumerSettings[K, V] = {
-    consumerSettings(rootConfig, kafkaClientSecurityConfig)
+    _consumerSettings
       .get(clientId)
       .map(
         _.withGroupId(groupId)
