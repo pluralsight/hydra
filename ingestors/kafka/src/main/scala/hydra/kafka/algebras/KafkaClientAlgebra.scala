@@ -236,6 +236,7 @@ object KafkaClientAlgebra {
       ProducerSettings[F, Array[Byte], Array[Byte]]
         .withBootstrapServers(bootstrapServers)
         .withAcks(Acks.All)
+        .withProperty("max.block.ms", publishMaxBlockMs.toMillis.toString)
         .withRetries(retries = 0)
         .withKafkaSecurityConfigs(kafkaClientSecurityConfig)
     for {

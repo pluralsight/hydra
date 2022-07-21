@@ -60,7 +60,7 @@ class KafkaClientAlgebraSpec
   (for {
     schemaRegistryAlgebra1 <- SchemaRegistry.test[IO]
     schemaRegistryAlgebra2 <- SchemaRegistry.test[IO]
-    live <- KafkaClientAlgebra.live[IO](s"localhost:$port", "https://schema-registry", schemaRegistryAlgebra1, KafkaConfigUtils.kafkaSecurityEmptyConfig)
+    live <- KafkaClientAlgebra.live[IO](s"localhost:$port", "https://schema-registry", schemaRegistryAlgebra1, KafkaConfigUtils.kafkaSecurityEmptyConfig, recordSizeLimit = None)
     test <- KafkaClientAlgebra.test[IO](schemaRegistryAlgebra2)
   } yield {
     runTest(schemaRegistryAlgebra1, live)
