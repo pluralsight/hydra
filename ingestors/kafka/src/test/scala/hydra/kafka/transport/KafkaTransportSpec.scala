@@ -3,7 +3,7 @@ package hydra.kafka.transport
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
-import hydra.common.config.ConfigSupport
+import hydra.common.config.{ConfigSupport, KafkaConfigUtils}
 import hydra.core.transport.Transport.Deliver
 import hydra.core.transport.{AckStrategy, RecordMetadata, TransportCallback}
 import hydra.kafka.producer.{DeleteTombstoneRecord, JsonRecord, StringRecord}
@@ -36,7 +36,7 @@ class KafkaTransportSpec
     AckStrategy.NoAck
   ).formatName
 
-  lazy val transport = system.actorOf(KafkaTransport.props(rootConfig), "kafka")
+  lazy val transport = system.actorOf(KafkaTransport.props(rootConfig, KafkaConfigUtils.kafkaSecurityEmptyConfig), "kafka")
 
   implicit val config = EmbeddedKafkaConfig(
     kafkaPort = 8012,
@@ -151,7 +151,7 @@ class KafkaTransportSpec
       """.stripMargin
       )
 
-      system.actorOf(KafkaTransport.props(cfg))
+      system.actorOf(KafkaTransport.props(cfg, KafkaConfigUtils.kafkaSecurityEmptyConfig))
       streamActor.expectMsgPF() {
         case ProducerInitializationError("test", err) =>
           err shouldBe a[KafkaException]

@@ -6,7 +6,8 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import hydra.avro.registry.ConfluentSchemaRegistry
-import hydra.common.config.ConfigSupport
+import hydra.common.config.KafkaConfigUtils.SchemaRegistrySecurityConfig
+import hydra.common.config.{ConfigSupport, KafkaConfigUtils}
 import hydra.common.util.ActorUtils
 import hydra.core.http.CorsSupport
 import hydra.ingest.http.SchemasEndpoint
@@ -24,6 +25,8 @@ class MockEndpoint(
 
   import ConfigSupport._
 
+  val schemaRegistrySecurityConfig = SchemaRegistrySecurityConfig(None, None)
+
   val consumerPath: String = applicationConfig
     .getStringOpt("actors.kafka.consumer_proxy.path")
     .getOrElse(
@@ -37,8 +40,9 @@ class MockEndpoint(
 
   private val streamsManagerProps = StreamsManagerActor.props(
     bootstrapKafkaConfig,
+    KafkaConfigUtils.kafkaSecurityEmptyConfig,
     KafkaUtils.BootstrapServers,
-    ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient
+    ConfluentSchemaRegistry.forConfig(applicationConfig, schemaRegistrySecurityConfig).registryClient
   )
   private val streamsManagerActor = system.actorOf(streamsManagerProps)
 
@@ -52,7 +56,7 @@ class MockEndpoint(
 
   private implicit val corsSupport: CorsSupport = new CorsSupport("http://*")
   val schemaRouteExceptionHandler: ExceptionHandler = {
-    new SchemasEndpoint(consumerProxy, streamsManagerActor).excptHandler(Instant.now, "MockEndpoint")
+    new SchemasEndpoint(consumerProxy, streamsManagerActor, schemaRegistrySecurityConfig).excptHandler(Instant.now, "MockEndpoint")
   }
 
   def route: Route = {

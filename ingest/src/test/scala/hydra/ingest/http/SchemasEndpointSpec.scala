@@ -7,6 +7,7 @@ import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.testkit.TestKit
 import hydra.avro.registry.{ConfluentSchemaRegistry, SchemaRegistry}
 import hydra.common.config.ConfigSupport
+import hydra.common.config.KafkaConfigUtils.SchemaRegistrySecurityConfig
 import hydra.common.util.ActorUtils
 import hydra.core.http.CorsSupport
 import hydra.core.marshallers.{GenericServiceResponse, HydraJsonSupport}
@@ -47,6 +48,8 @@ class SchemasEndpointSpec
     EmbeddedKafkaConfig(kafkaPort = 8062, zooKeeperPort = 3161)
 
   private implicit val corsSupport: CorsSupport = new CorsSupport("http://*")
+
+  val schemaRegistrySecurityConfig = SchemaRegistrySecurityConfig(None, None)
 
   def getTopicMetadata(topicName: String): TopicMetadata = {
     TopicMetadata(
@@ -93,7 +96,7 @@ class SchemasEndpointSpec
     "streams_manager_actor_test"
   )
 
-  val schemasRoute = new SchemasEndpoint(consumerProxy, streamsManagerActor).route
+  val schemasRoute = new SchemasEndpoint(consumerProxy, streamsManagerActor, schemaRegistrySecurityConfig).route
   implicit val endpointFormat = jsonFormat3(SchemasEndpointResponse.apply)
   implicit val endpointV2Format = jsonFormat2(SchemasWithKeyEndpointResponse.apply)
   implicit val schemasWithTopicFormat: RootJsonFormat[SchemasWithTopicResponse] = jsonFormat2(SchemasWithTopicResponse.apply)
@@ -104,7 +107,7 @@ class SchemasEndpointSpec
   }
 
   private val schemaRegistry =
-    ConfluentSchemaRegistry.forConfig(applicationConfig)
+    ConfluentSchemaRegistry.forConfig(applicationConfig, schemaRegistrySecurityConfig)
 
   val schema =
     new Schema.Parser().parse(Source.fromResource("schema.avsc").mkString)

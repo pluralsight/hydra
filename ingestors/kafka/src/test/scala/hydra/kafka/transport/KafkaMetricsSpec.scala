@@ -3,6 +3,7 @@ package hydra.kafka.transport
 import akka.actor.ActorSystem
 import akka.testkit.TestKit
 import com.typesafe.config.ConfigFactory
+import hydra.common.config.KafkaConfigUtils
 import hydra.core.transport.AckStrategy
 import hydra.kafka.producer.KafkaRecordMetadata
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
@@ -47,9 +48,9 @@ class KafkaMetricsSpec
   describe("When using the KafkaMetrics object") {
 
     it("uses the NoOpMetrics") {
-      KafkaMetrics(ConfigFactory.empty()) shouldBe NoOpMetrics
+      KafkaMetrics(ConfigFactory.empty(), KafkaConfigUtils.kafkaSecurityEmptyConfig) shouldBe NoOpMetrics
       KafkaMetrics(
-        ConfigFactory.parseString("transports.kafka.metrics.enabled=false")
+        ConfigFactory.parseString("transports.kafka.metrics.enabled=false"), KafkaConfigUtils.kafkaSecurityEmptyConfig
       ) shouldBe NoOpMetrics
     }
 
@@ -58,7 +59,7 @@ class KafkaMetricsSpec
       val cfg = ConfigFactory.parseString(s"""
            | transports.kafka.metrics.topic = metrics_topic
            | transports.kafka.metrics.enabled=true""".stripMargin)
-      val pm = KafkaMetrics(cfg)
+      val pm = KafkaMetrics(cfg, KafkaConfigUtils.kafkaSecurityEmptyConfig)
       pm shouldBe a[PublishMetrics]
       val kmd = KafkaRecordMetadata(1, 1, "topic", 1, 1, AckStrategy.NoAck)
       pm.saveMetrics(kmd)

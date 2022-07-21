@@ -76,11 +76,12 @@ object Dependencies {
       "io.kamon" %% "kamon-prometheus" % kamonPVersion
     )
 
-    val kafka = Seq(
+    val kafkaClients: Seq[ModuleID] =  Seq("org.apache.kafka" % "kafka-clients" % kafkaVersion)
+
+    val kafka: Seq[ModuleID] = Seq(
       "org.apache.kafka" %% "kafka" % kafkaVersion,
-      "org.apache.kafka" % "kafka-clients" % kafkaVersion,
       embeddedKafka
-    )
+    ) ++ kafkaClients
 
     val confluent: Seq[ModuleID] =
       Seq("io.confluent" % "kafka-avro-serializer" % confluentVersion).map(
@@ -178,7 +179,7 @@ object Dependencies {
   val integrationDeps: Seq[ModuleID] = testContainers ++ TestLibraries.getTestLibraries(module = "it")
 
   val baseDeps: Seq[ModuleID] =
-    akka ++ Seq(avro) ++ cats ++ logging ++ joda ++ testDeps
+    akka ++ Seq(avro, ciris) ++ cats ++ logging ++ joda ++ testDeps ++ kafkaClients
 
   val avroDeps: Seq[ModuleID] =
     baseDeps ++ confluent ++ jackson ++ guavacache ++ catsEffect
@@ -190,7 +191,7 @@ object Dependencies {
     ) ++ guavacache ++
     confluent ++ kamon
 
-  val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(ciris, embeddedKafka, sprayJson)
+  val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(embeddedKafka, sprayJson)
 
   val kafkaDeps: Seq[ModuleID] = coreDeps ++ Seq(
     akkaKafkaStream,

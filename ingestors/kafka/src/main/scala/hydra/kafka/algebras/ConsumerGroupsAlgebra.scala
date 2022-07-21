@@ -6,7 +6,10 @@ import java.time.Instant
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
 import cats.implicits._
+import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
+import hydra.common.config.KafkaConfigUtils.KafkaClientSecurityConfig
+import hydra.kafka.algebras.ConsumerGroupsAlgebra.{Consumer, ConsumerTopics, DetailedConsumerGroup, DetailedTopicConsumers, PartitionOffset, TopicConsumers}
 import hydra.kafka.algebras.ConsumerGroupsAlgebra._
 import hydra.kafka.algebras.KafkaClientAlgebra.Record
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Infinite
@@ -121,7 +124,8 @@ object ConsumerGroupsAlgebra {
                                                                      commonConsumerGroup: String,
                                                                      kafkaClientAlgebra: KafkaClientAlgebra[F],
                                                                      kAA: KafkaAdminAlgebra[F],
-                                                                     sra: SchemaRegistry[F]): F[ConsumerGroupsAlgebra[F]] = {
+                                                                     sra: SchemaRegistry[F],
+                                                                     kafkaClientSecurityConfig: KafkaClientSecurityConfig): F[ConsumerGroupsAlgebra[F]] = {
 
     val dvsConsumersStream: fs2.Stream[F, Record] = {
       kafkaClientAlgebra.consumeSafelyMessages(dvsConsumersTopic.value, uniquePerNodeConsumerGroup, commitOffsets = false)
@@ -159,8 +163,8 @@ object ConsumerGroupsAlgebra {
         for {
           _ <- Concurrent[F].start(consumeDVSConsumersTopicIntoCache(dvsConsumersStream, consumerGroupsStorageFacade))
           _ <- Concurrent[F].start {
-            ConsumerGroupsOffsetConsumer.start(kafkaClientAlgebra, kAA, sra, uniquePerNodeConsumerGroup,
-              consumerOffsetsOffsetsTopicConfig, kafkaInternalTopic, dvsConsumersTopic, bootstrapServers, commonConsumerGroup)
+            ConsumerGroupsOffsetConsumer.start(kafkaClientAlgebra, kAA, sra, uniquePerNodeConsumerGroup, consumerOffsetsOffsetsTopicConfig,
+              kafkaInternalTopic, dvsConsumersTopic, bootstrapServers, commonConsumerGroup, kafkaClientSecurityConfig)
           }
         } yield ()
       }

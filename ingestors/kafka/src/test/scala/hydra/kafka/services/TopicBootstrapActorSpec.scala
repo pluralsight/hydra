@@ -1,13 +1,13 @@
 package hydra.kafka.services
 
 import java.util.UUID
-
 import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.pattern.pipe
 import akka.testkit.{TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import hydra.avro.resource.SchemaResource
+import hydra.common.config.KafkaConfigUtils
 import hydra.core.akka.SchemaRegistryActor._
 import hydra.core.marshallers.TopicMetadataRequest
 import hydra.core.protocol.{Ingest, IngestorCompleted}
@@ -15,16 +15,9 @@ import hydra.core.transport.AckStrategy
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadata
 import hydra.kafka.producer.AvroRecord
-import hydra.kafka.services.StreamsManagerActor.{
-  GetMetadata,
-  GetMetadataResponse
-}
+import hydra.kafka.services.StreamsManagerActor.{GetMetadata, GetMetadataResponse}
 import hydra.kafka.services.TopicBootstrapActor._
-import net.manub.embeddedkafka.{
-  EmbeddedKafka,
-  EmbeddedKafkaConfig,
-  KafkaUnavailableException
-}
+import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig, KafkaUnavailableException}
 import org.apache.avro.Schema
 import org.apache.kafka.common.serialization.StringSerializer
 import org.joda.time.DateTime
@@ -448,6 +441,7 @@ class TopicBootstrapActorSpec
         schemaRegistryActor,
         system.actorSelection("/user/kafka_ingestor_test6"),
         system.actorOf(Props(new MockStreamsManagerActor())),
+        KafkaConfigUtils.kafkaSecurityEmptyConfig,
         Some(testConfig)
       )
     )

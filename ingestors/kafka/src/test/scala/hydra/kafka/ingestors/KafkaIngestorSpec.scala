@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.typesafe.config.ConfigFactory
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
+import hydra.common.config.KafkaConfigUtils.SchemaRegistrySecurityConfig
 import hydra.core.ingest.HydraRequest
 import hydra.core.ingest.RequestParams._
 import hydra.core.protocol._
@@ -40,7 +41,7 @@ class KafkaIngestorSpec
 
   import KafkaIngestorSpec._
 
-  val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig)
+  val schemaRegistry = ConfluentSchemaRegistry.forConfig(applicationConfig, SchemaRegistrySecurityConfig(None, None))
 
   val registryClient = schemaRegistry.registryClient
 

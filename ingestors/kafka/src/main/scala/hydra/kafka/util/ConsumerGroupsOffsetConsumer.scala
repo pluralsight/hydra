@@ -9,6 +9,7 @@ import cats.implicits._
 import fs2.Chunk.Bytes
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
+import hydra.common.config.KafkaConfigUtils._
 import hydra.kafka.algebras.ConsumerGroupsAlgebra.PartitionOffsetMap
 import hydra.kafka.algebras.KafkaClientAlgebra.{OffsetInfo, Record}
 import hydra.kafka.algebras.RetryableFs2Stream.ReRunnableStreamAdder
@@ -47,7 +48,8 @@ object ConsumerGroupsOffsetConsumer {
                                                                   kafkaInternalTopic: String,
                                                                   dvsConsumersTopic: Subject,
                                                                   bootstrapServers: String,
-                                                                  commonConsumerGroup: String
+                                                                  commonConsumerGroup: String,
+                                                                  kafkaClientSecurityConfig: KafkaClientSecurityConfig
                                                                 ): F[Unit] = {
     val dvsConsumerOffsetStream = kafkaClientAlgebra.consumeSafelyWithOffsetInfo(consumerOffsetsOffsetsTopicConfig.value, uniquePerNodeConsumerGroup, commitOffsets = false)
       .collect({case Right(value) => value})
@@ -61,7 +63,8 @@ object ConsumerGroupsOffsetConsumer {
       backgroundProcess <- Concurrent[F].start(getOffsetsToSeekTo(initialPartitionCache, deferred, dvsConsumerOffsetStream,hydraConsumerOffsetsOffsetsLatestOffsets, hydraConsumerOffsetsOffsetsCache))
       partitionMap <- deferred.get
       _ <- backgroundProcess.cancel
-      _ <- Concurrent[F].start(consumerOffsetsToInternalOffsets(kafkaInternalTopic, dvsConsumersTopic.value, bootstrapServers, commonConsumerGroup, schemaRegistryClient, partitionMap, consumerOffsetsOffsetsTopicConfig.value))
+      _ <- Concurrent[F].start(consumerOffsetsToInternalOffsets(kafkaInternalTopic, dvsConsumersTopic.value, bootstrapServers,
+        commonConsumerGroup, schemaRegistryClient, partitionMap, consumerOffsetsOffsetsTopicConfig.value, kafkaClientSecurityConfig))
     } yield ()
   }
 
@@ -145,7 +148,8 @@ object ConsumerGroupsOffsetConsumer {
     consumerGroupName: String,
     s: SchemaRegistryClient,
     partitionMap: PartitionOffsetMap,
-    dvsInternalKafkaOffsetTopic: String
+    dvsInternalKafkaOffsetTopic: String,
+    kafkaClientSecurityConfig: KafkaClientSecurityConfig
   ) = {
     val settings: ConsumerSettings[F, Option[BaseKey], Option[OffsetAndMetadata]] = ConsumerSettings(
       getConsumerGroupDeserializer[F, BaseKey](GroupMetadataManager.readMessageKey),
@@ -154,11 +158,13 @@ object ConsumerGroupsOffsetConsumer {
       .withAutoOffsetReset(AutoOffsetReset.Earliest)
       .withBootstrapServers(bootstrapServers)
       .withGroupId(consumerGroupName)
+      .withKafkaSecurityConfigs(kafkaClientSecurityConfig)
 
     val producerSettings = ProducerSettings[F, Array[Byte], Array[Byte]]
       .withBootstrapServers(bootstrapServers)
       .withRetries(0)
       .withAcks(Acks.One)
+      .withKafkaSecurityConfigs(kafkaClientSecurityConfig)
     val consumer = consumerStream(settings)
     val keySerializer = getSerializer[F, GenericRecord](s)(isKey = true)
     val valueSerializer = getSerializer[F, GenericRecord](s)(isKey = false)

@@ -12,6 +12,8 @@ import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
 import org.typelevel.log4cats.Logger
+import hydra.common.config.KafkaConfigUtils._
+import kafka.server.KafkaConfig
 
 /**
  * Internal interface to interact with the KafkaAdminClient from FS2 Kafka.
@@ -124,7 +126,7 @@ object KafkaAdminAlgebra {
 
   def live[F[_] : Sync : ConcurrentEffect : ContextShift : Timer : Logger](
                                                                             bootstrapServers: String,
-                                                                            useSsl: Boolean = false
+                                                                            kafkaClientSecurityConfig: KafkaClientSecurityConfig
                                                                           ): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
     new KafkaAdminAlgebra[F] {
 
@@ -217,26 +219,15 @@ object KafkaAdminAlgebra {
       private def getConsumerResource: Resource[F, KafkaConsumer[F, _, _]] = {
         val des = Deserializer[F, String]
         consumerResource[F, String, String] {
-          val s = ConsumerSettings.apply(des, des).withBootstrapServers(bootstrapServers)
-            .withProperty("security.protocol", "SASL_SSL")
-            .withProperty("sasl.jaas.config","org.apache.kafka.common.security.plain.PlainLoginModule  required username='I2TGTNT5E3SI6NX2'   password='5KI8zsJ47L0RZyE7fadOWTdwXS7s0VCHpAW2IJfd5cbJJxrLFAJz+SnJJhf4Vcjs';")
-            .withProperty("sasl.mechanism","PLAIN")
-            .withProperty("client.dns.lookup","use_all_dns_ips")
-            .withProperty("session.timeout.ms","45000")
-//            .withAllowAutoCreateTopics(false)
-          if (useSsl) s.withProperty("security.protocol", "SSL") else s
+          ConsumerSettings.apply(des, des).withBootstrapServers(bootstrapServers)
+            .withKafkaSecurityConfigs(kafkaClientSecurityConfig)
         }
       }
 
       private def getAdminClientResource: Resource[F, KafkaAdminClient[F]] = {
         adminClientResource {
-          val s = AdminClientSettings.apply.withBootstrapServers(bootstrapServers)
-            .withProperty("security.protocol", "SASL_SSL")
-            .withProperty("sasl.jaas.config","org.apache.kafka.common.security.plain.PlainLoginModule  required username='I2TGTNT5E3SI6NX2'   password='5KI8zsJ47L0RZyE7fadOWTdwXS7s0VCHpAW2IJfd5cbJJxrLFAJz+SnJJhf4Vcjs';")
-            .withProperty("sasl.mechanism","PLAIN")
-            .withProperty("client.dns.lookup","use_all_dns_ips")
-            .withProperty("session.timeout.ms","45000")
-          if (useSsl) s.withProperty("security.protocol", "SSL") else s
+          AdminClientSettings.apply.withBootstrapServers(bootstrapServers)
+            .withKafkaSecurityConfigs(kafkaClientSecurityConfig)
         }
       }
 

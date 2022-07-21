@@ -2,6 +2,7 @@ package hydra.kafka.consumer
 
 import akka.actor.Actor
 import akka.pattern.pipe
+import hydra.common.config.KafkaConfigUtils.KafkaClientSecurityConfig
 import hydra.kafka.consumer.KafkaConsumerProxy._
 import hydra.kafka.util.KafkaUtils
 import org.apache.kafka.clients.consumer.Consumer

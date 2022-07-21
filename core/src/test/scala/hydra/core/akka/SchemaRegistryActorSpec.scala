@@ -1,7 +1,6 @@
 package hydra.core.akka
 
 import java.net.ConnectException
-
 import akka.actor.ActorSystem
 import akka.actor.Status.Failure
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
@@ -9,6 +8,7 @@ import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.avro.resource.SchemaResource
+import hydra.common.config.KafkaConfigUtils.SchemaRegistrySecurityConfig
 import hydra.core.akka.SchemaRegistryActor._
 import hydra.core.protocol.HydraApplicationError
 import org.apache.avro.Schema.Parser
@@ -33,6 +33,8 @@ class SchemaRegistryActorSpec
     with BeforeAndAfterAll {
 
   implicit val timeout = Timeout(3.seconds)
+
+  val emptySchemaRegistrySecurityConfig = SchemaRegistrySecurityConfig(None, None)
 
   override def afterAll =
     TestKit.shutdownActorSystem(
@@ -78,7 +80,7 @@ class SchemaRegistryActorSpec
         |http.interace = 0.0.0.0
       """.stripMargin)
     val schemaRegistryActor =
-      system.actorOf(SchemaRegistryActor.props(config, Some(settings)))
+      system.actorOf(SchemaRegistryActor.props(config, emptySchemaRegistrySecurityConfig, Some(settings)))
     val testProbe = TestProbe()
     (testProbe, schemaRegistryActor)
   }
@@ -89,7 +91,7 @@ class SchemaRegistryActorSpec
         |schema.registry.url = "http://localhost:0101"
       """.stripMargin)
     val schemaRegistryActor =
-      system.actorOf(SchemaRegistryActor.props(config, Some(settings)))
+      system.actorOf(SchemaRegistryActor.props(config, emptySchemaRegistrySecurityConfig, Some(settings)))
     schemaRegistryActor ! FetchSchemaRequest("test")
     schemaRegistryActor ! FetchSchemaRequest("test")
     schemaRegistryActor ! FetchSchemaRequest("test")
@@ -171,7 +173,7 @@ class SchemaRegistryActorSpec
         |schema.registry.url = "http://localhost:0101"
       """.stripMargin)
     val schemaRegistryActor =
-      system.actorOf(SchemaRegistryActor.props(config, Some(settings)))
+      system.actorOf(SchemaRegistryActor.props(config, emptySchemaRegistrySecurityConfig, Some(settings)))
     val senderProbe = TestProbe()
 
     val expectedResource = SchemaResource(1, 1, testSchema)

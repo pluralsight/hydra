@@ -27,7 +27,16 @@ object Publish {
       */
 
     // When publishing remotely, use these settings
-    publishTo := Some(MavenCache("local-maven", file("path/to/maven-repo/releases"))),
+    publishTo := {
+      val nexus = "https://oss.sonatype.org/"
+      // versions that end with ``SNAPSHOT`` go to the Snapshots repository on Sonatype;
+      // anything else goes to releases on Sonatype.
+      if (version.toString.endsWith("SNAPSHOT")) {
+        Some("snapshots" at nexus + "content/repositories/snapshots")
+      } else {
+        Some("releases" at nexus + "service/local/staging/deploy/maven2")
+      }
+    },
     /**
       * We construct _proper_ Maven-esque POMs to be able to release on Maven.
       */

@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import cats.effect.{Clock, ContextShift, IO, Sync, Timer}
 import hydra.kafka.algebras.KafkaAdminAlgebra.{LagOffsets, Offset, Topic, TopicAndPartition}
 import hydra.avro.registry.SchemaRegistry
+import hydra.common.config.KafkaConfigUtils
 import hydra.kafka.algebras.KafkaAdminAlgebra.{LagOffsets, Offset, TopicAndPartition}
 import hydra.kafka.algebras.KafkaClientAlgebra.getOptionalGenericRecordDeserializer
 import hydra.kafka.util.KafkaUtils.TopicDetails
@@ -58,7 +59,7 @@ final class KafkaAdminAlgebraSpec
 
   (for {
     live <- KafkaAdminAlgebra
-      .live[IO](bootstrapServers)
+      .live[IO](bootstrapServers, KafkaConfigUtils.kafkaSecurityEmptyConfig)
     test <- KafkaAdminAlgebra.test[IO]()
   } yield {
     runTests(live)

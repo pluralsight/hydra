@@ -1,8 +1,10 @@
 package hydra.kafka
 
 import java.util.concurrent.ExecutionException
-
 import com.typesafe.config.ConfigFactory
+import hydra.common.config.KafkaConfigUtils
+import hydra.common.config.KafkaConfigUtils.KafkaClientSecurityConfig
+import hydra.kafka.KafkaUtilsSpec.{emptyKafkaClientSecurityConfig, kafkaClientSecurityConfig}
 import hydra.kafka.util.KafkaUtils
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
@@ -38,7 +40,7 @@ class KafkaUtilsSpec
     "metadata.fetch.timeout.ms" -> "100000"
   )
 
-  val ku = new KafkaUtils(defaultCfg)
+  val ku = new KafkaUtils(defaultCfg, KafkaConfigUtils.kafkaSecurityEmptyConfig)
 
   override def beforeAll = {
     EmbeddedKafka.start()
@@ -116,10 +118,13 @@ class KafkaUtilsSpec
     }
 
     "has settings for consumers by client id" in {
-      val d = KafkaUtils.loadConsumerSettings("avro", "hydrag")
+      val d = KafkaUtils.loadConsumerSettings("avro", "hydrag", kafkaClientSecurityConfig = kafkaClientSecurityConfig)
       val props = Map(
         "key.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
         "auto.offset.reset" -> "latest",
+        "sasl.mechanism" -> "sasl-mechanism",
+        "sasl.jaas.config" -> "sasl-jaas-config",
+        "security.protocol" -> "security-protocol",
         "group.id" -> "hydrag",
         "bootstrap.servers" -> "localhost:8012",
         "enable.auto.commit" -> "false",
@@ -134,11 +139,14 @@ class KafkaUtilsSpec
 
     "create ProducerSettings from config" in {
 
-      val settings = KafkaUtils.producerSettings("test", cfg)
+      val settings = KafkaUtils.producerSettings("test", cfg, kafkaClientSecurityConfig)
 
       settings.properties shouldBe Map(
         "value.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
         "key.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
+        "sasl.mechanism" -> "sasl-mechanism",
+        "security.protocol" -> "security-protocol",
+        "sasl.jaas.config" -> "sasl-jaas-config",
         "bootstrap.servers" -> "localhost:8042",
         "client.id" -> "test",
         "linger.ms" -> "10"
@@ -146,11 +154,14 @@ class KafkaUtilsSpec
     }
 
     "retrieve all clients from a config" in {
-      val clients = KafkaUtils.producerSettings(cfg)
+      val clients = KafkaUtils.producerSettings(cfg, kafkaClientSecurityConfig)
       clients.keys should contain allOf ("test", "test1")
       clients("test1").properties shouldBe Map(
         "value.serializer" -> "org.apache.kafka.common.serialization.Tester",
         "key.serializer" -> "org.apache.kafka.common.serialization.StringSerializer",
+        "sasl.mechanism" -> "sasl-mechanism",
+        "security.protocol" -> "security-protocol",
+        "sasl.jaas.config" -> "sasl-jaas-config",
         "bootstrap.servers" -> "localhost:8042",
         "client.id" -> "test1",
         "linger.ms" -> "10"
@@ -164,7 +175,7 @@ class KafkaUtilsSpec
         "cleanup.policy" -> "compact",
         "segment.bytes" -> "1048576"
       )
-      val kafkaUtils = new KafkaUtils(defaultCfg)
+      val kafkaUtils = new KafkaUtils(defaultCfg, emptyKafkaClientSecurityConfig)
       kafkaUtils.topicExists("test.Hydra").get shouldBe false
       val details = new TopicDetails(1, 1: Short, 1, configs)
       whenReady(kafkaUtils.createTopic("test.Hydra", details, 3000)) {
@@ -180,7 +191,7 @@ class KafkaUtilsSpec
         "cleanup.policy" -> "compact",
         "segment.bytes" -> "1048576"
       )
-      val kafkaUtils = new KafkaUtils(defaultCfg)
+      val kafkaUtils = new KafkaUtils(defaultCfg, emptyKafkaClientSecurityConfig)
       createCustomTopic("hydra.already.Exists")
       kafkaUtils.topicExists("hydra.already.Exists").get shouldBe true
       val details = new TopicDetails(1, 1, 1, configs)
@@ -194,11 +205,28 @@ class KafkaUtilsSpec
         "min.insync.replicas" -> "1",
         "cleanup.policy" -> "under the carpet"
       )
-      val kafkaUtils = new KafkaUtils(defaultCfg)
+      val kafkaUtils = new KafkaUtils(defaultCfg, emptyKafkaClientSecurityConfig)
       val details = new TopicDetails(1, 1, 1, configs)
       whenReady(kafkaUtils.createTopic("InvalidConfig", details, 1000)) {
         response => intercept[ExecutionException](response.all().get)
       }
     }
   }
+}
+
+object KafkaUtilsSpec {
+
+  val emptyKafkaClientSecurityConfig: KafkaClientSecurityConfig =
+    KafkaClientSecurityConfig(
+      None,
+      None,
+      None
+    )
+
+  val kafkaClientSecurityConfig: KafkaClientSecurityConfig =
+    KafkaClientSecurityConfig(
+      Some("security-protocol"),
+      Some("sasl-mechanism"),
+      Some("sasl-jaas-config")
+    )
 }

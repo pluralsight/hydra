@@ -1,10 +1,11 @@
 package hydra.kafka.endpoints
 
 import java.util.UUID
-
 import akka.actor.{ActorRef, Props}
 import com.typesafe.config.Config
 import hydra.avro.registry.ConfluentSchemaRegistry
+import hydra.common.config.KafkaConfigUtils
+import hydra.common.config.KafkaConfigUtils.SchemaRegistrySecurityConfig
 import hydra.core.akka.SchemaRegistryActor
 import hydra.kafka.model.TopicMetadata
 import hydra.kafka.services.{StreamsManagerActor, TopicBootstrapActor}
@@ -20,6 +21,7 @@ trait BootstrapEndpointTestActors extends BootstrapEndpointActors {
       schemaRegistryClient: SchemaRegistryClient
   ) extends StreamsManagerActor(
         bootstrapKafkaConfig,
+        KafkaConfigUtils.kafkaSecurityEmptyConfig,
         bootstrapServers,
         schemaRegistryClient
       ) {
@@ -65,8 +67,9 @@ trait BootstrapEndpointTestActors extends BootstrapEndpointActors {
       schemaRegistryActor,
       kafkaIngestor,
       system.actorOf(StreamsActorTest.props(bootstrapKafkaConfig, KafkaUtils.BootstrapServers,
-        ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient)),
-      Some(bootstrapKafkaConfig)
+        ConfluentSchemaRegistry.forConfig(applicationConfig,  SchemaRegistrySecurityConfig(None, None)).registryClient)),
+        KafkaConfigUtils.kafkaSecurityEmptyConfig,
+        Some(bootstrapKafkaConfig)
     )
   )
 

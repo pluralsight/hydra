@@ -3,9 +3,10 @@ package hydra.avro.registry
 import cats.Eval
 import cats.effect.Sync
 import cats.syntax.all._
+import hydra.common.config.KafkaConfigUtils._
 import io.confluent.kafka.schemaregistry.avro.AvroCompatibilityChecker
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
-import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, MockSchemaRegistryClient, SchemaRegistryClient}
+import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, MockSchemaRegistryClient, SchemaRegistryClient, SchemaRegistryClientConfig}
 import org.apache.avro.{LogicalType, LogicalTypes, Schema}
 
 import scala.collection.JavaConverters._
@@ -136,11 +137,10 @@ object SchemaRegistry {
 
   def live[F[_]: Sync](
       schemaRegistryBaseUrl: String,
-      maxCacheSize: Int
+      maxCacheSize: Int,
+      securityConfig: SchemaRegistrySecurityConfig
   ): F[SchemaRegistry[F]] = Sync[F].delay {
-    getFromSchemaRegistryClient(new CachedSchemaRegistryClient(schemaRegistryBaseUrl, maxCacheSize, Map(
-      "basic.auth.credentials.source" -> "USER_INFO",
-      "basic.auth.user.info" -> "PTGHGC2VS2HZEMJX:OLGqr67k2CY6/MO8lOnDdkqRkAJMFwpWu49t74f9yuJFHc/Ld+Kley6aWVhRm4Od").asJava))
+    getFromSchemaRegistryClient(new CachedSchemaRegistryClient(schemaRegistryBaseUrl, maxCacheSize,  securityConfig.toConfigMap.asJava))
   }
 
   def test[F[_]: Sync]: F[SchemaRegistry[F]] = Sync[F].delay {

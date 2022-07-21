@@ -10,6 +10,7 @@ import org.scalatest.wordspec.AnyWordSpecLike
 import vulcan.Codec
 import vulcan.generic._
 import cats.syntax.all._
+import hydra.common.config.KafkaConfigUtils
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError.{RecordTooLarge, TopicNotFoundInMetadata}
 import hydra.kafka.algebras.KafkaClientAlgebra.{OffsetInfoNotRetrievableInTest, PublishResponse}
 import hydra.kafka.util.KafkaUtils.TopicDetails
@@ -49,7 +50,7 @@ class KafkaClientAlgebraSpec
 
   private def createTopics: IO[Unit] = {
     val topicsToCreate: List[String] = List("topic1", "topic2" , "topic-inc-data", "stringTopic1", "stringTopic2", "nullTopic1")
-    KafkaAdminAlgebra.live[IO](s"localhost:$port")
+    KafkaAdminAlgebra.live[IO](s"localhost:$port", KafkaConfigUtils.kafkaSecurityEmptyConfig)
       .flatMap(adminClient => topicsToCreate.traverse(adminClient.createTopic(_, TopicDetails(1, 1, 1)))).void
   }
 
@@ -59,7 +60,7 @@ class KafkaClientAlgebraSpec
   (for {
     schemaRegistryAlgebra1 <- SchemaRegistry.test[IO]
     schemaRegistryAlgebra2 <- SchemaRegistry.test[IO]
-    live <- KafkaClientAlgebra.live[IO](s"localhost:$port", schemaRegistryAlgebra1, recordSizeLimit = None)
+    live <- KafkaClientAlgebra.live[IO](s"localhost:$port", "https://schema-registry", schemaRegistryAlgebra1, KafkaConfigUtils.kafkaSecurityEmptyConfig)
     test <- KafkaClientAlgebra.test[IO](schemaRegistryAlgebra2)
   } yield {
     runTest(schemaRegistryAlgebra1, live)

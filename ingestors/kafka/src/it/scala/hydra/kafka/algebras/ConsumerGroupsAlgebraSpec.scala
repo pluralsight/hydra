@@ -6,6 +6,7 @@ import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.implicits._
 import com.dimafeng.testcontainers.{ForAllTestContainer, KafkaContainer}
 import hydra.avro.registry.SchemaRegistry
+import hydra.common.config.KafkaConfigUtils.{KafkaClientSecurityConfig, SchemaRegistrySecurityConfig, kafkaSecurityEmptyConfig}
 import hydra.kafka.algebras.ConsumerGroupsAlgebra.PartitionOffsetMap
 import hydra.kafka.algebras.KafkaClientAlgebra.{OffsetInfo, Record}
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
@@ -61,10 +62,10 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
   private val consumerGroup = "consumerGroupName"
 
   (for {
-    kafkaAdmin <- KafkaAdminAlgebra.live[IO](container.bootstrapServers)
+    kafkaAdmin <- KafkaAdminAlgebra.live[IO](container.bootstrapServers,  kafkaSecurityEmptyConfig)
     schemaRegistry <- SchemaRegistry.test[IO]
-    kafkaClient <- KafkaClientAlgebra.live[IO](container.bootstrapServers, schemaRegistry)
-    consumerGroupAlgebra <- ConsumerGroupsAlgebra.make(internalKafkaConsumerTopic, dvsConsumerTopic, dvsInternalKafkaOffsetsTopic, container.bootstrapServers, consumerGroup, consumerGroup, kafkaClient, kafkaAdmin, schemaRegistry)
+    kafkaClient <- KafkaClientAlgebra.live[IO](container.bootstrapServers, "https://schema-registry", schemaRegistry , kafkaSecurityEmptyConfig)
+    consumerGroupAlgebra <- ConsumerGroupsAlgebra.make(internalKafkaConsumerTopic, dvsConsumerTopic, dvsInternalKafkaOffsetsTopic, container.bootstrapServers, consumerGroup, consumerGroup, kafkaClient, kafkaAdmin, schemaRegistry,  kafkaSecurityEmptyConfig)
     _ <- consumerGroupAlgebra.startConsumer
   } yield {
     runTests(consumerGroupAlgebra, schemaRegistry, kafkaClient, kafkaAdmin)
@@ -90,8 +91,8 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
 
       "sfgfg" in {
         (for {
-          schemaRegistry <- SchemaRegistry.live[IO]("http://localhost:8081", 1)
-          kafkaClient <- KafkaClientAlgebra.live[IO]("kafka:29092", schemaRegistry)
+          schemaRegistry <- SchemaRegistry.live[IO]("http://localhost:8081", 1,   SchemaRegistrySecurityConfig(None, None))
+          kafkaClient <- KafkaClientAlgebra.live[IO]("kafka:29092", "https://schema-registry" ,  schemaRegistry, kafkaSecurityEmptyConfig)
           s <- TopicMetadataV2.encode[IO](TopicMetadataV2Key(Subject.createValidated("dvs.data-platform.v-1.oleksii10").get), None, None)
           _ <- kafkaClient.publishMessage(s, "_hydra.v2.metadata")
           _ <- kafkaClient.publishMessage(s, "_hydra.v2.metadata")

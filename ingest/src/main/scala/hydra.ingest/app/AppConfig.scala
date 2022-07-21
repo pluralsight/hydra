@@ -1,19 +1,21 @@
 package hydra.ingest.app
 
-import cats.syntax.all._
-import ciris.{ConfigValue, env, _}
+
+import cats.implicits._
+import ciris.{ConfigDecoder, ConfigValue, env}
+import hydra.common.config.KafkaConfigUtils.{KafkaClientSecurityConfig, SchemaRegistrySecurityConfig, kafkaClientSecurityConfig, schemaRegistrySecurityConfig}
 import hydra.kafka.algebras.KafkaClientAlgebra.ConsumerGroup
 import hydra.kafka.model.ContactMethod
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 object AppConfig {
 
   final case class SchemaRegistryConfig(
       fullUrl: String,
       maxCacheSize: Int
-  )
+      )
 
   private val schemaRegistryConfig: ConfigValue[SchemaRegistryConfig] =
     (
@@ -21,7 +23,9 @@ object AppConfig {
         .as[String]
         .default("http://localhost:8081"),
       env("HYDRA_MAX_SCHEMAS_PER_SUBJECT").as[Int].default(1000)
-    ).parMapN(SchemaRegistryConfig)
+      ).parMapN(SchemaRegistryConfig)
+
+
 
   final case class CreateTopicConfig(
       schemaRegistryConfig: SchemaRegistryConfig,
@@ -43,8 +47,8 @@ object AppConfig {
       env("HYDRA_KAFKA_PRODUCER_BOOTSTRAP_SERVERS").as[String],
       env("HYDRA_DEFAULT_PARTIONS").as[Int].default(10),
       env("HYDRA_REPLICATION_FACTOR").as[Short].default(3),
-      env("HYDRA_MIN_INSYNC_REPLICAS").as[Short].default(1)
-    ).parMapN(CreateTopicConfig)
+      env("HYDRA_MIN_INSYNC_REPLICAS").as[Short].default(2)
+      ).parMapN(CreateTopicConfig)
 
   private implicit val subjectConfigDecoder: ConfigDecoder[String, Subject] =
     ConfigDecoder.identity[String].mapOption("Subject")(Subject.createValidated)
@@ -173,8 +177,10 @@ object AppConfig {
   private val tagsConfig: ConfigValue[TagsConfig] =
     (
       env("HYDRA_TAGS_ENDPOINT_PASSWORD").as[String].default(""),
-      env("HYDRA_TAGS_TOPIC").as[String].default("_hydra.tags-topic"),
-      env("HYDRA_TAGS_CONSUMER_GROUP").as[String].default("_hydra.tags-consumer-group")
+      env("HYDRA_TAGS_TOPIC").as[String].
+        default("_hydra.tags-topic"),
+      env("HYDRA_TAGS_CONSUMER_GROUP")
+      .as[String].default("_hydra.tags-consumer-group")
     ).mapN(TagsConfig)
 
   final case class AllowableTopicDeletionTimeConfig(allowableTopicDeletionTime: Long)
@@ -189,7 +195,6 @@ object AppConfig {
     env("CORS_ALLOWED_ORIGIN").as[String].default("*").map(CorsAllowedOriginConfig)
 
   final case class AppConfig(
-
                               createTopicConfig: CreateTopicConfig,
                               metadataTopicsConfig: MetadataTopicsConfig,
                               ingestConfig: IngestConfig,
@@ -200,7 +205,9 @@ object AppConfig {
                               consumerGroupsAlgebraConfig: ConsumerGroupsAlgebraConfig,
                               ignoreDeletionConsumerGroups: IgnoreDeletionConsumerGroups,
                               allowableTopicDeletionTimeConfig: AllowableTopicDeletionTimeConfig,
-                              corsAllowedOriginConfig: CorsAllowedOriginConfig
+                              corsAllowedOriginConfig: CorsAllowedOriginConfig,
+                              kafkaClientSecurityConfig: KafkaClientSecurityConfig,
+                              schemaRegistrySecurityConfig: SchemaRegistrySecurityConfig
                             )
 
   val appConfig: ConfigValue[AppConfig] =
@@ -215,6 +222,8 @@ object AppConfig {
       consumerGroupAlgebraConfig,
       ignoreDeletionConsumerGroups,
       allowableTopicDeletionTimeConfig,
-      corsAllowedOrigin
+      corsAllowedOrigin,
+      kafkaClientSecurityConfig,
+      schemaRegistrySecurityConfig
     ).parMapN(AppConfig)
 }

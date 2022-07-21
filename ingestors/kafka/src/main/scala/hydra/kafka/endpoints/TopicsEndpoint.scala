@@ -1,7 +1,6 @@
 package hydra.kafka.endpoints
 
 import java.time.Instant
-
 import akka.actor.ActorSelection
 import akka.http.scaladsl.common.EntityStreamingSupport
 import akka.http.scaladsl.model.StatusCodes
@@ -9,6 +8,7 @@ import akka.kafka.Subscriptions
 import akka.kafka.scaladsl.Consumer
 import akka.pattern.ask
 import akka.util.Timeout
+import hydra.common.config.KafkaConfigUtils.KafkaClientSecurityConfig
 import hydra.core.http.RouteSupport
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetLatestOffsets, LatestOffsetsResponse}
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -24,7 +24,7 @@ import scala.concurrent.{Await, ExecutionContext, Future}
   *
   * Created by alexsilva on 3/18/17.
   */
-class TopicsEndpoint(consumerProxy:ActorSelection)(implicit ec:ExecutionContext) extends RouteSupport {
+class TopicsEndpoint(consumerProxy:ActorSelection, kafkaSecurityConfig: KafkaClientSecurityConfig)(implicit ec:ExecutionContext) extends RouteSupport {
 
   import hydra.kafka.util.KafkaUtils._
 
@@ -41,12 +41,13 @@ class TopicsEndpoint(consumerProxy:ActorSelection)(implicit ec:ExecutionContext)
                 val settings = loadConsumerSettings[Any, Any](
                   format.getOrElse("avro"),
                   groupId.getOrElse("hydra"),
+                  kafkaSecurityConfig,
                   startOffset
                 )
                 val offsets = latestOffsets(topicName)
                 val source = Consumer
                   .plainSource(settings, Subscriptions.topics(topicName))
-                  .initialTimeout(60.seconds)
+                  .initialTimeout(5.seconds)
                   .zipWithIndex
                   .takeWhile(rec =>
                     rec._2 <= n && !shouldCancel(offsets, rec._1)
@@ -86,7 +87,7 @@ class TopicsEndpoint(consumerProxy:ActorSelection)(implicit ec:ExecutionContext)
   private def latestOffsets(
       topic: String
   ): Future[Map[TopicPartition, Long]] = {
-    implicit val timeout = Timeout(60 seconds)
+    implicit val timeout = Timeout(5 seconds)
     (consumerProxy ? GetLatestOffsets(topic))
       .mapTo[LatestOffsetsResponse]
       .map(_.offsets)

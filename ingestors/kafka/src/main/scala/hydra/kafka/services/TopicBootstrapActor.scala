@@ -9,6 +9,8 @@ import akka.util.Timeout
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import ConfigSupport._
+import hydra.common.config.KafkaConfigUtils.KafkaClientSecurityConfig
+import hydra.common.config.KafkaConfigUtils.kafkaSecurityEmptyConfig
 import hydra.core.akka.SchemaRegistryActor.{RegisterSchemaRequest, RegisterSchemaResponse}
 import hydra.core.ingest.{HydraRequest, RequestParams}
 import hydra.core.marshallers.{GenericSchema, HydraJsonSupport, StreamType, TopicMetadataRequest}
@@ -27,10 +29,11 @@ import scala.io.Source
 import scala.util._
 
 class TopicBootstrapActor(
-    schemaRegistryActor: ActorRef,
-    kafkaIngestor: ActorSelection,
-    streamsManagerActor: ActorRef,
-    bootstrapConfig: Option[Config] = None
+                           schemaRegistryActor: ActorRef,
+                           kafkaIngestor: ActorSelection,
+                           streamsManagerActor: ActorRef,
+                           kafkaClientSecurityConfig: KafkaClientSecurityConfig = kafkaSecurityEmptyConfig,
+                           bootstrapConfig: Option[Config] = None
 ) extends Actor
     with ActorLogging
     with ConfigSupport
@@ -49,14 +52,14 @@ class TopicBootstrapActor(
 
   val schema = Source.fromResource("HydraMetadataTopic.avsc").mkString
 
-  private val kafkaUtils = KafkaUtils()
+  private val kafkaUtils = KafkaUtils(kafkaClientSecurityConfig)
 
   val bootstrapKafkaConfig: Config = bootstrapConfig getOrElse
     applicationConfig.getConfig("bootstrap-config")
 
   val topicDetails = TopicDetails(
     bootstrapKafkaConfig.getInt("partitions"),
-    3.toShort,
+    bootstrapKafkaConfig.getInt("replication-factor").toShort,
     bootstrapKafkaConfig.getInt("min-insync-replicas").toShort
   )
 
@@ -260,8 +263,8 @@ class TopicBootstrapActor(
     val topicMap = Map(topicName -> topicDetails.copy(partialConfig = topicDetails.configs ++ getCleanupPolicyConfig))
 
     kafkaUtils
-      .createTopics(topicMap, timeout = 60000)
-      .map { r => r.all.get(60000, TimeUnit.MILLISECONDS) }
+      .createTopics(topicMap, timeout = timeoutMillis)
+      .map { r => r.all.get(timeoutMillis, TimeUnit.MILLISECONDS) }
       .map { _ => BootstrapSuccess }
       .recover {
         case illegalArg: IllegalArgumentException => {
@@ -291,9 +294,10 @@ object TopicBootstrapActor {
       schemaRegistryActor: ActorRef,
       kafkaIngestor: ActorSelection,
       streamsManagerActor: ActorRef,
+      kafkaClientSecurityConfig: KafkaClientSecurityConfig = kafkaSecurityEmptyConfig,
       config: Option[Config] = None
   ): Props =
-    Props(new TopicBootstrapActor(schemaRegistryActor, kafkaIngestor, streamsManagerActor, config))
+    Props(new TopicBootstrapActor(schemaRegistryActor, kafkaIngestor, streamsManagerActor, kafkaClientSecurityConfig, config))
 
   sealed trait TopicBootstrapMessage
 

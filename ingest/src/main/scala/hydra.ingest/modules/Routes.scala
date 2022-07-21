@@ -52,20 +52,21 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
 
      val streamsManagerProps = StreamsManagerActor.props(
       bootstrapKafkaConfig,
+      cfg.kafkaClientSecurityConfig,
       KafkaUtils.BootstrapServers,
-      ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient
+      ConfluentSchemaRegistry.forConfig(applicationConfig, cfg.schemaRegistrySecurityConfig).registryClient
     )
      val streamsManagerActor: ActorRef = system.actorOf(streamsManagerProps, "streamsManagerActor")
 
-    new SchemasEndpoint(consumerProxy, streamsManagerActor).route ~
-      new BootstrapEndpoint(system, streamsManagerActor).route ~
+    new SchemasEndpoint(consumerProxy, streamsManagerActor, cfg.schemaRegistrySecurityConfig).route ~
+      new BootstrapEndpoint(system, streamsManagerActor, cfg.kafkaClientSecurityConfig, cfg.schemaRegistrySecurityConfig).route ~
       new TopicMetadataEndpoint(consumerProxy, algebras.metadata,
         algebras.schemaRegistry, programs.createTopic, cfg.createTopicConfig.defaultMinInsyncReplicas, algebras.tagsAlgebra).route ~
       new ConsumerGroupsEndpoint(algebras.consumerGroups).route ~
       new IngestorRegistryEndpoint().route ~
       new IngestionWebSocketEndpoint().route ~
       new IngestionEndpoint(programs.ingestionFlow, programs.ingestionFlowV2).route ~
-      new TopicsEndpoint(consumerProxy)(system.dispatcher).route ~
+      new TopicsEndpoint(consumerProxy, cfg.kafkaClientSecurityConfig)(system.dispatcher).route ~
       new TopicDeletionEndpoint(programs.topicDeletion,cfg.topicDeletionConfig.deleteTopicPassword).route ~
       new HealthEndpoint(algebras.consumerGroups).route ~
       new TagsEndpoint[F](algebras.tagsAlgebra, cfg.tagsConfig.tagsPassword).route ~
