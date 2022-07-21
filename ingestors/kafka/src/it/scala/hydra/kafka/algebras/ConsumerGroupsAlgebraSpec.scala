@@ -89,15 +89,93 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
 
     "ConsumerGroupAlgebraSpec" should {
 
-      "sfgfg" in {
-        (for {
-          schemaRegistry <- SchemaRegistry.live[IO]("http://localhost:8081", 1,   SchemaRegistrySecurityConfig(None, None))
-          kafkaClient <- KafkaClientAlgebra.live[IO]("kafka:29092", "https://schema-registry" ,  schemaRegistry, kafkaSecurityEmptyConfig)
-          s <- TopicMetadataV2.encode[IO](TopicMetadataV2Key(Subject.createValidated("dvs.data-platform.v-1.oleksii10").get), None, None)
-          _ <- kafkaClient.publishMessage(s, "_hydra.v2.metadata")
-          _ <- kafkaClient.publishMessage(s, "_hydra.v2.metadata")
-          _ <- kafkaClient.publishMessage(s, "_hydra.v2.metadata")
-        } yield()).unsafeRunSync()
+      "consume randomConsumerGroup offsets into the cache" in {
+        cga.getConsumersForTopic(topicName).retryIfFalse(_.consumers.exists(_.consumerGroupName == "randomConsumerGroup")).unsafeRunSync()
+      }
+
+      "consume two consumerGroups on useless_topic_123 topic into the cache" in {
+        val consumer2 = "randomConsumerGroup2"
+        kafkaClient.consumeMessages(topicName, consumer2, commitOffsets = true).take(1).compile.last.unsafeRunSync() shouldBe (keyGR, valueGR.some, None).some
+        cga.getConsumersForTopic(topicName).retryIfFalse { c =>
+          val consumers = List(consumer1, consumer2)
+          c.consumers.length == 2 && c.consumers.map(_.consumerGroupName).forall(consumers.contains)
+        }.unsafeRunSync()
+      }
+
+      "consume two topics of the same consumer group randomConsumerGroup" in {
+        val topicName2 = "myNewTopix"
+        val (keyGR2, valueGR2) = getGenericRecords(topicName2, "abc", "123")
+        createTopic(topicName2, keyGR2, valueGR2, schemaRegistry, kafkaAdmin)
+        kafkaClient.publishMessage((keyGR2, Some(valueGR2), None), topicName2).unsafeRunSync()
+        kafkaClient.consumeMessages(topicName2, consumer1, commitOffsets = true).take(1).compile.last.unsafeRunSync() shouldBe (keyGR2, valueGR2.some, None).some
+        val topics = List(topicName, topicName2)
+        cga.getTopicsForConsumer(consumer1).retryIfFalse(_.topics.map(_.topicName).forall(topics.contains)).unsafeRunSync()
+      }
+
+      "confirm that the timestamps for the consumed topics vary from one to the other" in {
+        cga.getAllConsumers.map(_.toSet.size).unsafeRunSync() shouldBe cga.getAllConsumers.map(_.size).unsafeRunSync()
+      }
+
+      "update the consumer offset, verify that the latest timestamp is updated" in {
+        val topicName2 = "myNewTopix2.0"
+        val (keyGR2, valueGR2) = getGenericRecords(topicName2, "abcdef", "123456")
+        createTopic(topicName2, keyGR2, valueGR2, schemaRegistry, kafkaAdmin)
+        kafkaClient.publishMessage((keyGR2, Some(valueGR2), None), topicName2).unsafeRunSync()
+
+        val (keyGR3, valueGR3) = getGenericRecords(topicName2, "abcdef", "123456")
+        kafkaClient.publishMessage((keyGR3, Some(valueGR3), None), topicName2).unsafeRunSync()
+
+        kafkaClient.consumeMessages(topicName2, "randomConsumerGroup", commitOffsets = true).take(1).compile.last.unsafeRunSync() shouldBe (keyGR2, valueGR2.some, None).some
+        cga.getConsumersForTopic(topicName2).map(_.consumers.headOption.map(_.lastCommit)).retryIfFalse(_.isDefined).unsafeRunSync()
+        val firstTimestamp = cga.getConsumersForTopic(topicName2).map(_.consumers.headOption.map(_.lastCommit)).unsafeRunSync().get
+
+        kafkaClient.consumeMessages(topicName2, "randomConsumerGroup", commitOffsets = true).take(1).compile.last.unsafeRunSync() shouldBe (keyGR3, valueGR3.some, None).some
+        cga.getConsumersForTopic(topicName2).map(_.consumers.head.lastCommit).retryIfFalse(_.isAfter(firstTimestamp)).unsafeRunSync()
+      }
+
+      "test the getOffsets function" in {
+        def testConsumerGroupsAlgebraGetOffsetsToSeekTo(
+                                                         numberOfPartitionsForKafkaInternalTopic: Int,
+                                                         latestPartitionOffset: PartitionOffsetMap,
+                                                         dvsConsumerOffsetStream: fs2.Stream[IO, (Record, OffsetInfo)]
+                                                       ) = {
+          (for {
+            consumerOffsetsCache <- Ref[IO].of((0 to numberOfPartitionsForKafkaInternalTopic).map((_, 0L)).toMap)
+            hydraConsumerOffsetsOffsetsCache <- Ref[IO].of(latestPartitionOffset.filter(_._2 == 0))
+            deferred <- Deferred[IO, PartitionOffsetMap]
+            backgroundProcess <- Concurrent[IO].start {
+              ConsumerGroupsOffsetConsumer.getOffsetsToSeekTo(
+                consumerOffsetsCache = consumerOffsetsCache,
+                deferred = deferred,
+                dvsConsumerOffsetStream = dvsConsumerOffsetStream,
+                hydraConsumerOffsetsOffsetsLatestOffsets = latestPartitionOffset,
+                hydraConsumerOffsetsOffsetsCache = hydraConsumerOffsetsOffsetsCache
+              )
+            }
+            _ <- deferred.get
+            _ <- backgroundProcess.cancel
+          } yield succeed).unsafeRunSync()
+        }
+
+        val c = createOV(Ref[IO].of((0,-1L)).unsafeRunSync()) _
+
+        val latestPartitionMap = Map[Int, Long](0 -> 3, 1 -> 2, 2 -> 1)
+        val dvsConsumerOffsetStream = fs2.Stream(c(false),c(false),c(false),c(true),c(false),c(true))
+        testConsumerGroupsAlgebraGetOffsetsToSeekTo(3, latestPartitionMap, dvsConsumerOffsetStream)
+
+        val latestPartitionMap2 = Map[Int, Long](0 -> 0, 1 -> 0, 2 -> 0)
+        val dvsConsumerOffsetStream2 = fs2.Stream()
+        testConsumerGroupsAlgebraGetOffsetsToSeekTo(3, latestPartitionMap2, dvsConsumerOffsetStream2)
+
+        val d = createOV(Ref[IO].of((0,-1L)).unsafeRunSync()) _
+        val latestPartitionMap3 = Map[Int, Long](0 -> 3, 1 -> 2, 2 -> 1, 3 -> 0)
+        val dvsConsumerOffsetStream3 = fs2.Stream(d(false),d(false),d(false),d(true),d(false),d(true))
+        testConsumerGroupsAlgebraGetOffsetsToSeekTo(4, latestPartitionMap3, dvsConsumerOffsetStream3)
+
+        IO.race(IO.delay(testConsumerGroupsAlgebraGetOffsetsToSeekTo(3, latestPartitionMap, fs2.Stream.empty)), Timer[IO].sleep(1.seconds)).map {
+          case Left(_) => fail("Should never have completed")
+          case Right(_) => succeed
+        }.unsafeRunSync()
       }
     }
   }
