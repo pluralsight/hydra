@@ -2,7 +2,7 @@ package hydra.kafka.algebras
 
 import cats.effect.Sync
 import cats.implicits._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.language.higherKinds
 
