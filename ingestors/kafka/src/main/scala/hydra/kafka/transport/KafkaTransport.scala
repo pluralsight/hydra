@@ -16,13 +16,11 @@
 
 package hydra.kafka.transport
 
-import java.util.concurrent.atomic.AtomicLong
 import akka.actor.SupervisorStrategy._
 import akka.actor._
 import akka.kafka.ProducerSettings
 import com.typesafe.config.Config
-import hydra.common.config.KafkaConfigUtils.KafkaClientSecurityConfig
-import hydra.core.monitor.HydraMetrics
+import hydra.common.Settings.defaultKafkaClientSecurityCfg
 import hydra.core.transport.Transport
 import hydra.core.transport.Transport.Deliver
 import hydra.kafka.producer.{KafkaRecord, KafkaRecordMetadata}
@@ -30,20 +28,21 @@ import hydra.kafka.transport.KafkaProducerProxy.{ProduceToKafka, ProducerInitial
 import hydra.kafka.transport.KafkaTransport.{RecordProduceError, ReportMetrics}
 import hydra.kafka.util.KafkaUtils
 
+import java.util.concurrent.atomic.AtomicLong
 import scala.concurrent.duration._
 import scala.language.existentials
 
 /**
   * Created by alexsilva on 10/28/15.
   */
-class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]], kafkaClientSecurityConfig: KafkaClientSecurityConfig)
+class KafkaTransport(producerSettings: Map[String, ProducerSettings[Any, Any]])
     extends Transport
     with Timers {
 
   private type KR = KafkaRecord[_, _]
 
   private[kafka] lazy val metrics =
-    KafkaMetrics(applicationConfig, kafkaClientSecurityConfig)(context.system)
+    KafkaMetrics(applicationConfig, defaultKafkaClientSecurityCfg)(context.system)
 
   private[kafka] val msgCounter = new AtomicLong()
 
@@ -117,11 +116,8 @@ object KafkaTransport {
     * @param cfg - We are not using this (this is the rootConfig)
     * @return
     */
-  def props(cfg: Config, kafkaClientSecurityConfig: KafkaClientSecurityConfig): Props = {
-    Props(new KafkaTransport(
-      KafkaUtils.producerSettings(cfg, kafkaClientSecurityConfig),
-      kafkaClientSecurityConfig)
-    )
+  def props(cfg: Config): Props = {
+    Props(classOf[KafkaTransport], KafkaUtils.producerSettings(cfg, defaultKafkaClientSecurityCfg))
   }
 
 }

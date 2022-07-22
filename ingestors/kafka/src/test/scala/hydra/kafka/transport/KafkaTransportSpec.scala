@@ -36,7 +36,7 @@ class KafkaTransportSpec
     AckStrategy.NoAck
   ).formatName
 
-  lazy val transport = system.actorOf(KafkaTransport.props(rootConfig, KafkaConfigUtils.kafkaSecurityEmptyConfig), "kafka")
+  lazy val transport = system.actorOf(KafkaTransport.props(rootConfig), "kafka")
 
   implicit val config = EmbeddedKafkaConfig(
     kafkaPort = 8012,
@@ -151,7 +151,7 @@ class KafkaTransportSpec
       """.stripMargin
       )
 
-      system.actorOf(KafkaTransport.props(cfg, KafkaConfigUtils.kafkaSecurityEmptyConfig))
+      system.actorOf(KafkaTransport.props(cfg))
       streamActor.expectMsgPF() {
         case ProducerInitializationError("test", err) =>
           err shouldBe a[KafkaException]
