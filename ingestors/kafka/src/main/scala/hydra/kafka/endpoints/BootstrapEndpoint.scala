@@ -24,6 +24,7 @@ import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import akka.pattern.ask
 import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
+import hydra.common.config.KafkaConfigUtils.{KafkaClientSecurityConfig, SchemaRegistrySecurityConfig}
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.{CorsSupport, DefaultCorsSupport, HydraDirectives, RouteSupport}
 import hydra.core.marshallers.TopicMetadataRequest
@@ -35,7 +36,10 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
-class BootstrapEndpoint(override val system:ActorSystem, override val streamsManagerActor: ActorRef)(implicit val corsSupport: CorsSupport) extends RouteSupport
+class BootstrapEndpoint(override val system:ActorSystem,
+                        override val streamsManagerActor: ActorRef,
+                        override val kafkaClientSecurityConfig: KafkaClientSecurityConfig,
+                        override val schemaRegistrySecurityConfig: SchemaRegistrySecurityConfig)(implicit val corsSupport: CorsSupport) extends RouteSupport
   with LoggingAdapter
   with TopicMetadataAdapter
   with HydraDirectives

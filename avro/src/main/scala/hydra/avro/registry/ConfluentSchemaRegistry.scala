@@ -3,6 +3,7 @@ package hydra.avro.registry
 import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.typesafe.config.{Config, ConfigFactory}
 import hydra.common.logging.LoggingAdapter
+import hydra.common.config.KafkaConfigUtils._
 import io.confluent.kafka.schemaregistry.client.{
   CachedSchemaRegistryClient,
   MockSchemaRegistryClient,
@@ -45,7 +46,8 @@ object ConfluentSchemaRegistry extends LoggingAdapter {
 
   case class SchemaRegistryClientInfo(
       url: String,
-      schemaRegistryMaxCapacity: Int
+      schemaRegistryMaxCapacity: Int,
+      schemaRegistrySecurityConfig: SchemaRegistrySecurityConfig
   )
 
   private val cachedClients = CacheBuilder
@@ -60,7 +62,8 @@ object ConfluentSchemaRegistry extends LoggingAdapter {
           } else {
             new CachedSchemaRegistryClient(
               info.url,
-              info.schemaRegistryMaxCapacity
+              info.schemaRegistryMaxCapacity,
+              info.schemaRegistrySecurityConfig.toConfigMap.asJava
             )
           }
           ConfluentSchemaRegistry(client, info.url)
@@ -75,12 +78,13 @@ object ConfluentSchemaRegistry extends LoggingAdapter {
       .getOrElse(throw new IllegalArgumentException("A schema registry url is required."))
 
   def forConfig(
-      config: Config = ConfigFactory.load()
+      config: Config = ConfigFactory.load(),
+      schemaRegistrySecurityConfig: SchemaRegistrySecurityConfig
   ): ConfluentSchemaRegistry = {
     val identityMapCapacity =
       config.getIntOpt("max.schemas.per.subject").getOrElse(1000)
     cachedClients.get(
-      SchemaRegistryClientInfo(registryUrl(config), identityMapCapacity)
+      SchemaRegistryClientInfo(registryUrl(config), identityMapCapacity, schemaRegistrySecurityConfig)
     )
   }
 }

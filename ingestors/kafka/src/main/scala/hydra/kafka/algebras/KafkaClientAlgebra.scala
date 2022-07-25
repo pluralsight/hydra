@@ -9,7 +9,8 @@ import fs2.concurrent.Queue
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError.RecordTooLarge
-import io.chrisdavenport.log4cats.Logger
+import hydra.common.config.KafkaConfigUtils._
+import org.typelevel.log4cats.Logger
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import io.confluent.kafka.serializers.{AbstractKafkaAvroSerDeConfig, KafkaAvroDeserializer, KafkaAvroSerializer}
 import org.apache.avro.generic.GenericRecord
@@ -229,7 +230,7 @@ object KafkaClientAlgebra {
     _.evalMap(r => producer.produce(r._1).map(_ -> r._2)).mapAsync(settings.parallelism)(i => i._1.attempt.map(_ -> i._2))
 
   private def getProducerQueue[F[_] : ConcurrentEffect : ContextShift : Logger]
-  (bootstrapServers: String, publishMaxBlockMs: FiniteDuration): F[fs2.concurrent.Queue[F, ProduceRecordInfo[F]]] = {
+  (bootstrapServers: String, kafkaClientSecurityConfig : KafkaClientSecurityConfig, publishMaxBlockMs: FiniteDuration): F[fs2.concurrent.Queue[F, ProduceRecordInfo[F]]] = {
     import fs2.kafka._
     val producerSettings =
       ProducerSettings[F, Array[Byte], Array[Byte]]
@@ -237,6 +238,7 @@ object KafkaClientAlgebra {
         .withAcks(Acks.All)
         .withProperty("max.block.ms", publishMaxBlockMs.toMillis.toString)
         .withRetries(retries = 0)
+        .withKafkaSecurityConfigs(kafkaClientSecurityConfig)
     for {
       queue <- fs2.concurrent.Queue.unbounded[F, ProduceRecordInfo[F]]
       _ <- Concurrent[F].start {
@@ -258,14 +260,15 @@ object KafkaClientAlgebra {
     } yield queue
   }
 
-  private def getLiveInstance[F[_] : ContextShift : ConcurrentEffect : Timer : Logger](bootstrapServers: String)
+  private def getLiveInstance[F[_] : ContextShift : ConcurrentEffect : Timer : Logger](bootstrapServers: String, schemaRegistryUrl: String)
                                                                                       (queue: fs2.concurrent.Queue[F, ProduceRecordInfo[F]],
                                                                                        schemaRegistryClient: SchemaRegistryClient,
                                                                                        keySerializer: Serializer[F, RecordFormat],
                                                                                        valSerializer: Serializer[F, RecordFormat],
                                                                                        sizeLimitBytes: Option[Long] = None,
                                                                                        publishTimeoutDuration: FiniteDuration,
-                                                                                       publishMaxBlockMs: FiniteDuration
+                                                                                       publishMaxBlockMs: FiniteDuration,
+                                                                                       kafkaClientSecurityConfig : KafkaClientSecurityConfig
                                                                                       ): F[KafkaClientAlgebra[F]] = Sync[F].delay {
     val logger = LoggerFactory.getLogger(classOf[KafkaClientAlgebra[F]])
 
@@ -279,12 +282,12 @@ object KafkaClientAlgebra {
       }
 
       override def consumeMessages(topicName: TopicName, consumerGroup: String, commitOffsets: Boolean): fs2.Stream[F, Record] = {
-        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets)
+        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryUrl, schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets)
           .map(_.map(_._1)).evalMap(Sync[F].fromEither(_))
       }
 
       override def consumeMessagesWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, (Record, (Partition, Offset))] = {
-        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets)
+        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryUrl, schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets)
           .evalMap(Sync[F].fromEither(_))
       }
 
@@ -299,19 +302,19 @@ object KafkaClientAlgebra {
       }
 
       override def withProducerRecordSizeLimit(sizeLimitBytes: Long): F[KafkaClientAlgebra[F]] =
-        getLiveInstance[F](bootstrapServers)(queue, schemaRegistryClient, keySerializer, valSerializer, sizeLimitBytes.some, publishTimeoutDuration, publishMaxBlockMs)
+        getLiveInstance[F](bootstrapServers, schemaRegistryUrl)(queue, schemaRegistryClient, keySerializer, valSerializer, sizeLimitBytes.some, publishTimeoutDuration, publishMaxBlockMs, kafkaClientSecurityConfig)
 
       override def streamStringKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicPartitionAndOffsets: List[(TopicPartition, Offset)]):
       fs2.Stream[F, ((StringRecord), (Partition, Offset), Timestamp)] = {
         streamFromOffsetPartition[Option[String]](getStringKeyDeserializer, consumerGroup,
-          topicName, commitOffsets, topicPartitionAndOffsets)
+          topicName, commitOffsets, topicPartitionAndOffsets, kafkaClientSecurityConfig)
           .evalMap(Sync[F].fromEither(_))
       }
 
       override def streamAvroKeyFromGivenPartitionAndOffset(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean, topicPartitionAndOffsets: List[(TopicPartition, Offset)])
       : fs2.Stream[F, (Record, (Partition, Offset), Timestamp)] = {
-        streamFromOffsetPartition[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup,
-          topicName, commitOffsets, topicPartitionAndOffsets: List[(TopicPartition, Offset)])
+        streamFromOffsetPartition[GenericRecord](getGenericRecordDeserializer(schemaRegistryUrl, schemaRegistryClient)(isKey = true), consumerGroup,
+          topicName, commitOffsets, topicPartitionAndOffsets: List[(TopicPartition, Offset)], kafkaClientSecurityConfig)
           .evalMap(Sync[F].fromEither(_))
       }
 
@@ -320,12 +323,12 @@ object KafkaClientAlgebra {
       }
 
       override def consumeSafelyMessages(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, Either[Throwable, (GenericRecord, Option[GenericRecord], Option[Headers])]] = {
-        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets)
+        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryUrl, schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets)
           .map(_.map(_._1))
       }
 
       override def consumeSafelyWithOffsetInfo(topicName: TopicName, consumerGroup: ConsumerGroup, commitOffsets: Boolean): fs2.Stream[F, Either[Throwable, (Record, (Partition, Offset))]] = {
-        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets)
+        consumeMessages[GenericRecord](getGenericRecordDeserializer(schemaRegistryUrl, schemaRegistryClient)(isKey = true), consumerGroup, topicName, commitOffsets)
       }
 
       private def produceMessage[A](
@@ -355,12 +358,12 @@ object KafkaClientAlgebra {
                                     ): fs2.Stream[F, Either[Throwable, ((A, Option[GenericRecord], Option[Headers]), (Partition, Offset))]] = {
         val consumerSettings: ConsumerSettings[F, Either[Throwable, A], Either[Throwable, Option[GenericRecord]]] = ConsumerSettings(
           keyDeserializer = keyDeserializer,
-          valueDeserializer = getOptionalGenericRecordDeserializer(schemaRegistryClient)()
+          valueDeserializer = getOptionalGenericRecordDeserializer(schemaRegistryUrl, schemaRegistryClient)()
         )
           .withAutoOffsetReset(AutoOffsetReset.Earliest)
           .withBootstrapServers(bootstrapServers)
           .withGroupId(consumerGroup)
-
+          .withKafkaSecurityConfigs(kafkaClientSecurityConfig)
         consumerStream(consumerSettings)
           .evalTap(_.subscribeTo(topicName))
           .flatMap(_.stream)
@@ -400,14 +403,16 @@ object KafkaClientAlgebra {
                                                 consumerGroup: ConsumerGroup,
                                                 topicName: TopicName,
                                                 commitOffsets: Boolean,
-                                                topicPartitionAndOffsets: List[(TopicPartition, Offset)]
+                                                topicPartitionAndOffsets: List[(TopicPartition, Offset)],
+                                                kafkaClientSecurityConfig: KafkaClientSecurityConfig
                                               ): fs2.Stream[F, Either[Throwable, ((A, Option[GenericRecord], Option[Headers]), (Partition, Offset), Timestamp)]] = {
         val consumerSettings: ConsumerSettings[F, Either[Throwable, A], Either[Throwable, Option[GenericRecord]]] = ConsumerSettings(
           keyDeserializer = keyDeserializer,
-          valueDeserializer = getOptionalGenericRecordDeserializer(schemaRegistryClient)()
+          valueDeserializer = getOptionalGenericRecordDeserializer(schemaRegistryUrl, schemaRegistryClient)()
         )
           .withAutoOffsetReset(AutoOffsetReset.Earliest)
           .withBootstrapServers(bootstrapServers)
+          .withKafkaSecurityConfigs(kafkaClientSecurityConfig)
           .withGroupId(consumerGroup)
         implicit val order: Order[TopicPartition] =
           (x: TopicPartition, y: TopicPartition) => if (x.partition() > y.partition()) 1 else if (x.partition() < y.partition()) -1 else 0
@@ -431,24 +436,28 @@ object KafkaClientAlgebra {
 
   def live[F[_] : ContextShift : ConcurrentEffect : Timer : Logger](
                                                                      bootstrapServers: String,
+                                                                     schemaRegistryUrl: String,
                                                                      schemaRegistryAlgebra: SchemaRegistry[F],
+                                                                     kafkaClientSecurityConfig : KafkaClientSecurityConfig,
                                                                      recordSizeLimit: Option[Long] = None,
                                                                      publishTimeoutDuration: FiniteDuration = 5.seconds,
                                                                      publishMaxBlockMs: FiniteDuration = 4.5.seconds
                                                                    ): F[KafkaClientAlgebra[F]] =
     for {
       schemaRegistryClient <- schemaRegistryAlgebra.getSchemaRegistryClient
-      queue <- getProducerQueue[F](bootstrapServers, publishMaxBlockMs)
-      k <- getLiveInstance(bootstrapServers)(
+      queue <- getProducerQueue[F](bootstrapServers, kafkaClientSecurityConfig, publishMaxBlockMs)
+      k <- getLiveInstance(bootstrapServers, schemaRegistryUrl)(
         queue, schemaRegistryClient,
-        getSerializer(schemaRegistryClient)(isKey = true),
-        getSerializer(schemaRegistryClient)(isKey = false), None, publishTimeoutDuration, publishMaxBlockMs)
+        getSerializer(schemaRegistryUrl, schemaRegistryClient)(isKey = true),
+        getSerializer(schemaRegistryUrl, schemaRegistryClient)(isKey = false), None,
+        publishTimeoutDuration, publishMaxBlockMs, kafkaClientSecurityConfig)
       kWithSizeLimit <- recordSizeLimit.traverse(k.withProducerRecordSizeLimit)
     } yield kWithSizeLimit.getOrElse(k)
 
   final case class ConsumeErrorException(message: String) extends Exception(message)
 
   private def getTestInstance[F[_] : Sync : Concurrent](cache: Ref[F, MockFS2Kafka[F]],
+                                                        schemaRegistryUrl: String,
                                                         schemaRegistry: SchemaRegistry[F],
                                                         sizeLimitBytes: Option[Long] = None): KafkaClientAlgebra[F] = new KafkaClientAlgebra[F] {
 
@@ -524,7 +533,7 @@ object KafkaClientAlgebra {
     : fs2.Stream[F, Either[Throwable, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset))]] = ???
 
     override def withProducerRecordSizeLimit(sizeLimitBytes: Long): F[KafkaClientAlgebra[F]] = Sync[F].delay {
-      getTestInstance(cache, schemaRegistry, sizeLimitBytes.some)
+      getTestInstance(cache, schemaRegistryUrl, schemaRegistry, sizeLimitBytes.some)
     }
 
     private def consumeCacheMessage(topicName: TopicName, consumerGroup: ConsumerGroup): fs2.Stream[F, CacheRecord] = {
@@ -536,8 +545,8 @@ object KafkaClientAlgebra {
 
     private def checkSize(cacheRecord: CacheRecord, topicName: TopicName): F[Unit] = {
       for {
-        keySerializer <- schemaRegistry.getSchemaRegistryClient.map(getSerializer(_)(isKey = true))
-        valSerializer <- schemaRegistry.getSchemaRegistryClient.map(getSerializer(_)(isKey = false))
+        keySerializer <- schemaRegistry.getSchemaRegistryClient.map(getSerializer(schemaRegistryUrl, _)(isKey = true))
+        valSerializer <- schemaRegistry.getSchemaRegistryClient.map(getSerializer(schemaRegistryUrl, _)(isKey = false))
         key <- keySerializer.serialize(topicName, Headers.empty, cacheRecord._1)
         value <- cacheRecord._2.traverse(gr => valSerializer.serialize(topicName, Headers.empty, GenericRecordFormat(gr)))
         _ <- checkSizeLimit[F](key, value, sizeLimitBytes)
@@ -596,7 +605,7 @@ object KafkaClientAlgebra {
   }
 
   def test[F[_] : Sync : Concurrent](schemaRegistry: SchemaRegistry[F]): F[KafkaClientAlgebra[F]] = Ref[F].of(MockFS2Kafka.empty[F]).map { cache =>
-    getTestInstance(cache, schemaRegistry)
+    getTestInstance(cache, "", schemaRegistry)
   }
 
   private def createNewStreamOfQueue[F[_] : Concurrent](cache: Ref[F, MockFS2Kafka[F]], topicName: TopicName): F[Queue[F, CacheRecord]] = {
@@ -616,11 +625,11 @@ object KafkaClientAlgebra {
     }.suspend.attempt
   }
 
-  private def getGenericRecordDeserializer[F[_] : Sync](schemaRegistryClient: SchemaRegistryClient)(isKey: Boolean = false): Deserializer[F, Either[Throwable, GenericRecord]] =
+  private def getGenericRecordDeserializer[F[_] : Sync](schemaRegistryUrl: String, schemaRegistryClient: SchemaRegistryClient)(isKey: Boolean = false): Deserializer[F, Either[Throwable, GenericRecord]] =
     Deserializer.delegate[F, GenericRecord] {
       val deserializer = {
         val de = new KafkaAvroDeserializer(schemaRegistryClient)
-        de.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "").asJava, isKey)
+        de.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> schemaRegistryUrl).asJava, isKey)
         de
       }
       (topic: TopicName, data: Array[Byte]) => {
@@ -628,11 +637,11 @@ object KafkaClientAlgebra {
       }
     }.suspend.attempt
 
-  private def getOptionalGenericRecordDeserializer[F[_] : Sync](schemaRegistryClient: SchemaRegistryClient)(isKey: Boolean = false): Deserializer[F, Either[Throwable, Option[GenericRecord]]] =
+  private def getOptionalGenericRecordDeserializer[F[_] : Sync](schemaRegistryUrl: String, schemaRegistryClient: SchemaRegistryClient)(isKey: Boolean = false): Deserializer[F, Either[Throwable, Option[GenericRecord]]] =
     Deserializer.delegate[F, Option[GenericRecord]] {
       val deserializer = {
         val de = new KafkaAvroDeserializer(schemaRegistryClient)
-        de.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "").asJava, isKey)
+        de.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> schemaRegistryUrl).asJava, isKey)
         de
       }
       (topic: TopicName, data: Array[Byte]) => {
@@ -642,11 +651,11 @@ object KafkaClientAlgebra {
       }
     }.suspend.attempt
 
-  private def getSerializer[F[_] : Sync](schemaRegistryClient: SchemaRegistryClient)(isKey: Boolean): Serializer[F, RecordFormat] =
+  private def getSerializer[F[_] : Sync](schemaRegistryUrl: String, schemaRegistryClient: SchemaRegistryClient)(isKey: Boolean): Serializer[F, RecordFormat] =
     Serializer.delegate[F, RecordFormat] {
       val serializer = {
         val se = new KafkaAvroSerializer(schemaRegistryClient)
-        se.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> "").asJava, isKey)
+        se.configure(Map(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG -> schemaRegistryUrl).asJava, isKey)
         se
       }
       val stringSerializer = new StringSerializer

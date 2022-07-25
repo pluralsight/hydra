@@ -5,10 +5,10 @@ import cats.effect.{IO, Sync}
 import hydra.kafka.algebras.ReRunnableFS2StreamSpec.{erroredStream, successStream}
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.{Once, Zero}
 import hydra.kafka.algebras.RetryableFs2Stream.{ReRunnableStreamAdder, _}
-import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
-import io.chrisdavenport.log4cats.{Logger, SelfAwareStructuredLogger}
+import org.typelevel.log4cats.{Logger, SelfAwareStructuredLogger}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import scala.language.higherKinds
 

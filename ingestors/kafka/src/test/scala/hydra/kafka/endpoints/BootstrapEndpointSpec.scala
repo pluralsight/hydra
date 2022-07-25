@@ -8,7 +8,8 @@ import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit.TestKit
 import com.pluralsight.hydra.avro.JsonConverter
 import hydra.avro.registry.ConfluentSchemaRegistry
-import hydra.common.config.ConfigSupport
+import hydra.common.config.KafkaConfigUtils.SchemaRegistrySecurityConfig
+import hydra.common.config.{ConfigSupport, KafkaConfigUtils}
 import hydra.core.http.CorsSupport
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
@@ -81,15 +82,18 @@ class BootstrapEndpointSpec
   private[kafka] val bootstrapKafkaConfig =
     applicationConfig.getConfig("bootstrap-config")
 
+  private val schemaRegistryEmptySecurityConfig = SchemaRegistrySecurityConfig(None, None)
+
   val streamsManagerProps = StreamsManagerActor.props(
     bootstrapKafkaConfig,
+    KafkaConfigUtils.kafkaSecurityEmptyConfig,
     KafkaUtils.BootstrapServers,
-    ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient
+    ConfluentSchemaRegistry.forConfig(applicationConfig, schemaRegistryEmptySecurityConfig).registryClient
   )
   val streamsManagerActor: ActorRef = system.actorOf(streamsManagerProps, "streamsManagerActor")
 
 
-  private val bootstrapRoute = new BootstrapEndpoint(system, streamsManagerActor).route
+  private val bootstrapRoute = new BootstrapEndpoint(system, streamsManagerActor, KafkaConfigUtils.kafkaSecurityEmptyConfig, schemaRegistryEmptySecurityConfig).route
 
   implicit val f = jsonFormat12(TopicMetadata)
 
@@ -137,7 +141,7 @@ class BootstrapEndpointSpec
       val record: Object = new JsonConverter[GenericRecord](schema)
         .convert(json.toJson.compactPrint)
       implicit val deserializer = new KafkaAvroSerializer(
-        ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient
+        ConfluentSchemaRegistry.forConfig(applicationConfig, schemaRegistryEmptySecurityConfig).registryClient
       )
       EmbeddedKafka.publishToKafka("_hydra.metadata.topic", record)
 
@@ -178,7 +182,7 @@ class BootstrapEndpointSpec
       val record: Object = new JsonConverter[GenericRecord](schema)
         .convert(json.toJson.compactPrint)
       implicit val deserializer = new KafkaAvroSerializer(
-        ConfluentSchemaRegistry.forConfig(applicationConfig).registryClient
+        ConfluentSchemaRegistry.forConfig(applicationConfig, schemaRegistryEmptySecurityConfig).registryClient
       )
       EmbeddedKafka.publishToKafka("_hydra.metadata.topic", record)
 
@@ -391,7 +395,7 @@ class BootstrapEndpointSpec
       )
 
       val bootstrapRouteWithOverridenStreamManager =
-        (new BootstrapEndpoint(system, streamsManagerActor) with BootstrapEndpointTestActors).route
+        (new BootstrapEndpoint(system, streamsManagerActor, KafkaConfigUtils.kafkaSecurityEmptyConfig, schemaRegistryEmptySecurityConfig) with BootstrapEndpointTestActors).route
       Post("/streams", testEntity) ~> bootstrapRouteWithOverridenStreamManager ~> check {
         status shouldBe StatusCodes.OK
       }
@@ -426,7 +430,7 @@ class BootstrapEndpointSpec
       )
 
       val bootstrapRouteWithOverridenStreamManager =
-        (new BootstrapEndpoint(system, streamsManagerActor) with BootstrapEndpointTestActors).route
+        (new BootstrapEndpoint(system, streamsManagerActor, KafkaConfigUtils.kafkaSecurityEmptyConfig, schemaRegistryEmptySecurityConfig) with BootstrapEndpointTestActors).route
       Get("/streams/exp.test-existing.v1.SubjectPreexisted") ~> bootstrapRouteWithOverridenStreamManager ~> check {
         val originalTopicData = responseAs[Seq[TopicMetadata]]
         val originalTopicCreationDate = originalTopicData.head.createdDate

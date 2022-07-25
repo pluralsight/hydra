@@ -3,29 +3,25 @@ package hydra.kafka.util
 import akka.kafka.{ConsumerSettings, ProducerSettings}
 import com.typesafe.config.{Config, ConfigFactory}
 import hydra.common.config.ConfigSupport
-import ConfigSupport._
+import hydra.common.config.ConfigSupport._
+import hydra.common.config.KafkaConfigUtils._
 import hydra.common.logging.LoggingAdapter
 import hydra.common.util.TryWith
 import hydra.kafka.config.KafkaConfigSupport
 import hydra.kafka.util.KafkaUtils.TopicDetails
-import org.apache.kafka.clients.admin.{
-  AdminClient,
-  CreateTopicsResult,
-  NewTopic
-}
+import org.apache.kafka.clients.admin.{AdminClient, CreateTopicsResult, NewTopic}
 import org.apache.kafka.clients.consumer.ConsumerConfig
 
 import scala.collection.JavaConverters._
-import scala.collection.immutable.Map
 import scala.concurrent.Future
 import scala.util.Try
 
-case class KafkaUtils(config: Map[String, AnyRef])
+case class KafkaUtils(config: Map[String, AnyRef], kafkaClientSecurityConfig: KafkaClientSecurityConfig)
     extends LoggingAdapter
     with ConfigSupport {
 
   private[kafka] def withClient[T](body: AdminClient => T): Try[T] = {
-    TryWith(AdminClient.create(config.asJava))(body)
+    TryWith(AdminClient.create((config ++ kafkaClientSecurityConfig.toConfigMap).asJava))(body)
   }
 
   def topicExists(name: String): Try[Boolean] = withClient { c =>
@@ -61,7 +57,7 @@ case class KafkaUtils(config: Map[String, AnyRef])
           new NewTopic(t._1, t._2.numPartitions, t._2.replicationFactor)
             .configs(t._2.configs.asJava)
         )
-        TryWith(AdminClient.create(config.asJava)) { client =>
+        withClient { client =>
           client.createTopics(newTopics.asJavaCollection)
         }
       }
@@ -80,13 +76,13 @@ object KafkaUtils extends ConfigSupport {
     val configs: Map[String, String] = partialConfig + ("min.insync.replicas" -> minInsyncReplicas.toString)
   }
 
-  private val _consumerSettings = consumerSettings(rootConfig)
+  private val _consumerSettings = consumerSettings(rootConfig, defaultKafkaClientSecurityCfg)
 
   val BootstrapServers: String =
     applicationConfig.getString("kafka.producer.bootstrap.servers")
 
   val stringConsumerSettings: ConsumerSettings[String, String] =
-    consumerSettings[String, String]("string", rootConfig)
+    consumerSettings[String, String]("string", rootConfig, defaultKafkaClientSecurityCfg)
 
   def consumerForClientId[K, V](
       clientId: String
@@ -114,6 +110,7 @@ object KafkaUtils extends ConfigSupport {
 
   def loadConsumerSettings[K, V](
       cfg: Config,
+      kafkaClientSecurityConfig: KafkaClientSecurityConfig,
       groupId: String
   ): ConsumerSettings[K, V] = {
     val akkaConfig =
@@ -126,37 +123,45 @@ object KafkaUtils extends ConfigSupport {
     ).withGroupId(groupId)
       .withBootstrapServers(KafkaConfigSupport.bootstrapServers)
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest")
+      .withKafkaSecurityConfigs(kafkaClientSecurityConfig)
   }
 
   def producerSettings[K, V](
       id: String,
-      cfg: Config
+      cfg: Config,
+      kafkaClientSecurityConfig: KafkaClientSecurityConfig = defaultKafkaClientSecurityCfg
   ): ProducerSettings[K, V] = {
     ProducerSettings[K, V](settingsConfig("producer", id, cfg), None, None)
       .withProperty("client.id", id)
+      .withKafkaSecurityConfigs(kafkaClientSecurityConfig)
   }
 
-  def producerSettings(cfg: Config): Map[String, ProducerSettings[Any, Any]] = {
+  def producerSettings(cfg: Config, kafkaClientSecurityConfig: KafkaClientSecurityConfig): Map[String, ProducerSettings[Any, Any]] = {
     val clientsConfig = cfg.getConfig(s"$applicationName.kafka.clients")
     val clients = clientsConfig.root().entrySet().asScala.map(_.getKey)
     clients
-      .map(client => client -> producerSettings[Any, Any](client, cfg))
+      .map(client => client -> producerSettings[Any, Any](client, cfg, kafkaClientSecurityConfig))
       .toMap
   }
 
   def consumerSettings[K, V](
       id: String,
-      cfg: Config
+      cfg: Config,
+      kafkaClientSecurityConfig: KafkaClientSecurityConfig
   ): ConsumerSettings[K, V] = {
     ConsumerSettings[K, V](settingsConfig("consumer", id, cfg), None, None)
       .withProperty("client.id", id)
+      .withKafkaSecurityConfigs(kafkaClientSecurityConfig)
   }
 
-  def consumerSettings(cfg: Config): Map[String, ConsumerSettings[Any, Any]] = {
+  def consumerSettings(cfg: Config,
+                       kafkaClientSecurityConfig: KafkaClientSecurityConfig = defaultKafkaClientSecurityCfg): Map[String, ConsumerSettings[Any, Any]] = {
     val clientsConfig = cfg.getConfig(s"$applicationName.kafka.clients")
     val clients = clientsConfig.root().entrySet().asScala.map(_.getKey)
     clients
-      .map(client => client -> consumerSettings[Any, Any](client, cfg))
+      .map(client => client ->
+        consumerSettings[Any, Any](client, cfg, kafkaClientSecurityConfig)
+      )
       .toMap
   }
 
@@ -170,9 +175,10 @@ object KafkaUtils extends ConfigSupport {
     clientConfig.atKey("kafka-clients").withFallback(akkaConfig)
   }
 
-  def apply(config: Config): KafkaUtils =
-    KafkaUtils(ConfigSupport.toMap(config))
+  def apply(config: Config, kafkaSecurityConfig: KafkaClientSecurityConfig): KafkaUtils =
+    KafkaUtils(ConfigSupport.toMap(config), kafkaSecurityConfig)
 
-  def apply(): KafkaUtils =
-    apply(KafkaConfigSupport.kafkaConfig.getConfig("kafka.admin"))
+  def apply(kafkaSecurityConfig: KafkaClientSecurityConfig = defaultKafkaClientSecurityCfg): KafkaUtils =
+    apply(KafkaConfigSupport.kafkaConfig.getConfig("kafka.admin"), kafkaSecurityConfig)
+
 }

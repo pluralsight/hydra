@@ -5,7 +5,7 @@ import cats.syntax.all._
 import hydra.avro.registry.SchemaRegistry
 import hydra.ingest.app.AppConfig.AppConfig
 import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TagsAlgebra}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 final class Algebras[F[_]] private (
     val schemaRegistry: SchemaRegistry[F],
@@ -18,14 +18,17 @@ final class Algebras[F[_]] private (
 
 object Algebras {
 
-  def make[F[_]: Async: ConcurrentEffect: ContextShift: Timer: Logger](config: AppConfig): F[Algebras[F]] =
+  def make[F[_]: Async: ConcurrentEffect: ContextShift: Timer: Logger](config: AppConfig): F[Algebras[F]] = {
+    val schemaRegistryUrl = config.createTopicConfig.schemaRegistryConfig.fullUrl
     for {
       schemaRegistry <- SchemaRegistry.live[F](
-        config.createTopicConfig.schemaRegistryConfig.fullUrl,
-        config.createTopicConfig.schemaRegistryConfig.maxCacheSize
+        schemaRegistryUrl,
+        config.createTopicConfig.schemaRegistryConfig.maxCacheSize,
+        config.schemaRegistrySecurityConfig
       )
-      kafkaAdmin <- KafkaAdminAlgebra.live[F](config.createTopicConfig.bootstrapServers)
-      kafkaClient <- KafkaClientAlgebra.live[F](config.createTopicConfig.bootstrapServers, schemaRegistry, config.ingestConfig.recordSizeLimitBytes)
+      kafkaAdmin <- KafkaAdminAlgebra.live[F](config.createTopicConfig.bootstrapServers, config.kafkaClientSecurityConfig)
+      kafkaClient <- KafkaClientAlgebra.live[F](config.createTopicConfig.bootstrapServers, schemaRegistryUrl,
+        schemaRegistry, config.kafkaClientSecurityConfig, config.ingestConfig.recordSizeLimitBytes)
       metadata <- MetadataAlgebra.make[F](config.metadataTopicsConfig.topicNameV2,
         config.metadataTopicsConfig.consumerGroup, kafkaClient, schemaRegistry, config.metadataTopicsConfig.createV2OnStartup)
       consumerGroups <- ConsumerGroupsAlgebra.make[F](
@@ -37,8 +40,10 @@ object Algebras {
         commonConsumerGroup = config.consumerGroupsAlgebraConfig.commonConsumerGroup,
         kafkaClientAlgebra = kafkaClient,
         kAA = kafkaAdmin,
-        sra = schemaRegistry
+        sra = schemaRegistry,
+        config.kafkaClientSecurityConfig
         )
       tagsAlgebra <- TagsAlgebra.make(config.tagsConfig.tagsTopic,config.tagsConfig.tagsConsumerGroup,kafkaClient)
     } yield new Algebras[F](schemaRegistry, kafkaAdmin, kafkaClient, metadata, consumerGroups, tagsAlgebra)
+  }
 }

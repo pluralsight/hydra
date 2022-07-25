@@ -1,23 +1,22 @@
 package hydra.kafka.algebras
 
-import hydra.avro.convert.SimpleStringToGenericRecord
-import hydra.kafka.algebras.KafkaClientAlgebra.PublishResponse
-import SimpleStringToGenericRecord._
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import hydra.kafka.model.Schemas
-import vulcan.Codec
-import vulcan.generic._
 import cats.data.Validated
 import cats.data.Validated.{Invalid, Valid}
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, Sync}
 import cats.implicits._
+import hydra.avro.convert.SimpleStringToGenericRecord
+import hydra.avro.convert.SimpleStringToGenericRecord._
+import hydra.kafka.algebras.KafkaClientAlgebra.PublishResponse
 import hydra.kafka.algebras.RetryableFs2Stream.ReRunnableStreamAdder
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Infinite
-import hydra.kafka.util.ConsumerGroupsOffsetConsumer.getErrorMessage
-import io.chrisdavenport.log4cats.Logger
+import hydra.kafka.model.Schemas
 import org.apache.avro.generic.GenericRecord
+import org.typelevel.log4cats.Logger
 import spray.json._
+import vulcan.Codec
+import vulcan.generic._
 
 final case class HydraTag(name: String, description: String)
 private final case class HydraTagName(name: String)

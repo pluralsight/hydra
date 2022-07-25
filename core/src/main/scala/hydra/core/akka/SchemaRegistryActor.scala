@@ -8,6 +8,7 @@ import hydra.avro.registry.{ConfluentSchemaRegistry, SchemaRegistryException}
 import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
 import hydra.avro.util.SchemaWrapper
 import hydra.common.Settings
+import hydra.common.config.KafkaConfigUtils.SchemaRegistrySecurityConfig
 import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol.HydraApplicationError
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
@@ -29,7 +30,8 @@ import scala.util.{Failure, Success, Try}
   */
 class SchemaRegistryActor(
     config: Config,
-    settings: Option[CircuitBreakerSettings]
+    settings: Option[CircuitBreakerSettings],
+    schemaRegistrySecurityConfig: SchemaRegistrySecurityConfig
 ) extends Actor
     with LoggingAdapter {
 
@@ -51,7 +53,7 @@ class SchemaRegistryActor(
     resetTimeout = breakerSettings.resetTimeout
   ).onOpen(notifyOnOpen())
 
-  val registry = ConfluentSchemaRegistry.forConfig(config)
+  val registry = ConfluentSchemaRegistry.forConfig(config, schemaRegistrySecurityConfig)
 
   log.debug(s"Creating new SchemaRegistryActor for ${registry.registryUrl}")
 
@@ -200,8 +202,9 @@ object SchemaRegistryActor {
 
   def props(
       config: Config,
+      schemaRegistrySecurityConfig: SchemaRegistrySecurityConfig,
       settings: Option[CircuitBreakerSettings] = None
-  ): Props = Props(classOf[SchemaRegistryActor], config, settings)
+  ): Props = Props(classOf[SchemaRegistryActor], config, settings, schemaRegistrySecurityConfig)
 
   sealed trait SchemaRegistryRequest
 

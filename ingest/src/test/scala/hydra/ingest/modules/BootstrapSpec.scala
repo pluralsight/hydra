@@ -12,8 +12,8 @@ import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlge
 import hydra.kafka.model.{ContactMethod, TopicMetadataV2, TopicMetadataV2Key}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.{CreateTopicProgram, KeyAndValueSchemaV2Validator}
-import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
-import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.SelfAwareStructuredLogger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.common.TopicPartition
 import org.scalatest.matchers.should.Matchers

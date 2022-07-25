@@ -27,6 +27,7 @@ import spray.json._
 import scala.concurrent.duration._
 import scala.io.Source
 import akka.actor.ActorRef
+import hydra.common.config.KafkaConfigUtils
 import org.apache.kafka.clients.producer.ProducerRecord
 
 class StreamsManagerActorSpec
@@ -174,6 +175,7 @@ class StreamsManagerActorSpec
 
     val stream = StreamsManagerActor.createMetadataStream(
       kafkaConfig,
+      KafkaConfigUtils.kafkaSecurityEmptyConfig,
       "localhost:8092",
       srClient,
       "hydra.metadata.topic",
@@ -230,7 +232,7 @@ class StreamsManagerActorSpec
         .convertTo[TopicMetadata]
 
     val streamsManagerActor = system.actorOf(
-      StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient),
+      StreamsManagerActor.props(bootstrapConfig, KafkaConfigUtils.kafkaSecurityEmptyConfig, bootstrapServers, srClient),
       name = "stream_manager2"
     )
     val topicName = "exp.assessment.SkillAssessmentTopicsScored"
@@ -287,7 +289,7 @@ class StreamsManagerActorSpec
         .convertTo[TopicMetadata]
 
     val streamsManagerActor = system.actorOf(
-      StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient),
+      StreamsManagerActor.props(bootstrapConfig, KafkaConfigUtils.kafkaSecurityEmptyConfig, bootstrapServers, srClient),
       name = "stream_manager3"
     )
     val topicName = "exp.assessment.SkillAssessmentTopicsScored"
@@ -306,7 +308,7 @@ class StreamsManagerActorSpec
 
   it should "respond with MetadataProcessed after TopicMetadata is received" in {
     val streamsManagerActor: ActorRef = system.actorOf(
-      StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient),
+      StreamsManagerActor.props(bootstrapConfig, KafkaConfigUtils.kafkaSecurityEmptyConfig, bootstrapServers, srClient),
       name = "stream_manager4"
     )
     val topicMetadata = s"""{
@@ -330,7 +332,7 @@ class StreamsManagerActorSpec
 
   it should "respond with MetadataProcessed after TopicMetadataMessage is received" in {
     val streamsManagerActor: ActorRef = system.actorOf(
-      StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient),
+      StreamsManagerActor.props(bootstrapConfig, KafkaConfigUtils.kafkaSecurityEmptyConfig, bootstrapServers, srClient),
       name = "stream_manager5"
     )
     val topicMetadata = s"""{
@@ -354,7 +356,7 @@ class StreamsManagerActorSpec
 
   it should "respond with MetadataProcessed after TopicMetadataMessage with None for value is received" in {
     val streamsManagerActor: ActorRef = system.actorOf(
-      StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient),
+      StreamsManagerActor.props(bootstrapConfig, KafkaConfigUtils.kafkaSecurityEmptyConfig, bootstrapServers, srClient),
       name = "stream_manager6"
     )
     val probe = TestProbe()
@@ -364,7 +366,7 @@ class StreamsManagerActorSpec
 
   it should "remove metadata from metadataMap after a null value is received" in {
     val streamsManagerActor: ActorRef = system.actorOf(
-      StreamsManagerActor.props(bootstrapConfig, bootstrapServers, srClient),
+      StreamsManagerActor.props(bootstrapConfig, KafkaConfigUtils.kafkaSecurityEmptyConfig, bootstrapServers, srClient),
       name = "stream_manager7"
     )
     val topicMetadata = s"""{

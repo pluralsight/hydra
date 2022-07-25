@@ -1,9 +1,15 @@
 package hydra.kafka.algebras
 
+import cats.ApplicativeError
+
+import java.time.Instant
 import cats.effect.concurrent.Ref
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
 import cats.implicits._
+import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
+import hydra.common.config.KafkaConfigUtils.KafkaClientSecurityConfig
+import hydra.kafka.algebras.ConsumerGroupsAlgebra.{Consumer, ConsumerTopics, DetailedConsumerGroup, DetailedTopicConsumers, PartitionOffset, TopicConsumers}
 import hydra.kafka.algebras.ConsumerGroupsAlgebra._
 import hydra.kafka.algebras.KafkaClientAlgebra.Record
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Infinite
@@ -13,9 +19,8 @@ import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.serializers.TopicMetadataV2Parser.IntentionallyUnimplemented
 import hydra.kafka.util.ConsumerGroupsOffsetConsumer
-import io.chrisdavenport.log4cats.Logger
-
-import java.time.Instant
+import org.apache.avro.generic.GenericRecord
+import org.typelevel.log4cats.Logger
 
 trait ConsumerGroupsAlgebra[F[_]] {
   def getConsumersForTopic(topicName: String): F[TopicConsumers]
@@ -119,7 +124,8 @@ object ConsumerGroupsAlgebra {
                                                                      commonConsumerGroup: String,
                                                                      kafkaClientAlgebra: KafkaClientAlgebra[F],
                                                                      kAA: KafkaAdminAlgebra[F],
-                                                                     sra: SchemaRegistry[F]): F[ConsumerGroupsAlgebra[F]] = {
+                                                                     sra: SchemaRegistry[F],
+                                                                     kafkaClientSecurityConfig: KafkaClientSecurityConfig): F[ConsumerGroupsAlgebra[F]] = {
 
     val dvsConsumersStream: fs2.Stream[F, Record] = {
       kafkaClientAlgebra.consumeSafelyMessages(dvsConsumersTopic.value, uniquePerNodeConsumerGroup, commitOffsets = false)
@@ -157,8 +163,8 @@ object ConsumerGroupsAlgebra {
         for {
           _ <- Concurrent[F].start(consumeDVSConsumersTopicIntoCache(dvsConsumersStream, consumerGroupsStorageFacade))
           _ <- Concurrent[F].start {
-            ConsumerGroupsOffsetConsumer.start(kafkaClientAlgebra, kAA, sra, uniquePerNodeConsumerGroup,
-              consumerOffsetsOffsetsTopicConfig, kafkaInternalTopic, dvsConsumersTopic, bootstrapServers, commonConsumerGroup)
+            ConsumerGroupsOffsetConsumer.start(kafkaClientAlgebra, kAA, sra, uniquePerNodeConsumerGroup, consumerOffsetsOffsetsTopicConfig,
+              kafkaInternalTopic, dvsConsumersTopic, bootstrapServers, commonConsumerGroup, kafkaClientSecurityConfig)
           }
         } yield ()
       }

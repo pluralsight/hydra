@@ -1,7 +1,6 @@
 package hydra.kafka.endpoints
 
 import java.time.Instant
-
 import akka.actor.ActorSelection
 import akka.http.scaladsl.common.EntityStreamingSupport
 import akka.http.scaladsl.model.StatusCodes
@@ -9,6 +8,7 @@ import akka.kafka.Subscriptions
 import akka.kafka.scaladsl.Consumer
 import akka.pattern.ask
 import akka.util.Timeout
+import hydra.common.config.KafkaConfigUtils.KafkaClientSecurityConfig
 import hydra.core.http.RouteSupport
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetLatestOffsets, LatestOffsetsResponse}
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -24,7 +24,7 @@ import scala.concurrent.{Await, ExecutionContext, Future}
   *
   * Created by alexsilva on 3/18/17.
   */
-class TopicsEndpoint(consumerProxy:ActorSelection)(implicit ec:ExecutionContext) extends RouteSupport {
+class TopicsEndpoint(consumerProxy:ActorSelection, kafkaSecurityConfig: KafkaClientSecurityConfig)(implicit ec:ExecutionContext) extends RouteSupport {
 
   import hydra.kafka.util.KafkaUtils._
 

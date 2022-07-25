@@ -10,13 +10,14 @@ import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.avro.util.SchemaWrapper
+import hydra.common.config.KafkaConfigUtils.{KafkaClientSecurityConfig, kafkaSecurityEmptyConfig}
 import hydra.ingest.programs.TopicDeletionProgram
 import hydra.kafka.algebras.KafkaAdminAlgebra._
 import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.util.KafkaUtils.TopicDetails
-import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
-import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.SelfAwareStructuredLogger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.apache.kafka.clients.admin.ConsumerGroupDescription
@@ -139,7 +140,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
                          schemaAlgebra: SchemaRegistry[IO]): IO[ConsumerGroupsAlgebra[IO]] = {
     ConsumerGroupsAlgebra.make("",Subject.createValidated("dvs.blah.blah").get,
       Subject.createValidated("dvs.heyo.blah").get,"","","",
-      kafkaClientAlgebra,kafkaAdminAlgebra,schemaAlgebra)
+      kafkaClientAlgebra,kafkaAdminAlgebra,schemaAlgebra, kafkaSecurityEmptyConfig)
   }
 
   "The deletionEndpoint path" should {

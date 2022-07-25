@@ -8,12 +8,14 @@ import cats.effect.{ExitCode, IO, IOApp, Resource}
 import hydra.common.Settings
 import hydra.common.config.ConfigSupport
 import ConfigSupport._
+import hydra.common.config.KafkaConfigUtils.KafkaClientSecurityConfig
 import hydra.common.logging.LoggingAdapter
 import hydra.core.http.CorsSupport
+import hydra.ingest.app.Main.catsLogger
 import hydra.ingest.bootstrap.ActorFactory
 import hydra.ingest.modules.{Algebras, Bootstrap, Programs, Routes}
-import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
-import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.SelfAwareStructuredLogger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import kamon.Kamon
 import kamon.prometheus.PrometheusReporter
 
@@ -43,7 +45,7 @@ object Main extends IOApp with ConfigSupport with LoggingAdapter {
       }
     })
 
-  private def actorsIO()(implicit system: ActorSystem): IO[Unit] = {
+  private def actorsIO(kafkaClientSecurityConfig: KafkaClientSecurityConfig)(implicit system: ActorSystem): IO[Unit] = {
     IO {
       class Service extends Actor {
         override def preStart(): Unit = {
@@ -85,7 +87,7 @@ object Main extends IOApp with ConfigSupport with LoggingAdapter {
           bootstrap <- Bootstrap
             .make[IO](programs.createTopic, config.metadataTopicsConfig,
               config.dvsConsumersTopicConfig, config.consumerOffsetsOffsetsTopicConfig, algebras.kafkaAdmin, config.tagsConfig)
-          _ <- actorsIO()
+          _ <- actorsIO(config.kafkaClientSecurityConfig)
           _ <- bootstrap.bootstrapAll
           routes <- Routes.make[IO](programs, algebras, config)
           _ <- report

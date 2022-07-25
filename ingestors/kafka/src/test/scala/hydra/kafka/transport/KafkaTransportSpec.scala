@@ -3,7 +3,7 @@ package hydra.kafka.transport
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
-import hydra.common.config.ConfigSupport
+import hydra.common.config.{ConfigSupport, KafkaConfigUtils}
 import hydra.core.transport.Transport.Deliver
 import hydra.core.transport.{AckStrategy, RecordMetadata, TransportCallback}
 import hydra.kafka.producer.{DeleteTombstoneRecord, JsonRecord, StringRecord}

@@ -26,6 +26,7 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import hydra.avro.resource.SchemaResource
 import hydra.common.config.ConfigSupport
 import hydra.common.config.ConfigSupport._
+import hydra.common.config.KafkaConfigUtils.SchemaRegistrySecurityConfig
 import hydra.core.akka.SchemaRegistryActor
 import hydra.core.akka.SchemaRegistryActor._
 import hydra.core.http.{CorsSupport, DefaultCorsSupport, RouteSupport}
@@ -52,7 +53,9 @@ import scala.concurrent.duration._
   *
   * Created by alexsilva on 2/13/16.
   */
-class SchemasEndpoint(consumerProxy: ActorSelection, streamsManagerActor: ActorRef)(implicit system: ActorSystem, corsSupport: CorsSupport)
+class SchemasEndpoint(consumerProxy: ActorSelection,
+                      streamsManagerActor: ActorRef,
+                      schemaRegistrySecurityConfig: SchemaRegistrySecurityConfig)(implicit system: ActorSystem, corsSupport: CorsSupport)
     extends RouteSupport
     with ConfigSupport
     with DefaultCorsSupport {
@@ -66,10 +69,11 @@ class SchemasEndpoint(consumerProxy: ActorSelection, streamsManagerActor: ActorR
     val make: List[SchemasWithTopicResponse] => BatchSchemasResponse = BatchSchemasResponse.apply
     jsonFormat1(make)
   }
+
   implicit val timeout: Timeout = Timeout(3.seconds)
 
   private val schemaRegistryActor =
-    system.actorOf(SchemaRegistryActor.props(applicationConfig))
+    system.actorOf(SchemaRegistryActor.props(applicationConfig, schemaRegistrySecurityConfig))
 
   private val filterSystemTopics = (t: String) =>
     (t.startsWith("_") && showSystemTopics) || !t.startsWith("_")

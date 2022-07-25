@@ -5,7 +5,7 @@ import akka.pattern.pipe
 import hydra.core.akka.InitializingActor
 import hydra.core.monitor.HydraMetrics
 import hydra.core.protocol._
-import hydra.core.transport.{AckStrategy, HydraRecord, RecordFactory, Transport}
+import hydra.core.transport.{AckStrategy, HydraRecord, RecordFactory}
 import org.apache.commons.lang3.ClassUtils
 
 import scala.concurrent.Future

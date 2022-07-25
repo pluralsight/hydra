@@ -8,7 +8,7 @@ object Dependencies {
   val akkaVersion = "2.6.7"
   val avroVersion = "1.10.0"
   val catsEffectVersion = "2.3.1"
-  val catsLoggerVersion = "1.1.1"
+  val catsLoggerVersion = "1.2.1"
   val catsRetryVersion = "2.1.0"
   val catsVersion = "2.2.0"
   val cirisVersion = "1.2.1"
@@ -45,7 +45,8 @@ object Dependencies {
 
     val cats = Seq(
       "com.github.cb372" %% "cats-retry" % catsRetryVersion,
-      "io.chrisdavenport" %% "log4cats-slf4j" % catsLoggerVersion,
+      "org.typelevel" %% "log4cats-core" % catsLoggerVersion,
+      "org.typelevel" %% "log4cats-slf4j" % catsLoggerVersion,
       "org.typelevel" %% "cats-core" % catsVersion,
       "org.typelevel" %% "cats-effect" % catsEffectVersion
     )
@@ -75,11 +76,12 @@ object Dependencies {
       "io.kamon" %% "kamon-prometheus" % kamonPVersion
     )
 
-    val kafka = Seq(
+    val kafkaClients: Seq[ModuleID] =  Seq("org.apache.kafka" % "kafka-clients" % kafkaVersion)
+
+    val kafka: Seq[ModuleID] = Seq(
       "org.apache.kafka" %% "kafka" % kafkaVersion,
-      "org.apache.kafka" % "kafka-clients" % kafkaVersion,
       embeddedKafka
-    )
+    ) ++ kafkaClients
 
     val confluent: Seq[ModuleID] =
       Seq("io.confluent" % "kafka-avro-serializer" % confluentVersion).map(
@@ -177,7 +179,7 @@ object Dependencies {
   val integrationDeps: Seq[ModuleID] = testContainers ++ TestLibraries.getTestLibraries(module = "it")
 
   val baseDeps: Seq[ModuleID] =
-    akka ++ Seq(avro) ++ cats ++ logging ++ joda ++ testDeps
+    akka ++ Seq(avro, ciris) ++ cats ++ logging ++ joda ++ testDeps ++ kafkaClients
 
   val avroDeps: Seq[ModuleID] =
     baseDeps ++ confluent ++ jackson ++ guavacache ++ catsEffect
@@ -189,7 +191,7 @@ object Dependencies {
     ) ++ guavacache ++
     confluent ++ kamon
 
-  val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(ciris, embeddedKafka, sprayJson)
+  val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(embeddedKafka, sprayJson)
 
   val kafkaDeps: Seq[ModuleID] = coreDeps ++ Seq(
     akkaKafkaStream,

@@ -13,6 +13,7 @@ import akka.stream.scaladsl.{Keep, RunnableGraph, Sink}
 import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.common.config.ConfigSupport._
+import hydra.common.config.KafkaConfigUtils._
 import hydra.core.marshallers.HydraJsonSupport
 import hydra.kafka.model.TopicMetadata
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
@@ -27,6 +28,7 @@ import scala.util.Try
 
 class StreamsManagerActor(
     bootstrapKafkaConfig: Config,
+    kafkaClientSecurityConfig: KafkaClientSecurityConfig,
     bootstrapServers: String,
     schemaRegistryClient: SchemaRegistryClient
 ) extends Actor
@@ -48,6 +50,7 @@ class StreamsManagerActor(
 
   private val metadataStream = StreamsManagerActor.createMetadataStream(
     bootstrapKafkaConfig,
+    kafkaClientSecurityConfig,
     bootstrapServers,
     schemaRegistryClient,
     metadataTopicName,
@@ -126,6 +129,7 @@ object StreamsManagerActor {
 
   private[services] def createMetadataStream[K, V](
       config: Config,
+      kafkaClientSecurityConfig: KafkaClientSecurityConfig,
       bootstrapSevers: String,
       schemaRegistryClient: SchemaRegistryClient,
       metadataTopicName: String,
@@ -146,6 +150,7 @@ object StreamsManagerActor {
       .withGroupId(s"metadata-consumer-actor-$maybeHost")
       .withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
       .withProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false")
+      .withKafkaSecurityConfigs(kafkaClientSecurityConfig)
 
     Consumer
       .plainSource(settings, Subscriptions.topics(metadataTopicName))
@@ -182,9 +187,10 @@ object StreamsManagerActor {
 
   def props(
       bootstrapKafkaConfig: Config,
+      kafkaClientSecurityConfig: KafkaClientSecurityConfig,
       bootstrapServers: String,
       schemaRegistryClient: SchemaRegistryClient
   ): Props = {
-    Props(new StreamsManagerActor(bootstrapKafkaConfig, bootstrapServers, schemaRegistryClient))
+    Props(new StreamsManagerActor(bootstrapKafkaConfig, kafkaClientSecurityConfig, bootstrapServers, schemaRegistryClient))
   }
 }

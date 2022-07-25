@@ -16,6 +16,7 @@
 package hydra.avro.registry
 
 import com.typesafe.config.ConfigFactory
+import hydra.common.config.KafkaConfigUtils.SchemaRegistrySecurityConfig
 import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, MockSchemaRegistryClient}
 import org.apache.avro.Schema
 import org.scalatest.concurrent.ScalaFutures
@@ -34,6 +35,8 @@ class ConfluentSchemaRegistrySpec
     with PrivateMethodTester {
 
   private var id = 0
+
+  val emptySchemaRegistrySecurityConfig = SchemaRegistrySecurityConfig(None, None)
 
   val schema = new Schema.Parser().parse("""
       |{
@@ -55,7 +58,8 @@ class ConfluentSchemaRegistrySpec
   describe("When creating a schema registry client") {
     it("returns a mock") {
       val c = ConfluentSchemaRegistry.forConfig(
-        ConfigFactory.parseString("schema.registry.url=mock")
+        ConfigFactory.parseString("schema.registry.url=mock"),
+        emptySchemaRegistrySecurityConfig
       )
       c.registryClient shouldBe a[MockSchemaRegistryClient]
       c.registryUrl shouldBe "mock"
@@ -65,7 +69,8 @@ class ConfluentSchemaRegistrySpec
       val c = ConfluentSchemaRegistry
         .forConfig(
           ConfigFactory
-            .parseString("schema.registry.url=\"http://localhost:9092\"")
+            .parseString("schema.registry.url=\"http://localhost:9092\""),
+          emptySchemaRegistrySecurityConfig
         )
       c.registryUrl shouldBe "http://localhost:9092"
     }
@@ -74,13 +79,15 @@ class ConfluentSchemaRegistrySpec
       val c = ConfluentSchemaRegistry
         .forConfig(
           ConfigFactory
-            .parseString("schema.registry.url=\"http://localhost:12345\"")
+            .parseString("schema.registry.url=\"http://localhost:12345\""),
+          emptySchemaRegistrySecurityConfig
         )
 
       val c1 = ConfluentSchemaRegistry
         .forConfig(
           ConfigFactory
-            .parseString("schema.registry.url=\"http://localhost:12345\"")
+            .parseString("schema.registry.url=\"http://localhost:12345\""),
+          emptySchemaRegistrySecurityConfig
         )
 
       (c eq c1) shouldBe true
@@ -93,7 +100,7 @@ class ConfluentSchemaRegistrySpec
           |max.schemas.per.subject=1234
         """.stripMargin)
 
-      val client = ConfluentSchemaRegistry.forConfig(config).registryClient
+      val client = ConfluentSchemaRegistry.forConfig(config, emptySchemaRegistrySecurityConfig).registryClient
       val field = client.getClass.getDeclaredField("identityMapCapacity")
       field.setAccessible(true)
       assert(1234 === field.get(client))
@@ -102,7 +109,8 @@ class ConfluentSchemaRegistrySpec
     it("returns all subjects") {
       implicit val ec = scala.concurrent.ExecutionContext.Implicits.global
       val c = ConfluentSchemaRegistry.forConfig(
-        ConfigFactory.parseString("schema.registry.url=mock")
+        ConfigFactory.parseString("schema.registry.url=mock"),
+        emptySchemaRegistrySecurityConfig
       )
       whenReady(c.getAllSubjects) { r => r shouldBe Seq(schema.getFullName) }
     }
@@ -110,7 +118,8 @@ class ConfluentSchemaRegistrySpec
     it("returns by id") {
       implicit val ec = scala.concurrent.ExecutionContext.Implicits.global
       val c = ConfluentSchemaRegistry.forConfig(
-        ConfigFactory.parseString("schema.registry.url=mock")
+        ConfigFactory.parseString("schema.registry.url=mock"),
+        emptySchemaRegistrySecurityConfig
       )
       whenReady(c.getById(id, "")) { r =>
         r.getId shouldBe id
@@ -122,7 +131,7 @@ class ConfluentSchemaRegistrySpec
     it("throws an error if no config key is found") {
       val config = ConfigFactory.empty
       intercept[IllegalArgumentException] {
-        ConfluentSchemaRegistry.forConfig(config)
+        ConfluentSchemaRegistry.forConfig(config, emptySchemaRegistrySecurityConfig)
       }
     }
 
@@ -131,7 +140,7 @@ class ConfluentSchemaRegistrySpec
         "schema.registry.url=\"http://localhost:9092\""
       )
       ConfluentSchemaRegistry
-        .forConfig(config)
+        .forConfig(config, emptySchemaRegistrySecurityConfig)
         .registryClient shouldBe a[CachedSchemaRegistryClient]
       ConfluentSchemaRegistry.registryUrl(config) shouldBe "http://localhost:9092"
     }

@@ -6,16 +6,17 @@ import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.implicits._
 import com.dimafeng.testcontainers.{ForAllTestContainer, KafkaContainer}
 import hydra.avro.registry.SchemaRegistry
+import hydra.common.config.KafkaConfigUtils.{KafkaClientSecurityConfig, SchemaRegistrySecurityConfig, kafkaSecurityEmptyConfig}
 import hydra.kafka.algebras.ConsumerGroupsAlgebra.PartitionOffsetMap
 import hydra.kafka.algebras.KafkaClientAlgebra.{OffsetInfo, Record}
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
 import hydra.kafka.model.TopicConsumerOffset.{TopicConsumerOffsetKey, TopicConsumerOffsetValue}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{TopicConsumer, TopicConsumerOffset}
+import hydra.kafka.model.{TopicConsumer, TopicConsumerOffset, TopicMetadataV2, TopicMetadataV2Key}
 import hydra.kafka.util.ConsumerGroupsOffsetConsumer
 import hydra.kafka.util.KafkaUtils.TopicDetails
-import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
-import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.SelfAwareStructuredLogger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import org.apache.avro.generic.GenericRecord
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -25,6 +26,7 @@ import retry.syntax.all._
 import retry.{RetryDetails, RetryPolicy}
 import vulcan.Codec
 import vulcan.generic._
+
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.Try
@@ -60,10 +62,10 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
   private val consumerGroup = "consumerGroupName"
 
   (for {
-    kafkaAdmin <- KafkaAdminAlgebra.live[IO](container.bootstrapServers)
+    kafkaAdmin <- KafkaAdminAlgebra.live[IO](container.bootstrapServers,  kafkaSecurityEmptyConfig)
     schemaRegistry <- SchemaRegistry.test[IO]
-    kafkaClient <- KafkaClientAlgebra.live[IO](container.bootstrapServers, schemaRegistry)
-    consumerGroupAlgebra <- ConsumerGroupsAlgebra.make(internalKafkaConsumerTopic, dvsConsumerTopic, dvsInternalKafkaOffsetsTopic, container.bootstrapServers, consumerGroup, consumerGroup, kafkaClient, kafkaAdmin, schemaRegistry)
+    kafkaClient <- KafkaClientAlgebra.live[IO](container.bootstrapServers, "https://schema-registry", schemaRegistry , kafkaSecurityEmptyConfig)
+    consumerGroupAlgebra <- ConsumerGroupsAlgebra.make(internalKafkaConsumerTopic, dvsConsumerTopic, dvsInternalKafkaOffsetsTopic, container.bootstrapServers, consumerGroup, consumerGroup, kafkaClient, kafkaAdmin, schemaRegistry,  kafkaSecurityEmptyConfig)
     _ <- consumerGroupAlgebra.startConsumer
   } yield {
     runTests(consumerGroupAlgebra, schemaRegistry, kafkaClient, kafkaAdmin)
@@ -133,7 +135,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
 
       "test the getOffsets function" in {
         def testConsumerGroupsAlgebraGetOffsetsToSeekTo(
-                                                          numberOfPartitionsForKafkaInternalTopic: Int,
+                                                         numberOfPartitionsForKafkaInternalTopic: Int,
                                                          latestPartitionOffset: PartitionOffsetMap,
                                                          dvsConsumerOffsetStream: fs2.Stream[IO, (Record, OffsetInfo)]
                                                        ) = {

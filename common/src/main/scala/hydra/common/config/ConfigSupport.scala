@@ -16,11 +16,14 @@
 
 package hydra.common.config
 
-import java.util.Properties
-import java.util.concurrent.TimeUnit
+import akka.dispatch.ExecutionContexts
+import cats.effect.IO
 
+import java.util.Properties
+import java.util.concurrent.{Executors, TimeUnit}
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
+import hydra.common.config.KafkaConfigUtils.{SchemaRegistrySecurityConfig, kafkaClientSecurityConfig, schemaRegistrySecurityConfig}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.language.implicitConversions
@@ -45,6 +48,13 @@ trait ConfigSupport extends ConfigComponent {
   val rootConfig: Config = defaultConfig
 
   val applicationConfig: Config = rootConfig.getConfig(applicationName)
+
+  // It should be removed after V1 deprecation
+  private implicit val ctx = IO.contextShift(ExecutionContexts.fromExecutorService(Executors.newSingleThreadExecutor()))
+
+  val defaultKafkaClientSecurityCfg = kafkaClientSecurityConfig.load[IO].unsafeRunSync()
+
+  val schemaRegistrySecurityCfg: SchemaRegistrySecurityConfig = schemaRegistrySecurityConfig.load[IO].unsafeRunSync()
 
 }
 

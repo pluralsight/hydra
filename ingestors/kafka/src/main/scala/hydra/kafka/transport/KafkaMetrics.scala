@@ -5,6 +5,7 @@ import com.typesafe.config.Config
 import hydra.common.config.ConfigSupport
 import hydra.kafka.producer.KafkaRecordMetadata
 import hydra.kafka.util.KafkaUtils
+import hydra.common.config.KafkaConfigUtils._
 import org.apache.kafka.clients.producer.ProducerRecord
 import spray.json.DefaultJsonProtocol
 
@@ -21,7 +22,7 @@ object NoOpMetrics extends KafkaMetrics {
 
 // $COVERAGE-ON$
 
-class PublishMetrics(topic: String)(implicit system: ActorSystem)
+class PublishMetrics(topic: String, kafkaClientSecurityConfig: KafkaClientSecurityConfig)(implicit system: ActorSystem)
     extends KafkaMetrics
     with DefaultJsonProtocol
     with ConfigSupport {
@@ -31,7 +32,7 @@ class PublishMetrics(topic: String)(implicit system: ActorSystem)
   import KafkaRecordMetadata._
 
   private val producer = KafkaUtils
-    .producerSettings[String, String]("string", rootConfig)
+    .producerSettings[String, String]("string", rootConfig, kafkaClientSecurityConfig)
     .withProperty("client.id", "hydra.kafka.metrics")
     .createKafkaProducer()
 
@@ -50,7 +51,7 @@ object KafkaMetrics {
 
   import ConfigSupport._
 
-  def apply(config: Config)(implicit system: ActorSystem): KafkaMetrics = {
+  def apply(config: Config, kafkaClientSecurityConfig: KafkaClientSecurityConfig)(implicit system: ActorSystem): KafkaMetrics = {
     val metricsEnabled =
       config.getBooleanOpt("transports.kafka.metrics.enabled").getOrElse(false)
 
@@ -58,6 +59,6 @@ object KafkaMetrics {
       .getStringOpt("transports.kafka.metrics.topic")
       .getOrElse("HydraKafkaError")
 
-    if (metricsEnabled) new PublishMetrics(metricsTopic) else NoOpMetrics
+    if (metricsEnabled) new PublishMetrics(metricsTopic, kafkaClientSecurityConfig) else NoOpMetrics
   }
 }

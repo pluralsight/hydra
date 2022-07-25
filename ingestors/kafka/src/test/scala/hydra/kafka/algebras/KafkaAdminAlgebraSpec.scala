@@ -1,20 +1,24 @@
 package hydra.kafka.algebras
 
 import akka.actor.ActorSystem
-import cats.effect.{ContextShift, IO, Sync, Timer}
+import cats.effect.{Clock, ContextShift, IO, Sync, Timer}
 import hydra.kafka.algebras.KafkaAdminAlgebra.{LagOffsets, Offset, Topic, TopicAndPartition}
 import hydra.avro.registry.SchemaRegistry
+import hydra.common.config.KafkaConfigUtils
 import hydra.kafka.algebras.KafkaAdminAlgebra.{LagOffsets, Offset, TopicAndPartition}
 import hydra.kafka.algebras.KafkaClientAlgebra.getOptionalGenericRecordDeserializer
 import hydra.kafka.util.KafkaUtils.TopicDetails
-import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
-import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.SelfAwareStructuredLogger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
-import org.scalatest.BeforeAndAfterAll
+import org.joda.time.DurationFieldType.seconds
+import org.scalatest.{BeforeAndAfterAll, stats}
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.MILLISECONDS
 
 final class KafkaAdminAlgebraSpec
     extends AnyWordSpecLike
@@ -55,7 +59,7 @@ final class KafkaAdminAlgebraSpec
 
   (for {
     live <- KafkaAdminAlgebra
-      .live[IO](bootstrapServers)
+      .live[IO](bootstrapServers,  KafkaConfigUtils.kafkaSecurityEmptyConfig)
     test <- KafkaAdminAlgebra.test[IO]()
   } yield {
     runTests(live)

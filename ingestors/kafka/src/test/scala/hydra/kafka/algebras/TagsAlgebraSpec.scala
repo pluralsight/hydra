@@ -3,8 +3,8 @@ package hydra.kafka.algebras
 import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.implicits._
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishResponse
-import io.chrisdavenport.log4cats.SelfAwareStructuredLogger
-import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.SelfAwareStructuredLogger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import org.scalatest.Assertion
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike

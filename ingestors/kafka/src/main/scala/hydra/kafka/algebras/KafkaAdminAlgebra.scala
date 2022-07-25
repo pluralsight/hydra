@@ -7,11 +7,13 @@ import cats.implicits.catsSyntaxApplicativeError
 import cats.syntax.all._
 import fs2.kafka._
 import hydra.kafka.util.KafkaUtils.TopicDetails
-import io.chrisdavenport.log4cats.Logger
 import org.apache.kafka.clients.admin.{ConsumerGroupDescription, NewTopic}
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException
+import org.typelevel.log4cats.Logger
+import hydra.common.config.KafkaConfigUtils._
+import kafka.server.KafkaConfig
 
 /**
  * Internal interface to interact with the KafkaAdminClient from FS2 Kafka.
@@ -124,7 +126,7 @@ object KafkaAdminAlgebra {
 
   def live[F[_] : Sync : ConcurrentEffect : ContextShift : Timer : Logger](
                                                                             bootstrapServers: String,
-                                                                            useSsl: Boolean = false
+                                                                            kafkaClientSecurityConfig: KafkaClientSecurityConfig
                                                                           ): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
     new KafkaAdminAlgebra[F] {
 
@@ -217,16 +219,15 @@ object KafkaAdminAlgebra {
       private def getConsumerResource: Resource[F, KafkaConsumer[F, _, _]] = {
         val des = Deserializer[F, String]
         consumerResource[F, String, String] {
-          val s = ConsumerSettings.apply(des, des).withBootstrapServers(bootstrapServers)
-            .withAllowAutoCreateTopics(false)
-          if (useSsl) s.withProperty("security.protocol", "SSL") else s
+          ConsumerSettings.apply(des, des).withBootstrapServers(bootstrapServers)
+            .withKafkaSecurityConfigs(kafkaClientSecurityConfig)
         }
       }
 
       private def getAdminClientResource: Resource[F, KafkaAdminClient[F]] = {
         adminClientResource {
-          val s = AdminClientSettings.apply.withBootstrapServers(bootstrapServers)
-          if (useSsl) s.withProperty("security.protocol", "SSL") else s
+          AdminClientSettings.apply.withBootstrapServers(bootstrapServers)
+            .withKafkaSecurityConfigs(kafkaClientSecurityConfig)
         }
       }
 
