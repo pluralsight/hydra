@@ -59,7 +59,7 @@ final class KafkaAdminAlgebraSpec
 
   (for {
     live <- KafkaAdminAlgebra
-      .live[IO](bootstrapServers,  KafkaConfigUtils.kafkaSecurityEmptyConfig)
+      .live[IO](bootstrapServers, kafkaClientSecurityConfig = KafkaConfigUtils.kafkaSecurityEmptyConfig)
     test <- KafkaAdminAlgebra.test[IO]()
   } yield {
     runTests(live)

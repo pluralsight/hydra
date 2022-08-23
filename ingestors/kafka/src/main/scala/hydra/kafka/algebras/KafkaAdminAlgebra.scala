@@ -126,7 +126,8 @@ object KafkaAdminAlgebra {
 
   def live[F[_] : Sync : ConcurrentEffect : ContextShift : Timer : Logger](
                                                                             bootstrapServers: String,
-                                                                            kafkaClientSecurityConfig: KafkaClientSecurityConfig
+                                                                            useSsl : Boolean = false,
+                                                                            kafkaClientSecurityConfig: KafkaClientSecurityConfig = emptyKafkaClientSecurityConfig
                                                                           ): F[KafkaAdminAlgebra[F]] = Sync[F].delay {
     new KafkaAdminAlgebra[F] {
 
@@ -219,15 +220,23 @@ object KafkaAdminAlgebra {
       private def getConsumerResource: Resource[F, KafkaConsumer[F, _, _]] = {
         val des = Deserializer[F, String]
         consumerResource[F, String, String] {
-          ConsumerSettings.apply(des, des).withBootstrapServers(bootstrapServers)
-            .withKafkaSecurityConfigs(kafkaClientSecurityConfig)
+          val settings = ConsumerSettings.apply(des, des).withBootstrapServers(bootstrapServers)
+            if(useSsl) {
+              settings.withProperty("security.protocol", "SSL")
+            } else {
+              settings.withKafkaSecurityConfigs(kafkaClientSecurityConfig)
+            }
         }
       }
 
       private def getAdminClientResource: Resource[F, KafkaAdminClient[F]] = {
         adminClientResource {
-          AdminClientSettings.apply.withBootstrapServers(bootstrapServers)
-            .withKafkaSecurityConfigs(kafkaClientSecurityConfig)
+          val settings = AdminClientSettings.apply.withBootstrapServers(bootstrapServers)
+          if(useSsl) {
+            settings.withProperty("security.protocol", "SSL")
+          } else {
+            settings.withKafkaSecurityConfigs(kafkaClientSecurityConfig)
+          }
         }
       }
 
