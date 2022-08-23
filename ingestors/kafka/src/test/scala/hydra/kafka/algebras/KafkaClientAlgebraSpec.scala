@@ -50,7 +50,7 @@ class KafkaClientAlgebraSpec
 
   private def createTopics: IO[Unit] = {
     val topicsToCreate: List[String] = List("topic1", "topic2" , "topic-inc-data", "stringTopic1", "stringTopic2", "nullTopic1")
-    KafkaAdminAlgebra.live[IO](s"localhost:$port", KafkaConfigUtils.kafkaSecurityEmptyConfig)
+    KafkaAdminAlgebra.live[IO](s"localhost:$port", kafkaClientSecurityConfig = KafkaConfigUtils.kafkaSecurityEmptyConfig)
       .flatMap(adminClient => topicsToCreate.traverse(adminClient.createTopic(_, TopicDetails(1, 1, 1)))).void
   }
 

@@ -26,7 +26,7 @@ object Algebras {
         config.createTopicConfig.schemaRegistryConfig.maxCacheSize,
         config.schemaRegistrySecurityConfig
       )
-      kafkaAdmin <- KafkaAdminAlgebra.live[F](config.createTopicConfig.bootstrapServers, config.kafkaClientSecurityConfig)
+      kafkaAdmin <- KafkaAdminAlgebra.live[F](config.createTopicConfig.bootstrapServers, kafkaClientSecurityConfig = config.kafkaClientSecurityConfig)
       kafkaClient <- KafkaClientAlgebra.live[F](config.createTopicConfig.bootstrapServers, schemaRegistryUrl,
         schemaRegistry, config.kafkaClientSecurityConfig, config.ingestConfig.recordSizeLimitBytes)
       metadata <- MetadataAlgebra.make[F](config.metadataTopicsConfig.topicNameV2,

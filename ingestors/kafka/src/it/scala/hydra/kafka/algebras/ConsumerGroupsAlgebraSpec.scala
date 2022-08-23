@@ -62,7 +62,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
   private val consumerGroup = "consumerGroupName"
 
   (for {
-    kafkaAdmin <- KafkaAdminAlgebra.live[IO](container.bootstrapServers,  kafkaSecurityEmptyConfig)
+    kafkaAdmin <- KafkaAdminAlgebra.live[IO](container.bootstrapServers, kafkaClientSecurityConfig = kafkaSecurityEmptyConfig)
     schemaRegistry <- SchemaRegistry.test[IO]
     kafkaClient <- KafkaClientAlgebra.live[IO](container.bootstrapServers, "https://schema-registry", schemaRegistry , kafkaSecurityEmptyConfig)
     consumerGroupAlgebra <- ConsumerGroupsAlgebra.make(internalKafkaConsumerTopic, dvsConsumerTopic, dvsInternalKafkaOffsetsTopic, container.bootstrapServers, consumerGroup, consumerGroup, kafkaClient, kafkaAdmin, schemaRegistry,  kafkaSecurityEmptyConfig)
