@@ -43,6 +43,8 @@ object KafkaConfigUtils {
 
   }
 
+  val emptyKafkaClientSecurityConfig = KafkaClientSecurityConfig(None, None, None)
+
 
   //TODO: should be moved to AppConfig after V1 Deprecation
   val kafkaClientSecurityConfig: ConfigValue[KafkaClientSecurityConfig] =
