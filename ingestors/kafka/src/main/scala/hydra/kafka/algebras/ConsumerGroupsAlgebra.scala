@@ -8,9 +8,13 @@ import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Timer}
 import cats.implicits._
 import fs2.kafka._
 import hydra.avro.registry.SchemaRegistry
+import hydra.common.alerting.AlertProtocol.NotificationMessage
+import hydra.common.alerting.NotificationLevel
+import hydra.common.alerting.sender.{InternalNotificationSender, NotificationSender}
 import hydra.common.config.KafkaConfigUtils.KafkaClientSecurityConfig
 import hydra.kafka.algebras.ConsumerGroupsAlgebra.{Consumer, ConsumerTopics, DetailedConsumerGroup, DetailedTopicConsumers, PartitionOffset, TopicConsumers}
 import hydra.kafka.algebras.ConsumerGroupsAlgebra._
+import hydra.kafka.algebras.HydraTag.StringJsonFormat
 import hydra.kafka.algebras.KafkaClientAlgebra.Record
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Infinite
 import hydra.kafka.algebras.RetryableFs2Stream._
@@ -125,7 +129,8 @@ object ConsumerGroupsAlgebra {
                                                                      kafkaClientAlgebra: KafkaClientAlgebra[F],
                                                                      kAA: KafkaAdminAlgebra[F],
                                                                      sra: SchemaRegistry[F],
-                                                                     kafkaClientSecurityConfig: KafkaClientSecurityConfig): F[ConsumerGroupsAlgebra[F]] = {
+                                                                     kafkaClientSecurityConfig: KafkaClientSecurityConfig
+                                                                   ) (implicit  notificationsService: InternalNotificationSender[F]): F[ConsumerGroupsAlgebra[F]] = {
 
     val dvsConsumersStream: fs2.Stream[F, Record] = {
       kafkaClientAlgebra.consumeSafelyMessages(dvsConsumersTopic.value, uniquePerNodeConsumerGroup, commitOffsets = false)
@@ -203,9 +208,7 @@ object ConsumerGroupsAlgebra {
   private def consumeDVSConsumersTopicIntoCache[F[_] : ContextShift : ConcurrentEffect : Timer : Logger](
                                                                                                           dvsConsumersStream: fs2.Stream[F, Record],
                                                                                                           consumerGroupsStorageFacade: Ref[F, ConsumerGroupsStorageFacade]
-                                                                                                        ): F[Unit] = {
-    val errorMessage = "Error in ConsumergroupsAlgebra consumer"
-
+                                                                                                        )(implicit notificationsService: InternalNotificationSender[F]): F[Unit] = {
     dvsConsumersStream.evalTap { case (key, value, _) =>
       TopicConsumer.decode[F](key, value).flatMap {
         case (topicKey, topicValue) =>
@@ -216,10 +219,10 @@ object ConsumerGroupsAlgebra {
               consumerGroupsStorageFacade.update(_.removeConsumerGroup(topicKey))
           }
       }.recoverWith {
-        case e => Logger[F].error(e)(errorMessage)
+        case e => Logger[F].error(e)("Error in ConsumergroupsAlgebra consumer")
       }
     }
-      .makeRetryable(Infinite)(errorMessage)
+      .makeRetryableWithNotification(Infinite, "ConsumerGroupsAlgebra")
       .compile.drain
   }
 }

@@ -8,6 +8,10 @@ import cats.effect.{Concurrent, Sync}
 import cats.implicits._
 import hydra.avro.convert.SimpleStringToGenericRecord
 import hydra.avro.convert.SimpleStringToGenericRecord._
+import hydra.common.alerting.AlertProtocol.NotificationMessage
+import hydra.common.alerting.{NotificationLevel, NotificationType}
+import hydra.common.alerting.sender.{InternalNotificationSender, NotificationSender}
+import hydra.kafka.algebras.HydraTag.StringJsonFormat
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishResponse
 import hydra.kafka.algebras.RetryableFs2Stream.ReRunnableStreamAdder
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Infinite
@@ -62,7 +66,8 @@ object TagsAlgebra {
 
   def make[F[_]: Sync: Concurrent: Logger](tagsTopic: String,
                                            tagsClient: String,
-                                           kafkaClientAlgebra: KafkaClientAlgebra[F]): F[TagsAlgebra[F]] = {
+                                           kafkaClientAlgebra: KafkaClientAlgebra[F]
+                                          )(implicit notificationsService: InternalNotificationSender[F]): F[TagsAlgebra[F]] = {
     val tagsStream: fs2.Stream[F,(GenericRecord,Option[GenericRecord])] =
                     kafkaClientAlgebra.consumeSafelyMessages(tagsTopic, tagsClient, commitOffsets = false)
                       //Ignore records with errors
@@ -82,7 +87,7 @@ object TagsAlgebra {
         case e =>
           fs2.Stream.eval(Logger[F].error(s"Unexpected return from Kafka: ${e.toString()}"))
       }
-        .makeRetryable(Infinite)("Error in TagsAlgebra")
+        .makeRetryableWithNotification(Infinite, "TagsAlgebra")
         .compile.drain)
       algebra <- getTagsAlgebra(ref, tagsTopic, kafkaClientAlgebra)
     } yield algebra

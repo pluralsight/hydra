@@ -2,6 +2,8 @@ package hydra.kafka.algebras
 
 import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.implicits._
+import hydra.common.NotificationsTestSuite
+import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishResponse
 import org.typelevel.log4cats.SelfAwareStructuredLogger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -15,15 +17,16 @@ import retry.syntax.all._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
-class TagsAlgebraSpec extends AnyWordSpecLike with Matchers {
+class TagsAlgebraSpec extends AnyWordSpecLike with Matchers with NotificationsTestSuite {
   implicit private val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
 
   private implicit val policy: RetryPolicy[IO] = limitRetries[IO](5) |+| exponentialBackoff[IO](500.milliseconds)
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
+
   private implicit def noop[A]: (A, RetryDetails) => IO[Unit] = retry.noop[IO, A]
 
-  implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
+  implicit private def unsafeLogger[F[_] : Sync]: SelfAwareStructuredLogger[F] =
     Slf4jLogger.getLogger[F]
 
   private implicit class RetryAndAssert[A](boolIO: IO[A]) {
@@ -31,11 +34,13 @@ class TagsAlgebraSpec extends AnyWordSpecLike with Matchers {
       boolIO.map(check).retryingOnFailures(identity, policy, noop).map(assert(_))
   }
 
-  (for {
-    kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
-    tagsAlgebra <- TagsAlgebra.make("_dvs.tags-topic", "tagsClient", kafkaClientAlgebra)
-  } yield runTests(tagsAlgebra)
-  ).unsafeRunSync()
+  {
+    implicit val notificationSenderMock: InternalNotificationSender[IO] = getInternalNotificationSenderMock[IO]
+    for {
+      kafkaClientAlgebra <- KafkaClientAlgebra.test[IO]
+      tagsAlgebra <- TagsAlgebra.make("_dvs.tags-topic", "tagsClient", kafkaClientAlgebra)
+    } yield runTests(tagsAlgebra)
+  }.unsafeRunSync()
 
 
   private def runTests(tagsAlgebra: TagsAlgebra[IO]): Unit = {

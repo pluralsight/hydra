@@ -1,14 +1,14 @@
 package hydra.ingest.app
 
-
-import cats.implicits._
-import ciris.{ConfigDecoder, ConfigValue, env}
+import cats.syntax.all._
+import ciris.{ConfigValue, env, ConfigDecoder}
 import hydra.common.config.KafkaConfigUtils.{KafkaClientSecurityConfig, SchemaRegistrySecurityConfig, kafkaClientSecurityConfig, schemaRegistrySecurityConfig}
+import eu.timepit.refined.types.string.NonEmptyString
 import hydra.kafka.algebras.KafkaClientAlgebra.ConsumerGroup
 import hydra.kafka.model.ContactMethod
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.duration._
 
 object AppConfig {
 
@@ -52,6 +52,26 @@ object AppConfig {
 
   private implicit val subjectConfigDecoder: ConfigDecoder[String, Subject] =
     ConfigDecoder.identity[String].mapOption("Subject")(Subject.createValidated)
+
+    final case class NotificationsConfig(
+                                          notificationUri: String,
+                                          internalSlackNotificationsChannel: String,
+                                          internalSlackNotificationUrl: Option[NonEmptyString]
+                                        )
+
+    private val notificationsConfig: ConfigValue[NotificationsConfig] = (
+      env("HYDRA_NOTIFICATION_URL").as[String].default("http://localhost:8080"),
+      env("HYDRA_SYSTEM_NOTIFICATION_SLACK_CHANNEL")
+        .as[String]
+        .default("test-messages-thread")
+      ).parMapN {
+      case (notificationUrl, internalNotificationSlackChannel) =>
+        NotificationsConfig(
+          notificationUrl,
+          internalNotificationSlackChannel,
+          NonEmptyString.from(s"$notificationUrl/notify/slack?channel=$internalNotificationSlackChannel").toOption
+        )
+    }
 
   final case class IgnoreDeletionConsumerGroups(consumerGroupListToIgnore: List[String])
 
@@ -205,7 +225,8 @@ object AppConfig {
                               allowableTopicDeletionTimeConfig: AllowableTopicDeletionTimeConfig,
                               corsAllowedOriginConfig: CorsAllowedOriginConfig,
                               kafkaClientSecurityConfig: KafkaClientSecurityConfig,
-                              schemaRegistrySecurityConfig: SchemaRegistrySecurityConfig
+                              schemaRegistrySecurityConfig: SchemaRegistrySecurityConfig,
+                              notificationsConfig: NotificationsConfig
                             )
 
   val appConfig: ConfigValue[AppConfig] =
@@ -222,6 +243,7 @@ object AppConfig {
       allowableTopicDeletionTimeConfig,
       corsAllowedOrigin,
       kafkaClientSecurityConfig,
-      schemaRegistrySecurityConfig
+      schemaRegistrySecurityConfig,
+      notificationsConfig
     ).parMapN(AppConfig)
 }

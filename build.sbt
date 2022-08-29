@@ -108,7 +108,7 @@ lazy val core = Project(
 lazy val kafka = Project(
   id = "kafka",
   base = file("ingestors/kafka")
-).dependsOn(core)
+).dependsOn(core, common % "compile->compile;test->test")
   .configs(IntegrationTest)
   .settings(
     moduleSettings ++ Defaults.itSettings,
@@ -133,7 +133,7 @@ lazy val ingest = Project(
   id = "ingest",
   base = file("ingest")
 )
-  .dependsOn(core, kafka)
+  .dependsOn(core, kafka, common % "compile->compile;test->test")
   .settings(
     moduleSettings ++ dockerSettings,
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),

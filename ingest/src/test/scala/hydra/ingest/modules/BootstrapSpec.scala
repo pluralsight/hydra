@@ -5,9 +5,12 @@ import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Sync, Timer}
 import cats.syntax.all._
 import fs2.kafka.{Headers, Timestamp}
 import hydra.avro.registry.SchemaRegistry
+import hydra.common.NotificationsTestSuite
+import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, MetadataTopicsConfig, TagsConfig}
 import hydra.kafka.algebras.KafkaAdminAlgebra.Topic
 import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, Offset, Partition, PublishError, PublishResponse, TopicName}
+import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.{ContactMethod, TopicMetadataV2, TopicMetadataV2Key}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -20,7 +23,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import retry.RetryPolicies
 
-class BootstrapSpec extends AnyWordSpecLike with Matchers {
+class BootstrapSpec extends AnyWordSpecLike with Matchers with NotificationsTestSuite {
 
   implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
     Slf4jLogger.getLogger[F]
@@ -44,12 +47,13 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers {
 
   ): IO[(List[Topic], List[String], List[(GenericRecord, Option[GenericRecord], Option[Headers])])] = {
     val retry = RetryPolicies.alwaysGiveUp[IO]
+    implicit val notificationSenderMock: InternalNotificationSender[IO] = getInternalNotificationSenderMock[IO]
     for {
       schemaRegistry <- SchemaRegistry.test[IO]
       kafkaAdmin <- KafkaAdminAlgebra.test[IO]()
       ref <- Ref[IO].of(List.empty[(GenericRecord, Option[GenericRecord], Option[Headers])])
       kafkaClient = new TestKafkaClientAlgebraWithPublishTo(ref)
-      metadata <- MetadataAlgebra.make(metadataSubjectV2, "consumer_group",kafkaClient, schemaRegistry, consumeMetadataEnabled = true)
+      metadata <- MetadataAlgebra.make(metadataSubjectV2, "consumer_group",kafkaClient, schemaRegistry, consumeMetadataEnabled = true, Once)
       c = CreateTopicProgram.make[IO](
         schemaRegistry,
         kafkaAdmin,

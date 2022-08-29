@@ -6,7 +6,10 @@ import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import cats.implicits._
 import com.dimafeng.testcontainers.{ForAllTestContainer, KafkaContainer}
 import hydra.avro.registry.SchemaRegistry
+import hydra.common.NotificationsTestSuite
+import hydra.common.alerting.sender.{InternalNotificationSender, NotificationSender}
 import hydra.common.config.KafkaConfigUtils.{KafkaClientSecurityConfig, SchemaRegistrySecurityConfig, kafkaSecurityEmptyConfig}
+import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.kafka.algebras.ConsumerGroupsAlgebra.PartitionOffsetMap
 import hydra.kafka.algebras.KafkaClientAlgebra.{OffsetInfo, Record}
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
@@ -31,7 +34,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.Try
 
-class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAllTestContainer with BeforeAndAfterAll {
+class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAllTestContainer with BeforeAndAfterAll with NotificationsTestSuite {
 
   override val container: KafkaContainer = KafkaContainer()
   container.start()
@@ -61,15 +64,19 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
   private val dvsInternalKafkaOffsetsTopic = Subject.createValidated("_hydra.consumer-offsets-offsets").get
   private val consumerGroup = "consumerGroupName"
 
-  (for {
+  {
+    implicit val notificationSenderMock: InternalNotificationSender[IO] = getInternalNotificationSenderMock[IO]
+    for {
     kafkaAdmin <- KafkaAdminAlgebra.live[IO](container.bootstrapServers, kafkaClientSecurityConfig = kafkaSecurityEmptyConfig)
     schemaRegistry <- SchemaRegistry.test[IO]
     kafkaClient <- KafkaClientAlgebra.live[IO](container.bootstrapServers, "https://schema-registry", schemaRegistry , kafkaSecurityEmptyConfig)
-    consumerGroupAlgebra <- ConsumerGroupsAlgebra.make(internalKafkaConsumerTopic, dvsConsumerTopic, dvsInternalKafkaOffsetsTopic, container.bootstrapServers, consumerGroup, consumerGroup, kafkaClient, kafkaAdmin, schemaRegistry,  kafkaSecurityEmptyConfig)
+
+    consumerGroupAlgebra <- ConsumerGroupsAlgebra.make(internalKafkaConsumerTopic, dvsConsumerTopic, dvsInternalKafkaOffsetsTopic,
+      container.bootstrapServers, consumerGroup, consumerGroup, kafkaClient, kafkaAdmin, schemaRegistry, kafkaSecurityEmptyConfig)
     _ <- consumerGroupAlgebra.startConsumer
   } yield {
     runTests(consumerGroupAlgebra, schemaRegistry, kafkaClient, kafkaAdmin)
-  }).unsafeRunSync()
+  }}.unsafeRunSync()
 
   def runTests(
                 cga: ConsumerGroupsAlgebra[IO],
@@ -139,6 +146,7 @@ class ConsumerGroupsAlgebraSpec extends AnyWordSpecLike with Matchers with ForAl
                                                          latestPartitionOffset: PartitionOffsetMap,
                                                          dvsConsumerOffsetStream: fs2.Stream[IO, (Record, OffsetInfo)]
                                                        ) = {
+          implicit val notificationSenderMock: InternalNotificationSender[IO] = getInternalNotificationSenderMock[IO]
           (for {
             consumerOffsetsCache <- Ref[IO].of((0 to numberOfPartitionsForKafkaInternalTopic).map((_, 0L)).toMap)
             hydraConsumerOffsetsOffsetsCache <- Ref[IO].of(latestPartitionOffset.filter(_._2 == 0))

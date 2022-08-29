@@ -26,7 +26,10 @@ import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import org.scalatest.matchers.should.Matchers
 import retry.{RetryPolicies, RetryPolicy}
 import eu.timepit.refined._
+import hydra.common.NotificationsTestSuite
+import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.kafka.IOSuite
+import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
 
 import scala.concurrent.ExecutionContext
 import hydra.kafka.model.TopicMetadataV2Request.NumPartitions
@@ -37,7 +40,7 @@ import org.scalatest.freespec.AsyncFreeSpec
 
 import scala.jdk.CollectionConverters.collectionAsScalaIterableConverter
 
-class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
+class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite with NotificationsTestSuite {
   import CreateTopicProgramSpec._
 
   "CreateTopicSpec" - {
@@ -2064,7 +2067,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
   }
 }
 
-object CreateTopicProgramSpec {
+object CreateTopicProgramSpec extends NotificationsTestSuite {
   val keySchema     = getSchema("key")
   val valueSchema   = getSchema("val")
   val metadataTopic = "dvs.test-metadata-topic"
@@ -2110,8 +2113,12 @@ object CreateTopicProgramSpec {
 
   def metadataAlgebraF(metadataTopic: String,
                        schemaRegistry: SchemaRegistry[IO],
-                       kafkaClient: KafkaClientAlgebra[IO]): IO[MetadataAlgebra[IO]] =
-    MetadataAlgebra.make(Subject.createValidated(metadataTopic).get, "consumerGroup", kafkaClient, schemaRegistry, consumeMetadataEnabled = true)
+                       kafkaClient: KafkaClientAlgebra[IO]): IO[MetadataAlgebra[IO]] = {
+    implicit val notificationSenderMock: InternalNotificationSender[IO] = getInternalNotificationSenderMock[IO]
+    MetadataAlgebra.make(Subject.createValidated(metadataTopic).get, "consumerGroup", kafkaClient, schemaRegistry, consumeMetadataEnabled = true, Once
+    )
+  }
+
 
   def createTopicMetadataRequest(
                                   keySchema: Schema,

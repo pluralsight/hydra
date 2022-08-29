@@ -1,8 +1,14 @@
 package hydra.kafka.algebras
 
+import cats.Monad
+import cats.effect.ExitCase.{Canceled, Completed, Error}
 import cats.effect.Sync
 import cats.implicits._
 import org.typelevel.log4cats.Logger
+import hydra.common.alerting.AlertProtocol.NotificationMessage
+import hydra.common.alerting.NotificationLevel
+import hydra.common.alerting.sender.InternalNotificationSender
+import hydra.kafka.algebras.HydraTag.StringJsonFormat
 
 import scala.language.higherKinds
 
@@ -36,24 +42,30 @@ object RetryableFs2Stream {
   }
 
 
-  implicit class ReRunnableStreamAdder[F[_] : Sync : Logger, O](stream: fs2.Stream[F, O]) {
+  implicit class ReRunnableStreamAdder[F[_] : Monad : Sync : Logger, O](stream: fs2.Stream[F, O]) {
 
     import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy._
 
     /**
       * Reruns fs2 Streams when it accidentally or successfully stops
       */
-    def makeRetryable(retryPolicy: RetryPolicy = Zero, onReRunAction: F[Unit] = Sync[F].unit)(onErrorMessage: String): fs2.Stream[F, O] = {
-      stream.onComplete(
-        fs2.Stream.eval(
-          if (retryPolicy.count != 0) {
-            onReRunAction
-          } else {
-            Sync[F].unit
-          }
-        ) *> fs2.Stream.empty
-      ).onError {
-        case error => fs2.Stream.eval(Logger[F].error(error)(s"$onErrorMessage. Stream will be restarted due to RetryPolicy: $retryPolicy"))
+    def makeRetryable(retryPolicy: RetryPolicy = Zero,
+                      streamName: String,
+                      onReRunAction: Option[Throwable] => F[Unit] = (_) => Sync[F].unit): fs2.Stream[F, O] = {
+      def doOnRerun(error: Option[Throwable]) =
+        if (retryPolicy.count != 0) {
+          onReRunAction(error)
+        } else {
+          Sync[F].unit
+        }
+
+      stream.onFinalizeCase {
+        case Completed | Canceled =>
+          Logger[F].error(getStreamFinishedUnexpectedlyMessage(streamName, retryPolicy)) *>
+            doOnRerun(None)
+        case Error(error) =>
+          Logger[F].error(error)(getStreamFailedMessage(streamName, retryPolicy)) *>
+            doOnRerun(error.some)
       }
         .attempt
         .through(stream => {
@@ -65,8 +77,25 @@ object RetryableFs2Stream {
         }
           // skip already processed errors
           .collect { case Right(value) => value })
-
     }
 
+    def makeRetryableWithNotification(retryPolicy: RetryPolicy = Zero, streamName: String)
+                                     (implicit internalNotificationSender: InternalNotificationSender[F], monad: Monad[F]): fs2.Stream[F, O] =
+      makeRetryable(retryPolicy, streamName, sendNotificationOnRetry[F](streamName, retryPolicy))
   }
+
+  private def sendNotificationOnRetry[F[_] : Monad](streamName: String, retryPolicy: RetryPolicy)
+                                                   (implicit internalNotificationSender: InternalNotificationSender[F]): Option[Throwable] => F[Unit] = {
+    case Some(error: Throwable) => InternalNotificationSender(NotificationLevel.Error)
+      .send(NotificationMessage(getStreamFailedMessage(streamName, retryPolicy), error.getMessage.some))
+    case None => InternalNotificationSender(NotificationLevel.Error)
+      .send(NotificationMessage(getStreamFinishedUnexpectedlyMessage(streamName, retryPolicy)))
+  }
+
+  private def getStreamFinishedUnexpectedlyMessage(streamName: String, retryPolicy: RetryPolicy) =
+    s"`$streamName` Stream finished unexpectedly. It will be restarted due to RetryPolicy: $retryPolicy"
+
+  private def getStreamFailedMessage(streamName: String, retryPolicy: RetryPolicy) =
+    s"`$streamName` Stream failed. It will be restarted due to RetryPolicy: $retryPolicy"
+
 }
