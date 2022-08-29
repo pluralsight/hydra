@@ -16,8 +16,6 @@ import hydra.kafka.algebras.KafkaClientAlgebra.PublishResponse
 import hydra.kafka.algebras.RetryableFs2Stream.ReRunnableStreamAdder
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Infinite
 import hydra.kafka.model.Schemas
-import io.chrisdavenport.log4cats.Logger
-import hydra.kafka.model.Schemas
 import org.apache.avro.generic.GenericRecord
 import org.typelevel.log4cats.Logger
 import spray.json._

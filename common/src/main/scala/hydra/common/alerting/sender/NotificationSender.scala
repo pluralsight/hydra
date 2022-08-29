@@ -5,8 +5,8 @@ import cats.syntax.all._
 import hydra.common.alerting.AlertProtocol.{NotificationMessage, NotificationRequest, NotificationScope}
 import hydra.common.alerting._
 import hydra.common.util.UriUtils.convertUrl
-import io.chrisdavenport.log4cats.Logger
-import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import spray.json.JsonWriter
 
 import scala.language.higherKinds

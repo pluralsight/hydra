@@ -1,6 +1,5 @@
 package hydra.ingest.app
 
-import cats.implicits._
 import cats.syntax.all._
 import ciris.{ConfigValue, env, ConfigDecoder}
 import hydra.common.config.KafkaConfigUtils.{KafkaClientSecurityConfig, SchemaRegistrySecurityConfig, kafkaClientSecurityConfig, schemaRegistrySecurityConfig}
