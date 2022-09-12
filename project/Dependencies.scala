@@ -91,6 +91,8 @@ object Dependencies {
         )
       )
 
+    val awsMskIamAuth = Seq("software.amazon.msk" % "aws-msk-iam-auth" % "1.1.4")
+
     val logging = Seq(
       "org.apache.logging.log4j" % "log4j-slf4j-impl" % log4jVersion,
       "org.apache.logging.log4j" % "log4j-core" % log4jVersion,
@@ -179,7 +181,7 @@ object Dependencies {
   val integrationDeps: Seq[ModuleID] = testContainers ++ TestLibraries.getTestLibraries(module = "it")
 
   val baseDeps: Seq[ModuleID] =
-    akka ++ Seq(avro, ciris, refined) ++ cats ++ logging ++ joda ++ testDeps ++ kafkaClients
+    akka ++ Seq(avro, ciris, refined) ++ cats ++ logging ++ joda ++ testDeps ++ kafkaClients ++ awsMskIamAuth
 
   val avroDeps: Seq[ModuleID] =
     baseDeps ++ confluent ++ jackson ++ guavacache ++ catsEffect

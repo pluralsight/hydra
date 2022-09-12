@@ -33,17 +33,20 @@ object KafkaConfigUtils {
                                               securityProtocol: Option[String],
                                               saslMechanism: Option[String],
                                               saslJaasConfig: Option[String],
+                                              saslClientCallbackHandlerClass: Option[String]
                                             ) {
-
-    lazy val toConfigMap: Map[String, String] = List(
-      securityProtocol.map("security.protocol" -> _),
-      saslMechanism.map(SaslConfigs.SASL_MECHANISM -> _),
-      saslJaasConfig.map(SaslConfigs.SASL_JAAS_CONFIG -> _)
-    ).flatten.toMap
+    lazy val toConfigMap: Map[String, String] = {
+      List(
+        securityProtocol.map("security.protocol" -> _),
+        saslMechanism.map(SaslConfigs.SASL_MECHANISM -> _),
+        saslJaasConfig.map(SaslConfigs.SASL_JAAS_CONFIG -> _),
+        saslClientCallbackHandlerClass.map("sasl.client.callback.handler.class" -> _)
+      ).flatten.toMap
+    }
 
   }
 
-  val emptyKafkaClientSecurityConfig = KafkaClientSecurityConfig(None, None, None)
+  val emptyKafkaClientSecurityConfig = KafkaClientSecurityConfig(None, None, None, None)
 
 
   //TODO: should be moved to AppConfig after V1 Deprecation
@@ -51,11 +54,12 @@ object KafkaConfigUtils {
     (
       env("HYDRA_KAFKA_SECURITY_PROTOCOL").as[String].option,
       env("HYDRA_KAFKA_SASL_MECHANISM").as[String].option,
-      env("HYDRA_KAFKA_SASL_JAAS_CONFIG").as[String].option
+      env("HYDRA_KAFKA_SASL_JAAS_CONFIG").as[String].option,
+      env("HYDRA_KAFKA_SASL_CLIENT_CALLBACK_HANDLER_CLASS").as[String].option
       ).parMapN(KafkaClientSecurityConfig)
 
 
-  val kafkaSecurityEmptyConfig: KafkaClientSecurityConfig = KafkaClientSecurityConfig(None, None, None)
+  val kafkaSecurityEmptyConfig: KafkaClientSecurityConfig = KafkaClientSecurityConfig(None, None, None, None)
 
 
   type KafkaPropertiesBuilder[T] = {
