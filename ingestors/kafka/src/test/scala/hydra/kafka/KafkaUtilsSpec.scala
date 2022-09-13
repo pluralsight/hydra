@@ -144,6 +144,7 @@ class KafkaUtilsSpec
         "sasl.mechanism" -> "sasl-mechanism",
         "security.protocol" -> "security-protocol",
         "sasl.jaas.config" -> "sasl-jaas-config",
+        "sasl.client.callback.handler.class" -> "sasl-client-callback-handler-class",
         "bootstrap.servers" -> "localhost:8042",
         "client.id" -> "test",
         "linger.ms" -> "10"
@@ -159,6 +160,7 @@ class KafkaUtilsSpec
         "sasl.mechanism" -> "sasl-mechanism",
         "security.protocol" -> "security-protocol",
         "sasl.jaas.config" -> "sasl-jaas-config",
+        "sasl.client.callback.handler.class" -> "sasl-client-callback-handler-class",
         "bootstrap.servers" -> "localhost:8042",
         "client.id" -> "test1",
         "linger.ms" -> "10"
@@ -217,6 +219,7 @@ object KafkaUtilsSpec {
     KafkaClientSecurityConfig(
       None,
       None,
+      None,
       None
     )
 
@@ -224,6 +227,7 @@ object KafkaUtilsSpec {
     KafkaClientSecurityConfig(
       Some("security-protocol"),
       Some("sasl-mechanism"),
-      Some("sasl-jaas-config")
+      Some("sasl-jaas-config"),
+      Some("sasl-client-callback-handler-class")
     )
 }
