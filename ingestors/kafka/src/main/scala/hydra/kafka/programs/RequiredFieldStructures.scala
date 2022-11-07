@@ -14,12 +14,12 @@ object RequiredFieldStructures {
   def createdAtFieldValidator(schema: Schema): Boolean =
     schema.getFields.asScala.toList.find(_.name == RequiredField.CREATED_AT).exists{
       field =>
-        field.schema.getLogicalType == LogicalTypes.timestampMillis && field.schema.getType == Type.LONG
+        field.schema.getLogicalType == LogicalTypes.timestampMillis && field.schema.getType == Type.LONG && !field.hasDefaultValue
     }
 
   def updatedAtFieldValidator(schema: Schema): Boolean =
     schema.getFields.asScala.toList.find(_.name == RequiredField.UPDATED_AT).exists{
       field =>
-        field.schema.getLogicalType == LogicalTypes.timestampMillis && field.schema.getType == Type.LONG
+        field.schema.getLogicalType == LogicalTypes.timestampMillis && field.schema.getType == Type.LONG && !field.hasDefaultValue
     }
 }

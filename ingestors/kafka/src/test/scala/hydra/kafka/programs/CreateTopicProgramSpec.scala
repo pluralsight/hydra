@@ -266,11 +266,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .name(RequiredField.CREATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .name(RequiredField.UPDATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .endRecord()
 
       val result = for {
@@ -306,11 +306,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .name(RequiredField.CREATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .name(RequiredField.UPDATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .endRecord()
 
       val result = for {
@@ -345,11 +345,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .name(RequiredField.CREATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .name(RequiredField.UPDATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .endRecord()
 
       for {
@@ -380,11 +380,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .name(RequiredField.CREATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .name(RequiredField.UPDATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .endRecord()
 
       val result = for {
@@ -418,11 +418,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .name(RequiredField.CREATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .name(RequiredField.UPDATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .endRecord()
 
       for {
@@ -1720,11 +1720,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .name(RequiredField.CREATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .name(RequiredField.UPDATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .endRecord()
 
       for {
@@ -1747,11 +1747,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .name(RequiredField.CREATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .name(RequiredField.UPDATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .endRecord()
 
       for {
@@ -1793,11 +1793,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .name(RequiredField.CREATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .name(RequiredField.UPDATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .endRecord()
       val mismatchedValueSchemaEvolution =
         SchemaBuilder
@@ -1809,11 +1809,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .name(RequiredField.CREATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .name(RequiredField.UPDATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .endRecord()
 
       for {
@@ -1886,11 +1886,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
                           .name(RequiredField.CREATED_AT)
                           .doc("text")
                           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-                          .withDefault(Instant.now().toEpochMilli)
+                          .noDefault()
                           .name(RequiredField.UPDATED_AT)
                           .doc("text")
                           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-                          .withDefault(Instant.now().toEpochMilli)
+                          .noDefault()
                           .endRecord()
 
       val result = for {
@@ -2188,11 +2188,11 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
         .name(RequiredField.CREATED_AT)
         .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .withDefault(Instant.now().toEpochMilli)
+        .noDefault()
         .name(RequiredField.UPDATED_AT)
         .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .withDefault(Instant.now().toEpochMilli)
+        .noDefault()
         .endRecord()
     }
   }

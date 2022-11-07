@@ -36,12 +36,12 @@ object TopicSchemaError {
 
   case class RequiredSchemaKeyFieldMissingError(fieldName: String, keyFieldSchema: Schema, streamType: String) extends TopicSchemaError {
     override val message: String = s"Required field missing for the key schema fields: field name = $fieldName, " +
-      s"key schema = $keyFieldSchema, stream type = $streamType."
+      s"key schema = $keyFieldSchema, stream type = $streamType or used a default value."
   }
 
   case class RequiredSchemaValueFieldMissingError(fieldName: String, valueFieldSchema: Schema, streamType: String) extends TopicSchemaError {
     override val message: String = s"Required field missing for the value schema fields: field name = $fieldName, " +
-      s"value schema = $valueFieldSchema, stream type = $streamType."
+      s"value schema = $valueFieldSchema, stream type = $streamType or used a default value."
   }
 
   def getFieldMissingError(isKey: Boolean, fieldName: String, schema: Schema, streamType: String): TopicSchemaError = {

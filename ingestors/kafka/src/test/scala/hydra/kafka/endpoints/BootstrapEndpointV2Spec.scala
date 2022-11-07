@@ -101,11 +101,11 @@ final class BootstrapEndpointV2Spec
         .name(RequiredField.CREATED_AT)
         .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .withDefault(Instant.now().toEpochMilli)
+        .noDefault()
         .name(RequiredField.UPDATED_AT)
         .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .withDefault(Instant.now().toEpochMilli)
+        .noDefault()
         .endRecord()
 
     val badKeySchema: Schema =
@@ -146,6 +146,41 @@ final class BootstrapEndpointV2Spec
       Some("notificationUrl")
     ).toJson.compactPrint
 
+    val getTestSchemaWithOptionalRequiredFields: String => Schema = schemaName =>
+      SchemaBuilder
+        .record(schemaName)
+        .fields()
+        .name("test")
+        .doc("text")
+        .`type`()
+        .stringType()
+        .noDefault()
+        .name(RequiredField.CREATED_AT)
+        .doc("text")
+        .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+        .withDefault(1)
+        .name(RequiredField.UPDATED_AT)
+        .doc("text")
+        .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+        .withDefault(1)
+        .endRecord()
+
+    val invalidRequestWithoutRequiredFields = TopicMetadataV2Request(
+      Schemas(getTestSchema("key"), getTestSchemaWithOptionalRequiredFields("value")),
+      StreamTypeV2.Entity,
+      deprecated = false,
+      None,
+      Public,
+      NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
+      Instant.now,
+      List.empty,
+      None,
+      Some("dvs-teamName"),
+      None,
+      List.empty,
+      Some("notificationUrl")
+    ).toJson.compactPrint
+
     val validRequestWithDVSTag = TopicMetadataV2Request(
       Schemas(getTestSchema("key"), getTestSchema("value")),
       StreamTypeV2.Entity,
@@ -170,6 +205,19 @@ final class BootstrapEndpointV2Spec
           ) ~> check {
             val responseReturned = responseAs[String]
             response.status shouldBe StatusCodes.OK
+          }
+        }
+        .unsafeRunSync()
+    }
+
+    "reject a request with default value for required fields" in {
+      testCreateTopicProgram
+        .map { bootstrapEndpoint =>
+          Put("/v2/topics/dvs.testing", HttpEntity(ContentTypes.`application/json`, invalidRequestWithoutRequiredFields)) ~> Route.seal(
+            bootstrapEndpoint.route
+          ) ~> check {
+            val responseReturned = responseAs[String]
+            response.status shouldBe StatusCodes.BadRequest
           }
         }
         .unsafeRunSync()
