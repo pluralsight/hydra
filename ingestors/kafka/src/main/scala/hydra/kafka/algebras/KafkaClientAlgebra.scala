@@ -242,7 +242,7 @@ object KafkaClientAlgebra {
     for {
       queue <- fs2.concurrent.Queue.unbounded[F, ProduceRecordInfo[F]]
       _ <- Concurrent[F].start {
-        producerStream[F].using(producerSettings).flatMap { producer =>
+        KafkaProducer.stream[F].using(producerSettings).flatMap { producer =>
           queue.dequeue.map { payload =>
             val record = ProducerRecord(payload.topicName, payload.key.orNull, payload.value.orNull).withHeaders(payload.headers)
             (ProducerRecords.one(record), payload)
@@ -364,7 +364,7 @@ object KafkaClientAlgebra {
           .withBootstrapServers(bootstrapServers)
           .withGroupId(consumerGroup)
           .withKafkaSecurityConfigs(kafkaClientSecurityConfig)
-        consumerStream(consumerSettings)
+        KafkaConsumer.stream(consumerSettings)
           .evalTap(_.subscribeTo(topicName))
           .flatMap(_.stream)
           // TODO: Commit before action?
@@ -418,7 +418,7 @@ object KafkaClientAlgebra {
           (x: TopicPartition, y: TopicPartition) => if (x.partition() > y.partition()) 1 else if (x.partition() < y.partition()) -1 else 0
         val topicsPartitions = topicPartitionAndOffsets.map(_._1)
         val tp = data.NonEmptySet.of[TopicPartition](topicsPartitions.head, topicsPartitions.tail: _*)
-        consumerStream(consumerSettings)
+        KafkaConsumer.stream(consumerSettings)
           .evalTap(str => str.assign(tp))
           .evalTap(kc => topicPartitionAndOffsets.traverse(tuple => kc.seek(tuple._1, tuple._2)))
           .flatMap(kc => kc.stream)

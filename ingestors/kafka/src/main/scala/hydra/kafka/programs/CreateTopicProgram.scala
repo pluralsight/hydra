@@ -156,14 +156,14 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
       defaultTopicDetails.copy(numPartitions = numP.value))
       .copy(partialConfig = defaultTopicDetails.configs ++ getCleanupPolicyConfig)
     (for {
-      _ <- Resource.liftF(validator.validate(createTopicRequest, topicName, withRequiredFields))
+      _ <- Resource.eval(validator.validate(createTopicRequest, topicName, withRequiredFields))
       _ <- registerSchemas(
         topicName,
         createTopicRequest.schemas.key,
         createTopicRequest.schemas.value
       )
       _ <- createTopicResource(topicName, td)
-      _ <- Resource.liftF(publishMetadata(topicName, createTopicRequest))
+      _ <- Resource.eval(publishMetadata(topicName, createTopicRequest))
     } yield ()).use(_ => Bracket[F, Throwable].unit)
   }
 }

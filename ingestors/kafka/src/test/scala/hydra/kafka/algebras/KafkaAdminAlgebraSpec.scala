@@ -120,7 +120,7 @@ final class KafkaAdminAlgebraSpec
           ).withBootstrapServers(bootstrapServers)
           val record = ProducerRecord[String, String](topicName, "key", "value")
           fs2.Stream.eval(IO.pure(ProducerRecords.one(record)))
-            .through(produce(producerSettings))
+            .through(KafkaProducer.pipe(producerSettings))
             .compile.drain.unsafeRunSync()
         }
 
@@ -132,7 +132,7 @@ final class KafkaAdminAlgebraSpec
             .withAutoOffsetReset(AutoOffsetReset.Earliest)
             .withBootstrapServers(bootstrapServers)
             .withGroupId(consumerGroup)
-          consumerStream(consumerSettings)
+          KafkaConsumer.stream(consumerSettings)
             .evalTap(_.subscribeTo(topicName))
             .flatMap(_.stream)
             .evalTap(_.offset.commit)

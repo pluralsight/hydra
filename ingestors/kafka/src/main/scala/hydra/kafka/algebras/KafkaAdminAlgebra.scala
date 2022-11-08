@@ -219,7 +219,7 @@ object KafkaAdminAlgebra {
 
       private def getConsumerResource: Resource[F, KafkaConsumer[F, _, _]] = {
         val des = Deserializer[F, String]
-        consumerResource[F, String, String] {
+        KafkaConsumer.resource[F, String, String] {
           val settings = ConsumerSettings.apply(des, des).withBootstrapServers(bootstrapServers)
             if(useSsl) {
               settings.withProperty("security.protocol", "SSL")
@@ -230,7 +230,7 @@ object KafkaAdminAlgebra {
       }
 
       private def getAdminClientResource: Resource[F, KafkaAdminClient[F]] = {
-        adminClientResource {
+        KafkaAdminClient.resource {
           val settings = AdminClientSettings.apply.withBootstrapServers(bootstrapServers)
           if(useSsl) {
             settings.withProperty("security.protocol", "SSL")

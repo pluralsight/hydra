@@ -170,7 +170,7 @@ object ConsumerGroupsOffsetConsumer {
       .withRetries(0)
       .withAcks(Acks.One)
       .withKafkaSecurityConfigs(kafkaClientSecurityConfig)
-    val consumer = consumerStream(settings)
+    val consumer = KafkaConsumer.stream(settings)
     val keySerializer = getSerializer[F, GenericRecord](s)(isKey = true)
     val valueSerializer = getSerializer[F, GenericRecord](s)(isKey = false)
 
@@ -185,7 +185,7 @@ object ConsumerGroupsOffsetConsumer {
           valueSerializer
         )
       }
-      .through(produce(producerSettings))
+      .through(KafkaProducer.pipe(producerSettings))
       .makeRetryableWithNotification(Infinite, "ConsumersGroups offset consumer")
       .compile.drain
   }
