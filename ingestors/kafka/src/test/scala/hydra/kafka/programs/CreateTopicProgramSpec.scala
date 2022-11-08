@@ -1728,10 +1728,10 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .endRecord()
 
       for {
-        ts <- Resource.liftF(initTestServices())
+        ts <- Resource.eval(initTestServices())
         _  <- ts.program.registerSchemas(subject ,keySchema, recordWithNullDefault)
         _  <- ts.program.createTopicResource(subject, topicDetails)
-        _  <- Resource.liftF(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(keySchema, recordWithNullDefault), true))
+        _  <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(keySchema, recordWithNullDefault), true))
       } yield succeed
     }
 
@@ -1755,10 +1755,10 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .endRecord()
 
       for {
-        ts <- Resource.liftF(initTestServices())
+        ts <- Resource.eval(initTestServices())
         _  <- ts.program.registerSchemas(subject, keySchema, recordWithNullType)
         _  <- ts.program.createTopicResource(subject, topicDetails)
-        _  <- Resource.liftF(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(keySchema, recordWithNullType), true))
+        _  <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(keySchema, recordWithNullType), true))
       } yield succeed
     }
 
@@ -1775,10 +1775,10 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .endRecord()
 
       for {
-        ts <- Resource.liftF(initTestServices())
+        ts <- Resource.eval(initTestServices())
         _  <- ts.program.registerSchemas(subject, recordWithNullDefault, valueSchema)
         _  <- ts.program.createTopicResource(subject, topicDetails)
-        _  <- Resource.liftF(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(recordWithNullDefault, valueSchema), true))
+        _  <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(recordWithNullDefault, valueSchema), true))
       } yield succeed
     }
 
@@ -1817,11 +1817,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .endRecord()
 
       for {
-        ts <- Resource.liftF(initTestServices())
+        ts <- Resource.eval(initTestServices())
         _ <- ts.program.registerSchemas(subject ,keySchema, mismatchedValueSchema)
         _ <- ts.program.createTopicResource(subject, topicDetails)
-        _ <- Resource.liftF(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(keySchema, mismatchedValueSchema), true))
-        _ <- Resource.liftF(ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, mismatchedValueSchemaEvolution), topicDetails, true))
+        _ <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(keySchema, mismatchedValueSchema), true))
+        _ <- Resource.eval(ts.program.createTopic(subject, createTopicMetadataRequest(keySchema, mismatchedValueSchemaEvolution), topicDetails, true))
       } yield succeed
     }
 
@@ -1831,10 +1831,10 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
                                                            |	"type": "string"
                                                            |}""".stripMargin)
       val result = for {
-        ts <- Resource.liftF(initTestServices())
+        ts <- Resource.eval(initTestServices())
         _  <- ts.program.registerSchemas(subject, incorrectKeySchema, valueSchema)
         _  <- ts.program.createTopicResource(subject, topicDetails)
-        _  <- Resource.liftF(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(incorrectKeySchema, valueSchema)))
+        _  <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(incorrectKeySchema, valueSchema)))
       } yield ()
 
       result.attempt.map(_ shouldBe TopicSchemaError.InvalidSchemaTypeError.asLeft)
@@ -1846,10 +1846,10 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
                                                              |	"type": "string"
                                                              |}""".stripMargin)
       val result = for {
-        ts <- Resource.liftF(initTestServices())
+        ts <- Resource.eval(initTestServices())
         _  <- ts.program.registerSchemas(subject, keySchema, incorrectValueSchema)
         _  <- ts.program.createTopicResource(subject, topicDetails)
-        _  <- Resource.liftF(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(keySchema, incorrectValueSchema)))
+        _  <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject, createTopicMetadataRequest(keySchema, incorrectValueSchema)))
       } yield ()
 
       result.attempt.map(_ shouldBe TopicSchemaError.InvalidSchemaTypeError.asLeft)
@@ -1857,10 +1857,10 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
 
     "successfully creating topic from metadata only where key and value schemas are records" in {
       for {
-        ts <- Resource.liftF(initTestServices())
+        ts <- Resource.eval(initTestServices())
         _  <- ts.program.registerSchemas(subject ,keySchema, valueSchema)
         _  <- ts.program.createTopicResource(subject, topicDetails)
-        _  <- Resource.liftF(ts.program.createTopicFromMetadataOnly(subject, topicMetadataRequest))
+        _  <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject, topicMetadataRequest))
       } yield succeed
     }
 
