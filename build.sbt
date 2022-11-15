@@ -15,6 +15,11 @@ lazy val defaultSettings = Seq(
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
   excludeDependencies += "org.slf4j" % "slf4j-log4j12",
   excludeDependencies += "log4j" % "log4j",
+  dependencyOverrides ++= Seq(
+    "org.apache.commons" % "commons-lang3" % "3.9",
+    "org.apache.commons" % "commons-compress" % "1.21",
+    "org.apache.commons" % "lang3" % "3.1.0"
+  ),
   addCompilerPlugin(
     "org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full
   ),
