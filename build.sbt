@@ -16,8 +16,8 @@ lazy val defaultSettings = Seq(
   excludeDependencies += "org.slf4j" % "slf4j-log4j12",
   excludeDependencies += "log4j" % "log4j",
   dependencyOverrides ++= Seq(
-    "org.apache.commons" % "commons-lang3" % "3.9",
-    "org.apache.commons" % "commons-compress" % "1.21",
+    "org.apache.commons" % "commons-lang3" % "3.12.0",
+    "org.apache.commons" % "commons-compress" % "1.22",
     "org.apache.commons" % "lang3" % "3.1.0"
   ),
   addCompilerPlugin(
