@@ -133,21 +133,26 @@ class SchemasEndpoint(consumerProxy: ActorSelection,
   private val v2Route = {
     pathPrefix("v2") {
       get {
-        pathPrefix("schemas") {
-          val startTime = Instant.now
-          pathEndOrSingleSlash {
-            extractExecutionContext { implicit ec =>
-              onSuccess((streamsManagerActor ? GetMetadata).mapTo[GetMetadataResponse].map(_.metadata.keys.toList))  { keyList =>
+        extractRequest { request =>
+          log.debug(
+            s"""SchemasEndpoint v2: Request url ${request.uri} with header
+               |${request.headers.find(h => h.is("user-agent")).map(_.toString).getOrElse("header not found")}""".stripMargin)
+          pathPrefix("schemas") {
+            val startTime = Instant.now
+            pathEndOrSingleSlash {
+              extractExecutionContext { implicit ec =>
+                onSuccess((streamsManagerActor ? GetMetadata).mapTo[GetMetadataResponse].map(_.metadata.keys.toList)) { keyList =>
                   getSchemas(keyList, startTime)
+                }
               }
             }
-          }
-        } ~
-        pathPrefix("schemas" / Segment) { subject =>
-          pathEndOrSingleSlash {
-            val startTime = Instant.now
-            getSchema(includeKeySchema = true, subject, None, startTime)
-          }
+          } ~
+            pathPrefix("schemas" / Segment) { subject =>
+              pathEndOrSingleSlash {
+                val startTime = Instant.now
+                getSchema(includeKeySchema = true, subject, None, startTime)
+              }
+            }
         }
       }
     }
