@@ -134,7 +134,7 @@ class SchemasEndpoint(consumerProxy: ActorSelection,
     pathPrefix("v2") {
       get {
         extractRequest { request =>
-          log.debug(
+          log.info(
             s"""SchemasEndpoint v2: Request url ${request.uri} with header:
                |${request.headers.find(h => h.is("user-agent")).map(_.toString).getOrElse("header not found")}""".stripMargin)
           pathPrefix("schemas") {
