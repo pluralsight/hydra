@@ -19,7 +19,7 @@
             <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} %-5p (%C:%L) - %m%n"/>
         </Console>
         <RollingFile name="LogToRollingFile" fileName="/var/log/hydra/schema-registry-endpoint2.log"
-                     filePattern="logs/$${date:yyyy-MM}/app-%d{MM-dd-yyyy}-%i.log.gz">
+                     filePattern="/var/log/hydra/$${date:yyyy-MM}/app-%d{MM-dd-yyyy}-%i.log.gz">
             <PatternLayout>
                 <Pattern>%d{yyyy-MM-dd HH:mm:ss} %-5p (%C:%L) - %m%n</Pattern>
             </PatternLayout>
