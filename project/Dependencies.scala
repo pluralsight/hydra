@@ -93,6 +93,8 @@ object Dependencies {
 
     val awsMskIamAuth = Seq("software.amazon.msk" % "aws-msk-iam-auth" % "1.1.4")
 
+    val awsSdk = Seq("software.amazon.awssdk" % "aws-sdk-java" % "2.18.21")
+
     val logging = Seq(
       "org.apache.logging.log4j" % "log4j-slf4j-impl" % log4jVersion,
       "org.apache.logging.log4j" % "log4j-core" % log4jVersion,
@@ -191,7 +193,7 @@ object Dependencies {
       reflections,
       retry
     ) ++ guavacache ++
-    confluent ++ kamon
+    confluent ++ kamon ++ awsSdk
 
   val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(embeddedKafka, sprayJson)
 
