@@ -10,6 +10,7 @@ import software.amazon.awssdk.arns.Arn
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.iam.IamClient
 import security._
+import software.amazon.awssdk.auth.credentials.{DefaultCredentialsProvider, StaticCredentialsProvider}
 import software.amazon.awssdk.services.iam.model.{AttachedPolicy, DeleteRolePolicyRequest, GetPolicyRequest, GetPolicyVersionRequest, GetRolePolicyRequest, ListAttachedRolePoliciesRequest, ListRolePoliciesRequest, NoSuchEntityException, PolicyEvaluationDecisionType, PutRolePolicyRequest, SimulateCustomPolicyRequest}
 import software.amazon.awssdk.services.iam.model.{Policy => ManagedPolicy}
 
@@ -117,5 +118,6 @@ object AwsIamClient {
 
   private val IamGlobalRegion = Region.AWS_GLOBAL
 
-  private val iamClient = IamClient.builder().region(IamGlobalRegion).build()
+  private val iamClient = IamClient.builder().region(IamGlobalRegion)
+    .credentialsProvider(DefaultCredentialsProvider.create()).build()
 }
