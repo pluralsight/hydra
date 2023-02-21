@@ -17,6 +17,8 @@ object AppConfig {
       maxCacheSize: Int
       )
 
+  final case class SchemaRegistryRedisConfig(redisUrl: String, redisPort: Int)
+
   private val schemaRegistryConfig: ConfigValue[SchemaRegistryConfig] =
     (
       env("HYDRA_SCHEMA_REGISTRY_URL")
@@ -25,7 +27,14 @@ object AppConfig {
       env("HYDRA_MAX_SCHEMAS_PER_SUBJECT").as[Int].default(1000)
       ).parMapN(SchemaRegistryConfig)
 
-
+  private val schemaRegistryRedisConfig: ConfigValue[SchemaRegistryRedisConfig] = (
+    env("HYDRA_SCHEMA_REGISTRY_REDIS_HOST")
+      .as[String]
+      .default("localhost"),
+    env("HYDRA_SCHEMA_REGISTRY_REDIS_PORT")
+      .as[Int]
+      .default(6379)
+    ).parMapN(SchemaRegistryRedisConfig)
 
   final case class CreateTopicConfig(
       schemaRegistryConfig: SchemaRegistryConfig,
@@ -226,7 +235,8 @@ object AppConfig {
                               corsAllowedOriginConfig: CorsAllowedOriginConfig,
                               kafkaClientSecurityConfig: KafkaClientSecurityConfig,
                               schemaRegistrySecurityConfig: SchemaRegistrySecurityConfig,
-                              notificationsConfig: NotificationsConfig
+                              notificationsConfig: NotificationsConfig,
+                              schemaRegistryRedisConfig: SchemaRegistryRedisConfig
                             )
 
   val appConfig: ConfigValue[AppConfig] =
@@ -244,6 +254,7 @@ object AppConfig {
       corsAllowedOrigin,
       kafkaClientSecurityConfig,
       schemaRegistrySecurityConfig,
-      notificationsConfig
+      notificationsConfig,
+      schemaRegistryRedisConfig
     ).parMapN(AppConfig)
 }

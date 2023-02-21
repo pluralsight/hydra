@@ -31,7 +31,8 @@ object Dependencies {
   val testContainersVersion = "0.38.8"
   val typesafeConfigVersion = "1.3.2"
   val vulcanVersion = "1.2.0"
-
+  val scalaTestEmbeddedRedisVersion = "0.4.0"
+  val scalaChillBijectionVersion = "0.10.0"
 
   object Compile {
 
@@ -132,6 +133,12 @@ object Dependencies {
         "com.github.cb372" %% "scalacache-cats-effect"
       ).map(_ % scalaCacheVersion)
 
+    val redisCache =
+      Seq(
+        "com.twitter" %% "chill-bijection" % scalaChillBijectionVersion,
+        "com.github.cb372" %% "scalacache-redis" % scalaCacheVersion
+      )
+
     val reflections = "org.reflections" % "reflections" % reflectionsVersion
 
     val jackson = Seq(
@@ -155,7 +162,13 @@ object Dependencies {
 
       val scalaMock = "org.scalamock" %% "scalamock" % scalaMockVersion % module
       val junit = "junit" % "junit" % "4.13.1" % module
-      akkaTest ++ Seq(scalaTest, scalaMock, junit)
+
+      val embeddedKafka =
+        "io.github.embeddedkafka" %% "embedded-kafka-schema-registry" % "5.4.1" % module
+
+      val scalatestEmbeddedRedis = "com.github.sebruck" %% "scalatest-embedded-redis" % scalaTestEmbeddedRedisVersion % module
+
+      akkaTest ++ Seq(scalaTest, scalaMock, junit, scalatestEmbeddedRedis, embeddedKafka)
     }
 
   }
@@ -184,14 +197,14 @@ object Dependencies {
     akka ++ Seq(avro, ciris, refined) ++ cats ++ logging ++ joda ++ testDeps ++ kafkaClients ++ awsMskIamAuth
 
   val avroDeps: Seq[ModuleID] =
-    baseDeps ++ confluent ++ jackson ++ guavacache ++ catsEffect
+    baseDeps ++ confluent ++ jackson ++ guavacache ++ catsEffect ++ redisCache
 
   val coreDeps: Seq[ModuleID] = akka ++ baseDeps ++
     Seq(
       reflections,
       retry
     ) ++ guavacache ++
-    confluent ++ kamon
+    confluent ++ kamon ++ redisCache
 
   val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(embeddedKafka, sprayJson)
 

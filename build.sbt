@@ -18,7 +18,9 @@ lazy val defaultSettings = Seq(
   dependencyOverrides ++= Seq(
     "org.apache.commons" % "commons-lang3" % "3.12.0",
     "org.apache.commons" % "commons-compress" % "1.22",
-    "org.apache.commons" % "lang3" % "3.1.0"
+    "org.apache.commons" % "lang3" % "3.1.0",
+    "io.confluent" % "kafka-schema-registry" % "5.4.2" % "test",
+    "io.confluent" % "kafka-avro-serializer" % "5.4.2" % "test"
   ),
   addCompilerPlugin(
     "org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full
