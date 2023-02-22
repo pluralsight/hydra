@@ -14,9 +14,12 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
 
+case class CacheConfigs(idCacheTtl: Int, schemaCacheTtl: Int, versionCacheTtl: Int)
 object RedisSchemaRegistryClient {
 
   import com.twitter.chill.KryoInjection
+
+  val DEFAULT_REQUEST_PROPERTIES = Map("Content-Type" -> "application/vnd.schemaregistry.v1+json")
 
   private val schemaCacheCodec: Codec[Map[Schema, Int]] = new Codec[Map[Schema, Int]] {
 
@@ -35,57 +38,87 @@ object RedisSchemaRegistryClient {
       Codec.tryDecode(KryoInjection.invert(bytes).map(_.asInstanceOf[Map[Int, Schema]]).getOrElse(Map.empty[Int, Schema]))
     }
   }
-
-  private val idCacheConfig = CacheConfig.defaultCacheConfig
-  private val schemaCacheConfig = CacheConfig.defaultCacheConfig
-  private val versionCacheConfig = CacheConfig.defaultCacheConfig
-
-  private val idCacheDurationTtl = Option(Duration(1, TimeUnit.SECONDS))
-  private val schemaCacheDurationTtl = Option(Duration(1, TimeUnit.SECONDS))
-  private val versionCacheDurationTtl = Option(Duration(1, TimeUnit.SECONDS))
 }
 
 class RedisSchemaRegistryClient(restService: RestService,
                                 redisHost: String,
                                 redisPort: Int,
                                 httpHeaders: Map[String, String],
-                                configs: Map[String, Any]) extends SchemaRegistryClient {
+                                configs: Map[String, Any],
+                                cacheConfigs: CacheConfigs) extends SchemaRegistryClient {
 
   def this(baseUrl: String, redisHost: String, redisPort: Int) {
-    this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], Map.empty[String, Any])
+    this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], Map.empty[String, Any],  CacheConfigs(1, 1, 1))
+  }
+  def this(baseUrl: String, redisHost: String, redisPort: Int, cacheConfigs: CacheConfigs) {
+    this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], Map.empty[String, Any], cacheConfigs)
   }
 
   def this(baseUrl: String, redisHost: String, redisPort: Int, config: Map[String, Any]) {
-    this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], config)
+    this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], config, CacheConfigs(1, 1, 1))
+
+  }
+  def this(baseUrl: String, redisHost: String, redisPort: Int, config: Map[String, Any], cacheConfigs: CacheConfigs) {
+    this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], config, cacheConfigs)
   }
 
   def this(baseUrl: String, httpHeaders: Map[String, String], redisHost: String, redisPort: Int) {
-    this(new RestService(baseUrl), redisHost, redisPort, httpHeaders, Map.empty[String, Any])
+    this(new RestService(baseUrl), redisHost, redisPort, httpHeaders, Map.empty[String, Any], CacheConfigs(1, 1, 1))
+  }
+
+  def this(baseUrl: String, httpHeaders: Map[String, String], redisHost: String, redisPort: Int, cacheConfigs: CacheConfigs) {
+    this(new RestService(baseUrl), redisHost, redisPort, httpHeaders, Map.empty[String, Any], cacheConfigs)
   }
 
   def this(baseUrl: String, redisHost: String, redisPort: Int, httpHeaders: Map[String, String], config: Map[String, Any]) {
-    this(new RestService(baseUrl), redisHost, redisPort, httpHeaders, config)
+    this(new RestService(baseUrl), redisHost, redisPort, httpHeaders, config, CacheConfigs(1, 1, 1))
+  }
+
+  def this(baseUrl: String, redisHost: String, redisPort: Int, httpHeaders: Map[String, String], config: Map[String, Any], cacheConfigs: CacheConfigs) {
+    this(new RestService(baseUrl), redisHost, redisPort, httpHeaders, config, cacheConfigs)
   }
 
   def this(baseUrls: List[String], redisHost: String, redisPort: Int) {
-    this(new RestService(baseUrls.asJava), redisHost, redisPort, Map.empty[String, String], Map.empty[String, Any])
+    this(new RestService(baseUrls.asJava), redisHost, redisPort, Map.empty[String, String], Map.empty[String, Any], CacheConfigs(1, 1, 1))
+  }
+
+  def this(baseUrls: List[String], redisHost: String, redisPort: Int, cacheConfigs: CacheConfigs) {
+    this(new RestService(baseUrls.asJava), redisHost, redisPort, Map.empty[String, String], Map.empty[String, Any], cacheConfigs)
   }
 
   def this(baseUrls: List[String], redisHost: String, redisPort: Int, config: Map[String, Any]) {
-    this(new RestService(baseUrls.asJava), redisHost, redisPort, Map.empty[String, String], config)
+    this(new RestService(baseUrls.asJava), redisHost, redisPort, Map.empty[String, String], config, CacheConfigs(1, 1, 1))
+  }
+
+  def this(baseUrls: List[String], redisHost: String, redisPort: Int, config: Map[String, Any], cacheConfigs: CacheConfigs) {
+    this(new RestService(baseUrls.asJava), redisHost, redisPort, Map.empty[String, String], config, cacheConfigs)
   }
 
   def this(baseUrls: List[String], httpHeaders: Map[String, String], redisHost: String, redisPort: Int) {
-    this(new RestService(baseUrls.asJava), redisHost, redisPort, httpHeaders, Map.empty[String, Any])
+    this(new RestService(baseUrls.asJava), redisHost, redisPort, httpHeaders, Map.empty[String, Any], CacheConfigs(1, 1, 1))
+  }
+
+  def this(baseUrls: List[String], httpHeaders: Map[String, String], redisHost: String, redisPort: Int, cacheConfigs: CacheConfigs) {
+    this(new RestService(baseUrls.asJava), redisHost, redisPort, httpHeaders, Map.empty[String, Any], cacheConfigs)
   }
 
   def this(baseUrls: List[String], redisHost: String, redisPort: Int, httpHeaders: Map[String, String], config: Map[String, Any]) {
-    this(new RestService(baseUrls.asJava), redisHost, redisPort, httpHeaders, config)
+    this(new RestService(baseUrls.asJava), redisHost, redisPort, httpHeaders, config, CacheConfigs(1, 1, 1))
+  }
+
+  def this(baseUrls: List[String], redisHost: String, redisPort: Int, httpHeaders: Map[String, String], config: Map[String, Any], cacheConfigs: CacheConfigs) {
+    this(new RestService(baseUrls.asJava), redisHost, redisPort, httpHeaders, config, cacheConfigs)
   }
 
   import hydra.avro.registry.RedisSchemaRegistryClient._
 
-  private val DEFAULT_REQUEST_PROPERTIES = Map("Content-Type" -> "application/vnd.schemaregistry.v1+json")
+  private val idCacheConfig = CacheConfig.defaultCacheConfig
+  private val schemaCacheConfig = CacheConfig.defaultCacheConfig
+  private val versionCacheConfig = CacheConfig.defaultCacheConfig
+
+  private val idCacheDurationTtl = Option(Duration(cacheConfigs.idCacheTtl, TimeUnit.SECONDS))
+  private val schemaCacheDurationTtl = Option(Duration(cacheConfigs.schemaCacheTtl, TimeUnit.SECONDS))
+  private val versionCacheDurationTtl = Option(Duration(cacheConfigs.versionCacheTtl, TimeUnit.SECONDS))
 
   private val schemaCache: Cache[Map[Schema, Int]] =
     RedisCache(redisHost, redisPort)(schemaCacheConfig, schemaCacheCodec)
