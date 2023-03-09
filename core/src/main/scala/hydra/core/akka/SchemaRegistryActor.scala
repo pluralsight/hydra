@@ -4,10 +4,11 @@ import akka.actor.{Actor, Props}
 import akka.pattern.{CircuitBreaker, pipe}
 import akka.util.Timeout
 import com.typesafe.config.Config
-import hydra.avro.registry.{ConfluentSchemaRegistry, SchemaRegistryException}
+import hydra.avro.registry.{ConfluentSchemaRegistry, RedisSchemaRegistryClient, SchemaRegistryException}
 import hydra.avro.resource.{SchemaResource, SchemaResourceLoader}
 import hydra.avro.util.SchemaWrapper
 import hydra.common.Settings
+import hydra.common.config.ConfigSupport.ConfigImplicits
 import hydra.common.config.KafkaConfigUtils.SchemaRegistrySecurityConfig
 import hydra.common.logging.LoggingAdapter
 import hydra.core.protocol.HydraApplicationError
@@ -53,7 +54,11 @@ class SchemaRegistryActor(
     resetTimeout = breakerSettings.resetTimeout
   ).onOpen(notifyOnOpen())
 
-  val registry = ConfluentSchemaRegistry.forConfig(config, schemaRegistrySecurityConfig)
+  val registry = if (config.getBooleanOpt("schema.registry.redis.use-redis").getOrElse(false)) {
+    RedisSchemaRegistryClient.forConfig(config, schemaRegistrySecurityConfig)
+  } else {
+    ConfluentSchemaRegistry.forConfig(config, schemaRegistrySecurityConfig)
+  }
 
   log.debug(s"Creating new SchemaRegistryActor for ${registry.registryUrl}")
 

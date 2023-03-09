@@ -1,5 +1,8 @@
 package hydra.avro.registry
 
+import com.typesafe.config.{Config, ConfigFactory}
+import hydra.common.config.ConfigSupport.ConfigImplicits
+import hydra.common.config.KafkaConfigUtils.SchemaRegistrySecurityConfig
 import io.confluent.kafka.schemaregistry.client.{SchemaMetadata, SchemaRegistryClient}
 import io.confluent.kafka.schemaregistry.client.rest.RestService
 import io.confluent.kafka.schemaregistry.client.security.SslFactory
@@ -8,34 +11,104 @@ import scalacache._
 import scalacache.redis._
 import scalacache.modes.try_._
 import scalacache.serialization.Codec
+import scalacache.serialization.Codec.DecodingResult
 
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 import java.util.concurrent.TimeUnit
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
 
 case class CacheConfigs(idCacheTtl: Int, schemaCacheTtl: Int, versionCacheTtl: Int)
+
 object RedisSchemaRegistryClient {
 
-  import com.twitter.chill.KryoInjection
+  object SchemaIntMapBinCodec extends Codec[Map[Schema, Int]] {
+    override def encode(value: Map[Schema, Int]): Array[Byte] = {
+      val stream: ByteArrayOutputStream = new ByteArrayOutputStream()
+      val oos = new ObjectOutputStream(stream)
+      oos.writeObject(value)
+      oos.close()
+      stream.toByteArray
+    }
+
+    override def decode(bytes: Array[Byte]): DecodingResult[Map[Schema, Int]] = {
+      val ois = new ObjectInputStream(new ByteArrayInputStream(bytes))
+      val value = ois.readObject
+      ois.close()
+      Codec.tryDecode(value.asInstanceOf[Map[Schema, Int]])
+    }
+  }
+
+  object IntSchemaMapBinCodec extends Codec[Map[Int, Schema]] {
+    override def encode(value: Map[Int, Schema]): Array[Byte] = {
+      val stream: ByteArrayOutputStream = new ByteArrayOutputStream()
+      val oos = new ObjectOutputStream(stream)
+      oos.writeObject(value)
+      oos.close()
+      stream.toByteArray
+    }
+
+    override def decode(bytes: Array[Byte]): DecodingResult[Map[Int, Schema]] = {
+      val ois = new ObjectInputStream(new ByteArrayInputStream(bytes))
+      val value = ois.readObject
+      ois.close()
+      Codec.tryDecode(value.asInstanceOf[Map[Int, Schema]])
+    }
+  }
 
   val DEFAULT_REQUEST_PROPERTIES = Map("Content-Type" -> "application/vnd.schemaregistry.v1+json")
 
   private val schemaCacheCodec: Codec[Map[Schema, Int]] = new Codec[Map[Schema, Int]] {
 
-    def encode(value: Map[Schema, Int]): Array[Byte] = KryoInjection(value)
+    def encode(value: Map[Schema, Int]): Array[Byte] = SchemaIntMapBinCodec.encode(value)
 
-    def decode(bytes: Array[Byte]): Codec.DecodingResult[Map[Schema, Int]] = {
-      Codec.tryDecode(KryoInjection.invert(bytes).map(_.asInstanceOf[Map[Schema, Int]]).getOrElse(Map.empty[Schema, Int]))
-    }
+    def decode(bytes: Array[Byte]): Codec.DecodingResult[Map[Schema, Int]] = SchemaIntMapBinCodec.decode(bytes)
   }
 
   private val idCacheCodec: Codec[Map[Int, Schema]] = new Codec[Map[Int, Schema]] {
 
-    def encode(value: Map[Int, Schema]): Array[Byte] = KryoInjection(value)
+    def encode(value: Map[Int, Schema]): Array[Byte] = IntSchemaMapBinCodec.encode(value)
 
-    def decode(bytes: Array[Byte]): Codec.DecodingResult[Map[Int, Schema]] = {
-      Codec.tryDecode(KryoInjection.invert(bytes).map(_.asInstanceOf[Map[Int, Schema]]).getOrElse(Map.empty[Int, Schema]))
+    def decode(bytes: Array[Byte]): Codec.DecodingResult[Map[Int, Schema]] = IntSchemaMapBinCodec.decode(bytes)
+  }
+
+  private def readIntConfigParameter(config: Config, path: String): Int = {
+    config.getIntOpt(path)
+      .getOrElse(throw new IllegalArgumentException(s"A $path is required."))
+  }
+
+  private def readStringConfigParameter(config: Config, path: String): String = {
+    config.getStringOpt(path)
+      .getOrElse(throw new IllegalArgumentException(s"A $path is required."))
+  }
+
+  def registryUrl(config: Config): String =
+    readStringConfigParameter(config, "schema.registry.url")
+
+  def forConfig(
+                 config: Config = ConfigFactory.load(),
+                 schemaRegistrySecurityConfig: SchemaRegistrySecurityConfig
+               ): SchemaRegistryComponent = {
+    val baseUrl = registryUrl(config)
+    val redisHost = readStringConfigParameter(config, "schema.registry.redis.host")
+    val redisPort = readIntConfigParameter(config, "schema.registry.redis.port")
+    val redisIdCacheTtl = readIntConfigParameter(config, "schema.registry.redis.id-cache-ttl")
+    val redisSchemaCacheTtl = readIntConfigParameter(config, "schema.registry.redis.schema-cache-ttl")
+    val redisVersionCacheTtl = readIntConfigParameter(config, "schema.registry.redis.version-cache-ttl")
+
+    val client = new RedisSchemaRegistryClient(
+      baseUrl,
+      redisHost,
+      redisPort,
+      schemaRegistrySecurityConfig.toConfigMap,
+      CacheConfigs(redisIdCacheTtl, redisSchemaCacheTtl, redisVersionCacheTtl)
+    )
+
+    new SchemaRegistryComponent {
+      override def registryClient: SchemaRegistryClient = client
+
+      override def registryUrl: String = baseUrl
     }
   }
 }
@@ -50,14 +123,15 @@ class RedisSchemaRegistryClient(restService: RestService,
   def this(baseUrl: String, redisHost: String, redisPort: Int) {
     this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], Map.empty[String, Any],  CacheConfigs(1, 1, 1))
   }
+
   def this(baseUrl: String, redisHost: String, redisPort: Int, cacheConfigs: CacheConfigs) {
     this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], Map.empty[String, Any], cacheConfigs)
   }
 
   def this(baseUrl: String, redisHost: String, redisPort: Int, config: Map[String, Any]) {
     this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], config, CacheConfigs(1, 1, 1))
-
   }
+
   def this(baseUrl: String, redisHost: String, redisPort: Int, config: Map[String, Any], cacheConfigs: CacheConfigs) {
     this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], config, cacheConfigs)
   }
@@ -133,7 +207,7 @@ class RedisSchemaRegistryClient(restService: RestService,
     restService.setHttpHeaders(httpHeaders.asJava)
   }
 
-  if (configs.nonEmpty && configs.nonEmpty) {
+  if (configs!= null && configs.nonEmpty) {
     restService.configure(configs.asJava)
 
     val srPrefix = "schema.registry."
@@ -155,6 +229,7 @@ class RedisSchemaRegistryClient(restService: RestService,
   override def register(s: String, schema: Schema): Int = {
     register(s, schema, 0, -1)
   }
+
   override def getById(i: Int): Schema = synchronized {
     val restSchema = restService.getId(i)
     val parser = new Schema.Parser()
@@ -174,15 +249,20 @@ class RedisSchemaRegistryClient(restService: RestService,
 
     idCache.get(s) match {
       case Failure(_) =>
-        val map = call()
-        idCache.put(s)(map, idCacheDurationTtl)
-        map(i)
-      case Success(m) if m.nonEmpty && m.head.keys.exists(_ == i) =>
-        m.head(i)
-      case Success(m) =>
-        val map = call()
-        idCache.put(s)(m.getOrElse(Map.empty) ++ map, idCacheDurationTtl)
-        map(i)
+        call()(i)
+      case Success(map) =>
+        map match {
+          case Some(m) if m.keys.exists(_ == i) =>
+            m(i)
+          case Some(m) =>
+            val c = call()
+            idCache.put(s)(m ++ c, idCacheDurationTtl)
+            c(i)
+          case None =>
+            val c = call()
+            idCache.put(s)(c, idCacheDurationTtl)
+            c(i)
+        }
     }
   }
 
@@ -206,22 +286,24 @@ class RedisSchemaRegistryClient(restService: RestService,
   }
 
   override def getVersion(s: String, schema: Schema): Int = synchronized {
-    def call(): Map[Schema, Int] = Try {
-      val response = restService.lookUpSubjectVersion(schema.toString(), s, true)
-      Map(schema -> response.getVersion.toInt)
-    }.getOrElse(Map.empty)
-
     versionCache.get(s) match {
       case Failure(_) =>
-        val map = call()
-        versionCache.put(s)(map, versionCacheDurationTtl)
-        map(schema)
-      case Success(m) if m.nonEmpty && m.head.keys.exists(_ == schema) =>
-        m.head(schema)
-      case Success(m) =>
-        val map = call()
-        versionCache.put(s)(m.getOrElse(Map.empty) ++ map, versionCacheDurationTtl)
-        map(schema)
+        val response: io.confluent.kafka.schemaregistry.client.rest.entities.Schema = restService.lookUpSubjectVersion(schema.toString(), s, true)
+        versionCache.put(s)(Map(schema -> response.getVersion.toInt), versionCacheDurationTtl)
+        response.getVersion.toInt
+      case Success(map) =>
+        map match {
+          case Some(m) if m.keySet.contains(schema) =>
+            m(schema)
+          case Some(m) =>
+            val response: io.confluent.kafka.schemaregistry.client.rest.entities.Schema = restService.lookUpSubjectVersion(schema.toString(), s, true)
+            versionCache.put(s)(m ++ Map(schema -> response.getVersion.toInt), versionCacheDurationTtl)
+            response.getVersion.toInt
+          case None =>
+            val response: io.confluent.kafka.schemaregistry.client.rest.entities.Schema = restService.lookUpSubjectVersion(schema.toString(), s, true)
+            versionCache.put(s)(Map(schema -> response.getVersion.toInt), versionCacheDurationTtl)
+            response.getVersion.toInt
+        }
     }
   }
 
@@ -259,10 +341,10 @@ class RedisSchemaRegistryClient(restService: RestService,
 
   override def getId(s: String, schema: Schema): Int = synchronized {
 
-    def call(): Map[Schema, Int] = Try{
+    def call(): Map[Schema, Int] = {
       val response = restService.lookUpSubjectVersion(schema.toString, s, false)
       Map(schema -> response.getId.toInt)
-    }.getOrElse(Map.empty)
+    }
 
     def populateVersionCache(m: Map[Schema, Int]): Try[Any] = {
       val idM = m.map(kv => kv._2 -> kv._1)
@@ -277,17 +359,21 @@ class RedisSchemaRegistryClient(restService: RestService,
 
     schemaCache.get(s) match {
       case Failure(_) =>
-        val map = call()
-        schemaCache.put(s)(map, schemaCacheDurationTtl)
-        map(schema)
-      case Success(m) if m.nonEmpty && m.head.keys.exists(_ == schema) =>
-        populateVersionCache(m.head)
-        m.head(schema)
-      case Success(m) =>
-        val map = call()
-        populateVersionCache(m.getOrElse(Map.empty) ++ map)
-        schemaCache.put(s)(m.getOrElse(Map.empty) ++ map, schemaCacheDurationTtl)
-        map(schema)
+        schemaCache.put(s)(call(), schemaCacheDurationTtl)
+        call()(schema)
+      case Success(map) => map match {
+        case Some(m) if m.keys.exists(_ == schema) =>
+          populateVersionCache(m)
+          m(schema)
+        case Some(m) =>
+          val map = call()
+          populateVersionCache(m ++ map)
+          schemaCache.put(s)(m ++ map, schemaCacheDurationTtl)
+          call()(schema)
+        case None =>
+          schemaCache.put(s)(call(), schemaCacheDurationTtl)
+          call()(schema)
+      }
     }
   }
 
@@ -332,40 +418,44 @@ class RedisSchemaRegistryClient(restService: RestService,
     }.getOrElse(-1)
 
     def populateIdCache(sc: Schema, id: Int): Any = {
-      idCache.get(s) match {
-        case Failure(_) =>
-          idCache.put(s)(Map(id -> sc), idCacheDurationTtl)
-        case Success(m) if m.nonEmpty && m.head.exists(_ == (id -> sc)) =>
-          ()
-        case Success(m) =>
-          idCache.put(s)(Map(id -> sc) ++ m.getOrElse(Map.empty), idCacheDurationTtl)
+      idCache.caching(s)(idCacheDurationTtl) {
+        Map(id -> sc)
+      } match {
+        case Failure(_) => idCache.put(s)(Map(id -> sc), idCacheDurationTtl)
+        case Success(m) if m.exists(_ == (id -> sc)) => ()
+        case Success(m) => idCache.put(s)(Map(id -> sc) ++ m, idCacheDurationTtl)
       }
     }
 
     schemaCache.get(s) match {
       case Failure(_) =>
         val retrievedId = register()
-        schemaCache.put(s)(Map(schema -> retrievedId), schemaCacheDurationTtl)
         populateIdCache(schema, retrievedId)
         retrievedId
-      case Success(m) if m.nonEmpty && m.head.exists(_._1 == schema) =>
-        val cachedId = m.head(schema)
-        if (i1 >= 0 && i1 != cachedId) {
-          throw new IllegalStateException("Schema already registered with id " + cachedId + " instead of input id " + i1)
-        } else {
-          cachedId
-        }
+      case Success(map) => map match {
+        case Some(m) if m.exists(_._1 == schema) =>
+          val cachedId = m(schema)
 
-      case Success(m) =>
-        val retrievedId = register()
-        schemaCache.put(s)(Map(schema -> retrievedId) ++ m.getOrElse(Map.empty), schemaCacheDurationTtl)
-        populateIdCache(schema, retrievedId)
-        retrievedId
+          if (i1 >= 0 && i1 != cachedId) {
+            throw new IllegalStateException("Schema already registered with id " + cachedId + " instead of input id " + i1)
+          } else {
+            cachedId
+          }
+        case Some(m) =>
+          val retrievedId = register()
+          schemaCache.put(s)(Map(schema -> retrievedId) ++ m, schemaCacheDurationTtl)
+          populateIdCache(schema, retrievedId)
+          retrievedId
+        case None =>
+          val retrievedId = register()
+          populateIdCache(schema, retrievedId)
+          retrievedId
+      }
     }
   }
 
   override def reset(): Unit =
-    throw new UnsupportedOperationException("The reset operation unsupported for a distributed cache.")
+    println("The reset operation unsupported for a distributed cache.")
 
   override def getByID(i: Int): Schema = {
     getById(i)
