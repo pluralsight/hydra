@@ -190,9 +190,9 @@ class RedisSchemaRegistryClient(restService: RestService,
   private val schemaCacheConfig = CacheConfig.defaultCacheConfig
   private val versionCacheConfig = CacheConfig.defaultCacheConfig
 
-  private val idCacheDurationTtl = Option(Duration(cacheConfigs.idCacheTtl, TimeUnit.SECONDS))
-  private val schemaCacheDurationTtl = Option(Duration(cacheConfigs.schemaCacheTtl, TimeUnit.SECONDS))
-  private val versionCacheDurationTtl = Option(Duration(cacheConfigs.versionCacheTtl, TimeUnit.SECONDS))
+  private val idCacheDurationTtl = Option(Duration(cacheConfigs.idCacheTtl, TimeUnit.MINUTES))
+  private val schemaCacheDurationTtl = Option(Duration(cacheConfigs.schemaCacheTtl, TimeUnit.MINUTES))
+  private val versionCacheDurationTtl = Option(Duration(cacheConfigs.versionCacheTtl, TimeUnit.MINUTES))
 
   private val schemaCache: Cache[Map[Schema, Int]] =
     RedisCache(redisHost, redisPort)(schemaCacheConfig, schemaCacheCodec)
@@ -202,6 +202,16 @@ class RedisSchemaRegistryClient(restService: RestService,
 
   private val versionCache: Cache[Map[Schema, Int]] =
     RedisCache(redisHost, redisPort)(versionCacheConfig, schemaCacheCodec)
+
+  private def buildSchemaKey(subject: String): String = {
+    "schema_" + subject
+  }
+  private def buildIdKey(subject: String): String = {
+    "id_" + subject
+  }
+  private def buildVersionKey(subject: String): String = {
+    "version_" + subject
+  }
 
   if (httpHeaders.nonEmpty) {
     restService.setHttpHeaders(httpHeaders.asJava)
@@ -245,7 +255,7 @@ class RedisSchemaRegistryClient(restService: RestService,
       parser.setValidateDefaults(false)
       val schema = parser.parse(restSchema.getSchemaString)
       Map(i -> schema)
-    }.getOrElse(Map.empty)
+    }.getOrElse(Map.empty[Int, Schema])
 
     idCache.get(s) match {
       case Failure(_) =>
@@ -286,10 +296,12 @@ class RedisSchemaRegistryClient(restService: RestService,
   }
 
   override def getVersion(s: String, schema: Schema): Int = synchronized {
-    versionCache.get(s) match {
+    val versionKey = buildVersionKey(s)
+
+    versionCache.get(versionKey) match {
       case Failure(_) =>
         val response: io.confluent.kafka.schemaregistry.client.rest.entities.Schema = restService.lookUpSubjectVersion(schema.toString(), s, true)
-        versionCache.put(s)(Map(schema -> response.getVersion.toInt), versionCacheDurationTtl)
+        versionCache.put(versionKey)(Map(schema -> response.getVersion.toInt), versionCacheDurationTtl)
         response.getVersion.toInt
       case Success(map) =>
         map match {
@@ -297,11 +309,12 @@ class RedisSchemaRegistryClient(restService: RestService,
             m(schema)
           case Some(m) =>
             val response: io.confluent.kafka.schemaregistry.client.rest.entities.Schema = restService.lookUpSubjectVersion(schema.toString(), s, true)
-            versionCache.put(s)(m ++ Map(schema -> response.getVersion.toInt), versionCacheDurationTtl)
+            val concatMap: Map[Schema, Int] = m ++ Map(schema -> response.getVersion.toInt)
+            versionCache.put(versionKey)(concatMap, versionCacheDurationTtl)
             response.getVersion.toInt
           case None =>
             val response: io.confluent.kafka.schemaregistry.client.rest.entities.Schema = restService.lookUpSubjectVersion(schema.toString(), s, true)
-            versionCache.put(s)(Map(schema -> response.getVersion.toInt), versionCacheDurationTtl)
+            versionCache.put(versionKey)(Map(schema -> response.getVersion.toInt), versionCacheDurationTtl)
             response.getVersion.toInt
         }
     }
@@ -346,32 +359,37 @@ class RedisSchemaRegistryClient(restService: RestService,
       Map(schema -> response.getId.toInt)
     }
 
-    def populateVersionCache(m: Map[Schema, Int]): Try[Any] = {
-      val idM = m.map(kv => kv._2 -> kv._1)
+    val idKey = buildIdKey(s)
 
-      idCache.get(s) match {
+    def populateVersionCache(m: Map[Schema, Int]): Try[Any] = {
+      val idM: Map[Int, Schema] = m.map(kv => kv._2 -> kv._1)
+
+      idCache.get(idKey) match {
         case Failure(_) =>
-          idCache.put(s)(idM, idCacheDurationTtl)
+          idCache.put(idKey)(idM, idCacheDurationTtl)
         case Success(im) =>
-          idCache.put(s)(idM ++ im.getOrElse(Map.empty), idCacheDurationTtl)
+          val concatMap: Map[Int, Schema] = idM ++ im.getOrElse(Map.empty[Int, Schema])
+          idCache.put(idKey)(concatMap, idCacheDurationTtl)
       }
     }
 
-    schemaCache.get(s) match {
+    val schemaKey = buildSchemaKey(s)
+
+    schemaCache.get(schemaKey) match {
       case Failure(_) =>
-        schemaCache.put(s)(call(), schemaCacheDurationTtl)
+        schemaCache.put(schemaKey)(call(), schemaCacheDurationTtl)
         call()(schema)
       case Success(map) => map match {
         case Some(m) if m.keys.exists(_ == schema) =>
           populateVersionCache(m)
           m(schema)
         case Some(m) =>
-          val map = call()
-          populateVersionCache(m ++ map)
-          schemaCache.put(s)(m ++ map, schemaCacheDurationTtl)
+          val concatMaps: Map[Schema, Int] = m ++ call()
+          populateVersionCache(concatMaps)
+          schemaCache.put(schemaKey)(concatMaps, schemaCacheDurationTtl)
           call()(schema)
         case None =>
-          schemaCache.put(s)(call(), schemaCacheDurationTtl)
+          schemaCache.put(schemaKey)(call(), schemaCacheDurationTtl)
           call()(schema)
       }
     }
@@ -382,9 +400,9 @@ class RedisSchemaRegistryClient(restService: RestService,
   }
 
   override def deleteSubject(map: java.util.Map[String, String], s: String): java.util.List[Integer] = synchronized {
-    versionCache.remove(s)
-    idCache.remove(s)
-    schemaCache.remove(s)
+    versionCache.remove(buildVersionKey(s))
+    idCache.remove(buildIdKey(s))
+    schemaCache.remove(buildSchemaKey(s))
     restService.deleteSubject(map, s)
   }
 
@@ -396,11 +414,12 @@ class RedisSchemaRegistryClient(restService: RestService,
     Try(restService.deleteSchemaVersion(map, s, s1)) match {
       case Failure(exception) => throw exception
       case Success(value) =>
-        val cacheMap: Map[Schema, Int] = versionCache.get(s).map(_.get).getOrElse(Map.empty[Schema, Int])
+        val versionKey = buildVersionKey(s)
+        val cacheMap: Map[Schema, Int] = versionCache.get(versionKey).map(_.get).getOrElse(Map.empty[Schema, Int])
 
         if (cacheMap.nonEmpty) {
           if (cacheMap.values.exists(_ == value)) {
-            versionCache.put(s)(cacheMap.filterNot(kv => kv._2 == value), versionCacheDurationTtl)
+            versionCache.put(versionKey)(cacheMap.filterNot(kv => kv._2 == value), versionCacheDurationTtl)
           }
         }
         value
@@ -417,17 +436,23 @@ class RedisSchemaRegistryClient(restService: RestService,
       }
     }.getOrElse(-1)
 
-    def populateIdCache(sc: Schema, id: Int): Any = {
-      idCache.caching(s)(idCacheDurationTtl) {
+    val idKey = buildIdKey(s)
+
+    def populateIdCache(sc: Schema, id: Int): Unit = {
+      idCache.caching(idKey)(idCacheDurationTtl) {
         Map(id -> sc)
       } match {
-        case Failure(_) => idCache.put(s)(Map(id -> sc), idCacheDurationTtl)
+        case Failure(_) => idCache.put(idKey)(Map(id -> sc), idCacheDurationTtl)
         case Success(m) if m.exists(_ == (id -> sc)) => ()
-        case Success(m) => idCache.put(s)(Map(id -> sc) ++ m, idCacheDurationTtl)
+        case Success(m) =>
+          val concatMap: Map[Int, Schema] = Map(id -> sc) ++ m
+          idCache.put(idKey)(concatMap, idCacheDurationTtl)
       }
     }
 
-    schemaCache.get(s) match {
+    val schemaKey = buildSchemaKey(s)
+
+    schemaCache.get(schemaKey) match {
       case Failure(_) =>
         val retrievedId = register()
         populateIdCache(schema, retrievedId)
@@ -443,7 +468,8 @@ class RedisSchemaRegistryClient(restService: RestService,
           }
         case Some(m) =>
           val retrievedId = register()
-          schemaCache.put(s)(Map(schema -> retrievedId) ++ m, schemaCacheDurationTtl)
+          val concatMap: Map[Schema, Int] = Map(schema -> retrievedId) ++ m
+          schemaCache.put(schemaKey)(concatMap, schemaCacheDurationTtl)
           populateIdCache(schema, retrievedId)
           retrievedId
         case None =>
