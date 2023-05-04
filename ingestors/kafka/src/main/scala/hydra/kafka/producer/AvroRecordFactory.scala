@@ -19,7 +19,7 @@ import akka.actor.ActorRef
 import akka.pattern.ask
 import akka.util
 import com.pluralsight.hydra.avro.JsonConverter
-import hydra.avro.registry.ConfluentSchemaRegistry
+import hydra.avro.registry.{ConfluentSchemaRegistry, RedisSchemaRegistryClient}
 import hydra.avro.resource.SchemaResource
 import hydra.avro.util.AvroUtils
 import hydra.common.config.ConfigSupport
@@ -70,8 +70,14 @@ class AvroRecordFactory(schemaResourceLoader: ActorRef)
       val converted = converter.convert(request.payload)
       converted
     }).recover {
-      case ex => throw AvroUtils.improveException(ex, schemaResource,
-        ConfluentSchemaRegistry.registryUrl(applicationConfig))
+      case ex =>
+        val schemaRegistryClient = if (applicationConfig.hasPath("schema.registry.redis.use-redis") && applicationConfig.getBoolean("schema.registry.redis.use-redis")) {
+          RedisSchemaRegistryClient.registryUrl(applicationConfig)
+        } else {
+          ConfluentSchemaRegistry.registryUrl(applicationConfig)
+        }
+
+        throw AvroUtils.improveException(ex, schemaResource, schemaRegistryClient)
     }
   }
 }

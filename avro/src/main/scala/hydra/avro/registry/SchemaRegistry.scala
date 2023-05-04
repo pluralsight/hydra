@@ -143,6 +143,26 @@ object SchemaRegistry {
     getFromSchemaRegistryClient(new CachedSchemaRegistryClient(schemaRegistryBaseUrl, maxCacheSize,  securityConfig.toConfigMap.asJava))
   }
 
+  def live[F[_] : Sync](
+      schemaRegistryBaseUrl: String,
+      securityConfig: SchemaRegistrySecurityConfig,
+      redisUrl: String,
+      redisPort: Int,
+      idCacheTtl: Int,
+      schemaCacheTtl: Int,
+      versionCacheTtl: Int
+  ): F[SchemaRegistry[F]] = Sync[F].delay {
+    getFromSchemaRegistryClient(
+      new RedisSchemaRegistryClient(
+        schemaRegistryBaseUrl,
+        redisUrl,
+        redisPort,
+        securityConfig.toConfigMap,
+        CacheConfigs(idCacheTtl, schemaCacheTtl, versionCacheTtl)
+      )
+    )
+  }
+
   def test[F[_]: Sync]: F[SchemaRegistry[F]] = Sync[F].delay {
     getFromSchemaRegistryClient(new MockSchemaRegistryClient)
   }
