@@ -155,16 +155,22 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
     val td = createTopicRequest.numPartitions.fold(defaultTopicDetails)(numP =>
       defaultTopicDetails.copy(numPartitions = numP.value))
       .copy(partialConfig = defaultTopicDetails.configs ++ getCleanupPolicyConfig)
-    (for {
-      _ <- Resource.eval(validator.validate(createTopicRequest, topicName, withRequiredFields))
-      _ <- registerSchemas(
-        topicName,
-        createTopicRequest.schemas.key,
-        createTopicRequest.schemas.value
-      )
-      _ <- createTopicResource(topicName, td)
-      _ <- Resource.eval(publishMetadata(topicName, createTopicRequest))
-    } yield ()).use(_ => Bracket[F, Throwable].unit)
+
+    for {
+      metadata <- metadataAlgebra.getMetadataFor(topicName)
+      createdDate = metadata.map(_.value.createdDate).orElse(Option(createTopicRequest.createdDate))
+    } yield {
+      (for {
+        _ <- Resource.eval(validator.validate(createTopicRequest, topicName, withRequiredFields, createdDate))
+        _ <- registerSchemas(
+          topicName,
+          createTopicRequest.schemas.key,
+          createTopicRequest.schemas.value
+        )
+        _ <- createTopicResource(topicName, td)
+        _ <- Resource.eval(publishMetadata(topicName, createTopicRequest))
+      } yield ()).use(_ => Bracket[F, Throwable].unit)
+    }
   }
 }
 
