@@ -4,14 +4,10 @@ import java.time.format.DateTimeFormatter
 import java.time.{Instant, LocalDate, ZoneId}
 
 object GenericUtils {
-  def postCutOffDate(givenDate: Option[Instant], cutOffDate: String): Boolean =
-    givenDate.exists(
-      _.toEpochMilli > dateStringToInstant(cutOffDate).toEpochMilli
-    )
+  def postCutOffDate(givenDate: Option[Instant], cutOffDate: String): Boolean = {
+    val cutOffDateInstant = LocalDate.parse(cutOffDate, DateTimeFormatter.BASIC_ISO_DATE)
+      .atStartOfDay(ZoneId.of("UTC+05:30")).toInstant //TODO: Consult on the time-zone to use
 
-  def dateStringToInstant(date: String): Instant =
-    LocalDate
-      .parse(date, DateTimeFormatter.BASIC_ISO_DATE)
-      .atStartOfDay(ZoneId.of("UTC"))
-      .toInstant
+    givenDate.exists(_.toEpochMilli >= cutOffDateInstant.toEpochMilli)
+  }
 }
