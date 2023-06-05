@@ -17,7 +17,7 @@ import java.time.Instant
 import scala.jdk.CollectionConverters.collectionAsScalaIterableConverter
 
 class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRegistry[F]) extends Validator {
-  def validate(request: TopicMetadataV2Request, subject: Subject, withRequiredFields: Boolean, createdDate: Option[Instant] = None): F[Unit] = {
+  def validate(request: TopicMetadataV2Request, subject: Subject, withRequiredFields: Boolean, createdDate: Option[Instant]): F[Unit] = {
     val schemas = request.schemas
 
     (schemas.key.getType, schemas.value.getType) match {
