@@ -135,7 +135,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
   def createTopicFromMetadataOnly(topicName: Subject, createTopicRequest: TopicMetadataV2Request, withRequiredFields: Boolean = false): F[Unit] =
     for {
       _ <- checkThatTopicExists(topicName.value)
-      _ <- validator.validate(createTopicRequest, topicName, withRequiredFields)
+      _ <- validator.validate(createTopicRequest, topicName, withRequiredFields, createdDate = None)
       _ <- publishMetadata(topicName, createTopicRequest)
     } yield ()
 
@@ -156,21 +156,18 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
       defaultTopicDetails.copy(numPartitions = numP.value))
       .copy(partialConfig = defaultTopicDetails.configs ++ getCleanupPolicyConfig)
 
-    for {
-      metadata <- metadataAlgebra.getMetadataFor(topicName)
+    (for {
+      metadata <- Resource.eval(metadataAlgebra.getMetadataFor(topicName))
       createdDate = metadata.map(_.value.createdDate).orElse(Option(createTopicRequest.createdDate))
-    } yield {
-      (for {
-        _ <- Resource.eval(validator.validate(createTopicRequest, topicName, withRequiredFields, createdDate))
-        _ <- registerSchemas(
-          topicName,
-          createTopicRequest.schemas.key,
-          createTopicRequest.schemas.value
-        )
-        _ <- createTopicResource(topicName, td)
-        _ <- Resource.eval(publishMetadata(topicName, createTopicRequest))
-      } yield ()).use(_ => Bracket[F, Throwable].unit)
-    }
+      _ <- Resource.eval(validator.validate(createTopicRequest, topicName, withRequiredFields, createdDate))
+      _ <- registerSchemas(
+        topicName,
+        createTopicRequest.schemas.key,
+        createTopicRequest.schemas.value
+      )
+      _ <- createTopicResource(topicName, td)
+      _ <- Resource.eval(publishMetadata(topicName, createTopicRequest))
+    } yield ()).use(_ => Bracket[F, Throwable].unit)
   }
 }
 
