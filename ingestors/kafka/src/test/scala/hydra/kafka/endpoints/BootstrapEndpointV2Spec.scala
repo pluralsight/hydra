@@ -21,6 +21,7 @@ import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.serializers.TopicMetadataV2Parser._
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
+import org.apache.avro.SchemaBuilder.{FieldAssembler, GenericDefault}
 import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import org.scalamock.scalatest.{AsyncMockFactory, MockFactory}
 import org.scalatest.matchers.should.Matchers
@@ -97,7 +98,7 @@ final class BootstrapEndpointV2Spec
         .unsafeRunSync()
     }
 
-    val getTestSchema: String => Schema = schemaName =>
+    val getTestSchemaWithDefaultForCreatedAtAndUpdatedAt: String => Schema = schemaName =>
       SchemaBuilder
         .record(schemaName)
         .fields()
@@ -114,6 +115,33 @@ final class BootstrapEndpointV2Spec
         .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
         .noDefault()
+        .endRecord()
+
+    def getTestSchema(s: String,
+                      hasDefaultCreatedAt: Boolean = false,
+                      hasDefaultUpdatedAt: Boolean = false): Schema =
+      SchemaBuilder
+        .record(s)
+        .fields()
+        .name("test")
+        .doc("text")
+        .`type`()
+        .stringType()
+        .noDefault()
+        .name(RequiredField.CREATED_AT)
+        .doc("text")
+        .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+        .match {
+          case gd if hasDefaultCreatedAt => gd.withDefault(Instant.now().toEpochMilli)
+          case gd                              => gd.noDefault()
+        }
+        .name(RequiredField.UPDATED_AT)
+        .doc("text")
+        .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+        .match {
+          case gd if hasDefaultUpdatedAt => gd.withDefault(Instant.now().toEpochMilli)
+          case gd                              => gd.noDefault()
+        }
         .endRecord()
 
     val badKeySchema: Schema =
@@ -138,21 +166,27 @@ final class BootstrapEndpointV2Spec
       Some("notificationUrl")
     ).toJson.compactPrint
 
-    val validRequestWithoutDVSTag = TopicMetadataV2Request(
-      Schemas(getTestSchema("key"), getTestSchema("value")),
-      StreamTypeV2.Entity,
-      deprecated = false,
-      None,
-      Public,
-      NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
-      Instant.now,
-      List.empty,
-      None,
-      Some("dvs-teamName"),
-      None,
-      List.empty,
-      Some("notificationUrl")
-    ).toJson.compactPrint
+    def getTopicMetadataV2Request(valueSchema: Schema) = {
+      TopicMetadataV2Request(
+        Schemas(getTestSchema("key"), valueSchema),
+        StreamTypeV2.Entity,
+        deprecated = false,
+        None,
+        Public,
+        NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
+        Instant.now,
+        List.empty,
+        None,
+        Some("dvs-teamName"),
+        None,
+        List.empty,
+        Some("notificationUrl")
+      ).toJson.compactPrint
+    }
+
+    val validRequestWithoutDVSTag = getTopicMetadataV2Request(getTestSchema("value"))
+
+    val invalidRequestWithMandatoryFieldsHavingDefaults = getTopicMetadataV2Request(getTestSchema("value", hasDefaultCreatedAt = true, hasDefaultUpdatedAt = true))
 
     val validRequestWithDVSTag = TopicMetadataV2Request(
       Schemas(getTestSchema("key"), getTestSchema("value")),
@@ -353,6 +387,26 @@ final class BootstrapEndpointV2Spec
             response.status shouldBe StatusCodes.BadRequest
           }
       }.unsafeRunSync()
+    }
+
+    Seq (
+      getTopicMetadataV2Request(getTestSchema("value", hasDefaultCreatedAt = true, hasDefaultUpdatedAt = false)) -> "",
+      getTopicMetadataV2Request(getTestSchema("value", hasDefaultCreatedAt = false, hasDefaultUpdatedAt = true)) -> "",
+      getTopicMetadataV2Request(getTestSchema("value", hasDefaultCreatedAt = true, hasDefaultUpdatedAt = true)) -> ""
+    ) foreach {
+      case (request, description) =>
+        "reject a request with mandatory fields having default values" in {
+          testCreateTopicProgram
+            .map { bootstrapEndpoint =>
+              Put("/v2/topics/dvs.testing", HttpEntity(ContentTypes.`application/json`, invalidRequestWithMandatoryFieldsHavingDefaults)) ~> Route.seal(
+                bootstrapEndpoint.route
+              ) ~> check {
+                val responseReturned = responseAs[String]
+                response.status shouldBe StatusCodes.BadRequest
+              }
+            }
+            .unsafeRunSync()
+        }
     }
   }
 }
