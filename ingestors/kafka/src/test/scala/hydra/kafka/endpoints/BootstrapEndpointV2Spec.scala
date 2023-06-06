@@ -31,6 +31,7 @@ import spray.json._
 
 import java.time.Instant
 import scala.concurrent.ExecutionContext
+import scala.language.implicitConversions
 
 final class BootstrapEndpointV2Spec
     extends AnyWordSpecLike
@@ -90,28 +91,11 @@ final class BootstrapEndpointV2Spec
         .unsafeRunSync()
     }
 
-    val getTestSchemaWithDefaultForCreatedAtAndUpdatedAt: String => Schema = schemaName =>
-      SchemaBuilder
-        .record(schemaName)
-        .fields()
-        .name("test")
-        .doc("text")
-        .`type`()
-        .stringType()
-        .noDefault()
-        .name(RequiredField.CREATED_AT)
-        .doc("text")
-        .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .withDefault(Instant.now().toEpochMilli)
-        .name(RequiredField.UPDATED_AT)
-        .doc("text")
-        .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .withDefault(Instant.now().toEpochMilli)
-        .endRecord()
+    implicit def addOptionalDefaultValue[R](gd: GenericDefault[R]): CustomGenericDefault[R] = new CustomGenericDefault[R](gd)
 
     def getTestSchema(s: String,
-                      hasDefaultCreatedAt: Boolean = false,
-                      hasDefaultUpdatedAt: Boolean = false): Schema =
+                      createdAtDefaultValue: Option[Long] = None,
+                      updatedAtDefaultValue: Option[Long] = None): Schema =
       SchemaBuilder
         .record(s)
         .fields()
@@ -123,17 +107,11 @@ final class BootstrapEndpointV2Spec
         .name(RequiredField.CREATED_AT)
         .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .match {
-          case gd if hasDefaultCreatedAt => gd.withDefault(Instant.now().toEpochMilli)
-          case gd                              => gd.noDefault()
-        }
+        .default(createdAtDefaultValue)
         .name(RequiredField.UPDATED_AT)
         .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .match {
-          case gd if hasDefaultUpdatedAt => gd.withDefault(Instant.now().toEpochMilli)
-          case gd                              => gd.noDefault()
-        }
+        .default(updatedAtDefaultValue)
         .endRecord()
 
     val badKeySchema: Schema =
@@ -177,8 +155,6 @@ final class BootstrapEndpointV2Spec
     }
 
     val validRequestWithoutDVSTag = getTopicMetadataV2Request(getTestSchema("value"))
-
-    val invalidRequestWithMandatoryFieldsHavingDefaults = getTopicMetadataV2Request(getTestSchema("value", hasDefaultCreatedAt = true, hasDefaultUpdatedAt = true))
 
     val validRequestWithDVSTag = TopicMetadataV2Request(
       Schemas(getTestSchema("key"), getTestSchema("value")),
@@ -382,15 +358,16 @@ final class BootstrapEndpointV2Spec
     }
 
     Seq (
-      getTopicMetadataV2Request(getTestSchema("value", hasDefaultCreatedAt = true, hasDefaultUpdatedAt = false)) -> "",
-      getTopicMetadataV2Request(getTestSchema("value", hasDefaultCreatedAt = false, hasDefaultUpdatedAt = true)) -> "",
-      getTopicMetadataV2Request(getTestSchema("value", hasDefaultCreatedAt = true, hasDefaultUpdatedAt = true)) -> ""
+      getTopicMetadataV2Request(getTestSchema("value", createdAtDefaultValue = Option(Instant.now().toEpochMilli))) -> "createdAt",
+      getTopicMetadataV2Request(getTestSchema("value", updatedAtDefaultValue = Option(Instant.now().toEpochMilli))) -> "updatedAt",
+      getTopicMetadataV2Request(getTestSchema("value", createdAtDefaultValue = Option(Instant.now().toEpochMilli),
+        updatedAtDefaultValue = Option(Instant.now().toEpochMilli))) -> "createdAt & updatedAt"
     ) foreach {
       case (request, description) =>
-        "reject a request with mandatory fields having default values" in {
+        s"reject a request with mandatory fields($description) having default values" in {
           testCreateTopicProgram
             .map { bootstrapEndpoint =>
-              Put("/v2/topics/dvs.testing", HttpEntity(ContentTypes.`application/json`, invalidRequestWithMandatoryFieldsHavingDefaults)) ~> Route.seal(
+              Put("/v2/topics/dvs.testing", HttpEntity(ContentTypes.`application/json`, request)) ~> Route.seal(
                 bootstrapEndpoint.route
               ) ~> check {
                 val responseReturned = responseAs[String]
@@ -402,4 +379,10 @@ final class BootstrapEndpointV2Spec
     }
   }
 
+  class CustomGenericDefault[R](gd: GenericDefault[R]) {
+    def default(defaultValue: Option[Long]): FieldAssembler[R] = defaultValue match {
+      case Some(dv) => gd.withDefault(dv)
+      case None => gd.noDefault()
+    }
+  }
 }
