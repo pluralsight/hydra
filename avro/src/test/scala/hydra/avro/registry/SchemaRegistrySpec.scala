@@ -9,15 +9,24 @@ import cats.syntax.all._
 import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
 import hydra.avro.registry.SchemaRegistry.LogicalTypeBaseTypeMismatch
 import hydra.avro.registry.SchemaRegistry.LogicalTypeBaseTypeMismatchErrors
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
+import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import org.apache.avro.LogicalTypes
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Parser
 import org.apache.avro.SchemaBuilder
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
-import scala.annotation.tailrec
+import org.typelevel.log4cats.slf4j.Slf4jLogger
+import scala.collection.JavaConverters._
 
-class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
+import scala.annotation.tailrec
+import scala.concurrent.ExecutionContext
+
+class SchemaRegistrySpec extends AnyFlatSpecLike with MockFactory with Matchers {
+  implicit val logger =  Slf4jLogger.getLogger[IO]
+  implicit val timer = IO.timer(ExecutionContext.global)
 
   private def getSchema[F[_]: Applicative](name: String): F[Schema] =
     Applicative[F].pure {
@@ -379,6 +388,55 @@ class SchemaRegistrySpec extends AnyFlatSpecLike with Matchers {
   }
 
   runTests(SchemaRegistry.test[IO]).unsafeRunSync()
+
+  it must "do retries for getAllVersions when SchemaRegistry throws error" in {
+    val expectedVersions = List(1, 2, 3)
+    val mockSchemaRegistryClient = mock[SchemaRegistryClient]
+    (mockSchemaRegistryClient.getAllVersions _)
+      .expects(*)
+      .throws(new RestClientException("error", 0, 50005))
+      .repeat(2)
+
+    (mockSchemaRegistryClient.getAllVersions _)
+      .expects(*)
+      .returns(expectedVersions.map(Integer.valueOf).asJava)
+
+    (for {
+      sr <- SchemaRegistry.test[IO](mockSchemaRegistryClient)
+      versions <- sr.getAllVersions("some topic")
+    } yield versions shouldBe expectedVersions).unsafeRunSync()
+  }
+
+  it must "do retries for getVersion when SchemaRegistry throws error" in {
+    val mockSchemaRegistryClient = mock[SchemaRegistryClient]
+
+    (for {
+      sr <- SchemaRegistry.test[IO](mockSchemaRegistryClient)
+      schema <- getSchema[IO]("sometopic")
+      _ = (mockSchemaRegistryClient.getVersion(_: String, _: Schema))
+        .expects(*, *)
+        .throws(new RestClientException("error", 0, 50005))
+        .repeat(2)
+      _ = (mockSchemaRegistryClient.getVersion(_: String, _: Schema))
+        .expects(*, *)
+        .returns(Integer.valueOf(9))
+      version <- sr.getVersion("sometopic", schema)
+    } yield version shouldBe 9).unsafeRunSync()
+  }
+
+  it must "fail if all attempts were used" in {
+    val mockSchemaRegistryClient = mock[SchemaRegistryClient]
+    (mockSchemaRegistryClient.getAllVersions _)
+      .expects(*)
+      .throws(new RestClientException("error", 0, 50005))
+      .repeat(3)
+
+    val result = for {
+      sr <- SchemaRegistry.test[IO](mockSchemaRegistryClient)
+      versions <- sr.getAllVersions("some topic")
+    } yield ()
+    result.attempt.map(_.isLeft shouldBe true).unsafeRunSync()
+  }
 
   it must "catch incompatibleSchemaException" in {
     a[IncompatibleSchemaException] should be thrownBy testAddFailingEvolution(SchemaRegistry.test[IO]).unsafeRunSync()

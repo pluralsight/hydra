@@ -41,7 +41,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
   private val consumerGroup = "consumer groups"
   implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
   implicit val timer: Timer[IO] = IO.timer(concurrent.ExecutionContext.global)
-
+  implicit val logger =  Slf4jLogger.getLogger[IO]
 
 
   implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =

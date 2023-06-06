@@ -17,6 +17,7 @@ import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
 import org.slf4j.LoggerFactory
+import retry.Sleep
 
 import scala.util.{Either, Left, Right}
 import scala.collection.JavaConverters._
@@ -600,7 +601,7 @@ object KafkaClientAlgebra {
     : fs2.Stream[F, ((GenericRecord, Option[GenericRecord], Option[Headers]), (Partition, Offset), Timestamp)] = ???
   }
 
-  def test[F[_] : Sync : Concurrent]: F[KafkaClientAlgebra[F]] = SchemaRegistry.test[F].flatMap { sr =>
+  def test[F[_] : Sync : Concurrent: Logger: Sleep]: F[KafkaClientAlgebra[F]] = SchemaRegistry.test[F].flatMap { sr =>
     test(sr)
   }
 

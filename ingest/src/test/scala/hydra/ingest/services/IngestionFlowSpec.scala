@@ -3,12 +3,13 @@ package hydra.ingest.services
 import cats.effect.{Concurrent, ContextShift, IO}
 import hydra.avro.registry.SchemaRegistry
 import hydra.core.ingest.HydraRequest
-import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM,HYDRA_RECORD_KEY_PARAM}
+import hydra.core.ingest.RequestParams.{HYDRA_KAFKA_TOPIC_PARAM, HYDRA_RECORD_KEY_PARAM}
 import hydra.ingest.services.IngestionFlow.MissingTopicNameException
 import hydra.kafka.algebras.KafkaClientAlgebra
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import scala.concurrent.ExecutionContext
 
@@ -17,6 +18,8 @@ class IngestionFlowSpec extends AnyFlatSpec with Matchers {
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
   private implicit val mode: scalacache.Mode[IO] = scalacache.CatsEffect.modes.async
+  implicit val logger =  Slf4jLogger.getLogger[IO]
+  implicit val timer = IO.timer(ExecutionContext.global)
 
   private val testSubject: String = "test_subject"
 

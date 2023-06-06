@@ -26,6 +26,7 @@ import org.apache.avro.{Schema, SchemaBuilder}
 import org.apache.kafka.clients.admin.ConsumerGroupDescription
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import retry.Sleep
 import scalacache.guava.GuavaCache
 import scalacache.memoization._
 import scalacache.{Cache, Mode}
@@ -41,12 +42,13 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
   private val v1MetadataTopicName = Subject.createValidated("_test.V1.MetadataTopic").get
   private val consumerGroup = "consumergroups"
   implicit val timer: Timer[IO] = IO.timer(concurrent.ExecutionContext.global)
+  implicit val logger =  Slf4jLogger.getLogger[IO]
 
 
   implicit private def unsafeLogger[F[_] : Sync]: SelfAwareStructuredLogger[F] =
     Slf4jLogger.getLogger[F]
 
-  def schemaBadTest[F[_] : Sync](simulateBadDeletion: Boolean): F[SchemaRegistry[F]] =
+  def schemaBadTest[F[_] : Sync: Sleep](simulateBadDeletion: Boolean): F[SchemaRegistry[F]] =
     SchemaRegistry.test[F].map(sr => getFromBadSchemaRegistryClient[F](sr, simulateBadDeletion))
 
   private def getFromBadSchemaRegistryClient[F[_] : Sync](underlying: SchemaRegistry[F], simulateBadDeletion: Boolean): SchemaRegistry[F] =
