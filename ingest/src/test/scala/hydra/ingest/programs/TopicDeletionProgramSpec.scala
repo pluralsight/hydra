@@ -42,8 +42,6 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
   private val v1MetadataTopicName = Subject.createValidated("_test.V1.MetadataTopic").get
   private val consumerGroup = "consumergroups"
   implicit val timer: Timer[IO] = IO.timer(concurrent.ExecutionContext.global)
-  implicit val logger =  Slf4jLogger.getLogger[IO]
-
 
   implicit private def unsafeLogger[F[_] : Sync]: SelfAwareStructuredLogger[F] =
     Slf4jLogger.getLogger[F]
