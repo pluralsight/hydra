@@ -175,11 +175,11 @@ object SchemaRegistry {
   }
 
   def test[F[_]: Sync: Logger: Sleep]: F[SchemaRegistry[F]] = Sync[F].delay {
-    getFromSchemaRegistryClient(new MockSchemaRegistryClient, schemaRegistryClientRetries = 3, 500.milliseconds)
+    getFromSchemaRegistryClient(new MockSchemaRegistryClient, schemaRegistryClientRetries = 0, schemaRegistryClientRetriesDelay = 1.milliseconds)
   }
 
-  def test[F[_]: Sync: Logger: Sleep](mockedClient: SchemaRegistryClient): F[SchemaRegistry[F]] = Sync[F].delay {
-    getFromSchemaRegistryClient(mockedClient, schemaRegistryClientRetries = 3, 500.milliseconds)
+  def test[F[_]: Sync: Logger: Sleep](mockedClient: SchemaRegistryClient, schemaRegistryClientRetries: Int = 3, schemaRegistryClientRetriesDelay: FiniteDuration = 500.milliseconds): F[SchemaRegistry[F]] = Sync[F].delay {
+    getFromSchemaRegistryClient(mockedClient, schemaRegistryClientRetries, schemaRegistryClientRetriesDelay)
   }
 
   private def getFromSchemaRegistryClient[F[_]: Sync: Logger: Sleep](schemaRegistryClient: SchemaRegistryClient, schemaRegistryClientRetries: Int, schemaRegistryClientRetriesDelay: FiniteDuration): SchemaRegistry[F] =
