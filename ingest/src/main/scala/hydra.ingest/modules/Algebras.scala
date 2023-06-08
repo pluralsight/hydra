@@ -31,13 +31,17 @@ object Algebras {
           config.schemaRegistryRedisConfig.redisPort,
           config.schemaRegistryRedisConfig.idCacheTtl,
           config.schemaRegistryRedisConfig.schemaCacheTtl,
-          config.schemaRegistryRedisConfig.versionCacheTtl
+          config.schemaRegistryRedisConfig.versionCacheTtl,
+          config.createTopicConfig.schemaRegistryConfig.schemaRegistryClientRetriesConfig,
+          config.createTopicConfig.schemaRegistryConfig.schemaRegistryClientRetrieDelaysConfig
         )
       } else {
         SchemaRegistry.live[F](
           schemaRegistryUrl,
           config.createTopicConfig.schemaRegistryConfig.maxCacheSize,
-          config.schemaRegistrySecurityConfig
+          config.schemaRegistrySecurityConfig,
+          config.createTopicConfig.schemaRegistryConfig.schemaRegistryClientRetriesConfig,
+          config.createTopicConfig.schemaRegistryConfig.schemaRegistryClientRetrieDelaysConfig
         )
       }
       kafkaAdmin <- KafkaAdminAlgebra.live[F](config.createTopicConfig.bootstrapServers, kafkaClientSecurityConfig = config.kafkaClientSecurityConfig)
