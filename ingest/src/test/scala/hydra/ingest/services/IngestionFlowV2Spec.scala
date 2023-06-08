@@ -13,6 +13,7 @@ import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import scalacache.Cache
 import scalacache.guava.GuavaCache
 
@@ -23,6 +24,8 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
   private implicit val mode: scalacache.Mode[IO] = scalacache.CatsEffect.modes.async
+  implicit val logger =  Slf4jLogger.getLogger[IO]
+  implicit val timer = IO.timer(ExecutionContext.global)
 
   private val testSubject: Subject = Subject.createValidated("dvs.test.v0.Testing").get
 

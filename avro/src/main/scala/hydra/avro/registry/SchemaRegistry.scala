@@ -8,8 +8,13 @@ import io.confluent.kafka.schemaregistry.avro.AvroCompatibilityChecker
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, MockSchemaRegistryClient, SchemaRegistryClient, SchemaRegistryClientConfig}
 import org.apache.avro.{LogicalType, LogicalTypes, Schema}
+import org.typelevel.log4cats.Logger
+import retry.syntax.all._
+import retry.RetryPolicies._
+import retry.{RetryDetails, Sleep}
 
 import scala.collection.JavaConverters._
+import scala.concurrent.duration._
 import scala.util.Try
 
 /**
@@ -135,22 +140,26 @@ object SchemaRegistry {
     AvroCompatibilityChecker.FULL_TRANSITIVE_CHECKER.isCompatible(newSchema, oldSchemas.asJava)
   }
 
-  def live[F[_]: Sync](
+  def live[F[_]: Sync: Logger: Sleep](
       schemaRegistryBaseUrl: String,
       maxCacheSize: Int,
-      securityConfig: SchemaRegistrySecurityConfig
+      securityConfig: SchemaRegistrySecurityConfig,
+      schemaRegistryClientRetries: Int,
+      schemaRegistryClientRetriesDelay: FiniteDuration
   ): F[SchemaRegistry[F]] = Sync[F].delay {
-    getFromSchemaRegistryClient(new CachedSchemaRegistryClient(schemaRegistryBaseUrl, maxCacheSize,  securityConfig.toConfigMap.asJava))
+    getFromSchemaRegistryClient(new CachedSchemaRegistryClient(schemaRegistryBaseUrl, maxCacheSize,  securityConfig.toConfigMap.asJava), schemaRegistryClientRetries, schemaRegistryClientRetriesDelay)
   }
 
-  def live[F[_] : Sync](
+  def live[F[_] : Sync: Logger: Sleep](
       schemaRegistryBaseUrl: String,
       securityConfig: SchemaRegistrySecurityConfig,
       redisUrl: String,
       redisPort: Int,
       idCacheTtl: Int,
       schemaCacheTtl: Int,
-      versionCacheTtl: Int
+      versionCacheTtl: Int,
+      schemaRegistryClientRetries: Int,
+      schemaRegistryClientRetriesDelay: FiniteDuration
   ): F[SchemaRegistry[F]] = Sync[F].delay {
     getFromSchemaRegistryClient(
       new RedisSchemaRegistryClient(
@@ -159,16 +168,23 @@ object SchemaRegistry {
         redisPort,
         securityConfig.toConfigMap,
         CacheConfigs(idCacheTtl, schemaCacheTtl, versionCacheTtl)
-      )
+      ),
+      schemaRegistryClientRetries,
+      schemaRegistryClientRetriesDelay
     )
   }
 
-  def test[F[_]: Sync]: F[SchemaRegistry[F]] = Sync[F].delay {
-    getFromSchemaRegistryClient(new MockSchemaRegistryClient)
+  def test[F[_]: Sync: Logger: Sleep]: F[SchemaRegistry[F]] = Sync[F].delay {
+    getFromSchemaRegistryClient(new MockSchemaRegistryClient, schemaRegistryClientRetries = 0, schemaRegistryClientRetriesDelay = 1.milliseconds)
   }
 
-  private def getFromSchemaRegistryClient[F[_]: Sync](schemaRegistryClient: SchemaRegistryClient): SchemaRegistry[F] =
+  def test[F[_]: Sync: Logger: Sleep](mockedClient: SchemaRegistryClient, schemaRegistryClientRetries: Int = 3, schemaRegistryClientRetriesDelay: FiniteDuration = 500.milliseconds): F[SchemaRegistry[F]] = Sync[F].delay {
+    getFromSchemaRegistryClient(mockedClient, schemaRegistryClientRetries, schemaRegistryClientRetriesDelay)
+  }
+
+  private def getFromSchemaRegistryClient[F[_]: Sync: Logger: Sleep](schemaRegistryClient: SchemaRegistryClient, schemaRegistryClientRetries: Int, schemaRegistryClientRetriesDelay: FiniteDuration): SchemaRegistry[F] =
     new SchemaRegistry[F] {
+      val retryPolicy = limitRetries(schemaRegistryClientRetries) |+| constantDelay[F](schemaRegistryClientRetriesDelay)
 
       private implicit class SchemaOps(sch: Schema) {
         def fields: List[Schema.Field] = fieldsEval("topLevel", box = false).value
@@ -251,21 +267,23 @@ object SchemaRegistry {
           schemaRegistryClient.deleteSchemaVersion(subject, version.toString)
         )
 
-
-
       override def getVersion(
           subject: String,
           schema: Schema
       ): F[SchemaVersion] =
         Sync[F].delay {
           schemaRegistryClient.getVersion(subject, schema)
-        }
+        }.retryingOnAllErrors(retryPolicy, onFailure("getVersion"))
 
       override def getAllVersions(subject: String): F[List[SchemaId]] =
         Sync[F].fromTry(Try(schemaRegistryClient.getAllVersions(subject)))
           .map(_.asScala.toList.map(_.toInt)).recover {
           case r: RestClientException if r.getErrorCode == 40401 => List.empty
-        }
+        }.retryingOnAllErrors(retryPolicy, onFailure("getAllVersions"))
+
+      private def onFailure(resourceTried: String): (Throwable, RetryDetails) => F[Unit] =
+        (error, retryDetails) =>
+          Logger[F].info(s"Retrying due to failure in SchemaRegistry.$resourceTried: $error. RetryDetails: $retryDetails")
 
       override def getAllSubjects: F[List[String]] =
         Sync[F].delay {
