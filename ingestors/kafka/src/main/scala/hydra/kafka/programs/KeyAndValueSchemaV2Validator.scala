@@ -11,6 +11,7 @@ import hydra.kafka.programs.TopicSchemaError._
 import hydra.kafka.programs.Validator.ValidationChain
 import org.apache.avro.{Schema, SchemaBuilder}
 import RequiredFieldStructures._
+import hydra.kafka.programs.KeyAndValueSchemaV2Validator.{DEFAULT_LOOPHOLE_CUTOFF_DATE_DEFAULT_VALUE, DEFAULT_LOOPHOLE_CUTOFF_DATE_KEY}
 import hydra.kafka.util.GenericUtils.postCutOffDate
 
 import java.time.Instant
@@ -122,7 +123,9 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
         if (isKey) {
           List(validate(docFieldValidator(schema), getFieldMissingError(isKey, RequiredField.DOC, schema, streamType.toString))).pure
         } else {
-          val isCreatedAfterCutOffDate = postCutOffDate(createdDate, cutOffDate = sys.env.getOrElse("DEFAULT_LOOPHOLE_CUTOFF_DATE_IN_YYYYMMDD", "20230602"))
+          val isCreatedAfterCutOffDate =
+            postCutOffDate(createdDate, cutOffDate = sys.env.getOrElse(DEFAULT_LOOPHOLE_CUTOFF_DATE_KEY, DEFAULT_LOOPHOLE_CUTOFF_DATE_DEFAULT_VALUE))
+
           List(
             validate(docFieldValidator(schema), getFieldMissingError(isKey, RequiredField.DOC, schema, streamType.toString)),
             validate(createdAtFieldValidator(schema), getFieldMissingError(isKey, RequiredField.CREATED_AT, schema, streamType.toString)),
@@ -204,6 +207,9 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
 }
 
 object KeyAndValueSchemaV2Validator {
+
+  final val DEFAULT_LOOPHOLE_CUTOFF_DATE_KEY = "DEFAULT_LOOPHOLE_CUTOFF_DATE_IN_YYYYMMDD"
+  final val DEFAULT_LOOPHOLE_CUTOFF_DATE_DEFAULT_VALUE = "20230609"
   def make[F[_]: Sync](schemaRegistry: SchemaRegistry[F]): KeyAndValueSchemaV2Validator[F] =
     new KeyAndValueSchemaV2Validator(schemaRegistry)
 }

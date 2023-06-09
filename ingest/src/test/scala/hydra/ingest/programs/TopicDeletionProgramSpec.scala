@@ -12,20 +12,19 @@ import hydra.avro.resource.SchemaResourceLoader.SchemaNotFoundException
 import hydra.avro.util.SchemaWrapper
 import hydra.ingest.services.IngestionFlowV2.SchemaNotFoundAugmentedException
 import hydra.kafka.algebras.KafkaAdminAlgebra._
-import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, TestConsumerGroupsAlgebra, TestMetadataAlgebra}
-import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import hydra.kafka.util.KafkaUtils.TopicDetails
-import org.typelevel.log4cats.SelfAwareStructuredLogger
-import org.typelevel.log4cats.slf4j.Slf4jLogger
+import hydra.kafka.utils.FakeV2TopicMetadata.{registerTopics, writeV2TopicMetadata}
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.apache.kafka.clients.admin.ConsumerGroupDescription
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import org.typelevel.log4cats.SelfAwareStructuredLogger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import scalacache.guava.GuavaCache
 import scalacache.memoization._
 import scalacache.{Cache, Mode}
@@ -124,62 +123,11 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
   private val noUpgrade = ("", false)
   private type ErrorChecker = ValidatedNel[DeleteTopicError, Unit] => Unit
 
-  private def createTopicMetadataRequest(
-                                          keySchema: Schema,
-                                          valueSchema: Schema,
-                                          email: String = "test@test.com",
-                                          createdDate: Instant = Instant.now(),
-                                          deprecated: Boolean = false,
-                                          deprecatedDate: Option[Instant] = None
-                                        ): TopicMetadataV2Request =
-    TopicMetadataV2Request(
-      Schemas(keySchema, valueSchema),
-      StreamTypeV2.Entity,
-      deprecated = deprecated,
-      deprecatedDate,
-      Public,
-      NonEmptyList.of(Email.create(email).get),
-      createdDate,
-      List.empty,
-      None,
-      Some("dvs-teamName"),
-      None,
-      List.empty,
-      Some("notificationUrl")
-    )
-
-  private def buildSchema(topic: String, upgrade: Boolean): Schema = {
-    val schemaStart = SchemaBuilder.record("name" + topic.replace("-", "").replace(".", ""))
-      .fields().requiredString("id" + topic.replace("-", "").replace(".", ""))
-    if (upgrade && !topic.contains("-key")) {
-      schemaStart.nullableBoolean("upgrade", upgrade).endRecord()
-    } else {
-      schemaStart.endRecord()
-    }
-  }
-
-  private def registerTopics(topicNames: List[String], schemaAlgebra: SchemaRegistry[IO],
-                             registerKey: Boolean, upgrade: Boolean): IO[List[SchemaId]] = {
-    topicNames.flatMap(topic => if (registerKey) List(topic + "-key", topic + "-value") else List(topic + "-value"))
-      .traverse(topic => schemaAlgebra.registerSchema(topic, buildSchema(topic, upgrade)))
-  }
-
   private def possibleFailureGetAllSchemaVersions(topicNames: List[String], schemaAlgebra: SchemaRegistry[IO]): IO[List[String]] = {
     topicNames.traverse(topic => schemaAlgebra.getAllVersions(topic + "-value").attempt.map {
       case Right(versions) => if (versions.nonEmpty) Some(topic + "-value") else None
       case Left(_) => Some(topic + "-value")
     }).map(_.flatten)
-  }
-
-  private def writeV2TopicMetadata(topics: List[String], metadataAlgebra: TestMetadataAlgebra[IO]) = {
-    topics.traverse(topic => {
-      val keySchema = buildSchema(topic + "-key", false)
-      val valueSchema = buildSchema(topic + "-value", false)
-      val topicMetadataKey = TopicMetadataV2Key(Subject.createValidated(topic).get)
-      val req = createTopicMetadataRequest(keySchema, valueSchema)
-      val topicMetadataContainer = TopicMetadataContainer(topicMetadataKey, req.toValue, keySchema.some, valueSchema.some)
-      metadataAlgebra.addMetadata(topicMetadataContainer)
-    })
   }
 
   private def getExpectedDeletedTopics(topicNames: List[String], topicNamesToDelete: List[String], kafkaTopicNamesToFail: List[String]): List[String] = {
