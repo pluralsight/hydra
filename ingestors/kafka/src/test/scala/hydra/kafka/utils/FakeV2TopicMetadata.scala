@@ -78,4 +78,15 @@ object FakeV2TopicMetadata {
       metadataAlgebra.addMetadata(topicMetadataContainer)
     })
   }
+
+  def registerTopics(topicNames: List[String],
+                     schemaAlgebra: SchemaRegistry[IO],
+                     registerKey: Boolean,
+                     upgrade: Boolean): IO[List[SchemaId]] = {
+    topicNames
+      .flatMap(topic =>
+        if (registerKey) List(topic + "-key", topic + "-value") else List(topic + "-value"))
+      .traverse(topic =>
+        schemaAlgebra.registerSchema(topic, buildSchema(topic, upgrade)))
+  }
 }
