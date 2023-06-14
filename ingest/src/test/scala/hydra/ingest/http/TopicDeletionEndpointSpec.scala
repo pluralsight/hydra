@@ -21,13 +21,14 @@ import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
 import hydra.kafka.algebras.{ConsumerGroupsAlgebra, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.util.KafkaUtils.TopicDetails
-import org.typelevel.log4cats.SelfAwareStructuredLogger
+import org.typelevel.log4cats.{Logger, SelfAwareStructuredLogger}
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.apache.kafka.clients.admin.ConsumerGroupDescription
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
+import retry.Sleep
 import scalacache.Cache
 import scalacache.guava.GuavaCache
 
@@ -46,12 +47,10 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
   private val awsSecurityService = mock[AwsSecurityService[IO]]
   private val noAuth = new AccessControlService[IO](awsSecurityService, AwsConfig("somecluster", isAwsIamSecurityEnabled = false))
 
-
-
   implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
     Slf4jLogger.getLogger[F]
 
-  def schemaBadTest[F[_]: Sync](simulateV1BadDeletion: Boolean, simulateV2BadDeletion: Boolean): F[SchemaRegistry[F]] =
+  def schemaBadTest[F[_]: Sync: Sleep](simulateV1BadDeletion: Boolean, simulateV2BadDeletion: Boolean): F[SchemaRegistry[F]] =
     SchemaRegistry.test[F].map(sr => getFromBadSchemaRegistryClient[F](sr, simulateV1BadDeletion, simulateV2BadDeletion))
 
   private def getFromBadSchemaRegistryClient[F[_]: Sync](underlying: SchemaRegistry[F], simulateV1BadDeletion: Boolean, simulateV2BadDeletion: Boolean): SchemaRegistry[F] =

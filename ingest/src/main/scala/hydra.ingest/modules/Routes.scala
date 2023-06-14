@@ -4,7 +4,7 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.server.directives.RouteDirectives
 import akka.http.scaladsl.server.{Route, RouteConcatenation}
 import cats.effect.Sync
-import hydra.avro.registry.ConfluentSchemaRegistry
+import hydra.avro.registry.{ConfluentSchemaRegistry, RedisSchemaRegistryClient}
 import hydra.common.config.ConfigSupport
 import hydra.common.util.{ActorUtils, Futurable}
 import hydra.core.http.CorsSupport
@@ -51,11 +51,18 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
      val bootstrapKafkaConfig =
     applicationConfig.getConfig("bootstrap-config")
 
-     val streamsManagerProps = StreamsManagerActor.props(
+    val registryClient =
+      if (cfg.schemaRegistryRedisConfig.useRedisClient) {
+        RedisSchemaRegistryClient.forConfig(applicationConfig, cfg.schemaRegistrySecurityConfig).registryClient
+      } else {
+        ConfluentSchemaRegistry.forConfig(applicationConfig, cfg.schemaRegistrySecurityConfig).registryClient
+      }
+
+      val streamsManagerProps = StreamsManagerActor.props(
       bootstrapKafkaConfig,
       cfg.kafkaClientSecurityConfig,
       KafkaUtils.BootstrapServers,
-      ConfluentSchemaRegistry.forConfig(applicationConfig, cfg.schemaRegistrySecurityConfig).registryClient
+      registryClient
     )
      val streamsManagerActor: ActorRef = system.actorOf(streamsManagerProps, "streamsManagerActor")
 

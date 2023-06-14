@@ -15,21 +15,54 @@ object AppConfig {
 
   final case class SchemaRegistryConfig(
       fullUrl: String,
-      maxCacheSize: Int
+      maxCacheSize: Int,
+      schemaRegistryClientRetriesConfig: Int,
+      schemaRegistryClientRetrieDelaysConfig: FiniteDuration
       )
+
+  final case class SchemaRegistryRedisConfig(
+     redisUrl: String,
+     redisPort: Int,
+     idCacheTtl: Int = 1,
+     schemaCacheTtl: Int = 1,
+     versionCacheTtl: Int = 1,
+     useRedisClient: Boolean = false
+  )
 
   private val schemaRegistryConfig: ConfigValue[SchemaRegistryConfig] =
     (
       env("HYDRA_SCHEMA_REGISTRY_URL")
         .as[String]
         .default("http://localhost:8081"),
-      env("HYDRA_MAX_SCHEMAS_PER_SUBJECT").as[Int].default(1000)
+      env("HYDRA_MAX_SCHEMAS_PER_SUBJECT").as[Int].default(1000),
+      env("HYDRA_SCHEMA_REGISTRY_RETRIES").as[Int].default(3),
+      env("HYDRA_SCHEMA_REGISTRY_RETRIES_DELAY").as[FiniteDuration].default(500.milliseconds)
       ).parMapN(SchemaRegistryConfig)
 
-
+  private val schemaRegistryRedisConfig: ConfigValue[SchemaRegistryRedisConfig] = (
+    env("HYDRA_SCHEMA_REGISTRY_REDIS_HOST")
+      .as[String]
+      .default("localhost"),
+    env("HYDRA_SCHEMA_REGISTRY_REDIS_PORT")
+      .as[Int]
+      .default(6379),
+    env("HYDRA_SCHEMA_REGISTRY_REDIS_ID_CACHE_TTL")
+      .as[Int]
+      .default(1),
+    env("HYDRA_SCHEMA_REGISTRY_REDIS_SCHEMA_CACHE_TTL")
+      .as[Int]
+      .default(1),
+    env("HYDRA_SCHEMA_REGISTRY_REDIS_VERSION_CACHE_TTL")
+      .as[Int]
+      .default(1),
+    env("HYDRA_SCHEMA_REGISTRY_USE_REDIS")
+      .as[Boolean]
+      .default(false)
+    ).parMapN(SchemaRegistryRedisConfig)
 
   final case class CreateTopicConfig(
       schemaRegistryConfig: SchemaRegistryConfig,
+      schemaRegistryRedisConfig: SchemaRegistryRedisConfig,
       numRetries: Int,
       baseBackoffDelay: FiniteDuration,
       bootstrapServers: String,
@@ -41,6 +74,7 @@ object AppConfig {
   private val createTopicConfig: ConfigValue[CreateTopicConfig] =
     (
       schemaRegistryConfig,
+      schemaRegistryRedisConfig,
       env("CREATE_TOPIC_NUM_RETRIES").as[Int].default(1),
       env("CREATE_TOPIC_BASE_BACKOFF_DELAY")
         .as[FiniteDuration]
@@ -234,7 +268,8 @@ object AppConfig {
                               kafkaClientSecurityConfig: KafkaClientSecurityConfig,
                               schemaRegistrySecurityConfig: SchemaRegistrySecurityConfig,
                               notificationsConfig: NotificationsConfig,
-                              awsConfig: AwsConfig
+                              awsConfig: AwsConfig,
+                              schemaRegistryRedisConfig: SchemaRegistryRedisConfig
                             )
 
   val appConfig: ConfigValue[AppConfig] =
@@ -253,6 +288,7 @@ object AppConfig {
       kafkaClientSecurityConfig,
       schemaRegistrySecurityConfig,
       notificationsConfig,
-      awsConfig
+      awsConfig,
+      schemaRegistryRedisConfig
     ).parMapN(AppConfig)
 }

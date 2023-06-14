@@ -19,6 +19,7 @@ import org.apache.avro.SchemaBuilder
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import scalacache.Cache
 import scalacache.guava.GuavaCache
 
@@ -31,6 +32,8 @@ final class IngestionEndpointSpec
     with ScalatestRouteTest
     with MockFactory
     with HydraIngestJsonSupport {
+  implicit val logger =  Slf4jLogger.getLogger[IO]
+  implicit val timer = IO.timer(ExecutionContext.global)
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect

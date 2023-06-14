@@ -27,11 +27,27 @@ object Algebras {
     implicit val internalNotificationsServiceImpl: InternalNotificationSender[F] = internalNotificationsService
     val schemaRegistryUrl = config.createTopicConfig.schemaRegistryConfig.fullUrl
     for {
-      schemaRegistry <- SchemaRegistry.live[F](
-        schemaRegistryUrl,
-        config.createTopicConfig.schemaRegistryConfig.maxCacheSize,
-        config.schemaRegistrySecurityConfig
-      )
+      schemaRegistry <- if(config.schemaRegistryRedisConfig.useRedisClient) {
+        SchemaRegistry.live[F](
+          schemaRegistryUrl,
+          config.schemaRegistrySecurityConfig,
+          config.schemaRegistryRedisConfig.redisUrl,
+          config.schemaRegistryRedisConfig.redisPort,
+          config.schemaRegistryRedisConfig.idCacheTtl,
+          config.schemaRegistryRedisConfig.schemaCacheTtl,
+          config.schemaRegistryRedisConfig.versionCacheTtl,
+          config.createTopicConfig.schemaRegistryConfig.schemaRegistryClientRetriesConfig,
+          config.createTopicConfig.schemaRegistryConfig.schemaRegistryClientRetrieDelaysConfig
+        )
+      } else {
+        SchemaRegistry.live[F](
+          schemaRegistryUrl,
+          config.createTopicConfig.schemaRegistryConfig.maxCacheSize,
+          config.schemaRegistrySecurityConfig,
+          config.createTopicConfig.schemaRegistryConfig.schemaRegistryClientRetriesConfig,
+          config.createTopicConfig.schemaRegistryConfig.schemaRegistryClientRetrieDelaysConfig
+        )
+      }
       kafkaAdmin <- KafkaAdminAlgebra.live[F](config.createTopicConfig.bootstrapServers, kafkaClientSecurityConfig = config.kafkaClientSecurityConfig)
       kafkaClient <- KafkaClientAlgebra.live[F](config.createTopicConfig.bootstrapServers, schemaRegistryUrl,
         schemaRegistry, config.kafkaClientSecurityConfig, config.ingestConfig.recordSizeLimitBytes)
