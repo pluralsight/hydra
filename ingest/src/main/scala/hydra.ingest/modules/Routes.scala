@@ -8,6 +8,7 @@ import hydra.avro.registry.{ConfluentSchemaRegistry, RedisSchemaRegistryClient}
 import hydra.common.config.ConfigSupport
 import hydra.common.util.{ActorUtils, Futurable}
 import hydra.core.http.CorsSupport
+import hydra.core.http.security.AwsIamPolicyAction.KafkaAction
 import hydra.ingest.app.AppConfig.AppConfig
 import hydra.ingest.http._
 import hydra.kafka.consumer.KafkaConsumerProxy
@@ -30,7 +31,7 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
         cfg.createTopicConfig.defaultReplicationFactor,
         cfg.createTopicConfig.defaultMinInsyncReplicas
       )
-    new BootstrapEndpointV2(programs.createTopic, topicDetails, algebras.tagsAlgebra).route
+    new BootstrapEndpointV2(programs.createTopic, topicDetails, algebras.tagsAlgebra, algebras.accessControlService, algebras.awsSecurityService).route
   } else {
     RouteDirectives.reject
   }
@@ -65,19 +66,19 @@ final class Routes[F[_]: Sync: Futurable] private(programs: Programs[F], algebra
     )
      val streamsManagerActor: ActorRef = system.actorOf(streamsManagerProps, "streamsManagerActor")
 
-    new SchemasEndpoint(consumerProxy, streamsManagerActor, cfg.schemaRegistrySecurityConfig).route ~
-      new BootstrapEndpoint(system, streamsManagerActor, cfg.kafkaClientSecurityConfig, cfg.schemaRegistrySecurityConfig).route ~
+      new SchemasEndpoint(consumerProxy, streamsManagerActor, cfg.schemaRegistrySecurityConfig).route ~
+      new BootstrapEndpoint(system, streamsManagerActor, cfg.kafkaClientSecurityConfig, cfg.schemaRegistrySecurityConfig, algebras.accessControlService, algebras.awsSecurityService).route ~
       new TopicMetadataEndpoint(consumerProxy, algebras.metadata,
-        algebras.schemaRegistry, programs.createTopic, cfg.createTopicConfig.defaultMinInsyncReplicas, algebras.tagsAlgebra).route ~
+          algebras.schemaRegistry, programs.createTopic, cfg.createTopicConfig.defaultMinInsyncReplicas, algebras.tagsAlgebra, algebras.accessControlService, algebras.awsSecurityService).route ~
       new ConsumerGroupsEndpoint(algebras.consumerGroups).route ~
       new IngestorRegistryEndpoint().route ~
       new IngestionWebSocketEndpoint().route ~
-      new IngestionEndpoint(programs.ingestionFlow, programs.ingestionFlowV2).route ~
+      new IngestionEndpoint(programs.ingestionFlow, programs.ingestionFlowV2, algebras.accessControlService).route ~
       new TopicsEndpoint(consumerProxy, cfg.kafkaClientSecurityConfig)(system.dispatcher).route ~
-      new TopicDeletionEndpoint(programs.topicDeletion,cfg.topicDeletionConfig.deleteTopicPassword).route ~
+      new TopicDeletionEndpoint(programs.topicDeletion, cfg.topicDeletionConfig.deleteTopicPassword, algebras.accessControlService, algebras.awsSecurityService).route ~
       new HealthEndpoint(algebras.consumerGroups).route ~
       new TagsEndpoint[F](algebras.tagsAlgebra, cfg.tagsConfig.tagsPassword).route ~
-      bootstrapEndpointV2
+        bootstrapEndpointV2
   }
 }
 

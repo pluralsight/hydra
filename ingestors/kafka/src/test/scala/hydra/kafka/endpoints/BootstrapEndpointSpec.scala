@@ -1,5 +1,6 @@
 package hydra.kafka.endpoints
 
+import cats.effect.IO
 import akka.actor.{Actor, ActorRef, Props}
 import akka.http.javadsl.server.MalformedRequestContentRejection
 import akka.http.scaladsl.model._
@@ -11,6 +12,8 @@ import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.KafkaConfigUtils.SchemaRegistrySecurityConfig
 import hydra.common.config.{ConfigSupport, KafkaConfigUtils}
 import hydra.core.http.CorsSupport
+import hydra.core.http.security.entity.AwsConfig
+import hydra.core.http.security.{AccessControlService, AwsSecurityService}
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadata
@@ -23,6 +26,7 @@ import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
+import org.scalamock.scalatest.proxy.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -38,6 +42,7 @@ class BootstrapEndpointSpec
     with HydraKafkaJsonSupport
     with ConfigSupport
     with EmbeddedKafka
+    with MockFactory
     with Eventually {
 
   private implicit val timeout = RouteTestTimeout(10.seconds)
@@ -84,6 +89,9 @@ class BootstrapEndpointSpec
 
   private val schemaRegistryEmptySecurityConfig = SchemaRegistrySecurityConfig(None, None)
 
+  private val awsSecurityService = mock[AwsSecurityService[IO]]
+  private val auth = new AccessControlService[IO](awsSecurityService, AwsConfig("somecluster", isAwsIamSecurityEnabled = false))
+
   val streamsManagerProps = StreamsManagerActor.props(
     bootstrapKafkaConfig,
     KafkaConfigUtils.kafkaSecurityEmptyConfig,
@@ -93,7 +101,7 @@ class BootstrapEndpointSpec
   val streamsManagerActor: ActorRef = system.actorOf(streamsManagerProps, "streamsManagerActor")
 
 
-  private val bootstrapRoute = new BootstrapEndpoint(system, streamsManagerActor, KafkaConfigUtils.kafkaSecurityEmptyConfig, schemaRegistryEmptySecurityConfig).route
+  private val bootstrapRoute = new BootstrapEndpoint(system, streamsManagerActor, KafkaConfigUtils.kafkaSecurityEmptyConfig, schemaRegistryEmptySecurityConfig, auth, awsSecurityService).route
 
   implicit val f = jsonFormat12(TopicMetadata)
 
@@ -395,7 +403,7 @@ class BootstrapEndpointSpec
       )
 
       val bootstrapRouteWithOverridenStreamManager =
-        (new BootstrapEndpoint(system, streamsManagerActor, KafkaConfigUtils.kafkaSecurityEmptyConfig, schemaRegistryEmptySecurityConfig) with BootstrapEndpointTestActors).route
+        (new BootstrapEndpoint(system, streamsManagerActor, KafkaConfigUtils.kafkaSecurityEmptyConfig, schemaRegistryEmptySecurityConfig, auth, awsSecurityService) with BootstrapEndpointTestActors[IO]).route
       Post("/streams", testEntity) ~> bootstrapRouteWithOverridenStreamManager ~> check {
         status shouldBe StatusCodes.OK
       }
@@ -430,7 +438,7 @@ class BootstrapEndpointSpec
       )
 
       val bootstrapRouteWithOverridenStreamManager =
-        (new BootstrapEndpoint(system, streamsManagerActor, KafkaConfigUtils.kafkaSecurityEmptyConfig, schemaRegistryEmptySecurityConfig) with BootstrapEndpointTestActors).route
+        (new BootstrapEndpoint(system, streamsManagerActor, KafkaConfigUtils.kafkaSecurityEmptyConfig, schemaRegistryEmptySecurityConfig, auth, awsSecurityService) with BootstrapEndpointTestActors[IO]).route
       Get("/streams/exp.test-existing.v1.SubjectPreexisted") ~> bootstrapRouteWithOverridenStreamManager ~> check {
         val originalTopicData = responseAs[Seq[TopicMetadata]]
         val originalTopicCreationDate = originalTopicData.head.createdDate

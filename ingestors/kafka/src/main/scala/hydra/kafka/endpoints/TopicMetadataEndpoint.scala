@@ -35,8 +35,12 @@ import cats.data.NonEmptyList
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
 import hydra.common.config.KafkaConfigUtils.{KafkaClientSecurityConfig, kafkaClientSecurityConfig}
+import hydra.common.validation.ValidationError
+import hydra.core.http.security.AwsIamPolicyAction.KafkaAction
+import hydra.core.http.security.security.RoleName
+import hydra.core.http.security.{AccessControlService, AwsSecurityService}
 import hydra.kafka.programs.CreateTopicProgram.MetadataOnlyTopicDoesNotExist
-import hydra.kafka.programs.{CreateTopicProgram, ValidationError}
+import hydra.kafka.programs.CreateTopicProgram
 import org.apache.avro.{Schema, SchemaParseException}
 import spray.json.DeserializationException
 
@@ -50,7 +54,9 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                                              schemaRegistry: SchemaRegistry[F],
                                              createTopicProgram: CreateTopicProgram[F],
                                              defaultMinInsyncReplicas: Short,
-                                             tagsAlgebra: TagsAlgebra[F]
+                                             tagsAlgebra: TagsAlgebra[F],
+                                             auth: AccessControlService[F],
+                                             awsSecurityService: AwsSecurityService[F]
                                             )
                                             (implicit ec:ExecutionContext, corsSupport: CorsSupport)
   extends RouteSupport
@@ -131,7 +137,9 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
           val startTime = Instant.now
           handleExceptions(exceptionHandler(startTime, method.value, topic)) {
             put {
-              putV2Metadata(startTime, topic)
+              auth.mskAuth(KafkaAction.CreateTopic) { roleName =>
+                putV2Metadata(startTime, topic, roleName)
+              }
             }
           }
         }
@@ -147,7 +155,7 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
       valueSchema.getOrElse(throw new SchemaParseException("Unable to get Value Schema, please create Value Schema in Schema Registry and try again")))
   }
 
-  private def putV2Metadata(startTime: Instant, topic: String): Route = {
+  private def putV2Metadata(startTime: Instant, topic: String, userRoleName: Option[RoleName]): Route = {
     extractMethod { method =>
       Subject.createValidated(topic) match {
         case Some(t) => {
@@ -187,6 +195,7 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
 
                         case Success(value) =>
                           addHttpMetric(topic, StatusCodes.OK, "/v2/metadata", startTime, method.value)
+                          if (userRoleName.isDefined) Futurable[F].unsafeToFuture(awsSecurityService.addAllTopicPermissionsPolicy(topic, userRoleName.get))
                           complete(StatusCodes.OK)
                       }
                     }
