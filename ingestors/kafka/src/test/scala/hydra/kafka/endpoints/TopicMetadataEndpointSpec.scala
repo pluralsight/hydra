@@ -67,7 +67,7 @@ class TopicMetadataEndpointSpec
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
   private implicit val corsSupport: CorsSupport = new CorsSupport("http://*")
   private val awsSecurityService = mock[AwsSecurityService[IO]]
-  private val auth = new AccessControlService[IO](awsSecurityService, AwsConfig("somecluster", isAwsIamSecurityEnabled = false))
+  private val auth = new AccessControlService[IO](awsSecurityService, AwsConfig(Some("somecluster"), isAwsIamSecurityEnabled = false))
 
   override def beforeAll(): Unit = {
     super.beforeAll()

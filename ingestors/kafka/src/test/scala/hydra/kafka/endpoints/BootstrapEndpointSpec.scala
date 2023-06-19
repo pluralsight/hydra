@@ -90,7 +90,7 @@ class BootstrapEndpointSpec
   private val schemaRegistryEmptySecurityConfig = SchemaRegistrySecurityConfig(None, None)
 
   private val awsSecurityService = mock[AwsSecurityService[IO]]
-  private val auth = new AccessControlService[IO](awsSecurityService, AwsConfig("somecluster", isAwsIamSecurityEnabled = false))
+  private val auth = new AccessControlService[IO](awsSecurityService, AwsConfig(Some("somecluster"), isAwsIamSecurityEnabled = false))
 
   val streamsManagerProps = StreamsManagerActor.props(
     bootstrapKafkaConfig,

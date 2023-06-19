@@ -72,4 +72,8 @@ object AwsIamError {
   final case class AuthorizationServiceError(error: Throwable) extends AwsIamError {
     override def message: String = s"Authorization error: ${error.getMessage}"
   }
+
+  final case object MskClusterArnNotDefined extends AwsIamError {
+    override def message: String = s"MSK Cluster ARN variable is not defined."
+  }
 }

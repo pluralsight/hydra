@@ -45,7 +45,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
   implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
   implicit val timer: Timer[IO] = IO.timer(concurrent.ExecutionContext.global)
   private val awsSecurityService = mock[AwsSecurityService[IO]]
-  private val noAuth = new AccessControlService[IO](awsSecurityService, AwsConfig("somecluster", isAwsIamSecurityEnabled = false))
+  private val noAuth = new AccessControlService[IO](awsSecurityService, AwsConfig(None, isAwsIamSecurityEnabled = false))
 
   implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
     Slf4jLogger.getLogger[F]

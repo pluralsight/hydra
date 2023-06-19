@@ -229,7 +229,7 @@ object AppConfig {
 
   private val awsConfig: ConfigValue[AwsConfig] =
     (
-    env("MSK_CLUSTER_ARN").as[String],
+    env("MSK_CLUSTER_ARN").as[String].option,
     env("AWS_IAM_SECURITY_ENABLED").as[Boolean].default(false)
     ).mapN(AwsConfig)
 
