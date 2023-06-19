@@ -4,6 +4,7 @@ import cats.effect.Sync
 import cats.syntax.all._
 import com.amazonaws.auth.policy.{Action, Policy, Resource, Statement}
 import hydra.core.http.security.AwsIamPolicyAction.KafkaAction
+import hydra.core.http.security.entity.AwsIamError.MskClusterArnNotDefined
 import hydra.core.http.security.entity.{AwsConfig, AwsIamError}
 import hydra.core.http.security.security.{RoleName, SessionToken}
 import org.typelevel.log4cats.Logger
@@ -52,18 +53,21 @@ object AwsSecurityService {
           for {
             _               <- Logger[F].info(s"AwsSecurityService: Going to check if role's [$roleName] permissions can do actions [$actions] with topics [$topicNames]")
             rolePolicies    <- awsIamService.getRolePolicies(roleName)
-            kafkaTopicArns  = topicNames.map(convertToTopicArn)
+            kafkaTopicArns  <- topicNames.traverse(convertToTopicArn)
             isAllowed       <- awsIamService.allowedToDoActionsWithTopic(actions, kafkaTopicArns, rolePolicies)
             _               <- Logger[F].info(s"AwsSecurityService: Role's [$roleName] permissions ${if(!isAllowed) "do not" else ""} allow to do actions [$actions] with topics [$topicNames]")
           } yield isAllowed
 
         override def addAllTopicPermissionsPolicy(topicName: String, roleName: RoleName): F[Unit] =
-          Logger[F].info(s"AwsSecurityService: Going to add admin policy for topic [$topicName] and role [$roleName]") *>
-            awsIamService.addRolePolicy(
+          for {
+            _ <- Logger[F].info(s"AwsSecurityService: Going to add admin policy for topic [$topicName] and role [$roleName]")
+            allPermissionsPolicyForTopic <- getAllPermissionsPolicyForTopic(topicName)
+            _ <- awsIamService.addRolePolicy(
               roleName,
               getAllTopicPermissionsPolicyName(topicName),
-              getAllPermissionsPolicyForTopic(topicName)
+              allPermissionsPolicyForTopic
             )
+          } yield ()
 
         override def deleteAllTopicPermissionsPolicy(topicName: String, roleName: RoleName): F[Unit] =
           Logger[F].info(s"AwsSecurityService: Going to delete admin permissions for topic [$topicName] and role [$roleName]") *>
@@ -73,27 +77,29 @@ object AwsSecurityService {
           Logger[F].info(s"AwsSecurityService: Going to delete admin permissions for topics [$topicNames] and role [$roleName]") *>
             topicNames.traverse_(topicName => awsIamService.deleteRolePolicy(roleName, getAllTopicPermissionsPolicyName(topicName)))
 
-        private def convertToTopicArn(topicName: String): Arn =
-          Arn.fromString(awsConfig.mskClusterArn
-            .replace(":cluster/", ":topic/") ++ s"/$topicName")
+        private def convertToTopicArn(topicName: String): F[Arn] =
+          eff.fromOption(awsConfig.mskClusterArn, MskClusterArnNotDefined).map { mskClusterArn =>
+            Arn.fromString(mskClusterArn.replace(":cluster/", ":topic/") ++ s"/$topicName")
+          }
 
-        private def getAllPermissionsPolicyForTopic(topicName: String): Policy = {
-          val actions: Vector[Action] = Vector(
-            AwsIamPolicyAction.KafkaAction.CustomAction("*Topic*"),
-            AwsIamPolicyAction.KafkaAction.WriteData,
-            AwsIamPolicyAction.KafkaAction.ReadData
-          )
+        private def getAllPermissionsPolicyForTopic(topicName: String): F[Policy] =
+          convertToTopicArn(topicName).map { topicArn =>
+            val actions: Vector[Action] = Vector(
+              AwsIamPolicyAction.KafkaAction.CustomAction("*Topic*"),
+              AwsIamPolicyAction.KafkaAction.WriteData,
+              AwsIamPolicyAction.KafkaAction.ReadData
+            )
 
-          val resource = new Resource(convertToTopicArn(topicName).toString)
+            val resource = new Resource(topicArn.toString)
 
-          val statement = new Statement(Statement.Effect.Allow)
-          statement.setActions(actions.asJava)
-          statement.setResources(Vector(resource).asJava)
+            val statement = new Statement(Statement.Effect.Allow)
+            statement.setActions(actions.asJava)
+            statement.setResources(Vector(resource).asJava)
 
-          val policy = new Policy()
-          policy.setStatements(Vector(statement).asJava)
-          policy
-        }
+            val policy = new Policy()
+            policy.setStatements(Vector(statement).asJava)
+            policy
+          }
 
         private def getAllTopicPermissionsPolicyName(topicName: String) = PolicyName(s"internal-$topicName-admin-policy")
       }

@@ -145,7 +145,7 @@ class AwsSecurityServiceSpec extends AsyncFreeSpec with AsyncMockFactory with Ma
 
 object AwsSecurityServiceSpec {
   val mskClusterArn = "arn:aws:kafka:us-east-1:0123456789012:cluster/MyTestCluster/abcd1234-0123-abcd-5678-1234abcd-1"
-  val awsConfig = AwsConfig(mskClusterArn, true)
+  val awsConfig = AwsConfig(Some(mskClusterArn), true)
 
   val accessKeyId = AccessKeyId("someaccesskey")
   val secretAccessKey = SecretAccessKey("somesecretaccesskey")
