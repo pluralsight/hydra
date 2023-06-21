@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.headers.{RawHeader, `User-Agent`}
 import akka.http.scaladsl.server.{MethodRejection, MissingHeaderRejection, RequestEntityExpectedRejection, Route}
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.testkit.TestKit
-import cats.effect.{Concurrent, ContextShift, IO}
+import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.util.SchemaWrapper
 import hydra.core.http.security.{AccessControlService, AwsSecurityService}
@@ -15,10 +15,11 @@ import hydra.core.ingest.RequestParams._
 import hydra.core.marshallers.GenericError
 import hydra.ingest.services.{IngestionFlow, IngestionFlowV2}
 import hydra.kafka.algebras.KafkaClientAlgebra
-import org.apache.avro.SchemaBuilder
+import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
+import org.typelevel.log4cats.SelfAwareStructuredLogger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import scalacache.Cache
 import scalacache.guava.GuavaCache
@@ -32,8 +33,8 @@ final class IngestionEndpointSpec
     with ScalatestRouteTest
     with MockFactory
     with HydraIngestJsonSupport {
-  implicit val logger =  Slf4jLogger.getLogger[IO]
-  implicit val timer = IO.timer(ExecutionContext.global)
+  implicit val logger: SelfAwareStructuredLogger[IO] =  Slf4jLogger.getLogger[IO]
+  implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
@@ -67,12 +68,27 @@ final class IngestionEndpointSpec
   private val ingestRouteAlt = {
     val simpleSchema = SchemaBuilder.record("test").fields.requiredInt("test").endRecord()
     val otherSchema = SchemaBuilder.record("my_topic").fields().requiredBoolean("test").optionalInt("intField").endRecord()
+
+    val uuidType = LogicalTypes.uuid().addToSchema(Schema.create(Schema.Type.STRING))
+    val uuidSchemaKey = SchemaBuilder.record("test").fields().name("id").`type`(uuidType).noDefault().endRecord()
+
+    val timestampsType = LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG))
+    val timestampsSchemaKey = SchemaBuilder.record("test").fields().name("time").`type`(timestampsType).noDefault().endRecord()
+
     (for {
       schemaRegistry <- SchemaRegistry.test[IO]
       _ <- schemaRegistry.registerSchema("my_topic-value", otherSchema)
       _ <- schemaRegistry.registerSchema("my_topic-value", otherSchema)
       _ <- schemaRegistry.registerSchema("dvs.blah.blah-key", simpleSchema)
       _ <- schemaRegistry.registerSchema("dvs.blah.blah-value", simpleSchema)
+      _ <- schemaRegistry.registerSchema("dvs.blah.uuid-key", uuidSchemaKey)
+      _ <- schemaRegistry.registerSchema("dvs.blah.uuid-value", simpleSchema)
+      _ <- schemaRegistry.registerSchema("dvs.blah.uuid2-key", uuidSchemaKey)
+      _ <- schemaRegistry.registerSchema("dvs.blah.uuid2-value", uuidSchemaKey)
+      _ <- schemaRegistry.registerSchema("dvs.blah.timestamps-key", timestampsSchemaKey)
+      _ <- schemaRegistry.registerSchema("dvs.blah.timestamps-value", simpleSchema)
+      _ <- schemaRegistry.registerSchema("dvs.blah.timestamps2-key", timestampsSchemaKey)
+      _ <- schemaRegistry.registerSchema("dvs.blah.timestamps2-value", timestampsSchemaKey)
     } yield {
       new IngestionEndpoint(
         new IngestionFlow[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistry.notreal"),
@@ -87,10 +103,10 @@ final class IngestionEndpointSpec
 
     "rejects a GET request" in {
       Get("/ingest") ~> ingestRoute ~> check {
-        rejections should contain allElementsOf (Seq(
+        rejections should contain allElementsOf Seq(
           MethodRejection(HttpMethods.POST),
           MethodRejection(HttpMethods.DELETE)
-        ))
+        )
       }
     }
 
@@ -214,6 +230,58 @@ final class IngestionEndpointSpec
   }
 
   "The V2 Ingestion path" should {
+    "accept a valid UUID logical type in a key" in {
+      val request = Post("/v2/topics/dvs.blah.uuid/records", HttpEntity(ContentTypes.`application/json`, """{"key":{"id": "e1917f98-049f-448f-bc63-6184b46dbfa7"}, "value":{"test": 2}}"""))
+      request ~> Route.seal(ingestRouteAlt) ~> check {
+        responseAs[String] shouldBe "{\"offset\":0,\"partition\":0}"
+        status shouldBe StatusCodes.OK
+      }
+    }
+    "reject an invalid UUID logical type in a key" in {
+      val request = Post("/v2/topics/dvs.blah.uuid/records", HttpEntity(ContentTypes.`application/json`, """{"key":{"id": "6184b46dbfa7"}, "value":{"test": 2}}"""))
+      request ~> Route.seal(ingestRouteAlt) ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
+    "accept a valid UUID logical type in a value" in {
+      val request = Post("/v2/topics/dvs.blah.uuid2/records", HttpEntity(ContentTypes.`application/json`, """{"key":{"id": "e1917f98-049f-448f-bc63-6184b46dbfa7"}, "value":{"id": "e1917f98-049f-448f-bc63-6184b46dbfa7"}}"""))
+      request ~> Route.seal(ingestRouteAlt) ~> check {
+        responseAs[String] shouldBe "{\"offset\":0,\"partition\":0}"
+        status shouldBe StatusCodes.OK
+      }
+    }
+    "reject an invalid UUID logical type in a value" in {
+      val request = Post("/v2/topics/dvs.blah.uuid2/records", HttpEntity(ContentTypes.`application/json`, """{"key":{"id": "e1917f98-049f-448f-bc63-6184b46dbfa7"}, "value":{"id": "e1917f98"}}"""))
+      request ~> Route.seal(ingestRouteAlt) ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
+    "accept a valid timestamps logical type in a key" in {
+      val request = Post("/v2/topics/dvs.blah.timestamps/records", HttpEntity(ContentTypes.`application/json`, """{"key":{"time": 1649071249966}, "value":{"test": 2}}"""))
+      request ~> Route.seal(ingestRouteAlt) ~> check {
+        responseAs[String] shouldBe "{\"offset\":0,\"partition\":0}"
+        status shouldBe StatusCodes.OK
+      }
+    }
+    "reject an invalid timestamps logical type in a key" in {
+      val request = Post("/v2/topics/dvs.blah.timestamps/records", HttpEntity(ContentTypes.`application/json`, """{"key":{"time": "1649071249966"}, "value":{"test": 2}}"""))
+      request ~> Route.seal(ingestRouteAlt) ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
+    "accept a valid timestamps logical type in a value" in {
+      val request = Post("/v2/topics/dvs.blah.timestamps2/records", HttpEntity(ContentTypes.`application/json`, """{"key":{"time": 1649071249966}, "value":{"time": 1649071249966}}"""))
+      request ~> Route.seal(ingestRouteAlt) ~> check {
+        responseAs[String] shouldBe "{\"offset\":0,\"partition\":0}"
+        status shouldBe StatusCodes.OK
+      }
+    }
+    "reject an invalid timestamps logical type in a value" in {
+      val request = Post("/v2/topics/dvs.blah.timestamps2/records", HttpEntity(ContentTypes.`application/json`, """{"key":{"time": 1649071249966}, "value":{"time": "1649071249966"}}"""))
+      request ~> Route.seal(ingestRouteAlt) ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
     "reject an uncomplete request" in {
       val request = Post("/v2/topics/dvs.blah.blah/records", HttpEntity(ContentTypes.`application/json`, """{"test":true, "extraField":true}"""))
       request ~> Route.seal(ingestRouteAlt) ~> check {
