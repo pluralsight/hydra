@@ -20,6 +20,10 @@ object StringToGenericRecord {
     s"Invalid logical type. Expected $expected but received $received"
   )
 
+  final case class InvalidLogicalTypeErrorForTimeStamp(received: AnyRef) extends RuntimeException(
+    s"Invalid value for logical type - timestamp-millis. Value should be greater than 0 but received $received"
+  )
+
   import collection.JavaConverters._
   private def getExtraFields(json: JsValue, schema: Schema): List[String] = json match {
     case JsObject(fields) if schema.getType == Schema.Type.RECORD =>
@@ -58,6 +62,8 @@ object StringToGenericRecord {
           .traverse(f => checkAll(g.get(f.name), f.schema.some)).void
         case u: Utf8 if fieldSchema.exists(f => Option(f.getLogicalType).exists(_.getName == LogicalTypes.uuid.getName)) =>
           if (isUuidValid(u.toString)) Success(()) else Failure(InvalidLogicalTypeError("UUID", u.toString))
+        case l: java.lang.Long if fieldSchema.exists(f => Option(f.getLogicalType).exists(_.getName == LogicalTypes.timestampMillis().getName)) =>
+          if (l>0) Success(()) else Failure(InvalidLogicalTypeErrorForTimeStamp(l.toString))
         case _ => Success(())
       }
       val fields = record.getSchema.getFields.asScala.toList
