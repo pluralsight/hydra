@@ -2060,7 +2060,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
       } yield ()).attempt.map(_ shouldBe Right())
 
     def testDefaultLoophole(createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long])(implicit createdDate: Option[Instant]) = {
-      val valueSchema = getTestSchema("val", createdAtDefaultValue, updatedAtDefaultValue)
+      val valueSchema = getSchema("val", createdAtDefaultValue, updatedAtDefaultValue)
       val result = for {
         m <- TestMetadataAlgebra()
         _ <- FakeV2TopicMetadata.writeV2TopicMetadata(List(subject.value), m, createdDate)
@@ -2234,7 +2234,9 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
       Some("notification.url")
     )
 
-  def getSchema(name: String): Schema = {
+  def getSchema(name: String,
+                createdAtDefaultValue: Option[Long] = None,
+                updatedAtDefaultValue: Option[Long] = None): Schema = {
     val tempSchema = SchemaBuilder
       .record(name)
       .fields()
@@ -2251,36 +2253,17 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
         .name(RequiredField.CREATED_AT)
         .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .noDefault()
+        .default(createdAtDefaultValue)
         .name(RequiredField.UPDATED_AT)
         .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .noDefault()
+        .default(updatedAtDefaultValue)
         .endRecord()
     }
   }
 
   def createTopicMetadataRequest(createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long]): TopicMetadataV2Request =
-    createTopicMetadataRequest(keySchema, getTestSchema("val", createdAtDefaultValue, updatedAtDefaultValue))
-
-  def getTestSchema(s: String, createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long]): Schema =
-    SchemaBuilder
-      .record(s)
-      .fields()
-      .name("test")
-      .doc("text")
-      .`type`()
-      .stringType()
-      .noDefault()
-      .name(RequiredField.CREATED_AT)
-      .doc("text")
-      .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-      .default(createdAtDefaultValue)
-      .name(RequiredField.UPDATED_AT)
-      .doc("text")
-      .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-      .default(updatedAtDefaultValue)
-      .endRecord()
+    createTopicMetadataRequest(keySchema, getSchema("val", createdAtDefaultValue, updatedAtDefaultValue))
 }
 
 class CustomGenericDefault[R](gd: GenericDefault[R]) {

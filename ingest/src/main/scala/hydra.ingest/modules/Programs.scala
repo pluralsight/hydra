@@ -13,8 +13,6 @@ import retry.RetryPolicy
 import scalacache.{Cache, Mode}
 import scalacache.guava.GuavaCache
 
-import java.time.Instant
-
 final class Programs[F[_]: Logger: Sync: Timer: Mode: Concurrent] private(
     cfg: AppConfig,
     algebras: Algebras[F]
