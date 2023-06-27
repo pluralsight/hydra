@@ -77,11 +77,11 @@ object SimpleStringToGenericRecord {
       case _ => Success(json)
     }
 
-    def toGenericRecordSimple(schema: Schema, useStrictValidation: Boolean = false): Try[GenericRecord] = {
+    def toGenericRecordSimple(schema: Schema, useStrictValidation: Boolean = false, useTimestampValidation: Boolean = false): Try[GenericRecord] = {
       val jsonValidation = if (useStrictValidation) { checkStrictValidation(str, schema) } else Success()
       val jsonOfPayload: Try[JsValue] = jsonToGenericRecordJson(str.parseJson, schema)
 
-      jsonValidation.flatMap(_ => jsonOfPayload.flatMap(_.compactPrint.toGenericRecordPostValidation(schema)))
+      jsonValidation.flatMap(_ => jsonOfPayload.flatMap(_.compactPrint.toGenericRecordPostValidation(schema, useTimestampValidation)))
     }
   }
 

@@ -44,7 +44,8 @@ final class Programs[F[_]: Logger: Sync: Timer: Mode: Concurrent] private(
   val ingestionFlowV2: IngestionFlowV2[F] = new IngestionFlowV2[F](
     algebras.schemaRegistry,
     algebras.kafkaClient,
-    cfg.createTopicConfig.schemaRegistryConfig.fullUrl
+    cfg.createTopicConfig.schemaRegistryConfig.fullUrl,
+    algebras.metadata
   )
 
   val topicDeletion: TopicDeletionProgram[F] = new TopicDeletionProgram[F](
