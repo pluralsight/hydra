@@ -75,6 +75,8 @@ final class IngestionEndpointSpec
     val timestampsType = LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG))
     val timestampsSchemaKey = SchemaBuilder.record("test").fields().name("time").`type`(timestampsType).noDefault().endRecord()
 
+    val compositeKey = SchemaBuilder.record("test").fields.requiredInt("id1").requiredInt("id2").endRecord()
+
     (for {
       schemaRegistry <- SchemaRegistry.test[IO]
       _ <- schemaRegistry.registerSchema("my_topic-value", otherSchema)
@@ -89,6 +91,8 @@ final class IngestionEndpointSpec
       _ <- schemaRegistry.registerSchema("dvs.blah.timestamps-value", simpleSchema)
       _ <- schemaRegistry.registerSchema("dvs.blah.timestamps2-key", timestampsSchemaKey)
       _ <- schemaRegistry.registerSchema("dvs.blah.timestamps2-value", timestampsSchemaKey)
+      _ <- schemaRegistry.registerSchema("dvs.blah.composit-key", compositeKey)
+      _ <- schemaRegistry.registerSchema("dvs.blah.composit-value", simpleSchema)
     } yield {
       new IngestionEndpoint(
         new IngestionFlow[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistry.notreal"),
@@ -230,6 +234,35 @@ final class IngestionEndpointSpec
   }
 
   "The V2 Ingestion path" should {
+    "accept a composite key" in {
+      val validation = RawHeader(HYDRA_VALIDATION_STRATEGY, "relaxed")
+      val request = Post("/v2/topics/dvs.blah.composit/records", HttpEntity(ContentTypes.`application/json`,
+        """{
+          |"hydra.key": "id1, id2",
+          |"extraField":true,
+          |"key":{"id1": 123, "id2": 321},
+          |"value":{"test": 2}
+          |}
+          |""".stripMargin)).withHeaders(validation)
+      request ~> Route.seal(ingestRouteAlt) ~> check {
+        responseAs[String] shouldBe "{\"offset\":0,\"partition\":0}"
+        status shouldBe StatusCodes.OK
+      }
+    }
+    "unaccept a bad composite key" in {
+      val validation = RawHeader(HYDRA_VALIDATION_STRATEGY, "relaxed")
+      val request = Post("/v2/topics/dvs.blah.composit/records", HttpEntity(ContentTypes.`application/json`,
+        """{
+          |"hydra.key": "id1, id2",
+          |"extraField":true,
+          |"key":{"id3": 123, "id2": 321},
+          |"value":{"test": 2}
+          |}
+          |""".stripMargin)).withHeaders(validation)
+      request ~> Route.seal(ingestRouteAlt) ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
     "accept a valid UUID logical type in a key" in {
       val request = Post("/v2/topics/dvs.blah.uuid/records", HttpEntity(ContentTypes.`application/json`, """{"key":{"id": "e1917f98-049f-448f-bc63-6184b46dbfa7"}, "value":{"test": 2}}"""))
       request ~> Route.seal(ingestRouteAlt) ~> check {
