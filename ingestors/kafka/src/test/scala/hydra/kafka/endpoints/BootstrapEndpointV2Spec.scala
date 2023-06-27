@@ -7,7 +7,7 @@ import cats.data.NonEmptyList
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
-import hydra.common.NotificationsTestSuite
+import hydra.common.{Constants, NotificationsTestSuite}
 import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.core.http.CorsSupport
 import hydra.core.http.security.entity.AwsConfig
@@ -18,31 +18,24 @@ import hydra.kafka.model.ContactMethod.{Email, Slack}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import hydra.kafka.programs.CreateTopicProgram
-import hydra.kafka.programs.KeyAndValueSchemaV2Validator.DEFAULT_LOOPHOLE_CUTOFF_DATE_DEFAULT_VALUE
 import hydra.kafka.serializers.TopicMetadataV2Parser._
-import hydra.kafka.util.GenericUtils
 import hydra.kafka.util.KafkaUtils.TopicDetails
-import hydra.kafka.utils.FakeV2TopicMetadata
-import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
-import org.apache.avro.SchemaBuilder.{FieldAssembler, GenericDefault}
-import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
-import org.scalamock.scalatest.{AsyncMockFactory, MockFactory}
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpecLike
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
+import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
 import retry.{RetryPolicies, RetryPolicy}
 import spray.json._
 
 import java.time.Instant
 import scala.concurrent.ExecutionContext
-import scala.language.implicitConversions
 
 final class BootstrapEndpointV2Spec
     extends AnyWordSpecLike
     with ScalatestRouteTest
     with Matchers
-    with MockFactory
     with NotificationsTestSuite {
 
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
@@ -68,7 +61,8 @@ final class BootstrapEndpointV2Spec
         kc,
         retryPolicy,
         Subject.createValidated("dvs.hello-world").get,
-        m
+        m,
+        Constants.DEFAULT_LOOPHOLE_CUTOFF_DATE_FOR_TESTING
       ),
       TopicDetails(1, 1, 1),
       t,
@@ -89,20 +83,6 @@ final class BootstrapEndpointV2Spec
     } yield getTestCreateTopicProgram(s, k, kc, m, t)
   }
 
-  private def testCreatedTopicProgram(topics: List[String], createdDate: Instant): IO[BootstrapEndpointV2[IO]] = {
-    implicit val notificationSenderMock: InternalNotificationSender[IO] = getInternalNotificationSenderMock[IO]
-    for {
-      s <- SchemaRegistry.test[IO]
-      k <- KafkaAdminAlgebra.test[IO]()
-      kc <- KafkaClientAlgebra.test[IO]
-      m <- TestMetadataAlgebra()
-      _ <- FakeV2TopicMetadata.writeV2TopicMetadata(topics, m, Option(createdDate))
-      t <- TagsAlgebra.make[IO]("_hydra.tags-topic", "_hydra.tags-consumer", kc)
-      _ <- t.createOrUpdateTag(HydraTag("DVS tag", "DVS"))
-    } yield getTestCreateTopicProgram(s, k, kc, m, t)
-  }
-
-
   "BootstrapEndpointV2" must {
 
     "reject an empty request" in {
@@ -115,13 +95,9 @@ final class BootstrapEndpointV2Spec
         .unsafeRunSync()
     }
 
-    implicit def addOptionalDefaultValue[R](gd: GenericDefault[R]): CustomGenericDefault[R] = new CustomGenericDefault[R](gd)
-
-    def getTestSchema(s: String,
-                      createdAtDefaultValue: Option[Long] = None,
-                      updatedAtDefaultValue: Option[Long] = None): Schema =
+    val getTestSchema: String => Schema = schemaName =>
       SchemaBuilder
-        .record(s)
+        .record(schemaName)
         .fields()
         .name("test")
         .doc("text")
@@ -131,11 +107,11 @@ final class BootstrapEndpointV2Spec
         .name(RequiredField.CREATED_AT)
         .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .default(createdAtDefaultValue)
+        .noDefault()
         .name(RequiredField.UPDATED_AT)
         .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .default(updatedAtDefaultValue)
+        .noDefault()
         .endRecord()
 
     val badKeySchema: Schema =
@@ -160,25 +136,21 @@ final class BootstrapEndpointV2Spec
       Some("notificationUrl")
     ).toJson.compactPrint
 
-    def getTopicMetadataV2Request(valueSchema: Schema) = {
-      TopicMetadataV2Request(
-        Schemas(getTestSchema("key"), valueSchema),
-        StreamTypeV2.Entity,
-        deprecated = false,
-        None,
-        Public,
-        NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
-        Instant.now,
-        List.empty,
-        None,
-        Some("dvs-teamName"),
-        None,
-        List.empty,
-        Some("notificationUrl")
-      ).toJson.compactPrint
-    }
-
-    val validRequestWithoutDVSTag = getTopicMetadataV2Request(getTestSchema("value"))
+    val validRequestWithoutDVSTag = TopicMetadataV2Request(
+      Schemas(getTestSchema("key"), getTestSchema("value")),
+      StreamTypeV2.Entity,
+      deprecated = false,
+      None,
+      Public,
+      NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
+      Instant.now,
+      List.empty,
+      None,
+      Some("dvs-teamName"),
+      None,
+      List.empty,
+      Some("notificationUrl")
+    ).toJson.compactPrint
 
     val validRequestWithDVSTag = TopicMetadataV2Request(
       Schemas(getTestSchema("key"), getTestSchema("value")),
@@ -380,64 +352,6 @@ final class BootstrapEndpointV2Spec
           }
       }.unsafeRunSync()
     }
-
-    Seq(
-      "20230101" -> "Pre cutoff date",
-      DEFAULT_LOOPHOLE_CUTOFF_DATE_DEFAULT_VALUE -> "On cutoff date"
-    ) foreach {
-      case (date, dateDescription) =>
-        val dateInstant = GenericUtils.dateStringToInstant(date)
-        val dateInMillis = Option(dateInstant.toEpochMilli)
-        Seq(
-          getTestSchema("value", createdAtDefaultValue = dateInMillis) -> Seq("createdAt"),
-          getTestSchema("value", updatedAtDefaultValue = dateInMillis) -> Seq("updatedAt"),
-          getTestSchema("value", createdAtDefaultValue = dateInMillis, updatedAtDefaultValue = dateInMillis) -> Seq("createdAt", "updatedAt")
-        ) foreach {
-          case (valueSchema, fields) =>
-            s"[$dateDescription] For existing topic, accept a request with mandatory fields having a default value - ${fields.mkString(", ")}" in {
-              testCreatedTopicProgram(topics = List("dvs.testing"), dateInstant)
-                .map { bootstrapEndpoint =>
-                  Put("/v2/topics/dvs.testing", HttpEntity(ContentTypes.`application/json`,
-                    getTopicMetadataV2Request(valueSchema))
-                  ) ~> Route.seal(bootstrapEndpoint.route) ~> check {
-                    response.status shouldBe StatusCodes.OK
-                  }
-                }
-                .unsafeRunSync()
-            }
-        }
-    }
-
-    Seq(
-      getTestSchema("value", createdAtDefaultValue = Option(Instant.now().toEpochMilli)) -> Seq("createdAt"),
-      getTestSchema("value", updatedAtDefaultValue = Option(Instant.now().toEpochMilli)) -> Seq("updatedAt"),
-      getTestSchema("value", createdAtDefaultValue = Option(Instant.now().toEpochMilli),
-        updatedAtDefaultValue = Option(Instant.now().toEpochMilli)) -> Seq("createdAt", "updatedAt")
-    ) foreach {
-      case (valueSchema, fields) =>
-        s"[Post cutoff date] reject a request with mandatory fields having a default value - ${fields.mkString(", ")}" in {
-          testCreateTopicProgram
-            .map { bootstrapEndpoint =>
-              Put("/v2/topics/dvs.testing", HttpEntity(ContentTypes.`application/json`, getTopicMetadataV2Request(valueSchema))) ~> Route.seal(
-                bootstrapEndpoint.route
-              ) ~> check {
-                val errorStringSeq = fields map { f =>
-                  s"""Required field cannot have a default value in the value schema fields: field name = $f, value schema = $valueSchema, stream type = Entity."""
-                }
-
-                response.status shouldBe StatusCodes.BadRequest
-                responseAs[String] shouldBe s"${errorStringSeq.mkString("\n")}"
-              }
-            }
-            .unsafeRunSync()
-      }
-    }
   }
 
-  class CustomGenericDefault[R](gd: GenericDefault[R]) {
-    def default(defaultValue: Option[Long]): FieldAssembler[R] = defaultValue match {
-      case Some(dv) => gd.withDefault(dv)
-      case None => gd.noDefault()
-    }
-  }
 }

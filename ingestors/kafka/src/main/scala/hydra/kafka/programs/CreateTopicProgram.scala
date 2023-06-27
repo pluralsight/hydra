@@ -14,6 +14,7 @@ import retry.{RetryDetails, RetryPolicy, _}
 import cats.implicits._
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 
+import scala.language.higherKinds
 import scala.util.control.NoStackTrace
 
 final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] private (
@@ -135,7 +136,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
   def createTopicFromMetadataOnly(topicName: Subject, createTopicRequest: TopicMetadataV2Request, withRequiredFields: Boolean = false): F[Unit] =
     for {
       _ <- checkThatTopicExists(topicName.value)
-      _ <- validator.validate(createTopicRequest, topicName, withRequiredFields, createdDate = None)
+      _ <- validator.validate(createTopicRequest, topicName, withRequiredFields)
       _ <- publishMetadata(topicName, createTopicRequest)
     } yield ()
 
@@ -157,9 +158,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
       .copy(partialConfig = defaultTopicDetails.configs ++ getCleanupPolicyConfig)
 
     (for {
-      metadata <- Resource.eval(metadataAlgebra.getMetadataFor(topicName))
-      createdDate = metadata.map(_.value.createdDate).orElse(Option(createTopicRequest.createdDate))
-      _ <- Resource.eval(validator.validate(createTopicRequest, topicName, withRequiredFields, createdDate))
+      _ <- Resource.eval(validator.validate(createTopicRequest, topicName, withRequiredFields))
       _ <- registerSchemas(
         topicName,
         createTopicRequest.schemas.key,
@@ -179,6 +178,7 @@ object CreateTopicProgram {
                                                            retryPolicy: RetryPolicy[F],
                                                            v2MetadataTopicName: Subject,
                                                            metadataAlgebra: MetadataAlgebra[F],
+                                                           defaultLoopHoleCutoffDate: Instant
                                                          ) (implicit eff: Sync[F]): CreateTopicProgram[F] = {
     new CreateTopicProgram(
       schemaRegistry,
@@ -187,7 +187,7 @@ object CreateTopicProgram {
       retryPolicy,
       v2MetadataTopicName,
       metadataAlgebra,
-      KeyAndValueSchemaV2Validator.make(schemaRegistry)
+      KeyAndValueSchemaV2Validator.make(schemaRegistry, metadataAlgebra, defaultLoopHoleCutoffDate)
     )
   }
 

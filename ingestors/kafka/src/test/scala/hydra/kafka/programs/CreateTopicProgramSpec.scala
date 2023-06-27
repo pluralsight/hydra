@@ -13,7 +13,7 @@ import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.kafka.algebras.KafkaAdminAlgebra.{Topic, TopicName}
 import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, Offset, Partition, PublishError, PublishResponse}
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
-import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
+import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TestMetadataAlgebra}
 import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
@@ -26,8 +26,10 @@ import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import org.scalatest.matchers.should.Matchers
 import retry.{RetryPolicies, RetryPolicy}
 import eu.timepit.refined._
-import hydra.common.NotificationsTestSuite
+import hydra.common.{Constants, NotificationsTestSuite}
 import hydra.common.alerting.sender.InternalNotificationSender
+import hydra.common.util.InstantUtils.dateStringToInstant
+import hydra.common.validation.ValidationError.ValidationCombinedErrors
 import hydra.kafka.IOSuite
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
 
@@ -35,12 +37,15 @@ import scala.concurrent.ExecutionContext
 import hydra.kafka.model.TopicMetadataV2Request.NumPartitions
 import hydra.kafka.programs.CreateTopicProgram.MetadataOnlyTopicDoesNotExist
 import hydra.kafka.programs.TopicSchemaError._
+import hydra.kafka.utils.FakeV2TopicMetadata
+import org.apache.avro.SchemaBuilder.{FieldAssembler, GenericDefault}
 import org.apache.kafka.common.TopicPartition
 import org.scalatest.freespec.AsyncFreeSpec
 
 import scala.jdk.CollectionConverters.collectionAsScalaIterableConverter
+import scala.language.implicitConversions
 
-class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite with NotificationsTestSuite {
+class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
   import CreateTopicProgramSpec._
 
   "CreateTopicSpec" - {
@@ -151,6 +156,31 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
         _     <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails, true)
         topic <- ts.kafka.describeTopic(subject.value)
       } yield topic.get shouldBe Topic(subject.value, 1)
+    }
+
+    Seq(
+      (Some(123L), Some(456L)) -> "createdAt & updatedAt",
+      (Some(123L), None) -> "createdAt",
+      (None, Some(456L)) -> "updatedAt"
+    ) foreach {
+      case ((createdAt, updatedAt), fields) =>
+        s"[pre-cutoff-date] $fields - required fields in value schema of a topic can have a default value" in {
+          implicit val createdDate: Option[Instant] = Some("20230101").map(dateStringToInstant)
+
+          testDefaultLoopholeBeforeCutoff(createdAtDefaultValue = createdAt, updatedAtDefaultValue = updatedAt)
+        }
+
+        s"[on-cutoff-date] $fields - required fields in value schema of a topic can have a default value" in {
+          implicit val createdDate: Option[Instant] = Some("20230619").map(dateStringToInstant)
+
+          testDefaultLoopholeBeforeCutoff(createdAtDefaultValue = createdAt, updatedAtDefaultValue = updatedAt)
+        }
+
+        s"[post-cutoff-date] $fields - required fields in value schema of a topic cannot have a default value" in {
+          implicit val createdDate: Option[Instant] = Some("20230620").map(dateStringToInstant)
+
+          testDefaultLoophole(createdAtDefaultValue = createdAt, updatedAtDefaultValue = updatedAt)
+        }
     }
 
     "ingest metadata into the metadata topic" in {
@@ -266,11 +296,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .name(RequiredField.CREATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .name(RequiredField.UPDATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .endRecord()
 
       val result = for {
@@ -306,11 +336,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .name(RequiredField.CREATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .name(RequiredField.UPDATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .endRecord()
 
       val result = for {
@@ -345,11 +375,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .name(RequiredField.CREATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .name(RequiredField.UPDATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .endRecord()
 
       for {
@@ -380,11 +410,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .name(RequiredField.CREATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .name(RequiredField.UPDATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .endRecord()
 
       val result = for {
@@ -418,11 +448,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .name(RequiredField.CREATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .name(RequiredField.UPDATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .endRecord()
 
       for {
@@ -1720,11 +1750,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .name(RequiredField.CREATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .name(RequiredField.UPDATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .endRecord()
 
       for {
@@ -1747,11 +1777,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .name(RequiredField.CREATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .name(RequiredField.UPDATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .endRecord()
 
       for {
@@ -1793,11 +1823,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .name(RequiredField.CREATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .name(RequiredField.UPDATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .endRecord()
       val mismatchedValueSchemaEvolution =
         SchemaBuilder
@@ -1809,11 +1839,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
           .name(RequiredField.CREATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .name(RequiredField.UPDATED_AT)
           .doc("text")
           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-          .withDefault(Instant.now().toEpochMilli)
+          .noDefault()
           .endRecord()
 
       for {
@@ -1886,11 +1916,11 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
                           .name(RequiredField.CREATED_AT)
                           .doc("text")
                           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-                          .withDefault(Instant.now().toEpochMilli)
+                          .noDefault()
                           .name(RequiredField.UPDATED_AT)
                           .doc("text")
                           .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-                          .withDefault(Instant.now().toEpochMilli)
+                          .noDefault()
                           .endRecord()
 
       val result = for {
@@ -2020,6 +2050,36 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite wi
 
       result.attempt.map(_ shouldBe UnsupportedLogicalType(valueSchema.getField("timestamp"), "iso-datetime").asLeft)
     }
+
+    def testDefaultLoopholeBeforeCutoff(createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long])(implicit createdDate: Option[Instant]) =
+      (for {
+        m <- TestMetadataAlgebra()
+        _ <- FakeV2TopicMetadata.writeV2TopicMetadata(List(subject.value), m, createdDate)
+        ts <- initTestServices(metadataAlgebraOpt = Some(m))
+        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(createdAtDefaultValue, updatedAtDefaultValue), topicDetails, true)
+      } yield ()).attempt.map(_ shouldBe Right())
+
+    def testDefaultLoophole(createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long])(implicit createdDate: Option[Instant]) = {
+      val valueSchema = getTestSchema("val", createdAtDefaultValue, updatedAtDefaultValue)
+      val result = for {
+        m <- TestMetadataAlgebra()
+        _ <- FakeV2TopicMetadata.writeV2TopicMetadata(List(subject.value), m, createdDate)
+        ts <- initTestServices(metadataAlgebraOpt = Some(m))
+        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(createdAtDefaultValue, updatedAtDefaultValue), topicDetails, true)
+      } yield ()
+
+      (createdAtDefaultValue, updatedAtDefaultValue) match {
+        case (Some(_), Some(_)) =>
+          result.attempt.map(_ shouldBe ValidationCombinedErrors(List(
+            RequiredSchemaValueFieldWithDefaultValueError("createdAt", valueSchema, "Entity").message,
+            RequiredSchemaValueFieldWithDefaultValueError("updatedAt", valueSchema, "Entity").message)).asLeft)
+        case (Some(_), None)    =>
+          result.attempt.map(_ shouldBe RequiredSchemaValueFieldWithDefaultValueError("createdAt", valueSchema, "Entity").asLeft)
+        case (None, Some(_))    =>
+          result.attempt.map(_ shouldBe RequiredSchemaValueFieldWithDefaultValueError("updatedAt", valueSchema, "Entity").asLeft)
+        case _                  => result.attempt.map(_ shouldBe Left())
+      }
+    }
   }
 
   type Record = (GenericRecord, Option[GenericRecord], Option[Headers])
@@ -2084,6 +2144,8 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
 
   implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] = Slf4jLogger.getLogger[F]
 
+  implicit private def addOptionalDefaultValue[R](gd: GenericDefault[R]): CustomGenericDefault[R] = new CustomGenericDefault[R](gd)
+
   case class TestServices(program: CreateTopicProgram[IO], schemaRegistry: SchemaRegistry[IO], kafka: KafkaAdminAlgebra[IO])
 
   def initTestServices(kafkaClientOpt: Option[KafkaClientAlgebra[IO]] = None,
@@ -2104,7 +2166,8 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
           kafkaClient,
           retryPolicy,
           Subject.createValidated(metadataTopic).get,
-          metadataAlgebraOpt.getOrElse(defaultMetadata)
+          metadataAlgebraOpt.getOrElse(defaultMetadata),
+          Constants.DEFAULT_LOOPHOLE_CUTOFF_DATE_FOR_TESTING
         )
 
       TestServices(createTopicProgram, defaultSchemaRegistry, kafka)
@@ -2188,13 +2251,41 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
         .name(RequiredField.CREATED_AT)
         .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .withDefault(Instant.now().toEpochMilli)
+        .noDefault()
         .name(RequiredField.UPDATED_AT)
         .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .withDefault(Instant.now().toEpochMilli)
+        .noDefault()
         .endRecord()
     }
   }
 
+  def createTopicMetadataRequest(createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long]): TopicMetadataV2Request =
+    createTopicMetadataRequest(keySchema, getTestSchema("val", createdAtDefaultValue, updatedAtDefaultValue))
+
+  def getTestSchema(s: String, createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long]): Schema =
+    SchemaBuilder
+      .record(s)
+      .fields()
+      .name("test")
+      .doc("text")
+      .`type`()
+      .stringType()
+      .noDefault()
+      .name(RequiredField.CREATED_AT)
+      .doc("text")
+      .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+      .default(createdAtDefaultValue)
+      .name(RequiredField.UPDATED_AT)
+      .doc("text")
+      .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+      .default(updatedAtDefaultValue)
+      .endRecord()
+}
+
+class CustomGenericDefault[R](gd: GenericDefault[R]) {
+  def default(defaultValue: Option[Long]): FieldAssembler[R] = defaultValue match {
+    case Some(dv) => gd.withDefault(dv)
+    case None => gd.noDefault()
+  }
 }

@@ -1,13 +1,9 @@
-package hydra.kafka.util
+package hydra.common.util
 
 import java.time.format.DateTimeFormatter
 import java.time.{Instant, LocalDate, ZoneId}
 
-object GenericUtils {
-  def postCutOffDate(givenDate: Option[Instant], cutOffDate: String): Boolean =
-    givenDate.exists(
-      _.toEpochMilli > dateStringToInstant(cutOffDate).toEpochMilli
-    )
+object InstantUtils {
 
   def dateStringToInstant(date: String): Instant =
     LocalDate
