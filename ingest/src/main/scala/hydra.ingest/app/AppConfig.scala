@@ -63,15 +63,16 @@ object AppConfig {
     ).parMapN(SchemaRegistryRedisConfig)
 
   final case class CreateTopicConfig(
-      schemaRegistryConfig: SchemaRegistryConfig,
-      schemaRegistryRedisConfig: SchemaRegistryRedisConfig,
-      numRetries: Int,
-      baseBackoffDelay: FiniteDuration,
-      bootstrapServers: String,
-      defaultNumPartions: Int,
-      defaultReplicationFactor: Short,
-      defaultMinInsyncReplicas: Short,
-      defaultLoopHoleCutoffDate: Instant
+                                      schemaRegistryConfig: SchemaRegistryConfig,
+                                      schemaRegistryRedisConfig: SchemaRegistryRedisConfig,
+                                      numRetries: Int,
+                                      baseBackoffDelay: FiniteDuration,
+                                      bootstrapServers: String,
+                                      defaultNumPartions: Int,
+                                      defaultReplicationFactor: Short,
+                                      defaultMinInsyncReplicas: Short,
+                                      defaultLoopHoleCutoffDate: Instant,
+                                      timestampValidationCutoffDate: Instant
   )
 
   private implicit val dateStringToInstantDecoder: ConfigDecoder[String, Instant] =
@@ -90,6 +91,9 @@ object AppConfig {
       env("HYDRA_REPLICATION_FACTOR").as[Short].default(3),
       env("HYDRA_MIN_INSYNC_REPLICAS").as[Short].default(2),
       env("DEFAULT_LOOPHOLE_CUTOFF_DATE_IN_YYYYMMDD")
+        .as[Instant]
+        .default(dateStringToInstant("20230711")),
+      env("TIMESTAMP_VALIDATION_CUTOFF_DATE_IN_YYYYMMDD")
         .as[Instant]
         .default(dateStringToInstant("20230711"))
       ).parMapN(CreateTopicConfig)

@@ -27,7 +27,8 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
                                                                     schemaRegistry: SchemaRegistry[F],
                                                                     kafkaClient: KafkaClientAlgebra[F],
                                                                     schemaRegistryBaseUrl: String,
-                                                                    metadata: MetadataAlgebra[F])
+                                                                    metadata: MetadataAlgebra[F],
+                                                                    timestampValidationCutoffDate: Instant)
                                                                     (implicit guavaCache: Cache[SchemaWrapper]){
 
   import IngestionFlowV2._
@@ -78,7 +79,8 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
 
     for {
       metadata <- metadata.getMetadataFor(topic)
-      useTimestampValidation = metadata.map(_.value.createdDate).get.isAfter(Instant.now())
+      topicCreationDate = metadata.map(_.value.createdDate).getOrElse(Instant.now())
+      useTimestampValidation = timestampValidationCutoffDate.isAfter(topicCreationDate)
       kSchema <- getSchemaWrapper(topic, isKey = true)
       vSchema <- getSchemaWrapper(topic, isKey = false)
       k <- MonadError[F, Throwable].fromTry(

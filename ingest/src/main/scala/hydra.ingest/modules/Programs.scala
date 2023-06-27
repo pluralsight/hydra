@@ -45,7 +45,8 @@ final class Programs[F[_]: Logger: Sync: Timer: Mode: Concurrent] private(
     algebras.schemaRegistry,
     algebras.kafkaClient,
     cfg.createTopicConfig.schemaRegistryConfig.fullUrl,
-    algebras.metadata
+    algebras.metadata,
+    cfg.createTopicConfig.timestampValidationCutoffDate
   )
 
   val topicDeletion: TopicDeletionProgram[F] = new TopicDeletionProgram[F](
