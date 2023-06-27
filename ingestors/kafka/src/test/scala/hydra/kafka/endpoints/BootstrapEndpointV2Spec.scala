@@ -25,6 +25,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.apache.avro.SchemaBuilder.{FieldAssembler, GenericDefault}
 import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
+import org.scalamock.scalatest.{AsyncMockFactory, MockFactory}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import retry.{RetryPolicies, RetryPolicy}
@@ -37,6 +38,7 @@ final class BootstrapEndpointV2Spec
     extends AnyWordSpecLike
     with ScalatestRouteTest
     with Matchers
+    with MockFactory
     with NotificationsTestSuite {
 
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
