@@ -18,6 +18,13 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
   doing that. These just need to test that we are handling Strict and Relaxed validation types.
    */
 
+  private val timestampSchema = SchemaBuilder.record("testVal")
+    .fields()
+    .name("testTimestamp")
+    .`type`(LogicalTypes.timestampMillis.addToSchema(Schema.create(Schema.Type.LONG)))
+    .noDefault
+    .endRecord
+
   it should "convert basic record" in {
     val schema = SchemaBuilder.record("Test").fields()
       .requiredString("testing").endRecord()
@@ -261,5 +268,29 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
 
     the[AvroTypeException] thrownBy s"""{"testTs": "hi"}""".
       toGenericRecord(schema, useStrictValidation = true).get should have message "testTs -> Expected long. Got VALUE_STRING"
+  }
+
+  it should "throw an InvalidLogicalTypeErrorForTimeStamp for field with logical type of timestamp-millis having value 0 with timestampValidation enabled" in {
+    the[InvalidLogicalTypeErrorForTimeStamp] thrownBy
+      s"""{"testTimestamp": 0}""".
+        toGenericRecord(timestampSchema, useStrictValidation = true, useTimestampValidation = true).get should have message
+      "Invalid value for logical type - timestamp-millis. Value should be greater than 0 but received 0"
+  }
+
+  it should "throw an InvalidLogicalTypeErrorForTimeStamp for field with logical type of timestamp-millis having value -2 with timestampValidation enabled" in {
+    the[InvalidLogicalTypeErrorForTimeStamp] thrownBy
+      s"""{"testTimestamp": -2}""".
+        toGenericRecord(timestampSchema, useStrictValidation = true, useTimestampValidation = true).get should have message
+      "Invalid value for logical type - timestamp-millis. Value should be greater than 0 but received -2"
+  }
+
+  it should "accept a logical field type of timestamp-millis having a value 0 with timestampValidation disabled" in {
+    val record = """{"testTimestamp": 0}""".toGenericRecord(timestampSchema, useStrictValidation = true, useTimestampValidation = false)
+    record shouldBe a[Success[_]]
+  }
+
+  it should "accept a logical field type of timestamp-millis having negative value -2 with timestampValidation disabled" in {
+    val record = """{"testTimestamp": -2}""".toGenericRecord(timestampSchema, useStrictValidation = true)
+    record shouldBe a[Success[_]]
   }
 }

@@ -71,7 +71,7 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
 
   private def getSchemas(request: V2IngestRequest, topic: Subject): F[(GenericRecord, Option[GenericRecord])] = {
     val useStrictValidation = request.validationStrategy.getOrElse(ValidationStrategy.Strict) == ValidationStrategy.Strict
-    def getRecord(payload: String, schema: Schema, useTimestampValidation: Boolean = false): Try[GenericRecord] = if (request.useSimpleJsonFormat) {
+    def getRecord(payload: String, schema: Schema, useTimestampValidation: Boolean): Try[GenericRecord] = if (request.useSimpleJsonFormat) {
       payload.toGenericRecordSimple(schema, useStrictValidation, useTimestampValidation)
     } else {
       payload.toGenericRecord(schema, useStrictValidation, useTimestampValidation)
@@ -80,7 +80,7 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
     for {
       metadata <- metadata.getMetadataFor(topic)
       topicCreationDate = metadata.map(_.value.createdDate).getOrElse(Instant.now())
-      useTimestampValidation = timestampValidationCutoffDate.isAfter(topicCreationDate)
+      useTimestampValidation = topicCreationDate.isAfter(timestampValidationCutoffDate)
       kSchema <- getSchemaWrapper(topic, isKey = true)
       vSchema <- getSchemaWrapper(topic, isKey = false)
       k <- MonadError[F, Throwable].fromTry(

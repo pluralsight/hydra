@@ -5,18 +5,21 @@ import cats.syntax.all._
 import fs2.kafka.{Header, Headers}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.util.SchemaWrapper
+import hydra.common.util.InstantUtils
 import hydra.core.transport.ValidationStrategy
 import hydra.ingest.services.IngestionFlowV2.{KeyAndValueMismatch, KeyAndValueMismatchedValuesException, V2IngestRequest}
-import hydra.kafka.algebras.KafkaClientAlgebra
+import hydra.kafka.algebras.{KafkaClientAlgebra, TestMetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.utils.FakeV2TopicMetadata
 import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
-import org.apache.avro.{Schema, SchemaBuilder}
+import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import scalacache.Cache
 import scalacache.guava.GuavaCache
 
+import java.time.Instant
 import scala.concurrent.ExecutionContext
 
 final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
@@ -35,20 +38,33 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
   private val testValPayload: String =
     s"""{"testField": true}"""
 
+  private val testValPayloadHavingTs: String =
+    s"""{"testTimestamp": 0}"""
+
   private val testKeySchema: Schema = SchemaBuilder.record("TestRecord")
     .fields().requiredString("id").endRecord()
 
   private val testValSchema: Schema = SchemaBuilder.record("TestRecord")
     .fields().requiredBoolean("testField").endRecord()
 
+  private val testValSchemaHavingTsField: Schema = SchemaBuilder.record("TestRecord")
+    .fields().name("testTimestamp").`type`(LogicalTypes.timestampMillis.addToSchema(Schema.create(Schema.Type.LONG)))
+    .noDefault
+    .endRecord
+
   implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
 
-  private def ingest(request: V2IngestRequest, altValueSchema: Option[Schema] = None): IO[KafkaClientAlgebra[IO]] = for {
+  private def ingest(request: V2IngestRequest, altValueSchema: Option[Schema] = None,
+                     valueSchema: Schema = testValSchema,
+                     createdDate: Option[Instant] = Some(Instant.now),
+                     timestampValidationCutoffDate: Instant = InstantUtils.dateStringToInstant("20230711")): IO[KafkaClientAlgebra[IO]] = for {
     schemaRegistry <- SchemaRegistry.test[IO]
     _ <- schemaRegistry.registerSchema(testSubject.value + "-key", testKeySchema)
-    _ <- schemaRegistry.registerSchema(testSubject.value + "-value", altValueSchema.getOrElse(testValSchema))
+    _ <- schemaRegistry.registerSchema(testSubject.value + "-value", altValueSchema.getOrElse(valueSchema))
     kafkaClient <- KafkaClientAlgebra.test[IO]
-    ingestFlow <- IO(new IngestionFlowV2[IO](schemaRegistry, kafkaClient, "https://schemaRegistry.notreal"))
+    m <- TestMetadataAlgebra()
+    _ <- FakeV2TopicMetadata.writeV2TopicMetadata(List(testSubject.value), m, createdDate)
+    ingestFlow <- IO(new IngestionFlowV2[IO](schemaRegistry, kafkaClient, "https://schemaRegistry.notreal", m, timestampValidationCutoffDate))
     _ <- ingestFlow.ingest(request, testSubject)
   } yield kafkaClient
 
@@ -170,6 +186,16 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
       .set("id","12345")
       .build()
     IngestionFlowV2.validateKeyAndValueSchemas(key, None) shouldBe a[Right[Throwable,Unit]]
+  }
+
+  it should "positive" in {
+    val testRequest = V2IngestRequest(testKeyPayload, testValPayloadHavingTs.some, ValidationStrategy.Strict.some, useSimpleJsonFormat = false)
+    ingest(testRequest, valueSchema = testValSchemaHavingTsField).flatMap { kafkaClient =>
+      kafkaClient.consumeMessages(testSubject.value, "test-consumer", commitOffsets = false).take(1).compile.toList.map { publishedMessages =>
+        val firstMessage = publishedMessages.head
+        (firstMessage._1.toString, firstMessage._2.get.toString) shouldBe(testKeyPayload, testValPayloadHavingTs)
+      }
+    }.unsafeRunSync()
   }
 
 }

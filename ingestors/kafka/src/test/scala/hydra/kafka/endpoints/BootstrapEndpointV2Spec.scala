@@ -117,6 +117,27 @@ final class BootstrapEndpointV2Spec
         .noDefault()
         .endRecord()
 
+    def getTestSchema(s: String,
+                      hasDefaultCreatedAt: Boolean = false,
+                      hasDefaultUpdatedAt: Boolean = false): Schema =
+      SchemaBuilder
+        .record(s)
+        .fields()
+        .name("test")
+        .doc("text")
+        .`type`()
+        .stringType()
+        .noDefault()
+        .name(RequiredField.CREATED_AT)
+        .doc("text")
+        .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+        .noDefault()
+        .name(RequiredField.UPDATED_AT)
+        .doc("text")
+        .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
+        .noDefault()
+        .endRecord()
+
     val badKeySchema: Schema =
     SchemaBuilder
       .record("key")
