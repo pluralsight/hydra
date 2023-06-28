@@ -167,7 +167,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     }
 
     s"[on-cutoff-date] required fields in value schema of a topic can have a default value" in {
-      implicit val createdDate: Instant = dateStringToInstant("20230619")
+      implicit val createdDate: Instant = defaultLoopHoleCutoffDate
 
       createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
       createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = None).attempt.map(_ shouldBe Right())
@@ -2144,6 +2144,8 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
   val topicMetadataKey     = TopicMetadataV2Key(subject)
   val topicMetadataValue   = topicMetadataRequest.toValue
 
+  val defaultLoopHoleCutoffDate: Instant = dateStringToInstant("20230619")
+
   implicit val contextShift: ContextShift[IO]   = IO.contextShift(ExecutionContext.global)
   implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
   implicit val timer: Timer[IO]                 = IO.timer(ExecutionContext.global)
@@ -2173,7 +2175,7 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
           retryPolicy,
           Subject.createValidated(metadataTopic).get,
           metadataAlgebraOpt.getOrElse(defaultMetadata),
-          dateStringToInstant("20230619")
+          defaultLoopHoleCutoffDate
         )
 
       TestServices(createTopicProgram, defaultSchemaRegistry, kafka)
