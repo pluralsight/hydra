@@ -17,8 +17,8 @@ import hydra.core.marshallers.GenericError
 import hydra.ingest.services.{IngestionFlow, IngestionFlowV2}
 import hydra.kafka.algebras.{KafkaClientAlgebra, TestMetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.utils.FakeV2TopicMetadata
-import org.apache.avro.SchemaBuilder
+import hydra.kafka.utils.TopicUtils
+import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -56,9 +56,10 @@ final class IngestionEndpointSpec
       sr <- SchemaRegistry.test[IO]
       _ <- sr.registerSchema("testtopic-value", simpleSchema)
     } yield sr).unsafeRunSync
+
     val metadata = (for {
       m <- TestMetadataAlgebra()
-      _ <- FakeV2TopicMetadata.writeV2TopicMetadata(List(testSubject.value), m, Some(Instant.now))
+      _ <- TopicUtils.updateTopicMetadata(List(testSubject.value), m, Instant.now)
     } yield m).unsafeRunSync
 
     new IngestionEndpoint(
@@ -106,7 +107,7 @@ final class IngestionEndpointSpec
       _ <- schemaRegistry.registerSchema("dvs.blah.composit-key", compositeKey)
       _ <- schemaRegistry.registerSchema("dvs.blah.composit-value", simpleSchema)
       m <- TestMetadataAlgebra()
-      _ <- FakeV2TopicMetadata.writeV2TopicMetadata(List(testSubject.value), m, Some(Instant.now))
+      _ <- TopicUtils.updateTopicMetadata(List(testSubject.value), m, Instant.now)
     } yield {
       new IngestionEndpoint(
         new IngestionFlow[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistry.notreal"),
