@@ -5,8 +5,9 @@ import cats.effect.{ConcurrentEffect, ContextShift, IO, Sync, Timer}
 import cats.syntax.all._
 import fs2.kafka.{Headers, Timestamp}
 import hydra.avro.registry.SchemaRegistry
-import hydra.common.{Constants, NotificationsTestSuite}
+import hydra.common.NotificationsTestSuite
 import hydra.common.alerting.sender.InternalNotificationSender
+import hydra.common.util.InstantUtils.dateStringToInstant
 import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, MetadataTopicsConfig, TagsConfig}
 import hydra.kafka.algebras.KafkaAdminAlgebra.Topic
 import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, Offset, Partition, PublishError, PublishResponse, TopicName}
@@ -61,7 +62,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers with NotificationsTest
         retry,
         metadataSubjectV2,
         metadata,
-        Constants.DEFAULT_LOOPHOLE_CUTOFF_DATE_FOR_TESTING
+        dateStringToInstant("20230619")
       )
       boot <- Bootstrap.make[IO](c, metadataConfig, consumersTopicConfig, consumerOffsetsOffsetsTopicConfig, kafkaAdmin, tagsTopicConfig)
       _ <- boot.bootstrapAll

@@ -26,7 +26,7 @@ import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import org.scalatest.matchers.should.Matchers
 import retry.{RetryPolicies, RetryPolicy}
 import eu.timepit.refined._
-import hydra.common.{Constants, NotificationsTestSuite}
+import hydra.common.NotificationsTestSuite
 import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.common.util.InstantUtils.dateStringToInstant
 import hydra.common.validation.ValidationError.ValidationCombinedErrors
@@ -158,29 +158,57 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
       } yield topic.get shouldBe Topic(subject.value, 1)
     }
 
-    Seq(
-      (Some(123L), Some(456L)) -> "createdAt & updatedAt",
-      (Some(123L), None) -> "createdAt",
-      (None, Some(456L)) -> "updatedAt"
-    ) foreach {
-      case ((createdAt, updatedAt), fields) =>
-        s"[pre-cutoff-date] $fields - required fields in value schema of a topic can have a default value" in {
-          implicit val createdDate: Option[Instant] = Some("20230101").map(dateStringToInstant)
+    s"[pre-cutoff-date] required fields in value schema of a topic can have a default value" in {
+      implicit val createdDate: Option[Instant] = Some("20230101").map(dateStringToInstant)
 
-          testDefaultLoopholeBeforeCutoff(createdAtDefaultValue = createdAt, updatedAtDefaultValue = updatedAt)
-        }
+      createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
+      createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = None).attempt.map(_ shouldBe Right())
+      createTopic(createdAtDefaultValue = None, updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
+    }
 
-        s"[on-cutoff-date] $fields - required fields in value schema of a topic can have a default value" in {
-          implicit val createdDate: Option[Instant] = Some("20230619").map(dateStringToInstant)
+    s"[on-cutoff-date] required fields in value schema of a topic can have a default value" in {
+      implicit val createdDate: Option[Instant] = Some("20230619").map(dateStringToInstant)
 
-          testDefaultLoopholeBeforeCutoff(createdAtDefaultValue = createdAt, updatedAtDefaultValue = updatedAt)
-        }
+      createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
+      createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = None).attempt.map(_ shouldBe Right())
+      createTopic(createdAtDefaultValue = None, updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
+    }
 
-        s"[post-cutoff-date] $fields - required fields in value schema of a topic cannot have a default value" in {
-          implicit val createdDate: Option[Instant] = Some("20230620").map(dateStringToInstant)
+    s"[post-cutoff-date] required fields in value schema of a topic cannot have a default value - createdAt & updatedAt" in {
+      implicit val createdDate: Option[Instant] = Some("20230620").map(dateStringToInstant)
+      val createdAt = Some(123L)
+      val updatedAt = Some(456L)
+      val schema = getSchema("val", createdAt, updatedAt)
 
-          testDefaultLoophole(createdAtDefaultValue = createdAt, updatedAtDefaultValue = updatedAt)
-        }
+      createTopic(createdAtDefaultValue = createdAt, updatedAtDefaultValue = updatedAt).attempt.map(_ shouldBe
+        ValidationCombinedErrors(List(
+          RequiredSchemaValueFieldWithDefaultValueError("createdAt", schema, "Entity").message,
+          RequiredSchemaValueFieldWithDefaultValueError("updatedAt", schema, "Entity").message
+        )).asLeft)
+    }
+
+    s"[post-cutoff-date] required fields in value schema of a topic cannot have a default value - createdAt" in {
+      implicit val createdDate: Option[Instant] = Some("20230620").map(dateStringToInstant)
+      val createdAt = Some(123L)
+      val schema = getSchema("val", createdAt, None)
+
+      createTopic(createdAtDefaultValue = createdAt, updatedAtDefaultValue = None).attempt.map(_ shouldBe
+        RequiredSchemaValueFieldWithDefaultValueError("createdAt", schema, "Entity").asLeft)
+    }
+
+    s"[post-cutoff-date] required fields in value schema of a topic cannot have a default value - updateAt" in {
+      implicit val createdDate: Option[Instant] = Some("20230620").map(dateStringToInstant)
+      val updatedAt = Some(456L)
+      val schema = getSchema("val", None, updatedAt)
+
+      createTopic(createdAtDefaultValue = None, updatedAtDefaultValue = updatedAt).attempt.map(_ shouldBe
+        RequiredSchemaValueFieldWithDefaultValueError("updatedAt", schema, "Entity").asLeft)
+    }
+
+    s"[post-cutoff-date] accept a topic where the required fields do not have a default value" in {
+      implicit val createdDate: Option[Instant] = Some("20230620").map(dateStringToInstant)
+
+      createTopic(createdAtDefaultValue = None, updatedAtDefaultValue = None).attempt.map(_ shouldBe Right())
     }
 
     "ingest metadata into the metadata topic" in {
@@ -2051,35 +2079,13 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
       result.attempt.map(_ shouldBe UnsupportedLogicalType(valueSchema.getField("timestamp"), "iso-datetime").asLeft)
     }
 
-    def testDefaultLoopholeBeforeCutoff(createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long])(implicit createdDate: Option[Instant]) =
-      (for {
-        m <- TestMetadataAlgebra()
-        _ <- FakeV2TopicMetadata.writeV2TopicMetadata(List(subject.value), m, createdDate)
-        ts <- initTestServices(metadataAlgebraOpt = Some(m))
-        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(createdAtDefaultValue, updatedAtDefaultValue), topicDetails, true)
-      } yield ()).attempt.map(_ shouldBe Right())
-
-    def testDefaultLoophole(createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long])(implicit createdDate: Option[Instant]) = {
-      val valueSchema = getSchema("val", createdAtDefaultValue, updatedAtDefaultValue)
-      val result = for {
+    def createTopic(createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long])(implicit createdDate: Option[Instant]) =
+      for {
         m <- TestMetadataAlgebra()
         _ <- FakeV2TopicMetadata.writeV2TopicMetadata(List(subject.value), m, createdDate)
         ts <- initTestServices(metadataAlgebraOpt = Some(m))
         _ <- ts.program.createTopic(subject, createTopicMetadataRequest(createdAtDefaultValue, updatedAtDefaultValue), topicDetails, true)
       } yield ()
-
-      (createdAtDefaultValue, updatedAtDefaultValue) match {
-        case (Some(_), Some(_)) =>
-          result.attempt.map(_ shouldBe ValidationCombinedErrors(List(
-            RequiredSchemaValueFieldWithDefaultValueError("createdAt", valueSchema, "Entity").message,
-            RequiredSchemaValueFieldWithDefaultValueError("updatedAt", valueSchema, "Entity").message)).asLeft)
-        case (Some(_), None)    =>
-          result.attempt.map(_ shouldBe RequiredSchemaValueFieldWithDefaultValueError("createdAt", valueSchema, "Entity").asLeft)
-        case (None, Some(_))    =>
-          result.attempt.map(_ shouldBe RequiredSchemaValueFieldWithDefaultValueError("updatedAt", valueSchema, "Entity").asLeft)
-        case _                  => result.attempt.map(_ shouldBe Left())
-      }
-    }
   }
 
   type Record = (GenericRecord, Option[GenericRecord], Option[Headers])
@@ -2167,7 +2173,7 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
           retryPolicy,
           Subject.createValidated(metadataTopic).get,
           metadataAlgebraOpt.getOrElse(defaultMetadata),
-          Constants.DEFAULT_LOOPHOLE_CUTOFF_DATE_FOR_TESTING
+          dateStringToInstant("20230619")
         )
 
       TestServices(createTopicProgram, defaultSchemaRegistry, kafka)

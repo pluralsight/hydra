@@ -16,19 +16,6 @@ import java.time.Instant
 
 object FakeV2TopicMetadata {
 
-  private def buildSchema(topic: String, upgrade: Boolean): Schema = {
-    val schemaStart = SchemaBuilder
-      .record("name" + topic.replace("-", "").replace(".", ""))
-      .fields()
-      .requiredString("id" + topic.replace("-", "").replace(".", ""))
-
-    if (upgrade && !topic.contains("-key")) {
-      schemaStart.nullableBoolean("upgrade", upgrade).endRecord()
-    } else {
-      schemaStart.endRecord()
-    }
-  }
-
   private def createTopicMetadataRequest(
                                           keySchema: Schema,
                                           valueSchema: Schema,
@@ -59,8 +46,8 @@ object FakeV2TopicMetadata {
                             createdDate: Option[Instant] = None
                           ): IO[List[Unit]] = {
     topics.traverse(topic => {
-      val keySchema = buildSchema(topic + "-key", false)
-      val valueSchema = buildSchema(topic + "-value", false)
+      val keySchema = SchemaBuilder.record(topic + "Key").fields.requiredInt("test").endRecord()
+      val valueSchema = SchemaBuilder.record(topic + "Value").fields.requiredInt("test").endRecord()
       val topicMetadataKey =
         TopicMetadataV2Key(Subject.createValidated(topic).get)
       val req = createTopicMetadataRequest(
@@ -77,16 +64,5 @@ object FakeV2TopicMetadata {
 
       metadataAlgebra.addMetadata(topicMetadataContainer)
     })
-  }
-
-  def registerTopics(topicNames: List[String],
-                     schemaAlgebra: SchemaRegistry[IO],
-                     registerKey: Boolean,
-                     upgrade: Boolean): IO[List[SchemaId]] = {
-    topicNames
-      .flatMap(topic =>
-        if (registerKey) List(topic + "-key", topic + "-value") else List(topic + "-value"))
-      .traverse(topic =>
-        schemaAlgebra.registerSchema(topic, buildSchema(topic, upgrade)))
   }
 }

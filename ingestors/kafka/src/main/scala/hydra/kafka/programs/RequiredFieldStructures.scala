@@ -12,12 +12,12 @@ object RequiredFieldStructures {
     schema.getFields.asScala.toList.forall(d => Option(d.doc()).nonEmpty)
 
   def createdAtFieldValidator(schema: Schema): Boolean =
-    schema.getFields.asScala.toList.find(_.name == RequiredField.CREATED_AT).exists(checkFields)
+    schema.getFields.asScala.toList.find(_.name == RequiredField.CREATED_AT).exists(validateTimestampType)
 
   def updatedAtFieldValidator(schema: Schema): Boolean =
-    schema.getFields.asScala.toList.find(_.name == RequiredField.UPDATED_AT).exists(checkFields)
+    schema.getFields.asScala.toList.find(_.name == RequiredField.UPDATED_AT).exists(validateTimestampType)
 
-  private def checkFields(field: Schema.Field) =
+  private def validateTimestampType(field: Schema.Field) =
     field.schema.getLogicalType == LogicalTypes.timestampMillis && field.schema.getType == Type.LONG
 
   def defaultFieldOfRequiredFieldValidator(schema: Schema, field: String, isCreatedPostCutoffDate: Boolean): Boolean = {

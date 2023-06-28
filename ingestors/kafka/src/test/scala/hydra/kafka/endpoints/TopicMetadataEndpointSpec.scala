@@ -8,10 +8,11 @@ import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import cats.Applicative
 import cats.effect.{Concurrent, ContextShift, IO, Sync, Timer}
 import hydra.avro.registry.SchemaRegistry
-import hydra.common.{Constants, NotificationsTestSuite}
+import hydra.common.NotificationsTestSuite
 import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
+import hydra.common.util.InstantUtils.dateStringToInstant
 import hydra.core.http.CorsSupport
 import hydra.core.http.security.entity.AwsConfig
 import hydra.core.http.security.{AccessControlService, AwsSecurityService}
@@ -101,7 +102,7 @@ class TopicMetadataEndpointSpec
         retryPolicy,
         Subject.createValidated("dvs.hello-world").get,
         m,
-        Constants.DEFAULT_LOOPHOLE_CUTOFF_DATE_FOR_TESTING
+        dateStringToInstant("20230619")
       )
   }
 
