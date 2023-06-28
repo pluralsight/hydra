@@ -37,7 +37,7 @@ import scala.concurrent.ExecutionContext
 import hydra.kafka.model.TopicMetadataV2Request.NumPartitions
 import hydra.kafka.programs.CreateTopicProgram.MetadataOnlyTopicDoesNotExist
 import hydra.kafka.programs.TopicSchemaError._
-import hydra.kafka.utils.FakeV2TopicMetadata
+import hydra.kafka.utils.TopicUtils
 import org.apache.avro.SchemaBuilder.{FieldAssembler, GenericDefault}
 import org.apache.kafka.common.TopicPartition
 import org.scalatest.freespec.AsyncFreeSpec
@@ -159,7 +159,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     }
 
     s"[pre-cutoff-date] required fields in value schema of a topic can have a default value" in {
-      implicit val createdDate: Option[Instant] = Some("20230101").map(dateStringToInstant)
+      implicit val createdDate: Instant = dateStringToInstant("20230101")
 
       createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
       createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = None).attempt.map(_ shouldBe Right())
@@ -167,7 +167,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     }
 
     s"[on-cutoff-date] required fields in value schema of a topic can have a default value" in {
-      implicit val createdDate: Option[Instant] = Some("20230619").map(dateStringToInstant)
+      implicit val createdDate: Instant = dateStringToInstant("20230619")
 
       createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
       createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = None).attempt.map(_ shouldBe Right())
@@ -175,7 +175,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     }
 
     s"[post-cutoff-date] required fields in value schema of a topic cannot have a default value - createdAt & updatedAt" in {
-      implicit val createdDate: Option[Instant] = Some("20230620").map(dateStringToInstant)
+      implicit val createdDate: Instant = dateStringToInstant("20230620")
       val createdAt = Some(123L)
       val updatedAt = Some(456L)
       val schema = getSchema("val", createdAt, updatedAt)
@@ -188,7 +188,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     }
 
     s"[post-cutoff-date] required fields in value schema of a topic cannot have a default value - createdAt" in {
-      implicit val createdDate: Option[Instant] = Some("20230620").map(dateStringToInstant)
+      implicit val createdDate: Instant = dateStringToInstant("20230620")
       val createdAt = Some(123L)
       val schema = getSchema("val", createdAt, None)
 
@@ -197,7 +197,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     }
 
     s"[post-cutoff-date] required fields in value schema of a topic cannot have a default value - updateAt" in {
-      implicit val createdDate: Option[Instant] = Some("20230620").map(dateStringToInstant)
+      implicit val createdDate: Instant = dateStringToInstant("20230620")
       val updatedAt = Some(456L)
       val schema = getSchema("val", None, updatedAt)
 
@@ -206,7 +206,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     }
 
     s"[post-cutoff-date] accept a topic where the required fields do not have a default value" in {
-      implicit val createdDate: Option[Instant] = Some("20230620").map(dateStringToInstant)
+      implicit val createdDate: Instant = dateStringToInstant("20230620")
 
       createTopic(createdAtDefaultValue = None, updatedAtDefaultValue = None).attempt.map(_ shouldBe Right())
     }
@@ -2079,10 +2079,10 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
       result.attempt.map(_ shouldBe UnsupportedLogicalType(valueSchema.getField("timestamp"), "iso-datetime").asLeft)
     }
 
-    def createTopic(createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long])(implicit createdDate: Option[Instant]) =
+    def createTopic(createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long])(implicit createdDate: Instant) =
       for {
         m <- TestMetadataAlgebra()
-        _ <- FakeV2TopicMetadata.writeV2TopicMetadata(List(subject.value), m, createdDate)
+        _ <- TopicUtils.updateTopicMetadata(List(subject.value), m, createdDate)
         ts <- initTestServices(metadataAlgebraOpt = Some(m))
         _ <- ts.program.createTopic(subject, createTopicMetadataRequest(createdAtDefaultValue, updatedAtDefaultValue), topicDetails, true)
       } yield ()
