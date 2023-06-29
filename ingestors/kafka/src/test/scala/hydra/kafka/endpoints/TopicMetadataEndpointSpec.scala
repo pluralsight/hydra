@@ -39,6 +39,7 @@ import org.scalamock.scalatest.AsyncMockFactory
 import retry.{RetryPolicies, RetryPolicy}
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 
 class TopicMetadataEndpointSpec
@@ -102,7 +103,7 @@ class TopicMetadataEndpointSpec
         retryPolicy,
         Subject.createValidated("dvs.hello-world").get,
         m,
-        dateStringToInstant("20230619")
+        Instant.now().plus(2,ChronoUnit.DAYS)
       )
   }
 
