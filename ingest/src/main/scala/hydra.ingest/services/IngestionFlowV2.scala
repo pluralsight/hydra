@@ -79,8 +79,8 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
 
     for {
       metadata <- metadata.getMetadataFor(topic)
-      topicCreationDate = metadata.map(_.value.createdDate).getOrElse(Instant.now())
-      useTimestampValidation = topicCreationDate.isAfter(timestampValidationCutoffDate)
+      schemaCreationDate = metadata.map(_.value.createdDate).getOrElse(Instant.now())
+      useTimestampValidation = schemaCreationDate.isAfter(timestampValidationCutoffDate)
       kSchema <- getSchemaWrapper(topic, isKey = true)
       vSchema <- getSchemaWrapper(topic, isKey = false)
       k <- MonadError[F, Throwable].fromTry(

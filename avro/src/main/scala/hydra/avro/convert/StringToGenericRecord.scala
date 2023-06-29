@@ -78,7 +78,7 @@ object StringToGenericRecord {
       reader.read(null, decoder)
     }.flatTap(checkLogicalTypes(_,useTimestampValidation))
 
-    def toGenericRecord(schema: Schema, useStrictValidation: Boolean, useTimestampValidation: Boolean = false): Try[GenericRecord] = {
+    def toGenericRecord(schema: Schema, useStrictValidation: Boolean, useTimestampValidation: Boolean): Try[GenericRecord] = {
       (if (useStrictValidation) { checkStrictValidation(s, schema) } else Success()).flatMap { _ =>
         toGenericRecordPostValidation(schema, useTimestampValidation)
       }
