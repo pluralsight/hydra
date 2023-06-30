@@ -8,13 +8,16 @@ import akka.testkit.TestKit
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.util.SchemaWrapper
+import hydra.common.util.InstantUtils
 import hydra.core.http.security.{AccessControlService, AwsSecurityService}
 import hydra.core.http.security.entity.AwsConfig
 import hydra.core.ingest.RequestParams
 import hydra.core.ingest.RequestParams._
 import hydra.core.marshallers.GenericError
 import hydra.ingest.services.{IngestionFlow, IngestionFlowV2}
-import hydra.kafka.algebras.KafkaClientAlgebra
+import hydra.ingest.utils.TopicUtils
+import hydra.kafka.algebras.{KafkaClientAlgebra, TestMetadataAlgebra}
+import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should.Matchers
@@ -24,6 +27,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import scalacache.Cache
 import scalacache.guava.GuavaCache
 
+import java.time.Instant
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
@@ -41,6 +45,8 @@ final class IngestionEndpointSpec
   implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
 
   private val noAuth = new AccessControlService[IO](mock[AwsSecurityService[IO]], AwsConfig(None, isAwsIamSecurityEnabled = false))
+  private val testSubject = Subject.createValidated("dvs.test.v0.Testing").get
+  private val timestampValidationCutoffDate: Instant = InstantUtils.dateStringToInstant("20230711")
 
   import scalacache.Mode
   implicit val mode: Mode[IO] = scalacache.CatsEffect.modes.async
@@ -50,9 +56,14 @@ final class IngestionEndpointSpec
       sr <- SchemaRegistry.test[IO]
       _ <- sr.registerSchema("testtopic-value", simpleSchema)
     } yield sr).unsafeRunSync
+    val metadata = (for {
+      m <- TestMetadataAlgebra()
+      _ <- TopicUtils.updateTopicMetadata(List(testSubject.value), m, Instant.now)
+    } yield m).unsafeRunSync
     new IngestionEndpoint(
       new IngestionFlow[IO](schemaReg, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistryUrl.notreal"),
-      new IngestionFlowV2[IO](SchemaRegistry.test[IO].unsafeRunSync, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistryUrl.notreal"), noAuth
+      new IngestionFlowV2[IO](SchemaRegistry.test[IO].unsafeRunSync, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistryUrl.notreal",
+        metadata, timestampValidationCutoffDate), noAuth
     ).route
   }
 
@@ -93,10 +104,12 @@ final class IngestionEndpointSpec
       _ <- schemaRegistry.registerSchema("dvs.blah.timestamps2-value", timestampsSchemaKey)
       _ <- schemaRegistry.registerSchema("dvs.blah.composit-key", compositeKey)
       _ <- schemaRegistry.registerSchema("dvs.blah.composit-value", simpleSchema)
+      m <- TestMetadataAlgebra()
+      _ <- TopicUtils.updateTopicMetadata(List(testSubject.value), m, Instant.now)
     } yield {
       new IngestionEndpoint(
         new IngestionFlow[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistry.notreal"),
-        new IngestionFlowV2[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistry.notreal"),
+        new IngestionFlowV2[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistry.notreal", m, timestampValidationCutoffDate),
         noAuth
       ).route
     }).unsafeRunSync()

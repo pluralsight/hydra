@@ -281,14 +281,14 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     the[InvalidLogicalTypeErrorForTimeStamp] thrownBy
       s"""{"testTimestamp": 0}""".
         toGenericRecord(timestampSchema, useStrictValidation = true, useTimestampValidation = true).get should have message
-      "Invalid value for logical type - timestamp-millis. Value should be greater than 0 but received 0"
+      "Invalid value for field 'testTimestamp' having logical type - timestamp-millis. Value should be greater than 0 but received 0"
   }
 
   it should "throw an InvalidLogicalTypeErrorForTimeStamp for field with logical type of timestamp-millis having value -2 with timestampValidation enabled" in {
     the[InvalidLogicalTypeErrorForTimeStamp] thrownBy
       s"""{"testTimestamp": -2}""".
         toGenericRecord(timestampSchema, useStrictValidation = true, useTimestampValidation = true).get should have message
-      "Invalid value for logical type - timestamp-millis. Value should be greater than 0 but received -2"
+      "Invalid value for field 'testTimestamp' having logical type - timestamp-millis. Value should be greater than 0 but received -2"
   }
 
   it should "accept a logical field type of timestamp-millis having a value 0 with timestampValidation disabled" in {

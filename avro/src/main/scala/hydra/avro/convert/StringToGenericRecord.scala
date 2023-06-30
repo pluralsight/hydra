@@ -20,8 +20,8 @@ object StringToGenericRecord {
     s"Invalid logical type. Expected $expected but received $received"
   )
 
-  final case class InvalidLogicalTypeErrorForTimeStamp(received: AnyRef) extends RuntimeException(
-    s"Invalid value for logical type - timestamp-millis. Value should be greater than 0 but received $received"
+  final case class InvalidLogicalTypeErrorForTimeStamp(fieldName: String, received: AnyRef) extends RuntimeException(
+    s"Invalid value for field '$fieldName' having logical type - timestamp-millis. Value should be greater than 0 but received $received"
   )
 
   import collection.JavaConverters._
@@ -57,18 +57,18 @@ object StringToGenericRecord {
 
     private def checkLogicalTypes(record: GenericRecord, useTimestampValidation: Boolean): Try[Unit] = {
       import collection.JavaConverters._
-      def checkAll(avroField: AnyRef, fieldSchema: Option[Schema]): Try[Unit] = avroField match {
+      def checkAll(avroField: AnyRef, fieldSchema: Option[Schema], fieldName: String): Try[Unit] = avroField match {
         case g: GenericRecord => g.getSchema.getFields.asScala.toList
-          .traverse(f => checkAll(g.get(f.name), f.schema.some)).void
+          .traverse(f => checkAll(g.get(f.name), f.schema.some, f.name)).void
         case u: Utf8 if fieldSchema.exists(f => Option(f.getLogicalType).exists(_.getName == LogicalTypes.uuid.getName)) =>
           if (isUuidValid(u.toString)) Success(()) else Failure(InvalidLogicalTypeError("UUID", u.toString))
         case l: java.lang.Long if useTimestampValidation &&
           fieldSchema.exists(f => Option(f.getLogicalType).exists(_.getName == LogicalTypes.timestampMillis().getName)) =>
-          if (l > 0) Success(()) else Failure(InvalidLogicalTypeErrorForTimeStamp(l.toString))
+          if (l > 0) Success(()) else Failure(InvalidLogicalTypeErrorForTimeStamp(fieldName, l.toString))
         case _ => Success(())
       }
       val fields = record.getSchema.getFields.asScala.toList
-      fields.traverse(f => checkAll(record.get(f.name), f.schema.some)).void
+      fields.traverse(f => checkAll(record.get(f.name), f.schema.some, f.name)).void
     }
 
     private[convert] def toGenericRecordPostValidation(schema: Schema, useTimestampValidation: Boolean): Try[GenericRecord] = Try {

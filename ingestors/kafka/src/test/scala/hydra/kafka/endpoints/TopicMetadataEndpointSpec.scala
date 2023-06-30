@@ -117,11 +117,11 @@ class TopicMetadataEndpointSpec
         .name(RequiredField.CREATED_AT)
         .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .withDefault(Instant.now().toEpochMilli)
+        .noDefault()
         .name(RequiredField.UPDATED_AT)
         .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .withDefault(Instant.now().toEpochMilli)
+        .noDefault()
         .endRecord()
     }
 
