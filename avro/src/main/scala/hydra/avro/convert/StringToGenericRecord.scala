@@ -20,6 +20,10 @@ object StringToGenericRecord {
     s"Invalid logical type. Expected $expected but received $received"
   )
 
+  final case class InvalidLogicalTypeErrorForTimeStamp(received: AnyRef) extends RuntimeException(
+    s"Invalid value for logical type - timestamp-millis. Value should be greater than 0 but received $received"
+  )
+
   import collection.JavaConverters._
   private def getExtraFields(json: JsValue, schema: Schema): List[String] = json match {
     case JsObject(fields) if schema.getType == Schema.Type.RECORD =>
@@ -51,29 +55,32 @@ object StringToGenericRecord {
     private def isUuidValid(s: String): Boolean =
       Try(UUID.fromString(s)).isSuccess
 
-    private def checkLogicalTypes(record: GenericRecord): Try[Unit] = {
+    private def checkLogicalTypes(record: GenericRecord, useTimestampValidation: Boolean): Try[Unit] = {
       import collection.JavaConverters._
       def checkAll(avroField: AnyRef, fieldSchema: Option[Schema]): Try[Unit] = avroField match {
         case g: GenericRecord => g.getSchema.getFields.asScala.toList
           .traverse(f => checkAll(g.get(f.name), f.schema.some)).void
         case u: Utf8 if fieldSchema.exists(f => Option(f.getLogicalType).exists(_.getName == LogicalTypes.uuid.getName)) =>
           if (isUuidValid(u.toString)) Success(()) else Failure(InvalidLogicalTypeError("UUID", u.toString))
+        case l: java.lang.Long if useTimestampValidation &&
+          fieldSchema.exists(f => Option(f.getLogicalType).exists(_.getName == LogicalTypes.timestampMillis().getName)) =>
+          if (l > 0) Success(()) else Failure(InvalidLogicalTypeErrorForTimeStamp(l.toString))
         case _ => Success(())
       }
       val fields = record.getSchema.getFields.asScala.toList
       fields.traverse(f => checkAll(record.get(f.name), f.schema.some)).void
     }
 
-    private[convert] def toGenericRecordPostValidation(schema: Schema): Try[GenericRecord] = Try {
+    private[convert] def toGenericRecordPostValidation(schema: Schema, useTimestampValidation: Boolean): Try[GenericRecord] = Try {
       val decoderFactory = new DecoderFactory
       val decoder = decoderFactory.jsonDecoder(schema, s)
       val reader = new GenericRecordExceptionConverter[GenericRecord](schema)
       reader.read(null, decoder)
-    }.flatTap(checkLogicalTypes)
+    }.flatTap(checkLogicalTypes(_,useTimestampValidation))
 
-    def toGenericRecord(schema: Schema, useStrictValidation: Boolean): Try[GenericRecord] = {
+    def toGenericRecord(schema: Schema, useStrictValidation: Boolean, useTimestampValidation: Boolean): Try[GenericRecord] = {
       (if (useStrictValidation) { checkStrictValidation(s, schema) } else Success()).flatMap { _ =>
-        toGenericRecordPostValidation(schema)
+        toGenericRecordPostValidation(schema, useTimestampValidation)
       }
     }
   }

@@ -1,7 +1,6 @@
 package hydra.ingest.services
 
 import java.io.IOException
-
 import cats.MonadError
 import cats.syntax.all._
 import fs2.kafka.{Header, Headers}
@@ -9,7 +8,7 @@ import hydra.avro.registry.SchemaRegistry
 import hydra.avro.resource.SchemaResourceLoader.SchemaNotFoundException
 import hydra.avro.util.SchemaWrapper
 import hydra.core.transport.ValidationStrategy
-import hydra.kafka.algebras.KafkaClientAlgebra
+import hydra.kafka.algebras.{KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishResponse
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.Schema
@@ -18,6 +17,7 @@ import scalacache._
 import scalacache.guava._
 import scalacache.memoization._
 
+import java.time.Instant
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters.asScalaBufferConverter
 import scala.util.{Failure, Try}
@@ -25,7 +25,9 @@ import scala.util.{Failure, Try}
 final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
                                                                     schemaRegistry: SchemaRegistry[F],
                                                                     kafkaClient: KafkaClientAlgebra[F],
-                                                                    schemaRegistryBaseUrl: String)
+                                                                    schemaRegistryBaseUrl: String,
+                                                                    metadata: MetadataAlgebra[F],
+                                                                    timestampValidationCutoffDate: Instant)
                                                                     (implicit guavaCache: Cache[SchemaWrapper]){
 
   import IngestionFlowV2._
@@ -66,19 +68,22 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
 
   private def getSchemas(request: V2IngestRequest, topic: Subject): F[(GenericRecord, Option[GenericRecord])] = {
     val useStrictValidation = request.validationStrategy.getOrElse(ValidationStrategy.Strict) == ValidationStrategy.Strict
-    def getRecord(payload: String, schema: Schema): Try[GenericRecord] = if (request.useSimpleJsonFormat) {
-      payload.toGenericRecordSimple(schema, useStrictValidation)
+    def getRecord(payload: String, schema: Schema, useTimestampValidation: Boolean): Try[GenericRecord] = if (request.useSimpleJsonFormat) {
+      payload.toGenericRecordSimple(schema, useStrictValidation, useTimestampValidation)
     } else {
-      payload.toGenericRecord(schema, useStrictValidation)
+      payload.toGenericRecord(schema, useStrictValidation, useTimestampValidation)
     }
 
     for {
+      metadata <- metadata.getMetadataFor(topic)
+      schemaCreationDate = metadata.map(_.value.createdDate).getOrElse(Instant.now())
+      useTimestampValidation = schemaCreationDate.isAfter(timestampValidationCutoffDate)
       kSchema <- getSchemaWrapper(topic, isKey = true)
       vSchema <- getSchemaWrapper(topic, isKey = false)
       k <- MonadError[F, Throwable].fromTry(
-        getRecord(request.keyPayload, kSchema.schema).recoverWith(recover(topic, isKey = true)))
+        getRecord(request.keyPayload, kSchema.schema, useTimestampValidation).recoverWith(recover(topic, isKey = true)))
       v <- MonadError[F, Throwable].fromTry(
-        request.valPayload.traverse(getRecord(_, vSchema.schema)).recoverWith(recover(topic, isKey = false)))
+        request.valPayload.traverse(getRecord(_, vSchema.schema, useTimestampValidation)).recoverWith(recover(topic, isKey = false)))
     } yield (k, v)
   }
 
