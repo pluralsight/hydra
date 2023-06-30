@@ -4,11 +4,13 @@ import cats.syntax.all._
 import ciris.{ConfigDecoder, ConfigValue, env}
 import hydra.common.config.KafkaConfigUtils.{KafkaClientSecurityConfig, SchemaRegistrySecurityConfig, kafkaClientSecurityConfig, schemaRegistrySecurityConfig}
 import eu.timepit.refined.types.string.NonEmptyString
+import hydra.common.util.InstantUtils.dateStringToInstant
 import hydra.core.http.security.entity.AwsConfig
 import hydra.kafka.algebras.KafkaClientAlgebra.ConsumerGroup
 import hydra.kafka.model.ContactMethod
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 
+import java.time.Instant
 import scala.concurrent.duration._
 
 object AppConfig {
@@ -68,8 +70,12 @@ object AppConfig {
       bootstrapServers: String,
       defaultNumPartions: Int,
       defaultReplicationFactor: Short,
-      defaultMinInsyncReplicas: Short
+      defaultMinInsyncReplicas: Short,
+      timestampValidationCutoffDate: Instant
   )
+
+  private implicit val dateStringToInstantDecoder: ConfigDecoder[String, Instant] =
+    ConfigDecoder.identity[String].mapOption("Instant")(d => Some(dateStringToInstant(d)))
 
   private val createTopicConfig: ConfigValue[CreateTopicConfig] =
     (
@@ -82,7 +88,10 @@ object AppConfig {
       env("HYDRA_KAFKA_PRODUCER_BOOTSTRAP_SERVERS").as[String],
       env("HYDRA_DEFAULT_PARTIONS").as[Int].default(10),
       env("HYDRA_REPLICATION_FACTOR").as[Short].default(3),
-      env("HYDRA_MIN_INSYNC_REPLICAS").as[Short].default(2)
+      env("HYDRA_MIN_INSYNC_REPLICAS").as[Short].default(2),
+      env("TIMESTAMP_VALIDATION_CUTOFF_DATE_IN_YYYYMMDD")
+        .as[Instant]
+        .default(dateStringToInstant("20230711"))
       ).parMapN(CreateTopicConfig)
 
   private implicit val subjectConfigDecoder: ConfigDecoder[String, Subject] =
