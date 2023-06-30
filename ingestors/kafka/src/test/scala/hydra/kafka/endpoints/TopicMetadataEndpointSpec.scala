@@ -32,10 +32,9 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.ExecutionContext
-import hydra.kafka.programs.{CreateTopicProgram, KeyAndValueSchemaV2Validator}
+import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
-import org.scalamock.scalatest.AsyncMockFactory
 import retry.{RetryPolicies, RetryPolicy}
 
 import java.time.Instant
@@ -119,11 +118,11 @@ class TopicMetadataEndpointSpec
         .name(RequiredField.CREATED_AT)
         .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .withDefault(Instant.now().toEpochMilli)
+        .noDefault()
         .name(RequiredField.UPDATED_AT)
         .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .withDefault(Instant.now().toEpochMilli)
+        .noDefault()
         .endRecord()
     }
 
@@ -229,7 +228,7 @@ class TopicMetadataEndpointSpec
 
     "sends back an error response if topic already exists" in {
       implicit val timeout = RouteTestTimeout(5.seconds)
-      createCustomTopic("testExisting")(kafkaConfig)
+      EmbeddedKafka.createCustomTopic("testExisting")(kafkaConfig)
       val config = Map(
         "min.insync.replicas" -> "1",
         "cleanup.policy" -> "compact",
