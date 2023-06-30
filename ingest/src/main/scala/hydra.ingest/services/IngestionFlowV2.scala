@@ -58,6 +58,8 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
         Failure(AvroConversionAugmentedException(s"${e.getClass.getName}: ${e.getMessage} [$location]"))
       case e: InvalidLogicalTypeError =>
         Failure(AvroConversionAugmentedException(s"${e.getClass.getName}: ${e.getMessage} [$location]"))
+      case e: InvalidLogicalTypeErrorForTimeStamp =>
+        Failure(AvroConversionAugmentedException(s"${e.getClass.getName}: ${e.getMessage} [$location]"))
       case e: IOException =>
         Failure(AvroConversionAugmentedException(s"${e.getClass.getName}: ${e.getMessage} [$location]"))
       case e =>
