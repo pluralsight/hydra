@@ -101,6 +101,11 @@ object Dependencies {
       "software.amazon.awssdk" % "arns" % awsSdkVersion,
       "software.amazon.awssdk" % "regions" % awsSdkVersion,
       "software.amazon.awssdk" % "auth" % awsSdkVersion
+    ).map(
+      _.excludeAll(
+        ExclusionRule(organization = "org.codehaus.jackson"),
+        ExclusionRule(organization = "com.fasterxml.jackson.core")
+      )
     )
 
     val logging = Seq(
