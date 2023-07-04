@@ -33,6 +33,7 @@ object Dependencies {
   val vulcanVersion = "1.2.0"
   val scalaTestEmbeddedRedisVersion = "0.4.0"
   val scalaChillBijectionVersion = "0.10.0"
+  val awsSdkVersion = "2.20.97"
 
   object Compile {
 
@@ -94,7 +95,13 @@ object Dependencies {
 
     val awsMskIamAuth = Seq("software.amazon.msk" % "aws-msk-iam-auth" % "1.1.4")
 
-    val awsSdk = Seq("software.amazon.awssdk" % "aws-sdk-java" % "2.18.21")
+    val awsSdk = Seq(
+      "software.amazon.awssdk" % "sts" % awsSdkVersion,
+      "software.amazon.awssdk" % "iam" % awsSdkVersion,
+      "software.amazon.awssdk" % "arns" % awsSdkVersion,
+      "software.amazon.awssdk" % "regions" % awsSdkVersion,
+      "software.amazon.awssdk" % "auth" % awsSdkVersion
+    )
 
     val logging = Seq(
       "org.apache.logging.log4j" % "log4j-slf4j-impl" % log4jVersion,
