@@ -9,7 +9,6 @@ import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.common.NotificationsTestSuite
 import hydra.common.alerting.sender.InternalNotificationSender
-import hydra.common.util.InstantUtils.dateStringToInstant
 import hydra.core.http.CorsSupport
 import hydra.core.http.security.entity.AwsConfig
 import hydra.core.http.security.{AccessControlService, AwsSecurityService}
@@ -65,7 +64,7 @@ final class BootstrapEndpointV2Spec
         retryPolicy,
         Subject.createValidated("dvs.hello-world").get,
         m,
-        dateStringToInstant("20230619")
+        Instant.parse("2023-07-05T00:00:00Z")
       ),
       TopicDetails(1, 1, 1),
       t,

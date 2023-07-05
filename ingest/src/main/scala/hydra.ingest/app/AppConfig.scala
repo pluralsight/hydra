@@ -4,13 +4,13 @@ import cats.syntax.all._
 import ciris.{ConfigDecoder, ConfigValue, env}
 import hydra.common.config.KafkaConfigUtils.{KafkaClientSecurityConfig, SchemaRegistrySecurityConfig, kafkaClientSecurityConfig, schemaRegistrySecurityConfig}
 import eu.timepit.refined.types.string.NonEmptyString
-import hydra.common.util.InstantUtils.dateStringToInstant
 import hydra.core.http.security.entity.AwsConfig
 import hydra.kafka.algebras.KafkaClientAlgebra.ConsumerGroup
 import hydra.kafka.model.ContactMethod
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 
-import java.time.Instant
+import java.time.format.DateTimeFormatter
+import java.time.{Instant, LocalDate, ZoneId}
 import scala.concurrent.duration._
 
 object AppConfig {
@@ -74,8 +74,13 @@ object AppConfig {
       defaultLoopHoleCutoffDate: Instant
   )
 
-  private implicit val dateStringToInstantDecoder: ConfigDecoder[String, Instant] =
-    ConfigDecoder.identity[String].mapOption("Instant")(d => Some(dateStringToInstant(d)))
+  private[app] implicit val dateStringToInstantDecoder: ConfigDecoder[String, Instant] =
+    ConfigDecoder.identity[String].mapOption("Instant")(date =>
+      Some(LocalDate
+        .parse(date, DateTimeFormatter.BASIC_ISO_DATE)
+        .atStartOfDay(ZoneId.of("UTC"))
+        .toInstant)
+    )
 
   private val createTopicConfig: ConfigValue[CreateTopicConfig] =
     (
@@ -91,7 +96,7 @@ object AppConfig {
       env("HYDRA_MIN_INSYNC_REPLICAS").as[Short].default(2),
       env("DEFAULT_LOOPHOLE_CUTOFF_DATE_IN_YYYYMMDD")
         .as[Instant]
-        .default(dateStringToInstant("20230711"))
+        .default(Instant.parse("2023-07-11T00:00:00Z"))
       ).parMapN(CreateTopicConfig)
 
   private implicit val subjectConfigDecoder: ConfigDecoder[String, Subject] =

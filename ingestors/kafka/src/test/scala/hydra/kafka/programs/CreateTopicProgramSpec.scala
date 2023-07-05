@@ -28,7 +28,6 @@ import retry.{RetryPolicies, RetryPolicy}
 import eu.timepit.refined._
 import hydra.common.NotificationsTestSuite
 import hydra.common.alerting.sender.InternalNotificationSender
-import hydra.common.util.InstantUtils.dateStringToInstant
 import hydra.common.validation.ValidationError.ValidationCombinedErrors
 import hydra.kafka.IOSuite
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
@@ -159,7 +158,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     }
 
     s"[pre-cutoff-date] required fields in value schema of a topic can have a default value" in {
-      implicit val createdDate: Instant = dateStringToInstant("20230101")
+      implicit val createdDate: Instant = Instant.parse("2023-01-01T00:00:00Z")
 
       createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
       createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = None).attempt.map(_ shouldBe Right())
@@ -175,7 +174,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     }
 
     s"[post-cutoff-date] required fields in value schema of a topic cannot have a default value - createdAt & updatedAt" in {
-      implicit val createdDate: Instant = dateStringToInstant("20230620")
+      implicit val createdDate: Instant = Instant.parse("2023-07-07T00:00:00Z")
       val createdAt = Some(123L)
       val updatedAt = Some(456L)
       val schema = getSchema("val", createdAt, updatedAt)
@@ -188,7 +187,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     }
 
     s"[post-cutoff-date] required fields in value schema of a topic cannot have a default value - createdAt" in {
-      implicit val createdDate: Instant = dateStringToInstant("20230620")
+      implicit val createdDate: Instant = Instant.parse("2023-07-07T00:00:00Z")
       val createdAt = Some(123L)
       val schema = getSchema("val", createdAt, None)
 
@@ -197,7 +196,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     }
 
     s"[post-cutoff-date] required fields in value schema of a topic cannot have a default value - updateAt" in {
-      implicit val createdDate: Instant = dateStringToInstant("20230620")
+      implicit val createdDate: Instant = Instant.parse("2023-07-07T00:00:00Z")
       val updatedAt = Some(456L)
       val schema = getSchema("val", None, updatedAt)
 
@@ -206,7 +205,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     }
 
     s"[post-cutoff-date] accept a topic where the required fields do not have a default value" in {
-      implicit val createdDate: Instant = dateStringToInstant("20230620")
+      implicit val createdDate: Instant = Instant.parse("2023-07-07T00:00:00Z")
 
       createTopic(createdAtDefaultValue = None, updatedAtDefaultValue = None).attempt.map(_ shouldBe Right())
     }
@@ -2144,7 +2143,7 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
   val topicMetadataKey     = TopicMetadataV2Key(subject)
   val topicMetadataValue   = topicMetadataRequest.toValue
 
-  val defaultLoopHoleCutoffDate: Instant = dateStringToInstant("20230619")
+  val defaultLoopHoleCutoffDate: Instant = Instant.parse("2023-07-05T00:00:00Z")
 
   implicit val contextShift: ContextShift[IO]   = IO.contextShift(ExecutionContext.global)
   implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect

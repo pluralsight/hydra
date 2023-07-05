@@ -7,7 +7,6 @@ import fs2.kafka.{Headers, Timestamp}
 import hydra.avro.registry.SchemaRegistry
 import hydra.common.NotificationsTestSuite
 import hydra.common.alerting.sender.InternalNotificationSender
-import hydra.common.util.InstantUtils.dateStringToInstant
 import hydra.ingest.app.AppConfig.{ConsumerOffsetsOffsetsTopicConfig, DVSConsumersTopicConfig, MetadataTopicsConfig, TagsConfig}
 import hydra.kafka.algebras.KafkaAdminAlgebra.Topic
 import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, Offset, Partition, PublishError, PublishResponse, TopicName}
@@ -23,6 +22,8 @@ import org.apache.kafka.common.TopicPartition
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import retry.RetryPolicies
+
+import java.time.Instant
 
 class BootstrapSpec extends AnyWordSpecLike with Matchers with NotificationsTestSuite {
 
@@ -62,7 +63,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers with NotificationsTest
         retry,
         metadataSubjectV2,
         metadata,
-        dateStringToInstant("20230619")
+        Instant.parse("2023-07-05T00:00:00Z")
       )
       boot <- Bootstrap.make[IO](c, metadataConfig, consumersTopicConfig, consumerOffsetsOffsetsTopicConfig, kafkaAdmin, tagsTopicConfig)
       _ <- boot.bootstrapAll
