@@ -8,7 +8,6 @@ import akka.testkit.TestKit
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.util.SchemaWrapper
-import hydra.common.util.InstantUtils
 import hydra.core.http.security.{AccessControlService, AwsSecurityService}
 import hydra.core.http.security.entity.AwsConfig
 import hydra.core.ingest.RequestParams
@@ -46,7 +45,7 @@ final class IngestionEndpointSpec
 
   private val noAuth = new AccessControlService[IO](mock[AwsSecurityService[IO]], AwsConfig(None, isAwsIamSecurityEnabled = false))
   private val testSubject = Subject.createValidated("dvs.test.v0.Testing").get
-  private val timestampValidationCutoffDate: Instant = InstantUtils.dateStringToInstant("20230711")
+  private val timestampValidationCutoffDate: Instant = Instant.parse("2023-07-11T00:00:00Z")
 
   import scalacache.Mode
   implicit val mode: Mode[IO] = scalacache.CatsEffect.modes.async
