@@ -33,7 +33,7 @@ object Dependencies {
   val vulcanVersion = "1.2.0"
   val scalaTestEmbeddedRedisVersion = "0.4.0"
   val scalaChillBijectionVersion = "0.10.0"
-  val awsSdkVersion = "2.20.97"
+  val awsSdkVersion = "2.17.192"
 
   object Compile {
 
@@ -96,16 +96,8 @@ object Dependencies {
     val awsMskIamAuth = Seq("software.amazon.msk" % "aws-msk-iam-auth" % "1.1.4")
 
     val awsSdk = Seq(
-      "software.amazon.awssdk" % "sts" % awsSdkVersion,
       "software.amazon.awssdk" % "iam" % awsSdkVersion,
-      "software.amazon.awssdk" % "arns" % awsSdkVersion,
-      "software.amazon.awssdk" % "regions" % awsSdkVersion,
-      "software.amazon.awssdk" % "auth" % awsSdkVersion
-    ).map(
-      _.excludeAll(
-        ExclusionRule(organization = "org.codehaus.jackson"),
-        ExclusionRule(organization = "com.fasterxml.jackson.core")
-      )
+      "software.amazon.awssdk" % "arns" % awsSdkVersion
     )
 
     val logging = Seq(
