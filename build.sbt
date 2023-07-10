@@ -109,7 +109,7 @@ lazy val core = Project(
   .settings(
     moduleSettings,
     name := "hydra-core",
-    libraryDependencies ++= Dependencies.coreDeps
+    libraryDependencies ++= Dependencies.coreDeps ++ Dependencies.awsAuthDeps
   )
 
 lazy val kafka = Project(
