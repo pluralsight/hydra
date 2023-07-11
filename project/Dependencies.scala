@@ -209,7 +209,8 @@ object Dependencies {
     Seq(
       reflections,
       retry
-    ) ++ guavacache ++ confluent ++ kamon ++ redisCache
+    ) ++ guavacache ++
+    confluent ++ kamon ++ redisCache
 
   val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(embeddedKafka, sprayJson)
 
