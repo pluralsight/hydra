@@ -10,8 +10,6 @@ import hydra.avro.registry.SchemaRegistry.{SchemaId, SchemaVersion}
 import hydra.common.NotificationsTestSuite
 import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.core.http.CorsSupport
-import hydra.core.http.security.entity.AwsConfig
-import hydra.core.http.security.{AccessControlService, AwsSecurityService}
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
 import hydra.kafka.algebras._
 import hydra.kafka.model.ContactMethod.{Email, Slack}
@@ -25,7 +23,6 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
-import org.scalamock.scalatest.{AsyncMockFactory, MockFactory}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import retry.{RetryPolicies, RetryPolicy}
@@ -38,7 +35,6 @@ final class BootstrapEndpointV2Spec
     extends AnyWordSpecLike
     with ScalatestRouteTest
     with Matchers
-    with MockFactory
     with NotificationsTestSuite {
 
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
@@ -46,8 +42,6 @@ final class BootstrapEndpointV2Spec
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
   private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
   private implicit val corsSupport: CorsSupport = new CorsSupport("http://*.vnerd.com")
-  private val awsSecurityService = mock[AwsSecurityService[IO]]
-  private val auth = new AccessControlService[IO](awsSecurityService, AwsConfig("somecluster", isAwsIamSecurityEnabled = false))
 
   private def getTestCreateTopicProgram(
       s: SchemaRegistry[IO],
@@ -67,9 +61,7 @@ final class BootstrapEndpointV2Spec
         m
       ),
       TopicDetails(1, 1, 1),
-      t,
-      auth,
-      awsSecurityService
+      t
     )
   }
 

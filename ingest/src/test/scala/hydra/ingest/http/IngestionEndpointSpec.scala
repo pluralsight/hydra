@@ -8,15 +8,12 @@ import akka.testkit.TestKit
 import cats.effect.{Concurrent, ContextShift, IO}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.util.SchemaWrapper
-import hydra.core.http.security.{AccessControlService, AwsSecurityService}
-import hydra.core.http.security.entity.AwsConfig
 import hydra.core.ingest.RequestParams
 import hydra.core.ingest.RequestParams._
 import hydra.core.marshallers.GenericError
 import hydra.ingest.services.{IngestionFlow, IngestionFlowV2}
 import hydra.kafka.algebras.KafkaClientAlgebra
 import org.apache.avro.SchemaBuilder
-import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -30,7 +27,6 @@ final class IngestionEndpointSpec
     extends Matchers
     with AnyWordSpecLike
     with ScalatestRouteTest
-    with MockFactory
     with HydraIngestJsonSupport {
   implicit val logger =  Slf4jLogger.getLogger[IO]
   implicit val timer = IO.timer(ExecutionContext.global)
@@ -38,8 +34,6 @@ final class IngestionEndpointSpec
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
   implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
-
-  private val noAuth = new AccessControlService[IO](mock[AwsSecurityService[IO]], AwsConfig("somecluster", isAwsIamSecurityEnabled = false))
 
   import scalacache.Mode
   implicit val mode: Mode[IO] = scalacache.CatsEffect.modes.async
@@ -51,7 +45,7 @@ final class IngestionEndpointSpec
     } yield sr).unsafeRunSync
     new IngestionEndpoint(
       new IngestionFlow[IO](schemaReg, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistryUrl.notreal"),
-      new IngestionFlowV2[IO](SchemaRegistry.test[IO].unsafeRunSync, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistryUrl.notreal"), noAuth
+      new IngestionFlowV2[IO](SchemaRegistry.test[IO].unsafeRunSync, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistryUrl.notreal")
     ).route
   }
 
@@ -76,8 +70,7 @@ final class IngestionEndpointSpec
     } yield {
       new IngestionEndpoint(
         new IngestionFlow[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistry.notreal"),
-        new IngestionFlowV2[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistry.notreal"),
-        noAuth
+        new IngestionFlowV2[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistry.notreal")
       ).route
     }).unsafeRunSync()
   }
