@@ -33,6 +33,7 @@ object Dependencies {
   val vulcanVersion = "1.2.0"
   val scalaTestEmbeddedRedisVersion = "0.4.0"
   val scalaChillBijectionVersion = "0.10.0"
+  val awsSdkVersion = "2.17.192"
 
   object Compile {
 
@@ -93,6 +94,11 @@ object Dependencies {
       )
 
     val awsMskIamAuth = Seq("software.amazon.msk" % "aws-msk-iam-auth" % "1.1.4")
+
+    val awsSdk = Seq(
+      "software.amazon.awssdk" % "iam" % awsSdkVersion,
+      "software.amazon.awssdk" % "arns" % awsSdkVersion
+    )
 
     val logging = Seq(
       "org.apache.logging.log4j" % "log4j-slf4j-impl" % log4jVersion,
@@ -203,8 +209,7 @@ object Dependencies {
     Seq(
       reflections,
       retry
-    ) ++ guavacache ++
-    confluent ++ kamon ++ redisCache
+    ) ++ guavacache ++ confluent ++ kamon ++ redisCache
 
   val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(embeddedKafka, sprayJson)
 
@@ -212,5 +217,7 @@ object Dependencies {
     akkaKafkaStream,
     refined
   ) ++ kafka ++ akkaHttpHal ++ vulcan ++ fs2Kafka ++ integrationDeps
+
+  val awsAuthDeps: Seq[ModuleID] = awsSdk
 
 }

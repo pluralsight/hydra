@@ -21,14 +21,18 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
 import hydra.avro.registry.SchemaRegistry.IncompatibleSchemaException
+import hydra.common.logging.LoggingAdapter
 import hydra.common.util.Futurable
+import hydra.common.validation.ValidationError
+import hydra.common.validation.ValidationError.ValidationCombinedErrors
 import hydra.core.http.CorsSupport
+import hydra.core.http.security.{AccessControlService, AwsSecurityService}
+import hydra.core.http.security.AwsIamPolicyAction.KafkaAction
 import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.kafka.algebras.TagsAlgebra
 import hydra.kafka.model.TopicMetadataV2Request
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.programs.{CreateTopicProgram, ValidationError}
-import hydra.kafka.programs.ValidationError.ValidationCombinedErrors
+import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.serializers.TopicMetadataV2Parser
 import hydra.kafka.util.KafkaUtils.TopicDetails
 
@@ -37,50 +41,55 @@ import scala.util.{Failure, Success}
 final class BootstrapEndpointV2[F[_]: Futurable](
     createTopicProgram: CreateTopicProgram[F],
     defaultTopicDetails: TopicDetails,
-    tagsAlgebra: TagsAlgebra[F]
-)(implicit corsSupport: CorsSupport) {
+    tagsAlgebra: TagsAlgebra[F],
+    auth: AccessControlService[F],
+    awsSecurityService: AwsSecurityService[F]
+)(implicit corsSupport: CorsSupport) extends LoggingAdapter {
 
   import TopicMetadataV2Parser._
 
   val route: Route = cors(corsSupport.settings) {
     extractExecutionContext { implicit ec =>
       extractMethod { method =>
-        pathPrefix("v2" / "topics" / Segment) { topicName =>
-          val startTime = Instant.now
-          handleExceptions(exceptionHandler(topicName, startTime, method.value)) {
-            pathEndOrSingleSlash {
-              put {
-                entity(as[TopicMetadataV2Request]) { p =>
-                  val t = p.copy(tags = if(p.tags.contains("DVS")) p.tags else p.tags ++ List("DVS")) //adding "DVS" tag
-                  onComplete(Futurable[F].unsafeToFuture(tagsAlgebra.validateTags(t.tags))) {
-                    case Failure(exception) =>
-                      addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, method.value, error = Some(exception.getMessage))
-                      complete(StatusCodes.BadRequest, exception.getMessage)
-                    case Success(_) =>
-                        Subject.createValidated(topicName) match {
-                          case Some(validatedTopic) =>
-                            onComplete(
-                              Futurable[F].unsafeToFuture(createTopicProgram
-                                .createTopic(validatedTopic, t, defaultTopicDetails, withRequiredFields = true))
-                            ) {
-                              case Success(_) =>
-                                addHttpMetric(topicName, StatusCodes.OK, "V2Bootstrap", startTime, "PUT")
-                                complete(StatusCodes.OK)
-                              case Failure(IncompatibleSchemaException(m))=>
-                                addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(s"$IncompatibleSchemaException"))
-                                complete(StatusCodes.BadRequest, m)
-                              case Failure(error: ValidationError)=>
-                                addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(s"$ValidationCombinedErrors"))
-                                complete(StatusCodes.BadRequest, error.message)
-                              case Failure(e) =>
-                                addHttpMetric(topicName, StatusCodes.InternalServerError, "V2Bootstrap", startTime, "PUT", error = Some(e.getMessage))
-                                complete(StatusCodes.InternalServerError, e)
-                            }
-                          case None =>
-                            addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(Subject.invalidFormat))
-                            complete(StatusCodes.BadRequest, Subject.invalidFormat)
+          pathPrefix("v2" / "topics" / Segment) { topicName =>
+            val startTime = Instant.now
+            handleExceptions(exceptionHandler(topicName, startTime, method.value)) {
+              pathEndOrSingleSlash {
+                put {
+                  auth.mskAuth(KafkaAction.CreateTopic) { roleName =>
+                    entity(as[TopicMetadataV2Request]) { p =>
+                      val t = p.copy(tags = if (p.tags.contains("DVS")) p.tags else p.tags ++ List("DVS")) //adding "DVS" tag
+                      onComplete(Futurable[F].unsafeToFuture(tagsAlgebra.validateTags(t.tags))) {
+                        case Failure(exception) =>
+                          addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, method.value, error = Some(exception.getMessage))
+                          complete(StatusCodes.BadRequest, exception.getMessage)
+                        case Success(_) =>
+                          Subject.createValidated(topicName) match {
+                            case Some(validatedTopic) =>
+                              onComplete(
+                                Futurable[F].unsafeToFuture(createTopicProgram
+                                  .createTopic(validatedTopic, t, defaultTopicDetails, withRequiredFields = true))
+                              ) {
+                                case Success(_) =>
+                                  addHttpMetric(topicName, StatusCodes.OK, "V2Bootstrap", startTime, "PUT")
+                                  if (roleName.isDefined) Futurable[F].unsafeToFuture(awsSecurityService.addAllTopicPermissionsPolicy(topicName, roleName.get))
+                                  complete(StatusCodes.OK)
+                                case Failure(IncompatibleSchemaException(m)) =>
+                                  addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(s"$IncompatibleSchemaException"))
+                                  complete(StatusCodes.BadRequest, m)
+                                case Failure(error: ValidationError) =>
+                                  addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(s"$ValidationCombinedErrors"))
+                                  complete(StatusCodes.BadRequest, error.message)
+                                case Failure(e) =>
+                                  addHttpMetric(topicName, StatusCodes.InternalServerError, "V2Bootstrap", startTime, "PUT", error = Some(e.getMessage))
+                                  complete(StatusCodes.InternalServerError, e)
+                              }
+                            case None =>
+                              addHttpMetric(topicName, StatusCodes.BadRequest, "V2Bootstrap", startTime, "PUT", error = Some(Subject.invalidFormat))
+                              complete(StatusCodes.BadRequest, Subject.invalidFormat)
+                          }
                       }
-                  }
+                    }
                 }
               }
             }

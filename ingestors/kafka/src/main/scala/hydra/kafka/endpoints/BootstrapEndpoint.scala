@@ -26,6 +26,9 @@ import akka.util.Timeout
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import hydra.common.config.KafkaConfigUtils.{KafkaClientSecurityConfig, SchemaRegistrySecurityConfig}
 import hydra.common.logging.LoggingAdapter
+import hydra.common.util.Futurable
+import hydra.core.http.security.{AccessControlService, AwsSecurityService}
+import hydra.core.http.security.AwsIamPolicyAction.KafkaAction
 import hydra.core.http.{CorsSupport, DefaultCorsSupport, HydraDirectives, RouteSupport}
 import hydra.core.marshallers.TopicMetadataRequest
 import hydra.core.monitor.HydraMetrics.addHttpMetric
@@ -36,15 +39,17 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
-class BootstrapEndpoint(override val system:ActorSystem,
+class BootstrapEndpoint[F[_]: Futurable](override val system:ActorSystem,
                         override val streamsManagerActor: ActorRef,
                         override val kafkaClientSecurityConfig: KafkaClientSecurityConfig,
-                        override val schemaRegistrySecurityConfig: SchemaRegistrySecurityConfig)(implicit val corsSupport: CorsSupport) extends RouteSupport
+                        override val schemaRegistrySecurityConfig: SchemaRegistrySecurityConfig,
+                        override val auth: AccessControlService[F],
+                        override val awsSecurityService: AwsSecurityService[F])(implicit val corsSupport: CorsSupport) extends RouteSupport
   with LoggingAdapter
   with TopicMetadataAdapter
   with HydraDirectives
   with DefaultCorsSupport
-  with BootstrapEndpointActors {
+  with BootstrapEndpointActors[F] {
 
   private implicit val timeout = Timeout(10.seconds)
 
@@ -56,6 +61,7 @@ class BootstrapEndpoint(override val system:ActorSystem,
             val startTime = Instant.now
             pathEndOrSingleSlash {
               post {
+              auth.mskAuth(KafkaAction.CreateTopic) { roleName =>
                 requestEntityPresent {
                   entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
                     val topic = topicMetadataRequest.schema.getFields("namespace", "name").mkString(".").replaceAll("\"", "")
@@ -68,6 +74,7 @@ class BootstrapEndpoint(override val system:ActorSystem,
 
                           case BootstrapSuccess(metadata) =>
                             addHttpMetric(topic, StatusCodes.OK, "Bootstrap", startTime, "POST")
+                            if (roleName.isDefined) Futurable[F].unsafeToFuture(awsSecurityService.addAllTopicPermissionsPolicy(metadata.subject, roleName.get))
                             complete(StatusCodes.OK, toResource(metadata))
 
                           case BootstrapFailure(reasons) =>
@@ -87,6 +94,7 @@ class BootstrapEndpoint(override val system:ActorSystem,
                     }
                   }
                 }
+              }
               }
             } ~ get {
               pathEndOrSingleSlash(getAllStreams(None, startTime)) ~
