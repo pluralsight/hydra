@@ -1,5 +1,6 @@
 package hydra.kafka.programs
 
+import hydra.common.validation.ValidationError
 import org.apache.avro.Schema
 
 sealed trait TopicSchemaError extends ValidationError

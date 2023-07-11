@@ -1,9 +1,9 @@
-package hydra.kafka.programs
+package hydra.common.validation
 
 import cats.MonadThrow
-import cats.syntax.all._
 import cats.data.{NonEmptyChain, Validated, ValidatedNec}
-import hydra.kafka.programs.ValidationError.ValidationCombinedErrors
+import cats.syntax.all._
+import hydra.common.validation.ValidationError.ValidationCombinedErrors
 
 trait Validator {
   import Validator._

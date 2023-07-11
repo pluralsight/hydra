@@ -13,6 +13,8 @@ import hydra.avro.util.SchemaWrapper
 import hydra.common.NotificationsTestSuite
 import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.common.config.KafkaConfigUtils.{KafkaClientSecurityConfig, kafkaSecurityEmptyConfig}
+import hydra.core.http.security.{AccessControlService, AwsSecurityService}
+import hydra.core.http.security.entity.AwsConfig
 import hydra.ingest.programs.TopicDeletionProgram
 import hydra.kafka.algebras.KafkaAdminAlgebra._
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
@@ -42,6 +44,8 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
   private val consumerGroup = "consumer groups"
   implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
   implicit val timer: Timer[IO] = IO.timer(concurrent.ExecutionContext.global)
+  private val awsSecurityService = mock[AwsSecurityService[IO]]
+  private val noAuth = new AccessControlService[IO](awsSecurityService, AwsConfig(None, isAwsIamSecurityEnabled = false))
 
   implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
     Slf4jLogger.getLogger[F]
@@ -175,7 +179,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             List.empty,
             0
           ),
-          "myPass").route
+          "myPass", noAuth, awsSecurityService).route
         Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe """["exp.blah.blah"]"""
@@ -208,7 +212,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             consumerGroupAlgebra,
             List.empty,
             0
-          ), "myPass").route
+          ), "myPass", noAuth, awsSecurityService).route
         Delete("/v2/topics/schemas/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe """["exp.blah.blah"]"""
@@ -239,7 +243,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             consumerGroupAlgebra,
             List.empty,
             0
-          ), "myPass").route
+          ), "myPass", noAuth, awsSecurityService).route
         Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah","exp.hello.world","exp.hi.there"]}""")) ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe "[\"exp.blah.blah\",\"exp.hello.world\",\"exp.hi.there\"]"
@@ -270,7 +274,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             consumerGroupAlgebra,
             List.empty,
             0
-          ), "myPass").route
+          ), "myPass", noAuth, awsSecurityService).route
         Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe """{"clientError":[],"serverError":[{"message":"exp.blah.blah Unable to delete topic","responseCode":500,"topicOrSubject":"exp.blah.blah"}],"success":[]}"""
@@ -303,7 +307,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             consumerGroupAlgebra,
             List.empty,
             0
-          ), "myPass").route
+          ), "myPass", noAuth, awsSecurityService).route
         Delete("/v2/topics/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe """["exp.blah.blah"]"""
@@ -336,7 +340,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             consumerGroupAlgebra,
             List.empty,
             0
-          ), "myPass").route
+          ), "myPass", noAuth, awsSecurityService).route
         Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
           addCredentials(BasicHttpCredentials("John", "badPass")) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe "The supplied authentication is invalid"
@@ -369,7 +373,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             consumerGroupAlgebra,
             List.empty,
             0
-          ), "myPass").route
+          ), "myPass", noAuth, awsSecurityService).route
         Delete("/v2/topics", HttpEntity(ContentTypes.`application/json`, """{"topics":["exp.blah.blah"]}""")) ~>
           Route.seal(route) ~> check {
           responseAs[String] shouldBe "The resource requires authentication, which was not supplied with the request"
@@ -402,7 +406,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             consumerGroupAlgebra,
             List.empty,
             0
-          ), "myPass").route
+          ), "myPass", noAuth, awsSecurityService).route
         Delete("/v2/topics/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe """{"clientError":[],"serverError":[{"message":"Unable to delete schemas for exp.blah.blah-value. If this is a V1 topic, a key schema deletion error is normal. java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-value"}],"success":[{"responseCode":200,"topicOrSubject":"exp.blah.blah"}]}"""
@@ -435,7 +439,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             consumerGroupAlgebra,
             List.empty,
             0
-          ), "myPass").route
+          ), "myPass", noAuth, awsSecurityService).route
         Delete("/v2/topics/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe """{"clientError":[],"serverError":[{"message":"Unable to delete schemas for exp.blah.blah-key. If this is a V1 topic, a key schema deletion error is normal. java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-key"},{"message":"Unable to delete schemas for exp.blah.blah-value. If this is a V1 topic, a key schema deletion error is normal. java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-value"}],"success":[{"responseCode":200,"topicOrSubject":"exp.blah.blah"}]}"""
@@ -468,7 +472,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             consumerGroupAlgebra,
             List.empty,
             0
-          ), "myPass").route
+          ), "myPass", noAuth, awsSecurityService).route
         Delete("/v2/topics/schemas/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe """{"clientError":[{"message":"Unable to delete schemas for exp.blah.blah-value. If this is a V1 topic, a key schema deletion error is normal. java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-value"}],"serverError":[],"success":[]}"""
@@ -501,7 +505,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             consumerGroupAlgebra,
             List.empty,
             0
-          ), "myPass").route
+          ), "myPass", noAuth, awsSecurityService).route
         Delete("/v2/topics/schemas/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe """{"clientError":[{"message":"Unable to delete schemas for exp.blah.blah-key. If this is a V1 topic, a key schema deletion error is normal. java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-key"},{"message":"Unable to delete schemas for exp.blah.blah-value. If this is a V1 topic, a key schema deletion error is normal. java.lang.Exception: Unable to delete schema","responseCode":500,"topicOrSubject":"exp.blah.blah-value"}],"serverError":[],"success":[]}"""
@@ -530,7 +534,7 @@ class TopicDeletionEndpointSpec extends Matchers with AnyWordSpecLike with Scala
             consumerGroupAlgebra,
             List.empty,
             0
-          ), "myPass").route
+          ), "myPass", noAuth, awsSecurityService).route
         Delete("/v2/topics/exp.blah.blah") ~>
           addCredentials(validCredentials) ~> Route.seal(route) ~> check {
           responseAs[String] shouldBe """{"clientError":[{"message":"The requested topic does not exist.","responseCode":404,"topicOrSubject":"exp.blah.blah"}],"serverError":[],"success":[]}"""
