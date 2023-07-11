@@ -210,7 +210,7 @@ object Dependencies {
       reflections,
       retry
     ) ++ guavacache ++
-    confluent ++ kamon ++ redisCache
+    confluent ++ kamon ++ awsSdk ++ redisCache
 
   val ingestDeps: Seq[ModuleID] = coreDeps ++ akkaHttpHal ++ Seq(embeddedKafka, sprayJson)
 
@@ -218,7 +218,5 @@ object Dependencies {
     akkaKafkaStream,
     refined
   ) ++ kafka ++ akkaHttpHal ++ vulcan ++ fs2Kafka ++ integrationDeps
-
-  val awsAuthDeps: Seq[ModuleID] = awsSdk
 
 }
