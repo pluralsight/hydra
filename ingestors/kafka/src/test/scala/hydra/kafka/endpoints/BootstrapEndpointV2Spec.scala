@@ -47,7 +47,7 @@ final class BootstrapEndpointV2Spec
   private implicit val logger: Logger[IO] = Slf4jLogger.getLogger
   private implicit val corsSupport: CorsSupport = new CorsSupport("http://*.vnerd.com")
   private val awsSecurityService = mock[AwsSecurityService[IO]]
-  private val auth = new AccessControlService[IO](awsSecurityService, AwsConfig(Some("somecluster"), isAwsIamSecurityEnabled = false))
+  private val auth = new AccessControlService[IO](awsSecurityService, AwsConfig("somecluster", isAwsIamSecurityEnabled = false))
 
   private def getTestCreateTopicProgram(
       s: SchemaRegistry[IO],

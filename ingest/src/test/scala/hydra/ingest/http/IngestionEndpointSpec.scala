@@ -39,7 +39,7 @@ final class IngestionEndpointSpec
   private implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
   implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
 
-  private val noAuth = new AccessControlService[IO](mock[AwsSecurityService[IO]], AwsConfig(None, isAwsIamSecurityEnabled = false))
+  private val noAuth = new AccessControlService[IO](mock[AwsSecurityService[IO]], AwsConfig("somecluster", isAwsIamSecurityEnabled = false))
 
   import scalacache.Mode
   implicit val mode: Mode[IO] = scalacache.CatsEffect.modes.async

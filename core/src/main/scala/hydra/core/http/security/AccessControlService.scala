@@ -23,7 +23,7 @@ class AccessControlService[F[_]: Sync: Futurable](awsSecurityService: AwsSecurit
 
   private def doMskAuth(topics: Vector[String],
                         actions: Seq[AwsIamPolicyAction.KafkaAction]): Directive1[Option[RoleName]] =
-    if (awsConfig.isAwsIamSecurityEnabled && awsConfig.mskClusterArn.isDefined) {
+    if (awsConfig.isAwsIamSecurityEnabled) {
       (optionalHeaderValueByName("accesskeyid") & optionalHeaderValueByName("secretaccesskey") & optionalHeaderValueByName("sessiontoken")).tflatMap {
         case (accessKeyIdOpt, secretAccessKeyOpt, sessionTokenOpt) =>
           auth(topics, actions, accessKeyIdOpt.map(AccessKeyId), secretAccessKeyOpt.map(SecretAccessKey), sessionTokenOpt.map(SessionToken))

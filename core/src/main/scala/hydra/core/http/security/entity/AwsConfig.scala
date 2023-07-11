@@ -1,3 +1,3 @@
 package hydra.core.http.security.entity
 
-final case class AwsConfig(mskClusterArn: Option[String], isAwsIamSecurityEnabled: Boolean)
+final case class AwsConfig(mskClusterArn: String, isAwsIamSecurityEnabled: Boolean)
