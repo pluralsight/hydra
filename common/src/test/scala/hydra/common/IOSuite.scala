@@ -1,13 +1,14 @@
 package hydra.common
 
-import cats.syntax.all._
 import cats.effect.{ContextShift, IO, Timer}
+import cats.implicits.catsSyntaxSemigroup
 import org.scalatest.{Assertion, AsyncTestSuite}
 import retry.RetryPolicies.{exponentialBackoff, limitRetries}
 import retry.RetryPolicy
-import scala.concurrent.duration._
 
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
+
 
 trait IOSuite {
   _: AsyncTestSuite =>

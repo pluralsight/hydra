@@ -24,7 +24,6 @@ import fs2.kafka.{Header, Headers}
 import hydra.common.config.ConfigSupport._
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
-import hydra.core.http.security.AccessControlService
 import hydra.core.ingest.RequestParams.HYDRA_KAFKA_TOPIC_PARAM
 import hydra.core.ingest.{CorrelationIdBuilder, HydraRequest, IngestionReport, RequestParams}
 import hydra.core.marshallers.GenericError
@@ -36,15 +35,13 @@ import hydra.ingest.services.{IngestionFlow, IngestionFlowV2}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishError
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.AvroTypeException
-import hydra.core.http.security.AwsIamPolicyAction.KafkaAction
 
 import java.time.Instant
 import scala.util.{Failure, Success, Try}
 
 class IngestionEndpoint[F[_]: Futurable](
                                           ingestionFlow: IngestionFlow[F],
-                                          ingestionV2Flow: IngestionFlowV2[F],
-                                          auth: AccessControlService[F]
+                                          ingestionV2Flow: IngestionFlowV2[F]
                                         )(implicit system: ActorSystem) extends RouteSupport with HydraIngestJsonSupport {
 
   import hydra.ingest.bootstrap.RequestFactories._
@@ -66,10 +63,8 @@ class IngestionEndpoint[F[_]: Futurable](
             val startTime = Instant.now
             pathEndOrSingleSlash {
               post {
-                auth.mskAuth(topicName, KafkaAction.WriteData) { _ =>
-                  handleExceptions(exceptionHandler(topicName, Instant.now, method.value)) {
-                    publishRequestV2(topicName, startTime)
-                  }
+                handleExceptions(exceptionHandler(topicName, Instant.now, method.value)) {
+                  publishRequestV2(topicName, startTime)
                 }
               }
             }
