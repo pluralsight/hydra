@@ -274,7 +274,7 @@ sealed trait TopicMetadataV2Parser
       extends RootJsonFormat[TopicMetadataV2Request] {
 
     override def write(obj: TopicMetadataV2Request): JsValue =
-      jsonFormat13(TopicMetadataV2Request.apply).write(obj)
+      jsonFormat15(TopicMetadataV2Request.apply).write(obj)
 
     override def read(json: JsValue): TopicMetadataV2Request = json match {
       case j: JsObject =>
@@ -389,10 +389,22 @@ sealed trait TopicMetadataV2Parser
         val notificationUrl = toResult(
           j.getFields("notificationUrl").headOption.map(_.convertTo[String])
         )
+        val replacementTopic = toResult(
+          j.getFields("replacementField").headOption.map(validateTopic)
+        )
+        val previousTopics = toResult(
+          j.fields.get("previousTopics") match {
+            case Some(t) => t.convertTo[Option[List[String]]].map(_.map(p => validateTopic(JsString(p))))
+            case None => None
+          }
+        )
+
         (
           streamType,
           deprecated,
           deprecatedDate,
+          replacementTopic,
+          previousTopics,
           dataClassification,
           contact,
           createdDate,
@@ -404,6 +416,8 @@ sealed trait TopicMetadataV2Parser
           notificationUrl
           ).mapN(MetadataOnlyRequest.apply)
     }
+
+    private def validateTopic(jsonField: JsValue): String = SubjectFormat.read(jsonField).value
   }
 
   implicit object MaybeSchemasFormat extends RootJsonFormat[MaybeSchemas] {

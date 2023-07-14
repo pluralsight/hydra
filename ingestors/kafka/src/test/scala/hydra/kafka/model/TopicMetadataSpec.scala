@@ -48,6 +48,8 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
       StreamTypeV2.Entity,
       false,
       None,
+      None,
+      None,
       Public,
       NonEmptyList.of(ContactMethod.create("test@test.com").get),
       createdDate,
@@ -73,6 +75,8 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
          |"streamType":"Entity",
          |"deprecated": false,
          |"deprecatedDate": null,
+         |"replacementTopic": null,
+         |"previousTopics": null,
          |"dataClassification":"Public",
          |"teamName":{"string":"dvs-teamName"},
          |"contact":[
@@ -100,6 +104,8 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
     val value = TopicMetadataV2Value(
       StreamTypeV2.Entity,
       false,
+      None,
+      None,
       None,
       Public,
       NonEmptyList.of(ContactMethod.create("test@test.com").get),

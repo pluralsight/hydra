@@ -350,6 +350,8 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
           streamType,
           deprecated,
           None,
+          None,
+          None,
           dataClassification,
           NonEmptyList(email, slackChannel :: Nil),
           tmv2.createdDate,
@@ -394,6 +396,8 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
           streamType,
           deprecated = false,
           None,
+          replacementTopic = None,
+          previousTopics = None,
           dataClassification,
           NonEmptyList(email, slackChannel :: Nil),
           tmv2.createdDate,
@@ -588,6 +592,8 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         streamType = streamType,
         deprecated = deprecated,
         deprecatedDate,
+        replacementTopic = None,
+        previousTopics = None,
         dataClassification = dataClassification,
         contact = contact,
         createdDate = createdDate,
@@ -625,14 +631,14 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
     "TopicMetadataV2Format write matches TopicMetadataResponseV2Format write" in {
       val subject = Subject.createValidated("dvs.valid").get
       val tmc = TopicMetadataContainer(TopicMetadataV2Key(subject),
-        TopicMetadataV2Value(StreamTypeV2.Entity, false, None, Public,
+        TopicMetadataV2Value(StreamTypeV2.Entity, false, None, None, None, Public,
           NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get),
           Instant.now(), List.empty, None, Some("dvs-teamName"), List.empty, None),
         Some(new SchemaFormat(isKey = true).read(validAvroSchema)),
         Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
       val response = TopicMetadataV2Response.fromTopicMetadataContainer(tmc)
       val request = TopicMetadataV2Request.apply(Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,
-        tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.dataClassification,tmc.value.contact,
+        tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.replacementTopic,tmc.value.previousTopics,tmc.value.dataClassification,tmc.value.contact,
         tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes, teamName = tmc.value.teamName, None, List.empty, None)
 
       TopicMetadataV2Format.write(request).compactPrint shouldBe
@@ -672,12 +678,12 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val subject = Subject.createValidated("dvs.valid").get
       val before = Instant.now
       val tmc = TopicMetadataContainer(TopicMetadataV2Key(subject),
-        TopicMetadataV2Value(StreamTypeV2.Entity, true, None,
+        TopicMetadataV2Value(StreamTypeV2.Entity, true, None, None, None,
           Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None, Some("dvs-teamName"), List.empty, None),
         Some(new SchemaFormat(isKey = true).read(validAvroSchema)),
         Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
       val request = TopicMetadataV2Request.apply(Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,
-        tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.dataClassification,tmc.value.contact,
+        tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.replacementTopic,tmc.value.previousTopics,tmc.value.dataClassification,tmc.value.contact,
         tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes,tmc.value.teamName, None, List.empty, None)
       val firstDeprecatedDate = TopicMetadataV2Format.read(request.toJson).deprecatedDate.getOrElse(None)
       firstDeprecatedDate shouldBe None
@@ -687,12 +693,12 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       val subject = Subject.createValidated("dvs.valid").get
       val now = Instant.now
       val tmc = TopicMetadataContainer(TopicMetadataV2Key(subject),
-        TopicMetadataV2Value(StreamTypeV2.Entity, true, Some(now),
+        TopicMetadataV2Value(StreamTypeV2.Entity, true, Some(now), None, None,
           Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None, Some("dvs-teamName"), List.empty, None),
         Some(new SchemaFormat(isKey = true).read(validAvroSchema)),
         Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
       val request = TopicMetadataV2Request.apply(Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,
-        tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.dataClassification,tmc.value.contact,tmc.value.createdDate,
+        tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.replacementTopic,tmc.value.previousTopics,tmc.value.dataClassification,tmc.value.contact,tmc.value.createdDate,
         tmc.value.parentSubjects,tmc.value.notes,tmc.value.teamName, None, List.empty, None)
       val firstDeprecatedDate = TopicMetadataV2Format.read(request.toJson).deprecatedDate.get
       val now2 = Instant.now
@@ -703,12 +709,12 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
     "make sure deprecatedDate works with deprecated false" in {
       val subject = Subject.createValidated("dvs.valid").get
       val tmc = TopicMetadataContainer(TopicMetadataV2Key(subject),
-        TopicMetadataV2Value(StreamTypeV2.Entity, false, None,
+        TopicMetadataV2Value(StreamTypeV2.Entity, false, None, None, None,
           Public, NonEmptyList.one(ContactMethod.create("blah@pluralsight.com").get), Instant.now(), List.empty, None, Some("dvs-teamName"), List.empty, None),
         Some(new SchemaFormat(isKey = true).read(validAvroSchema)),
         Some(new SchemaFormat(isKey = false).read(validAvroSchema)))
       val request = TopicMetadataV2Request.apply(Schemas(tmc.keySchema.get, tmc.valueSchema.get),tmc.value.streamType,
-        tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.dataClassification,tmc.value.contact,
+        tmc.value.deprecated,tmc.value.deprecatedDate,tmc.value.replacementTopic,tmc.value.previousTopics,tmc.value.dataClassification,tmc.value.contact,
         tmc.value.createdDate,tmc.value.parentSubjects,tmc.value.notes, tmc.value.teamName, None, List.empty, None)
       val firstDeprecatedDate = TopicMetadataV2Format.read(request.toJson).deprecatedDate.getOrElse(None)
       firstDeprecatedDate shouldBe None
