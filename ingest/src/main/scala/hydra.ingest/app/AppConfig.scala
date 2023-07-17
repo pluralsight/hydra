@@ -1,10 +1,9 @@
 package hydra.ingest.app
 
 import cats.syntax.all._
-import ciris.{ConfigDecoder, ConfigValue, env}
+import ciris.{ConfigValue, env, ConfigDecoder}
 import hydra.common.config.KafkaConfigUtils.{KafkaClientSecurityConfig, SchemaRegistrySecurityConfig, kafkaClientSecurityConfig, schemaRegistrySecurityConfig}
 import eu.timepit.refined.types.string.NonEmptyString
-import hydra.core.http.security.entity.AwsConfig
 import hydra.kafka.algebras.KafkaClientAlgebra.ConsumerGroup
 import hydra.kafka.model.ContactMethod
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -227,12 +226,6 @@ object AppConfig {
       env("HYDRA_INGEST_TOPIC_DELETION_PASSWORD").as[String].default("")
       ).map(TopicDeletionConfig)
 
-  private val awsConfig: ConfigValue[AwsConfig] =
-    (
-    env("MSK_CLUSTER_ARN").as[String].option,
-    env("AWS_IAM_SECURITY_ENABLED").as[Boolean].default(false)
-    ).mapN(AwsConfig)
-
   final case class TagsConfig(tagsPassword: String, tagsTopic: String, tagsConsumerGroup: String)
 
   private val tagsConfig: ConfigValue[TagsConfig] =
@@ -268,7 +261,6 @@ object AppConfig {
                               kafkaClientSecurityConfig: KafkaClientSecurityConfig,
                               schemaRegistrySecurityConfig: SchemaRegistrySecurityConfig,
                               notificationsConfig: NotificationsConfig,
-                              awsConfig: AwsConfig,
                               schemaRegistryRedisConfig: SchemaRegistryRedisConfig
                             )
 
@@ -288,7 +280,6 @@ object AppConfig {
       kafkaClientSecurityConfig,
       schemaRegistrySecurityConfig,
       notificationsConfig,
-      awsConfig,
       schemaRegistryRedisConfig
     ).parMapN(AppConfig)
 }

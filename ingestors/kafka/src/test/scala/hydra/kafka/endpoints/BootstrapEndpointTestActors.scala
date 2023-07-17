@@ -13,7 +13,7 @@ import hydra.kafka.util.KafkaUtils
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.joda.time.DateTime
 
-trait BootstrapEndpointTestActors[F[_]] extends BootstrapEndpointActors[F] {
+trait BootstrapEndpointTestActors extends BootstrapEndpointActors {
 
   class StreamsActorTest(
       bootstrapKafkaConfig: Config,
