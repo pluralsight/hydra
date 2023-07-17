@@ -6,12 +6,13 @@ import hydra.avro.registry.ConfluentSchemaRegistry
 import hydra.common.config.ConfigSupport
 import hydra.common.config.KafkaConfigUtils.{KafkaClientSecurityConfig, SchemaRegistrySecurityConfig, kafkaSecurityEmptyConfig}
 import hydra.core.akka.SchemaRegistryActor
+import hydra.core.http.security.{AccessControlService, AwsSecurityService}
 import hydra.kafka.services.{StreamsManagerActor, TopicBootstrapActor}
 import hydra.kafka.util.KafkaUtils
 
 import scala.concurrent.ExecutionContext
 
-trait BootstrapEndpointActors extends ConfigSupport {
+trait BootstrapEndpointActors[F[_]] extends ConfigSupport {
 
   implicit val system: ActorSystem
   implicit val streamsManagerActor: ActorRef
@@ -29,6 +30,10 @@ trait BootstrapEndpointActors extends ConfigSupport {
     applicationConfig.getConfig("bootstrap-config")
 
   private[kafka] val kafkaClientSecurityConfig: KafkaClientSecurityConfig = kafkaSecurityEmptyConfig
+
+  private[kafka] val auth: AccessControlService[F]
+
+  private[kafka] val awsSecurityService: AwsSecurityService[F]
 
   val bootstrapActor: ActorRef = system.actorOf(
     TopicBootstrapActor.props(

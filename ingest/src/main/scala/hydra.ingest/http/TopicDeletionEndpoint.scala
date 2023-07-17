@@ -7,6 +7,9 @@ import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import cats.data.{NonEmptyList, Validated}
 import hydra.common.util.Futurable
 import hydra.core.http.RouteSupport
+import hydra.core.http.security.AwsIamPolicyAction.KafkaAction
+import hydra.core.http.security.security.RoleName
+import hydra.core.http.security.{AccessControlService, AwsSecurityService}
 import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.ingest.programs.TopicDeletionProgram.SchemaDeleteTopicErrorList
 import hydra.ingest.programs._
@@ -73,7 +76,10 @@ object TopicDeletionEndpoint extends
   }
 }
 
-final class TopicDeletionEndpoint[F[_] : Futurable](deletionProgram: TopicDeletionProgram[F], deletionPassword: String)
+final class TopicDeletionEndpoint[F[_] : Futurable](deletionProgram: TopicDeletionProgram[F],
+                                                    deletionPassword: String,
+                                                    auth: AccessControlService[F],
+                                                    awsSecurityService: AwsSecurityService[F])
   extends RouteSupport with
     DefaultJsonProtocol with
     SprayJsonSupport {
@@ -115,21 +121,21 @@ final class TopicDeletionEndpoint[F[_] : Futurable](deletionProgram: TopicDeleti
     topicDoesNotExistError.map(err => ErroredResponse(err.topic, "The requested topic does not exist.", StatusCodes.NotFound.intValue))
   }
 
-  private def validResponse(topics: List[String], userDeleting: String, path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
+  private def validResponse(topics: List[String], roleName: Option[RoleName], path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
     topics.foreach { topicName =>
       addHttpMetric(topicName, StatusCodes.OK, path, startTime, "DELETE")
-      log.info(s"User $userDeleting deleted topic: $topicName")
+      if (roleName.isDefined) log.info(s"User with role ${roleName.get} deleted topic: $topicName")
     }
     complete(StatusCodes.OK, topics)
   }
 
-  private def returnResponse(topics: List[String], userDeleting: String, response: DeletionEndpointResponse,
+  private def returnResponse(topics: List[String], response: DeletionEndpointResponse,
                              path: String, startTime: Instant, responseCode: StatusCode)(implicit ec: ExecutionContext) = {
     topics.map(topicName => addHttpMetric(topicName, responseCode, path, startTime, "DELETE", error = Some(response.toString)))
     complete(responseCode, response)
   }
 
-  private def invalidResponse(topics: List[String], userDeleting: String, e: NonEmptyList[DeleteTopicError],
+  private def invalidResponse(topics: List[String], e: NonEmptyList[DeleteTopicError],
                               path: String, startTime: Instant)(implicit ec: ExecutionContext) = {
     val allErrors = e.foldLeft((List.empty[SchemaDeletionErrors], List.empty[KafkaDeletionErrors], List.empty[ConsumersStillExistError],
       List.empty[ActivelyPublishedToError], List.empty[TopicDoesNotExistError])) { (agg, i) =>
@@ -156,22 +162,24 @@ final class TopicDeletionEndpoint[F[_] : Futurable](deletionProgram: TopicDeleti
     val successfulTopics: List[SuccessfulResponse] = topics.filterNot(a => erroredResponse.map(er => er.topicOrSubject).contains(a))
       .map(topic => SuccessfulResponse(topic, StatusCodes.OK.intValue))
     val response = DeletionEndpointResponse(successfulTopics,clientErrors,serverErrors)
-    returnResponse(topics, userDeleting, response, path, startTime, responseCode)
+    returnResponse(topics, response, path, startTime, responseCode)
   }
 
   private def deleteTopics(topics: List[String], ignoreConsumerGroups: List[String],
-                           userDeleting: String, ignorePublishTime: Boolean, ignoreAllConsumerGroups: Boolean, path: String, startTime: Instant)
+                           roleName: Option[RoleName], ignorePublishTime: Boolean, ignoreAllConsumerGroups: Boolean, path: String, startTime: Instant)
                           (implicit ec: ExecutionContext) = {
     onComplete(
       Futurable[F].unsafeToFuture(deletionProgram.deleteTopics(topics, ignoreConsumerGroups, ignorePublishTime, ignoreAllConsumerGroups))
     ) {
       case Success(maybeSuccess) => {
         maybeSuccess match {
-          case Validated.Valid(a) => {
-            validResponse(topics, userDeleting, path, startTime)
-          }
+          case Validated.Valid(a) =>
+            if (roleName.isDefined) {
+              Futurable[F].unsafeToFuture(awsSecurityService.deleteAllTopicPermissionsPolicy(topics.toVector, roleName.get))
+            }
+            validResponse(topics, roleName, path, startTime)
           case Validated.Invalid(e) => {
-            invalidResponse(topics, userDeleting, e, path, startTime)
+            invalidResponse(topics, e, path, startTime)
           }
         }
       }
@@ -195,44 +203,50 @@ final class TopicDeletionEndpoint[F[_] : Futurable](deletionProgram: TopicDeleti
           pathPrefix("v2" / "topics") {
             val startTime = Instant.now
             delete {
-              authenticateBasic(realm = "", myUserPassAuthenticator) { userName =>
+              authenticateBasic(realm = "", myUserPassAuthenticator) { userName => // remove it after msk authorization will be mandatory
                 pathPrefix("schemas" / Segment) { topic =>
-                  onComplete(
-                    Futurable[F].unsafeToFuture(deletionProgram.deleteFromSchemaRegistry(List(topic)))
-                  ) {
-                    case Success(maybeSuccess) => {
-                      maybeSuccess match {
-                        case Validated.Valid(a) => {
-                          validResponse(List(topic), userName, "/v2/topics/schemas", startTime)
-                        }
-                        case Validated.Invalid(e) => {
-                          val erroredResponse = schemaErrorsToResponse(List(SchemaDeletionErrors(SchemaDeleteTopicErrorList(e))))
-                          val response = DeletionEndpointResponse(List.empty, erroredResponse, List.empty)
-                          if (erroredResponse.length >= 2) {
-                            // With one topic coming in if we get anything >= to 2 there was at least a -key and a -value error
-                            addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/topics/schemas", startTime, "DELETE", error = Some(response.toString))
-                            complete(StatusCodes.InternalServerError, response)
-                          } else {
-                            returnResponse(List(topic), userName, response, "/v2/topics/schemas", startTime, StatusCodes.MultiStatus)
+                  auth.mskAuth(topic, KafkaAction.DeleteTopic) { roleName =>
+                    onComplete(
+                      Futurable[F].unsafeToFuture(deletionProgram.deleteFromSchemaRegistry(List(topic)))
+                    ) {
+                      case Success(maybeSuccess) => {
+                        maybeSuccess match {
+                          case Validated.Valid(a) => {
+                            validResponse(List(topic), roleName, "/v2/topics/schemas", startTime)
+                          }
+                          case Validated.Invalid(e) => {
+                            val erroredResponse = schemaErrorsToResponse(List(SchemaDeletionErrors(SchemaDeleteTopicErrorList(e))))
+                            val response = DeletionEndpointResponse(List.empty, erroredResponse, List.empty)
+                            if (erroredResponse.length >= 2) {
+                              // With one topic coming in if we get anything >= to 2 there was at least a -key and a -value error
+                              addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/topics/schemas", startTime, "DELETE", error = Some(response.toString))
+                              complete(StatusCodes.InternalServerError, response)
+                            } else {
+                              returnResponse(List(topic), response, "/v2/topics/schemas", startTime, StatusCodes.MultiStatus)
+                            }
                           }
                         }
                       }
-                    }
-                    case Failure(e) => {
-                      addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/topics/schemas", startTime, "DELETE", error = Some(e.getMessage))
-                      complete(StatusCodes.InternalServerError, e.getMessage)
+                      case Failure(e) => {
+                        addHttpMetric(topic, StatusCodes.InternalServerError, "/v2/topics/schemas", startTime, "DELETE", error = Some(e.getMessage))
+                        complete(StatusCodes.InternalServerError, e.getMessage)
+                      }
                     }
                   }
                 } ~
                   pathPrefix(Segment) { topic =>
-                    deleteTopics(List(topic), List.empty, userName, ignorePublishTime = false, ignoreAllConsumerGroups = false, "/v2/topics", startTime)
+                    auth.mskAuth(topic, KafkaAction.DeleteTopic) { roleName =>
+                      deleteTopics(List(topic), List.empty, roleName, ignorePublishTime = false, ignoreAllConsumerGroups = false, "/v2/topics", startTime)
+                    }
                   } ~
                   pathEndOrSingleSlash {
                     entity(as[DeletionRequest]) { req =>
                       if (req.topics.isEmpty) {
                         spray.json.deserializationError("Must provide a List of topics to delete")
                       } else {
-                        deleteTopics(req.topics, req.ignoreConsumerGroups, userName, req.ignorePublishTime, req.ignoreAllConsumerGroups, "/v2/topics", startTime)
+                        auth.mskAuth(req.topics.toVector, KafkaAction.DeleteTopic) { roleName =>
+                          deleteTopics(req.topics, req.ignoreConsumerGroups, roleName, req.ignorePublishTime, req.ignoreAllConsumerGroups, "/v2/topics", startTime)
+                        }
                       }
                     }
                   }
