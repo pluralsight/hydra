@@ -1,4 +1,4 @@
-package hydra.common.validation
+package hydra.kafka.programs
 
 import scala.util.control.NoStackTrace
 
