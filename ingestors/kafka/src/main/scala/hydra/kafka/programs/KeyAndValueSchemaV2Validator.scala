@@ -8,10 +8,9 @@ import hydra.avro.registry.SchemaRegistry
 import hydra.kafka.model.{RequiredField, Schemas, StreamTypeV2, TopicMetadataV2Request}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.TopicSchemaError._
+import hydra.kafka.programs.Validator.ValidationChain
 import org.apache.avro.{Schema, SchemaBuilder}
 import RequiredFieldStructures._
-import hydra.common.validation.Validator
-import hydra.common.validation.Validator.ValidationChain
 
 import scala.jdk.CollectionConverters.collectionAsScalaIterableConverter
 

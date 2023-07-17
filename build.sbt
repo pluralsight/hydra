@@ -109,11 +109,7 @@ lazy val core = Project(
   .settings(
     moduleSettings,
     name := "hydra-core",
-    libraryDependencies ++= Dependencies.coreDeps ++ Dependencies.awsAuthDeps,
-    dependencyOverrides ++= Seq(
-      "io.confluent" % "kafka-schema-registry" % "5.4.2",
-      "io.confluent" % "kafka-avro-serializer" % "5.4.2"
-    )
+    libraryDependencies ++= Dependencies.coreDeps
   )
 
 lazy val kafka = Project(
@@ -124,11 +120,7 @@ lazy val kafka = Project(
   .settings(
     moduleSettings ++ Defaults.itSettings,
     name := "hydra-kafka",
-    libraryDependencies ++= Dependencies.kafkaDeps,
-    dependencyOverrides ++= Seq(
-      "io.confluent" % "kafka-schema-registry" % "5.4.2",
-      "io.confluent" % "kafka-avro-serializer" % "5.4.2"
-    )
+    libraryDependencies ++= Dependencies.kafkaDeps
   )
 
 lazy val avro = Project(
