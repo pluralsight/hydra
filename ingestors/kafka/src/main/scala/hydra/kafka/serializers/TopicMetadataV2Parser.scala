@@ -390,7 +390,7 @@ sealed trait TopicMetadataV2Parser
           j.getFields("notificationUrl").headOption.map(_.convertTo[String])
         )
         val replacementTopic = toResult(
-          j.getFields("replacementField").headOption.map(validateTopic)
+          j.getFields("replacementTopic").headOption.map(validateTopic)
         )
         val previousTopics = toResult(
           j.fields.get("previousTopics") match {
