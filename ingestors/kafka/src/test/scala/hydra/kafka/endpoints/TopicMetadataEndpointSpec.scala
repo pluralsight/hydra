@@ -13,6 +13,8 @@ import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.common.config.ConfigSupport
 import hydra.common.util.ActorUtils
 import hydra.core.http.CorsSupport
+import hydra.core.http.security.entity.AwsConfig
+import hydra.core.http.security.{AccessControlService, AwsSecurityService}
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
 import hydra.kafka.algebras.{HydraTag, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TagsAlgebra}
 import hydra.kafka.consumer.KafkaConsumerProxy
@@ -32,6 +34,7 @@ import scala.concurrent.ExecutionContext
 import hydra.kafka.programs.{CreateTopicProgram, KeyAndValueSchemaV2Validator}
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
+import org.scalamock.scalatest.AsyncMockFactory
 import retry.{RetryPolicies, RetryPolicy}
 
 import java.time.Instant
@@ -63,6 +66,9 @@ class TopicMetadataEndpointSpec
   implicit val concurrent: Concurrent[IO] = IO.ioConcurrentEffect
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
   private implicit val corsSupport: CorsSupport = new CorsSupport("http://*")
+  private val awsSecurityService = mock[AwsSecurityService[IO]]
+  private val auth = new AccessControlService[IO](awsSecurityService, AwsConfig(Some("somecluster"), isAwsIamSecurityEnabled = false))
+
   override def beforeAll(): Unit = {
     super.beforeAll()
     EmbeddedKafka.start()
@@ -136,7 +142,9 @@ class TopicMetadataEndpointSpec
     tagsAlgebra <- TagsAlgebra.make[IO]("_hydra.tags-topic", "_hydra.tags-consumer",kafkaClient)
     _ <- tagsAlgebra.createOrUpdateTag(HydraTag("Source: DVS", "A valid source"))
     createTopicProgram = getTestCreateTopicProgram(schemaRegistry, ka, kafkaClient, metadataAlgebra)
-  } yield new TopicMetadataEndpoint(consumerProxy, metadataAlgebra, schemaRegistry, createTopicProgram, 1, tagsAlgebra).route}.unsafeRunSync()
+  } yield new TopicMetadataEndpoint(consumerProxy, metadataAlgebra, schemaRegistry, createTopicProgram, 1, tagsAlgebra,
+      auth,
+      awsSecurityService).route}.unsafeRunSync()
 
   val node = new Node(0, "host", 1)
 
