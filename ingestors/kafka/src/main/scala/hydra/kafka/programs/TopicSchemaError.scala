@@ -45,6 +45,11 @@ object TopicSchemaError {
       s"value schema = $valueFieldSchema, stream type = $streamType."
   }
 
+  case class RequiredSchemaValueFieldWithDefaultValueError(fieldName: String, valueFieldSchema: Schema, streamType: String) extends TopicSchemaError {
+    override val message: String = s"Required field cannot have a default value in the value schema fields: field name = $fieldName, " +
+      s"value schema = $valueFieldSchema, stream type = $streamType."
+  }
+
   def getFieldMissingError(isKey: Boolean, fieldName: String, schema: Schema, streamType: String): TopicSchemaError = {
     if (isKey) RequiredSchemaKeyFieldMissingError(fieldName, schema, streamType) else RequiredSchemaValueFieldMissingError(fieldName, schema, streamType)
   }
