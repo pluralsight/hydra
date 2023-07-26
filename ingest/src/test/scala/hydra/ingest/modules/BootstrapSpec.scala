@@ -1,7 +1,7 @@
 package hydra.ingest.modules
 
 import cats.effect.concurrent.Ref
-import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, IO, Sync, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Sync, Timer}
 import cats.syntax.all._
 import fs2.kafka.{Headers, Timestamp}
 import hydra.avro.registry.SchemaRegistry
@@ -14,7 +14,7 @@ import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.{ContactMethod, TopicMetadataV2, TopicMetadataV2Key}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.programs.{CreateTopicProgram, KeyAndValueSchemaV2Validator}
+import hydra.kafka.programs.CreateTopicProgram
 import org.typelevel.log4cats.SelfAwareStructuredLogger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import org.apache.avro.generic.GenericRecord
@@ -22,6 +22,8 @@ import org.apache.kafka.common.TopicPartition
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import retry.RetryPolicies
+
+import java.time.Instant
 
 class BootstrapSpec extends AnyWordSpecLike with Matchers with NotificationsTestSuite {
 
@@ -60,7 +62,8 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers with NotificationsTest
         kafkaClient,
         retry,
         metadataSubjectV2,
-        metadata
+        metadata,
+        Instant.parse("2023-07-05T00:00:00Z")
       )
       boot <- Bootstrap.make[IO](c, metadataConfig, consumersTopicConfig, consumerOffsetsOffsetsTopicConfig, kafkaAdmin, tagsTopicConfig)
       _ <- boot.bootstrapAll

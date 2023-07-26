@@ -14,6 +14,7 @@ import retry.{RetryDetails, RetryPolicy, _}
 import cats.implicits._
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 
+import scala.language.higherKinds
 import scala.util.control.NoStackTrace
 
 final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] private (
@@ -155,6 +156,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
     val td = createTopicRequest.numPartitions.fold(defaultTopicDetails)(numP =>
       defaultTopicDetails.copy(numPartitions = numP.value))
       .copy(partialConfig = defaultTopicDetails.configs ++ getCleanupPolicyConfig)
+
     (for {
       _ <- Resource.eval(validator.validate(createTopicRequest, topicName, withRequiredFields))
       _ <- registerSchemas(
@@ -176,6 +178,7 @@ object CreateTopicProgram {
                                                            retryPolicy: RetryPolicy[F],
                                                            v2MetadataTopicName: Subject,
                                                            metadataAlgebra: MetadataAlgebra[F],
+                                                           defaultLoopHoleCutoffDate: Instant
                                                          ) (implicit eff: Sync[F]): CreateTopicProgram[F] = {
     new CreateTopicProgram(
       schemaRegistry,
@@ -184,7 +187,7 @@ object CreateTopicProgram {
       retryPolicy,
       v2MetadataTopicName,
       metadataAlgebra,
-      KeyAndValueSchemaV2Validator.make(schemaRegistry)
+      KeyAndValueSchemaV2Validator.make(schemaRegistry, metadataAlgebra, defaultLoopHoleCutoffDate)
     )
   }
 
