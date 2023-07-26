@@ -18,16 +18,15 @@ import hydra.kafka.model.ContactMethod.{Email, Slack}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import hydra.kafka.programs.CreateTopicProgram
-import hydra.kafka.serializers.TopicMetadataV2Parser
 import hydra.kafka.serializers.TopicMetadataV2Parser._
 import hydra.kafka.util.KafkaUtils.TopicDetails
-import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.slf4j.Slf4jLogger
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
 import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import org.scalamock.scalatest.{AsyncMockFactory, MockFactory}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import retry.{RetryPolicies, RetryPolicy}
 import spray.json._
 
@@ -64,7 +63,8 @@ final class BootstrapEndpointV2Spec
         kc,
         retryPolicy,
         Subject.createValidated("dvs.hello-world").get,
-        m
+        m,
+        Instant.parse("2023-07-05T00:00:00Z")
       ),
       TopicDetails(1, 1, 1),
       t,
@@ -109,11 +109,11 @@ final class BootstrapEndpointV2Spec
         .name(RequiredField.CREATED_AT)
         .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .withDefault(Instant.now().toEpochMilli)
+        .noDefault()
         .name(RequiredField.UPDATED_AT)
         .doc("text")
         .`type`(LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)))
-        .withDefault(Instant.now().toEpochMilli)
+        .noDefault()
         .endRecord()
 
     val badKeySchema: Schema =
@@ -355,5 +355,4 @@ final class BootstrapEndpointV2Spec
       }.unsafeRunSync()
     }
   }
-
 }
