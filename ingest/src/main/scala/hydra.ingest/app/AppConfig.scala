@@ -96,7 +96,7 @@ object AppConfig {
       env("HYDRA_MIN_INSYNC_REPLICAS").as[Short].default(2),
       env("DEFAULT_LOOPHOLE_CUTOFF_DATE_IN_YYYYMMDD")
         .as[Instant]
-        .default(Instant.parse("2023-07-11T00:00:00Z"))
+        .default(Instant.parse("2023-08-31T00:00:00Z"))
       ).parMapN(CreateTopicConfig)
 
   private implicit val subjectConfigDecoder: ConfigDecoder[String, Subject] =
