@@ -18,31 +18,38 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
   doing that. These just need to test that we are handling Strict and Relaxed validation types.
    */
 
+  private val timestampSchema = SchemaBuilder.record("testVal")
+    .fields()
+    .name("testTimestamp")
+    .`type`(LogicalTypes.timestampMillis.addToSchema(Schema.create(Schema.Type.LONG)))
+    .noDefault
+    .endRecord
+
   it should "convert basic record" in {
     val schema = SchemaBuilder.record("Test").fields()
       .requiredString("testing").endRecord()
-    val record = """{"testing": "test"}""".toGenericRecord(schema, useStrictValidation = true)
+    val record = """{"testing": "test"}""".toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false)
     record.get.get("testing") shouldBe new Utf8("test")
   }
 
   it should "convert union record" in {
     val schema = SchemaBuilder.record("Test").fields()
       .optionalString("testing").endRecord()
-    val record = """{"testing": {"string": "test"}}""".toGenericRecord(schema, useStrictValidation = true)
+    val record = """{"testing": {"string": "test"}}""".toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false)
     record.get.get("testing") shouldBe new Utf8("test")
   }
 
   it should "convert union record with explicit null branch" in {
     val schema = SchemaBuilder.record("Test").fields()
       .optionalString("testing").endRecord()
-    val record = """{"testing": {"null": null}}""".toGenericRecord(schema, useStrictValidation = true)
+    val record = """{"testing": {"null": null}}""".toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false)
     record.get.get("testing") shouldBe null
   }
 
   it should "convert union record with implicit null branch" in {
     val schema = SchemaBuilder.record("Test").fields()
       .optionalString("testing").endRecord()
-    val record = """{"testing": null}""".toGenericRecord(schema, useStrictValidation = true)
+    val record = """{"testing": null}""".toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false)
     record.get.get("testing") shouldBe null
   }
 
@@ -50,21 +57,22 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     val schema = SchemaBuilder.record("Test").namespace("my.namespace").fields().name("testing").`type`()
       .unionOf().nullType().and().record("TestingInner").fields()
       .requiredInt("testInner").endRecord().endUnion().nullDefault().endRecord()
-    val record = """{"testing": {"my.namespace.TestingInner": {"testInner": 2020}}}""".toGenericRecord(schema, useStrictValidation = true)
+    val record =
+    """{"testing": {"my.namespace.TestingInner": {"testInner": 2020}}}""".toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false)
     record.get.get("testing").toString shouldBe "{\"testInner\": 2020}"
   }
 
   it should "reject union record with explicit null branch containing extra fields" in {
     val schema = SchemaBuilder.record("Test").fields()
       .optionalString("testing").endRecord()
-    val record = """{"testing": {"null": null, "another": 2020}}""".toGenericRecord(schema, useStrictValidation = true)
+    val record = """{"testing": {"null": null, "another": 2020}}""".toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false)
     record shouldBe a[Failure[_]]
   }
 
   it should "return an error for extra field and Strict validation" in {
     val schema = SchemaBuilder.record("Test").fields()
       .requiredString("testing").endRecord()
-    val record = """{"testing": "test", "blah": 10}""".toGenericRecord(schema, useStrictValidation = true)
+    val record = """{"testing": "test", "blah": 10}""".toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false)
     record shouldBe a[Failure[_]]
   }
 
@@ -73,7 +81,7 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
       .requiredInt("testInner").endRecord()
     val schema = SchemaBuilder.record("Test").fields()
       .requiredString("testing").name("nested").`type`(inner).noDefault.endRecord()
-    val record = """{"testing": "test", "nested": {"testInner": 10}}""".toGenericRecord(schema, useStrictValidation = true)
+    val record = """{"testing": "test", "nested": {"testInner": 10}}""".toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false)
     record shouldBe a[Success[_]]
   }
 
@@ -82,7 +90,8 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
       .requiredInt("testInner").endRecord()
     val schema = SchemaBuilder.record("Test").fields()
       .requiredString("testing").name("nested").`type`(inner).noDefault.endRecord()
-    val record = """{"testing": "test", "nested": {"testInner": 10, "blah": 90}}""".toGenericRecord(schema, useStrictValidation = true)
+    val record =
+    """{"testing": "test", "nested": {"testInner": 10, "blah": 90}}""".toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false)
     record shouldBe a[Failure[_]]
   }
 
@@ -91,7 +100,8 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
       .requiredInt("testInner").endRecord()
     val schema = SchemaBuilder.record("Test").fields()
       .requiredString("testing").name("nested").`type`(inner).noDefault.endRecord()
-    val record = """{"testing": "test", "nested": {"testInner": 10, "blah": 90}}""".toGenericRecord(schema, useStrictValidation = false)
+    val record =
+    """{"testing": "test", "nested": {"testInner": 10, "blah": 90}}""".toGenericRecord(schema, useStrictValidation = false, useTimestampValidation = false)
     record shouldBe a[Success[_]]
   }
 
@@ -100,14 +110,15 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
       .requiredInt("testInner").endRecord()
     val schema = SchemaBuilder.record("Test").fields()
       .requiredString("testing").name("nested").`type`(inner).noDefault.endRecord()
-    val record = """{"testing": "test", "nested": {"testInner": 10, "testing": 90}}""".toGenericRecord(schema, useStrictValidation = true)
+    val record =
+    """{"testing": "test", "nested": {"testInner": 10, "testing": 90}}""".toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false)
     record shouldBe a[Failure[_]]
   }
 
   it should "return error if record contains two of same field in same scope" in {
     val schema = SchemaBuilder.record("Test").fields()
       .requiredInt("testing").endRecord()
-    val record = """{"testing": "test", "testing": "test"}""".toGenericRecord(schema, useStrictValidation = false)
+    val record = """{"testing": "test", "testing": "test"}""".toGenericRecord(schema, useStrictValidation = false, useTimestampValidation = false)
     record shouldBe a[Failure[_]]
   }
 
@@ -118,7 +129,7 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
       .`type`(LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.STRING)))
       .noDefault
       .endRecord
-    val record = """{"testUuid": "test"}""".toGenericRecord(schema, useStrictValidation = true)
+    val record = """{"testUuid": "test"}""".toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false)
     record shouldBe a[Failure[_]]
   }
 
@@ -130,7 +141,7 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
       .`type`(LogicalTypes.uuid.addToSchema(Schema.create(Schema.Type.STRING)))
       .noDefault
       .endRecord
-    val record = s"""{"testUuid": "${uuid.toString}"}""".toGenericRecord(schema, useStrictValidation = true)
+    val record = s"""{"testUuid": "${uuid.toString}"}""".toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false)
     record shouldBe a[Success[_]]
   }
 
@@ -148,7 +159,7 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
       .`type`(inner)
       .noDefault
       .endRecord
-    val record = """{"extra": true, "inner": {"testUuid": "test"}}""".toGenericRecord(schema, useStrictValidation = true)
+    val record = """{"extra": true, "inner": {"testUuid": "test"}}""".toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false)
     record shouldBe a[Failure[_]]
   }
 
@@ -167,7 +178,8 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
       .`type`(inner)
       .noDefault
       .endRecord
-    val record = s"""{"extra": true, "inner": {"testUuid": "${uuid.toString}"}}""".toGenericRecord(schema, useStrictValidation = true)
+    val record =
+      s"""{"extra": true, "inner": {"testUuid": "${uuid.toString}"}}""".toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false)
     record shouldBe a[Success[_]]
   }
 
@@ -178,7 +190,8 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
       .`type`(LogicalTypes.timestampMillis.addToSchema(Schema.create(Schema.Type.LONG)))
       .noDefault
       .endRecord
-    val record = """{"testTs": 819283928392839283928398293829382938298329839283928392839283928398}""".toGenericRecord(schema, useStrictValidation = true)
+    val record = """{"testTs": 819283928392839283928398293829382938298329839283928392839283928398}""".
+      toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false)
     record shouldBe a[Failure[_]]
   }
 
@@ -190,7 +203,7 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
       .`type`(LogicalTypes.timestampMillis.addToSchema(Schema.create(Schema.Type.LONG)))
       .noDefault
       .endRecord
-    val record = s"""{"testTs": ${ts.toEpochMilli}}""".toGenericRecord(schema, useStrictValidation = true)
+    val record = s"""{"testTs": ${ts.toEpochMilli}}""".toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false)
     record shouldBe a[Success[_]]
   }
 
@@ -207,7 +220,7 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
         |  }
         |}
         |""".stripMargin
-    val record = json.toGenericRecord(schema, useStrictValidation = true)
+    val record = json.toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false)
     import collection.JavaConverters._
     record.get.get("testing") shouldBe Map("one" -> 1, "two" -> 2, "three" -> 3).map(kv => new Utf8(kv._1) -> kv._2).asJava
   }
@@ -221,7 +234,7 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
       .requiredString("testing").name("nested").`type`(inner2).noDefault.endRecord()
 
     the[AvroTypeException] thrownBy """{"testing": "test", "nested": {"testInner": {"testInner2" : "10"}}}""".
-      toGenericRecord(schema, useStrictValidation = true).get should have message "nested -> testInner -> testInner2 -> Expected int. Got VALUE_STRING"
+      toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false).get should have message "nested -> testInner -> testInner2 -> Expected int. Got VALUE_STRING"
   }
 
   it should "throw an AvroTypeException for union field with unexpected value" in {
@@ -235,10 +248,10 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
     val json = """{"testing2": "test", "nested": {"testing": {"my.namespace.TestingInner": {"testInner": "2020"}}}}"""
 
     the[AvroTypeException] thrownBy json.
-      toGenericRecord(schema, useStrictValidation = true).get should have message "nested -> testInner -> Expected int. Got VALUE_STRING"
+      toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false).get should have message "nested -> testInner -> Expected int. Got VALUE_STRING"
 
     the[AvroTypeException] thrownBy """{"testing": {"my.namespace.TestingInner": {"testInner": "2020"}}}""".
-      toGenericRecord(innerSchema, useStrictValidation = true).get should have message "testInner -> Expected int. Got VALUE_STRING"
+      toGenericRecord(innerSchema, useStrictValidation = true, useTimestampValidation = false).get should have message "testInner -> Expected int. Got VALUE_STRING"
   }
 
   it should "not throw an AvroTypeException for union field with null value" in {
@@ -246,7 +259,8 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
       .unionOf().nullType().and().record("TestingInner").fields()
       .requiredInt("testInner").endRecord().endUnion().nullDefault().endRecord()
 
-    val record = """{"testing": {"my.namespace.TestingInner": {"testInner": 2020}}}""".toGenericRecord(schema, useStrictValidation = true)
+    val record =
+    """{"testing": {"my.namespace.TestingInner": {"testInner": 2020}}}""".toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false)
     record shouldBe a[Success[_]]
   }
 
@@ -260,6 +274,30 @@ final class StringToGenericRecordSpec extends AnyFlatSpec with Matchers {
       .endRecord
 
     the[AvroTypeException] thrownBy s"""{"testTs": "hi"}""".
-      toGenericRecord(schema, useStrictValidation = true).get should have message "testTs -> Expected long. Got VALUE_STRING"
+      toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false).get should have message "testTs -> Expected long. Got VALUE_STRING"
+  }
+
+  it should "throw an InvalidLogicalTypeErrorForTimeStamp for field with logical type of timestamp-millis having value 0 with timestampValidation enabled" in {
+    the[InvalidLogicalTypeErrorForTimeStamp] thrownBy
+      s"""{"testTimestamp": 0}""".
+        toGenericRecord(timestampSchema, useStrictValidation = true, useTimestampValidation = true).get should have message
+      "Invalid value for field 'testTimestamp' having logical type - timestamp-millis. Value should be greater than 0 but received 0"
+  }
+
+  it should "throw an InvalidLogicalTypeErrorForTimeStamp for field with logical type of timestamp-millis having value -2 with timestampValidation enabled" in {
+    the[InvalidLogicalTypeErrorForTimeStamp] thrownBy
+      s"""{"testTimestamp": -2}""".
+        toGenericRecord(timestampSchema, useStrictValidation = true, useTimestampValidation = true).get should have message
+      "Invalid value for field 'testTimestamp' having logical type - timestamp-millis. Value should be greater than 0 but received -2"
+  }
+
+  it should "accept a logical field type of timestamp-millis having a value 0 with timestampValidation disabled" in {
+    val record = """{"testTimestamp": 0}""".toGenericRecord(timestampSchema, useStrictValidation = true, useTimestampValidation = false)
+    record shouldBe a[Success[_]]
+  }
+
+  it should "accept a logical field type of timestamp-millis having negative value -2 with timestampValidation disabled" in {
+    val record = """{"testTimestamp": -2}""".toGenericRecord(timestampSchema, useStrictValidation = true, useTimestampValidation = false)
+    record shouldBe a[Success[_]]
   }
 }

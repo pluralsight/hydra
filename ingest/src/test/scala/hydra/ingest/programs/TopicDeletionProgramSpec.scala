@@ -249,7 +249,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       schema = SchemaBuilder.record("Test").fields()
         .requiredString("testing").endRecord()
       _ <- v1TopicNames.traverse {
-        kafkaClientAlgebra.publishStringKeyMessage((None, """{"testing": "test"}""".toGenericRecord(schema, useStrictValidation = true).toOption, None)
+        kafkaClientAlgebra.publishStringKeyMessage((None, """{"testing": "test"}""".toGenericRecord(schema, useStrictValidation = true, useTimestampValidation = false).toOption, None)
           , _)
       }
       // delete all given topics
