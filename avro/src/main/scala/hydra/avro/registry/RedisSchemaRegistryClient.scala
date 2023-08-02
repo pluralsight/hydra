@@ -14,7 +14,6 @@ import scalacache.serialization.Codec
 import scalacache.serialization.Codec.DecodingResult
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
-import java.util.Base64
 import java.util.concurrent.TimeUnit
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.Duration
@@ -31,11 +30,11 @@ object RedisSchemaRegistryClient {
       oos.writeObject(value)
       oos.close()
       stream.close()
-      Base64.getEncoder.encode(stream.toByteArray)
+      stream.toByteArray
     }
 
     override def decode(bytes: Array[Byte]): DecodingResult[Map[Schema, Int]] = {
-      val stream = new ByteArrayInputStream(Base64.getDecoder.decode(bytes))
+      val stream = new ByteArrayInputStream(bytes)
       val ois = new ObjectInputStream(stream)
       val value = ois.readObject
       ois.close()
@@ -51,11 +50,11 @@ object RedisSchemaRegistryClient {
       oos.writeObject(value)
       oos.close()
       stream.close()
-      Base64.getEncoder.encode(stream.toByteArray)
+      stream.toByteArray
     }
 
     override def decode(bytes: Array[Byte]): DecodingResult[Map[Int, Schema]] = {
-      val stream = new ByteArrayInputStream(Base64.getDecoder.decode(bytes))
+      val stream = new ByteArrayInputStream(bytes)
       val ois = new ObjectInputStream(stream)
       val value = ois.readObject
       ois.close()
@@ -82,11 +81,11 @@ object RedisSchemaRegistryClient {
       oos.writeObject(value.map(m => (m._1, SerializableSchemaMetadata.fromSchemaMetadata(m._2))))
       oos.close()
       stream.close()
-      Base64.getEncoder.encode(stream.toByteArray)
+      stream.toByteArray
     }
 
     override def decode(bytes: Array[Byte]): DecodingResult[Map[Int, SchemaMetadata]] = {
-      val stream = new ByteArrayInputStream(Base64.getDecoder.decode(bytes))
+      val stream = new ByteArrayInputStream(bytes)
       val ois = new ObjectInputStream(stream)
       val value = ois.readObject
       ois.close()
