@@ -144,7 +144,7 @@ final case class TopicMetadataV2ValueOptionalTagList(
                                          streamType: StreamTypeV2,
                                          deprecated: Boolean,
                                          deprecatedDate: Option[Instant],
-                                         replacementTopic: Option[String],
+                                         replacementTopics: Option[List[String]],
                                          previousTopics: Option[List[String]],
                                          dataClassification: DataClassification,
                                          contact: NonEmptyList[ContactMethod],
@@ -153,14 +153,15 @@ final case class TopicMetadataV2ValueOptionalTagList(
                                          notes: Option[String],
                                          teamName: Option[String],
                                          tags: Option[List[String]],
-                                         notificationUrl: Option[String]
+                                         notificationUrl: Option[String],
+                                         _validations: Option[List[NewMetadataV2Validation]]
                                        ) {
   def toTopicMetadataV2Value: TopicMetadataV2Value = {
     TopicMetadataV2Value(
       streamType,
       deprecated,
       deprecatedDate,
-      replacementTopic,
+      replacementTopics,
       previousTopics,
       dataClassification,
       contact,
@@ -169,7 +170,8 @@ final case class TopicMetadataV2ValueOptionalTagList(
       notes,
       teamName,
       tags.getOrElse(List.empty),
-      notificationUrl
+      notificationUrl,
+      _validations
     )
   }
 }
@@ -179,7 +181,7 @@ final case class TopicMetadataV2Value(
     streamType: StreamTypeV2,
     deprecated: Boolean,
     deprecatedDate: Option[Instant],
-    replacementTopic: Option[String],
+    replacementTopics: Option[List[String]],
     previousTopics: Option[List[String]],
     dataClassification: DataClassification,
     contact: NonEmptyList[ContactMethod],
@@ -188,14 +190,15 @@ final case class TopicMetadataV2Value(
     notes: Option[String],
     teamName: Option[String],
     tags: List[String],
-    notificationUrl: Option[String]
+    notificationUrl: Option[String],
+    _validations: Option[List[NewMetadataV2Validation]]
 ) {
   def toTopicMetadataV2ValueOptionalTagList: TopicMetadataV2ValueOptionalTagList = {
     TopicMetadataV2ValueOptionalTagList(
       streamType,
       deprecated,
       deprecatedDate,
-      replacementTopic,
+      replacementTopics,
       previousTopics,
       dataClassification,
       contact,
@@ -204,7 +207,8 @@ final case class TopicMetadataV2Value(
       notes,
       teamName,
       tags.some,
-      notificationUrl
+      notificationUrl,
+      _validations
     )
   }
 }
@@ -266,6 +270,22 @@ object TopicMetadataV2ValueOptionalTagList {
   private implicit val contactMethodCodec: Codec[ContactMethod] =
     Codec.derive[ContactMethod]
 
+  private implicit val _validationsCodec: Codec[NewMetadataV2Validation] = Codec.deriveEnum[NewMetadataV2Validation](
+    symbols = List(
+      NewMetadataV2Validation.replacementTopics.entryName,
+      NewMetadataV2Validation.previousTopics.entryName
+    ),
+    encode = {
+      case NewMetadataV2Validation.`replacementTopics` => NewMetadataV2Validation.replacementTopics.entryName
+      case NewMetadataV2Validation.previousTopics   => NewMetadataV2Validation.previousTopics.entryName
+    },
+    decode = {
+      case "replacementTopics" => Right(NewMetadataV2Validation.replacementTopics)
+      case "previousTopics"    => Right(NewMetadataV2Validation.previousTopics)
+      case other               => Left(AvroError(s"$other is not a ${NewMetadataV2Validation.toString}"))
+    }
+  )
+
   implicit val codec: Codec[TopicMetadataV2ValueOptionalTagList] =
   Codec.record[TopicMetadataV2ValueOptionalTagList](
     name = "TopicMetadataV2Value",
@@ -275,8 +295,8 @@ object TopicMetadataV2ValueOptionalTagList {
       (field("streamType", _.streamType),
         field("deprecated", _.deprecated),
         field("deprecatedDate", _.deprecatedDate, default = Some(None)),
-        field("replacementTopic", _.replacementTopic, default = Some(None)), // TODO: Check why Some(None) and not simply None
-        field("previousTopics", _.previousTopics, default = Some(None)), // TODO: Check why Some(None) and not simply None
+        field("replacementTopics", _.replacementTopics, default = Some(None)),
+        field("previousTopics", _.previousTopics, default = Some(None)),
         field("dataClassification", _.dataClassification),
         field("contact", _.contact),
         field("createdDate", _.createdDate),
@@ -284,7 +304,8 @@ object TopicMetadataV2ValueOptionalTagList {
         field("notes", _.notes, default = Some(None)),
         field("teamName", _.teamName, default = Some(None)),
         field("tags", _.tags, default = Some(None)),
-        field("notificationUrl", _.notificationUrl, default = Some(None))
+        field("notificationUrl", _.notificationUrl, default = Some(None)),
+        field("_validations", _._validations, default = Some(None))
         ).mapN(TopicMetadataV2ValueOptionalTagList.apply)
   }
 }

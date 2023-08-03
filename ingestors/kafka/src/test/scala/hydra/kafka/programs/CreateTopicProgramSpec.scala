@@ -14,7 +14,7 @@ import hydra.kafka.algebras.KafkaAdminAlgebra.{Topic, TopicName}
 import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, Offset, Partition, PublishError, PublishResponse}
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TestMetadataAlgebra}
-import hydra.kafka.model.ContactMethod.Email
+import hydra.kafka.model.ContactMethod.{Email, Slack}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import hydra.kafka.util.KafkaUtils.TopicDetails
@@ -35,6 +35,7 @@ import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
 import scala.concurrent.ExecutionContext
 import hydra.kafka.model.TopicMetadataV2Request.NumPartitions
 import hydra.kafka.programs.CreateTopicProgram.MetadataOnlyTopicDoesNotExist
+import hydra.kafka.programs.CreateTopicProgramSpec.topicMetadataKey
 import hydra.kafka.programs.TopicSchemaError._
 import hydra.kafka.utils.TopicUtils
 import org.apache.avro.SchemaBuilder.{FieldAssembler, GenericDefault}
@@ -213,7 +214,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     "ingest metadata into the metadata topic" in {
       for {
         publishTo     <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
-        topicMetadata <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue))
+        topicMetadata <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue.copy(_validations = Some(NewMetadataV2Validation.values.toList))))
         ts            <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some)
         _             <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails, true)
         published     <- publishTo.get
@@ -227,7 +228,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         publishTo   <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         consumeFrom <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
         metadata    <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
-        m           <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue))
+        m           <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue.copy(_validations = Some(NewMetadataV2Validation.values.toList))))
         updatedM    <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(updatedValue.copy(createdDate = topicMetadataValue.createdDate)))
         ts          <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
         _           <- ts.program.createTopic(subject, topicMetadataRequest, TopicDetails(1, 1, 1), true)
@@ -2078,6 +2079,74 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
       result.attempt.map(_ shouldBe UnsupportedLogicalType(valueSchema.getField("timestamp"), "iso-datetime").asLeft)
     }
 
+    "_validations field is NOT populated if an existing topic does not have it" in {
+      for {
+        publishTo             <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
+        consumeFrom           <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
+        metadata              <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
+        _                     <- metadata.addToMetadata(subject, topicMetadataRequest)
+        ts                    <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
+        _                     <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails, withRequiredFields = true)
+        published             <- publishTo.get
+        expectedTopicMetadata <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue)) // NOTE: _validations empty in topicMetadataValue
+      } yield {
+        published shouldBe Map(metadataTopic -> (expectedTopicMetadata._1, expectedTopicMetadata._2, None))
+      }
+    }
+
+    "_validations field is NOT populated via the validations field in the create topic request" in {
+      val requestWithEmptyValidations = createTopicMetadataRequest(keySchema, valueSchema, validations = Some(NewMetadataV2Validation.values.toList))
+
+      for {
+        publishTo             <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
+        consumeFrom           <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
+        metadata              <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
+        _                     <- metadata.addToMetadata(subject, topicMetadataRequest)
+        ts                    <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
+        _                     <- ts.program.createTopic(subject, requestWithEmptyValidations, topicDetails, withRequiredFields = true)
+        published             <- publishTo.get
+        expectedTopicMetadata <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue)) // NOTE: _validations empty in topicMetadataValue
+      } yield {
+        published shouldBe Map(metadataTopic -> (expectedTopicMetadata._1, expectedTopicMetadata._2, None))
+      }
+    }
+
+    "_validations field is populated for a new topic" in {
+      for {
+        publishTo             <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
+        consumeFrom           <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
+        metadata              <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
+        ts                    <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
+        _                     <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails, withRequiredFields = true)
+        published             <- publishTo.get
+        expectedTopicMetadata <- TopicMetadataV2.encode[IO](
+          topicMetadataKey,
+          Some(topicMetadataValue.copy(_validations = Some(NewMetadataV2Validation.values.toList)))) // NOTE: _validations populated in topicMetadataValue
+      } yield {
+        published shouldBe Map(metadataTopic -> (expectedTopicMetadata._1, expectedTopicMetadata._2, None))
+      }
+    }
+
+    "_validations field will remain populated if an existing topic already has it" in {
+      for {
+        publishTo             <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
+        consumeFrom           <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
+        metadata              <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
+        ts                    <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
+        _                     <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails, withRequiredFields = true)
+        publishedFirst        <- publishTo.get
+        _                     <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails, withRequiredFields = true)
+        publishedSecond       <- publishTo.get
+        expectedTopicMetadata <- TopicMetadataV2.encode[IO] (
+          topicMetadataKey,
+          Some(topicMetadataValue.copy(_validations = Some(NewMetadataV2Validation.values.toList)))) // NOTE: _validations populated in topicMetadataValue
+
+      } yield {
+        publishedFirst shouldBe Map(metadataTopic -> (expectedTopicMetadata._1, expectedTopicMetadata._2, None))
+        publishedSecond shouldBe Map(metadataTopic -> (expectedTopicMetadata._1, expectedTopicMetadata._2, None))
+      }
+    }
+
     def createTopic(createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long])(implicit createdDate: Instant) =
       for {
         m <- TestMetadataAlgebra()
@@ -2197,14 +2266,15 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
                                   createdDate: Instant = Instant.now(),
                                   deprecated: Boolean = false,
                                   deprecatedDate: Option[Instant] = None,
-                                  numPartitions: Option[NumPartitions] = None
+                                  numPartitions: Option[NumPartitions] = None,
+                                  validations: Option[List[NewMetadataV2Validation]] = None
                                 ): TopicMetadataV2Request =
     TopicMetadataV2Request(
       Schemas(keySchema, valueSchema),
       StreamTypeV2.Entity,
       deprecated = deprecated,
       deprecatedDate,
-      replacementTopic = None,
+      replacementTopics = None,
       previousTopics = None,
       Public,
       NonEmptyList.of(Email.create(email).get),
@@ -2214,7 +2284,8 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
       Some("dvs-teamName"),
       numPartitions,
       List.empty,
-      Some("notification.url")
+      Some("notification.url"),
+      _validations = validations
     )
 
   def createEventStreamTypeTopicMetadataRequest(
@@ -2232,7 +2303,7 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
       StreamTypeV2.Event,
       deprecated = deprecated,
       deprecatedDate,
-      replacementTopic = None,
+      replacementTopics = None,
       previousTopics = None,
       Public,
       NonEmptyList.of(Email.create(email).get),
@@ -2242,7 +2313,8 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
       Some("dvs-teamName"),
       numPartitions,
       tags,
-      Some("notification.url")
+      Some("notification.url"),
+      None
     )
 
   def getSchema(name: String,
@@ -2275,6 +2347,28 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
 
   def createTopicMetadataRequest(createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long]): TopicMetadataV2Request =
     createTopicMetadataRequest(keySchema, getSchema("val", createdAtDefaultValue, updatedAtDefaultValue))
+
+  private def getMetadataGenericRecords(subject: Subject, nullValue: Boolean = false): (IO[(GenericRecord,Option[GenericRecord], Option[Headers])],
+    TopicMetadataV2Key, TopicMetadataV2Value) = {
+    val key = TopicMetadataV2Key(subject)
+    val value = TopicMetadataV2Value(
+      StreamTypeV2.Entity,
+      deprecated = false,
+      None,
+      None,
+      None,
+      Public,
+      NonEmptyList.one(Slack.create("#channel").get),
+      Instant.now,
+      List(),
+      None,
+      Some("dvs-teamName"),
+      List.empty,
+      Some("notificationUrl"),
+      None
+    )
+    (TopicMetadataV2.encode[IO](key, if (nullValue) None else Some(value), None), key, value)
+  }
 }
 
 class CustomGenericDefault[R](gd: GenericDefault[R]) {

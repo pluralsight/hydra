@@ -1,6 +1,7 @@
 package hydra.kafka.model
 
 import cats.data.NonEmptyList
+import enumeratum._
 import eu.timepit.refined._
 import eu.timepit.refined.api.{Refined, RefinedTypeOps}
 import eu.timepit.refined.boolean._
@@ -10,9 +11,9 @@ import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.Schema
 import shapeless.Witness
-import shapeless.Witness.Lt
 
 import java.time.Instant
+import scala.collection.immutable
 
 sealed trait DataClassification
 
@@ -73,12 +74,21 @@ object StreamTypeV2 {
   case object Telemetry extends StreamTypeV2
 }
 
+sealed trait NewMetadataV2Validation extends EnumEntry
+
+object NewMetadataV2Validation extends Enum[NewMetadataV2Validation] {
+  case object replacementTopics extends NewMetadataV2Validation
+  case object previousTopics extends NewMetadataV2Validation
+
+  override val values: immutable.IndexedSeq[NewMetadataV2Validation] = findValues
+}
+
 final case class TopicMetadataV2Request(
                                          schemas: Schemas,
                                          streamType: StreamTypeV2,
                                          deprecated: Boolean,
                                          deprecatedDate: Option[Instant],
-                                         replacementTopic: Option[String],
+                                         replacementTopics: Option[List[String]],
                                          previousTopics: Option[List[String]],
                                          dataClassification: DataClassification,
                                          contact: NonEmptyList[ContactMethod],
@@ -88,7 +98,8 @@ final case class TopicMetadataV2Request(
                                          teamName: Option[String],
                                          numPartitions: Option[TopicMetadataV2Request.NumPartitions],
                                          tags: List[String],
-                                         notificationUrl: Option[String]
+                                         notificationUrl: Option[String],
+                                         _validations: Option[List[NewMetadataV2Validation]]
                                        ) {
 
   def toValue: TopicMetadataV2Value = {
@@ -96,7 +107,7 @@ final case class TopicMetadataV2Request(
       streamType,
       deprecated,
       deprecatedDate,
-      replacementTopic,
+      replacementTopics,
       previousTopics,
       dataClassification,
       contact,
@@ -105,7 +116,8 @@ final case class TopicMetadataV2Request(
       notes,
       teamName,
       tags,
-      notificationUrl
+      notificationUrl,
+      _validations
     )
   }
 }
@@ -142,7 +154,7 @@ object TopicMetadataV2Request {
       mor.streamType,
       mor.deprecated,
       mor.deprecatedDate,
-      mor.replacementTopic,
+      mor.replacementTopics,
       mor.previousTopics,
       mor.dataClassification,
       mor.contact,
@@ -152,7 +164,8 @@ object TopicMetadataV2Request {
       mor.teamName,
       mor.numPartitions,
       mor.tags,
-      mor.notificationUrl
+      mor.notificationUrl,
+      mor._validations
     )
   }
 }
@@ -166,6 +179,8 @@ final case class TopicMetadataV2Response(
                                           streamType: StreamTypeV2,
                                           deprecated: Boolean,
                                           deprecatedDate: Option[Instant],
+                                          replacementTopics: Option[List[String]],
+                                          previousTopics: Option[List[String]],
                                           dataClassification: DataClassification,
                                           contact: NonEmptyList[ContactMethod],
                                           createdDate: Instant,
@@ -185,6 +200,8 @@ object TopicMetadataV2Response {
       v.streamType,
       v.deprecated,
       v.deprecatedDate,
+      v.replacementTopics,
+      v.previousTopics,
       v.dataClassification,
       v.contact,
       v.createdDate,
@@ -200,7 +217,7 @@ object TopicMetadataV2Response {
 final case class MetadataOnlyRequest(streamType: StreamTypeV2,
                                      deprecated: Boolean,
                                      deprecatedDate: Option[Instant],
-                                     replacementTopic: Option[String],
+                                     replacementTopics: Option[List[String]],
                                      previousTopics: Option[List[String]],
                                      dataClassification: DataClassification,
                                      contact: NonEmptyList[ContactMethod],
@@ -210,7 +227,8 @@ final case class MetadataOnlyRequest(streamType: StreamTypeV2,
                                      teamName: Option[String],
                                      numPartitions: Option[TopicMetadataV2Request.NumPartitions],
                                      tags: List[String],
-                                     notificationUrl: Option[String]) {
+                                     notificationUrl: Option[String],
+                                     _validations: Option[List[NewMetadataV2Validation]]) {
 }
 
 

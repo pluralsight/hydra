@@ -137,7 +137,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       StreamTypeV2.Entity,
       deprecated = deprecated,
       deprecatedDate,
-      replacementTopic = None,
+      replacementTopics = None,
       previousTopics = None,
       Public,
       NonEmptyList.of(Email.create(email).get),
@@ -147,7 +147,8 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       Some("dvs-teamName"),
       None,
       List.empty,
-      Some("notificationUrl")
+      Some("notificationUrl"),
+      None
     )
 
   private def buildSchema(topic: String, upgrade: Boolean): Schema = {

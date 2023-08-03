@@ -1,20 +1,20 @@
 package hydra.kafka.programs
-import java.time.Instant
 import cats.effect.{Bracket, ExitCase, Resource, Sync}
+import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
+import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
-import hydra.kafka.model.{StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
+import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.model._
 import hydra.kafka.programs.CreateTopicProgram._
 import hydra.kafka.util.KafkaUtils.TopicDetails
-import org.typelevel.log4cats.Logger
 import org.apache.avro.Schema
+import org.typelevel.log4cats.Logger
+import retry._
 import retry.syntax.all._
-import retry.{RetryDetails, RetryPolicy, _}
-import cats.implicits._
-import hydra.kafka.model.TopicMetadataV2Request.Subject
 
-import scala.language.higherKinds
+import java.time.Instant
 import scala.util.control.NoStackTrace
 
 final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] private (
@@ -118,13 +118,35 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
             None
           }
       }
-      message = (TopicMetadataV2Key(topicName), createTopicRequest.copy(createdDate = createdDate, deprecatedDate = deprecatedDate).toValue)
+      message = (
+        TopicMetadataV2Key(topicName),
+        createTopicRequest.copy(createdDate = createdDate, deprecatedDate = deprecatedDate, _validations = newMetadataValidations(metadata)).toValue)
       records <- TopicMetadataV2.encode[F](message._1, Some(message._2), None)
       _ <- kafkaClient
         .publishMessage(records, v2MetadataTopicName.value)
         .rethrow
     } yield ()
   }
+
+  /**
+   * An OLD topic will have its metadata populated.
+   * Therefore, _validations=None will be picked from the metadata.
+   * And no new validations will be applied on older topics.
+   *
+   * A NEW topic will not have a metadata object.
+   * Therefore, Some([replacementTopics, previousTopics]) will be assigned to _validations.
+   * Thus, validations on corresponding fields will be applied.
+   *
+   * Corner case: After this feature has been on STAGE/PROD for sometime and validation for another new field is required.
+   * We need not worry about old topics as the value of _validations will remain the same since topic creation.
+   * New validations should be applied only on new topics.
+   * Therefore, assigning all the values from NewMetadataV2Validation enum is reasonable.
+   *
+   * @param metadata a metadata object of current topic
+   * @return value of _validations if the topic is already existing(OLD topic) otherwise all enum values of NewMetadataV2Validation(NEW topic).
+   */
+  private def newMetadataValidations(metadata: Option[TopicMetadataContainer]): Option[List[NewMetadataV2Validation]] =
+    metadata.map(_.value._validations).getOrElse(NewMetadataV2Validation.values.toList.some)
 
   def checkThatTopicExists(topicName: String): F[Unit] =
     for {

@@ -284,6 +284,7 @@ class TopicMetadataEndpointSpec
     val validRequest = """{
                          |    "streamType": "Event",
                          |    "deprecated": true,
+                         |    "replacementTopics": ["dvs.test.subject.new"],
                          |    "dataClassification": "InternalUseOnly",
                          |    "contact": {
                          |        "email": "bob@myemail.com"
@@ -314,6 +315,7 @@ class TopicMetadataEndpointSpec
     """{
        |    "streamType": "Event",
        |    "deprecated": true,
+       |    "replacementTopics": ["dvs.test.subject.new"],
        |    "dataClassification": "InternalUseOnly",
        |    "contact": {
        |        "email": "bob@myemail.com"

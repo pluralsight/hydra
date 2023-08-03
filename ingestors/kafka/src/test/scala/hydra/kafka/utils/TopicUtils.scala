@@ -3,14 +3,12 @@ package hydra.kafka.utils
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.implicits._
-import hydra.avro.registry.SchemaRegistry
-import hydra.avro.registry.SchemaRegistry.SchemaId
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.algebras.TestMetadataAlgebra
 import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
-import org.apache.avro.{Schema, SchemaBuilder}
+import org.apache.avro.SchemaBuilder
 
 import java.time.Instant
 
@@ -26,6 +24,8 @@ object TopicUtils {
         StreamTypeV2.Entity,
         deprecated = false,
         deprecatedDate = None,
+        replacementTopics = None,
+        previousTopics = None,
         Public,
         NonEmptyList.of(Email.create("test@test.com").get),
         createdDate,
@@ -34,7 +34,8 @@ object TopicUtils {
         Some("dvs-teamName"),
         None,
         List.empty,
-        Some("notificationUrl")
+        Some("notificationUrl"),
+        _validations = None
       )
       val topicMetadataContainer = TopicMetadataContainer(
         topicMetadataKey,

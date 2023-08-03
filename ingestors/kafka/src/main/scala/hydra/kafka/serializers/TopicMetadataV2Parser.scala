@@ -1,11 +1,11 @@
 package hydra.kafka.serializers
 
 import java.time.Instant
-
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import cats.data.Validated.{Invalid, Valid}
 import cats.data._
 import cats.syntax.all._
+import enumeratum.EnumEntry
 import eu.timepit.refined.auto._
 import hydra.kafka.model.ContactMethod.{Email, Slack}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -270,11 +270,26 @@ sealed trait TopicMetadataV2Parser
     
   }
 
+  class EnumEntryJsonFormat[E <: EnumEntry](values: Seq[E]) extends RootJsonFormat[E] {
+
+    override def write(obj: E): JsValue = JsString(obj.entryName)
+
+    override def read(json: JsValue): E = json match {
+      case s: JsString => values.find(v => v.entryName == s.value).getOrElse(deserializationError(s))
+      case x           => deserializationError(x)
+    }
+
+    private def deserializationError(value: JsValue) = throw DeserializationException(s"Expected a value from enum $values instead of $value")
+  }
+
+  implicit val newMetadataValidationFormat: EnumEntryJsonFormat[NewMetadataV2Validation] =
+    new EnumEntryJsonFormat[NewMetadataV2Validation](NewMetadataV2Validation.values)
+
   implicit object TopicMetadataV2Format
       extends RootJsonFormat[TopicMetadataV2Request] {
 
     override def write(obj: TopicMetadataV2Request): JsValue =
-      jsonFormat15(TopicMetadataV2Request.apply).write(obj)
+      jsonFormat16(TopicMetadataV2Request.apply).write(obj)
 
     override def read(json: JsValue): TopicMetadataV2Request = json match {
       case j: JsObject =>
@@ -333,7 +348,8 @@ sealed trait TopicMetadataV2Parser
               .getOrElse(throwDeserializationError("streamType", "String"))
           )
         )
-        val deprecated = toResult(getBoolWithKey(j, "deprecated"))
+        val deprecatedFieldName = "deprecated"
+        val deprecated = toResult(getBoolWithKey(j, deprecatedFieldName))
         val deprecatedDate = if ( deprecated.toOption.getOrElse(false) && !j.getFields("deprecatedDate").headOption.getOrElse(None).equals(None)) {
           toResult(Option(Instant.parse(j.getFields("deprecatedDate").headOption
             .getOrElse(throwDeserializationError("deprecatedDate","long"))
@@ -389,9 +405,17 @@ sealed trait TopicMetadataV2Parser
         val notificationUrl = toResult(
           j.getFields("notificationUrl").headOption.map(_.convertTo[String])
         )
-        val replacementTopic = toResult(
-          j.getFields("replacementTopic").headOption.map(validateTopic)
-        )
+
+        val replacementTopics = toResult {
+          val rtFieldName = "replacementTopics"
+
+          j.fields.get("replacementTopics") match {
+            case Some(t)                            => t.convertTo[Option[List[String]]].map(_.map(p => validateTopic(JsString(p))))
+            case None if deprecated.contains_(true) => throw DeserializationException(MissingRequiredFieldWhenAnotherFieldSet(rtFieldName, deprecatedFieldName, "true").errorMessage)
+            case None                               => None
+          }
+        }
+
         val previousTopics = toResult(
           j.fields.get("previousTopics") match {
             case Some(t) => t.convertTo[Option[List[String]]].map(_.map(p => validateTopic(JsString(p))))
@@ -403,7 +427,7 @@ sealed trait TopicMetadataV2Parser
           streamType,
           deprecated,
           deprecatedDate,
-          replacementTopic,
+          replacementTopics,
           previousTopics,
           dataClassification,
           contact,
@@ -413,7 +437,8 @@ sealed trait TopicMetadataV2Parser
           teamName,
           numPartitions,
           tags,
-          notificationUrl
+          notificationUrl,
+          toResult(None)
           ).mapN(MetadataOnlyRequest.apply)
     }
 
@@ -436,7 +461,7 @@ sealed trait TopicMetadataV2Parser
   implicit object TopicMetadataResponseV2Format extends RootJsonFormat[TopicMetadataV2Response] {
     override def read(json: JsValue): TopicMetadataV2Response = throw IntentionallyUnimplemented
 
-    override def write(obj: TopicMetadataV2Response): JsValue = jsonFormat13(TopicMetadataV2Response.apply).write(obj)
+    override def write(obj: TopicMetadataV2Response): JsValue = jsonFormat15(TopicMetadataV2Response.apply).write(obj)
   }
 
   private def throwDeserializationError(key: String, `type`: String) =
@@ -564,4 +589,8 @@ object Errors {
     def errorMessage: String = s"Field `$field` of type $fieldType"
   }
 
+  final case class MissingRequiredFieldWhenAnotherFieldSet(field: String, anotherField: String, anotherFieldValue: String) {
+
+    def errorMessage: String = s"Field `$field` must be populated when `$anotherField` is set to $anotherFieldValue!"
+  }
 }
