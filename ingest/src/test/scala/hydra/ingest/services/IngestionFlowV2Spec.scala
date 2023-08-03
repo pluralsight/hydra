@@ -6,17 +6,19 @@ import fs2.kafka.{Header, Headers}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.util.SchemaWrapper
 import hydra.core.transport.ValidationStrategy
-import hydra.ingest.services.IngestionFlowV2.{KeyAndValueMismatch, KeyAndValueMismatchedValuesException, V2IngestRequest}
-import hydra.kafka.algebras.KafkaClientAlgebra
+import hydra.ingest.services.IngestionFlowV2.{AvroConversionAugmentedException, KeyAndValueMismatch, KeyAndValueMismatchedValuesException, V2IngestRequest}
+import hydra.ingest.utils.TopicUtils
+import hydra.kafka.algebras.{KafkaClientAlgebra, TestMetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import org.apache.avro.generic.{GenericRecord, GenericRecordBuilder}
-import org.apache.avro.{Schema, SchemaBuilder}
+import org.apache.avro.generic.GenericRecordBuilder
+import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import scalacache.Cache
 import scalacache.guava.GuavaCache
 
+import java.time.Instant
 import scala.concurrent.ExecutionContext
 
 final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
@@ -28,6 +30,10 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
   implicit val timer = IO.timer(ExecutionContext.global)
 
   private val testSubject: Subject = Subject.createValidated("dvs.test.v0.Testing").get
+  private val testSubjectV1: Subject = Subject.createValidated("dvs.test.v1.Testing").get
+  private val timestampValidationCutoffDate: Instant = Instant.parse("2023-07-11T00:00:00Z")
+  private val preTimestampValidationCutoffDate: Instant = Instant.parse("2023-05-30T00:00:00Z")
+  private val postTimestampValidationCutoffDate: Instant = Instant.parse("2023-07-30T00:00:00Z")
 
   private val testKeyPayload: String =
     """{"id": "testing"}"""
@@ -41,15 +47,25 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
   private val testValSchema: Schema = SchemaBuilder.record("TestRecord")
     .fields().requiredBoolean("testField").endRecord()
 
+  private val testValSchemaForV1: Schema = SchemaBuilder.record("TestRecord")
+    .fields().name("testTimestamp").`type`(LogicalTypes.timestampMillis.addToSchema(Schema.create(Schema.Type.LONG)))
+    .noDefault
+    .endRecord
+
   implicit val guavaCache: Cache[SchemaWrapper] = GuavaCache[SchemaWrapper]
 
-  private def ingest(request: V2IngestRequest, altValueSchema: Option[Schema] = None): IO[KafkaClientAlgebra[IO]] = for {
+  private def ingest(request: V2IngestRequest, altValueSchema: Option[Schema] = None,
+                     altSubject: Option[Subject] = None,
+                     createdDate: Instant = Instant.now,
+                     timestampValidationCutoffDate: Instant = timestampValidationCutoffDate): IO[KafkaClientAlgebra[IO]] = for {
     schemaRegistry <- SchemaRegistry.test[IO]
-    _ <- schemaRegistry.registerSchema(testSubject.value + "-key", testKeySchema)
-    _ <- schemaRegistry.registerSchema(testSubject.value + "-value", altValueSchema.getOrElse(testValSchema))
+    _ <- schemaRegistry.registerSchema(altSubject.getOrElse(testSubject.value) + "-key", testKeySchema)
+    _ <- schemaRegistry.registerSchema(altSubject.getOrElse(testSubject.value) + "-value", altValueSchema.getOrElse(testValSchema))
     kafkaClient <- KafkaClientAlgebra.test[IO]
-    ingestFlow <- IO(new IngestionFlowV2[IO](schemaRegistry, kafkaClient, "https://schemaRegistry.notreal"))
-    _ <- ingestFlow.ingest(request, testSubject)
+    m <- TestMetadataAlgebra()
+    _ <- TopicUtils.updateTopicMetadata(List(altSubject.getOrElse(testSubject.value).toString), m, createdDate)
+    ingestFlow <- IO(new IngestionFlowV2[IO](schemaRegistry, kafkaClient, "https://schemaRegistry.notreal", m, timestampValidationCutoffDate))
+    _ <- ingestFlow.ingest(request, altSubject.getOrElse(testSubject))
   } yield kafkaClient
 
   it should "ingest a record" in {
@@ -170,6 +186,57 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
       .set("id","12345")
       .build()
     IngestionFlowV2.validateKeyAndValueSchemas(key, None) shouldBe a[Right[Throwable,Unit]]
+  }
+
+  it should "accept a logical field type of timestamp-millis having a value 0 before timestamp-millis validation cut-off date" in {
+    val testValPayloadV1: String = s"""{"testTimestamp": 0}"""
+    val testRequest = V2IngestRequest(testKeyPayload, testValPayloadV1.some, ValidationStrategy.Strict.some, useSimpleJsonFormat = false)
+
+    ingest(testRequest, testValSchemaForV1.some, testSubjectV1.some, createdDate = preTimestampValidationCutoffDate).flatMap { kafkaClient =>
+      kafkaClient.consumeMessages(testSubjectV1.value, "test-consumer", commitOffsets = false).take(1).compile.toList.map { publishedMessages =>
+        val firstMessage = publishedMessages.head
+        (firstMessage._1.toString, firstMessage._2.get.toString) shouldBe(testKeyPayload, testValPayloadV1)
+      }
+    }.unsafeRunSync()
+  }
+
+  it should "accept a logical field type of timestamp-millis having a negative value -2 before timestamp-millis validation cut-off date" in {
+    val testValPayloadV1: String = s"""{"testTimestamp": -2}"""
+    val testRequest = V2IngestRequest(testKeyPayload, testValPayloadV1.some, ValidationStrategy.Strict.some, useSimpleJsonFormat = false)
+
+    ingest(testRequest, testValSchemaForV1.some, testSubjectV1.some, createdDate = preTimestampValidationCutoffDate).flatMap { kafkaClient =>
+      kafkaClient.consumeMessages(testSubjectV1.value, "test-consumer", commitOffsets = false).take(1).compile.toList.map { publishedMessages =>
+        val firstMessage = publishedMessages.head
+        (firstMessage._1.toString, firstMessage._2.get.toString) shouldBe(testKeyPayload, testValPayloadV1)
+      }
+    }.unsafeRunSync()
+  }
+
+  it should "throw an AvroConversionAugmentedException if a logical type(timestamp-millis) field is having a value 0 after timestamp-millis validation " +
+    "cut-off date" in {
+    val testValPayloadV1: String = s"""{"testTimestamp": 0}"""
+    val testRequest = V2IngestRequest(testKeyPayload, testValPayloadV1.some, ValidationStrategy.Strict.some, useSimpleJsonFormat = false)
+    the[AvroConversionAugmentedException] thrownBy ingest(testRequest, createdDate = postTimestampValidationCutoffDate).unsafeRunSync()
+  }
+
+  it should "throw an AvroConversionAugmentedException if a logical type(timestamp-millis) field is having a negative value -2 after timestamp-millis " +
+    "validation cut-off date" in {
+    val testValPayloadV1: String = s"""{"testTimestamp": -2}"""
+    val testRequest = V2IngestRequest(testKeyPayload, testValPayloadV1.some, ValidationStrategy.Strict.some, useSimpleJsonFormat = false)
+    the[AvroConversionAugmentedException] thrownBy ingest(testRequest, createdDate = postTimestampValidationCutoffDate).unsafeRunSync()
+  }
+
+  it should "accept a logical field type of timestamp-millis having a valid value 123 after validation cut-off date" in {
+    val testValPayloadV1: String = s"""{"testTimestamp": 123}"""
+    val testRequest = V2IngestRequest(testKeyPayload, testValPayloadV1.some, ValidationStrategy.Strict.some, useSimpleJsonFormat = false)
+
+    ingest(testRequest, testValSchemaForV1.some, testSubjectV1.some,
+      createdDate = postTimestampValidationCutoffDate).flatMap { kafkaClient =>
+      kafkaClient.consumeMessages(testSubjectV1.value, "test-consumer", commitOffsets = false).take(1).compile.toList.map { publishedMessages =>
+        val firstMessage = publishedMessages.head
+        (firstMessage._1.toString, firstMessage._2.get.toString) shouldBe(testKeyPayload, testValPayloadV1)
+      }
+    }.unsafeRunSync()
   }
 
 }

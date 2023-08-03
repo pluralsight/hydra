@@ -15,6 +15,7 @@ import retry._
 import retry.syntax.all._
 
 import java.time.Instant
+import scala.language.higherKinds
 import scala.util.control.NoStackTrace
 
 final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] private (
