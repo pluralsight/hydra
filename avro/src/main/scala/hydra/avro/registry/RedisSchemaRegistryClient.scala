@@ -16,6 +16,7 @@ import scalacache.serialization.Codec.DecodingResult
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 import java.util.concurrent.TimeUnit
 import scala.collection.JavaConverters._
+import scala.collection.immutable.Map
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
 
@@ -304,31 +305,44 @@ class RedisSchemaRegistryClient(restService: RestService,
     parser.parse(restSchema.getSchemaString)
   }
 
-  override def getBySubjectAndId(s: String, i: Int): Schema = synchronized { //?
+  override def getBySubjectAndId(s: String, i: Int): Schema = {
+    val idKey = buildIdKey(s)
 
-    def call(): Map[Int, Schema] = Try {
-      val restSchema = restService.getId(i)
-      val parser = new Schema.Parser()
-      parser.setValidateDefaults(false)
-      val schema = parser.parse(restSchema.getSchemaString)
-      Map(i -> schema)
-    }.getOrElse(Map.empty[Int, Schema])
+    idCache.get(idKey) match {
+      case Failure(_) => restGetId(s, i)(i)
+      case Success(map) =>
+        map match {
+          case Some(m) if m.keys.exists(_ == i) => m(i)
+          case _ => getBySubjectAndIdSynchronized(s, i)
+        }
+    }
+  }
+
+  private def restGetId(s: String, i: Int): Map[Int, Schema] = Try {
+    val restSchema = restService.getId(i)
+    val parser = new Schema.Parser()
+    parser.setValidateDefaults(false)
+    val schema = parser.parse(restSchema.getSchemaString)
+    Map(i -> schema)
+  }.getOrElse(Map.empty[Int, Schema])
+
+  private def getBySubjectAndIdSynchronized(s: String, i: Int): Schema = synchronized {
 
     val idKey = buildIdKey(s)
 
     idCache.get(idKey) match {
       case Failure(_) =>
-        call()(i)
+        restGetId(s, i)(i)
       case Success(map) =>
         map match {
           case Some(m) if m.keys.exists(_ == i) =>
             m(i)
           case Some(m) =>
-            val c = call()
+            val c = restGetId(s, i)
             idCache.put(idKey)(m ++ c, idCacheDurationTtl)
             c(i)
           case None =>
-            val c = call()
+            val c = restGetId(s, i)
             idCache.put(idKey)(c, idCacheDurationTtl)
             c(i)
         }
