@@ -26,6 +26,8 @@ object TopicUtils {
         StreamTypeV2.Entity,
         deprecated = false,
         deprecatedDate = None,
+        replacementTopics = None,
+        previousTopics = None,
         Public,
         NonEmptyList.of(Email.create("test@test.com").get),
         createdDate,
@@ -34,7 +36,8 @@ object TopicUtils {
         Some("dvs-teamName"),
         None,
         List.empty,
-        Some("notificationUrl")
+        Some("notificationUrl"),
+        _validations = None
       )
       val topicMetadataContainer = TopicMetadataContainer(
         topicMetadataKey,
