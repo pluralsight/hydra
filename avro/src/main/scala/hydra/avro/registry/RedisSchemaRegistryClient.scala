@@ -16,10 +16,11 @@ import scalacache.serialization.Codec.DecodingResult
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 import java.util.concurrent.TimeUnit
 import scala.collection.JavaConverters._
+import scala.collection.immutable.Map
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
 
-case class CacheConfigs(idCacheTtl: Int, schemaCacheTtl: Int, versionCacheTtl: Int)
+case class CacheConfigs(idCacheTtl: Int, schemaCacheTtl: Int, versionCacheTtl: Int, metadataCacheTtl: Option[Int] = Option(12000))
 
 object RedisSchemaRegistryClient {
 
@@ -29,13 +30,16 @@ object RedisSchemaRegistryClient {
       val oos = new ObjectOutputStream(stream)
       oos.writeObject(value)
       oos.close()
+      stream.close()
       stream.toByteArray
     }
 
     override def decode(bytes: Array[Byte]): DecodingResult[Map[Schema, Int]] = {
-      val ois = new ObjectInputStream(new ByteArrayInputStream(bytes))
+      val stream = new ByteArrayInputStream(bytes)
+      val ois = new ObjectInputStream(stream)
       val value = ois.readObject
       ois.close()
+      stream.close()
       Codec.tryDecode(value.asInstanceOf[Map[Schema, Int]])
     }
   }
@@ -46,14 +50,50 @@ object RedisSchemaRegistryClient {
       val oos = new ObjectOutputStream(stream)
       oos.writeObject(value)
       oos.close()
+      stream.close()
       stream.toByteArray
     }
 
     override def decode(bytes: Array[Byte]): DecodingResult[Map[Int, Schema]] = {
-      val ois = new ObjectInputStream(new ByteArrayInputStream(bytes))
+      val stream = new ByteArrayInputStream(bytes)
+      val ois = new ObjectInputStream(stream)
       val value = ois.readObject
       ois.close()
+      stream.close()
       Codec.tryDecode(value.asInstanceOf[Map[Int, Schema]])
+    }
+  }
+
+  private object SerializableSchemaMetadata {
+    def fromSchemaMetadata(sm: SchemaMetadata): SerializableSchemaMetadata = {
+      new SerializableSchemaMetadata(sm.getId, sm.getVersion, sm.getSchema)
+    }
+  }
+  private class SerializableSchemaMetadata(id: Int, version: Int, schema: String) extends Serializable {
+    def getSchemaMetadata: SchemaMetadata = {
+      new SchemaMetadata(id, version, schema)
+    }
+  }
+
+  object IntSchemaMetadataMapBinCodec extends Codec[Map[Int, SchemaMetadata]] {
+    override def encode(value: Map[Int, SchemaMetadata]): Array[Byte] = {
+      val stream: ByteArrayOutputStream = new ByteArrayOutputStream()
+      val oos = new ObjectOutputStream(stream)
+      oos.writeObject(value.map(m => (m._1, SerializableSchemaMetadata.fromSchemaMetadata(m._2))))
+      oos.close()
+      stream.close()
+      stream.toByteArray
+    }
+
+    override def decode(bytes: Array[Byte]): DecodingResult[Map[Int, SchemaMetadata]] = {
+      val stream = new ByteArrayInputStream(bytes)
+      val ois = new ObjectInputStream(stream)
+      val value = ois.readObject
+      ois.close()
+      stream.close()
+
+      val maybeValue = value.asInstanceOf[Map[Int, SerializableSchemaMetadata]]
+      Codec.tryDecode(maybeValue.map(m => (m._1, m._2.getSchemaMetadata)))
     }
   }
 
@@ -71,6 +111,13 @@ object RedisSchemaRegistryClient {
     def encode(value: Map[Int, Schema]): Array[Byte] = IntSchemaMapBinCodec.encode(value)
 
     def decode(bytes: Array[Byte]): Codec.DecodingResult[Map[Int, Schema]] = IntSchemaMapBinCodec.decode(bytes)
+  }
+
+  private val metadataCacheCodec: Codec[Map[Int, SchemaMetadata]] = new Codec[Map[Int, SchemaMetadata]] {
+
+    def encode(value: Map[Int, SchemaMetadata]): Array[Byte] = IntSchemaMetadataMapBinCodec.encode(value)
+
+    def decode(bytes: Array[Byte]): Codec.DecodingResult[Map[Int, SchemaMetadata]] = IntSchemaMetadataMapBinCodec.decode(bytes)
   }
 
   private def readIntConfigParameter(config: Config, path: String): Int = {
@@ -189,10 +236,13 @@ class RedisSchemaRegistryClient(restService: RestService,
   private val idCacheConfig = CacheConfig.defaultCacheConfig
   private val schemaCacheConfig = CacheConfig.defaultCacheConfig
   private val versionCacheConfig = CacheConfig.defaultCacheConfig
+  private val metadataCacheConfig = CacheConfig.defaultCacheConfig
+  private val latestSchemaCacheConfig = CacheConfig.defaultCacheConfig
 
   private val idCacheDurationTtl = Option(Duration(cacheConfigs.idCacheTtl, TimeUnit.MINUTES))
   private val schemaCacheDurationTtl = Option(Duration(cacheConfigs.schemaCacheTtl, TimeUnit.MINUTES))
   private val versionCacheDurationTtl = Option(Duration(cacheConfigs.versionCacheTtl, TimeUnit.MINUTES))
+  private val metadataCacheDurationTtl = Option(Duration(cacheConfigs.metadataCacheTtl.getOrElse(10000), TimeUnit.MINUTES))
 
   private val schemaCache: Cache[Map[Schema, Int]] =
     RedisCache(redisHost, redisPort)(schemaCacheConfig, schemaCacheCodec)
@@ -203,6 +253,10 @@ class RedisSchemaRegistryClient(restService: RestService,
   private val versionCache: Cache[Map[Schema, Int]] =
     RedisCache(redisHost, redisPort)(versionCacheConfig, schemaCacheCodec)
 
+
+  private val metadataCache: Cache[Map[Int, SchemaMetadata]] =
+    RedisCache(redisHost, redisPort)(metadataCacheConfig, metadataCacheCodec)
+
   private def buildSchemaKey(subject: String): String = {
     "schema_" + subject
   }
@@ -211,6 +265,10 @@ class RedisSchemaRegistryClient(restService: RestService,
   }
   private def buildVersionKey(subject: String): String = {
     "version_" + subject
+  }
+
+  private def buildMetadataKey(subject: String): String = {
+    "meta_" + subject
   }
 
   if (httpHeaders.nonEmpty) {
@@ -247,30 +305,45 @@ class RedisSchemaRegistryClient(restService: RestService,
     parser.parse(restSchema.getSchemaString)
   }
 
-  override def getBySubjectAndId(s: String, i: Int): Schema = synchronized {
+  override def getBySubjectAndId(s: String, i: Int): Schema = {
+    val idKey = buildIdKey(s)
 
-    def call(): Map[Int, Schema] = Try {
-      val restSchema = restService.getId(i)
-      val parser = new Schema.Parser()
-      parser.setValidateDefaults(false)
-      val schema = parser.parse(restSchema.getSchemaString)
-      Map(i -> schema)
-    }.getOrElse(Map.empty[Int, Schema])
+    idCache.get(idKey) match {
+      case Failure(_) => restGetId(s, i)(i)
+      case Success(map) =>
+        map match {
+          case Some(m) if m.keys.exists(_ == i) => m(i)
+          case _ => getBySubjectAndIdSynchronized(s, i)
+        }
+    }
+  }
 
-    idCache.get(s) match {
+  private def restGetId(s: String, i: Int): Map[Int, Schema] = Try {
+    val restSchema = restService.getId(i)
+    val parser = new Schema.Parser()
+    parser.setValidateDefaults(false)
+    val schema = parser.parse(restSchema.getSchemaString)
+    Map(i -> schema)
+  }.getOrElse(Map.empty[Int, Schema])
+
+  private def getBySubjectAndIdSynchronized(s: String, i: Int): Schema = synchronized {
+
+    val idKey = buildIdKey(s)
+
+    idCache.get(idKey) match {
       case Failure(_) =>
-        call()(i)
+        restGetId(s, i)(i)
       case Success(map) =>
         map match {
           case Some(m) if m.keys.exists(_ == i) =>
             m(i)
           case Some(m) =>
-            val c = call()
-            idCache.put(s)(m ++ c, idCacheDurationTtl)
+            val c = restGetId(s, i)
+            idCache.put(idKey)(m ++ c, idCacheDurationTtl)
             c(i)
           case None =>
-            val c = call()
-            idCache.put(s)(c, idCacheDurationTtl)
+            val c = restGetId(s, i)
+            idCache.put(idKey)(c, idCacheDurationTtl)
             c(i)
         }
     }
@@ -280,7 +353,7 @@ class RedisSchemaRegistryClient(restService: RestService,
     restService.getAllSubjectsById(i)
   }
 
-  override def getLatestSchemaMetadata(s: String): SchemaMetadata = synchronized {
+   def getLatestSchemaMetadata(s: String): SchemaMetadata = synchronized {
     val response = restService.getLatestVersion(s)
     val id = response.getId
     val schema: String  = response.getSchema
@@ -288,11 +361,42 @@ class RedisSchemaRegistryClient(restService: RestService,
     new SchemaMetadata(id, version, schema)
   }
 
-  override def getSchemaMetadata(s: String, i: Int): SchemaMetadata = {
+/*  override def getSchemaMetadata(s: String, i: Int): SchemaMetadata = {
     val response = restService.getVersion(s, i)
     val id = response.getId
     val schema: String = response.getSchema
     new SchemaMetadata(id, i, schema)
+  }*/
+
+  override def getSchemaMetadata(s: String, i: Int): SchemaMetadata = {
+    def get(s: String, i: Int): SchemaMetadata = {
+      val response = restService.getVersion(s, i)
+      val id = response.getId
+      val schema: String = response.getSchema
+      new SchemaMetadata(id, i, schema)
+    }
+
+    val metadataKey = buildMetadataKey(s)
+
+    metadataCache.get(metadataKey) match {
+      case Failure(_) =>
+        val sm = get(s, i)
+        metadataCache.put(metadataKey)(Map(i -> sm), metadataCacheDurationTtl)
+        sm
+      case Success(map) => map match {
+        case Some(m) if m.keySet.contains(i) =>
+            m(i)
+        case Some(m) =>
+          val sm = get(s, i)
+          val concatMap: Map[Int, SchemaMetadata] = m ++ Map(i -> sm)
+          metadataCache.put(metadataKey)(concatMap, metadataCacheDurationTtl)
+          sm
+        case None =>
+          val sm = get(s, i)
+          metadataCache.put(metadataKey)(Map(i -> sm), metadataCacheDurationTtl)
+          sm
+      }
+    }
   }
 
   override def getVersion(s: String, schema: Schema): Int = synchronized {
@@ -403,6 +507,7 @@ class RedisSchemaRegistryClient(restService: RestService,
     versionCache.remove(buildVersionKey(s))
     idCache.remove(buildIdKey(s))
     schemaCache.remove(buildSchemaKey(s))
+    metadataCache.remove(buildMetadataKey(s))
     restService.deleteSubject(map, s)
   }
 
