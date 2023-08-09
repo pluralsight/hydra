@@ -1,5 +1,6 @@
 package hydra.avro.io
 
+import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
 
 import scala.collection.JavaConverters._
@@ -11,3 +12,5 @@ case class Upsert(record: GenericRecord) extends Operation
 case class DeleteByKey(keys: Map[String, AnyRef]) extends Operation {
   def this(jmap: java.util.Map[String, AnyRef]) = this(jmap.asScala.toMap)
 }
+
+case class CreateOrAlterTable(schema: Schema) extends Operation
