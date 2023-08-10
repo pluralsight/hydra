@@ -227,7 +227,7 @@ class TopicMetadataEndpointSpec
 
     "sends back an error response if topic already exists" in {
       implicit val timeout = RouteTestTimeout(5.seconds)
-      EmbeddedKafka.createCustomTopic("testExisting")(kafkaConfig) // NOTE: Updated this fix intermittent test failure.
+      createCustomTopic("testExisting")(kafkaConfig)
       val config = Map(
         "min.insync.replicas" -> "1",
         "cleanup.policy" -> "compact",

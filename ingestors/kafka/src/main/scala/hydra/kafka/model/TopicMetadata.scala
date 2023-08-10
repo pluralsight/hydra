@@ -154,7 +154,7 @@ final case class TopicMetadataV2ValueOptionalTagList(
                                          teamName: Option[String],
                                          tags: Option[List[String]],
                                          notificationUrl: Option[String],
-                                         _validations: Option[List[ValidationEnum]]
+                                         validations: Option[List[ValidationEnum]]
                                        ) {
   def toTopicMetadataV2Value: TopicMetadataV2Value = {
     TopicMetadataV2Value(
@@ -171,7 +171,7 @@ final case class TopicMetadataV2ValueOptionalTagList(
       teamName,
       tags.getOrElse(List.empty),
       notificationUrl,
-      _validations
+      validations
     )
   }
 }
@@ -191,7 +191,7 @@ final case class TopicMetadataV2Value(
     teamName: Option[String],
     tags: List[String],
     notificationUrl: Option[String],
-    _validations: Option[List[ValidationEnum]]
+    validations: Option[List[ValidationEnum]]
 ) {
   def toTopicMetadataV2ValueOptionalTagList: TopicMetadataV2ValueOptionalTagList = {
     TopicMetadataV2ValueOptionalTagList(
@@ -208,7 +208,7 @@ final case class TopicMetadataV2Value(
       teamName,
       tags.some,
       notificationUrl,
-      _validations
+      validations
     )
   }
 }
@@ -305,7 +305,7 @@ object TopicMetadataV2ValueOptionalTagList {
         field("teamName", _.teamName, default = Some(None)),
         field("tags", _.tags, default = Some(None)),
         field("notificationUrl", _.notificationUrl, default = Some(None)),
-        field("_validations", _._validations, default = Some(None))
+        field("validations", _.validations, default = Some(None))
         ).mapN(TopicMetadataV2ValueOptionalTagList.apply)
   }
 }

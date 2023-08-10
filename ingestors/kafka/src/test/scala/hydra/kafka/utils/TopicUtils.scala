@@ -35,7 +35,7 @@ object TopicUtils {
         None,
         List.empty,
         Some("notificationUrl"),
-        _validations = None
+        validations = None
       )
       val topicMetadataContainer = TopicMetadataContainer(
         topicMetadataKey,

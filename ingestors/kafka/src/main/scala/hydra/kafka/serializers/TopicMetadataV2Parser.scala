@@ -429,7 +429,7 @@ sealed trait TopicMetadataV2Parser
           numPartitions,
           tags,
           notificationUrl,
-          toResult(None) // NOTE: Never pick validations from the request.
+          toResult(None) // Never pick validations from the request.
           ).mapN(MetadataOnlyRequest.apply)
     }
   }
