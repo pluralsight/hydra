@@ -35,7 +35,6 @@ import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
 import scala.concurrent.ExecutionContext
 import hydra.kafka.model.TopicMetadataV2Request.NumPartitions
 import hydra.kafka.programs.CreateTopicProgram.MetadataOnlyTopicDoesNotExist
-import hydra.kafka.programs.CreateTopicProgramSpec.topicMetadataKey
 import hydra.kafka.programs.TopicSchemaError._
 import hydra.kafka.utils.TopicUtils
 import org.apache.avro.SchemaBuilder.{FieldAssembler, GenericDefault}
@@ -214,7 +213,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     "ingest metadata into the metadata topic" in {
       for {
         publishTo     <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
-        topicMetadata <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue.copy(_validations = Some(NewMetadataV2Validation.values.toList))))
+        topicMetadata <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue.copy(_validations = Some(ValidationEnum.values.toList))))
         ts            <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some)
         _             <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails, true)
         published     <- publishTo.get
@@ -228,7 +227,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         publishTo   <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         consumeFrom <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
         metadata    <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
-        m           <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue.copy(_validations = Some(NewMetadataV2Validation.values.toList))))
+        m           <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue.copy(_validations = Some(ValidationEnum.values.toList))))
         updatedM    <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(updatedValue.copy(createdDate = topicMetadataValue.createdDate)))
         ts          <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
         _           <- ts.program.createTopic(subject, topicMetadataRequest, TopicDetails(1, 1, 1), true)
@@ -265,6 +264,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
 
     "ingest updated metadata into the metadata topic - verify deprecated date if supplied is not overwritten" in {
       val request        = createTopicMetadataRequest(keySchema, valueSchema, deprecated = true, deprecatedDate = Some(Instant.now))
+        .copy(replacementTopics = Some(List("dvs.subject.replacement")))
       val updatedRequest = createTopicMetadataRequest(keySchema, valueSchema, "updated@email.com", deprecated = true)
       for {
         publishTo   <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
@@ -2095,7 +2095,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     }
 
     "_validations field is NOT populated via the validations field in the create topic request" in {
-      val requestWithEmptyValidations = createTopicMetadataRequest(keySchema, valueSchema, validations = Some(NewMetadataV2Validation.values.toList))
+      val requestWithEmptyValidations = createTopicMetadataRequest(keySchema, valueSchema, validations = Some(ValidationEnum.values.toList))
 
       for {
         publishTo             <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
@@ -2121,7 +2121,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         published             <- publishTo.get
         expectedTopicMetadata <- TopicMetadataV2.encode[IO](
           topicMetadataKey,
-          Some(topicMetadataValue.copy(_validations = Some(NewMetadataV2Validation.values.toList)))) // NOTE: _validations populated in topicMetadataValue
+          Some(topicMetadataValue.copy(_validations = Some(ValidationEnum.values.toList)))) // NOTE: _validations populated in topicMetadataValue
       } yield {
         published shouldBe Map(metadataTopic -> (expectedTopicMetadata._1, expectedTopicMetadata._2, None))
       }
@@ -2139,11 +2139,148 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         publishedSecond       <- publishTo.get
         expectedTopicMetadata <- TopicMetadataV2.encode[IO] (
           topicMetadataKey,
-          Some(topicMetadataValue.copy(_validations = Some(NewMetadataV2Validation.values.toList)))) // NOTE: _validations populated in topicMetadataValue
+          Some(topicMetadataValue.copy(_validations = Some(ValidationEnum.values.toList)))) // NOTE: _validations populated in topicMetadataValue
 
       } yield {
         publishedFirst shouldBe Map(metadataTopic -> (expectedTopicMetadata._1, expectedTopicMetadata._2, None))
         publishedSecond shouldBe Map(metadataTopic -> (expectedTopicMetadata._1, expectedTopicMetadata._2, None))
+      }
+    }
+
+    "When _validations is empty no corresponding validation is done" in {
+      val invalidReplacementAndPreviousTopicsRequest = topicMetadataRequest.copy(
+        replacementTopics = Some(List("incorrect.dvs.replacement")),
+        previousTopics = Some(List("incorrect.dvs.previous"))
+      )
+
+      val result = for {
+        publishTo   <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
+        consumeFrom <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
+        metadata    <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
+        _           <- metadata.addToMetadata(subject, topicMetadataRequest)
+        ts          <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
+        _           <- ts.program.createTopic(subject, invalidReplacementAndPreviousTopicsRequest, topicDetails, withRequiredFields = true)
+      } yield ()
+
+      result.attempt.map(_ shouldBe Right())
+    }
+
+    "When _validations is populated corresponding validations are done" in {
+      val invalidReplacementAndPreviousTopicsRequest = topicMetadataRequest.copy(
+        replacementTopics = Some(List("incorrect.dvs.replacement")),
+        previousTopics = Some(List("incorrect.dvs.previous"))
+      )
+
+      val result = for {
+        publishTo   <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
+        consumeFrom <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
+        metadata    <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
+        ts          <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
+        _           <- ts.program.createTopic(subject, invalidReplacementAndPreviousTopicsRequest, topicDetails, withRequiredFields = true)
+      } yield ()
+
+      result.attempt.map(_ shouldBe
+        ValidationCombinedErrors(List(
+          InvalidTopicFormatError("incorrect.dvs.replacement").message,
+          InvalidTopicFormatError("incorrect.dvs.previous").message,
+        )).asLeft)
+    }
+
+    "throw error when a topic pattern in replacementTopics is incorrect" in {
+      val incorrectReplacementTopicsRequest = topicMetadataRequest.copy(replacementTopics = Some(List("dvs.valid.replacement", "incorrect.dvs.replacement")))
+      val result = for {
+        ts <- initTestServices()
+        _  <- ts.program.createTopic(subject, incorrectReplacementTopicsRequest, topicDetails)
+      } yield ()
+
+      result.attempt.map(_ shouldBe InvalidTopicFormatError("incorrect.dvs.replacement").asLeft)
+    }
+
+    "throw error when the more than one topic pattern in replacementTopics are incorrect" in {
+      val incorrectReplacementTopicsRequest = topicMetadataRequest.copy(
+        replacementTopics = Some(List("dvs.valid.previous", "incorrect.dvs.replacement1", "incorrect.dvs.replacement2")))
+      val result = for {
+        ts <- initTestServices()
+        _ <- ts.program.createTopic(subject, incorrectReplacementTopicsRequest, topicDetails)
+      } yield ()
+
+      result.attempt.map(_ shouldBe
+        ValidationCombinedErrors(List(
+          InvalidTopicFormatError("incorrect.dvs.replacement1").message,
+          InvalidTopicFormatError("incorrect.dvs.replacement2").message,
+        )).asLeft)
+    }
+
+    "throw error when a topic pattern in previousTopics is incorrect" in {
+      val incorrectPreviousTopicsRequest = topicMetadataRequest.copy(previousTopics = Some(List("dvs.valid.replacement", "incorrect.dvs.previous")))
+      val result = for {
+        ts <- initTestServices()
+        _  <- ts.program.createTopic(subject, incorrectPreviousTopicsRequest, topicDetails)
+      } yield ()
+
+      result.attempt.map(_ shouldBe InvalidTopicFormatError("incorrect.dvs.previous").asLeft)
+    }
+
+    "throw error when the more than one topic pattern in previousTopics are incorrect" in {
+      val incorrectPreviousTopicsRequest = topicMetadataRequest.copy(
+        previousTopics = Some(List("dvs.valid.previous", "incorrect.dvs.previous1", "incorrect.dvs.previous2")))
+      val result = for {
+        ts <- initTestServices()
+        _  <- ts.program.createTopic(subject, incorrectPreviousTopicsRequest, topicDetails)
+      } yield ()
+
+      result.attempt.map(_ shouldBe
+        ValidationCombinedErrors(List(
+          InvalidTopicFormatError("incorrect.dvs.previous1").message,
+          InvalidTopicFormatError("incorrect.dvs.previous2").message,
+        )).asLeft)
+    }
+
+    "throw error when a topic being deprecated does not have replacementTopics populated" in {
+      val incorrectReplacementTopicsRequest = topicMetadataRequest.copy(deprecated = true)
+      val result = for {
+        ts <- initTestServices()
+        _  <- ts.program.createTopic(subject, incorrectReplacementTopicsRequest, topicDetails)
+      } yield ()
+
+      result.attempt.map(_ shouldBe ReplacementTopicMissingError(subject.value).asLeft)
+    }
+
+    "throw error when a topic being deprecated has empty replacementTopics" in {
+      val incorrectReplacementTopicsRequest = topicMetadataRequest.copy(deprecated = true, replacementTopics = Some(List.empty))
+      val result = for {
+        ts <- initTestServices()
+        _  <- ts.program.createTopic(subject, incorrectReplacementTopicsRequest, topicDetails)
+      } yield ()
+
+      result.attempt.map(_ shouldBe ReplacementTopicMissingError(subject.value).asLeft)
+    }
+
+    "Topic is deprecated with valid replacementTopics" in {
+      val now = Some(Instant.now())
+      val newTopics = Some(List("dvs.subject.replacement"))
+      val deprecateWithReplacementTopicsRequest = topicMetadataRequest.copy(
+        deprecated = true,
+        deprecatedDate = now,
+        replacementTopics = newTopics)
+
+      for {
+        publishTo             <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
+        consumeFrom           <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
+        metadata              <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
+        ts                    <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
+        _                     <- ts.program.createTopic(subject, deprecateWithReplacementTopicsRequest, topicDetails)
+        published             <- publishTo.get
+        expectedTopicMetadata <- TopicMetadataV2.encode[IO](
+          topicMetadataKey,
+          Some(topicMetadataValue.copy(
+            deprecated = true,
+            deprecatedDate = now,
+            replacementTopics = newTopics,
+            _validations = Some(ValidationEnum.values.toList)
+          )))
+      } yield {
+        published shouldBe Map(metadataTopic -> (expectedTopicMetadata._1, expectedTopicMetadata._2, None))
       }
     }
     
@@ -2267,7 +2404,7 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
                                   deprecated: Boolean = false,
                                   deprecatedDate: Option[Instant] = None,
                                   numPartitions: Option[NumPartitions] = None,
-                                  validations: Option[List[NewMetadataV2Validation]] = None
+                                  validations: Option[List[ValidationEnum]] = None
                                 ): TopicMetadataV2Request =
     TopicMetadataV2Request(
       Schemas(keySchema, valueSchema),
@@ -2347,28 +2484,6 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
 
   def createTopicMetadataRequest(createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long]): TopicMetadataV2Request =
     createTopicMetadataRequest(keySchema, getSchema("val", createdAtDefaultValue, updatedAtDefaultValue))
-  
-  private def getMetadataGenericRecords(subject: Subject, nullValue: Boolean = false): (IO[(GenericRecord,Option[GenericRecord], Option[Headers])],
-    TopicMetadataV2Key, TopicMetadataV2Value) = {
-    val key = TopicMetadataV2Key(subject)
-    val value = TopicMetadataV2Value(
-      StreamTypeV2.Entity,
-      deprecated = false,
-      None,
-      None,
-      None,
-      Public,
-      NonEmptyList.one(Slack.create("#channel").get),
-      Instant.now,
-      List(),
-      None,
-      Some("dvs-teamName"),
-      List.empty,
-      Some("notificationUrl"),
-      None
-    )
-    (TopicMetadataV2.encode[IO](key, if (nullValue) None else Some(value), None), key, value)
-  }
 }
 
 class CustomGenericDefault[R](gd: GenericDefault[R]) {

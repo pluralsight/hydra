@@ -697,7 +697,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       firstDeprecatedDate shouldBe None
     }
 
-    "replacementTopics field is rendered only when populated" in {
+    "replacementTopics field is populated only when provided" in {
       val emptyReplacementTopics = topicMetadataV2Request().replacementTopics
       emptyReplacementTopics shouldBe None
 
@@ -706,32 +706,13 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       populatedReplacementTopics shouldBe replacementTopics
     }
 
-    "previousTopics field is rendered only when populated" in {
+    "previousTopics field is populated only when provided" in {
       val emptyPreviousTopics = topicMetadataV2Request().previousTopics
       emptyPreviousTopics shouldBe None
 
       val previousTopics = Some(List("dvs.valid.previous"))
       val populatedPreviousTopics = topicMetadataV2Request(previousTopics = previousTopics).previousTopics
       populatedPreviousTopics shouldBe previousTopics
-    }
-
-    "throw deserialization error when the topic pattern in replacementTopics is incorrect" in {
-      the[DeserializationException] thrownBy {
-        topicMetadataV2Request(replacementTopics = Some(List("dvs.valid.replacement", "incorrect.dvs.replacement")))
-      }  should have message Subject.invalidFormat
-    }
-
-    "throw deserialization error when the topic pattern in previousTopics is incorrect" in {
-      the[DeserializationException] thrownBy {
-        topicMetadataV2Request(previousTopics = Some(List("dvs.valid.previous", "incorrect.dvs.previous")))
-      }  should have message Subject.invalidFormat
-    }
-
-    "throw deserialization error when a topic being deprecated does not have replacementTopics populated" in {
-      the[DeserializationException] thrownBy {
-        topicMetadataV2Request(deprecated = true)
-      } should have message MissingRequiredFieldWhenAnotherFieldSet(
-        field = "replacementTopics", anotherField = "deprecated", anotherFieldValue = "true").errorMessage
     }
   }
 

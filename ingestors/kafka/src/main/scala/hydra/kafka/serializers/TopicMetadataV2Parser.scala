@@ -8,7 +8,7 @@ import cats.syntax.all._
 import enumeratum.EnumEntry
 import eu.timepit.refined.auto._
 import hydra.kafka.model.ContactMethod.{Email, Slack}
-import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.model.TopicMetadataV2Request.{NumPartitions, Subject}
 import hydra.kafka.model._
 import hydra.kafka.serializers.Errors._
 import hydra.kafka.serializers.TopicMetadataV2Parser.IntentionallyUnimplemented
@@ -282,8 +282,8 @@ sealed trait TopicMetadataV2Parser
     private def deserializationError(value: JsValue) = throw DeserializationException(s"Expected a value from enum $values instead of $value")
   }
 
-  implicit val newMetadataValidationFormat: EnumEntryJsonFormat[NewMetadataV2Validation] =
-    new EnumEntryJsonFormat[NewMetadataV2Validation](NewMetadataV2Validation.values)
+  implicit val newMetadataValidationFormat: EnumEntryJsonFormat[ValidationEnum] =
+    new EnumEntryJsonFormat[ValidationEnum](ValidationEnum.values)
 
   implicit object TopicMetadataV2Format
       extends RootJsonFormat[TopicMetadataV2Request] {
@@ -323,6 +323,59 @@ sealed trait TopicMetadataV2Parser
     }
   }
 
+  private class Converter(j: JsObject) {
+
+    def toSubject(jsonField: String): Subject =
+      SubjectFormat.read(j.getFields(jsonField).headOption.getOrElse(JsString.empty))
+
+    def toStreamTypeV2(jsonField: String): StreamTypeV2 =
+      StreamTypeV2Format.read(
+        j.getFields(jsonField)
+          .headOption
+          .getOrElse(throwDeserializationError(jsonField, "String")))
+
+    def toDataClassification(jsonField: String): DataClassification =
+      DataClassificationFormat.read(
+        j.getFields(jsonField)
+          .headOption
+          .getOrElse(
+            throwDeserializationError(jsonField, "String")))
+
+    def toListOfContactMethods(jsonField: String): NonEmptyList[ContactMethod] =
+      ContactFormat.read(
+        j.getFields(jsonField)
+          .headOption
+          .getOrElse(throwDeserializationError(jsonField, "JsObject")))
+
+    def toListOfStrings(jsonField: String): List[String] =
+      j.fields.get(jsonField) match {
+        case Some(t) => t.convertTo[Option[List[String]]].getOrElse(List.empty)
+        case None    => List.empty[String]
+      }
+
+    def toOptionalString(jsonField: String): Option[String] =
+      j.fields.get(jsonField) match {
+        case Some(teamName) => teamName.convertTo[Option[String]]
+        case None           => throwDeserializationError(jsonField, "String")
+      }
+
+    def toOptionalStringNoError(jsonField: String): Option[String] = j.getFields(jsonField).headOption.map(_.convertTo[String])
+
+    def toOptionalNumPartitions(jsonField: String): Option[NumPartitions] =
+      j.fields.get(jsonField).map { num =>
+        TopicMetadataV2Request.NumPartitions.from(num.convertTo[Int]).toOption match {
+          case Some(numP) => numP
+          case None       => throwDeserializationError(jsonField, "Int [10-50]")
+        }
+      }
+
+    def toOptionalListOfStrings(jsonField: String): Option[List[String]] =
+      j.fields.get(jsonField) match {
+        case Some(t) => t.convertTo[Option[List[String]]]
+        case None    => None
+      }
+  }
+
   implicit object MetadataOnlyRequestFormat extends RootJsonFormat[MetadataOnlyRequest] {
     override def write(obj: MetadataOnlyRequest): JsValue = {
       JsString(obj.toString)
@@ -337,17 +390,9 @@ sealed trait TopicMetadataV2Parser
 
     def getValidationResult(json: JsValue): MetadataValidationResult[MetadataOnlyRequest] = json match {
       case j: JsObject =>
-        val subject = toResult(
-          SubjectFormat
-            .read(j.getFields("subject").headOption.getOrElse(JsString.empty))
-        )
-        val streamType = toResult(
-          StreamTypeV2Format.read(
-            j.getFields("streamType")
-              .headOption
-              .getOrElse(throwDeserializationError("streamType", "String"))
-          )
-        )
+        val c = new Converter(j)
+        val subject = toResult(c.toSubject("subject"))
+        val streamType = toResult(c.toStreamTypeV2("streamType"))
         val deprecatedFieldName = "deprecated"
         val deprecated = toResult(getBoolWithKey(j, deprecatedFieldName))
         val deprecatedDate = if ( deprecated.toOption.getOrElse(false) && !j.getFields("deprecatedDate").headOption.getOrElse(None).equals(None)) {
@@ -357,71 +402,17 @@ sealed trait TopicMetadataV2Parser
         } else {
           toResult(None)
         }
-        val dataClassification = toResult(
-          DataClassificationFormat.read(
-            j.getFields("dataClassification")
-              .headOption
-              .getOrElse(
-                throwDeserializationError("dataClassification", "String")
-              )
-          )
-        )
-        val contact = toResult(
-          ContactFormat.read(
-            j.getFields("contact")
-              .headOption
-              .getOrElse(throwDeserializationError("contact", "JsObject"))
-          )
-        )
+        val dataClassification = toResult(c.toDataClassification("dataClassification"))
+        val contact = toResult(c.toListOfContactMethods("contact"))
         val createdDate = toResult(Instant.now())
-        val parentSubjects = toResult(
-          j.fields.get("parentSubjects") match {
-            case Some(t) => t.convertTo[Option[List[String]]].getOrElse(List.empty)
-            case None => List.empty[String]
-          })
-        val notes = toResult(
-          j.getFields("notes").headOption.map(_.convertTo[String])
-        )
-        val teamName = toResult(
-          j.fields.get("teamName") match {
-            case Some(teamName) => teamName.convertTo[Option[String]]
-            case None => throwDeserializationError("teamName", "String")
-          }
-        )
-        val numPartitions = toResult(
-          j.fields.get("numPartitions").map { num =>
-            TopicMetadataV2Request.NumPartitions.from(num.convertTo[Int]).toOption match {
-              case Some(numP) => numP
-              case None => throwDeserializationError("numPartitions", "Int [10-50]")
-            }
-          }
-        )
-        val tags = toResult(
-          j.fields.get("tags") match {
-            case Some(t) => t.convertTo[Option[List[String]]].getOrElse(List.empty)
-            case None => List.empty[String]
-          }
-        )
-        val notificationUrl = toResult(
-          j.getFields("notificationUrl").headOption.map(_.convertTo[String])
-        )
-
-        val replacementTopics = toResult {
-          val rtFieldName = "replacementTopics"
-
-          j.fields.get("replacementTopics") match {
-            case Some(t)                            => t.convertTo[Option[List[String]]].map(_.map(p => validateTopic(JsString(p))))
-            case None if deprecated.contains_(true) => throw DeserializationException(MissingRequiredFieldWhenAnotherFieldSet(rtFieldName, deprecatedFieldName, "true").errorMessage)
-            case None                               => None
-          }
-        }
-
-        val previousTopics = toResult(
-          j.fields.get("previousTopics") match {
-            case Some(t) => t.convertTo[Option[List[String]]].map(_.map(p => validateTopic(JsString(p))))
-            case None => None
-          }
-        )
+        val parentSubjects = toResult(c.toListOfStrings("parentSubjects"))
+        val notes = toResult(c.toOptionalStringNoError("notes"))
+        val teamName = toResult(c.toOptionalString("teamName"))
+        val numPartitions = toResult(c.toOptionalNumPartitions("numPartitions"))
+        val tags = toResult(c.toListOfStrings("tags"))
+        val notificationUrl = toResult(c.toOptionalStringNoError("notificationUrl"))
+        val replacementTopics = toResult(c.toOptionalListOfStrings("replacementTopics"))
+        val previousTopics = toResult(c.toOptionalListOfStrings("previousTopics"))
 
         (
           streamType,
@@ -438,11 +429,9 @@ sealed trait TopicMetadataV2Parser
           numPartitions,
           tags,
           notificationUrl,
-          toResult(None)
+          toResult(None) // NOTE: Never pick validations from the request.
           ).mapN(MetadataOnlyRequest.apply)
     }
-
-    private def validateTopic(jsonField: JsValue): String = SubjectFormat.read(jsonField).value
   }
 
   implicit object MaybeSchemasFormat extends RootJsonFormat[MaybeSchemas] {
@@ -587,10 +576,5 @@ object Errors {
 
   final case class MissingField(field: String, fieldType: String) {
     def errorMessage: String = s"Field `$field` of type $fieldType"
-  }
-
-  final case class MissingRequiredFieldWhenAnotherFieldSet(field: String, anotherField: String, anotherFieldValue: String) {
-
-    def errorMessage: String = s"Field `$field` must be populated when `$anotherField` is set to $anotherFieldValue!"
   }
 }

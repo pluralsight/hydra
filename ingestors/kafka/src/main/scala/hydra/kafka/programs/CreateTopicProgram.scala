@@ -25,7 +25,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
                                                                                retryPolicy: RetryPolicy[F],
                                                                                v2MetadataTopicName: Subject,
                                                                                metadataAlgebra: MetadataAlgebra[F],
-                                                                               validator: KeyAndValueSchemaV2Validator[F]
+                                                                               schemaValidator: KeyAndValueSchemaV2Validator[F],
+                                                                               metadataValidator: MetadataV2Validator[F]
                                                                              ) (implicit eff: Sync[F]){
 
   private def onFailure(resourceTried: String): (Throwable, RetryDetails) => F[Unit] = {
@@ -121,33 +122,13 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
       }
       message = (
         TopicMetadataV2Key(topicName),
-        createTopicRequest.copy(createdDate = createdDate, deprecatedDate = deprecatedDate, _validations = newMetadataValidations(metadata)).toValue)
+        createTopicRequest.copy(createdDate = createdDate, deprecatedDate = deprecatedDate, _validations = validations(metadata)).toValue)
       records <- TopicMetadataV2.encode[F](message._1, Some(message._2), None)
       _ <- kafkaClient
         .publishMessage(records, v2MetadataTopicName.value)
         .rethrow
     } yield ()
   }
-
-  /**
-   * An OLD topic will have its metadata populated.
-   * Therefore, _validations=None will be picked from the metadata.
-   * And no new validations will be applied on older topics.
-   *
-   * A NEW topic will not have a metadata object.
-   * Therefore, Some([replacementTopics, previousTopics]) will be assigned to _validations.
-   * Thus, validations on corresponding fields will be applied.
-   *
-   * Corner case: After this feature has been on STAGE/PROD for sometime and validation for another new field is required.
-   * We need not worry about old topics as the value of _validations will remain the same since topic creation.
-   * New validations should be applied only on new topics.
-   * Therefore, assigning all the values from NewMetadataV2Validation enum is reasonable.
-   *
-   * @param metadata a metadata object of current topic
-   * @return value of _validations if the topic is already existing(OLD topic) otherwise all enum values of NewMetadataV2Validation(NEW topic).
-   */
-  private def newMetadataValidations(metadata: Option[TopicMetadataContainer]): Option[List[NewMetadataV2Validation]] =
-    metadata.map(_.value._validations).getOrElse(NewMetadataV2Validation.values.toList.some)
 
   def checkThatTopicExists(topicName: String): F[Unit] =
     for {
@@ -159,7 +140,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
   def createTopicFromMetadataOnly(topicName: Subject, createTopicRequest: TopicMetadataV2Request, withRequiredFields: Boolean = false): F[Unit] =
     for {
       _ <- checkThatTopicExists(topicName.value)
-      _ <- validator.validate(createTopicRequest, topicName, withRequiredFields)
+      _ <- metadataValidator.validate(createTopicRequest, topicName)
+      _ <- schemaValidator.validate(createTopicRequest, topicName, withRequiredFields)
       _ <- publishMetadata(topicName, createTopicRequest)
     } yield ()
 
@@ -181,7 +163,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
       .copy(partialConfig = defaultTopicDetails.configs ++ getCleanupPolicyConfig)
 
     (for {
-      _ <- Resource.eval(validator.validate(createTopicRequest, topicName, withRequiredFields))
+      _ <- Resource.eval(metadataValidator.validate(createTopicRequest, topicName))
+      _ <- Resource.eval(schemaValidator.validate(createTopicRequest, topicName, withRequiredFields))
       _ <- registerSchemas(
         topicName,
         createTopicRequest.schemas.key,
@@ -210,11 +193,32 @@ object CreateTopicProgram {
       retryPolicy,
       v2MetadataTopicName,
       metadataAlgebra,
-      KeyAndValueSchemaV2Validator.make(schemaRegistry, metadataAlgebra, defaultLoopHoleCutoffDate)
+      KeyAndValueSchemaV2Validator.make(schemaRegistry, metadataAlgebra, defaultLoopHoleCutoffDate),
+      MetadataV2Validator.make(metadataAlgebra)
     )
   }
 
   final case class MetadataOnlyTopicDoesNotExist(topicName: String) extends NoStackTrace {
     override def getMessage: String = s"You cannot add metadata for topic '$topicName' if it does not exist in the cluster. Please create your topic first."
   }
+
+  /**
+   * An OLD topic will have its metadata populated.
+   * Therefore, _validations=None will be picked from the metadata.
+   * And no new validations will be applied on older topics.
+   *
+   * A NEW topic will not have a metadata object.
+   * Therefore, Some([replacementTopics, previousTopics]) will be assigned to _validations.
+   * Thus, validations on corresponding fields will be applied.
+   *
+   * Corner case: After this feature has been on STAGE/PROD for sometime and validation for another new field is required.
+   * We need not worry about old topics as the value of _validations will remain the same since topic creation.
+   * New validations should be applied only on new topics.
+   * Therefore, assigning all the values from ValidationEnum enum is reasonable.
+   *
+   * @param metadata a metadata object of current topic
+   * @return value of _validations if the topic is already existing(OLD topic) otherwise all enum values of ValidationEnum(NEW topic).
+   */
+  def validations(metadata: Option[TopicMetadataContainer]): Option[List[ValidationEnum]] =
+    metadata.map(_.value._validations).getOrElse(ValidationEnum.values.toList.some)
 }
