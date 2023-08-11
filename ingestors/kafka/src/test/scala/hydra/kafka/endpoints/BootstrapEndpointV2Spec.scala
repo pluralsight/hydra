@@ -17,7 +17,7 @@ import hydra.kafka.algebras._
 import hydra.kafka.model.ContactMethod.{Email, Slack}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
-import hydra.kafka.programs.CreateTopicProgram
+import hydra.kafka.programs.{CreateTopicProgram, InvalidTopicFormatError, ReplacementTopicsMissingError}
 import hydra.kafka.serializers.TopicMetadataV2Parser._
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient
@@ -141,7 +141,7 @@ final class BootstrapEndpointV2Spec
       None
     ).toJson.compactPrint
 
-    val validRequestWithoutDVSTag = TopicMetadataV2Request(
+    val topicMetadataV2Request = TopicMetadataV2Request(
       Schemas(getTestSchema("key"), getTestSchema("value")),
       StreamTypeV2.Entity,
       deprecated = false,
@@ -158,26 +158,9 @@ final class BootstrapEndpointV2Spec
       List.empty,
       Some("notificationUrl"),
       None
-    ).toJson.compactPrint
+    )
 
-    val validRequestWithDVSTag = TopicMetadataV2Request(
-      Schemas(getTestSchema("key"), getTestSchema("value")),
-      StreamTypeV2.Entity,
-      deprecated = false,
-      None,
-      None,
-      None,
-      Public,
-      NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
-      Instant.now,
-      List.empty,
-      None,
-      Some("dvs-teamName"),
-      None,
-      List("DVS"),
-      Some("notificationUrl"),
-      None
-    ).toJson.compactPrint
+    val validRequestWithoutDVSTag = topicMetadataV2Request.toJson.compactPrint
 
     "accept a valid request without a DVS tag" in {
       testCreateTopicProgram
@@ -193,6 +176,7 @@ final class BootstrapEndpointV2Spec
     }
 
     "accept a valid request with a DVS tag" in {
+      val validRequestWithDVSTag = topicMetadataV2Request.copy(tags = List("DVS")).toJson.compactPrint
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
           Put("/v2/topics/dvs.testing", HttpEntity(ContentTypes.`application/json`, validRequestWithDVSTag)) ~> Route.seal(
@@ -372,5 +356,73 @@ final class BootstrapEndpointV2Spec
           }
       }.unsafeRunSync()
     }
+
+    "reject a request when a topic being deprecated does not have replacementTopics" in {
+      val deprecateWithoutReplacementTopicsRequest = topicMetadataV2Request.copy(deprecated = true).toJson.compactPrint
+
+      testFailure(deprecateWithoutReplacementTopicsRequest, error = ReplacementTopicsMissingError("dvs.testing").message)
+    }
+
+    "reject a request when a topic being deprecated contains replacementTopics with invalid patterns" in {
+      val deprecateWithInvalidReplacementTopicsRequest = topicMetadataV2Request.copy(
+        deprecated = true,
+        replacementTopics = Some(List("dvs.testing", "invalid.dvs.testing"))
+      ).toJson.compactPrint
+
+      testFailure(deprecateWithInvalidReplacementTopicsRequest, error = InvalidTopicFormatError("invalid.dvs.testing").message)
+    }
+
+    "reject a request when a topic contains previousTopics with invalid patterns" in {
+      val deprecateWithInvalidPreviousTopicsRequest = topicMetadataV2Request.copy(
+        previousTopics = Some(List("dvs.testing", "invalid.dvs.testing"))
+      ).toJson.compactPrint
+
+      testFailure(deprecateWithInvalidPreviousTopicsRequest, error = InvalidTopicFormatError("invalid.dvs.testing").message)
+    }
+
+    "accept a request when a topic being deprecated has valid replacementTopics" in {
+      val deprecateWithValidReplacementTopicsRequest = topicMetadataV2Request.copy(
+        deprecated = true,
+        replacementTopics = Some(List("dvs.testing.replacement"))
+      ).toJson.compactPrint
+
+      testSuccess(deprecateWithValidReplacementTopicsRequest)
+    }
+
+    "create topic with valid replacementTopics" in {
+      val replacementTopicsRequest = topicMetadataV2Request.copy(
+        previousTopics = Some(List("dvs.testing.replacement"))
+      ).toJson.compactPrint
+
+      testSuccess(replacementTopicsRequest)
+    }
+
+    "create topic with valid previousTopics" in {
+      val previousTopicsRequest = topicMetadataV2Request.copy(
+        previousTopics = Some(List("dvs.testing.previous"))
+      ).toJson.compactPrint
+
+      testSuccess(previousTopicsRequest)
+    }
+
+    def testFailure(request: String, error: String) = testRequest(request, reject = true, errorMessage = Some(error))
+
+    def testSuccess(request: String) = testRequest(request)
+
+    def testRequest(request: String, reject: Boolean = false, errorMessage: Option[String] = None) =
+      testCreateTopicProgram
+        .map { bootstrapEndpoint =>
+          Put("/v2/topics/dvs.testing", HttpEntity(ContentTypes.`application/json`, request)) ~> Route.seal(
+            bootstrapEndpoint.route
+          ) ~> check {
+            if (reject) {
+              response.status shouldBe StatusCodes.BadRequest
+              errorMessage.foreach(e => responseAs[String] shouldBe e)
+            } else {
+              response.status shouldBe StatusCodes.OK
+            }
+          }
+        }
+        .unsafeRunSync()
   }
 }

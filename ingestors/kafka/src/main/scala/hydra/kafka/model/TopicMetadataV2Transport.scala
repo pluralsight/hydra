@@ -74,13 +74,13 @@ object StreamTypeV2 {
   case object Telemetry extends StreamTypeV2
 }
 
-sealed trait ValidationEnum extends EnumEntry
+sealed trait ValidationType extends EnumEntry
 
-object ValidationEnum extends Enum[ValidationEnum] {
-  case object replacementTopics extends ValidationEnum
-  case object previousTopics extends ValidationEnum
+object ValidationType extends Enum[ValidationType] {
+  case object replacementTopics extends ValidationType
+  case object previousTopics extends ValidationType
 
-  override val values: immutable.IndexedSeq[ValidationEnum] = findValues
+  override val values: immutable.IndexedSeq[ValidationType] = findValues
 }
 
 final case class TopicMetadataV2Request(
@@ -99,7 +99,7 @@ final case class TopicMetadataV2Request(
                                          numPartitions: Option[TopicMetadataV2Request.NumPartitions],
                                          tags: List[String],
                                          notificationUrl: Option[String],
-                                         validations: Option[List[ValidationEnum]]
+                                         validations: Option[List[ValidationType]]
                                        ) {
 
   def toValue: TopicMetadataV2Value = {
@@ -228,7 +228,7 @@ final case class MetadataOnlyRequest(streamType: StreamTypeV2,
                                      numPartitions: Option[TopicMetadataV2Request.NumPartitions],
                                      tags: List[String],
                                      notificationUrl: Option[String],
-                                     validations: Option[List[ValidationEnum]]) {
+                                     validations: Option[List[ValidationType]]) {
 }
 
 

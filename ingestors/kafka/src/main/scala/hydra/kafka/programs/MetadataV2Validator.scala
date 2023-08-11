@@ -6,7 +6,7 @@ import hydra.common.validation.Validator.ValidationChain
 import hydra.common.validation.{ValidationError, Validator}
 import hydra.kafka.algebras.MetadataAlgebra
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{TopicMetadataV2Request, ValidationEnum}
+import hydra.kafka.model.{TopicMetadataV2Request, ValidationType}
 import hydra.kafka.programs.CreateTopicProgram.validations
 
 import scala.language.higherKinds
@@ -20,10 +20,10 @@ class MetadataV2Validator[F[_] : Sync](metadataAlgebra: MetadataAlgebra[F]) exte
       _           <- resultOf(validate(validations, request, subject))
     } yield()
 
-  def validate(validations: List[ValidationEnum], request: TopicMetadataV2Request, subject: Subject): F[List[ValidationChain]] =
+  private def validate(validations: List[ValidationType], request: TopicMetadataV2Request, subject: Subject): F[List[ValidationChain]] =
     (validations flatMap {
-      case ValidationEnum.replacementTopics => validateReplacementTopics(request.deprecated, request.replacementTopics, subject.value)
-      case ValidationEnum.previousTopics => validatePreviousTopics(request.previousTopics)
+      case ValidationType.replacementTopics => validateReplacementTopics(request.deprecated, request.replacementTopics, subject.value)
+      case ValidationType.previousTopics => validatePreviousTopics(request.previousTopics)
     }).pure
 
   private def validateReplacementTopics(deprecated: Boolean, replacementTopics: Option[List[String]], topic: String): List[ValidationChain] = {
@@ -37,7 +37,7 @@ class MetadataV2Validator[F[_] : Sync](metadataAlgebra: MetadataAlgebra[F]) exte
 
   private def validateDeprecatedTopicHasReplacementTopic(deprecated: Boolean, replacementTopics: Option[List[String]], topic: String): ValidationChain = {
     val hasReplacementTopicsIfDeprecated = if (deprecated) replacementTopics.exists(_.nonEmpty) else true
-    validate(hasReplacementTopicsIfDeprecated, ReplacementTopicMissingError(topic))
+    validate(hasReplacementTopicsIfDeprecated, ReplacementTopicsMissingError(topic))
   }
 
   private def validateTopicsFormat(maybeTopics: Option[List[String]]): List[ValidationChain] = {
@@ -55,7 +55,7 @@ class MetadataV2Validator[F[_] : Sync](metadataAlgebra: MetadataAlgebra[F]) exte
 
 sealed trait MetadataValidationError extends ValidationError
 
-case class ReplacementTopicMissingError(topic: String) extends MetadataValidationError {
+case class ReplacementTopicsMissingError(topic: String) extends MetadataValidationError {
   override def message: String = s"Field 'replacementTopics' is required when the topic '$topic' is being deprecated!"
 }
 
