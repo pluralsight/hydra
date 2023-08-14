@@ -12,11 +12,11 @@ import scalacache.redis._
 import scalacache.modes.try_._
 import scalacache.serialization.Codec
 import scalacache.serialization.Codec.DecodingResult
+import _root_.redis.clients.jedis._
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 import java.util.concurrent.TimeUnit
 import scala.collection.JavaConverters._
-import scala.collection.immutable.Map
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
 
@@ -244,18 +244,22 @@ class RedisSchemaRegistryClient(restService: RestService,
   private val versionCacheDurationTtl = Option(Duration(cacheConfigs.versionCacheTtl, TimeUnit.MINUTES))
   private val metadataCacheDurationTtl = Option(Duration(cacheConfigs.metadataCacheTtl.getOrElse(10000), TimeUnit.MINUTES))
 
+  private def jedisFactory: JedisPool = {
+    new JedisPool(redisHost, redisPort, true)
+  }
+
   private val schemaCache: Cache[Map[Schema, Int]] =
-    RedisCache(redisHost, redisPort)(schemaCacheConfig, schemaCacheCodec)
+    RedisCache(jedisFactory)(schemaCacheConfig, schemaCacheCodec)
 
   private val idCache: Cache[Map[Int, Schema]] =
-    RedisCache(redisHost, redisPort)(idCacheConfig, idCacheCodec)
+    RedisCache(jedisFactory)(idCacheConfig, idCacheCodec)
 
   private val versionCache: Cache[Map[Schema, Int]] =
-    RedisCache(redisHost, redisPort)(versionCacheConfig, schemaCacheCodec)
+    RedisCache(jedisFactory)(versionCacheConfig, schemaCacheCodec)
 
 
   private val metadataCache: Cache[Map[Int, SchemaMetadata]] =
-    RedisCache(redisHost, redisPort)(metadataCacheConfig, metadataCacheCodec)
+    RedisCache(jedisFactory)(metadataCacheConfig, metadataCacheCodec)
 
   private def buildSchemaKey(subject: String): String = {
     "schema_" + subject
