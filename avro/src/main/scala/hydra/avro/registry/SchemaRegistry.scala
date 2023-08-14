@@ -167,7 +167,8 @@ object SchemaRegistry {
         redisUrl,
         redisPort,
         securityConfig.toConfigMap,
-        CacheConfigs(idCacheTtl, schemaCacheTtl, versionCacheTtl)
+        CacheConfigs(idCacheTtl, schemaCacheTtl, versionCacheTtl),
+        true
       ),
       schemaRegistryClientRetries,
       schemaRegistryClientRetriesDelay

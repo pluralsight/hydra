@@ -26,7 +26,7 @@ class RedisSchemaRegistryClientSpec extends AnyFlatSpec with EmbeddedRedis with 
     redis = startRedis()
     redisPort = redis.ports().get(0)
     val srUrl = s"http://localhost:${config.schemaRegistryPort}"
-    redisClient = new RedisSchemaRegistryClient(srUrl, "localhost", redisPort)
+    redisClient = new RedisSchemaRegistryClient(srUrl, "localhost", redisPort, false)
     cachedClient = new CachedSchemaRegistryClient(srUrl, 50)
   }
 
