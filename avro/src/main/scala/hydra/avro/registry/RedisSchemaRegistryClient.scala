@@ -149,7 +149,8 @@ object RedisSchemaRegistryClient {
       redisHost,
       redisPort,
       schemaRegistrySecurityConfig.toConfigMap,
-      CacheConfigs(redisIdCacheTtl, redisSchemaCacheTtl, redisVersionCacheTtl)
+      CacheConfigs(redisIdCacheTtl, redisSchemaCacheTtl, redisVersionCacheTtl),
+      true
     )
 
     new SchemaRegistryComponent {
@@ -165,70 +166,75 @@ class RedisSchemaRegistryClient(restService: RestService,
                                 redisPort: Int,
                                 httpHeaders: Map[String, String],
                                 configs: Map[String, Any],
-                                cacheConfigs: CacheConfigs) extends SchemaRegistryClient {
+                                cacheConfigs: CacheConfigs,
+                                ssl: Boolean = true) extends SchemaRegistryClient {
 
   def this(baseUrl: String, redisHost: String, redisPort: Int) {
-    this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], Map.empty[String, Any],  CacheConfigs(1, 1, 1))
+    this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], Map.empty[String, Any], CacheConfigs(1, 1, 1), true)
   }
 
-  def this(baseUrl: String, redisHost: String, redisPort: Int, cacheConfigs: CacheConfigs) {
-    this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], Map.empty[String, Any], cacheConfigs)
+  def this(baseUrl: String, redisHost: String, redisPort: Int, ssl: Boolean) {
+    this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], Map.empty[String, Any],  CacheConfigs(1, 1, 1), ssl)
   }
 
-  def this(baseUrl: String, redisHost: String, redisPort: Int, config: Map[String, Any]) {
-    this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], config, CacheConfigs(1, 1, 1))
+  def this(baseUrl: String, redisHost: String, redisPort: Int, cacheConfigs: CacheConfigs, ssl: Boolean) {
+    this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], Map.empty[String, Any], cacheConfigs, ssl)
   }
 
-  def this(baseUrl: String, redisHost: String, redisPort: Int, config: Map[String, Any], cacheConfigs: CacheConfigs) {
-    this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], config, cacheConfigs)
+  def this(baseUrl: String, redisHost: String, redisPort: Int, config: Map[String, Any], ssl: Boolean) {
+    this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], config, CacheConfigs(1, 1, 1), ssl)
   }
 
-  def this(baseUrl: String, httpHeaders: Map[String, String], redisHost: String, redisPort: Int) {
-    this(new RestService(baseUrl), redisHost, redisPort, httpHeaders, Map.empty[String, Any], CacheConfigs(1, 1, 1))
+  def this(baseUrl: String, redisHost: String, redisPort: Int, config: Map[String, Any], cacheConfigs: CacheConfigs, ssl: Boolean) {
+    this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], config, cacheConfigs, ssl)
   }
 
-  def this(baseUrl: String, httpHeaders: Map[String, String], redisHost: String, redisPort: Int, cacheConfigs: CacheConfigs) {
-    this(new RestService(baseUrl), redisHost, redisPort, httpHeaders, Map.empty[String, Any], cacheConfigs)
+  def this(baseUrl: String, httpHeaders: Map[String, String], redisHost: String, redisPort: Int, ssl: Boolean) {
+    this(new RestService(baseUrl), redisHost, redisPort, httpHeaders, Map.empty[String, Any], CacheConfigs(1, 1, 1), ssl)
   }
 
-  def this(baseUrl: String, redisHost: String, redisPort: Int, httpHeaders: Map[String, String], config: Map[String, Any]) {
-    this(new RestService(baseUrl), redisHost, redisPort, httpHeaders, config, CacheConfigs(1, 1, 1))
+  def this(baseUrl: String, httpHeaders: Map[String, String], redisHost: String, redisPort: Int, cacheConfigs: CacheConfigs, ssl: Boolean) {
+    this(new RestService(baseUrl), redisHost, redisPort, httpHeaders, Map.empty[String, Any], cacheConfigs, ssl)
   }
 
-  def this(baseUrl: String, redisHost: String, redisPort: Int, httpHeaders: Map[String, String], config: Map[String, Any], cacheConfigs: CacheConfigs) {
-    this(new RestService(baseUrl), redisHost, redisPort, httpHeaders, config, cacheConfigs)
+  def this(baseUrl: String, redisHost: String, redisPort: Int, httpHeaders: Map[String, String], config: Map[String, Any], ssl: Boolean) {
+    this(new RestService(baseUrl), redisHost, redisPort, httpHeaders, config, CacheConfigs(1, 1, 1), ssl)
   }
 
-  def this(baseUrls: List[String], redisHost: String, redisPort: Int) {
-    this(new RestService(baseUrls.asJava), redisHost, redisPort, Map.empty[String, String], Map.empty[String, Any], CacheConfigs(1, 1, 1))
+  def this(baseUrl: String, redisHost: String, redisPort: Int, httpHeaders: Map[String, String], config: Map[String, Any], cacheConfigs: CacheConfigs, ssl: Boolean) {
+    this(new RestService(baseUrl), redisHost, redisPort, httpHeaders, config, cacheConfigs, ssl)
   }
 
-  def this(baseUrls: List[String], redisHost: String, redisPort: Int, cacheConfigs: CacheConfigs) {
-    this(new RestService(baseUrls.asJava), redisHost, redisPort, Map.empty[String, String], Map.empty[String, Any], cacheConfigs)
+  def this(baseUrls: List[String], redisHost: String, redisPort: Int, ssl: Boolean) {
+    this(new RestService(baseUrls.asJava), redisHost, redisPort, Map.empty[String, String], Map.empty[String, Any], CacheConfigs(1, 1, 1), ssl)
   }
 
-  def this(baseUrls: List[String], redisHost: String, redisPort: Int, config: Map[String, Any]) {
-    this(new RestService(baseUrls.asJava), redisHost, redisPort, Map.empty[String, String], config, CacheConfigs(1, 1, 1))
+  def this(baseUrls: List[String], redisHost: String, redisPort: Int, cacheConfigs: CacheConfigs, ssl: Boolean) {
+    this(new RestService(baseUrls.asJava), redisHost, redisPort, Map.empty[String, String], Map.empty[String, Any], cacheConfigs, ssl)
   }
 
-  def this(baseUrls: List[String], redisHost: String, redisPort: Int, config: Map[String, Any], cacheConfigs: CacheConfigs) {
-    this(new RestService(baseUrls.asJava), redisHost, redisPort, Map.empty[String, String], config, cacheConfigs)
+  def this(baseUrls: List[String], redisHost: String, redisPort: Int, config: Map[String, Any], ssl: Boolean) {
+    this(new RestService(baseUrls.asJava), redisHost, redisPort, Map.empty[String, String], config, CacheConfigs(1, 1, 1), ssl)
   }
 
-  def this(baseUrls: List[String], httpHeaders: Map[String, String], redisHost: String, redisPort: Int) {
-    this(new RestService(baseUrls.asJava), redisHost, redisPort, httpHeaders, Map.empty[String, Any], CacheConfigs(1, 1, 1))
+  def this(baseUrls: List[String], redisHost: String, redisPort: Int, config: Map[String, Any], cacheConfigs: CacheConfigs, ssl: Boolean) {
+    this(new RestService(baseUrls.asJava), redisHost, redisPort, Map.empty[String, String], config, cacheConfigs, ssl)
   }
 
-  def this(baseUrls: List[String], httpHeaders: Map[String, String], redisHost: String, redisPort: Int, cacheConfigs: CacheConfigs) {
-    this(new RestService(baseUrls.asJava), redisHost, redisPort, httpHeaders, Map.empty[String, Any], cacheConfigs)
+  def this(baseUrls: List[String], httpHeaders: Map[String, String], redisHost: String, redisPort: Int, ssl: Boolean) {
+    this(new RestService(baseUrls.asJava), redisHost, redisPort, httpHeaders, Map.empty[String, Any], CacheConfigs(1, 1, 1), ssl)
   }
 
-  def this(baseUrls: List[String], redisHost: String, redisPort: Int, httpHeaders: Map[String, String], config: Map[String, Any]) {
-    this(new RestService(baseUrls.asJava), redisHost, redisPort, httpHeaders, config, CacheConfigs(1, 1, 1))
+  def this(baseUrls: List[String], httpHeaders: Map[String, String], redisHost: String, redisPort: Int, cacheConfigs: CacheConfigs, ssl: Boolean) {
+    this(new RestService(baseUrls.asJava), redisHost, redisPort, httpHeaders, Map.empty[String, Any], cacheConfigs, ssl)
   }
 
-  def this(baseUrls: List[String], redisHost: String, redisPort: Int, httpHeaders: Map[String, String], config: Map[String, Any], cacheConfigs: CacheConfigs) {
-    this(new RestService(baseUrls.asJava), redisHost, redisPort, httpHeaders, config, cacheConfigs)
+  def this(baseUrls: List[String], redisHost: String, redisPort: Int, httpHeaders: Map[String, String], config: Map[String, Any], ssl: Boolean) {
+    this(new RestService(baseUrls.asJava), redisHost, redisPort, httpHeaders, config, CacheConfigs(1, 1, 1), ssl)
+  }
+
+  def this(baseUrls: List[String], redisHost: String, redisPort: Int, httpHeaders: Map[String, String], config: Map[String, Any], cacheConfigs: CacheConfigs, ssl: Boolean) {
+    this(new RestService(baseUrls.asJava), redisHost, redisPort, httpHeaders, config, cacheConfigs, ssl)
   }
 
   import hydra.avro.registry.RedisSchemaRegistryClient._
@@ -245,7 +251,7 @@ class RedisSchemaRegistryClient(restService: RestService,
   private val metadataCacheDurationTtl = Option(Duration(cacheConfigs.metadataCacheTtl.getOrElse(10000), TimeUnit.MINUTES))
 
   private def jedisFactory: JedisPool = {
-    new JedisPool(redisHost, redisPort, true)
+    new JedisPool(redisHost, redisPort, ssl)
   }
 
   private val schemaCache: Cache[Map[Schema, Int]] =
