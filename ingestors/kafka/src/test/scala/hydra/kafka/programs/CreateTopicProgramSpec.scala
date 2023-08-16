@@ -213,7 +213,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     "ingest metadata into the metadata topic" in {
       for {
         publishTo     <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
-        topicMetadata <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue.copy(validations = Some(ValidationType.values.toList))))
+        topicMetadata <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue.copy(validations = Some(MetadataValidationType.values.toList))))
         ts            <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some)
         _             <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails, true)
         published     <- publishTo.get
@@ -227,7 +227,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         publishTo   <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         consumeFrom <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
         metadata    <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
-        m           <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue.copy(validations = Some(ValidationType.values.toList))))
+        m           <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue.copy(validations = Some(MetadataValidationType.values.toList))))
         updatedM    <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(updatedValue.copy(createdDate = topicMetadataValue.createdDate)))
         ts          <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
         _           <- ts.program.createTopic(subject, topicMetadataRequest, TopicDetails(1, 1, 1), true)
@@ -2095,7 +2095,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     }
 
     "validations field is NOT populated via the validations field in the create topic request" in {
-      val requestWithEmptyValidations = createTopicMetadataRequest(keySchema, valueSchema, validations = Some(ValidationType.values.toList))
+      val requestWithEmptyValidations = createTopicMetadataRequest(keySchema, valueSchema, validations = Some(MetadataValidationType.values.toList))
 
       for {
         publishTo             <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
@@ -2121,7 +2121,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         published             <- publishTo.get
         expectedTopicMetadata <- TopicMetadataV2.encode[IO](
           topicMetadataKey,
-          Some(topicMetadataValue.copy(validations = Some(ValidationType.values.toList)))) // validations populated in topicMetadataValue
+          Some(topicMetadataValue.copy(validations = Some(MetadataValidationType.values.toList)))) // validations populated in topicMetadataValue
       } yield {
         published shouldBe Map(metadataTopic -> (expectedTopicMetadata._1, expectedTopicMetadata._2, None))
       }
@@ -2139,7 +2139,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         publishedSecond       <- publishTo.get
         expectedTopicMetadata <- TopicMetadataV2.encode[IO] (
           topicMetadataKey,
-          Some(topicMetadataValue.copy(validations = Some(ValidationType.values.toList)))) // validations populated in topicMetadataValue
+          Some(topicMetadataValue.copy(validations = Some(MetadataValidationType.values.toList)))) // validations populated in topicMetadataValue
 
       } yield {
         publishedFirst shouldBe Map(metadataTopic -> (expectedTopicMetadata._1, expectedTopicMetadata._2, None))
@@ -2295,7 +2295,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
             deprecatedDate = deprecatedDate,
             replacementTopics = replacementTopics,
             previousTopics = previousTopics,
-            validations = Some(ValidationType.values.toList)
+            validations = Some(MetadataValidationType.values.toList)
           )))
       } yield {
         published shouldBe Map(metadataTopic -> (expectedTopicMetadata._1, expectedTopicMetadata._2, None))
@@ -2431,7 +2431,7 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
                                   deprecated: Boolean = false,
                                   deprecatedDate: Option[Instant] = None,
                                   numPartitions: Option[NumPartitions] = None,
-                                  validations: Option[List[ValidationType]] = None
+                                  validations: Option[List[MetadataValidationType]] = None
                                 ): TopicMetadataV2Request =
     TopicMetadataV2Request(
       Schemas(keySchema, valueSchema),

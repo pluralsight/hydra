@@ -6,7 +6,7 @@ import hydra.common.validation.Validator.ValidationChain
 import hydra.common.validation.{ValidationError, Validator}
 import hydra.kafka.algebras.MetadataAlgebra
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{TopicMetadataV2Request, ValidationType}
+import hydra.kafka.model.{TopicMetadataV2Request, MetadataValidationType}
 import hydra.kafka.programs.CreateTopicProgram.validations
 
 import scala.language.higherKinds
@@ -20,10 +20,10 @@ class MetadataV2Validator[F[_] : Sync](metadataAlgebra: MetadataAlgebra[F]) exte
       _           <- resultOf(validate(validations, request, subject))
     } yield()
 
-  private def validate(validations: List[ValidationType], request: TopicMetadataV2Request, subject: Subject): F[List[ValidationChain]] =
+  private def validate(validations: List[MetadataValidationType], request: TopicMetadataV2Request, subject: Subject): F[List[ValidationChain]] =
     (validations flatMap {
-      case ValidationType.replacementTopics => validateReplacementTopics(request.deprecated, request.replacementTopics, subject.value)
-      case ValidationType.previousTopics => validatePreviousTopics(request.previousTopics)
+      case MetadataValidationType.replacementTopics => validateReplacementTopics(request.deprecated, request.replacementTopics, subject.value)
+      case MetadataValidationType.previousTopics => validatePreviousTopics(request.previousTopics)
     }).pure
 
   private def validateReplacementTopics(deprecated: Boolean, replacementTopics: Option[List[String]], topic: String): List[ValidationChain] = {

@@ -154,7 +154,7 @@ final case class TopicMetadataV2ValueOptionalTagList(
                                          teamName: Option[String],
                                          tags: Option[List[String]],
                                          notificationUrl: Option[String],
-                                         validations: Option[List[ValidationType]]
+                                         validations: Option[List[MetadataValidationType]]
                                        ) {
   def toTopicMetadataV2Value: TopicMetadataV2Value = {
     TopicMetadataV2Value(
@@ -191,7 +191,7 @@ final case class TopicMetadataV2Value(
     teamName: Option[String],
     tags: List[String],
     notificationUrl: Option[String],
-    validations: Option[List[ValidationType]]
+    validations: Option[List[MetadataValidationType]]
 ) {
   def toTopicMetadataV2ValueOptionalTagList: TopicMetadataV2ValueOptionalTagList = {
     TopicMetadataV2ValueOptionalTagList(
@@ -270,19 +270,19 @@ object TopicMetadataV2ValueOptionalTagList {
   private implicit val contactMethodCodec: Codec[ContactMethod] =
     Codec.derive[ContactMethod]
 
-  private implicit val _validationsCodec: Codec[ValidationType] = Codec.deriveEnum[ValidationType](
+  private implicit val _validationsCodec: Codec[MetadataValidationType] = Codec.deriveEnum[MetadataValidationType](
     symbols = List(
-      ValidationType.replacementTopics.entryName,
-      ValidationType.previousTopics.entryName
+      MetadataValidationType.replacementTopics.entryName,
+      MetadataValidationType.previousTopics.entryName
     ),
     encode = {
-      case ValidationType.replacementTopics => ValidationType.replacementTopics.entryName
-      case ValidationType.previousTopics    => ValidationType.previousTopics.entryName
+      case MetadataValidationType.replacementTopics => MetadataValidationType.replacementTopics.entryName
+      case MetadataValidationType.previousTopics    => MetadataValidationType.previousTopics.entryName
     },
     decode = {
-      case "replacementTopics" => Right(ValidationType.replacementTopics)
-      case "previousTopics"    => Right(ValidationType.previousTopics)
-      case other               => Left(AvroError(s"$other is not a ${ValidationType.toString}"))
+      case "replacementTopics" => Right(MetadataValidationType.replacementTopics)
+      case "previousTopics"    => Right(MetadataValidationType.previousTopics)
+      case other               => Left(AvroError(s"$other is not a ${MetadataValidationType.toString}"))
     }
   )
 

@@ -214,11 +214,11 @@ object CreateTopicProgram {
    * Corner case: After this feature has been on STAGE/PROD for sometime and validation for another new field is required.
    * We need not worry about old topics as the value of validations will remain the same since topic creation.
    * New validations should be applied only on new topics.
-   * Therefore, assigning all the values from ValidationType enum is reasonable.
+   * Therefore, assigning all the values from MetadataValidationType enum is reasonable.
    *
    * @param metadata a metadata object of current topic
-   * @return value of validations if the topic is already existing(OLD topic) otherwise all enum values of ValidationType(NEW topic).
+   * @return value of validations if the topic is already existing(OLD topic) otherwise all enum values of MetadataValidationType(NEW topic).
    */
-  def validations(metadata: Option[TopicMetadataContainer]): Option[List[ValidationType]] =
-    metadata.map(_.value.validations).getOrElse(ValidationType.values.toList.some)
+  def validations(metadata: Option[TopicMetadataContainer]): Option[List[MetadataValidationType]] =
+    metadata.map(_.value.validations).getOrElse(MetadataValidationType.values.toList.some)
 }
