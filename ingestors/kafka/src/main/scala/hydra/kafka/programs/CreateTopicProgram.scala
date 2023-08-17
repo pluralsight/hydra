@@ -3,7 +3,6 @@ import cats.effect.{Bracket, ExitCase, Resource, Sync}
 import cats.implicits._
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
-import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
@@ -122,7 +121,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
       }
       message = (
         TopicMetadataV2Key(topicName),
-        createTopicRequest.copy(createdDate = createdDate, deprecatedDate = deprecatedDate, validations = validations(metadata)).toValue)
+        createTopicRequest.copy(createdDate = createdDate, deprecatedDate = deprecatedDate, validations = ValidationType.validations(metadata)).toValue)
       records <- TopicMetadataV2.encode[F](message._1, Some(message._2), None)
       _ <- kafkaClient
         .publishMessage(records, v2MetadataTopicName.value)
@@ -201,24 +200,4 @@ object CreateTopicProgram {
   final case class MetadataOnlyTopicDoesNotExist(topicName: String) extends NoStackTrace {
     override def getMessage: String = s"You cannot add metadata for topic '$topicName' if it does not exist in the cluster. Please create your topic first."
   }
-
-  /**
-   * An OLD topic will have its metadata populated.
-   * Therefore, validations=None will be picked from the metadata.
-   * And no new validations will be applied on older topics.
-   *
-   * A NEW topic will not have a metadata object.
-   * Therefore, Some([replacementTopics, previousTopics]) will be assigned to validations.
-   * Thus, validations on corresponding fields will be applied.
-   *
-   * Corner case: After this feature has been on STAGE/PROD for sometime and validation for another new field is required.
-   * We need not worry about old topics as the value of validations will remain the same since topic creation.
-   * New validations should be applied only on new topics.
-   * Therefore, assigning all the values from MetadataValidationType enum is reasonable.
-   *
-   * @param metadata a metadata object of current topic
-   * @return value of validations if the topic is already existing(OLD topic) otherwise all enum values of MetadataValidationType(NEW topic).
-   */
-  def validations(metadata: Option[TopicMetadataContainer]): Option[List[MetadataValidationType]] =
-    metadata.map(_.value.validations).getOrElse(MetadataValidationType.values.toList.some)
 }

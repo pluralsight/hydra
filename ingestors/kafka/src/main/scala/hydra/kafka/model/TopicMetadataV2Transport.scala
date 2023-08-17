@@ -1,7 +1,6 @@
 package hydra.kafka.model
 
 import cats.data.NonEmptyList
-import enumeratum._
 import eu.timepit.refined._
 import eu.timepit.refined.api.{Refined, RefinedTypeOps}
 import eu.timepit.refined.boolean._
@@ -74,17 +73,6 @@ object StreamTypeV2 {
   case object Telemetry extends StreamTypeV2
 }
 
-sealed trait ValidationType extends EnumEntry
-
-sealed trait MetadataValidationType extends ValidationType
-
-object MetadataValidationType extends Enum[MetadataValidationType] {
-  case object replacementTopics extends MetadataValidationType
-  case object previousTopics extends MetadataValidationType
-
-  override val values: immutable.IndexedSeq[MetadataValidationType] = findValues
-}
-
 final case class TopicMetadataV2Request(
                                          schemas: Schemas,
                                          streamType: StreamTypeV2,
@@ -101,7 +89,7 @@ final case class TopicMetadataV2Request(
                                          numPartitions: Option[TopicMetadataV2Request.NumPartitions],
                                          tags: List[String],
                                          notificationUrl: Option[String],
-                                         validations: Option[List[MetadataValidationType]]
+                                         validations: Option[Map[String, List[ValidationType]]]
                                        ) {
 
   def toValue: TopicMetadataV2Value = {
@@ -230,7 +218,7 @@ final case class MetadataOnlyRequest(streamType: StreamTypeV2,
                                      numPartitions: Option[TopicMetadataV2Request.NumPartitions],
                                      tags: List[String],
                                      notificationUrl: Option[String],
-                                     validations: Option[List[MetadataValidationType]]) {
+                                     validations: Option[Map[String, List[ValidationType]]]) {
 }
 
 

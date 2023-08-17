@@ -6,8 +6,7 @@ import hydra.common.validation.Validator.ValidationChain
 import hydra.common.validation.{ValidationError, Validator}
 import hydra.kafka.algebras.MetadataAlgebra
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{TopicMetadataV2Request, MetadataValidationType}
-import hydra.kafka.programs.CreateTopicProgram.validations
+import hydra.kafka.model.{MetadataValidationType, TopicMetadataV2Request, ValidationType}
 
 import scala.language.higherKinds
 
@@ -16,7 +15,7 @@ class MetadataV2Validator[F[_] : Sync](metadataAlgebra: MetadataAlgebra[F]) exte
   def validate(request: TopicMetadataV2Request, subject: Subject): F[Unit] =
     for {
       metadata    <- metadataAlgebra.getMetadataFor(subject)
-      validations <- validations(metadata).getOrElse(List.empty).pure
+      validations <- ValidationType.metadataValidations(metadata).getOrElse(List.empty).pure
       _           <- resultOf(validate(validations, request, subject))
     } yield()
 
