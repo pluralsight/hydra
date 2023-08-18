@@ -274,15 +274,21 @@ object TopicMetadataV2ValueOptionalTagList {
     symbols = List(
       MetadataValidationType.replacementTopics.entryName,
       MetadataValidationType.previousTopics.entryName,
+      SchemaValidationType.defaultInRequiredField.entryName,
+      SchemaValidationType.timestampMillis.entryName
     ),
     encode = {
-      case MetadataValidationType.replacementTopics  => MetadataValidationType.replacementTopics.entryName
-      case MetadataValidationType.previousTopics     => MetadataValidationType.previousTopics.entryName
+      case MetadataValidationType.replacementTopics    => MetadataValidationType.replacementTopics.entryName
+      case MetadataValidationType.previousTopics       => MetadataValidationType.previousTopics.entryName
+      case SchemaValidationType.defaultInRequiredField => SchemaValidationType.defaultInRequiredField.entryName
+      case SchemaValidationType.timestampMillis        => SchemaValidationType.timestampMillis.entryName
     },
     decode = {
-      case "replacementTopics" => Right(MetadataValidationType.replacementTopics)
-      case "previousTopics"    => Right(MetadataValidationType.previousTopics)
-      case other               => Left(AvroError(s"$other is not a ${ValidationType.toString}"))
+      case "replacementTopics"      => Right(MetadataValidationType.replacementTopics)
+      case "previousTopics"         => Right(MetadataValidationType.previousTopics)
+      case "defaultInRequiredField" => Right(SchemaValidationType.defaultInRequiredField)
+      case "timestampMillis"        => Right(SchemaValidationType.timestampMillis)
+      case other                    => Left(AvroError(s"$other is not a ${ValidationType.toString}"))
     }
   )
 

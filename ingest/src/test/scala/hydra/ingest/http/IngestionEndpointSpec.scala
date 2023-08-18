@@ -45,7 +45,6 @@ final class IngestionEndpointSpec
 
   private val noAuth = new AccessControlService[IO](mock[AwsSecurityService[IO]], AwsConfig(None, isAwsIamSecurityEnabled = false))
   private val testSubject = Subject.createValidated("dvs.test.v0.Testing").get
-  private val timestampValidationCutoffDate: Instant = Instant.parse("2023-07-11T00:00:00Z")
 
   import scalacache.Mode
   implicit val mode: Mode[IO] = scalacache.CatsEffect.modes.async
@@ -57,12 +56,12 @@ final class IngestionEndpointSpec
     } yield sr).unsafeRunSync
     val metadata = (for {
       m <- TestMetadataAlgebra()
-      _ <- TopicUtils.updateTopicMetadata(List(testSubject.value), m, Instant.now)
+      _ <- TopicUtils.updateTopicMetadata(List(testSubject.value), m)
     } yield m).unsafeRunSync
     new IngestionEndpoint(
       new IngestionFlow[IO](schemaReg, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistryUrl.notreal"),
       new IngestionFlowV2[IO](SchemaRegistry.test[IO].unsafeRunSync, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistryUrl.notreal",
-        metadata, timestampValidationCutoffDate), noAuth
+        metadata), noAuth
     ).route
   }
 
@@ -104,11 +103,11 @@ final class IngestionEndpointSpec
       _ <- schemaRegistry.registerSchema("dvs.blah.composit-key", compositeKey)
       _ <- schemaRegistry.registerSchema("dvs.blah.composit-value", simpleSchema)
       m <- TestMetadataAlgebra()
-      _ <- TopicUtils.updateTopicMetadata(List(testSubject.value), m, Instant.now)
+      _ <- TopicUtils.updateTopicMetadata(List(testSubject.value), m)
     } yield {
       new IngestionEndpoint(
         new IngestionFlow[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistry.notreal"),
-        new IngestionFlowV2[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistry.notreal", m, timestampValidationCutoffDate),
+        new IngestionFlowV2[IO](schemaRegistry, KafkaClientAlgebra.test[IO].unsafeRunSync, "https://schemaregistry.notreal", m),
         noAuth
       ).route
     }).unsafeRunSync()

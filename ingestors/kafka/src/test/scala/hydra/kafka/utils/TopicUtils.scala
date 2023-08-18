@@ -14,7 +14,7 @@ import java.time.Instant
 
 object TopicUtils {
 
-  def updateTopicMetadata(topics: List[String], metadataAlgebra: TestMetadataAlgebra[IO], createdDate: Instant): IO[List[Unit]] = {
+  def updateTopicMetadata(topics: List[String], metadataAlgebra: TestMetadataAlgebra[IO]): IO[List[Unit]] = {
     topics.traverse(topic => {
       val keySchema = SchemaBuilder.record(topic + "Key").fields.requiredInt("test").endRecord()
       val valueSchema = SchemaBuilder.record(topic + "Value").fields.requiredInt("test").endRecord()
@@ -28,7 +28,7 @@ object TopicUtils {
         previousTopics = None,
         Public,
         NonEmptyList.of(Email.create("test@test.com").get),
-        createdDate,
+        Instant.now(),
         List.empty,
         None,
         Some("dvs-teamName"),

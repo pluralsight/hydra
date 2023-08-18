@@ -11,13 +11,13 @@ import hydra.core.transport.ValidationStrategy
 import hydra.kafka.algebras.{KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishResponse
 import hydra.kafka.model.TopicMetadataV2Request.Subject
+import hydra.kafka.model.{ValidationType, SchemaValidationType}
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
 import scalacache._
 import scalacache.guava._
 import scalacache.memoization._
 
-import java.time.Instant
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters.asScalaBufferConverter
 import scala.util.{Failure, Try}
@@ -26,8 +26,7 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
                                                                     schemaRegistry: SchemaRegistry[F],
                                                                     kafkaClient: KafkaClientAlgebra[F],
                                                                     schemaRegistryBaseUrl: String,
-                                                                    metadata: MetadataAlgebra[F],
-                                                                    timestampValidationCutoffDate: Instant)
+                                                                    metadata: MetadataAlgebra[F])
                                                                     (implicit guavaCache: Cache[SchemaWrapper]){
 
   import IngestionFlowV2._
@@ -78,8 +77,7 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
 
     for {
       metadata <- metadata.getMetadataFor(topic)
-      schemaCreationDate = metadata.map(_.value.createdDate).getOrElse(Instant.now())
-      useTimestampValidation = schemaCreationDate.isAfter(timestampValidationCutoffDate)
+      useTimestampValidation = ValidationType.isPresent(metadata, SchemaValidationType.timestampMillis)
       kSchema <- getSchemaWrapper(topic, isKey = true)
       vSchema <- getSchemaWrapper(topic, isKey = false)
       k <- MonadError[F, Throwable].fromTry(

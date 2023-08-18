@@ -182,8 +182,7 @@ object CreateTopicProgram {
                                                            kafkaClient: KafkaClientAlgebra[F],
                                                            retryPolicy: RetryPolicy[F],
                                                            v2MetadataTopicName: Subject,
-                                                           metadataAlgebra: MetadataAlgebra[F],
-                                                           defaultLoopHoleCutoffDate: Instant
+                                                           metadataAlgebra: MetadataAlgebra[F]
                                                          ) (implicit eff: Sync[F]): CreateTopicProgram[F] = {
     new CreateTopicProgram(
       schemaRegistry,
@@ -192,7 +191,7 @@ object CreateTopicProgram {
       retryPolicy,
       v2MetadataTopicName,
       metadataAlgebra,
-      KeyAndValueSchemaV2Validator.make(schemaRegistry, metadataAlgebra, defaultLoopHoleCutoffDate),
+      KeyAndValueSchemaV2Validator.make(schemaRegistry, metadataAlgebra),
       MetadataV2Validator.make(metadataAlgebra)
     )
   }

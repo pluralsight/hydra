@@ -63,8 +63,7 @@ final class BootstrapEndpointV2Spec
         kc,
         retryPolicy,
         Subject.createValidated("dvs.hello-world").get,
-        m,
-        Instant.parse("2023-07-05T00:00:00Z")
+        m
       ),
       TopicDetails(1, 1, 1),
       t,

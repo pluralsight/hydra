@@ -19,10 +19,23 @@ object MetadataValidationType extends Enum[MetadataValidationType] {
   lazy val key: String = "MetadataValidationType"
 }
 
+sealed trait SchemaValidationType extends ValidationType
+
+object SchemaValidationType extends Enum[SchemaValidationType] {
+  case object defaultInRequiredField extends SchemaValidationType
+
+  case object timestampMillis extends SchemaValidationType
+
+  override val values: immutable.IndexedSeq[SchemaValidationType] = findValues
+
+  lazy val key: String = "SchemaValidationType"
+}
+
 object ValidationType {
   lazy val allValidations: Option[Map[String, List[ValidationType]]] =
     Some(Map(
-      MetadataValidationType.key -> MetadataValidationType.values.toList
+      MetadataValidationType.key -> MetadataValidationType.values.toList,
+      SchemaValidationType.key   -> SchemaValidationType.values.toList,
     ))
 
   /**
@@ -50,4 +63,7 @@ object ValidationType {
       vMap.get(MetadataValidationType.key)
         .map(_.asInstanceOf[List[MetadataValidationType]])
     }
+
+  def isPresent(metadata: Option[TopicMetadataContainer], validationType: ValidationType): Boolean =
+    validations(metadata).exists(m => m.keys.exists(k => m.get(k).exists(_.contains(validationType))))
 }

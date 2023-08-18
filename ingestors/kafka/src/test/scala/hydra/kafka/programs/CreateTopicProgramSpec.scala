@@ -157,24 +157,13 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
       } yield topic.get shouldBe Topic(subject.value, 1)
     }
 
-    s"[pre-cutoff-date] required fields in value schema of a topic can have a default value" in {
-      implicit val createdDate: Instant = Instant.parse("2023-01-01T00:00:00Z")
-
-      createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
-      createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = None).attempt.map(_ shouldBe Right())
-      createTopic(createdAtDefaultValue = None, updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
+    s"[exiting-topic] required fields in value schema of a topic can have a default value" in {
+      createTopic(existingTopic = true, createdAtDefaultValue = Some(123), updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
+      createTopic(existingTopic = true, createdAtDefaultValue = Some(123), updatedAtDefaultValue = None).attempt.map(_ shouldBe Right())
+      createTopic(existingTopic = true, createdAtDefaultValue = None, updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
     }
 
-    s"[on-cutoff-date] required fields in value schema of a topic can have a default value" in {
-      implicit val createdDate: Instant = defaultLoopHoleCutoffDate
-
-      createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
-      createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = None).attempt.map(_ shouldBe Right())
-      createTopic(createdAtDefaultValue = None, updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
-    }
-
-    s"[post-cutoff-date] required fields in value schema of a topic cannot have a default value - createdAt & updatedAt" in {
-      implicit val createdDate: Instant = Instant.parse("2023-07-07T00:00:00Z")
+    s"[new-topic] required fields in value schema of a topic cannot have a default value - createdAt & updatedAt" in {
       val createdAt = Some(123L)
       val updatedAt = Some(456L)
       val schema = getSchema("val", createdAt, updatedAt)
@@ -186,8 +175,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         )).asLeft)
     }
 
-    s"[post-cutoff-date] required fields in value schema of a topic cannot have a default value - createdAt" in {
-      implicit val createdDate: Instant = Instant.parse("2023-07-07T00:00:00Z")
+    s"[new-topic] required fields in value schema of a topic cannot have a default value - createdAt" in {
       val createdAt = Some(123L)
       val schema = getSchema("val", createdAt, None)
 
@@ -195,8 +183,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         RequiredSchemaValueFieldWithDefaultValueError("createdAt", schema, "Entity").asLeft)
     }
 
-    s"[post-cutoff-date] required fields in value schema of a topic cannot have a default value - updateAt" in {
-      implicit val createdDate: Instant = Instant.parse("2023-07-07T00:00:00Z")
+    s"[new-topic] required fields in value schema of a topic cannot have a default value - updateAt" in {
       val updatedAt = Some(456L)
       val schema = getSchema("val", None, updatedAt)
 
@@ -204,9 +191,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         RequiredSchemaValueFieldWithDefaultValueError("updatedAt", schema, "Entity").asLeft)
     }
 
-    s"[post-cutoff-date] accept a topic where the required fields do not have a default value" in {
-      implicit val createdDate: Instant = Instant.parse("2023-07-07T00:00:00Z")
-
+    s"[new-topic] accept a topic where the required fields do not have a default value" in {
       createTopic(createdAtDefaultValue = None, updatedAtDefaultValue = None).attempt.map(_ shouldBe Right())
     }
 
@@ -2095,7 +2080,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     }
 
     "validations field is NOT populated via the validations field in the create topic request" in {
-      val requestWithEmptyValidations = createTopicMetadataRequest(keySchema, valueSchema, validations = ValidationType.allValidations)
+      val requestWithValidations = createTopicMetadataRequest(keySchema, valueSchema, validations = ValidationType.allValidations)
 
       for {
         publishTo             <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
@@ -2103,7 +2088,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         metadata              <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
         _                     <- metadata.addToMetadata(subject, topicMetadataRequest)
         ts                    <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
-        _                     <- ts.program.createTopic(subject, requestWithEmptyValidations, topicDetails, withRequiredFields = true)
+        _                     <- ts.program.createTopic(subject, requestWithValidations, topicDetails, withRequiredFields = true)
         published             <- publishTo.get
         expectedTopicMetadata <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue)) // validations empty in topicMetadataValue
       } yield {
@@ -2311,12 +2296,12 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
       result.attempt.map(_ shouldBe error.asLeft)
     }
     
-    def createTopic(createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long])(implicit createdDate: Instant) =
+    def createTopic(createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long], existingTopic: Boolean = false) =
       for {
-        m <- TestMetadataAlgebra()
-        _ <- TopicUtils.updateTopicMetadata(List(subject.value), m, createdDate)
+        m  <- TestMetadataAlgebra()
+        _  <- if (existingTopic) TopicUtils.updateTopicMetadata(List(subject.value), m) else IO()
         ts <- initTestServices(metadataAlgebraOpt = Some(m))
-        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(createdAtDefaultValue, updatedAtDefaultValue), topicDetails, true)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(createdAtDefaultValue, updatedAtDefaultValue), topicDetails, true)
       } yield ()
   }
 
@@ -2376,8 +2361,6 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
   val topicMetadataKey     = TopicMetadataV2Key(subject)
   val topicMetadataValue   = topicMetadataRequest.toValue
 
-  val defaultLoopHoleCutoffDate: Instant = Instant.parse("2023-07-05T00:00:00Z")
-
   implicit val contextShift: ContextShift[IO]   = IO.contextShift(ExecutionContext.global)
   implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
   implicit val timer: Timer[IO]                 = IO.timer(ExecutionContext.global)
@@ -2406,8 +2389,7 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
           kafkaClient,
           retryPolicy,
           Subject.createValidated(metadataTopic).get,
-          metadataAlgebraOpt.getOrElse(defaultMetadata),
-          defaultLoopHoleCutoffDate
+          metadataAlgebraOpt.getOrElse(defaultMetadata)
         )
 
       TestServices(createTopicProgram, defaultSchemaRegistry, kafka)
