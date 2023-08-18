@@ -56,7 +56,7 @@ object ConfluentSchemaRegistry extends LoggingAdapter {
       new CacheLoader[SchemaRegistryClientInfo, ConfluentSchemaRegistry] {
 
         def load(info: SchemaRegistryClientInfo): ConfluentSchemaRegistry = {
-          log.debug(s"Creating new schema registry client for ${info.url}")
+          log.debug(s"Creating new schema registry client for ${info.url}.")
           val client = if (info.url == "mock") {
             mockRegistry
           } else {

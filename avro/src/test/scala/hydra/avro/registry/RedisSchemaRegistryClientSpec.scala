@@ -3,6 +3,7 @@ package hydra.avro.registry
 import org.apache.avro.{Schema, SchemaBuilder}
 import org.scalatest.BeforeAndAfterAll
 import com.github.sebruck.EmbeddedRedis
+import hydra.avro.registry.RedisSchemaRegistryClient.IntSchemaMetadataMapBinCodec
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, SchemaMetadata, SchemaRegistryClient}
 import net.manub.embeddedkafka.schemaregistry.{EmbeddedKafka, EmbeddedKafkaConfig}
@@ -25,10 +26,29 @@ class RedisSchemaRegistryClientSpec extends AnyFlatSpec with EmbeddedRedis with 
     redis = startRedis()
     redisPort = redis.ports().get(0)
     val srUrl = s"http://localhost:${config.schemaRegistryPort}"
-    redisClient = new RedisSchemaRegistryClient(srUrl, "localhost", redisPort)
+    redisClient = new RedisSchemaRegistryClient(srUrl, "localhost", redisPort, false)
     cachedClient = new CachedSchemaRegistryClient(srUrl, 50)
   }
 
+  "RedisSchemaRegistryClient codec" should "successfully encode and decode data structure with SchemaMetadata" in {
+    val schema = SchemaBuilder.record("Test12").fields()
+      .requiredString("testing1").endRecord().toString
+
+    val sm = new SchemaMetadata(1, 1, schema)
+
+    val map = Map(1 -> sm)
+
+    val encode = IntSchemaMetadataMapBinCodec.encode(map)
+    val decode = IntSchemaMetadataMapBinCodec.decode(encode)
+
+    decode.isRight shouldBe true
+
+    val value = decode.right.get
+    value.keySet shouldBe map.keySet
+    value.values.head.getId shouldBe map.values.head.getId
+    value.values.head.getSchema shouldBe map.values.head.getSchema
+    value.values.head.getVersion shouldBe map.values.head.getVersion
+  }
 
   "RedisSchemaRegistryClient" should "successfully pass tests with SchemaRegistry and Redis" in {
     withRunningKafka {
