@@ -154,7 +154,7 @@ final case class TopicMetadataV2ValueOptionalTagList(
                                          teamName: Option[String],
                                          tags: Option[List[String]],
                                          notificationUrl: Option[String],
-                                         validations: Option[Map[String, List[ValidationType]]]
+                                         additionalValidations: Option[Map[String, List[AdditionalValidation]]]
                                        ) {
   def toTopicMetadataV2Value: TopicMetadataV2Value = {
     TopicMetadataV2Value(
@@ -171,7 +171,7 @@ final case class TopicMetadataV2ValueOptionalTagList(
       teamName,
       tags.getOrElse(List.empty),
       notificationUrl,
-      validations
+      additionalValidations
     )
   }
 }
@@ -191,7 +191,7 @@ final case class TopicMetadataV2Value(
     teamName: Option[String],
     tags: List[String],
     notificationUrl: Option[String],
-    validations: Option[Map[String, List[ValidationType]]]
+    additionalValidations: Option[Map[String, List[AdditionalValidation]]]
 ) {
   def toTopicMetadataV2ValueOptionalTagList: TopicMetadataV2ValueOptionalTagList = {
     TopicMetadataV2ValueOptionalTagList(
@@ -208,7 +208,7 @@ final case class TopicMetadataV2Value(
       teamName,
       tags.some,
       notificationUrl,
-      validations
+      additionalValidations
     )
   }
 }
@@ -270,19 +270,16 @@ object TopicMetadataV2ValueOptionalTagList {
   private implicit val contactMethodCodec: Codec[ContactMethod] =
     Codec.derive[ContactMethod]
 
-  private implicit val validationsCodec: Codec[ValidationType] = Codec.deriveEnum[ValidationType](
+  private implicit val validationsCodec: Codec[AdditionalValidation] = Codec.deriveEnum[AdditionalValidation](
     symbols = List(
-      MetadataValidationType.replacementTopics.entryName,
-      MetadataValidationType.previousTopics.entryName,
+      MetadataAdditionalValidation.replacementTopics.entryName
     ),
     encode = {
-      case MetadataValidationType.replacementTopics  => MetadataValidationType.replacementTopics.entryName
-      case MetadataValidationType.previousTopics     => MetadataValidationType.previousTopics.entryName
+      case MetadataAdditionalValidation.replacementTopics  => MetadataAdditionalValidation.replacementTopics.entryName
     },
     decode = {
-      case "replacementTopics" => Right(MetadataValidationType.replacementTopics)
-      case "previousTopics"    => Right(MetadataValidationType.previousTopics)
-      case other               => Left(AvroError(s"$other is not a ${ValidationType.toString}"))
+      case "replacementTopics" => Right(MetadataAdditionalValidation.replacementTopics)
+      case other               => Left(AvroError(s"$other is not a ${AdditionalValidation.toString}"))
     }
   )
 
@@ -305,7 +302,7 @@ object TopicMetadataV2ValueOptionalTagList {
         field("teamName", _.teamName, default = Some(None)),
         field("tags", _.tags, default = Some(None)),
         field("notificationUrl", _.notificationUrl, default = Some(None)),
-        field("validations", _.validations, default = Some(None))
+        field("additionalValidations", _.additionalValidations, default = Some(None))
         ).mapN(TopicMetadataV2ValueOptionalTagList.apply)
   }
 }

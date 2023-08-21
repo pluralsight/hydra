@@ -282,8 +282,8 @@ sealed trait TopicMetadataV2Parser
     private def deserializationError(value: JsValue) = throw DeserializationException(s"Expected a value from enum $values instead of $value")
   }
 
-  implicit val newMetadataValidationFormat: EnumEntryJsonFormat[ValidationType] =
-    new EnumEntryJsonFormat[ValidationType](Seq.empty)
+  implicit val newMetadataValidationFormat: EnumEntryJsonFormat[AdditionalValidation] =
+    new EnumEntryJsonFormat[AdditionalValidation](Seq.empty)
 
   implicit object TopicMetadataV2Format
       extends RootJsonFormat[TopicMetadataV2Request] {
@@ -429,7 +429,7 @@ sealed trait TopicMetadataV2Parser
           numPartitions,
           tags,
           notificationUrl,
-          toResult(None) // Never pick validations from the request.
+          toResult(None) // Never pick additionalValidations from the request.
           ).mapN(MetadataOnlyRequest.apply)
     }
   }
