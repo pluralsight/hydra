@@ -6,7 +6,7 @@ import hydra.common.validation.Validator.ValidationChain
 import hydra.common.validation.{ValidationError, Validator}
 import hydra.kafka.algebras.MetadataAlgebra
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{MetadataValidationType, TopicMetadataV2Request, ValidationType}
+import hydra.kafka.model.{AdditionalValidation, MetadataAdditionalValidation, TopicMetadataV2Request}
 
 import scala.language.higherKinds
 
@@ -14,25 +14,25 @@ class MetadataV2Validator[F[_] : Sync](metadataAlgebra: MetadataAlgebra[F]) exte
 
   def validate(request: TopicMetadataV2Request, subject: Subject): F[Unit] =
     for {
-      metadata    <- metadataAlgebra.getMetadataFor(subject)
-      validations <- ValidationType.metadataValidations(metadata).getOrElse(List.empty).pure
-      _           <- resultOf(validate(validations, request, subject))
+      metadata              <- metadataAlgebra.getMetadataFor(subject)
+      additionalValidations <- AdditionalValidation.metadataValidations(metadata).getOrElse(List.empty).pure
+      _                     <- resultOf(validate(request))
+      _                     <- resultOf(validateAdditional(additionalValidations, request, subject))
     } yield()
 
-  private def validate(validations: List[MetadataValidationType], request: TopicMetadataV2Request, subject: Subject): F[List[ValidationChain]] =
-    (validations flatMap {
-      case MetadataValidationType.replacementTopics => validateReplacementTopics(request.deprecated, request.replacementTopics, subject.value)
-      case MetadataValidationType.previousTopics => validatePreviousTopics(request.previousTopics)
+  private def validate(request: TopicMetadataV2Request): F[List[ValidationChain]] = {
+    val validationResults = validateTopicsFormat(request.replacementTopics) ++
+      validateTopicsFormat(request.previousTopics)
+    validationResults.pure
+  }
+
+  private def validateAdditional(additionalValidations: List[MetadataAdditionalValidation],
+                                 request: TopicMetadataV2Request,
+                                 subject: Subject): F[List[ValidationChain]] =
+    (additionalValidations flatMap {
+      case MetadataAdditionalValidation.replacementTopics =>
+        List(validateDeprecatedTopicHasReplacementTopic(request.deprecated, request.replacementTopics, subject.value))
     }).pure
-
-  private def validateReplacementTopics(deprecated: Boolean, replacementTopics: Option[List[String]], topic: String): List[ValidationChain] = {
-    validateDeprecatedTopicHasReplacementTopic(deprecated, replacementTopics, topic) +:
-      validateTopicsFormat(replacementTopics)
-  }
-
-  private def validatePreviousTopics(previousTopics: Option[List[String]]): List[ValidationChain] = {
-    validateTopicsFormat(previousTopics)
-  }
 
   private def validateDeprecatedTopicHasReplacementTopic(deprecated: Boolean, replacementTopics: Option[List[String]], topic: String): ValidationChain = {
     val hasReplacementTopicsIfDeprecated = if (deprecated) replacementTopics.exists(_.nonEmpty) else true
@@ -40,7 +40,7 @@ class MetadataV2Validator[F[_] : Sync](metadataAlgebra: MetadataAlgebra[F]) exte
   }
 
   private def validateTopicsFormat(maybeTopics: Option[List[String]]): List[ValidationChain] = {
-    val validations = for {
+    val validationResults = for {
       topics <- maybeTopics
     } yield {
       topics map { topic =>
@@ -48,7 +48,7 @@ class MetadataV2Validator[F[_] : Sync](metadataAlgebra: MetadataAlgebra[F]) exte
         validate(isValidTopicFormat, InvalidTopicFormatError(topic))
       }
     }
-    validations.getOrElse(List.empty)
+    validationResults.getOrElse(List.empty)
   }
 }
 

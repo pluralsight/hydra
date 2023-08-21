@@ -5,7 +5,7 @@ import cats.effect.Sync
 import cats.syntax.all._
 import hydra.avro.convert.IsoDate
 import hydra.avro.registry.SchemaRegistry
-import hydra.kafka.model.{RequiredField, Schemas, StreamTypeV2, TopicMetadataV2Request, ValidationType, SchemaValidationType}
+import hydra.kafka.model.{AdditionalValidation, RequiredField, SchemaAdditionalValidation, Schemas, StreamTypeV2, TopicMetadataV2Request}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.TopicSchemaError._
 import org.apache.avro.{Schema, SchemaBuilder}
@@ -22,7 +22,7 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
   def validate(request: TopicMetadataV2Request, subject: Subject, withRequiredFields: Boolean): F[Unit] =
     for {
       metadata <- metadataAlgebra.getMetadataFor(subject)
-      validateDefaultInRequiredField = ValidationType.isPresent(metadata, SchemaValidationType.defaultInRequiredField)
+      validateDefaultInRequiredField = AdditionalValidation.isPresent(metadata, SchemaAdditionalValidation.defaultInRequiredField)
       schemas = request.schemas
       _ <- (schemas.key.getType, schemas.value.getType) match {
         case (Schema.Type.RECORD, Schema.Type.RECORD) =>

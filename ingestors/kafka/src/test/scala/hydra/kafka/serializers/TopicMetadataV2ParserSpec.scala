@@ -605,7 +605,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         numPartitions = np,
         tags = tags,
         notificationUrl = notificationUrl,
-        validations = None
+        additionalValidations = None
       )
       TopicMetadataV2Format.write(topicMetadataV2) shouldBe
         createJsValueOfTopicMetadataV2Request(

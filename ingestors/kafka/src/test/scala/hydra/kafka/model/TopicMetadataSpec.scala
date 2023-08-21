@@ -90,7 +90,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
          |"notes": null,
          |"notificationUrl": null,
          |"tags": null,
-         |"validations": null
+         |"additionalValidations": null
          |}""".stripMargin
 
     val decoder = DecoderFactory.get().jsonDecoder(valueSchema, json)

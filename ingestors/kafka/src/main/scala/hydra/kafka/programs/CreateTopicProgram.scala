@@ -121,7 +121,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
       }
       message = (
         TopicMetadataV2Key(topicName),
-        createTopicRequest.copy(createdDate = createdDate, deprecatedDate = deprecatedDate, validations = ValidationType.validations(metadata)).toValue)
+        createTopicRequest.copy(createdDate = createdDate, deprecatedDate = deprecatedDate,
+          additionalValidations = AdditionalValidation.validations(metadata)).toValue)
       records <- TopicMetadataV2.encode[F](message._1, Some(message._2), None)
       _ <- kafkaClient
         .publishMessage(records, v2MetadataTopicName.value)

@@ -89,7 +89,7 @@ final case class TopicMetadataV2Request(
                                          numPartitions: Option[TopicMetadataV2Request.NumPartitions],
                                          tags: List[String],
                                          notificationUrl: Option[String],
-                                         validations: Option[Map[String, List[ValidationType]]]
+                                         additionalValidations: Option[Map[String, List[AdditionalValidation]]]
                                        ) {
 
   def toValue: TopicMetadataV2Value = {
@@ -107,7 +107,7 @@ final case class TopicMetadataV2Request(
       teamName,
       tags,
       notificationUrl,
-      validations
+      additionalValidations
     )
   }
 }
@@ -155,7 +155,7 @@ object TopicMetadataV2Request {
       mor.numPartitions,
       mor.tags,
       mor.notificationUrl,
-      mor.validations
+      mor.additionalValidations
     )
   }
 }
@@ -218,7 +218,7 @@ final case class MetadataOnlyRequest(streamType: StreamTypeV2,
                                      numPartitions: Option[TopicMetadataV2Request.NumPartitions],
                                      tags: List[String],
                                      notificationUrl: Option[String],
-                                     validations: Option[Map[String, List[ValidationType]]]) {
+                                     additionalValidations: Option[Map[String, List[AdditionalValidation]]]) {
 }
 
 

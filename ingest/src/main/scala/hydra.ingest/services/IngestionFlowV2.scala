@@ -11,7 +11,7 @@ import hydra.core.transport.ValidationStrategy
 import hydra.kafka.algebras.{KafkaClientAlgebra, MetadataAlgebra}
 import hydra.kafka.algebras.KafkaClientAlgebra.PublishResponse
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{ValidationType, SchemaValidationType}
+import hydra.kafka.model.{AdditionalValidation, SchemaAdditionalValidation}
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
 import scalacache._
@@ -20,6 +20,7 @@ import scalacache.memoization._
 
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters.asScalaBufferConverter
+import scala.language.higherKinds
 import scala.util.{Failure, Try}
 
 final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
@@ -77,7 +78,7 @@ final class IngestionFlowV2[F[_]: MonadError[*[_], Throwable]: Mode](
 
     for {
       metadata <- metadata.getMetadataFor(topic)
-      useTimestampValidation = ValidationType.isPresent(metadata, SchemaValidationType.timestampMillis)
+      useTimestampValidation = AdditionalValidation.isPresent(metadata, SchemaAdditionalValidation.timestampMillis)
       kSchema <- getSchemaWrapper(topic, isKey = true)
       vSchema <- getSchemaWrapper(topic, isKey = false)
       k <- MonadError[F, Throwable].fromTry(
