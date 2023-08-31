@@ -152,7 +152,7 @@ object RedisSchemaRegistryClient {
       redisPort,
       schemaRegistrySecurityConfig.toConfigMap,
       CacheConfigs(redisIdCacheTtl, redisSchemaCacheTtl, redisVersionCacheTtl),
-      false
+      true
     )
 
     new SchemaRegistryComponent {
