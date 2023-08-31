@@ -24,6 +24,8 @@ case class CacheConfigs(idCacheTtl: Int, schemaCacheTtl: Int, versionCacheTtl: I
 
 object RedisSchemaRegistryClient {
 
+  private val DO_NOT_CACHE_LIST = List("_", "hydra.")
+
   object SchemaIntMapBinCodec extends Codec[Map[Schema, Int]] {
     override def encode(value: Map[Schema, Int]): Array[Byte] = {
       val stream: ByteArrayOutputStream = new ByteArrayOutputStream()
@@ -150,7 +152,7 @@ object RedisSchemaRegistryClient {
       redisPort,
       schemaRegistrySecurityConfig.toConfigMap,
       CacheConfigs(redisIdCacheTtl, redisSchemaCacheTtl, redisVersionCacheTtl),
-      true
+      false
     )
 
     new SchemaRegistryComponent {
@@ -316,7 +318,7 @@ class RedisSchemaRegistryClient(restService: RestService,
   }
 
   override def getBySubjectAndId(s: String, i: Int): Schema = {
-    if (s.startsWith("_")) {
+    if (DO_NOT_CACHE_LIST.exists(s.startsWith)) {
       restGetSchemaById(s, i)
     } else {
       val idKey = buildIdKey(s)
@@ -394,7 +396,7 @@ class RedisSchemaRegistryClient(restService: RestService,
       new SchemaMetadata(id, i, schema)
     }
 
-    if(s.startsWith("_")) {
+    if(DO_NOT_CACHE_LIST.exists(s.startsWith)) {
       get(s, i)
     } else {
       val metadataKey = buildMetadataKey(s)
@@ -422,7 +424,7 @@ class RedisSchemaRegistryClient(restService: RestService,
   }
 
   override def getVersion(s: String, schema: Schema): Int = synchronized {
-    if(s.startsWith("_")) {
+    if(DO_NOT_CACHE_LIST.exists(s.startsWith)) {
       val response: io.confluent.kafka.schemaregistry.client.rest.entities.Schema = restService.lookUpSubjectVersion(schema.toString(), s, true)
       response.getVersion.toInt
     } else {
@@ -484,7 +486,7 @@ class RedisSchemaRegistryClient(restService: RestService,
   }
 
   override def getId(s: String, schema: Schema): Int = synchronized {
-    if (s.startsWith("_")) {
+    if (DO_NOT_CACHE_LIST.exists(s.startsWith)) {
       restService.lookUpSubjectVersion(schema.toString, s, false).getId.toInt
     } else {
       def call(): Map[Schema, Int] = {
@@ -570,7 +572,7 @@ class RedisSchemaRegistryClient(restService: RestService,
       }
     }.getOrElse(-1)
 
-    if(s.startsWith("_")) {
+    if(DO_NOT_CACHE_LIST.exists(s.startsWith)) {
       register()
     } else {
       val idKey = buildIdKey(s)
