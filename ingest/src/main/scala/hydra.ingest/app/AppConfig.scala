@@ -25,6 +25,7 @@ object AppConfig {
   final case class SchemaRegistryRedisConfig(
      redisUrl: String,
      redisPort: Int,
+     ssl: Boolean,
      idCacheTtl: Int = 1,
      schemaCacheTtl: Int = 1,
      versionCacheTtl: Int = 1,
@@ -48,6 +49,9 @@ object AppConfig {
     env("HYDRA_SCHEMA_REGISTRY_REDIS_PORT")
       .as[Int]
       .default(6379),
+    env("HYDRA_SCHEMA_REGISTRY_USE_SSL")
+      .as[Boolean]
+      .default(true),
     env("HYDRA_SCHEMA_REGISTRY_REDIS_ID_CACHE_TTL")
       .as[Int]
       .default(1),

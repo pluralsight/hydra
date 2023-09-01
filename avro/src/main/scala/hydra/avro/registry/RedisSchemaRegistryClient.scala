@@ -132,6 +132,10 @@ object RedisSchemaRegistryClient {
       .getOrElse(throw new IllegalArgumentException(s"A $path is required."))
   }
 
+  private def readSslConfigParameter(config: Config, path: String): Boolean = {
+    config.getBooleanOpt(path).getOrElse(true)
+  }
+
   def registryUrl(config: Config): String =
     readStringConfigParameter(config, "schema.registry.url")
 
@@ -145,6 +149,7 @@ object RedisSchemaRegistryClient {
     val redisIdCacheTtl = readIntConfigParameter(config, "schema.registry.redis.id-cache-ttl")
     val redisSchemaCacheTtl = readIntConfigParameter(config, "schema.registry.redis.schema-cache-ttl")
     val redisVersionCacheTtl = readIntConfigParameter(config, "schema.registry.redis.version-cache-ttl")
+    val useSSL = readSslConfigParameter(config, "schema.registry.redis.ssl")
 
     val client = new RedisSchemaRegistryClient(
       baseUrl,
@@ -152,7 +157,7 @@ object RedisSchemaRegistryClient {
       redisPort,
       schemaRegistrySecurityConfig.toConfigMap,
       CacheConfigs(redisIdCacheTtl, redisSchemaCacheTtl, redisVersionCacheTtl),
-      true
+      useSSL
     )
 
     new SchemaRegistryComponent {
@@ -564,13 +569,12 @@ class RedisSchemaRegistryClient(restService: RestService,
   }
 
   override def register(s: String, schema: Schema, i: Int, i1: Int): Int = synchronized {
-    def register(): Int = Try {
+    def register(): Int =
       if (i >= 0) {
         restService.registerSchema(schema.toString(), s, i, i1)
       } else {
         restService.registerSchema(schema.toString(), s)
       }
-    }.getOrElse(-1)
 
     if(DO_NOT_CACHE_LIST.exists(s.startsWith)) {
       register()

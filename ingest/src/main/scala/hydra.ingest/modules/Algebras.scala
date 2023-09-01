@@ -33,6 +33,7 @@ object Algebras {
           config.schemaRegistrySecurityConfig,
           config.schemaRegistryRedisConfig.redisUrl,
           config.schemaRegistryRedisConfig.redisPort,
+          config.schemaRegistryRedisConfig.ssl,
           config.schemaRegistryRedisConfig.idCacheTtl,
           config.schemaRegistryRedisConfig.schemaCacheTtl,
           config.schemaRegistryRedisConfig.versionCacheTtl,
