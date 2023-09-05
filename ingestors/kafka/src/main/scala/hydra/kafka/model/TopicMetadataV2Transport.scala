@@ -89,7 +89,7 @@ final case class TopicMetadataV2Request(
                                          numPartitions: Option[TopicMetadataV2Request.NumPartitions],
                                          tags: List[String],
                                          notificationUrl: Option[String],
-                                         additionalValidations: Option[Map[String, List[AdditionalValidation]]]
+                                         additionalValidations: Option[List[AdditionalValidation]]
                                        ) {
 
   def toValue: TopicMetadataV2Value = {
@@ -218,7 +218,7 @@ final case class MetadataOnlyRequest(streamType: StreamTypeV2,
                                      numPartitions: Option[TopicMetadataV2Request.NumPartitions],
                                      tags: List[String],
                                      notificationUrl: Option[String],
-                                     additionalValidations: Option[Map[String, List[AdditionalValidation]]]) {
+                                     additionalValidations: Option[List[AdditionalValidation]]) {
 }
 
 

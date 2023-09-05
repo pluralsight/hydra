@@ -2404,7 +2404,7 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
                                   deprecated: Boolean = false,
                                   deprecatedDate: Option[Instant] = None,
                                   numPartitions: Option[NumPartitions] = None,
-                                  additionalValidations: Option[Map[String, List[AdditionalValidation]]] = None
+                                  additionalValidations: Option[List[AdditionalValidation]] = None
                                 ): TopicMetadataV2Request =
     TopicMetadataV2Request(
       Schemas(keySchema, valueSchema),

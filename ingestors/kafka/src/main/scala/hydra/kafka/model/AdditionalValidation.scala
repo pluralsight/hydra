@@ -30,11 +30,8 @@ object SchemaAdditionalValidation extends Enum[SchemaAdditionalValidation] {
 }
 
 object AdditionalValidation {
-  lazy val allValidations: Option[Map[String, List[AdditionalValidation]]] =
-    Some(Map(
-      MetadataAdditionalValidation.key -> MetadataAdditionalValidation.values.toList,
-      SchemaAdditionalValidation.key   -> SchemaAdditionalValidation.values.toList
-    ))
+  lazy val allValidations: Option[List[AdditionalValidation]] =
+    Some(MetadataAdditionalValidation.values.toList ++ SchemaAdditionalValidation.values.toList)
 
   /**
    * An OLD topic will have its metadata populated.
@@ -53,15 +50,14 @@ object AdditionalValidation {
    * @param metadata a metadata object of current topic
    * @return value of additionalValidations if the topic is already existing(OLD topic) otherwise all enum values under AdditionalValidation(NEW topic)
    */
-  def validations(metadata: Option[TopicMetadataContainer]): Option[Map[String, List[AdditionalValidation]]] =
+  def validations(metadata: Option[TopicMetadataContainer]): Option[List[AdditionalValidation]] =
     metadata.map(_.value.additionalValidations).getOrElse(AdditionalValidation.allValidations)
 
   def metadataValidations(metadata: Option[TopicMetadataContainer]): Option[List[MetadataAdditionalValidation]] =
-    validations(metadata) flatMap { vMap =>
-      vMap.get(MetadataAdditionalValidation.key)
-        .map(_.asInstanceOf[List[MetadataAdditionalValidation]])
-    }
+    validations(metadata)
+      .map(_.filter(_.isInstanceOf[MetadataAdditionalValidation])
+        .map(_.asInstanceOf[MetadataAdditionalValidation]))
 
   def isPresent(metadata: Option[TopicMetadataContainer], additionalValidation: AdditionalValidation): Boolean =
-    validations(metadata).exists(m => m.keys.exists(k => m.get(k).exists(_.contains(additionalValidation))))
+    validations(metadata).exists(_.contains(additionalValidation))
 }
