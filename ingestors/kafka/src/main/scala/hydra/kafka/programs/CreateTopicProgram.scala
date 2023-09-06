@@ -4,7 +4,7 @@ import cats.effect.{Bracket, ExitCase, Resource, Sync}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
-import hydra.kafka.model.{StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
+import hydra.kafka.model.{AdditionalValidation, StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
 import hydra.kafka.programs.CreateTopicProgram._
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.typelevel.log4cats.Logger
@@ -24,7 +24,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
                                                                                retryPolicy: RetryPolicy[F],
                                                                                v2MetadataTopicName: Subject,
                                                                                metadataAlgebra: MetadataAlgebra[F],
-                                                                               validator: KeyAndValueSchemaV2Validator[F]
+                                                                               schemaValidator: KeyAndValueSchemaV2Validator[F]
                                                                              ) (implicit eff: Sync[F]){
 
   private def onFailure(resourceTried: String): (Throwable, RetryDetails) => F[Unit] = {
@@ -118,7 +118,9 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
             None
           }
       }
-      message = (TopicMetadataV2Key(topicName), createTopicRequest.copy(createdDate = createdDate, deprecatedDate = deprecatedDate).toValue)
+      message = (TopicMetadataV2Key(topicName),
+        createTopicRequest.copy(createdDate = createdDate, deprecatedDate = deprecatedDate,
+          additionalValidations = AdditionalValidation.validations(metadata)).toValue)
       records <- TopicMetadataV2.encode[F](message._1, Some(message._2), None)
       _ <- kafkaClient
         .publishMessage(records, v2MetadataTopicName.value)
@@ -136,7 +138,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
   def createTopicFromMetadataOnly(topicName: Subject, createTopicRequest: TopicMetadataV2Request, withRequiredFields: Boolean = false): F[Unit] =
     for {
       _ <- checkThatTopicExists(topicName.value)
-      _ <- validator.validate(createTopicRequest, topicName, withRequiredFields)
+      _ <- schemaValidator.validate(createTopicRequest, topicName, withRequiredFields)
       _ <- publishMetadata(topicName, createTopicRequest)
     } yield ()
 
@@ -158,7 +160,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
       .copy(partialConfig = defaultTopicDetails.configs ++ getCleanupPolicyConfig)
 
     (for {
-      _ <- Resource.eval(validator.validate(createTopicRequest, topicName, withRequiredFields))
+      _ <- Resource.eval(schemaValidator.validate(createTopicRequest, topicName, withRequiredFields))
       _ <- registerSchemas(
         topicName,
         createTopicRequest.schemas.key,
@@ -177,8 +179,7 @@ object CreateTopicProgram {
                                                            kafkaClient: KafkaClientAlgebra[F],
                                                            retryPolicy: RetryPolicy[F],
                                                            v2MetadataTopicName: Subject,
-                                                           metadataAlgebra: MetadataAlgebra[F],
-                                                           defaultLoopHoleCutoffDate: Instant
+                                                           metadataAlgebra: MetadataAlgebra[F]
                                                          ) (implicit eff: Sync[F]): CreateTopicProgram[F] = {
     new CreateTopicProgram(
       schemaRegistry,
@@ -187,7 +188,7 @@ object CreateTopicProgram {
       retryPolicy,
       v2MetadataTopicName,
       metadataAlgebra,
-      KeyAndValueSchemaV2Validator.make(schemaRegistry, metadataAlgebra, defaultLoopHoleCutoffDate)
+      KeyAndValueSchemaV2Validator.make(schemaRegistry, metadataAlgebra)
     )
   }
 
