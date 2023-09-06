@@ -3,20 +3,18 @@ package hydra.kafka.utils
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.implicits._
-import hydra.avro.registry.SchemaRegistry
-import hydra.avro.registry.SchemaRegistry.SchemaId
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.algebras.TestMetadataAlgebra
 import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
-import org.apache.avro.{Schema, SchemaBuilder}
+import org.apache.avro.SchemaBuilder
 
 import java.time.Instant
 
 object TopicUtils {
 
-  def updateTopicMetadata(topics: List[String], metadataAlgebra: TestMetadataAlgebra[IO], createdDate: Instant): IO[List[Unit]] = {
+  def updateTopicMetadata(topics: List[String], metadataAlgebra: TestMetadataAlgebra[IO]): IO[List[Unit]] = {
     topics.traverse(topic => {
       val keySchema = SchemaBuilder.record(topic + "Key").fields.requiredInt("test").endRecord()
       val valueSchema = SchemaBuilder.record(topic + "Value").fields.requiredInt("test").endRecord()
@@ -28,13 +26,14 @@ object TopicUtils {
         deprecatedDate = None,
         Public,
         NonEmptyList.of(Email.create("test@test.com").get),
-        createdDate,
+        Instant.now(),
         List.empty,
         None,
         Some("dvs-teamName"),
         None,
         List.empty,
-        Some("notificationUrl")
+        Some("notificationUrl"),
+        additionalValidations = None
       )
       val topicMetadataContainer = TopicMetadataContainer(
         topicMetadataKey,

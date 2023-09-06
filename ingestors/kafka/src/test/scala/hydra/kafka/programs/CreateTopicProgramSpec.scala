@@ -14,6 +14,7 @@ import hydra.kafka.algebras.KafkaAdminAlgebra.{Topic, TopicName}
 import hydra.kafka.algebras.KafkaClientAlgebra.{ConsumerGroup, Offset, Partition, PublishError, PublishResponse}
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TestMetadataAlgebra}
+import hydra.kafka.model.AdditionalValidation.allValidations
 import hydra.kafka.model.ContactMethod.Email
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
@@ -157,24 +158,13 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
       } yield topic.get shouldBe Topic(subject.value, 1)
     }
 
-    s"[pre-cutoff-date] required fields in value schema of a topic can have a default value" in {
-      implicit val createdDate: Instant = Instant.parse("2023-01-01T00:00:00Z")
-
-      createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
-      createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = None).attempt.map(_ shouldBe Right())
-      createTopic(createdAtDefaultValue = None, updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
+    s"[exiting-topic] required fields in value schema of a topic can have a default value" in {
+      createTopic(existingTopic = true, createdAtDefaultValue = Some(123), updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
+      createTopic(existingTopic = true, createdAtDefaultValue = Some(123), updatedAtDefaultValue = None).attempt.map(_ shouldBe Right())
+      createTopic(existingTopic = true, createdAtDefaultValue = None, updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
     }
 
-    s"[on-cutoff-date] required fields in value schema of a topic can have a default value" in {
-      implicit val createdDate: Instant = defaultLoopHoleCutoffDate
-
-      createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
-      createTopic(createdAtDefaultValue = Some(123), updatedAtDefaultValue = None).attempt.map(_ shouldBe Right())
-      createTopic(createdAtDefaultValue = None, updatedAtDefaultValue = Some(456)).attempt.map(_ shouldBe Right())
-    }
-
-    s"[post-cutoff-date] required fields in value schema of a topic cannot have a default value - createdAt & updatedAt" in {
-      implicit val createdDate: Instant = Instant.parse("2023-07-07T00:00:00Z")
+    s"[new-topic] required fields in value schema of a topic cannot have a default value - createdAt & updatedAt" in {
       val createdAt = Some(123L)
       val updatedAt = Some(456L)
       val schema = getSchema("val", createdAt, updatedAt)
@@ -186,8 +176,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         )).asLeft)
     }
 
-    s"[post-cutoff-date] required fields in value schema of a topic cannot have a default value - createdAt" in {
-      implicit val createdDate: Instant = Instant.parse("2023-07-07T00:00:00Z")
+    s"[new-topic] required fields in value schema of a topic cannot have a default value - createdAt" in {
       val createdAt = Some(123L)
       val schema = getSchema("val", createdAt, None)
 
@@ -195,8 +184,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         RequiredSchemaValueFieldWithDefaultValueError("createdAt", schema, "Entity").asLeft)
     }
 
-    s"[post-cutoff-date] required fields in value schema of a topic cannot have a default value - updateAt" in {
-      implicit val createdDate: Instant = Instant.parse("2023-07-07T00:00:00Z")
+    s"[new-topic] required fields in value schema of a topic cannot have a default value - updateAt" in {
       val updatedAt = Some(456L)
       val schema = getSchema("val", None, updatedAt)
 
@@ -204,16 +192,14 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         RequiredSchemaValueFieldWithDefaultValueError("updatedAt", schema, "Entity").asLeft)
     }
 
-    s"[post-cutoff-date] accept a topic where the required fields do not have a default value" in {
-      implicit val createdDate: Instant = Instant.parse("2023-07-07T00:00:00Z")
-
+    s"[new-topic] accept a topic where the required fields do not have a default value" in {
       createTopic(createdAtDefaultValue = None, updatedAtDefaultValue = None).attempt.map(_ shouldBe Right())
     }
 
     "ingest metadata into the metadata topic" in {
       for {
         publishTo     <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
-        topicMetadata <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue))
+        topicMetadata <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue.copy(additionalValidations = allValidations)))
         ts            <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some)
         _             <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails, true)
         published     <- publishTo.get
@@ -227,7 +213,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         publishTo   <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
         consumeFrom <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
         metadata    <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
-        m           <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue))
+        m           <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue.copy(additionalValidations = allValidations)))
         updatedM    <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(updatedValue.copy(createdDate = topicMetadataValue.createdDate)))
         ts          <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
         _           <- ts.program.createTopic(subject, topicMetadataRequest, TopicDetails(1, 1, 1), true)
@@ -2078,12 +2064,116 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
       result.attempt.map(_ shouldBe UnsupportedLogicalType(valueSchema.getField("timestamp"), "iso-datetime").asLeft)
     }
 
-    def createTopic(createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long])(implicit createdDate: Instant) =
+    "additionalValidations field is NOT populated if an existing topic does not have it" in {
       for {
-        m <- TestMetadataAlgebra()
-        _ <- TopicUtils.updateTopicMetadata(List(subject.value), m, createdDate)
+        publishTo             <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
+        consumeFrom           <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
+        metadata              <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
+        _                     <- metadata.addToMetadata(subject, topicMetadataRequest)
+        ts                    <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
+        _                     <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails, withRequiredFields = true)
+        published             <- publishTo.get
+        expectedTopicMetadata <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue)) // additionalValidations empty in topicMetadataValue
+      } yield {
+        published shouldBe Map(metadataTopic -> (expectedTopicMetadata._1, expectedTopicMetadata._2, None))
+      }
+    }
+
+    "additionalValidations field is NOT populated via the additionalValidations field in the create topic request" in {
+      val requestWithEmptyValidations = createTopicMetadataRequest(keySchema, valueSchema, additionalValidations = allValidations)
+
+      for {
+        publishTo             <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
+        consumeFrom           <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
+        metadata              <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
+        _                     <- metadata.addToMetadata(subject, topicMetadataRequest)
+        ts                    <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
+        _                     <- ts.program.createTopic(subject, requestWithEmptyValidations, topicDetails, withRequiredFields = true)
+        published             <- publishTo.get
+        expectedTopicMetadata <- TopicMetadataV2.encode[IO](topicMetadataKey, Some(topicMetadataValue)) // additionalValidations empty in topicMetadataValue
+      } yield {
+        published shouldBe Map(metadataTopic -> (expectedTopicMetadata._1, expectedTopicMetadata._2, None))
+      }
+    }
+
+    "additionalValidations field is populated for a new topic" in {
+      for {
+        publishTo             <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
+        consumeFrom           <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
+        metadata              <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
+        ts                    <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
+        _                     <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails, withRequiredFields = true)
+        published             <- publishTo.get
+        expectedTopicMetadata <- TopicMetadataV2.encode[IO](
+          topicMetadataKey,
+          Some(topicMetadataValue.copy(additionalValidations = allValidations))) // additionalValidations populated in topicMetadataValue
+      } yield {
+        published shouldBe Map(metadataTopic -> (expectedTopicMetadata._1, expectedTopicMetadata._2, None))
+      }
+    }
+
+    "additionalValidations field will remain populated if an existing topic already has it" in {
+      for {
+        publishTo             <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
+        consumeFrom           <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
+        metadata              <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
+        ts                    <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
+        _                     <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails, withRequiredFields = true)
+        publishedFirst        <- publishTo.get
+        _                     <- ts.program.createTopic(subject, topicMetadataRequest, topicDetails, withRequiredFields = true)
+        publishedSecond       <- publishTo.get
+        expectedTopicMetadata <- TopicMetadataV2.encode[IO](
+          topicMetadataKey,
+          Some(topicMetadataValue.copy(additionalValidations = allValidations))) // additionalValidations populated in topicMetadataValue
+
+      } yield {
+        publishedFirst shouldBe Map(metadataTopic -> (expectedTopicMetadata._1, expectedTopicMetadata._2, None))
+        publishedSecond shouldBe Map(metadataTopic -> (expectedTopicMetadata._1, expectedTopicMetadata._2, None))
+      }
+    }
+
+    "[existing-topic] When additionalValidations is empty no corresponding validation is done" in {
+      val defaultLoopholeRequest = createTopicMetadataRequest(createdAtDefaultValue = Some(123), updatedAtDefaultValue = Some(456))
+
+      val result = for {
+        publishTo   <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
+        consumeFrom <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
+        metadata    <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
+        _           <- metadata.addToMetadata(subject, topicMetadataRequest)
+        ts          <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
+        _           <- ts.program.createTopic(subject, defaultLoopholeRequest, topicDetails, withRequiredFields = true)
+      } yield ()
+
+      result.attempt.map(_ shouldBe Right())
+    }
+
+    "[new-topic] When additionalValidations is populated corresponding additional validations are done" in {
+      val createdAt: Option[Long] = Some(123)
+      val updatedAt: Option[Long] = Some(456)
+      val defaultLoopholeRequest = createTopicMetadataRequest(createdAtDefaultValue = createdAt, updatedAtDefaultValue = updatedAt)
+
+      val result = for {
+        publishTo   <- Ref[IO].of(Map.empty[String, (GenericRecord, Option[GenericRecord], Option[Headers])])
+        consumeFrom <- Ref[IO].of(Map.empty[Subject, TopicMetadataContainer])
+        metadata    <- IO(new TestMetadataAlgebraWithPublishTo(consumeFrom))
+        ts          <- initTestServices(new TestKafkaClientAlgebraWithPublishTo(publishTo).some, metadata.some)
+        _           <- ts.program.createTopic(subject, defaultLoopholeRequest, topicDetails, withRequiredFields = true)
+      } yield ()
+
+      val schema = getSchema("val", createdAt, updatedAt)
+      result.attempt.map(_ shouldBe
+        ValidationCombinedErrors(List(
+          RequiredSchemaValueFieldWithDefaultValueError("createdAt", schema, "Entity").message,
+          RequiredSchemaValueFieldWithDefaultValueError("updatedAt", schema, "Entity").message
+        )).asLeft)
+    }
+
+    def createTopic(createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long], existingTopic: Boolean = false) =
+      for {
+        m  <- TestMetadataAlgebra()
+        _  <- if (existingTopic) TopicUtils.updateTopicMetadata(List(subject.value), m) else IO()
         ts <- initTestServices(metadataAlgebraOpt = Some(m))
-        _ <- ts.program.createTopic(subject, createTopicMetadataRequest(createdAtDefaultValue, updatedAtDefaultValue), topicDetails, true)
+        _  <- ts.program.createTopic(subject, createTopicMetadataRequest(createdAtDefaultValue, updatedAtDefaultValue), topicDetails, true)
       } yield ()
   }
 
@@ -2143,8 +2233,6 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
   val topicMetadataKey     = TopicMetadataV2Key(subject)
   val topicMetadataValue   = topicMetadataRequest.toValue
 
-  val defaultLoopHoleCutoffDate: Instant = Instant.parse("2023-07-05T00:00:00Z")
-
   implicit val contextShift: ContextShift[IO]   = IO.contextShift(ExecutionContext.global)
   implicit val concurrentEffect: Concurrent[IO] = IO.ioConcurrentEffect
   implicit val timer: Timer[IO]                 = IO.timer(ExecutionContext.global)
@@ -2173,8 +2261,7 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
           kafkaClient,
           retryPolicy,
           Subject.createValidated(metadataTopic).get,
-          metadataAlgebraOpt.getOrElse(defaultMetadata),
-          defaultLoopHoleCutoffDate
+          metadataAlgebraOpt.getOrElse(defaultMetadata)
         )
 
       TestServices(createTopicProgram, defaultSchemaRegistry, kafka)
@@ -2197,7 +2284,8 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
                                   createdDate: Instant = Instant.now(),
                                   deprecated: Boolean = false,
                                   deprecatedDate: Option[Instant] = None,
-                                  numPartitions: Option[NumPartitions] = None
+                                  numPartitions: Option[NumPartitions] = None,
+                                  additionalValidations: Option[List[AdditionalValidation]] = None
                                 ): TopicMetadataV2Request =
     TopicMetadataV2Request(
       Schemas(keySchema, valueSchema),
@@ -2212,7 +2300,8 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
       Some("dvs-teamName"),
       numPartitions,
       List.empty,
-      Some("notification.url")
+      Some("notification.url"),
+      additionalValidations
     )
 
   def createEventStreamTypeTopicMetadataRequest(
@@ -2238,7 +2327,8 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
       Some("dvs-teamName"),
       numPartitions,
       tags,
-      Some("notification.url")
+      Some("notification.url"),
+      additionalValidations = None
     )
 
   def getSchema(name: String,
