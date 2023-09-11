@@ -270,16 +270,17 @@ class RedisSchemaRegistryClient(restService: RestService,
   private val versionCache: Cache[Map[Schema, Int]] =
     RedisCache(jedisFactory)(versionCacheConfig, schemaCacheCodec)
 
-
   private val metadataCache: Cache[Map[Int, SchemaMetadata]] =
     RedisCache(jedisFactory)(metadataCacheConfig, metadataCacheCodec)
 
   private def buildSchemaKey(subject: String): String = {
     "schema_" + subject
   }
+
   private def buildIdKey(subject: String): String = {
     "id_" + subject
   }
+
   private def buildVersionKey(subject: String): String = {
     "version_" + subject
   }
