@@ -174,7 +174,7 @@ class RedisSchemaRegistryClient(restService: RestService,
                                 httpHeaders: Map[String, String],
                                 configs: Map[String, Any],
                                 cacheConfigs: CacheConfigs,
-                                ssl: Boolean = true) extends SchemaRegistryClient {
+                                ssl: Boolean) extends SchemaRegistryClient {
 
   def this(baseUrl: String, redisHost: String, redisPort: Int) {
     this(new RestService(baseUrl), redisHost, redisPort, Map.empty[String, String], Map.empty[String, Any], CacheConfigs(1, 1, 1), true)

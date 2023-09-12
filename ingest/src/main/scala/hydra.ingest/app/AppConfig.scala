@@ -49,7 +49,7 @@ object AppConfig {
     env("HYDRA_SCHEMA_REGISTRY_REDIS_PORT")
       .as[Int]
       .default(6379),
-    env("HYDRA_SCHEMA_REGISTRY_USE_SSL")
+    env("HYDRA_SCHEMA_REGISTRY_REDIS_SSL")
       .as[Boolean]
       .default(true),
     env("HYDRA_SCHEMA_REGISTRY_REDIS_ID_CACHE_TTL")
