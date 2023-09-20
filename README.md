@@ -31,53 +31,13 @@ sbt clean compile
 
 ## Docker
 
-### Services needed to run Hydra 
-- Kafka 2.0.0
-- Confluent Schema Registry 5.0.0
-- Zookeeper (3.x +)
+### Development Environment for Testing
+We have a development MSK and Schema Registry Cluster running in the eplur-staging AWS account. Access to this cluster is granted via IAM to the `exp_adapt_dvs_set` role.
 
-This documentation walks through setting up the core basic components of Hydra.
-
-### Create a VirtualBox instance
-
-```
-docker-machine create --driver virtualbox --virtualbox-memory 6000 hydra
-```
-
-### Configure Terminal to attach to the new machine
-
-```
-docker-machine env hydra
-```
-
-### Create a Docker network
-
-```
-docker network create hydra
-```
-
-### Start Zookeeper
-
-Hydra uses Zookeeper as a coordination service to automate bootstrapping and joining a cluster.
-
-It is also used by Kafka and the Schema Registry.
-
-Since all services depend on Zookeeper being up, so we will start that first.  It is not always 
-needed to do this, but doing so avoids race conditions tht may happen across the different containers.
-
-```
-docker-compose up -d zookeeper
-```
-
-### Start Hydra
-
-```
-docker-compose up hydra
-```
-
-> You can also start each service separately.
-
-That should do it!
+### Steps for building locally
+- Create a .env from the example.env template. 
+- Update the .env file with your AWS Credentials. Those can be gathered in AWS Identity Center.
+- Use the Makefile to build and deploy Hydra Publish into a local Docker container.
 
 # Checking if Hydra is Running
 
