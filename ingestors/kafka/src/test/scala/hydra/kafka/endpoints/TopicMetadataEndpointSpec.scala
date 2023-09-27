@@ -227,7 +227,7 @@ class TopicMetadataEndpointSpec
 
     "sends back an error response if topic already exists" in {
       implicit val timeout = RouteTestTimeout(5.seconds)
-      EmbeddedKafka.createCustomTopic("testExisting")(kafkaConfig)
+      createCustomTopic("testExisting")(kafkaConfig)
       val config = Map(
         "min.insync.replicas" -> "1",
         "cleanup.policy" -> "compact",
@@ -284,6 +284,7 @@ class TopicMetadataEndpointSpec
     val validRequest = """{
                          |    "streamType": "Event",
                          |    "deprecated": true,
+                         |    "replacementTopics": ["dvs.test.subject.new"],
                          |    "dataClassification": "InternalUseOnly",
                          |    "contact": {
                          |        "email": "bob@myemail.com"
@@ -314,6 +315,7 @@ class TopicMetadataEndpointSpec
     """{
        |    "streamType": "Event",
        |    "deprecated": true,
+       |    "replacementTopics": ["dvs.test.subject.new"],
        |    "dataClassification": "InternalUseOnly",
        |    "contact": {
        |        "email": "bob@myemail.com"

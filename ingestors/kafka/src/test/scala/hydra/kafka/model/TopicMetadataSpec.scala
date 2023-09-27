@@ -48,6 +48,8 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
       StreamTypeV2.Entity,
       false,
       None,
+      None,
+      None,
       Public,
       NonEmptyList.of(ContactMethod.create("test@test.com").get),
       createdDate,
@@ -55,6 +57,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
       None,
       Some("dvs-teamName"),
       List.empty,
+      None,
       None
     )
 
@@ -73,6 +76,8 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
          |"streamType":"Entity",
          |"deprecated": false,
          |"deprecatedDate": null,
+         |"replacementTopics": null,
+         |"previousTopics": null,
          |"dataClassification":"Public",
          |"teamName":{"string":"dvs-teamName"},
          |"contact":[
@@ -84,7 +89,8 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
          |"parentSubjects": [],
          |"notes": null,
          |"notificationUrl": null,
-         |"tags": null
+         |"tags": null,
+         |"additionalValidations": null
          |}""".stripMargin
 
     val decoder = DecoderFactory.get().jsonDecoder(valueSchema, json)
@@ -101,6 +107,8 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
       StreamTypeV2.Entity,
       false,
       None,
+      None,
+      None,
       Public,
       NonEmptyList.of(ContactMethod.create("test@test.com").get),
       createdDate,
@@ -108,7 +116,8 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
       None,
       Some("dvs-teamName"),
       List.empty,
-      Some("notificationUrl")
+      Some("notificationUrl"),
+      None
     )
 
     val (encodedKey, encodedValue, headers) =

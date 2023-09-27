@@ -55,6 +55,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
             StreamTypeV2.Entity,
             deprecated = false,
             None,
+            replacementTopics = None,
+            previousTopics = None,
             InternalUseOnly,
             NonEmptyList.of(cfg.contactMethod),
             Instant.now,
@@ -65,6 +67,7 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
             Some("Data-Platform"),
             None,
             List.empty,
+            None,
             None
           ),
           TopicDetails(cfg.numPartitions, cfg.replicationFactor, cfg.minInsyncReplicas, Map("cleanup.policy" -> "compact"))
@@ -83,6 +86,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
           StreamTypeV2.Entity,
           deprecated = false,
           None,
+          replacementTopics = None,
+          previousTopics = None,
           InternalUseOnly,
           NonEmptyList.of(dvsConsumersTopicConfig.contactMethod),
           Instant.now,
@@ -93,6 +98,7 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
           Some("Data-Platform"),
           None,
           List.empty,
+          None,
           None
         ),
         TopicDetails(
@@ -114,6 +120,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
           StreamTypeV2.Entity,
           deprecated = false,
           None,
+          replacementTopics = None,
+          previousTopics = None,
           InternalUseOnly,
           NonEmptyList.of(cooTopicConfig.contactMethod),
           Instant.now,
@@ -124,6 +132,7 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
           Some("Data-Platform"),
           None,
           List.empty,
+          None,
           None
         ),
         TopicDetails(
@@ -144,6 +153,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
         StreamTypeV2.Entity,
         deprecated = false,
         None,
+        replacementTopics = None,
+        previousTopics = None,
         InternalUseOnly,
         NonEmptyList.of(cooTopicConfig.contactMethod),
         Instant.now,
@@ -152,6 +163,7 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
         Some("Data-Platform"),
         None,
         List.empty,
+        None,
         None
       ),
       TopicDetails(cfg.numPartitions, cfg.replicationFactor, cfg.minInsyncReplicas, Map("cleanup.policy" -> "compact")))

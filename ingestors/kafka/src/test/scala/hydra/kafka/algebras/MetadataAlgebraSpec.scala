@@ -118,6 +118,8 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers with Notificatio
         StreamTypeV2.Entity,
         deprecated = false,
         None,
+        None,
+        None,
         Public,
         NonEmptyList.one(Slack.create("#channel").get),
         Instant.now,
@@ -125,7 +127,8 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers with Notificatio
         None,
         Some("dvs-teamName"),
         List.empty,
-        Some("notificationUrl")
+        Some("notificationUrl"),
+        None
         )
     (TopicMetadataV2.encode[IO](key, if (nullValue) None else Some(value), None), key, value)
   }

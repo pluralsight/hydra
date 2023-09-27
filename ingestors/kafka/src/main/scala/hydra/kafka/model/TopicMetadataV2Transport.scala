@@ -10,9 +10,9 @@ import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.Schema
 import shapeless.Witness
-import shapeless.Witness.Lt
 
 import java.time.Instant
+import scala.collection.immutable
 
 sealed trait DataClassification
 
@@ -78,6 +78,8 @@ final case class TopicMetadataV2Request(
                                          streamType: StreamTypeV2,
                                          deprecated: Boolean,
                                          deprecatedDate: Option[Instant],
+                                         replacementTopics: Option[List[String]],
+                                         previousTopics: Option[List[String]],
                                          dataClassification: DataClassification,
                                          contact: NonEmptyList[ContactMethod],
                                          createdDate: Instant,
@@ -86,7 +88,8 @@ final case class TopicMetadataV2Request(
                                          teamName: Option[String],
                                          numPartitions: Option[TopicMetadataV2Request.NumPartitions],
                                          tags: List[String],
-                                         notificationUrl: Option[String]
+                                         notificationUrl: Option[String],
+                                         additionalValidations: Option[Map[String, List[AdditionalValidation]]]
                                        ) {
 
   def toValue: TopicMetadataV2Value = {
@@ -94,6 +97,8 @@ final case class TopicMetadataV2Request(
       streamType,
       deprecated,
       deprecatedDate,
+      replacementTopics,
+      previousTopics,
       dataClassification,
       contact,
       createdDate,
@@ -101,7 +106,8 @@ final case class TopicMetadataV2Request(
       notes,
       teamName,
       tags,
-      notificationUrl
+      notificationUrl,
+      additionalValidations
     )
   }
 }
@@ -138,6 +144,8 @@ object TopicMetadataV2Request {
       mor.streamType,
       mor.deprecated,
       mor.deprecatedDate,
+      mor.replacementTopics,
+      mor.previousTopics,
       mor.dataClassification,
       mor.contact,
       mor.createdDate,
@@ -146,7 +154,8 @@ object TopicMetadataV2Request {
       mor.teamName,
       mor.numPartitions,
       mor.tags,
-      mor.notificationUrl
+      mor.notificationUrl,
+      mor.additionalValidations
     )
   }
 }
@@ -160,6 +169,8 @@ final case class TopicMetadataV2Response(
                                           streamType: StreamTypeV2,
                                           deprecated: Boolean,
                                           deprecatedDate: Option[Instant],
+                                          replacementTopics: Option[List[String]],
+                                          previousTopics: Option[List[String]],
                                           dataClassification: DataClassification,
                                           contact: NonEmptyList[ContactMethod],
                                           createdDate: Instant,
@@ -179,6 +190,8 @@ object TopicMetadataV2Response {
       v.streamType,
       v.deprecated,
       v.deprecatedDate,
+      v.replacementTopics,
+      v.previousTopics,
       v.dataClassification,
       v.contact,
       v.createdDate,
@@ -194,6 +207,8 @@ object TopicMetadataV2Response {
 final case class MetadataOnlyRequest(streamType: StreamTypeV2,
                                      deprecated: Boolean,
                                      deprecatedDate: Option[Instant],
+                                     replacementTopics: Option[List[String]],
+                                     previousTopics: Option[List[String]],
                                      dataClassification: DataClassification,
                                      contact: NonEmptyList[ContactMethod],
                                      createdDate: Instant,
@@ -202,7 +217,8 @@ final case class MetadataOnlyRequest(streamType: StreamTypeV2,
                                      teamName: Option[String],
                                      numPartitions: Option[TopicMetadataV2Request.NumPartitions],
                                      tags: List[String],
-                                     notificationUrl: Option[String]) {
+                                     notificationUrl: Option[String],
+                                     additionalValidations: Option[Map[String, List[AdditionalValidation]]]) {
 }
 
 
