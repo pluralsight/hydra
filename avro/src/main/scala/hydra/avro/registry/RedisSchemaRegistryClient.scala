@@ -639,5 +639,4 @@ class RedisSchemaRegistryClient(restService: RestService,
   override def testCompatibility(s: String, schema: Schema): Boolean = {
     restService.testCompatibility(schema.toString(), s, "latest")
   }
-
 }
