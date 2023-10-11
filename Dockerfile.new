@@ -10,6 +10,6 @@ RUN mkdir -p /etc/hydra && mkdir -p /var/log/hydra && mkdir /ps-publish
 
 EXPOSE 8088
 
-COPY ps-publish/hydra-ingest* /ps-publish
+COPY ps-publish/ /ps-publish
 
 ENTRYPOINT ["/ps-publish/bin/hydra-ingest"]
