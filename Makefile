@@ -8,10 +8,14 @@ ENV_FILE = .env
 
 # Target to build the Docker image
 build:
-	mkdir ps-publish
 	sbt clean compile
 	sbt universal:packageBin
+	ls -a
 	unzip ingest/target/universal/*.zip -d ps-publish
+	ls -a
+	mv ps-publish/hydra-ingest*/* ps-publish
+	rm -rf ps-publish/hydra-ingest*
+	cd ps-publish/bin
 	docker build -t $(DOCKER_IMAGE_NAME) -f $(DOCKERFILE) .
 
 # Target to run the Docker container
