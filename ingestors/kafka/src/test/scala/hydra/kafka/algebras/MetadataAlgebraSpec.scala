@@ -125,7 +125,8 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers with Notificatio
         None,
         Some("dvs-teamName"),
         List.empty,
-        Some("notificationUrl")
+        Some("notificationUrl"),
+        additionalValidations = None
         )
     (TopicMetadataV2.encode[IO](key, if (nullValue) None else Some(value), None), key, value)
   }
