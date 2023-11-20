@@ -62,8 +62,7 @@ class BootstrapSpec extends AnyWordSpecLike with Matchers with NotificationsTest
         kafkaClient,
         retry,
         metadataSubjectV2,
-        metadata,
-        Instant.parse("2023-07-05T00:00:00Z")
+        metadata
       )
       boot <- Bootstrap.make[IO](c, metadataConfig, consumersTopicConfig, consumerOffsetsOffsetsTopicConfig, kafkaAdmin, tagsTopicConfig)
       _ <- boot.bootstrapAll

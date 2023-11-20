@@ -55,6 +55,7 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
       None,
       Some("dvs-teamName"),
       List.empty,
+      None,
       None
     )
 
@@ -84,7 +85,8 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
          |"parentSubjects": [],
          |"notes": null,
          |"notificationUrl": null,
-         |"tags": null
+         |"tags": null,
+         |"additionalValidations": null
          |}""".stripMargin
 
     val decoder = DecoderFactory.get().jsonDecoder(valueSchema, json)
@@ -108,7 +110,8 @@ final class TopicMetadataSpec extends AnyFlatSpecLike with Matchers {
       None,
       Some("dvs-teamName"),
       List.empty,
-      Some("notificationUrl")
+      Some("notificationUrl"),
+      None
     )
 
     val (encodedKey, encodedValue, headers) =

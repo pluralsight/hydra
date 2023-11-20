@@ -20,8 +20,8 @@ object RequiredFieldStructures {
   private def validateTimestampType(field: Schema.Field) =
     field.schema.getLogicalType == LogicalTypes.timestampMillis && field.schema.getType == Type.LONG
 
-  def defaultFieldOfRequiredFieldValidator(schema: Schema, field: String, isCreatedPostCutoffDate: Boolean): Boolean = {
+  def defaultFieldOfRequiredFieldValidator(schema: Schema, field: String, validateDefaultInRequiredField: Boolean): Boolean = {
     val requiredField = schema.getFields.asScala.toList.find(_.name == field)
-    if (isCreatedPostCutoffDate && requiredField.nonEmpty) requiredField.exists(!_.hasDefaultValue) else true
+    if (validateDefaultInRequiredField && requiredField.nonEmpty) requiredField.exists(!_.hasDefaultValue) else true
   }
 }

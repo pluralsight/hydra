@@ -5,7 +5,7 @@ import cats.effect.Sync
 import cats.syntax.all._
 import hydra.avro.convert.IsoDate
 import hydra.avro.registry.SchemaRegistry
-import hydra.kafka.model.{RequiredField, Schemas, StreamTypeV2, TopicMetadataV2Request}
+import hydra.kafka.model.{AdditionalValidation, RequiredField, SchemaAdditionalValidation, Schemas, StreamTypeV2, TopicMetadataV2Request}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.TopicSchemaError._
 import org.apache.avro.{Schema, SchemaBuilder}
@@ -14,22 +14,19 @@ import hydra.common.validation.Validator
 import hydra.common.validation.Validator.ValidationChain
 import hydra.kafka.algebras.MetadataAlgebra
 
-import java.time.Instant
 import scala.jdk.CollectionConverters.collectionAsScalaIterableConverter
 import scala.language.higherKinds
 
 class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRegistry[F],
-                                                        metadataAlgebra: MetadataAlgebra[F],
-                                                        defaultLoopHoleCutoffDate: Instant) extends Validator {
+                                                        metadataAlgebra: MetadataAlgebra[F]) extends Validator {
   def validate(request: TopicMetadataV2Request, subject: Subject, withRequiredFields: Boolean): F[Unit] =
     for {
       metadata <- metadataAlgebra.getMetadataFor(subject)
-      createdDate = metadata.map(_.value.createdDate).getOrElse(request.createdDate)
-      isCreatedPostCutoffDate = createdDate.isAfter(defaultLoopHoleCutoffDate)
+      validateDefaultInRequiredField = AdditionalValidation.isPresent(metadata, SchemaAdditionalValidation.defaultInRequiredField)
       schemas = request.schemas
       _ <- (schemas.key.getType, schemas.value.getType) match {
         case (Schema.Type.RECORD, Schema.Type.RECORD) =>
-          validateRecordRecordTypeSchemas(schemas, subject, request.streamType, withRequiredFields, isCreatedPostCutoffDate)
+          validateRecordRecordTypeSchemas(schemas, subject, request.streamType, withRequiredFields, validateDefaultInRequiredField)
         case (Schema.Type.STRING, Schema.Type.RECORD) if request.tags.contains("KSQL") =>
           validateKSQLSchemas(schemas, subject, request.streamType)
         case _ => resultOf(Validated.Invalid(NonEmptyChain.one(InvalidSchemaTypeError)))
@@ -70,7 +67,7 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
                                               subject: Subject,
                                               streamType: StreamTypeV2,
                                               withRequiredFields: Boolean,
-                                              isCreatedPostCutoffDate: Boolean): F[Unit] = {
+                                              validateDefaultInRequiredField: Boolean): F[Unit] = {
     val keyFields   = schemas.key.getFields.asScala.toList
     val valueFields = schemas.value.getFields.asScala.toList
 
@@ -79,9 +76,9 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
       keySchemaEvolutionValidationResult         <- validateKeySchemaEvolution(schemas, subject)
       valueSchemaEvolutionValidationResult       <- validateValueSchemaEvolution(schemas, subject)
       validateRequiredKeyFieldsResult            <-
-        if (withRequiredFields) validateRequiredKeyFields(schemas.key, streamType, isCreatedPostCutoffDate) else Nil.pure
+        if (withRequiredFields) validateRequiredKeyFields(schemas.key, streamType, validateDefaultInRequiredField) else Nil.pure
       validateRequiredValueFieldsResult          <-
-        if (withRequiredFields) validateRequiredValueFields(schemas.value, streamType, isCreatedPostCutoffDate) else Nil.pure
+        if (withRequiredFields) validateRequiredValueFields(schemas.value, streamType, validateDefaultInRequiredField) else Nil.pure
       mismatchesValidationResult                 <- checkForMismatches(keyFields, valueFields)
       nullableKeyFieldsValidationResult          <- checkForNullableKeyFields(keyFields, streamType)
       defaultNullableValueFieldsValidationResult <- checkForDefaultNullableValueFields(valueFields, streamType)
@@ -124,13 +121,14 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
       case _ => List(Validator.valid)
     }
 
-  private def validateRequiredKeyFields(keySchema: Schema, streamType: StreamTypeV2, isCreatedPostCutoffDate: Boolean): F[List[ValidationChain]] =
-    validateRequiredFields(isKey = true, keySchema, streamType, isCreatedPostCutoffDate)
+  private def validateRequiredKeyFields(keySchema: Schema, streamType: StreamTypeV2, validateDefaultInRequiredField: Boolean): F[List[ValidationChain]] =
+    validateRequiredFields(isKey = true, keySchema, streamType, validateDefaultInRequiredField)
 
-  private def validateRequiredValueFields(valueSchema: Schema, streamType: StreamTypeV2, isCreatedPostCutoffDate: Boolean): F[List[ValidationChain]] =
-    validateRequiredFields(isKey = false, valueSchema, streamType, isCreatedPostCutoffDate)
+  private def validateRequiredValueFields(valueSchema: Schema, streamType: StreamTypeV2, validateDefaultInRequiredField: Boolean): F[List[ValidationChain]] =
+    validateRequiredFields(isKey = false, valueSchema, streamType, validateDefaultInRequiredField)
 
-  private def validateRequiredFields(isKey: Boolean, schema: Schema, streamType: StreamTypeV2, isCreatedPostCutoffDate: Boolean): F[List[ValidationChain]] =
+  private def validateRequiredFields(isKey: Boolean, schema: Schema, streamType: StreamTypeV2,
+                                     validateDefaultInRequiredField: Boolean): F[List[ValidationChain]] =
     streamType match {
       case (StreamTypeV2.Entity | StreamTypeV2.Event) =>
         if (isKey) {
@@ -140,9 +138,9 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
             validate(docFieldValidator(schema), getFieldMissingError(isKey, RequiredField.DOC, schema, streamType.toString)),
             validate(createdAtFieldValidator(schema), getFieldMissingError(isKey, RequiredField.CREATED_AT, schema, streamType.toString)),
             validate(updatedAtFieldValidator(schema), getFieldMissingError(isKey, RequiredField.UPDATED_AT, schema, streamType.toString)),
-            validate(defaultFieldOfRequiredFieldValidator(schema, RequiredField.CREATED_AT, isCreatedPostCutoffDate),
+            validate(defaultFieldOfRequiredFieldValidator(schema, RequiredField.CREATED_AT, validateDefaultInRequiredField),
               RequiredSchemaValueFieldWithDefaultValueError(RequiredField.CREATED_AT, schema, streamType.toString)),
-            validate(defaultFieldOfRequiredFieldValidator(schema, RequiredField.UPDATED_AT, isCreatedPostCutoffDate),
+            validate(defaultFieldOfRequiredFieldValidator(schema, RequiredField.UPDATED_AT, validateDefaultInRequiredField),
               RequiredSchemaValueFieldWithDefaultValueError(RequiredField.UPDATED_AT, schema, streamType.toString))
           ).pure
         }
@@ -217,8 +215,6 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
 }
 
 object KeyAndValueSchemaV2Validator {
-  def make[F[_]: Sync](schemaRegistry: SchemaRegistry[F],
-                       metadataAlgebra: MetadataAlgebra[F],
-                       defaultLoopHoleCutoffDate: Instant): KeyAndValueSchemaV2Validator[F] =
-    new KeyAndValueSchemaV2Validator(schemaRegistry, metadataAlgebra, defaultLoopHoleCutoffDate)
+  def make[F[_]: Sync](schemaRegistry: SchemaRegistry[F], metadataAlgebra: MetadataAlgebra[F]): KeyAndValueSchemaV2Validator[F] =
+    new KeyAndValueSchemaV2Validator(schemaRegistry, metadataAlgebra)
 }
