@@ -57,7 +57,7 @@ final class IngestionFlowV2Spec extends AnyFlatSpec with Matchers {
     _ <- schemaRegistry.registerSchema(altSubject.getOrElse(testSubject.value) + "-value", altValueSchema.getOrElse(testValSchema))
     kafkaClient <- KafkaClientAlgebra.test[IO]
     m <- TestMetadataAlgebra()
-    _ <- if (existingTopic) TopicUtils.updateTopicMetadata(List(altSubject.getOrElse(testSubject.value).toString), m) else IO()
+    _ <- if (existingTopic) TopicUtils.updateTopicMetadata(List(altSubject.getOrElse(testSubject.value).toString), m) else IO((): Unit)
     ingestFlow <- IO(new IngestionFlowV2[IO](schemaRegistry, kafkaClient, "https://schemaRegistry.notreal", m))
     _ <- ingestFlow.ingest(request, altSubject.getOrElse(testSubject))
   } yield kafkaClient

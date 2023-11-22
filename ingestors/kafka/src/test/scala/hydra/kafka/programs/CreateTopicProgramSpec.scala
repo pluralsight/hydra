@@ -2171,7 +2171,7 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
     def createTopic(createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long], existingTopic: Boolean = false) =
       for {
         m  <- TestMetadataAlgebra()
-        _  <- if (existingTopic) TopicUtils.updateTopicMetadata(List(subject.value), m) else IO()
+        _  <- if (existingTopic) TopicUtils.updateTopicMetadata(List(subject.value), m) else IO((): Unit)
         ts <- initTestServices(metadataAlgebraOpt = Some(m))
         _  <- ts.program.createTopic(subject, createTopicMetadataRequest(createdAtDefaultValue, updatedAtDefaultValue), topicDetails, true)
       } yield ()
