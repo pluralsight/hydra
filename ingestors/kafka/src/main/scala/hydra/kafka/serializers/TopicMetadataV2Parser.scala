@@ -1,11 +1,11 @@
 package hydra.kafka.serializers
 
 import java.time.Instant
-
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import cats.data.Validated.{Invalid, Valid}
 import cats.data._
 import cats.syntax.all._
+import enumeratum.EnumEntry
 import eu.timepit.refined.auto._
 import hydra.kafka.model.ContactMethod.{Email, Slack}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
@@ -270,11 +270,26 @@ sealed trait TopicMetadataV2Parser
     
   }
 
+  class EnumEntryJsonFormat[E <: EnumEntry](values: Seq[E]) extends RootJsonFormat[E] {
+
+    override def write(obj: E): JsValue = JsString(obj.entryName)
+
+    override def read(json: JsValue): E = json match {
+      case s: JsString => values.find(v => v.entryName == s.value).getOrElse(deserializationError(s))
+      case x => deserializationError(x)
+    }
+
+    private def deserializationError(value: JsValue) = throw DeserializationException(s"Expected a value from enum $values instead of $value")
+  }
+
+  implicit val additionalValidationFormat: EnumEntryJsonFormat[AdditionalValidation] =
+    new EnumEntryJsonFormat[AdditionalValidation](Seq.empty)
+
   implicit object TopicMetadataV2Format
       extends RootJsonFormat[TopicMetadataV2Request] {
 
     override def write(obj: TopicMetadataV2Request): JsValue =
-      jsonFormat13(TopicMetadataV2Request.apply).write(obj)
+      jsonFormat14(TopicMetadataV2Request.apply).write(obj)
 
     override def read(json: JsValue): TopicMetadataV2Request = json match {
       case j: JsObject =>
@@ -401,7 +416,8 @@ sealed trait TopicMetadataV2Parser
           teamName,
           numPartitions,
           tags,
-          notificationUrl
+          notificationUrl,
+          toResult(None) // Never pick additionalValidations from the request.
           ).mapN(MetadataOnlyRequest.apply)
     }
   }

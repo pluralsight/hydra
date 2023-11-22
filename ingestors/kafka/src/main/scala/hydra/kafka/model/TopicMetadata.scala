@@ -151,7 +151,8 @@ final case class TopicMetadataV2ValueOptionalTagList(
                                          notes: Option[String],
                                          teamName: Option[String],
                                          tags: Option[List[String]],
-                                         notificationUrl: Option[String]
+                                         notificationUrl: Option[String],
+                                         additionalValidations: Option[List[AdditionalValidation]]
                                        ) {
   def toTopicMetadataV2Value: TopicMetadataV2Value = {
     TopicMetadataV2Value(
@@ -165,7 +166,8 @@ final case class TopicMetadataV2ValueOptionalTagList(
       notes,
       teamName,
       tags.getOrElse(List.empty),
-      notificationUrl
+      notificationUrl,
+      additionalValidations
     )
   }
 }
@@ -182,7 +184,8 @@ final case class TopicMetadataV2Value(
     notes: Option[String],
     teamName: Option[String],
     tags: List[String],
-    notificationUrl: Option[String]
+    notificationUrl: Option[String],
+    additionalValidations: Option[List[AdditionalValidation]]
 ) {
   def toTopicMetadataV2ValueOptionalTagList: TopicMetadataV2ValueOptionalTagList = {
     TopicMetadataV2ValueOptionalTagList(
@@ -196,7 +199,8 @@ final case class TopicMetadataV2Value(
       notes,
       teamName,
       tags.some,
-      notificationUrl
+      notificationUrl,
+      additionalValidations
     )
   }
 }
@@ -258,6 +262,22 @@ object TopicMetadataV2ValueOptionalTagList {
   private implicit val contactMethodCodec: Codec[ContactMethod] =
     Codec.derive[ContactMethod]
 
+  private implicit val additionalValidationCodec: Codec[AdditionalValidation] = Codec.deriveEnum[AdditionalValidation](
+    symbols = List(
+      SchemaAdditionalValidation.defaultInRequiredField.entryName,
+      SchemaAdditionalValidation.timestampMillis.entryName
+    ),
+    encode = {
+      case SchemaAdditionalValidation.defaultInRequiredField => SchemaAdditionalValidation.defaultInRequiredField.entryName
+      case SchemaAdditionalValidation.timestampMillis        => SchemaAdditionalValidation.timestampMillis.entryName
+    },
+    decode = {
+      case "defaultInRequiredField" => Right(SchemaAdditionalValidation.defaultInRequiredField)
+      case "timestampMillis"        => Right(SchemaAdditionalValidation.timestampMillis)
+      case other                    => Left(AvroError(s"$other is not a ${AdditionalValidation.toString}"))
+    }
+  )
+
   implicit val codec: Codec[TopicMetadataV2ValueOptionalTagList] =
   Codec.record[TopicMetadataV2ValueOptionalTagList](
     name = "TopicMetadataV2Value",
@@ -274,7 +294,8 @@ object TopicMetadataV2ValueOptionalTagList {
         field("notes", _.notes, default = Some(None)),
         field("teamName", _.teamName, default = Some(None)),
         field("tags", _.tags, default = Some(None)),
-        field("notificationUrl", _.notificationUrl, default = Some(None))
+        field("notificationUrl", _.notificationUrl, default = Some(None)),
+        field("additionalValidations", _.additionalValidations, default = Some(None))
         ).mapN(TopicMetadataV2ValueOptionalTagList.apply)
   }
 }

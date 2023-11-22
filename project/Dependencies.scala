@@ -34,6 +34,7 @@ object Dependencies {
   val scalaTestEmbeddedRedisVersion = "0.4.0"
   val scalaChillBijectionVersion = "0.10.0"
   val awsSdkVersion = "2.17.192"
+  val enumeratumVersion = "1.7.2"
 
   object Compile {
 
@@ -152,6 +153,7 @@ object Dependencies {
       "com.fasterxml.jackson.core" % "jackson-databind" % jacksonDatabindVersion
     )
 
+    val enumeratum = "com.beachape" %% "enumeratum" % enumeratumVersion
   }
 
   // oneOf test, it, main
@@ -200,7 +202,7 @@ object Dependencies {
   val integrationDeps: Seq[ModuleID] = testContainers ++ TestLibraries.getTestLibraries(module = "it")
 
   val baseDeps: Seq[ModuleID] =
-    akka ++ Seq(avro, ciris, refined) ++ cats ++ logging ++ joda ++ testDeps ++ kafkaClients ++ awsMskIamAuth
+    akka ++ Seq(avro, ciris, refined, enumeratum) ++ cats ++ logging ++ joda ++ testDeps ++ kafkaClients ++ awsMskIamAuth
 
   val avroDeps: Seq[ModuleID] =
     baseDeps ++ confluent ++ jackson ++ guavacache ++ catsEffect ++ redisCache

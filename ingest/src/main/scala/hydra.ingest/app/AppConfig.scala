@@ -74,9 +74,7 @@ object AppConfig {
       bootstrapServers: String,
       defaultNumPartions: Int,
       defaultReplicationFactor: Short,
-      defaultMinInsyncReplicas: Short,
-      timestampValidationCutoffDate: Instant,
-      defaultLoopHoleCutoffDate: Instant
+      defaultMinInsyncReplicas: Short
   )
 
   private[app] implicit val dateStringToInstantDecoder: ConfigDecoder[String, Instant] =
@@ -98,13 +96,7 @@ object AppConfig {
       env("HYDRA_KAFKA_PRODUCER_BOOTSTRAP_SERVERS").as[String],
       env("HYDRA_DEFAULT_PARTIONS").as[Int].default(10),
       env("HYDRA_REPLICATION_FACTOR").as[Short].default(3),
-      env("HYDRA_MIN_INSYNC_REPLICAS").as[Short].default(2),
-      env("TIMESTAMP_VALIDATION_CUTOFF_DATE_IN_YYYYMMDD")
-        .as[Instant]
-        .default(Instant.parse("2023-08-31T00:00:00Z")),
-      env("DEFAULT_LOOPHOLE_CUTOFF_DATE_IN_YYYYMMDD")
-        .as[Instant]
-        .default(Instant.parse("2023-08-31T00:00:00Z"))
+      env("HYDRA_MIN_INSYNC_REPLICAS").as[Short].default(2)
       ).parMapN(CreateTopicConfig)
 
   private implicit val subjectConfigDecoder: ConfigDecoder[String, Subject] =

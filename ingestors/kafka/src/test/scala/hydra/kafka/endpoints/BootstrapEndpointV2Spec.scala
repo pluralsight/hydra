@@ -63,8 +63,7 @@ final class BootstrapEndpointV2Spec
         kc,
         retryPolicy,
         Subject.createValidated("dvs.hello-world").get,
-        m,
-        Instant.parse("2023-07-05T00:00:00Z")
+        m
       ),
       TopicDetails(1, 1, 1),
       t,
@@ -135,7 +134,8 @@ final class BootstrapEndpointV2Spec
       Some("dvs-teamName"),
       None,
       List.empty,
-      Some("notificationUrl")
+      Some("notificationUrl"),
+      additionalValidations = None
     ).toJson.compactPrint
 
     val validRequestWithoutDVSTag = TopicMetadataV2Request(
@@ -151,7 +151,8 @@ final class BootstrapEndpointV2Spec
       Some("dvs-teamName"),
       None,
       List.empty,
-      Some("notificationUrl")
+      Some("notificationUrl"),
+      additionalValidations = None
     ).toJson.compactPrint
 
     val validRequestWithDVSTag = TopicMetadataV2Request(
@@ -167,7 +168,8 @@ final class BootstrapEndpointV2Spec
       Some("dvs-teamName"),
       None,
       List("DVS"),
-      Some("notificationUrl")
+      Some("notificationUrl"),
+      additionalValidations = None
     ).toJson.compactPrint
 
     "accept a valid request without a DVS tag" in {
@@ -237,7 +239,8 @@ final class BootstrapEndpointV2Spec
         None,
         None,
         List.empty,
-        Some("notificationUrl")
+        Some("notificationUrl"),
+        additionalValidations = None
       ).toJson.compactPrint
       testCreateTopicProgram
         .map { bootstrapEndpoint =>
@@ -310,7 +313,8 @@ final class BootstrapEndpointV2Spec
         Some("dvs-teamName"),
         None,
         List("DVS"),
-        Some("notificationUrl")
+        Some("notificationUrl"),
+        additionalValidations = None
       ).toJson.compactPrint
 
 
@@ -338,7 +342,8 @@ final class BootstrapEndpointV2Spec
         Some("dvs-teamName"),
         None,
         List("Source: NotValid"),
-        Some("notificationUrl")
+        Some("notificationUrl"),
+        additionalValidations = None
       ).toJson.compactPrint
 
       implicit val notificationSenderMock: InternalNotificationSender[IO] = getInternalNotificationSenderMock[IO]

@@ -65,7 +65,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
             Some("Data-Platform"),
             None,
             List.empty,
-            None
+            None,
+            additionalValidations = None
           ),
           TopicDetails(cfg.numPartitions, cfg.replicationFactor, cfg.minInsyncReplicas, Map("cleanup.policy" -> "compact"))
         )
@@ -93,7 +94,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
           Some("Data-Platform"),
           None,
           List.empty,
-          None
+          None,
+          additionalValidations = None
         ),
         TopicDetails(
           dvsConsumersTopicConfig.numPartitions,
@@ -124,7 +126,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
           Some("Data-Platform"),
           None,
           List.empty,
-          None
+          None,
+          additionalValidations = None
         ),
         TopicDetails(
           cooTopicConfig.numPartitions,
@@ -152,7 +155,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
         Some("Data-Platform"),
         None,
         List.empty,
-        None
+        None,
+        additionalValidations = None
       ),
       TopicDetails(cfg.numPartitions, cfg.replicationFactor, cfg.minInsyncReplicas, Map("cleanup.policy" -> "compact")))
   }

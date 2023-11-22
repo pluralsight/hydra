@@ -145,7 +145,8 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       Some("dvs-teamName"),
       None,
       List.empty,
-      Some("notificationUrl")
+      Some("notificationUrl"),
+      additionalValidations = None
     )
 
   private def buildSchema(topic: String, upgrade: Boolean): Schema = {

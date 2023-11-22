@@ -99,8 +99,7 @@ class TopicMetadataEndpointSpec
         kc,
         retryPolicy,
         Subject.createValidated("dvs.hello-world").get,
-        m,
-        Instant.parse("2023-07-05T00:00:00Z")
+        m
       )
   }
 
