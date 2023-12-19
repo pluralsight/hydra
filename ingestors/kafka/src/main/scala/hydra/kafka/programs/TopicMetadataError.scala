@@ -12,7 +12,7 @@ object TopicMetadataError {
                                                    supportedValues: Seq[SubDataClassification]) extends TopicMetadataError {
 
     override def message: String = {
-      val validValues = s"Valid value is ${if (supportedValues.size == 1) "'" + supportedValues.head + "'" else s"one of [${supportedValues.mkString(", ")}]"}."
+      val validValues = s"Valid value is ${if (supportedValues.size == 1) s"'${supportedValues.head}'" else s"one of [${supportedValues.mkString(", ")}]"}."
       s"'$subDataClassification' is not a valid SubDataClassification value for '$dataClassification' DataClassification. $validValues"
     }
   }
