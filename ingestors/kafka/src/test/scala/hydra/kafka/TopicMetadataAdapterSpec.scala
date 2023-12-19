@@ -24,6 +24,7 @@ class TopicMetadataAdapterSpec
       derived = false,
       deprecated = None,
       dataClassification = "public",
+      subDataClassification = Some("public"),
       contact = "alex",
       additionalDocumentation = None,
       notes = None,

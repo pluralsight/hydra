@@ -6,6 +6,7 @@ import cats.implicits._
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.algebras.TestMetadataAlgebra
 import hydra.kafka.model.ContactMethod.Email
+import hydra.kafka.model.DataClassification.Public
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import org.apache.avro.SchemaBuilder
@@ -25,6 +26,7 @@ object TopicUtils {
         deprecated = false,
         deprecatedDate = None,
         Public,
+        None,
         NonEmptyList.of(Email.create("test@test.com").get),
         Instant.now(),
         List.empty,

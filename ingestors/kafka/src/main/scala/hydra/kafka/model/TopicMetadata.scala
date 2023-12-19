@@ -2,7 +2,6 @@ package hydra.kafka.model
 
 import java.time.Instant
 import java.util.UUID
-
 import cats.data.Validated.{Invalid, Valid}
 import cats.data.{NonEmptyList, Validated}
 import cats.syntax.all._
@@ -10,6 +9,7 @@ import cats.{Applicative, ApplicativeError, Monad, MonadError}
 import fs2.kafka.Headers
 import hydra.avro.convert.{ISODateConverter, IsoDate}
 import hydra.core.marshallers._
+import hydra.kafka.model.DataClassification._
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.generic.GenericRecord
 import org.apache.avro.io.{Encoder, EncoderFactory}
@@ -31,6 +31,7 @@ case class TopicMetadata(
     derived: Boolean,
     deprecated: Option[Boolean],
     dataClassification: String,
+    subDataClassification: Option[String],
     contact: String,
     additionalDocumentation: Option[String],
     notes: Option[String],
@@ -145,6 +146,7 @@ final case class TopicMetadataV2ValueOptionalTagList(
                                          deprecated: Boolean,
                                          deprecatedDate: Option[Instant],
                                          dataClassification: DataClassification,
+                                         subDataClassification: Option[SubDataClassification],
                                          contact: NonEmptyList[ContactMethod],
                                          createdDate: Instant,
                                          parentSubjects: List[String],
@@ -160,6 +162,7 @@ final case class TopicMetadataV2ValueOptionalTagList(
       deprecated,
       deprecatedDate,
       dataClassification,
+      subDataClassification,
       contact,
       createdDate,
       parentSubjects,
@@ -178,6 +181,7 @@ final case class TopicMetadataV2Value(
     deprecated: Boolean,
     deprecatedDate: Option[Instant],
     dataClassification: DataClassification,
+    subDataClassification: Option[SubDataClassification],
     contact: NonEmptyList[ContactMethod],
     createdDate: Instant,
     parentSubjects: List[String],
@@ -193,6 +197,7 @@ final case class TopicMetadataV2Value(
       deprecated,
       deprecatedDate,
       dataClassification,
+      subDataClassification,
       contact,
       createdDate,
       parentSubjects,
@@ -227,25 +232,48 @@ object TopicMetadataV2ValueOptionalTagList {
     Codec.deriveEnum[DataClassification](
       symbols = List(
         "Public",
+        "InternalUse",
+        "Confidential",
+        "Restricted"
+      ),
+      encode = {
+        case Public       => "Public"
+        case InternalUse  => "InternalUse"
+        case Confidential => "Confidential"
+        case Restricted   => "Restricted"
+      },
+      decode = {
+        case "Public"       => Right(Public)
+        case "InternalUse"  => Right(InternalUse)
+        case "Confidential" => Right(Confidential)
+        case "Restricted"   => Right(Restricted)
+        case other          => Left(AvroError(s"$other is not a DataClassification. Valid value is one of: ${DataClassification.values}"))
+      }
+    )
+
+  implicit val subDataClassificationCodec: Codec[SubDataClassification] =
+    Codec.deriveEnum[SubDataClassification](
+      symbols = List(
+        "Public",
         "InternalUseOnly",
         "ConfidentialPII",
         "RestrictedFinancial",
         "RestrictedEmployeeData"
       ),
       encode = {
-        case Public                 => "Public"
-        case InternalUseOnly        => "InternalUseOnly"
-        case ConfidentialPII        => "ConfidentialPII"
-        case RestrictedFinancial    => "RestrictedFinancial"
-        case RestrictedEmployeeData => "RestrictedEmployeeData"
+        case SubDataClassification.Public                 => "Public"
+        case SubDataClassification.InternalUseOnly        => "InternalUseOnly"
+        case SubDataClassification.ConfidentialPII        => "ConfidentialPII"
+        case SubDataClassification.RestrictedFinancial    => "RestrictedFinancial"
+        case SubDataClassification.RestrictedEmployeeData => "RestrictedEmployeeData"
       },
       decode = {
-        case "Public"                 => Right(Public)
-        case "InternalUseOnly"        => Right(InternalUseOnly)
-        case "ConfidentialPII"        => Right(ConfidentialPII)
-        case "RestrictedFinancial"    => Right(RestrictedFinancial)
-        case "RestrictedEmployeeData" => Right(RestrictedEmployeeData)
-        case other                    => Left(AvroError(s"$other is not a DataClassification"))
+        case "Public"                 => Right(SubDataClassification.Public)
+        case "InternalUseOnly"        => Right(SubDataClassification.InternalUseOnly)
+        case "ConfidentialPII"        => Right(SubDataClassification.ConfidentialPII)
+        case "RestrictedFinancial"    => Right(SubDataClassification.RestrictedFinancial)
+        case "RestrictedEmployeeData" => Right(SubDataClassification.RestrictedEmployeeData)
+        case other                    => Left(AvroError(s"$other is not a SubDataClassification. Valid value is one of: ${SubDataClassification.values}"))
       }
     )
 
@@ -288,6 +316,7 @@ object TopicMetadataV2ValueOptionalTagList {
         field("deprecated", _.deprecated),
         field("deprecatedDate", _.deprecatedDate, default = Some(None)),
         field("dataClassification", _.dataClassification),
+        field("subDataClassification", _.subDataClassification, default = Some(None)),
         field("contact", _.contact),
         field("createdDate", _.createdDate),
         field("parentSubjects", _.parentSubjects),

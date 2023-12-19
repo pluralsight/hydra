@@ -15,6 +15,7 @@ import hydra.core.http.security.{AccessControlService, AwsSecurityService}
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
 import hydra.kafka.algebras._
 import hydra.kafka.model.ContactMethod.{Email, Slack}
+import hydra.kafka.model.DataClassification.Public
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import hydra.kafka.programs.CreateTopicProgram
@@ -127,6 +128,7 @@ final class BootstrapEndpointV2Spec
       deprecated = false,
       None,
       Public,
+      subDataClassification = None,
       NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
       Instant.now,
       List.empty,
@@ -144,6 +146,7 @@ final class BootstrapEndpointV2Spec
       deprecated = false,
       None,
       Public,
+      subDataClassification = None,
       NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
       Instant.now,
       List.empty,
@@ -161,6 +164,7 @@ final class BootstrapEndpointV2Spec
       deprecated = false,
       None,
       Public,
+      subDataClassification = None,
       NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
       Instant.now,
       List.empty,
@@ -232,6 +236,7 @@ final class BootstrapEndpointV2Spec
         deprecated = false,
         None,
         Public,
+        subDataClassification = None,
         NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
         Instant.now,
         List.empty,
@@ -306,6 +311,7 @@ final class BootstrapEndpointV2Spec
         deprecated = false,
         None,
         Public,
+        subDataClassification = None,
         NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
         Instant.now,
         List.empty,
@@ -335,6 +341,7 @@ final class BootstrapEndpointV2Spec
         deprecated = false,
         None,
         Public,
+        subDataClassification = None,
         NonEmptyList.of(Email.create("test@pluralsight.com").get, Slack.create("#dev-data-platform").get),
         Instant.now,
         List.empty,

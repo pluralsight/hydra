@@ -283,7 +283,8 @@ class TopicMetadataEndpointSpec
     val validRequest = """{
                          |    "streamType": "Event",
                          |    "deprecated": true,
-                         |    "dataClassification": "InternalUseOnly",
+                         |    "dataClassification": "InternalUse",
+                         |    "subDataClassification": "InternalUseOnly",
                          |    "contact": {
                          |        "email": "bob@myemail.com"
                          |    },
@@ -299,7 +300,8 @@ class TopicMetadataEndpointSpec
       """{
         |    "streamType": "History",
         |    "deprecated": true,
-        |    "dataClassification": "InternalUseOnly",
+        |    "dataClassification": "InternalUse",
+        |    "subDataClassification": "InternalUseOnly",
         |    "contact": {
         |        "email": "bob@myemail.com"
         |    },
@@ -313,7 +315,8 @@ class TopicMetadataEndpointSpec
     """{
        |    "streamType": "Event",
        |    "deprecated": true,
-       |    "dataClassification": "InternalUseOnly",
+       |    "dataClassification": "InternalUse",
+       |    "subDataClassification": "InternalUseOnly",
        |    "contact": {
        |        "email": "bob@myemail.com"
        |    },
@@ -323,6 +326,40 @@ class TopicMetadataEndpointSpec
        |    "teamName": "dvs-teamName",
        |    "tags": []
        |}""".stripMargin
+
+    val invalidDataClassificationRequest =
+      """{
+        |    "streamType": "Event",
+        |    "deprecated": true,
+        |    "dataClassification": "InternalUseOnly",
+        |    "subDataClassification": "InternalUseOnly",
+        |    "contact": {
+        |        "email": "bob@myemail.com"
+        |    },
+        |    "createdDate": "2020-02-02T12:34:56Z",
+        |    "notes": "here are some notes",
+        |    "parentSubjects": [],
+        |    "teamName": "dvs-teamName",
+        |    "tags": ["Source: DVS"],
+        |    "notificationUrl": "testnotification.url"
+        |}""".stripMargin
+
+    val invalidSubDataClassificationRequest =
+      """{
+        |    "streamType": "Event",
+        |    "deprecated": true,
+        |    "dataClassification": "InternalUseOnly",
+        |    "subDataClassification": "InternalUse",
+        |    "contact": {
+        |        "email": "bob@myemail.com"
+        |    },
+        |    "createdDate": "2020-02-02T12:34:56Z",
+        |    "notes": "here are some notes",
+        |    "parentSubjects": [],
+        |    "teamName": "dvs-teamName",
+        |    "tags": ["Source: DVS"],
+        |    "notificationUrl": "testnotification.url"
+        |}""".stripMargin
 
     "return 200 with proper metadata" in {
       implicit val timeout = RouteTestTimeout(5.seconds)
@@ -345,6 +382,18 @@ class TopicMetadataEndpointSpec
 
     "reject invalid metadata" in {
       Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, invalidRequest)) ~> route ~> check {
+        rejection shouldBe a[MalformedRequestContentRejection]
+      }
+    }
+
+    "reject invalid DataClassification metadata" in {
+      Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, invalidDataClassificationRequest)) ~> route ~> check {
+        rejection shouldBe a[MalformedRequestContentRejection]
+      }
+    }
+
+    "reject invalid SubDataClassification metadata" in {
+      Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, invalidSubDataClassificationRequest)) ~> route ~> check {
         rejection shouldBe a[MalformedRequestContentRejection]
       }
     }

@@ -164,6 +164,7 @@ object StreamsManagerActor {
             record.get("derived").toString.toBoolean,
             Try(Option(record.get("deprecated"))).toOption.flatten.map(_.toString.toBoolean),
             record.get("dataClassification").toString,
+            Try(Option(record.get("subDataClassification"))).toOption.flatten.map(_.toString),
             record.get("contact").toString,
             Try(Option(record.get("additionalDocumentation"))).toOption.flatten.map(_.toString),
             Try(Option(record.get("notes"))).toOption.flatten.map(_.toString),

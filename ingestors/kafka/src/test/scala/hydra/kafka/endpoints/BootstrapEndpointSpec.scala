@@ -103,7 +103,7 @@ class BootstrapEndpointSpec
 
   private val bootstrapRoute = new BootstrapEndpoint(system, streamsManagerActor, KafkaConfigUtils.kafkaSecurityEmptyConfig, schemaRegistryEmptySecurityConfig, auth, awsSecurityService).route
 
-  implicit val f = jsonFormat12(TopicMetadata)
+  implicit val f = jsonFormat13(TopicMetadata)
 
   override def beforeAll: Unit = {
     EmbeddedKafka.start()
@@ -133,6 +133,7 @@ class BootstrapEndpointSpec
            |	"streamType": "Notification",
            | "derived": false,
            |	"dataClassification": "Public",
+           |	"subDataClassification": "Public",
            |	"contact": "slackity slack dont talk back",
            |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
            |	"notes": "here are some notes topkek",
@@ -174,6 +175,7 @@ class BootstrapEndpointSpec
            |	"streamType": "Notification",
            | "derived": false,
            |	"dataClassification": "Public",
+           |	"subDataClassification": "Public",
            |	"contact": "slackity slack dont talk back",
            |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
            |	"notes": "here are some notes topkek",
@@ -216,6 +218,7 @@ class BootstrapEndpointSpec
           |	"streamType": "Notification",
           | "derived": false,
           |	"dataClassification": "Public",
+          |	"subDataClassification": "Public",
           |	"dataSourceOwner": "BARTON",
           |	"contact": "slackity slack dont talk back",
           |	"psDataLake": false,
@@ -251,6 +254,7 @@ class BootstrapEndpointSpec
           |	"streamType": "Notification",
           | "derived": false,
           |	"dataClassification": "Public",
+          |	"subDataClassification": "Public",
           |	"dataSourceOwner": "BARTON",
           |	"contact": "slackity slack dont talk back",
           |	"psDataLake": false,
@@ -284,6 +288,7 @@ class BootstrapEndpointSpec
           |	"streamType": "Notification",
           | "derived": false,
           |	"dataClassification": "Public",
+          |	"subDataClassification": "Public",
           |	"dataSourceOwner": "BARTON",
           |	"contact": "slackity slack dont talk back",
           |	"psDataLake": false,
@@ -317,6 +322,7 @@ class BootstrapEndpointSpec
           |	"streamType": "Notification",
           | "derived": false,
           |	"dataClassification": "Public",
+          |	"subDataClassification": "Public",
           |	"dataSourceOwner": "BARTON",
           |	"contact": "slackity slack dont talk back",
           |	"psDataLake": false,
@@ -381,6 +387,7 @@ class BootstrapEndpointSpec
           |	"streamType": "Notification",
           | "derived": false,
           |	"dataClassification": "Public",
+          |	"subDataClassification": "Public",
           |	"dataSourceOwner": "BARTON",
           |	"contact": "slackity slack dont talk back",
           |	"psDataLake": false,
@@ -416,6 +423,7 @@ class BootstrapEndpointSpec
           |	"streamType": "Notification",
           | "derived": false,
           |	"dataClassification": "Public",
+          |	"subDataClassification": "Public",
           |	"dataSourceOwner": "BARTON",
           |	"contact": "slackity slack dont talk back",
           |	"psDataLake": false,
