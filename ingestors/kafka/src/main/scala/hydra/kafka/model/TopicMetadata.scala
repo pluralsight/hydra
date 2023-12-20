@@ -243,11 +243,16 @@ object TopicMetadataV2ValueOptionalTagList {
         case Restricted   => "Restricted"
       },
       decode = {
-        case "Public"       => Right(Public)
-        case "InternalUse"  => Right(InternalUse)
-        case "Confidential" => Right(Confidential)
-        case "Restricted"   => Right(Restricted)
-        case other          => Left(AvroError(s"$other is not a DataClassification. Valid value is one of: ${DataClassification.values}"))
+        case "Public"                 => Right(Public)
+        case "InternalUse"            => Right(InternalUse)
+        case "Confidential"           => Right(Confidential)
+        case "Restricted"             => Right(Restricted)
+        // Below are added to uplift old Data Classification value to the corresponding policy-specific value.
+        case "InternalUseOnly"        => Right(InternalUse)
+        case "ConfidentialPII"        => Right(Confidential)
+        case "RestrictedFinancial"    => Right(Restricted)
+        case "RestrictedEmployeeData" => Right(Restricted)
+        case other                    => Left(AvroError(s"$other is not a DataClassification. Valid value is one of: ${DataClassification.values}"))
       }
     )
 
