@@ -16,7 +16,7 @@ class TopicMetadataV2Validator[F[_] : Sync] () extends Validator {
   private def validateSubDataClassification(dataClassification: DataClassification,
                                             subDataClassification: Option[SubDataClassification]): F[Unit] = {
     (subDataClassification map { sdc =>
-      val correctionRequired = validateSubDataClassificationValues(dataClassification, sdc)
+      val correctionRequired = collectValidSubDataClassificationValues(dataClassification, sdc)
       resultOf(validate(
         correctionRequired.isEmpty,
         TopicMetadataError.InvalidSubDataClassificationTypeError(dataClassification.entryName, sdc.entryName, correctionRequired)
@@ -24,7 +24,7 @@ class TopicMetadataV2Validator[F[_] : Sync] () extends Validator {
     }).getOrElse(().pure)
   }
 
-  private def validateSubDataClassificationValues(dc: DataClassification, sdc: SubDataClassification): Seq[SubDataClassification] = dc match {
+  private def collectValidSubDataClassificationValues(dc: DataClassification, sdc: SubDataClassification): Seq[SubDataClassification] = dc match {
     case Public       => if (sdc != SubDataClassification.Public) Seq(SubDataClassification.Public) else Seq.empty
     case InternalUse  => if (sdc != SubDataClassification.InternalUseOnly) Seq(SubDataClassification.InternalUseOnly) else Seq.empty
     case Confidential => if (sdc != SubDataClassification.ConfidentialPII) Seq(SubDataClassification.ConfidentialPII) else Seq.empty
