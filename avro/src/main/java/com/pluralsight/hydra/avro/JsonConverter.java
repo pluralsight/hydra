@@ -283,7 +283,10 @@ public class JsonConverter<T extends GenericRecord> {
             case STRING:
                 return value.toString();
             case ENUM:
-                boolean valid = schema.getEnumSymbols().contains(value);
+                if (name.equals("dataClassification")) {
+                    value = adaptOldDataClassificationValue(value);
+                }
+                boolean valid = schema.getEnumSymbols().contains(value.toString());
                 if (!valid)
                     throw new IllegalArgumentException(value + " is not a valid symbol. Possible values are: " +
                             schema.getEnumSymbols() + ".");
@@ -334,5 +337,27 @@ public class JsonConverter<T extends GenericRecord> {
             e.printStackTrace();
         }
         return newMap;
+    }
+
+    private String adaptOldDataClassificationValue(Object oldValue) {
+        String newValue;
+
+        switch (oldValue.toString()) {
+            case "InternalUseOnly":
+                newValue = "InternalUse";
+                break;
+            case "ConfidentialPII":
+                newValue = "Confidential";
+                break;
+            case "RestrictedFinancial":
+            case "RestrictedEmployeeData":
+                newValue = "Restricted";
+                break;
+            default:
+                newValue = oldValue.toString();
+                break;
+        }
+
+        return newValue;
     }
 }

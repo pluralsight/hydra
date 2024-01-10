@@ -261,7 +261,11 @@ sealed trait TopicMetadataV2Parser
       case x => deserializationError(x)
     }
 
-    private def deserializationError(value: JsValue) = throw DeserializationException(s"Expected a value from enum $values instead of $value")
+    private def deserializationError(value: JsValue) = {
+      val className = if (values.nonEmpty) values.head.getClass.getEnclosingClass.getSimpleName else ""
+      throw DeserializationException(
+        s"For '$className': Expected a value from enum $values instead of $value")
+    }
   }
 
   implicit val additionalValidationFormat: EnumEntryJsonFormat[AdditionalValidation] =
@@ -338,19 +342,18 @@ sealed trait TopicMetadataV2Parser
         } else {
           toResult(None)
         }
+
+        val payloadDataClassification = j.getFields("dataClassification").headOption
+        val adaptedDataClassification = adaptOldDataClassificationValue(payloadDataClassification)
         val dataClassification = toResult(
           new EnumEntryJsonFormat[DataClassification](DataClassification.values).read(
-            j.getFields("dataClassification")
-              .headOption
-              .getOrElse(
-                throwDeserializationError("dataClassification", "String")
-              )
-          )
-        )
+            adaptedDataClassification.getOrElse(throwDeserializationError("dataClassification", "String"))))
+
+        val maybeSubDataClassification = pickSubDataClassificationValue(
+          j.getFields("subDataClassification").headOption, payloadDataClassification)
         val subDataClassification = toResult(
-          j.getFields("subDataClassification").headOption map {
-            new EnumEntryJsonFormat[SubDataClassification](SubDataClassification.values).read
-          })
+          maybeSubDataClassification.map(new EnumEntryJsonFormat[SubDataClassification](SubDataClassification.values).read))
+
         val contact = toResult(
           ContactFormat.read(
             j.getFields("contact")
@@ -407,6 +410,23 @@ sealed trait TopicMetadataV2Parser
           toResult(None) // Never pick additionalValidations from the request.
           ).mapN(MetadataOnlyRequest.apply)
     }
+
+    private def adaptOldDataClassificationValue(dataClassification: Option[JsValue]): Option[JsValue] = dataClassification map {
+      case JsString("InternalUseOnly") => JsString("InternalUse")
+      case JsString("ConfidentialPII") => JsString("Confidential")
+      case JsString("RestrictedFinancial") => JsString("Restricted")
+      case JsString("RestrictedEmployeeData") => JsString("Restricted")
+      case other: JsValue => other
+    }
+
+    private def pickSubDataClassificationValue(payloadSubDataClassification: Option[JsValue],
+                                                  payloadDataClassification: Option[JsValue]): Option[JsValue] =
+      if (payloadSubDataClassification.isEmpty &&
+        payloadDataClassification.exists(dc => SubDataClassification.values.exists(_.entryName == dc.compactPrint))) {
+        payloadDataClassification
+      } else {
+        payloadSubDataClassification
+      }
   }
 
   implicit object MaybeSchemasFormat extends RootJsonFormat[MaybeSchemas] {

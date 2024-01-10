@@ -223,13 +223,13 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       dataClassificationEnumEntry.read(JsString("Restricted")) shouldBe Restricted
     }
 
-    "throw error when parsing DataClassification" in {
+    "throw error when parsing invalid DataClassification" in {
       val dataClassificationEnumEntry = new EnumEntryJsonFormat(DataClassification.values)
       val jsValue = JsString("junk")
 
       the[DeserializationException] thrownBy {
         dataClassificationEnumEntry.read(jsValue)
-      } should have message s"Expected a value from enum $values instead of $jsValue"
+      } should have message s"For 'DataClassification': Expected a value from enum $values instead of $jsValue"
     }
 
     "parse SubDataClassification enum" in {
@@ -241,13 +241,13 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       subDataClassificationEnumEntry.read(JsString("RestrictedEmployeeData")) shouldBe SubDataClassification.RestrictedEmployeeData
     }
 
-    "throw error when parsing SubDataClassification" in {
+    "throw error when parsing invalid SubDataClassification" in {
       val subDataClassificationEnumEntry = new EnumEntryJsonFormat(SubDataClassification.values)
       val jsValue = JsString("InternalUse")
 
       the[DeserializationException] thrownBy {
         subDataClassificationEnumEntry.read(jsValue)
-      } should have message s"Expected a value from enum ${SubDataClassification.values} instead of $jsValue"
+      } should have message s"For 'SubDataClassification': Expected a value from enum ${SubDataClassification.values} instead of $jsValue"
     }
 
     "parse a valid schema" in {

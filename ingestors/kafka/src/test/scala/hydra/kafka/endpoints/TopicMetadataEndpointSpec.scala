@@ -16,27 +16,25 @@ import hydra.core.http.CorsSupport
 import hydra.core.http.security.entity.AwsConfig
 import hydra.core.http.security.{AccessControlService, AwsSecurityService}
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
-import hydra.kafka.algebras.{HydraTag, KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra, TagsAlgebra}
+import hydra.kafka.algebras._
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
-import hydra.kafka.model.RequiredField
+import hydra.kafka.model.{DataClassification, RequiredField, SubDataClassification}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import org.typelevel.log4cats.SelfAwareStructuredLogger
-import org.typelevel.log4cats.slf4j.Slf4jLogger
+import hydra.kafka.programs.CreateTopicProgram
+import hydra.kafka.util.KafkaUtils.TopicDetails
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
+import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import org.apache.kafka.common.{Node, PartitionInfo}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
-
-import scala.concurrent.ExecutionContext
-import hydra.kafka.programs.CreateTopicProgram
-import hydra.kafka.util.KafkaUtils.TopicDetails
-import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
+import org.typelevel.log4cats.SelfAwareStructuredLogger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import retry.{RetryPolicies, RetryPolicy}
 
-import java.time.Instant
+import scala.concurrent.ExecutionContext
 
 
 class TopicMetadataEndpointSpec
@@ -49,11 +47,10 @@ class TopicMetadataEndpointSpec
     with ConfigSupport
     with NotificationsTestSuite {
 
+  import ConfigSupport._
   import spray.json._
 
   import scala.concurrent.duration._
-
-  import ConfigSupport._
 
   implicit private def unsafeLogger[F[_]: Sync]: SelfAwareStructuredLogger[F] =
     Slf4jLogger.getLogger[F]
@@ -327,29 +324,12 @@ class TopicMetadataEndpointSpec
        |    "tags": []
        |}""".stripMargin
 
-    val invalidDataClassificationRequest =
-      """{
+    def dataClassificationRequest(dataClassification: String = "Public", subDataClassification: Option[String] = None) =
+      s"""{
         |    "streamType": "Event",
         |    "deprecated": true,
-        |    "dataClassification": "InternalUseOnly",
-        |    "subDataClassification": "InternalUseOnly",
-        |    "contact": {
-        |        "email": "bob@myemail.com"
-        |    },
-        |    "createdDate": "2020-02-02T12:34:56Z",
-        |    "notes": "here are some notes",
-        |    "parentSubjects": [],
-        |    "teamName": "dvs-teamName",
-        |    "tags": ["Source: DVS"],
-        |    "notificationUrl": "testnotification.url"
-        |}""".stripMargin
-
-    val invalidSubDataClassificationRequest =
-      """{
-        |    "streamType": "Event",
-        |    "deprecated": true,
-        |    "dataClassification": "InternalUseOnly",
-        |    "subDataClassification": "InternalUse",
+        |    "dataClassification": "$dataClassification",
+        |    ${if (subDataClassification.isDefined) s""""subDataClassification": "${subDataClassification.get}",""" else ""}
         |    "contact": {
         |        "email": "bob@myemail.com"
         |    },
@@ -386,15 +366,42 @@ class TopicMetadataEndpointSpec
       }
     }
 
-    "reject invalid DataClassification metadata" in {
-      Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, invalidDataClassificationRequest)) ~> route ~> check {
+    "reject invalid DataClassification metadata value" in {
+      Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`,
+        dataClassificationRequest("junk"))) ~> route ~> check {
         rejection shouldBe a[MalformedRequestContentRejection]
       }
     }
 
-    "reject invalid SubDataClassification metadata" in {
-      Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, invalidSubDataClassificationRequest)) ~> route ~> check {
+    "reject invalid SubDataClassification metadata value" in {
+      Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`,
+        dataClassificationRequest(subDataClassification = Some("junk")))) ~> route ~> check {
         rejection shouldBe a[MalformedRequestContentRejection]
+      }
+    }
+
+    DataClassification.values foreach { dc =>
+      s"$dc: accept valid DataClassification value" in {
+        Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, dataClassificationRequest(dc.entryName))) ~> route ~> check {
+          response.status shouldBe StatusCodes.OK
+        }
+      }
+    }
+
+    SubDataClassification.values foreach { dc =>
+      s"$dc: accept deprecated valid DataClassification value" in {
+        Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, dataClassificationRequest(dc.entryName))) ~> route ~> check {
+          response.status shouldBe StatusCodes.OK
+        }
+      }
+    }
+
+    SubDataClassification.values foreach { value =>
+      s"$value: accept valid SubDataClassification values" in {
+        Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`,
+          dataClassificationRequest(dataClassification = value.entryName, subDataClassification = Some(value.entryName)))) ~> route ~> check {
+          response.status shouldBe StatusCodes.OK
+        }
       }
     }
   }
