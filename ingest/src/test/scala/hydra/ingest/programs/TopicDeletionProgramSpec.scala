@@ -15,6 +15,7 @@ import hydra.kafka.algebras.KafkaAdminAlgebra._
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, TestConsumerGroupsAlgebra, TestMetadataAlgebra}
 import hydra.kafka.model.ContactMethod.Email
+import hydra.kafka.model.DataClassification.Public
 import hydra.kafka.model.TopicConsumer.{TopicConsumerKey, TopicConsumerValue}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
@@ -138,6 +139,7 @@ class TopicDeletionProgramSpec extends AnyFlatSpec with Matchers {
       deprecated = deprecated,
       deprecatedDate,
       Public,
+      None,
       NonEmptyList.of(Email.create(email).get),
       createdDate,
       List.empty,

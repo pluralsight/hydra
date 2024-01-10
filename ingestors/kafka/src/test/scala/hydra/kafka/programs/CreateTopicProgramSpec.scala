@@ -32,10 +32,12 @@ import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.common.validation.ValidationError.ValidationCombinedErrors
 import hydra.kafka.IOSuite
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
+import hydra.kafka.model.DataClassification.{Confidential, InternalUse, Public, Restricted}
 
 import scala.concurrent.ExecutionContext
 import hydra.kafka.model.TopicMetadataV2Request.NumPartitions
 import hydra.kafka.programs.CreateTopicProgram.MetadataOnlyTopicDoesNotExist
+import hydra.kafka.programs.TopicMetadataError.InvalidSubDataClassificationTypeError
 import hydra.kafka.programs.TopicSchemaError._
 import hydra.kafka.utils.TopicUtils
 import org.apache.avro.SchemaBuilder.{FieldAssembler, GenericDefault}
@@ -2168,6 +2170,92 @@ class CreateTopicProgramSpec extends AsyncFreeSpec with Matchers with IOSuite {
         )).asLeft)
     }
 
+    "valid combination of DataClassification and SubDataClassification should be successful" in {
+      for {
+        ts <- Resource.eval(initTestServices())
+        _ <- ts.program.registerSchemas(subject, keySchema, valueSchema)
+        _ <- ts.program.createTopicResource(subject, topicDetails)
+        _ <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject, createDataClassificationMetadataRequest(Public)))
+        _ <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject, createDataClassificationMetadataRequest(InternalUse)))
+        _ <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject, createDataClassificationMetadataRequest(Confidential)))
+        _ <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject, createDataClassificationMetadataRequest(Restricted)))
+        _ <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject,
+          createDataClassificationMetadataRequest(Public, Some(SubDataClassification.Public))))
+        _ <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject,
+          createDataClassificationMetadataRequest(InternalUse, Some(SubDataClassification.InternalUseOnly))))
+        _ <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject,
+          createDataClassificationMetadataRequest(Confidential, Some(SubDataClassification.ConfidentialPII))))
+        _ <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject,
+          createDataClassificationMetadataRequest(Restricted, Some(SubDataClassification.RestrictedFinancial))))
+        _ <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject,
+          createDataClassificationMetadataRequest(Restricted, Some(SubDataClassification.RestrictedEmployeeData))))
+      } yield succeed
+    }
+
+    "Public DataClassification: invalid combination of SubDataClassification value should result in failure" in {
+      val result = for {
+        ts <- Resource.eval(initTestServices())
+        _ <- ts.program.registerSchemas(subject, keySchema, valueSchema)
+        _ <- ts.program.createTopicResource(subject, topicDetails)
+        _ <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject,
+          createDataClassificationMetadataRequest(Public, Some(SubDataClassification.InternalUseOnly))))
+      } yield ()
+
+      result.attempt.map(_ shouldBe InvalidSubDataClassificationTypeError(
+        Public.entryName,
+        SubDataClassification.InternalUseOnly.entryName,
+        Seq(SubDataClassification.Public)
+      ).asLeft)
+    }
+
+    "InternalUse DataClassification: invalid combination of SubDataClassification value should result in failure" in {
+      val result = for {
+        ts <- Resource.eval(initTestServices())
+        _ <- ts.program.registerSchemas(subject, keySchema, valueSchema)
+        _ <- ts.program.createTopicResource(subject, topicDetails)
+        _ <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject,
+          createDataClassificationMetadataRequest(InternalUse, Some(SubDataClassification.Public))))
+      } yield ()
+
+      result.attempt.map(_ shouldBe InvalidSubDataClassificationTypeError(
+        InternalUse.entryName,
+        SubDataClassification.Public.entryName,
+        Seq(SubDataClassification.InternalUseOnly)
+      ).asLeft)
+    }
+
+    "Confidential DataClassification: invalid combination of SubDataClassification value should result in failure" in {
+      val result = for {
+        ts <- Resource.eval(initTestServices())
+        _ <- ts.program.registerSchemas(subject, keySchema, valueSchema)
+        _ <- ts.program.createTopicResource(subject, topicDetails)
+        _ <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject,
+          createDataClassificationMetadataRequest(Confidential, Some(SubDataClassification.Public))))
+      } yield ()
+
+      result.attempt.map(_ shouldBe InvalidSubDataClassificationTypeError(
+        Confidential.entryName,
+        SubDataClassification.Public.entryName,
+        Seq(SubDataClassification.ConfidentialPII)
+      ).asLeft)
+    }
+
+    "Restricted DataClassification: invalid combination of SubDataClassification value should result in failure" in {
+      val result = for {
+        ts <- Resource.eval(initTestServices())
+        _ <- ts.program.registerSchemas(subject, keySchema, valueSchema)
+        _ <- ts.program.createTopicResource(subject, topicDetails)
+        _ <- Resource.eval(ts.program.createTopicFromMetadataOnly(subject,
+          createDataClassificationMetadataRequest(Restricted, Some(SubDataClassification.Public))))
+      } yield ()
+
+      result.attempt.map(_ shouldBe InvalidSubDataClassificationTypeError(
+        Restricted.entryName,
+        SubDataClassification.Public.entryName,
+        Seq(SubDataClassification.RestrictedFinancial, SubDataClassification.RestrictedEmployeeData)
+      ).asLeft)
+    }
+
     def createTopic(createdAtDefaultValue: Option[Long], updatedAtDefaultValue: Option[Long], existingTopic: Boolean = false) =
       for {
         m  <- TestMetadataAlgebra()
@@ -2293,6 +2381,7 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
       deprecated = deprecated,
       deprecatedDate,
       Public,
+      None,
       NonEmptyList.of(Email.create(email).get),
       createdDate,
       List.empty,
@@ -2320,6 +2409,7 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
       deprecated = deprecated,
       deprecatedDate,
       Public,
+      None,
       NonEmptyList.of(Email.create(email).get),
       createdDate,
       List.empty,
@@ -2329,6 +2419,28 @@ object CreateTopicProgramSpec extends NotificationsTestSuite {
       tags,
       Some("notification.url"),
       additionalValidations = None
+    )
+
+  def createDataClassificationMetadataRequest(
+                                               dataClassification: DataClassification,
+                                               subDataClassification: Option[SubDataClassification] = None
+                                             ): TopicMetadataV2Request =
+    TopicMetadataV2Request(
+      Schemas(keySchema, valueSchema),
+      StreamTypeV2.Entity,
+      deprecated = false,
+      None,
+      dataClassification,
+      subDataClassification,
+      NonEmptyList.of(Email.create("test@test.com").get),
+      Instant.now(),
+      List.empty,
+      None,
+      Some("dvs-teamName"),
+      None,
+      List.empty,
+      Some("notification.url"),
+      None
     )
 
   def getSchema(name: String,

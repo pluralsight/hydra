@@ -14,18 +14,6 @@ import shapeless.Witness.Lt
 
 import java.time.Instant
 
-sealed trait DataClassification
-
-case object Public extends DataClassification
-
-case object InternalUseOnly extends DataClassification
-
-case object ConfidentialPII extends DataClassification
-
-case object RestrictedFinancial extends DataClassification
-
-case object RestrictedEmployeeData extends DataClassification
-
 sealed trait ContactMethod
 
 object ContactMethod {
@@ -79,6 +67,7 @@ final case class TopicMetadataV2Request(
                                          deprecated: Boolean,
                                          deprecatedDate: Option[Instant],
                                          dataClassification: DataClassification,
+                                         subDataClassification: Option[SubDataClassification],
                                          contact: NonEmptyList[ContactMethod],
                                          createdDate: Instant,
                                          parentSubjects: List[String],
@@ -96,6 +85,7 @@ final case class TopicMetadataV2Request(
       deprecated,
       deprecatedDate,
       dataClassification,
+      subDataClassification,
       contact,
       createdDate,
       parentSubjects,
@@ -141,6 +131,7 @@ object TopicMetadataV2Request {
       mor.deprecated,
       mor.deprecatedDate,
       mor.dataClassification,
+      mor.subDataClassification,
       mor.contact,
       mor.createdDate,
       mor.parentSubjects,
@@ -164,6 +155,7 @@ final case class TopicMetadataV2Response(
                                           deprecated: Boolean,
                                           deprecatedDate: Option[Instant],
                                           dataClassification: DataClassification,
+                                          subDataClassification: Option[SubDataClassification],
                                           contact: NonEmptyList[ContactMethod],
                                           createdDate: Instant,
                                           parentSubjects: List[String],
@@ -183,6 +175,7 @@ object TopicMetadataV2Response {
       v.deprecated,
       v.deprecatedDate,
       v.dataClassification,
+      v.subDataClassification,
       v.contact,
       v.createdDate,
       v.parentSubjects,
@@ -198,6 +191,7 @@ final case class MetadataOnlyRequest(streamType: StreamTypeV2,
                                      deprecated: Boolean,
                                      deprecatedDate: Option[Instant],
                                      dataClassification: DataClassification,
+                                     subDataClassification: Option[SubDataClassification],
                                      contact: NonEmptyList[ContactMethod],
                                      createdDate: Instant,
                                      parentSubjects: List[String],

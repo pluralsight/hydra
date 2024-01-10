@@ -160,29 +160,11 @@ sealed trait TopicMetadataV2Parser
     }
   }
 
-  implicit object DataClassificationFormat
-      extends RootJsonFormat[DataClassification] {
+  implicit val dataClassificationFormat: EnumEntryJsonFormat[DataClassification] =
+    new EnumEntryJsonFormat[DataClassification](DataClassification.values)
 
-    def read(json: JsValue): DataClassification = json match {
-      case JsString("Public")                 => Public
-      case JsString("InternalUseOnly")        => InternalUseOnly
-      case JsString("ConfidentialPII")        => ConfidentialPII
-      case JsString("RestrictedFinancial")    => RestrictedFinancial
-      case JsString("RestrictedEmployeeData") => RestrictedEmployeeData
-      case _ =>
-        import scala.reflect.runtime.{universe => ru}
-        val tpe = ru.typeOf[DataClassification]
-        val knownDirectSubclasses: Set[ru.Symbol] =
-          tpe.typeSymbol.asClass.knownDirectSubclasses
-        throw DeserializationException(
-          DataClassificationInvalid(json, knownDirectSubclasses).errorMessage
-        )
-    }
-
-    def write(obj: DataClassification): JsValue = {
-      JsString(obj.toString)
-    }
-  }
+  implicit val subDataClassificationFormat: EnumEntryJsonFormat[SubDataClassification] =
+    new EnumEntryJsonFormat[SubDataClassification](SubDataClassification.values)
 
   implicit object SchemasFormat extends RootJsonFormat[Schemas] {
 
@@ -279,7 +261,11 @@ sealed trait TopicMetadataV2Parser
       case x => deserializationError(x)
     }
 
-    private def deserializationError(value: JsValue) = throw DeserializationException(s"Expected a value from enum $values instead of $value")
+    private def deserializationError(value: JsValue) = {
+      val className = values.headOption.map(_.getClass.getEnclosingClass.getSimpleName).getOrElse("")
+      throw DeserializationException(
+        s"For '$className': Expected a value from enum $values instead of $value")
+    }
   }
 
   implicit val additionalValidationFormat: EnumEntryJsonFormat[AdditionalValidation] =
@@ -289,7 +275,7 @@ sealed trait TopicMetadataV2Parser
       extends RootJsonFormat[TopicMetadataV2Request] {
 
     override def write(obj: TopicMetadataV2Request): JsValue =
-      jsonFormat14(TopicMetadataV2Request.apply).write(obj)
+      jsonFormat15(TopicMetadataV2Request.apply).write(obj)
 
     override def read(json: JsValue): TopicMetadataV2Request = json match {
       case j: JsObject =>
@@ -356,15 +342,18 @@ sealed trait TopicMetadataV2Parser
         } else {
           toResult(None)
         }
+
+        val payloadDataClassification = j.getFields("dataClassification").headOption
+        val adaptedDataClassification = adaptOldDataClassificationValue(payloadDataClassification)
         val dataClassification = toResult(
-          DataClassificationFormat.read(
-            j.getFields("dataClassification")
-              .headOption
-              .getOrElse(
-                throwDeserializationError("dataClassification", "String")
-              )
-          )
-        )
+          new EnumEntryJsonFormat[DataClassification](DataClassification.values).read(
+            adaptedDataClassification.getOrElse(throwDeserializationError("dataClassification", "String"))))
+
+        val maybeSubDataClassification = pickSubDataClassificationValue(
+          j.getFields("subDataClassification").headOption, payloadDataClassification)
+        val subDataClassification = toResult(
+          maybeSubDataClassification.map(new EnumEntryJsonFormat[SubDataClassification](SubDataClassification.values).read))
+
         val contact = toResult(
           ContactFormat.read(
             j.getFields("contact")
@@ -409,6 +398,7 @@ sealed trait TopicMetadataV2Parser
           deprecated,
           deprecatedDate,
           dataClassification,
+          subDataClassification,
           contact,
           createdDate,
           parentSubjects,
@@ -420,6 +410,23 @@ sealed trait TopicMetadataV2Parser
           toResult(None) // Never pick additionalValidations from the request.
           ).mapN(MetadataOnlyRequest.apply)
     }
+
+    private def adaptOldDataClassificationValue(dataClassification: Option[JsValue]): Option[JsValue] = dataClassification map {
+      case JsString("InternalUseOnly") => JsString("InternalUse")
+      case JsString("ConfidentialPII") => JsString("Confidential")
+      case JsString("RestrictedFinancial") => JsString("Restricted")
+      case JsString("RestrictedEmployeeData") => JsString("Restricted")
+      case other: JsValue => other
+    }
+
+    private def pickSubDataClassificationValue(payloadSubDataClassification: Option[JsValue],
+                                                  payloadDataClassification: Option[JsValue]): Option[JsValue] =
+      if (payloadSubDataClassification.isEmpty &&
+        payloadDataClassification.exists(dc => SubDataClassification.values.exists(_.entryName == dc.compactPrint))) {
+        payloadDataClassification
+      } else {
+        payloadSubDataClassification
+      }
   }
 
   implicit object MaybeSchemasFormat extends RootJsonFormat[MaybeSchemas] {
@@ -438,7 +445,7 @@ sealed trait TopicMetadataV2Parser
   implicit object TopicMetadataResponseV2Format extends RootJsonFormat[TopicMetadataV2Response] {
     override def read(json: JsValue): TopicMetadataV2Response = throw IntentionallyUnimplemented
 
-    override def write(obj: TopicMetadataV2Response): JsValue = jsonFormat13(TopicMetadataV2Response.apply).write(obj)
+    override def write(obj: TopicMetadataV2Response): JsValue = jsonFormat14(TopicMetadataV2Response.apply).write(obj)
   }
 
   private def throwDeserializationError(key: String, `type`: String) =

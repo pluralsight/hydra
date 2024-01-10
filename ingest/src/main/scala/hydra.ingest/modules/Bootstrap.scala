@@ -1,7 +1,6 @@
 package hydra.ingest.modules
 
 import java.time.Instant
-
 import cats.data.NonEmptyList
 import cats.effect.Sync
 import cats.syntax.all._
@@ -11,6 +10,7 @@ import hydra.kafka.model._
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import hydra.kafka.algebras.{HydraTag, KafkaAdminAlgebra}
+import hydra.kafka.model.DataClassification.InternalUse
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 
 final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
@@ -55,7 +55,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
             StreamTypeV2.Entity,
             deprecated = false,
             None,
-            InternalUseOnly,
+            InternalUse,
+            Some(SubDataClassification.InternalUseOnly),
             NonEmptyList.of(cfg.contactMethod),
             Instant.now,
             List.empty,
@@ -84,7 +85,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
           StreamTypeV2.Entity,
           deprecated = false,
           None,
-          InternalUseOnly,
+          InternalUse,
+          Some(SubDataClassification.InternalUseOnly),
           NonEmptyList.of(dvsConsumersTopicConfig.contactMethod),
           Instant.now,
           List.empty,
@@ -116,7 +118,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
           StreamTypeV2.Entity,
           deprecated = false,
           None,
-          InternalUseOnly,
+          InternalUse,
+          Some(SubDataClassification.InternalUseOnly),
           NonEmptyList.of(cooTopicConfig.contactMethod),
           Instant.now,
           List.empty,
@@ -147,7 +150,8 @@ final class Bootstrap[F[_]: MonadError[*[_], Throwable]] private (
         StreamTypeV2.Entity,
         deprecated = false,
         None,
-        InternalUseOnly,
+        InternalUse,
+        Some(SubDataClassification.InternalUseOnly),
         NonEmptyList.of(cooTopicConfig.contactMethod),
         Instant.now,
         List.empty,

@@ -24,7 +24,8 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
                                                                                retryPolicy: RetryPolicy[F],
                                                                                v2MetadataTopicName: Subject,
                                                                                metadataAlgebra: MetadataAlgebra[F],
-                                                                               schemaValidator: KeyAndValueSchemaV2Validator[F]
+                                                                               schemaValidator: KeyAndValueSchemaV2Validator[F],
+                                                                               metadataValidator: TopicMetadataV2Validator[F]
                                                                              ) (implicit eff: Sync[F]){
 
   private def onFailure(resourceTried: String): (Throwable, RetryDetails) => F[Unit] = {
@@ -106,6 +107,7 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
                                createTopicRequest: TopicMetadataV2Request,
                              ): F[Unit] = {
     for {
+      _ <- metadataValidator.validate(createTopicRequest)
       metadata <- metadataAlgebra.getMetadataFor(topicName)
       createdDate = metadata.map(_.value.createdDate).getOrElse(createTopicRequest.createdDate)
       deprecatedDate = metadata.map(_.value.deprecatedDate).getOrElse(createTopicRequest.deprecatedDate) match {
@@ -188,7 +190,8 @@ object CreateTopicProgram {
       retryPolicy,
       v2MetadataTopicName,
       metadataAlgebra,
-      KeyAndValueSchemaV2Validator.make(schemaRegistry, metadataAlgebra)
+      KeyAndValueSchemaV2Validator.make(schemaRegistry, metadataAlgebra),
+      new TopicMetadataV2Validator()
     )
   }
 

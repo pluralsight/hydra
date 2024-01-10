@@ -68,7 +68,7 @@ class StreamsManagerActorSpec
 
   val schema = new Schema.Parser().parse(topicMetadataJson)
 
-  implicit val format = jsonFormat12(TopicMetadata)
+  implicit val format = jsonFormat13(TopicMetadata)
 
   val formatter = ISODateTimeFormat.basicDateTimeNoMillis()
 
@@ -99,6 +99,7 @@ class StreamsManagerActorSpec
        |	"streamType": "Notification",
        | "derived": false,
        |	"dataClassification": "Public",
+       |	"subDataClassification": "Public",
        |	"contact": "slackity slack dont talk back",
        |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
        |	"notes": "here are some notes topkek",
@@ -223,6 +224,7 @@ class StreamsManagerActorSpec
          |	"streamType": "History",
          | "derived": false,
          |	"dataClassification": "Public",
+         |	"subDataClassification": "Public",
          |	"contact": "slackity slack dont talk back",
          |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
          |	"notes": "here are some notes topkek",
@@ -280,6 +282,7 @@ class StreamsManagerActorSpec
          |	"streamType": "CurrentState",
          | "derived": false,
          |	"dataClassification": "Public",
+         |	"subDataClassification": "Public",
          |	"contact": "slackity slack dont talk back",
          |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
          |	"notes": "here are some notes topkek",
@@ -318,6 +321,7 @@ class StreamsManagerActorSpec
          |	"streamType": "History",
          | "derived": false,
          |	"dataClassification": "Public",
+         |	"subDataClassification": "Public",
          |	"contact": "slackity slack dont talk back",
          |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
          |	"notes": "here are some notes topkek",
@@ -342,6 +346,7 @@ class StreamsManagerActorSpec
          |	"streamType": "History",
          | "derived": false,
          |	"dataClassification": "Public",
+         |	"subDataClassification": "Public",
          |	"contact": "slackity slack dont talk back",
          |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
          |	"notes": "here are some notes topkek",
@@ -376,6 +381,7 @@ class StreamsManagerActorSpec
                            |	"streamType": "History",
                            | "derived": false,
                            |	"dataClassification": "Public",
+                           |	"subDataClassification": "Public",
                            |	"contact": "slackity slack dont talk back",
                            |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
                            |	"notes": "here are some notes topkek",

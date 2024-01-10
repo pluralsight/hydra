@@ -10,6 +10,7 @@ import hydra.common.alerting.sender.InternalNotificationSender
 import hydra.kafka.algebras.MetadataAlgebra.TopicMetadataContainer
 import hydra.kafka.algebras.RetryableFs2Stream.RetryPolicy.Once
 import hydra.kafka.model.ContactMethod.Slack
+import hydra.kafka.model.DataClassification.Public
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import org.typelevel.log4cats.SelfAwareStructuredLogger
@@ -119,6 +120,7 @@ class MetadataAlgebraSpec extends AnyWordSpecLike with Matchers with Notificatio
         deprecated = false,
         None,
         Public,
+        None,
         NonEmptyList.one(Slack.create("#channel").get),
         Instant.now,
         List(),

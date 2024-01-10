@@ -38,8 +38,27 @@
       "type": {
         "name": "dataClassificationEnum",
         "type": "enum",
-        "symbols": ["Public", "InternalUseOnly", "ConfidentialPII", "RestrictedFinancial","RestrictedEmployeeData"]
+        "symbols": ["Public", "InternalUse", "Confidential", "Restricted"]
       }
+    },
+    {
+      "name": "subDataClassification",
+      "type": [
+        "null",
+        {
+          "type": "enum",
+          "name": "SubDataClassification",
+          "namespace": "hydra.kafka.model",
+          "symbols": [
+            "Public",
+            "InternalUseOnly",
+            "ConfidentialPII",
+            "RestrictedFinancial",
+            "RestrictedEmployeeData"
+          ]
+        }
+      ],
+      "default": null
     },
     {
       "name": "derived",

@@ -35,6 +35,7 @@ trait BootstrapEndpointTestActors[F[_]] extends BootstrapEndpointActors[F] {
           derived = false,
           None,
           "",
+          None,
           "",
           None,
           None,

@@ -16,7 +16,7 @@ import hydra.core.http.security.entity.AwsConfig
 import hydra.core.http.security.{AccessControlService, AwsSecurityService}
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
-import hydra.kafka.model.TopicMetadata
+import hydra.kafka.model.{DataClassification, SubDataClassification, TopicMetadata}
 import hydra.kafka.producer.AvroRecord
 import hydra.kafka.services.StreamsManagerActor
 import hydra.kafka.util.KafkaUtils
@@ -103,7 +103,7 @@ class BootstrapEndpointSpec
 
   private val bootstrapRoute = new BootstrapEndpoint(system, streamsManagerActor, KafkaConfigUtils.kafkaSecurityEmptyConfig, schemaRegistryEmptySecurityConfig, auth, awsSecurityService).route
 
-  implicit val f = jsonFormat12(TopicMetadata)
+  implicit val f = jsonFormat13(TopicMetadata)
 
   override def beforeAll: Unit = {
     EmbeddedKafka.start()
@@ -120,6 +120,34 @@ class BootstrapEndpointSpec
     )
   }
 
+  def dataClassificationRequest(dataClassification: String = "Public", subDataClassification: Option[String] = None): HttpEntity.Strict = HttpEntity(
+    ContentTypes.`application/json`,
+    s"""{
+      |	"streamType": "Notification",
+      | "derived": false,
+      |	"dataClassification": "$dataClassification",
+      |	${if (subDataClassification.isDefined) s""""subDataClassification": "${subDataClassification.get}",""" else ""}
+      |	"dataSourceOwner": "BARTON",
+      |	"contact": "slackity slack dont talk back",
+      |	"psDataLake": false,
+      |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
+      |	"notes": "here are some notes topkek",
+      |	"schema": {
+      |	  "namespace": "exp.assessment",
+      |	  "name": "SkillAssessmentTopicsScored",
+      |	  "type": "record",
+      |	  "version": 1,
+      |	  "fields": [
+      |	    {
+      |	      "name": "testField",
+      |	      "type": "string"
+      |	    }
+      |	  ]
+      |	},
+      | "notificationUrl": "notification.url"
+      |}""".stripMargin
+  )
+
   "The bootstrap endpoint" should {
     "list streams" in {
 
@@ -133,6 +161,7 @@ class BootstrapEndpointSpec
            |	"streamType": "Notification",
            | "derived": false,
            |	"dataClassification": "Public",
+           |	"subDataClassification": "Public",
            |	"contact": "slackity slack dont talk back",
            |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
            |	"notes": "here are some notes topkek",
@@ -174,6 +203,7 @@ class BootstrapEndpointSpec
            |	"streamType": "Notification",
            | "derived": false,
            |	"dataClassification": "Public",
+           |	"subDataClassification": "Public",
            |	"contact": "slackity slack dont talk back",
            |	"additionalDocumentation": "akka://some/path/here.jpggifyo",
            |	"notes": "here are some notes topkek",
@@ -216,6 +246,7 @@ class BootstrapEndpointSpec
           |	"streamType": "Notification",
           | "derived": false,
           |	"dataClassification": "Public",
+          |	"subDataClassification": "Public",
           |	"dataSourceOwner": "BARTON",
           |	"contact": "slackity slack dont talk back",
           |	"psDataLake": false,
@@ -251,6 +282,7 @@ class BootstrapEndpointSpec
           |	"streamType": "Notification",
           | "derived": false,
           |	"dataClassification": "Public",
+          |	"subDataClassification": "Public",
           |	"dataSourceOwner": "BARTON",
           |	"contact": "slackity slack dont talk back",
           |	"psDataLake": false,
@@ -284,6 +316,7 @@ class BootstrapEndpointSpec
           |	"streamType": "Notification",
           | "derived": false,
           |	"dataClassification": "Public",
+          |	"subDataClassification": "Public",
           |	"dataSourceOwner": "BARTON",
           |	"contact": "slackity slack dont talk back",
           |	"psDataLake": false,
@@ -317,6 +350,7 @@ class BootstrapEndpointSpec
           |	"streamType": "Notification",
           | "derived": false,
           |	"dataClassification": "Public",
+          |	"subDataClassification": "Public",
           |	"dataSourceOwner": "BARTON",
           |	"contact": "slackity slack dont talk back",
           |	"psDataLake": false,
@@ -381,6 +415,7 @@ class BootstrapEndpointSpec
           |	"streamType": "Notification",
           | "derived": false,
           |	"dataClassification": "Public",
+          |	"subDataClassification": "Public",
           |	"dataSourceOwner": "BARTON",
           |	"contact": "slackity slack dont talk back",
           |	"psDataLake": false,
@@ -416,6 +451,7 @@ class BootstrapEndpointSpec
           |	"streamType": "Notification",
           | "derived": false,
           |	"dataClassification": "Public",
+          |	"subDataClassification": "Public",
           |	"dataSourceOwner": "BARTON",
           |	"contact": "slackity slack dont talk back",
           |	"psDataLake": false,
@@ -447,6 +483,42 @@ class BootstrapEndpointSpec
           val response2 = responseAs[TopicMetadata]
           response2.createdDate shouldBe originalTopicCreationDate
         }
+      }
+    }
+
+    DataClassification.values foreach { dc =>
+      s"$dc: accept valid DataClassification value" in {
+        Post("/streams", dataClassificationRequest(dc.entryName)) ~> bootstrapRoute ~> check {
+          status shouldBe StatusCodes.OK
+        }
+      }
+    }
+
+    SubDataClassification.values foreach { dc =>
+      s"$dc: accept deprecated valid DataClassification value" in {
+        Post("/streams", dataClassificationRequest(dc.entryName)) ~> bootstrapRoute ~> check {
+          status shouldBe StatusCodes.OK
+        }
+      }
+    }
+
+    SubDataClassification.values foreach { value =>
+      s"$value: accept valid SubDataClassification values" in {
+        Post("/streams", dataClassificationRequest(value.entryName, Some(value.entryName))) ~> bootstrapRoute ~> check {
+          status shouldBe StatusCodes.OK
+        }
+      }
+    }
+
+    "reject invalid DataClassification metadata value" in {
+      Post("/streams", dataClassificationRequest("junk")) ~> bootstrapRoute ~> check {
+        status shouldBe StatusCodes.BadRequest
+      }
+    }
+
+    "reject invalid SubDataClassification metadata value" in {
+      Post("/streams", dataClassificationRequest(subDataClassification = Some("junk"))) ~> bootstrapRoute ~> check {
+        status shouldBe StatusCodes.BadRequest
       }
     }
   }

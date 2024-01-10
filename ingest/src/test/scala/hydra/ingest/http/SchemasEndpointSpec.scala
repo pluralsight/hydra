@@ -59,6 +59,7 @@ class SchemasEndpointSpec
         false,
         Some(false),
         "Public",
+        Some("Public"),
         "test_contact",
         Some("test_additionalDocumentation"),
         Some("test_notes"),
