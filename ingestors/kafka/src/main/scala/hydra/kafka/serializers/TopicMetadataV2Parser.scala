@@ -262,7 +262,7 @@ sealed trait TopicMetadataV2Parser
     }
 
     private def deserializationError(value: JsValue) = {
-      val className = if (values.nonEmpty) values.head.getClass.getEnclosingClass.getSimpleName else ""
+      val className = values.headOption.map(_.getClass.getEnclosingClass.getSimpleName).getOrElse("")
       throw DeserializationException(
         s"For '$className': Expected a value from enum $values instead of $value")
     }
