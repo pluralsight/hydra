@@ -38,7 +38,7 @@
       "type": {
         "name": "dataClassificationEnum",
         "type": "enum",
-        "symbols": ["Public", "InternalUse", "Confidential", "Restricted"]
+        "symbols": ["Public", "InternalUseOnly", "ConfidentialPII", "RestrictedFinancial", "RestrictedEmployeeData", "InternalUse", "Confidential", "Restricted"]
       }
     },
     {

@@ -16,7 +16,7 @@ import hydra.core.http.security.entity.AwsConfig
 import hydra.core.http.security.{AccessControlService, AwsSecurityService}
 import hydra.core.protocol.{Ingest, IngestorCompleted, IngestorError}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
-import hydra.kafka.model.{DataClassification, SubDataClassification, TopicMetadata}
+import hydra.kafka.model.{DataClassification, ObsoleteDataClassification, SubDataClassification, TopicMetadata}
 import hydra.kafka.producer.AvroRecord
 import hydra.kafka.services.StreamsManagerActor
 import hydra.kafka.util.KafkaUtils
@@ -487,15 +487,7 @@ class BootstrapEndpointSpec
     }
 
     DataClassification.values foreach { dc =>
-      s"$dc: accept valid DataClassification value" in {
-        Post("/streams", dataClassificationRequest(dc.entryName)) ~> bootstrapRoute ~> check {
-          status shouldBe StatusCodes.OK
-        }
-      }
-    }
-
-    SubDataClassification.values foreach { dc =>
-      s"$dc: accept deprecated valid DataClassification value" in {
+      s"$dc: accept valid as well as obsolete(enforced by backward schema evolution) DataClassification value" in {
         Post("/streams", dataClassificationRequest(dc.entryName)) ~> bootstrapRoute ~> check {
           status shouldBe StatusCodes.OK
         }
