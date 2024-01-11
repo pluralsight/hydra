@@ -381,15 +381,7 @@ class TopicMetadataEndpointSpec
     }
 
     DataClassification.values foreach { dc =>
-      s"$dc: accept valid DataClassification value" in {
-        Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, dataClassificationRequest(dc.entryName))) ~> route ~> check {
-          response.status shouldBe StatusCodes.OK
-        }
-      }
-    }
-
-    SubDataClassification.values foreach { dc =>
-      s"$dc: accept deprecated valid DataClassification value" in {
+      s"$dc: accept valid as well as obsolete(enforced by backward schema evolution) DataClassification value" in {
         Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, dataClassificationRequest(dc.entryName))) ~> route ~> check {
           response.status shouldBe StatusCodes.OK
         }

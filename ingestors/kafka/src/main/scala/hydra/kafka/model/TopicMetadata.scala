@@ -232,22 +232,34 @@ object TopicMetadataV2ValueOptionalTagList {
     Codec.deriveEnum[DataClassification](
       symbols = List(
         "Public",
+        "InternalUseOnly",
+        "ConfidentialPII",
+        "RestrictedFinancial",
+        "RestrictedEmployeeData",
         "InternalUse",
         "Confidential",
         "Restricted"
       ),
       encode = {
-        case Public       => "Public"
-        case InternalUse  => "InternalUse"
-        case Confidential => "Confidential"
-        case Restricted   => "Restricted"
+        case Public                                            => "Public"
+        case ObsoleteDataClassification.InternalUseOnly        => "InternalUseOnly"
+        case ObsoleteDataClassification.ConfidentialPII        => "ConfidentialPII"
+        case ObsoleteDataClassification.RestrictedFinancial    => "RestrictedFinancial"
+        case ObsoleteDataClassification.RestrictedEmployeeData => "RestrictedEmployeeData"
+        case InternalUse                                       => "InternalUse"
+        case Confidential                                      => "Confidential"
+        case Restricted                                        => "Restricted"
       },
       decode = {
-        case "Public"       => Right(Public)
-        case "InternalUse"  => Right(InternalUse)
-        case "Confidential" => Right(Confidential)
-        case "Restricted"   => Right(Restricted)
-        case other          => Left(AvroError(s"$other is not a DataClassification. Valid value is one of: ${DataClassification.values}"))
+        case "Public"                 => Right(Public)
+        case "InternalUseOnly"        => Right(ObsoleteDataClassification.InternalUseOnly)
+        case "ConfidentialPII"        => Right(ObsoleteDataClassification.ConfidentialPII)
+        case "RestrictedFinancial"    => Right(ObsoleteDataClassification.RestrictedFinancial)
+        case "RestrictedEmployeeData" => Right(ObsoleteDataClassification.RestrictedEmployeeData)
+        case "InternalUse"            => Right(InternalUse)
+        case "Confidential"           => Right(Confidential)
+        case "Restricted"             => Right(Restricted)
+        case other                    => Left(AvroError(s"$other is not a DataClassification. Valid value is one of: ${DataClassification.values}"))
       }
     )
 

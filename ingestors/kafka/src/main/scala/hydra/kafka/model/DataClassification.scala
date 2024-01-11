@@ -5,6 +5,17 @@ import enumeratum.{Enum, EnumEntry}
 import scala.collection.immutable
 
 sealed trait DataClassification extends EnumEntry
+sealed trait ObsoleteDataClassification extends DataClassification
+
+object ObsoleteDataClassification extends Enum[ObsoleteDataClassification]  {
+
+  case object InternalUseOnly extends ObsoleteDataClassification
+  case object ConfidentialPII extends ObsoleteDataClassification
+  case object RestrictedFinancial extends ObsoleteDataClassification
+  case object RestrictedEmployeeData extends ObsoleteDataClassification
+
+  override val values: immutable.IndexedSeq[ObsoleteDataClassification] = findValues
+}
 
 object DataClassification extends Enum[DataClassification]  {
 
@@ -13,7 +24,7 @@ object DataClassification extends Enum[DataClassification]  {
   case object Confidential extends DataClassification
   case object Restricted extends DataClassification
 
-  override val values: immutable.IndexedSeq[DataClassification] = findValues
+  override val values: immutable.IndexedSeq[DataClassification] = findValues ++ ObsoleteDataClassification.values
 }
 
 sealed trait SubDataClassification extends EnumEntry
