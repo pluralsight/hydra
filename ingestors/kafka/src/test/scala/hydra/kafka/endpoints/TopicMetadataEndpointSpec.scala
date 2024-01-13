@@ -20,7 +20,7 @@ import hydra.kafka.algebras._
 import hydra.kafka.consumer.KafkaConsumerProxy
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
-import hydra.kafka.model.{DataClassification, RequiredField, SubDataClassification}
+import hydra.kafka.model.{DataClassification, ObsoleteDataClassification, RequiredField, SubDataClassification}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.CreateTopicProgram
 import hydra.kafka.util.KafkaUtils.TopicDetails
@@ -324,7 +324,7 @@ class TopicMetadataEndpointSpec
        |    "tags": []
        |}""".stripMargin
 
-    def dataClassificationRequest(dataClassification: String = "Public", subDataClassification: Option[String] = None) =
+    def dataClassificationRequest(dataClassification: String, subDataClassification: Option[String] = None) =
       s"""{
         |    "streamType": "Event",
         |    "deprecated": true,
@@ -366,24 +366,19 @@ class TopicMetadataEndpointSpec
       }
     }
 
-    "reject invalid DataClassification metadata value" in {
-      Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`,
-        dataClassificationRequest("junk"))) ~> route ~> check {
-        rejection shouldBe a[MalformedRequestContentRejection]
-      }
-    }
-
-    "reject invalid SubDataClassification metadata value" in {
-      Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`,
-        dataClassificationRequest(subDataClassification = Some("junk")))) ~> route ~> check {
-        rejection shouldBe a[MalformedRequestContentRejection]
-      }
-    }
-
     DataClassification.values foreach { dc =>
       s"$dc: accept valid as well as obsolete(enforced by backward schema evolution) DataClassification value" in {
         Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`, dataClassificationRequest(dc.entryName))) ~> route ~> check {
           response.status shouldBe StatusCodes.OK
+        }
+      }
+
+      if (dc != DataClassification.Restricted) {
+        s"$dc: accept the request when SubDataClassification value can be derived from DataClassification ignoring user given SDC value" in {
+          Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`,
+            dataClassificationRequest(dataClassification = dc.entryName, subDataClassification = Some("junk")))) ~> route ~> check {
+            response.status shouldBe StatusCodes.OK
+          }
         }
       }
     }
@@ -394,6 +389,22 @@ class TopicMetadataEndpointSpec
           dataClassificationRequest(dataClassification = value.entryName, subDataClassification = Some(value.entryName)))) ~> route ~> check {
           response.status shouldBe StatusCodes.OK
         }
+      }
+    }
+
+    "reject invalid DataClassification metadata value" in {
+      Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`,
+        dataClassificationRequest("junk"))) ~> route ~> check {
+        rejection shouldBe a[MalformedRequestContentRejection]
+      }
+    }
+
+    "reject invalid SubDataClassification metadata value when its value cannot be derived from DataClassification" in {
+      Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`,
+        dataClassificationRequest(
+          dataClassification = DataClassification.Restricted.entryName,
+          subDataClassification = Some("junk")))) ~> route ~> check {
+        rejection shouldBe a[MalformedRequestContentRejection]
       }
     }
   }

@@ -34,6 +34,7 @@ import hydra.core.marshallers.TopicMetadataRequest
 import hydra.core.monitor.HydraMetrics.addHttpMetric
 import hydra.kafka.model.TopicMetadataAdapter
 import hydra.kafka.services.TopicBootstrapActor._
+import hydra.kafka.util.MetadataUtils
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -64,9 +65,13 @@ class BootstrapEndpoint[F[_]: Futurable](override val system:ActorSystem,
               auth.mskAuth(KafkaAction.CreateTopic) { roleName =>
                 requestEntityPresent {
                   entity(as[TopicMetadataRequest]) { topicMetadataRequest =>
-                    val topic = topicMetadataRequest.schema.getFields("namespace", "name").mkString(".").replaceAll("\"", "")
+                    val dc = topicMetadataRequest.dataClassification
+                    val transformedTopicMetadataRequest = topicMetadataRequest
+                      .updateDataClassification(MetadataUtils.oldToNewDataClassification(dc))
+                      .updateSubDataClassification(MetadataUtils.deriveSubDataClassification(dc))
+                    val topic = transformedTopicMetadataRequest.schema.getFields("namespace", "name").mkString(".").replaceAll("\"", "")
                     onComplete(
-                      bootstrapActor ? InitiateTopicBootstrap(topicMetadataRequest)
+                      bootstrapActor ? InitiateTopicBootstrap(transformedTopicMetadataRequest)
                     ) {
 
                       case Success(message) =>
