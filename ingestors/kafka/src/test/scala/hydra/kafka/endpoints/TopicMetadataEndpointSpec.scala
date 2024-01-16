@@ -373,7 +373,28 @@ class TopicMetadataEndpointSpec
         }
       }
 
-      if (dc != DataClassification.Restricted) {
+      if (dc == DataClassification.Restricted) {
+        s"$dc: accept the request when SubDataClassification value cannot be derived from DataClassification" in {
+          Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`,
+            dataClassificationRequest(dataClassification = dc.entryName))) ~> route ~> check {
+            response.status shouldBe StatusCodes.OK
+          }
+        }
+
+        s"$dc: accept the request when SubDataClassification value cannot be derived from DataClassification honoring the user given SDC value" in {
+          Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`,
+            dataClassificationRequest(dataClassification = dc.entryName, subDataClassification = Some("RestrictedEmployeeData")))) ~> route ~> check {
+            response.status shouldBe StatusCodes.OK
+          }
+        }
+
+        s"$dc: validate the user given SubDataClassification value when it cannot be derived from DataClassification" in {
+          Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`,
+            dataClassificationRequest(dataClassification = dc.entryName, subDataClassification = Some("junk")))) ~> route ~> check {
+            rejection shouldBe a[MalformedRequestContentRejection]
+          }
+        }
+      } else {
         s"$dc: accept the request when SubDataClassification value can be derived from DataClassification ignoring user given SDC value" in {
           Put("/v2/metadata/dvs.test.subject", HttpEntity(ContentTypes.`application/json`,
             dataClassificationRequest(dataClassification = dc.entryName, subDataClassification = Some("junk")))) ~> route ~> check {
