@@ -9,7 +9,6 @@ import cats.{Applicative, ApplicativeError, Monad, MonadError}
 import fs2.kafka.Headers
 import hydra.avro.convert.{ISODateConverter, IsoDate}
 import hydra.core.marshallers._
-import hydra.kafka.model.DataClassification._
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import org.apache.avro.generic.GenericRecord
 import org.apache.avro.io.{Encoder, EncoderFactory}
@@ -231,34 +230,34 @@ object TopicMetadataV2ValueOptionalTagList {
   implicit val dataClassificationCodec: Codec[DataClassification] =
     Codec.deriveEnum[DataClassification](
       symbols = List(
-        "Public",
-        "InternalUseOnly",
-        "ConfidentialPII",
-        "RestrictedFinancial",
-        "RestrictedEmployeeData",
-        "InternalUse",
-        "Confidential",
-        "Restricted"
+        DataClassification.Public.entryName,
+        DataClassification.InternalUse.entryName,
+        DataClassification.Confidential.entryName,
+        DataClassification.Restricted.entryName,
+        ObsoleteDataClassification.InternalUseOnly.entryName,
+        ObsoleteDataClassification.ConfidentialPII.entryName,
+        ObsoleteDataClassification.RestrictedEmployeeData.entryName,
+        ObsoleteDataClassification.RestrictedFinancial.entryName
       ),
       encode = {
-        case Public                                            => "Public"
-        case ObsoleteDataClassification.InternalUseOnly        => "InternalUseOnly"
-        case ObsoleteDataClassification.ConfidentialPII        => "ConfidentialPII"
-        case ObsoleteDataClassification.RestrictedFinancial    => "RestrictedFinancial"
-        case ObsoleteDataClassification.RestrictedEmployeeData => "RestrictedEmployeeData"
-        case InternalUse                                       => "InternalUse"
-        case Confidential                                      => "Confidential"
-        case Restricted                                        => "Restricted"
+        case DataClassification.Public                         => DataClassification.Public.entryName
+        case DataClassification.InternalUse                    => DataClassification.InternalUse.entryName
+        case DataClassification.Confidential                   => DataClassification.Confidential.entryName
+        case DataClassification.Restricted                     => DataClassification.Restricted.entryName
+        case ObsoleteDataClassification.InternalUseOnly        => ObsoleteDataClassification.InternalUseOnly.entryName
+        case ObsoleteDataClassification.ConfidentialPII        => ObsoleteDataClassification.ConfidentialPII.entryName
+        case ObsoleteDataClassification.RestrictedEmployeeData => ObsoleteDataClassification.RestrictedEmployeeData.entryName
+        case ObsoleteDataClassification.RestrictedFinancial    => ObsoleteDataClassification.RestrictedFinancial.entryName
       },
       decode = {
-        case "Public"                 => Right(Public)
+        case "Public"                 => Right(DataClassification.Public)
+        case "InternalUse"            => Right(DataClassification.InternalUse)
+        case "Confidential"           => Right(DataClassification.Confidential)
+        case "Restricted"             => Right(DataClassification.Restricted)
         case "InternalUseOnly"        => Right(ObsoleteDataClassification.InternalUseOnly)
         case "ConfidentialPII"        => Right(ObsoleteDataClassification.ConfidentialPII)
-        case "RestrictedFinancial"    => Right(ObsoleteDataClassification.RestrictedFinancial)
         case "RestrictedEmployeeData" => Right(ObsoleteDataClassification.RestrictedEmployeeData)
-        case "InternalUse"            => Right(InternalUse)
-        case "Confidential"           => Right(Confidential)
-        case "Restricted"             => Right(Restricted)
+        case "RestrictedFinancial"    => Right(ObsoleteDataClassification.RestrictedFinancial)
         case other                    => Left(AvroError(s"$other is not a DataClassification. Valid value is one of: ${DataClassification.values}"))
       }
     )
@@ -266,25 +265,25 @@ object TopicMetadataV2ValueOptionalTagList {
   implicit val subDataClassificationCodec: Codec[SubDataClassification] =
     Codec.deriveEnum[SubDataClassification](
       symbols = List(
-        "Public",
-        "InternalUseOnly",
-        "ConfidentialPII",
-        "RestrictedFinancial",
-        "RestrictedEmployeeData"
+        SubDataClassification.Public.entryName,
+        SubDataClassification.InternalUseOnly.entryName,
+        SubDataClassification.ConfidentialPII.entryName,
+        SubDataClassification.RestrictedEmployeeData.entryName,
+        SubDataClassification.RestrictedFinancial.entryName
       ),
       encode = {
-        case SubDataClassification.Public                 => "Public"
-        case SubDataClassification.InternalUseOnly        => "InternalUseOnly"
-        case SubDataClassification.ConfidentialPII        => "ConfidentialPII"
-        case SubDataClassification.RestrictedFinancial    => "RestrictedFinancial"
-        case SubDataClassification.RestrictedEmployeeData => "RestrictedEmployeeData"
+        case SubDataClassification.Public                 => SubDataClassification.Public.entryName
+        case SubDataClassification.InternalUseOnly        => SubDataClassification.InternalUseOnly.entryName
+        case SubDataClassification.ConfidentialPII        => SubDataClassification.ConfidentialPII.entryName
+        case SubDataClassification.RestrictedEmployeeData => SubDataClassification.RestrictedEmployeeData.entryName
+        case SubDataClassification.RestrictedFinancial    => SubDataClassification.RestrictedFinancial.entryName
       },
       decode = {
         case "Public"                 => Right(SubDataClassification.Public)
         case "InternalUseOnly"        => Right(SubDataClassification.InternalUseOnly)
         case "ConfidentialPII"        => Right(SubDataClassification.ConfidentialPII)
-        case "RestrictedFinancial"    => Right(SubDataClassification.RestrictedFinancial)
         case "RestrictedEmployeeData" => Right(SubDataClassification.RestrictedEmployeeData)
+        case "RestrictedFinancial"    => Right(SubDataClassification.RestrictedFinancial)
         case other                    => Left(AvroError(s"$other is not a SubDataClassification. Valid value is one of: ${SubDataClassification.values}"))
       }
     )
