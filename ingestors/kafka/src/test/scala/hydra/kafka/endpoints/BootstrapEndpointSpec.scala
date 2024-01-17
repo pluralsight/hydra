@@ -19,7 +19,7 @@ import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.{DataClassification, ObsoleteDataClassification, SubDataClassification, TopicMetadata}
 import hydra.kafka.producer.AvroRecord
 import hydra.kafka.services.StreamsManagerActor
-import hydra.kafka.util.KafkaUtils
+import hydra.kafka.util.{KafkaUtils, MetadataUtils}
 import io.confluent.kafka.serializers.KafkaAvroSerializer
 import net.manub.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import org.apache.avro.Schema
@@ -120,7 +120,7 @@ class BootstrapEndpointSpec
     )
   }
 
-  def dataClassificationRequest(dataClassification: String = "Public", subDataClassification: Option[String] = None): HttpEntity.Strict = HttpEntity(
+  def dataClassificationRequest(dataClassification: String, subDataClassification: Option[String] = None): HttpEntity.Strict = HttpEntity(
     ContentTypes.`application/json`,
     s"""{
       |	"streamType": "Notification",
@@ -492,6 +492,42 @@ class BootstrapEndpointSpec
           status shouldBe StatusCodes.OK
         }
       }
+
+      if (dc == DataClassification.Restricted) {
+        s"$dc: accept the request when SubDataClassification value cannot be derived from DataClassification" in {
+          Post("/streams", dataClassificationRequest(dc.entryName)) ~> bootstrapRoute ~> check {
+            status shouldBe StatusCodes.OK
+            val response = responseAs[TopicMetadata]
+            response.dataClassification shouldBe MetadataUtils.oldToNewDataClassification(dc.entryName)
+            response.subDataClassification shouldBe None
+          }
+        }
+
+        s"$dc: accept the request when SubDataClassification value cannot be derived from DataClassification honoring the user given SDC value" in {
+          Post("/streams", dataClassificationRequest(dc.entryName, Some("RestrictedEmployeeData"))) ~> bootstrapRoute ~> check {
+            status shouldBe StatusCodes.OK
+            val response = responseAs[TopicMetadata]
+            response.dataClassification shouldBe MetadataUtils.oldToNewDataClassification(dc.entryName)
+            response.subDataClassification shouldBe Some("RestrictedEmployeeData")
+          }
+        }
+
+        s"$dc: validate the user given SubDataClassification value when it cannot be derived from DataClassification" in {
+          Post("/streams", dataClassificationRequest(dc.entryName, Some("junk"))) ~> bootstrapRoute ~> check {
+            status shouldBe StatusCodes.BadRequest
+            responseAs[String] shouldBe "[\"junk is not a valid symbol. Possible values are: [Public, InternalUseOnly, ConfidentialPII, RestrictedFinancial, RestrictedEmployeeData].\"]"
+          }
+        }
+      } else {
+        s"$dc: accept the request when SubDataClassification value can be derived from DataClassification ignoring user given SDC value" in {
+          Post("/streams", dataClassificationRequest(dc.entryName, Some("junk"))) ~> bootstrapRoute ~> check {
+            status shouldBe StatusCodes.OK
+            val response = responseAs[TopicMetadata]
+            response.dataClassification shouldBe MetadataUtils.oldToNewDataClassification(dc.entryName)
+            response.subDataClassification shouldBe MetadataUtils.deriveSubDataClassification(dc.entryName)
+          }
+        }
+      }
     }
 
     SubDataClassification.values foreach { value =>
@@ -508,8 +544,11 @@ class BootstrapEndpointSpec
       }
     }
 
-    "reject invalid SubDataClassification metadata value" in {
-      Post("/streams", dataClassificationRequest(subDataClassification = Some("junk"))) ~> bootstrapRoute ~> check {
+    "reject invalid SubDataClassification metadata value when its value cannot be derived from DataClassification" in {
+      Post("/streams",
+        dataClassificationRequest(
+          dataClassification = "Restricted",
+          subDataClassification = Some("junk"))) ~> bootstrapRoute ~> check {
         status shouldBe StatusCodes.BadRequest
       }
     }

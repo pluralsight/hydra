@@ -18,7 +18,6 @@ package hydra.core.marshallers
 
 import java.io.{PrintWriter, StringWriter}
 import java.util.UUID
-
 import akka.actor.ActorPath
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.StatusCode
@@ -177,7 +176,12 @@ case class TopicMetadataRequest(
     additionalDocumentation: Option[String],
     notes: Option[String],
     notificationUrl: Option[String]
-)
+) {
+  def updateDataClassification(dc: String): TopicMetadataRequest = this.copy(dataClassification = dc)
+
+  def updateSubDataClassification(sdc: Option[String]): TopicMetadataRequest =
+    sdc.map(s => this.copy(subDataClassification = Some(s))).getOrElse(this)
+}
 
 case class GenericSchema(name: String, namespace: String) {
   def subject = s"$namespace.$name"

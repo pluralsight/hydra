@@ -338,7 +338,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         streamType,
         deprecated,
         dataClassification,
-        subDataClassification,
+        _,
         email,
         slackChannel,
         parentSubjects,
@@ -364,7 +364,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
           deprecated,
           None,
           dataClassification,
-          subDataClassification,
+          Some(SubDataClassification.Public),
           NonEmptyList(email, slackChannel :: Nil),
           tmv2.createdDate,
           parentSubjects,
@@ -384,7 +384,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
         streamType,
         _,
         dataClassification,
-        subDataClassification,
+        _,
         email,
         slackChannel,
         _,
@@ -411,7 +411,7 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
           deprecated = false,
           None,
           dataClassification,
-          subDataClassification,
+          Some(SubDataClassification.Public),
           NonEmptyList(email, slackChannel :: Nil),
           tmv2.createdDate,
           parentSubjects = List(),
@@ -422,6 +422,120 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
           None,
           additionalValidations = None
         )
+    }
+
+    ObsoleteDataClassification.values foreach { odc =>
+      val expectedDataClassification = odc match {
+        case ObsoleteDataClassification.InternalUseOnly        => DataClassification.InternalUse
+        case ObsoleteDataClassification.ConfidentialPII        => DataClassification.Confidential
+        case ObsoleteDataClassification.RestrictedFinancial    => DataClassification.Restricted
+        case ObsoleteDataClassification.RestrictedEmployeeData => DataClassification.Restricted
+        case other                                             => other
+      }
+      val expectedSubDataClassification = odc match {
+        case ObsoleteDataClassification.InternalUseOnly        => Some(SubDataClassification.InternalUseOnly)
+        case ObsoleteDataClassification.ConfidentialPII        => Some(SubDataClassification.ConfidentialPII)
+        case ObsoleteDataClassification.RestrictedFinancial    => Some(SubDataClassification.RestrictedFinancial)
+        case ObsoleteDataClassification.RestrictedEmployeeData => Some(SubDataClassification.RestrictedEmployeeData)
+        case _                                                 => None
+      }
+
+      s"$odc: Obsolete data classification value is converted to '$expectedDataClassification' with old value retained in 'SubDataClassification=$odc'" in {
+        val (
+          jsonData,
+          _,
+          streamType,
+          deprecated,
+          _,
+          _,
+          email,
+          slackChannel,
+          parentSubjects,
+          notes,
+          teamName,
+          _
+          ) =
+          createJsValueOfTopicMetadataV2Request(
+            Subject.createValidated("dvs.Foo").get,
+            "#slack_channel",
+            "email@address.com",
+            "dvs-teamName",
+            dataClassification = odc
+          )()
+        val tmv2 = TopicMetadataV2Format.read(jsonData)
+
+        tmv2 shouldBe
+          TopicMetadataV2Request(
+            Schemas(
+              new SchemaFormat(isKey = true).read(validAvroSchema),
+              new SchemaFormat(isKey = false).read(validAvroSchema)
+            ),
+            streamType,
+            deprecated,
+            None,
+            dataClassification = expectedDataClassification,
+            // Corresponding SubDataClassification value of ObsoleteDataClassification is stored.
+            subDataClassification = expectedSubDataClassification,
+            NonEmptyList(email, slackChannel :: Nil),
+            tmv2.createdDate,
+            parentSubjects,
+            notes,
+            Some(teamName),
+            None,
+            List.empty,
+            None,
+            additionalValidations = None
+          )
+      }
+
+      s"$odc: store transformed value($expectedDataClassification) is DataClassification and old value in SubDataClassification" in {
+        val (
+          jsonData,
+          _,
+          streamType,
+          deprecated,
+          _,
+          _,
+          email,
+          slackChannel,
+          parentSubjects,
+          notes,
+          teamName,
+          _
+          ) =
+          createJsValueOfTopicMetadataV2Request(
+            Subject.createValidated("dvs.Foo").get,
+            "#slack_channel",
+            "email@address.com",
+            "dvs-teamName",
+            dataClassification = odc,
+            // wrong value of subDataClassification is ignored when obsolete data classification value is passed.
+            subDataClassification = Some(SubDataClassification.Public)
+          )()
+        val tmv2 = TopicMetadataV2Format.read(jsonData)
+
+        tmv2 shouldBe
+          TopicMetadataV2Request(
+            Schemas(
+              new SchemaFormat(isKey = true).read(validAvroSchema),
+              new SchemaFormat(isKey = false).read(validAvroSchema)
+            ),
+            streamType,
+            deprecated,
+            None,
+            dataClassification = expectedDataClassification,
+            subDataClassification = expectedSubDataClassification,
+            NonEmptyList(email, slackChannel :: Nil),
+            tmv2.createdDate,
+            parentSubjects,
+            notes,
+            Some(teamName),
+            None,
+            List.empty,
+            None,
+            additionalValidations = None
+          )
+      }
     }
 
     "throw deserialization error with invalid payload" in {
@@ -456,12 +570,12 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
       email: String,
       teamName: String,
       allOptionalFieldsPresent: Boolean = true,
-      notificationUrl: Option[String] = None
+      notificationUrl: Option[String] = None,
+      dataClassification: DataClassification = Public,
+      subDataClassification: Option[SubDataClassification] = None
   )(
       streamType: StreamTypeV2 = StreamTypeV2.Entity,
       deprecated: Boolean = false,
-      dataClassification: DataClassification = Public,
-      subDataClassification: Option[SubDataClassification] = Some(SubDataClassification.Public),
       validAvroSchema: JsValue = validAvroSchema,
       parentSubjects: List[String] = List(),
       notes: Option[String] = None,
@@ -633,12 +747,12 @@ class TopicMetadataV2ParserSpec extends AnyWordSpecLike with Matchers {
           slack.channel.value,
           email.address.value,
           teamName,
-          notificationUrl = notificationUrl
+          notificationUrl = notificationUrl,
+          dataClassification = Public,
+          subDataClassification = Some(SubDataClassification.Public),
         )(
           streamType,
           deprecated,
-          dataClassification,
-          subDataClassification,
           validAvroSchema,
           parentSubjects,
           notes,

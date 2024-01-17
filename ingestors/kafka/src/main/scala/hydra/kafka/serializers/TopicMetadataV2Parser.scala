@@ -12,6 +12,7 @@ import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.model._
 import hydra.kafka.serializers.Errors._
 import hydra.kafka.serializers.TopicMetadataV2Parser.IntentionallyUnimplemented
+import hydra.kafka.util.MetadataUtils
 import org.apache.avro.Schema
 import spray.json.{DefaultJsonProtocol, DeserializationException, JsObject, JsString, JsValue, RootJsonFormat}
 
@@ -344,7 +345,7 @@ sealed trait TopicMetadataV2Parser
         }
 
         val payloadDataClassification = j.getFields("dataClassification").headOption
-        val adaptedDataClassification = adaptOldDataClassificationValue(payloadDataClassification)
+        val adaptedDataClassification = MetadataUtils.oldToNewDataClassification(payloadDataClassification)
         val dataClassification = toResult(
           new EnumEntryJsonFormat[DataClassification](DataClassification.values).read(
             adaptedDataClassification.getOrElse(throwDeserializationError("dataClassification", "String"))))
@@ -411,22 +412,9 @@ sealed trait TopicMetadataV2Parser
           ).mapN(MetadataOnlyRequest.apply)
     }
 
-    private def adaptOldDataClassificationValue(dataClassification: Option[JsValue]): Option[JsValue] = dataClassification map {
-      case JsString("InternalUseOnly") => JsString("InternalUse")
-      case JsString("ConfidentialPII") => JsString("Confidential")
-      case JsString("RestrictedFinancial") => JsString("Restricted")
-      case JsString("RestrictedEmployeeData") => JsString("Restricted")
-      case other: JsValue => other
-    }
-
     private def pickSubDataClassificationValue(payloadSubDataClassification: Option[JsValue],
                                                   payloadDataClassification: Option[JsValue]): Option[JsValue] =
-      if (payloadSubDataClassification.isEmpty &&
-        payloadDataClassification.exists(dc => SubDataClassification.values.exists(_.entryName == dc.compactPrint))) {
-        payloadDataClassification
-      } else {
-        payloadSubDataClassification
-      }
+      MetadataUtils.deriveSubDataClassification(payloadDataClassification).orElse(payloadSubDataClassification)
   }
 
   implicit object MaybeSchemasFormat extends RootJsonFormat[MaybeSchemas] {
