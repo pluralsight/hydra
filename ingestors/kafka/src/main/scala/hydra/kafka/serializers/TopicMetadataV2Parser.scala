@@ -269,8 +269,36 @@ sealed trait TopicMetadataV2Parser
     }
   }
 
+  class ListEnumEntryJsonFormat[E <: List[EnumEntry]](values: E) extends RootJsonFormat[E] {
+
+    override def write(obj: E): JsValue = JsString(obj.map(_.entryName).mkString(","))
+
+    override def read(json: JsValue): E = json match {
+      case commaSeparatedStrings: JsString => {
+        val invalidValues = commaSeparatedStrings.value.split(",").flatMap(s => values.find(v => v.entryName != s))
+        val validValues = commaSeparatedStrings.value.split(",").flatMap(s => values.find(v => v.entryName == s))
+
+        if (invalidValues.isEmpty && validValues.nonEmpty) {
+          values
+        } else {
+          deserializationListError(JsString(invalidValues.mkString(",")))
+        }
+      }
+      case x => deserializationListError(x)
+    }
+
+    private def deserializationListError(value: JsValue) = {
+      val className = values.headOption.map(_.getClass.getEnclosingClass.getSimpleName).getOrElse("")
+      throw DeserializationException(
+        s"For '$className': Expected single or comma-separated values from enum $values but received invalid $value")
+    }
+  }
+
   implicit val additionalValidationFormat: EnumEntryJsonFormat[AdditionalValidation] =
     new EnumEntryJsonFormat[AdditionalValidation](Seq.empty)
+
+  implicit val skipValidationFormat: ListEnumEntryJsonFormat[List[SkipValidation]] =
+    new ListEnumEntryJsonFormat[List[SkipValidation]](SkipValidation.values.toList)
 
   implicit object TopicMetadataV2Format
       extends RootJsonFormat[TopicMetadataV2Request] {
