@@ -4,7 +4,7 @@ import cats.effect.{Bracket, ExitCase, Resource, Sync}
 import hydra.avro.registry.SchemaRegistry
 import hydra.avro.registry.SchemaRegistry.SchemaVersion
 import hydra.kafka.algebras.{KafkaAdminAlgebra, KafkaClientAlgebra, MetadataAlgebra}
-import hydra.kafka.model.{AdditionalValidation, StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
+import hydra.kafka.model.{AdditionalValidation, SkipValidation, StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request}
 import hydra.kafka.programs.CreateTopicProgram._
 import hydra.kafka.util.KafkaUtils.TopicDetails
 import org.typelevel.log4cats.Logger
@@ -137,10 +137,11 @@ final class CreateTopicProgram[F[_]: Bracket[*[_], Throwable]: Sleep: Logger] pr
     } yield ()
 
   //todo: workaround for https://pluralsight.atlassian.net/browse/ADAPT-929, should be removed in the future
-  def createTopicFromMetadataOnly(topicName: Subject, createTopicRequest: TopicMetadataV2Request, withRequiredFields: Boolean = false): F[Unit] =
+  def createTopicFromMetadataOnly(topicName: Subject, createTopicRequest: TopicMetadataV2Request, withRequiredFields: Boolean = false,
+                                  maybeSkipValidations: Option[List[SkipValidation]] = None): F[Unit] =
     for {
       _ <- checkThatTopicExists(topicName.value)
-      _ <- schemaValidator.validate(createTopicRequest, topicName, withRequiredFields)
+      _ <- schemaValidator.validate(createTopicRequest, topicName, withRequiredFields, maybeSkipValidations)
       _ <- publishMetadata(topicName, createTopicRequest)
     } yield ()
 

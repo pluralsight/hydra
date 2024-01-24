@@ -16,7 +16,7 @@ import hydra.kafka.algebras.{MetadataAlgebra, TagsAlgebra}
 import hydra.kafka.consumer.KafkaConsumerProxy.{GetPartitionInfo, ListTopics, ListTopicsResponse, PartitionInfoResponse}
 import hydra.kafka.marshallers.HydraKafkaJsonSupport
 import hydra.kafka.model.TopicMetadataV2Request.Subject
-import hydra.kafka.model.{ContactMethod, DataClassification, MetadataOnlyRequest, Schemas, StreamTypeV2, TopicMetadataV2, TopicMetadataV2Key, TopicMetadataV2Request, TopicMetadataV2Response}
+import hydra.kafka.model.{MetadataOnlyRequest, Schemas, SkipValidation, TopicMetadataV2Request, TopicMetadataV2Response}
 import hydra.kafka.serializers.TopicMetadataV2Parser._
 import hydra.kafka.util.KafkaUtils
 import hydra.kafka.util.KafkaUtils.TopicDetails
@@ -29,7 +29,7 @@ import scala.collection.immutable.Map
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
-import akka.http.scaladsl.server.Directives.onComplete
+import akka.http.scaladsl.server.Directives.{onComplete, parameter}
 import akka.http.scaladsl.server.directives.Credentials
 import cats.data.NonEmptyList
 import hydra.avro.registry.SchemaRegistry
@@ -138,7 +138,9 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
           handleExceptions(exceptionHandler(startTime, method.value, topic)) {
             put {
               auth.mskAuth(KafkaAction.CreateTopic) { roleName =>
-                putV2Metadata(startTime, topic, roleName)
+                parameter(Symbol("skipValidations").as[List[SkipValidation]].?) { maybeSkipValidations =>
+                  putV2Metadata(startTime, topic, roleName, maybeSkipValidations)
+                }
               }
             }
           }
@@ -155,7 +157,7 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
       valueSchema.getOrElse(throw new SchemaParseException("Unable to get Value Schema, please create Value Schema in Schema Registry and try again")))
   }
 
-  private def putV2Metadata(startTime: Instant, topic: String, userRoleName: Option[RoleName]): Route = {
+  private def putV2Metadata(startTime: Instant, topic: String, userRoleName: Option[RoleName], maybeSkipValidations: Option[List[SkipValidation]]): Route = {
     extractMethod { method =>
       Subject.createValidated(topic) match {
         case Some(t) => {
@@ -179,7 +181,7 @@ class TopicMetadataEndpoint[F[_]: Futurable](consumerProxy:ActorSelection,
                       val req = TopicMetadataV2Request.fromMetadataOnlyRequest(schemas, mor)
                       onComplete(
                         Futurable[F].unsafeToFuture(createTopicProgram
-                          .createTopicFromMetadataOnly(t, req, withRequiredFields = true))
+                          .createTopicFromMetadataOnly(t, req, withRequiredFields = true, maybeSkipValidations))
                       ) {
                         case Failure(exception) => exception match {
                           case e @ (_:IncompatibleSchemaException | _:ValidationError) =>

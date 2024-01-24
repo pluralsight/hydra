@@ -1,7 +1,7 @@
 package hydra.kafka.endpoints
 
 import akka.actor.{Actor, ActorRef, ActorSelection, Props}
-import akka.http.javadsl.server.MalformedRequestContentRejection
+import akka.http.javadsl.server.{MalformedQueryParamRejection, MalformedRequestContentRejection}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
@@ -426,6 +426,23 @@ class TopicMetadataEndpointSpec
           dataClassification = DataClassification.Restricted.entryName,
           subDataClassification = Some("junk")))) ~> route ~> check {
         rejection shouldBe a[MalformedRequestContentRejection]
+      }
+    }
+
+    "reject skipValidations param with invalid values" in {
+      Put("/v2/metadata/dvs.test.subject?skipValidations=junk,moreJunk,all,emptyKeyFields",
+        HttpEntity(ContentTypes.`application/json`, validRequest)) ~> route ~> check {
+        rejection shouldBe a[MalformedQueryParamRejection]
+      }
+    }
+
+    "accept skipValidations param with valid values" in {
+      Put("/v2/metadata/dvs.test.subject?skipValidations=all,emptyKeyFields,keySchemaEvolution,valueSchemaEvolution," +
+        "requiredDocField,requiredCreatedAtField,requiredUpdatedAtField,sameFieldsTypeMismatchInKeyValueSchemas," +
+        "nullableFieldsInKeySchema,missingDefaultInNullableFieldsOfValueSchema,unsupportedLogicalTypeFieldsInKeySchema," +
+        "unsupportedLogicalTypeFieldsInValueSchema,defaultLoopholeInRequiredField",
+        HttpEntity(ContentTypes.`application/json`, validRequest)) ~> route ~> check {
+        response.status shouldBe StatusCodes.OK
       }
     }
   }

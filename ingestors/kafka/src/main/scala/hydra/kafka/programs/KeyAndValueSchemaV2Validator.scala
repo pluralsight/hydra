@@ -5,35 +5,46 @@ import cats.effect.Sync
 import cats.syntax.all._
 import hydra.avro.convert.IsoDate
 import hydra.avro.registry.SchemaRegistry
-import hydra.kafka.model.{AdditionalValidation, RequiredField, SchemaAdditionalValidation, Schemas, StreamTypeV2, TopicMetadataV2Request}
+import hydra.kafka.model.{AdditionalValidation, RequiredField, SchemaAdditionalValidation, Schemas, SkipValidation, StreamTypeV2, TopicMetadataV2Request}
 import hydra.kafka.model.TopicMetadataV2Request.Subject
 import hydra.kafka.programs.TopicSchemaError._
 import org.apache.avro.{Schema, SchemaBuilder}
 import RequiredFieldStructures._
 import hydra.common.validation.Validator
-import hydra.common.validation.Validator.ValidationChain
+import hydra.common.validation.Validator.{ValidationChain, valid}
 import hydra.kafka.algebras.MetadataAlgebra
+import hydra.kafka.model.RequiredField.RequiredField
 
 import scala.jdk.CollectionConverters.collectionAsScalaIterableConverter
 import scala.language.higherKinds
 
 class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRegistry[F],
                                                         metadataAlgebra: MetadataAlgebra[F]) extends Validator {
-  def validate(request: TopicMetadataV2Request, subject: Subject, withRequiredFields: Boolean): F[Unit] =
+
+  def validate(request: TopicMetadataV2Request, subject: Subject, withRequiredFields: Boolean,
+               maybeSkipValidations: Option[List[SkipValidation]] = None): F[Unit] = {
+
+    val skipValidations = maybeSkipValidations.getOrElse(List.empty)
+    if (skipValidations.contains(SkipValidation.all)) {
+      return ().pure
+    }
+
     for {
       metadata <- metadataAlgebra.getMetadataFor(subject)
       validateDefaultInRequiredField = AdditionalValidation.isPresent(metadata, SchemaAdditionalValidation.defaultInRequiredField)
       schemas = request.schemas
-      _ <- (schemas.key.getType, schemas.value.getType) match {
+      _ <- (Option(schemas.key).map(_.getType).getOrElse(Schema.Type.NULL), Option(schemas.value).map(_.getType).getOrElse(Schema.Type.NULL)) match {
         case (Schema.Type.RECORD, Schema.Type.RECORD) =>
-          validateRecordRecordTypeSchemas(schemas, subject, request.streamType, withRequiredFields, validateDefaultInRequiredField)
+          validateRecordRecordTypeSchemas(schemas, subject, request.streamType, withRequiredFields, validateDefaultInRequiredField, skipValidations)
         case (Schema.Type.STRING, Schema.Type.RECORD) if request.tags.contains("KSQL") =>
-          validateKSQLSchemas(schemas, subject, request.streamType)
+          validateKSQLSchemas(schemas, subject, request.streamType, skipValidations)
         case _ => resultOf(Validated.Invalid(NonEmptyChain.one(InvalidSchemaTypeError)))
       }
     } yield()
+  }
 
-  private def validateKSQLSchemas(schemas: Schemas, subject: Subject, streamType: StreamTypeV2): F[Unit] = {
+  private def validateKSQLSchemas(schemas: Schemas, subject: Subject, streamType: StreamTypeV2,
+                                  skipValidations: List[SkipValidation]): F[Unit] = {
     val concoctedKeyFields = SchemaBuilder
       .record("uselessRecord") //This is a useless record whose only purpose is to transform the string key into a list of fields.
       .fields()
@@ -44,13 +55,21 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
       .endRecord().getFields.asScala.toList
 
     val valueFields = schemas.value.getFields.asScala.toList
+
+    val doKeySchemaEvolutionValidation = !skipValidations.contains(SkipValidation.keySchemaEvolution)
+    val doValueSchemaEvolutionValidation = !skipValidations.contains(SkipValidation.valueSchemaEvolution)
+    val doSameFieldsTypeMismatchInKeyValueSchemasValidation = !skipValidations.contains(SkipValidation.sameFieldsTypeMismatchInKeyValueSchemas)
+    val doMissingDefaultInNullableFieldsOfValueSchemaValidation = !skipValidations.contains(SkipValidation.missingDefaultInNullableFieldsOfValueSchema)
+    val doUnsupportedLogicalTypeFieldsInKeySchemaValidation = !skipValidations.contains(SkipValidation.unsupportedLogicalTypeFieldsInKeySchema)
+    val doUnsupportedLogicalTypeFieldsInValueSchemaValidation = !skipValidations.contains(SkipValidation.unsupportedLogicalTypeFieldsInValueSchema)
+
     val validators = for {
-        keySchemaEvolutionValidationResult         <- validateKeySchemaEvolution(schemas, subject)
-        valueSchemaEvolutionValidationResult       <- validateValueSchemaEvolution(schemas, subject)
-        defaultNullableValueFieldsValidationResult <- checkForDefaultNullableValueFields(valueFields, streamType)
-        unsupportedLogicalTypesKey                 <- checkForUnsupportedLogicalType(concoctedKeyFields)
-        unsupportedLogicalTypesValues              <- checkForUnsupportedLogicalType(valueFields)
-        mismatchesValidationResult                 <- checkForMismatches(concoctedKeyFields, valueFields)
+        keySchemaEvolutionValidationResult         <- validateKeySchemaEvolution(schemas, subject, doKeySchemaEvolutionValidation)
+        valueSchemaEvolutionValidationResult       <- validateValueSchemaEvolution(schemas, subject, doValueSchemaEvolutionValidation)
+        defaultNullableValueFieldsValidationResult <- checkForDefaultNullableValueFields(valueFields, doMissingDefaultInNullableFieldsOfValueSchemaValidation)
+        unsupportedLogicalTypesKey                 <- checkForUnsupportedLogicalType(concoctedKeyFields, doUnsupportedLogicalTypeFieldsInKeySchemaValidation)
+        unsupportedLogicalTypesValues              <- checkForUnsupportedLogicalType(valueFields, doUnsupportedLogicalTypeFieldsInValueSchemaValidation)
+        mismatchesValidationResult                 <- checkForMismatches(concoctedKeyFields, valueFields, doSameFieldsTypeMismatchInKeyValueSchemasValidation)
       } yield {
         keySchemaEvolutionValidationResult ++
           valueSchemaEvolutionValidationResult ++
@@ -67,23 +86,39 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
                                               subject: Subject,
                                               streamType: StreamTypeV2,
                                               withRequiredFields: Boolean,
-                                              validateDefaultInRequiredField: Boolean): F[Unit] = {
+                                              validateDefaultInRequiredField: Boolean,
+                                              skipValidations: List[SkipValidation]): F[Unit] = {
     val keyFields   = schemas.key.getFields.asScala.toList
     val valueFields = schemas.value.getFields.asScala.toList
 
+    val doEmptyKeyFieldsValidation = !skipValidations.contains(SkipValidation.emptyKeyFields)
+    val doKeySchemaEvolutionValidation = !skipValidations.contains(SkipValidation.keySchemaEvolution)
+    val doValueSchemaEvolutionValidation = !skipValidations.contains(SkipValidation.valueSchemaEvolution)
+    val doSameFieldsTypeMismatchInKeyValueSchemasValidation = !skipValidations.contains(SkipValidation.sameFieldsTypeMismatchInKeyValueSchemas)
+    val doNullableFieldsInKeySchemaValidation = !skipValidations.contains(SkipValidation.nullableFieldsInKeySchema)
+    val doMissingDefaultInNullableFieldsOfValueSchemaValidation = !skipValidations.contains(SkipValidation.missingDefaultInNullableFieldsOfValueSchema)
+    val doUnsupportedLogicalTypeFieldsInKeySchemaValidation = !skipValidations.contains(SkipValidation.unsupportedLogicalTypeFieldsInKeySchema)
+    val doUnsupportedLogicalTypeFieldsInValueSchemaValidation = !skipValidations.contains(SkipValidation.unsupportedLogicalTypeFieldsInValueSchema)
+
     val validators = for {
-      keyFieldsValidationResult                  <- validateKeyFields(keyFields)
-      keySchemaEvolutionValidationResult         <- validateKeySchemaEvolution(schemas, subject)
-      valueSchemaEvolutionValidationResult       <- validateValueSchemaEvolution(schemas, subject)
-      validateRequiredKeyFieldsResult            <-
-        if (withRequiredFields) validateRequiredKeyFields(schemas.key, streamType, validateDefaultInRequiredField) else Nil.pure
-      validateRequiredValueFieldsResult          <-
-        if (withRequiredFields) validateRequiredValueFields(schemas.value, streamType, validateDefaultInRequiredField) else Nil.pure
-      mismatchesValidationResult                 <- checkForMismatches(keyFields, valueFields)
-      nullableKeyFieldsValidationResult          <- checkForNullableKeyFields(keyFields, streamType)
-      defaultNullableValueFieldsValidationResult <- checkForDefaultNullableValueFields(valueFields, streamType)
-      unsupportedLogicalTypesKey                 <- checkForUnsupportedLogicalType(keyFields)
-      unsupportedLogicalTypesValues              <- checkForUnsupportedLogicalType(valueFields)
+      keyFieldsValidationResult                  <- validateKeyFields(keyFields, doEmptyKeyFieldsValidation)
+      keySchemaEvolutionValidationResult         <- validateKeySchemaEvolution(schemas, subject, doKeySchemaEvolutionValidation)
+      valueSchemaEvolutionValidationResult       <- validateValueSchemaEvolution(schemas, subject, doValueSchemaEvolutionValidation)
+      validateRequiredKeyFieldsResult            <- if (withRequiredFields) {
+          validateRequiredKeyFields(schemas.key, streamType, validateDefaultInRequiredField, skipValidations)
+        } else {
+          Nil.pure
+        }
+      validateRequiredValueFieldsResult          <- if (withRequiredFields) {
+          validateRequiredValueFields(schemas.value, streamType, validateDefaultInRequiredField, skipValidations)
+        } else {
+          Nil.pure
+        }
+      mismatchesValidationResult                 <- checkForMismatches(keyFields, valueFields, doSameFieldsTypeMismatchInKeyValueSchemasValidation)
+      nullableKeyFieldsValidationResult          <- checkForNullableKeyFields(keyFields, streamType, doNullableFieldsInKeySchemaValidation)
+      defaultNullableValueFieldsValidationResult <- checkForDefaultNullableValueFields(valueFields, doMissingDefaultInNullableFieldsOfValueSchemaValidation)
+      unsupportedLogicalTypesKey                 <- checkForUnsupportedLogicalType(keyFields, doUnsupportedLogicalTypeFieldsInKeySchemaValidation)
+      unsupportedLogicalTypesValues              <- checkForUnsupportedLogicalType(valueFields, doUnsupportedLogicalTypeFieldsInValueSchemaValidation)
     } yield {
         (keyFieldsValidationResult +: keySchemaEvolutionValidationResult) ++
         valueSchemaEvolutionValidationResult ++
@@ -99,19 +134,36 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
     resultOf(validators)
   }
 
-  private def checkForUnsupportedLogicalType(fields: List[Schema.Field]): F[List[ValidationChain]] =
-    fields.map { field =>
-      validate(!getLogicalType(field.schema()).contains(IsoDate.IsoDateLogicalTypeName), UnsupportedLogicalType(field, getLogicalType(field.schema()).getOrElse("")))
-    }.pure
+  private def checkForUnsupportedLogicalType(fields: List[Schema.Field], doValidation: Boolean): F[List[ValidationChain]] =
+    if (doValidation) {
+      fields.map { field =>
+        validate(!getLogicalType(field.schema()).contains(IsoDate.IsoDateLogicalTypeName),
+          UnsupportedLogicalType(field, getLogicalType(field.schema()).getOrElse("")))
+      }.pure
+    } else {
+      List(valid).pure
+    }
 
-  private def validateKeyFields(keyFields: List[Schema.Field]): F[ValidationChain] =
-    validate(keyFields.nonEmpty, TopicSchemaError.KeyIsEmptyError).pure
+  private def validateKeyFields(keyFields: List[Schema.Field], doValidation: Boolean): F[ValidationChain] =
+    if (doValidation) {
+      validate(keyFields.nonEmpty, TopicSchemaError.KeyIsEmptyError).pure
+    } else {
+      valid.pure
+    }
 
-  private def validateKeySchemaEvolution(schemas: Schemas, subject: Subject): F[List[ValidationChain]] =
-    validateSchemaEvolution(schemas, subject + "-key")
+  private def validateKeySchemaEvolution(schemas: Schemas, subject: Subject, doValidation: Boolean): F[List[ValidationChain]] =
+    if (doValidation) {
+      validateSchemaEvolution(schemas, subject + "-key")
+    } else {
+      List(valid).pure
+    }
 
-  private def validateValueSchemaEvolution(schemas: Schemas, subject: Subject): F[List[ValidationChain]] =
-    validateSchemaEvolution(schemas, subject + "-value")
+  private def validateValueSchemaEvolution(schemas: Schemas, subject: Subject, doValidation: Boolean): F[List[ValidationChain]] =
+    if (doValidation) {
+      validateSchemaEvolution(schemas, subject + "-value")
+    } else {
+      List(valid).pure
+    }
 
   private def validateSchemaEvolution(schemas: Schemas, subject: String): F[List[ValidationChain]] =
     schemaRegistry.getLatestSchemaBySubject(subject).map {
@@ -121,31 +173,62 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
       case _ => List(Validator.valid)
     }
 
-  private def validateRequiredKeyFields(keySchema: Schema, streamType: StreamTypeV2, validateDefaultInRequiredField: Boolean): F[List[ValidationChain]] =
-    validateRequiredFields(isKey = true, keySchema, streamType, validateDefaultInRequiredField)
+  private def validateRequiredKeyFields(keySchema: Schema, streamType: StreamTypeV2, validateDefaultInRequiredField: Boolean,
+                                        skipValidations: List[SkipValidation]): F[List[ValidationChain]] =
+    validateRequiredFields(isKey = true, keySchema, streamType, validateDefaultInRequiredField, skipValidations)
 
-  private def validateRequiredValueFields(valueSchema: Schema, streamType: StreamTypeV2, validateDefaultInRequiredField: Boolean): F[List[ValidationChain]] =
-    validateRequiredFields(isKey = false, valueSchema, streamType, validateDefaultInRequiredField)
+  private def validateRequiredValueFields(valueSchema: Schema, streamType: StreamTypeV2, validateDefaultInRequiredField: Boolean,
+                                          skipValidations: List[SkipValidation]): F[List[ValidationChain]] =
+    validateRequiredFields(isKey = false, valueSchema, streamType, validateDefaultInRequiredField, skipValidations)
 
   private def validateRequiredFields(isKey: Boolean, schema: Schema, streamType: StreamTypeV2,
-                                     validateDefaultInRequiredField: Boolean): F[List[ValidationChain]] =
+                                     validateDefaultInRequiredField: Boolean, skipValidations: List[SkipValidation]): F[List[ValidationChain]] = {
+    val doRequiredDocFieldValidation = !skipValidations.contains(SkipValidation.requiredDocField)
+    val doRequiredCreatedAtFieldValidation = !skipValidations.contains(SkipValidation.requiredCreatedAtField)
+    val doRequiredUpdatedAtFieldValidation = !skipValidations.contains(SkipValidation.requiredUpdatedAtField)
+    val doDefaultLoopholeInRequiredFieldValidation = !skipValidations.contains(SkipValidation.defaultLoopholeInRequiredField)
+
     streamType match {
       case (StreamTypeV2.Entity | StreamTypeV2.Event) =>
         if (isKey) {
-          List(validate(docFieldValidator(schema), getFieldMissingError(isKey, RequiredField.DOC, schema, streamType.toString))).pure
+          List(validateRequiredField(doRequiredDocFieldValidation, RequiredField.DOC, isKey, schema, streamType.toString)).pure
         } else {
           List(
-            validate(docFieldValidator(schema), getFieldMissingError(isKey, RequiredField.DOC, schema, streamType.toString)),
-            validate(createdAtFieldValidator(schema), getFieldMissingError(isKey, RequiredField.CREATED_AT, schema, streamType.toString)),
-            validate(updatedAtFieldValidator(schema), getFieldMissingError(isKey, RequiredField.UPDATED_AT, schema, streamType.toString)),
-            validate(defaultFieldOfRequiredFieldValidator(schema, RequiredField.CREATED_AT, validateDefaultInRequiredField),
-              RequiredSchemaValueFieldWithDefaultValueError(RequiredField.CREATED_AT, schema, streamType.toString)),
-            validate(defaultFieldOfRequiredFieldValidator(schema, RequiredField.UPDATED_AT, validateDefaultInRequiredField),
-              RequiredSchemaValueFieldWithDefaultValueError(RequiredField.UPDATED_AT, schema, streamType.toString))
+            validateRequiredField(doRequiredDocFieldValidation, RequiredField.DOC, isKey, schema, streamType.toString),
+            validateRequiredField(doRequiredCreatedAtFieldValidation, RequiredField.CREATED_AT, isKey, schema, streamType.toString),
+            validateRequiredField(doRequiredUpdatedAtFieldValidation, RequiredField.UPDATED_AT, isKey, schema, streamType.toString),
+            validateDefaultFieldInRequiredField(validateDefaultInRequiredField && doDefaultLoopholeInRequiredFieldValidation,
+              RequiredField.CREATED_AT, schema, streamType.toString),
+            validateDefaultFieldInRequiredField(validateDefaultInRequiredField && doDefaultLoopholeInRequiredFieldValidation,
+              RequiredField.UPDATED_AT, schema, streamType.toString)
           ).pure
         }
       case _ =>
-        List(validate(docFieldValidator(schema), getFieldMissingError(isKey, RequiredField.DOC, schema, streamType.toString))).pure
+        List(validateRequiredField(doRequiredDocFieldValidation, RequiredField.DOC, isKey, schema, streamType.toString)).pure
+    }
+  }
+
+  private def validateRequiredField(doValidation: Boolean, requiredField: RequiredField, isKey: Boolean, schema: Schema, streamType: String): ValidationChain =
+    if (doValidation) {
+      val result = requiredField match {
+        case RequiredField.DOC         => docFieldValidator(schema)
+        case RequiredField.CREATED_AT  => createdAtFieldValidator(schema)
+        case RequiredField.UPDATED_AT  => updatedAtFieldValidator(schema)
+      }
+      validate(result, getFieldMissingError(isKey, requiredField, schema, streamType))
+    } else {
+      valid
+    }
+
+  private def validateDefaultFieldInRequiredField(doValidation: Boolean,
+                                                  requiredField: RequiredField,
+                                                  schema: Schema,
+                                                  streamType: String): ValidationChain =
+    if (doValidation) {
+      validate(defaultFieldOfRequiredFieldValidator(schema, requiredField),
+        RequiredSchemaValueFieldWithDefaultValueError(requiredField, schema, streamType))
+    } else {
+      valid
     }
 
   private def checkForIllegalLogicalTypeEvolutions(existingSchema: Schema, newSchema: Schema, fieldName: String): List[ValidationChain] = {
@@ -180,7 +263,8 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
     Option(schema.getLogicalType)
       .fold(Option(schema.getProp("logicalType")))(_.getName.some)
 
-  private def checkForNullableKeyFields(keyFields: List[Schema.Field], streamType: StreamTypeV2): F[List[ValidationChain]] = {
+  private def checkForNullableKeyFields(keyFields: List[Schema.Field], streamType: StreamTypeV2,
+                                        doValidation: Boolean): F[List[ValidationChain]] = {
     def fieldIsNotNull(field: Schema.Field): Boolean =
       field.schema().getType match {
         case Schema.Type.UNION if field.schema.getTypes.asScala.toList.exists(_.isNullable) => false
@@ -188,30 +272,43 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
         case _                                                                              => true
       }
 
-    keyFields.map(field =>
-      validate(streamType == StreamTypeV2.Event || fieldIsNotNull(field), KeyHasNullableFieldError(field.name(), field.schema()))
-    ).pure
+    if (doValidation) {
+      keyFields.map(field =>
+        validate(streamType == StreamTypeV2.Event || fieldIsNotNull(field), KeyHasNullableFieldError(field.name(), field.schema()))
+      ).pure
+    } else {
+      List(valid).pure
+    }
   }
 
-  private def checkForDefaultNullableValueFields(valueFields: List[Schema.Field], streamType: StreamTypeV2): F[List[ValidationChain]] = {
+  private def checkForDefaultNullableValueFields(valueFields: List[Schema.Field], doValidation: Boolean): F[List[ValidationChain]] = {
     def validateIfFieldIsNullable(field: Schema.Field): Boolean =
       field.schema().getType match {
         case Schema.Type.UNION if field.schema().getTypes.asScala.toList.exists(_.isNullable) && Option(field.defaultVal()).isEmpty => false
         case _ => true
       }
 
-    valueFields.map(field =>
-      validate(validateIfFieldIsNullable(field), NullableFieldWithoutDefaultValueError(field.name(), field.schema()))
-    ).pure
+    if (doValidation) {
+      valueFields.map(field =>
+        validate(validateIfFieldIsNullable(field), NullableFieldWithoutDefaultValueError(field.name(), field.schema()))
+      ).pure
+    } else {
+      List(valid).pure
+    }
   }
 
-  private def checkForMismatches(keyFields: List[Schema.Field], valueFields: List[Schema.Field]): F[List[ValidationChain]] =
-    keyFields.flatMap { keyField =>
-      valueFields.map { valueField =>
-        validate(keyField.name() != valueField.name() || keyField.schema().equals(valueField.schema()),
-          IncompatibleKeyAndValueFieldNamesError(keyField.name(), keyField.schema(), valueField.schema()))
-      }
-    }.pure
+  private def checkForMismatches(keyFields: List[Schema.Field], valueFields: List[Schema.Field],
+                                 doValidation: Boolean): F[List[ValidationChain]] =
+    if (doValidation) {
+      keyFields.flatMap { keyField =>
+        valueFields.map { valueField =>
+          validate(keyField.name() != valueField.name() || keyField.schema().equals(valueField.schema()),
+            IncompatibleKeyAndValueFieldNamesError(keyField.name(), keyField.schema(), valueField.schema()))
+        }
+      }.pure
+    } else {
+      List(valid).pure
+    }
 }
 
 object KeyAndValueSchemaV2Validator {
