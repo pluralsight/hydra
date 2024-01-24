@@ -29,12 +29,12 @@ object SkipValidation extends Enum[SkipValidation] {
   implicit val skipValidationUnmarshaller: Unmarshaller[String, List[SkipValidation]] =
     Unmarshaller.strict[String, List[SkipValidation]] { commaSeparatedValidations =>
       val stringValues = values.map(_.entryName)
-      val invalidValues = commaSeparatedValidations.split(",").filterNot(s => stringValues.contains(s) )
+      val invalidValues = commaSeparatedValidations.split(",").filterNot(s => stringValues.contains(s.trim))
       val validValues = commaSeparatedValidations.split(",").flatMap(s => values.find(v => v.entryName == s.trim)).toList
 
       if (invalidValues.nonEmpty) {
         throw DeserializationException(
-          s"Expected single or comma-separated values from enum[${values.mkString(", ")}] but received invalid value(s): ${invalidValues.mkString(",")}")
+          s"Expected a single or comma-separated values from enum[${values.mkString(", ")}] but received invalid value(s): [${invalidValues.mkString(",")}]")
       }
 
       validValues
