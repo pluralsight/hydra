@@ -474,6 +474,44 @@ class SkipValidationSpec extends AsyncFreeSpec with IOSuite {
       resultWithSkipValidation.attempt.map(_ shouldBe ().asRight)
     }
 
+    "skip validation: default loophole in a required field" in {
+      val schemaWithDefaultLoophole =
+        """
+          |{
+          |  "type": "record",
+          |  "name": "test",
+          |  "fields": [
+          |    {
+          |      "name": "createdAt",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      },
+          |      "doc": "text",
+          |      "default": 0
+          |    },
+          |    {
+          |      "name": "updatedAt",
+          |      "type":{
+          |        "type": "long",
+          |        "logicalType":"timestamp-millis"
+          |      },
+          |      "doc": "text"
+          |    }
+          |  ]
+          |}
+        """.stripMargin
+
+      val schema = new Schema.Parser().parse(schemaWithDefaultLoophole)
+
+      val result = createTopicMetadataV2Request(valueSchema = schema)
+      result.attempt.map(_ shouldBe RequiredSchemaValueFieldWithDefaultValueError("createdAt", schema, "Entity").asLeft)
+
+      val resultWithSkipValidation = createTopicMetadataV2Request(valueSchema = schema,
+        skipValidations = Some(List(SkipValidation.defaultLoopholeInRequiredField)))
+      resultWithSkipValidation.attempt.map(_ shouldBe ().asRight)
+    }
+
     "skip multiple validations: all" in {
       val valueSchemaString =
         """

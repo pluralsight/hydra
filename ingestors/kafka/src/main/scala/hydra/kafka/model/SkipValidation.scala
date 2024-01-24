@@ -22,6 +22,7 @@ object SkipValidation extends Enum[SkipValidation] {
   case object missingDefaultInNullableFieldsOfValueSchema extends SkipValidation
   case object unsupportedLogicalTypeFieldsInKeySchema extends SkipValidation
   case object unsupportedLogicalTypeFieldsInValueSchema extends SkipValidation
+  case object defaultLoopholeInRequiredField extends SkipValidation
 
   override val values: immutable.IndexedSeq[SkipValidation] = findValues
 

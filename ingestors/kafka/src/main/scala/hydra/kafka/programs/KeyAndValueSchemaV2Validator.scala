@@ -186,6 +186,7 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
     val doRequiredDocFieldValidation = !skipValidations.contains(SkipValidation.requiredDocField)
     val doRequiredCreatedAtFieldValidation = !skipValidations.contains(SkipValidation.requiredCreatedAtField)
     val doRequiredUpdatedAtFieldValidation = !skipValidations.contains(SkipValidation.requiredUpdatedAtField)
+    val doDefaultLoopholeInRequiredFieldValidation = !skipValidations.contains(SkipValidation.defaultLoopholeInRequiredField)
 
     streamType match {
       case (StreamTypeV2.Entity | StreamTypeV2.Event) =>
@@ -196,10 +197,10 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
             validateRequiredField(doRequiredDocFieldValidation, RequiredField.DOC, isKey, schema, streamType.toString),
             validateRequiredField(doRequiredCreatedAtFieldValidation, RequiredField.CREATED_AT, isKey, schema, streamType.toString),
             validateRequiredField(doRequiredUpdatedAtFieldValidation, RequiredField.UPDATED_AT, isKey, schema, streamType.toString),
-            validateDefaultFieldInRequiredField(doRequiredCreatedAtFieldValidation, RequiredField.CREATED_AT,
-              validateDefaultInRequiredField, schema, streamType.toString),
-            validateDefaultFieldInRequiredField(doRequiredUpdatedAtFieldValidation, RequiredField.UPDATED_AT,
-              validateDefaultInRequiredField, schema, streamType.toString)
+            validateDefaultFieldInRequiredField(validateDefaultInRequiredField && doDefaultLoopholeInRequiredFieldValidation,
+              RequiredField.CREATED_AT, schema, streamType.toString),
+            validateDefaultFieldInRequiredField(validateDefaultInRequiredField && doDefaultLoopholeInRequiredFieldValidation,
+              RequiredField.UPDATED_AT, schema, streamType.toString)
           ).pure
         }
       case _ =>
@@ -221,11 +222,10 @@ class KeyAndValueSchemaV2Validator[F[_]: Sync] private (schemaRegistry: SchemaRe
 
   private def validateDefaultFieldInRequiredField(doValidation: Boolean,
                                                   requiredField: RequiredField,
-                                                  validateDefaultInRequiredField: Boolean,
                                                   schema: Schema,
                                                   streamType: String): ValidationChain =
     if (doValidation) {
-      validate(defaultFieldOfRequiredFieldValidator(schema, requiredField, validateDefaultInRequiredField),
+      validate(defaultFieldOfRequiredFieldValidator(schema, requiredField),
         RequiredSchemaValueFieldWithDefaultValueError(requiredField, schema, streamType))
     } else {
       valid
