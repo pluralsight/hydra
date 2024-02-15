@@ -1,0 +1,20 @@
+apiVersion: pluralsight/v1
+kind: BC
+metadata:
+  name: adapt-dvs
+spec:
+  lifecycle: production
+  owner: exp_adapt_dvs
+  responsibilities:
+    - Shared component for hydra
+  systems:
+    - adapt-dvs
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: adapt-dvs
+  tags: []
+spec:
+  lifecycle: production
+  owner: exp_adapt_dvs
